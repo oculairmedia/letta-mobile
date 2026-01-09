@@ -50,7 +50,7 @@ export type AppMessage =
   | AppToolReturnMessage
   | AppReasoningMessage
 
-export type LettaMessageUnion = Letta.LettaMessageContentUnion
+export type LettaMessageUnion = Letta.LettaMessageUnion
 
 export enum MESSAGE_TYPE {
   SYSTEM_MESSAGE = "system_message",

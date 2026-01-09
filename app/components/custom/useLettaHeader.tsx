@@ -1,7 +1,5 @@
-import { useIsDeveloper } from "@/hooks/is-developer"
 import { getAgentsQueryKey } from "@/hooks/use-agents"
-import { navigate, type RouteName } from "@/navigators"
-import { useLettaClient } from "@/providers/LettaProvider"
+import type { RouteName } from "@/navigators"
 import { useHeader } from "@/utils/useHeader"
 import { useNavigation, useRoute } from "@react-navigation/native"
 import { useQueryClient } from "@tanstack/react-query"
@@ -75,21 +73,26 @@ export function useLettaHeader(headerProps: HeaderProps = {}, deps: any[] = defa
   const navigation = useNavigation()
   const route = useRoute()
   const queryClient = useQueryClient()
-  const { resetConfig } = useLettaClient()
-
-  const isDeveloper = useIsDeveloper()
 
   const routeProps: RouteProps = useMemo(() => {
     const routeName = route.name as RouteName
     switch (routeName) {
+      case "Templates":
+        return createHeaderProps({
+          leftProps: {
+            leftIcon: "back" satisfies IconTypes,
+            onLeftPress: () => navigation.goBack(),
+          },
+          rightProps: {},
+          titleProps: {
+            title: "Templates",
+          },
+        })
       case "AgentList":
         return createHeaderProps({
           leftProps: {
-            leftIcon: "x" satisfies IconTypes,
-            onLeftPress: () => {
-              resetConfig()
-              queryClient.clear()
-            },
+            leftIcon: "settings" satisfies IconTypes,
+            onLeftPress: () => navigation.navigate("ConfigList" as never),
           },
           rightProps: {
             rightIcon: "RotateCw" satisfies IconTypes,
@@ -135,17 +138,36 @@ export function useLettaHeader(headerProps: HeaderProps = {}, deps: any[] = defa
             title: "Studio",
           },
         })
+      case "Developer":
+        // check if can go back
+        const canGoBack = navigation.canGoBack()
+        return createHeaderProps({
+          leftProps: {
+            leftIcon: canGoBack ? ("back" satisfies IconTypes) : undefined,
+            onLeftPress: canGoBack ? () => navigation.goBack() : undefined,
+          },
+          rightProps: {},
+          titleProps: {},
+        })
+      case "ConfigList":
+        return createHeaderProps({
+          leftProps: {
+            leftIcon: "back" satisfies IconTypes,
+            onLeftPress: () => navigation.goBack(),
+          },
+          rightProps: {
+            rightIcon: "Plus" satisfies IconTypes,
+            onRightPress: () => navigation.navigate("Developer" as never),
+          },
+          titleProps: { title: "Providers" },
+        })
       case "Welcome":
         return createHeaderProps({
           leftProps: {},
-          rightProps: isDeveloper
-            ? {
-                rightIcon: "settings" satisfies IconTypes,
-                onRightPress: () => navigate("Developer"),
-              }
-            : {},
+          rightProps: {},
           titleProps: {},
         })
+
       default:
         return createHeaderProps({
           leftProps: {
@@ -156,7 +178,7 @@ export function useLettaHeader(headerProps: HeaderProps = {}, deps: any[] = defa
           titleProps: {},
         })
     }
-  }, [navigation, queryClient, resetConfig, route.name, isDeveloper])
+  }, [navigation, queryClient, route.name])
 
   useHeader(
     mergeHeaderProps(

@@ -1,88 +1,72 @@
 import { Screen, Text } from "@/components"
-
 import { LettaConfigsForm } from "@/components/custom/forms/letta-config"
 import { ThemeToggle } from "@/components/custom/theme-toggle"
 import { useLettaHeader } from "@/components/custom/useLettaHeader"
-import { isRTL } from "@/i18n"
+import { useLettaConfigStore } from "@/stores/lettaConfigStore"
 import { $styles, type ThemedStyle } from "@/theme"
 import { useAppTheme } from "@/utils/useAppTheme"
-import { observer } from "mobx-react-lite"
-import { FC } from "react"
-import { Image, ImageStyle, TextStyle, View, ViewStyle } from "react-native"
-import { useSafeAreaInsets } from "react-native-safe-area-context"
+import { FC, useState } from "react"
+import { TextStyle, View, ViewStyle } from "react-native"
 import { AppStackScreenProps } from "../navigators"
 
-const welcomeFace = require("../../assets/images/welcome-face.png")
+interface DeveloperScreenProps extends AppStackScreenProps<"Developer" | "Welcome"> {}
 
-interface DeveloperScreenProps extends AppStackScreenProps<"Developer"> {}
-
-export const DeveloperScreen: FC<DeveloperScreenProps> = observer(function DeveloperScreen(_props) {
-  const { themed, theme } = useAppTheme()
+export const DeveloperScreen: FC<DeveloperScreenProps> = () => {
+  const { themed } = useAppTheme()
+  const { setConfig } = useLettaConfigStore()
+  const [isPending, setIsPending] = useState(false)
 
   useLettaHeader()
 
-  const { bottom } = useSafeAreaInsets()
+  const handleSubmit = async (config: {
+    id?: string
+    mode: "cloud" | "selfhosted"
+    serverUrl?: string
+    accessToken: string
+  }) => {
+    try {
+      setIsPending(true)
+      const result = setConfig(config)
+      console.log("Configuration saved:", result)
+    } catch (error) {
+      console.error("Failed to save configuration:", error)
+    } finally {
+      setIsPending(false)
+    }
+  }
 
   return (
     <Screen preset="fixed" contentContainerStyle={$styles.flex1}>
-      <View style={themed($topContainer)}>
+      <View style={themed($container)}>
         <Text
           testID="developer-heading"
-          style={themed($welcomeHeading)}
+          style={themed($heading)}
           tx="developerScreen:title"
           preset="heading"
         />
         <Text tx="developerScreen:description" preset="subheading" />
         <ThemeToggle />
 
-        <Image
-          style={$welcomeFace}
-          source={welcomeFace}
-          resizeMode="contain"
-          tintColor={theme.colors.text}
-        />
-      </View>
-
-      <View style={[themed([$bottomContainer]), { paddingBottom: bottom }]}>
         <Text
           testID="config-heading"
           tx="developerScreen:serverDetails"
           preset="formLabel"
           style={themed($subheading)}
         />
-        <LettaConfigsForm />
+        <LettaConfigsForm onSubmit={handleSubmit} isPending={isPending} />
       </View>
     </Screen>
   )
-})
-
-const $topContainer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexShrink: 1,
-  flexGrow: 0,
-  justifyContent: "center",
-  paddingHorizontal: spacing.lg,
-})
-
-const $bottomContainer: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  flexShrink: 1,
-  flexGrow: 0.5,
-  borderTopLeftRadius: spacing.sheetRadius,
-  borderTopRightRadius: spacing.sheetRadius,
-  paddingHorizontal: spacing.lg,
-  justifyContent: "flex-end",
-  paddingTop: spacing.md,
-})
-
-const $welcomeFace: ImageStyle = {
-  height: 169,
-  width: 269,
-  position: "absolute",
-  bottom: -47,
-  right: -80,
-  transform: [{ scaleX: isRTL ? -1 : 1 }],
 }
 
-const $welcomeHeading: ThemedStyle<TextStyle> = ({ spacing }) => ({
+const $container: ThemedStyle<ViewStyle> = ({ spacing }) => ({
+  flex: 1,
+  paddingHorizontal: spacing.lg,
+  paddingTop: spacing.lg,
+  paddingBottom: spacing.lg,
+})
+
+const $heading: ThemedStyle<TextStyle> = ({ spacing }) => ({
   marginBottom: spacing.md,
 })
 

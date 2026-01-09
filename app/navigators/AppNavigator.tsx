@@ -4,14 +4,16 @@
  * Generally speaking, it will contain an auth flow (registration, login, forgot password)
  * and a "main" flow which the user will use once logged in.
  */
-import { useStores } from "@/models"
+
 import * as Screens from "@/screens"
 import { ThemeContexts } from "@/theme"
 import { useAppTheme, useThemeProvider } from "@/utils/useAppTheme"
 import { NavigationContainer, NavigatorScreenParams } from "@react-navigation/native"
 import { createNativeStackNavigator, NativeStackScreenProps } from "@react-navigation/native-stack"
-import { observer } from "mobx-react-lite"
-import { ComponentProps } from "react"
+
+import { useAppSettingsStore } from "@/stores/appSettingsStore"
+import { useLettaConfigStore } from "@/stores/lettaConfigStore"
+import { ComponentProps, useMemo } from "react"
 import Config from "../config"
 import { AgentDrawerNavigator, AgentDrawerParamList } from "./AgentDrawerNavigator"
 import { navigationRef, useBackButtonHandler } from "./navigationUtilities"
@@ -20,7 +22,7 @@ import { navigationRef, useBackButtonHandler } from "./navigationUtilities"
  * as well as what properties (if any) they might take when navigating to them.
  *
  * If no params are allowed, pass through `undefined`. Generally speaking, we
- * recommend using your MobX-State-Tree store(s) to keep application state
+ * recommend using your Zustand store(s) to keep application state
  * rather than passing state through navigation params.
  *
  * For more information, see this documentation:
@@ -37,8 +39,10 @@ export type AppStackParamList = {
   AgentList: undefined
   AgentDrawer: NavigatorScreenParams<AgentDrawerParamList>
   Studio: undefined
+  Templates: undefined
   MCP: undefined
   EditAgent: { agentId: string }
+  ConfigList: undefined
   // IGNITE_GENERATOR_ANCHOR_APP_STACK_PARAM_LIST
 }
 
@@ -56,52 +60,50 @@ export type AppStackScreenProps<T extends keyof AppStackParamList> = NativeStack
 // Documentation: https://reactnavigation.org/docs/stack-navigator/
 const Stack = createNativeStackNavigator<AppStackParamList>()
 
-const AppStack = observer(function AppStack() {
-  const {
-    lettaConfigStore: { isConfigured },
-  } = useStores()
+const AppStack = () => {
+  const { configs } = useLettaConfigStore()
 
   const {
     theme: { colors },
   } = useAppTheme()
+
+  const canAccess = useMemo(() => configs.length > 0, [configs])
 
   return (
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
         navigationBarColor: colors.background,
-        contentStyle: {
-          backgroundColor: colors.background,
-        },
+        contentStyle: { backgroundColor: colors.background },
       }}
-      initialRouteName={isConfigured ? "AgentList" : "Welcome"}
+      initialRouteName="AgentList"
     >
-      {isConfigured ? (
+      {canAccess ? (
         <Stack.Group>
           <Stack.Screen name="AgentList" component={Screens.AgentListScreen} />
+          <Stack.Screen name="Developer" component={Screens.DeveloperScreen} />
           <Stack.Screen name="AgentDrawer" component={AgentDrawerNavigator} />
           <Stack.Screen name="Studio" component={Screens.StudioScreen} />
+          <Stack.Screen name="Templates" component={Screens.TemplatesScreen} />
           <Stack.Screen name="MCP" component={Screens.MCPScreen} />
           <Stack.Screen name="EditAgent" component={Screens.EditAgentScreen} />
+          <Stack.Screen name="ConfigList" component={Screens.ConfigListScreen} />
           {/* IGNITE_GENERATOR_ANCHOR_APP_STACK_SCREENS */}
           {/** 🔥 Your screens go here */}
         </Stack.Group>
       ) : (
         <Stack.Group>
           <Stack.Screen name="Welcome" component={Screens.WelcomeScreen} />
-          <Stack.Screen name="Developer" component={Screens.DeveloperScreen} />
         </Stack.Group>
       )}
     </Stack.Navigator>
   )
-})
+}
 
 export interface NavigationProps extends Partial<ComponentProps<typeof NavigationContainer>> {}
 
-export const AppNavigator = observer(function AppNavigator(props: NavigationProps) {
-  const {
-    appSettingsStore: { appTheme, setAppTheme },
-  } = useStores()
+export const AppNavigator = (props: NavigationProps) => {
+  const { appTheme, setAppTheme } = useAppSettingsStore()
   const { themeScheme, navigationTheme, setThemeContextOverride, ThemeProvider } = useThemeProvider(
     appTheme as ThemeContexts,
   )
@@ -123,4 +125,4 @@ export const AppNavigator = observer(function AppNavigator(props: NavigationProp
       </NavigationContainer>
     </ThemeProvider>
   )
-})
+}

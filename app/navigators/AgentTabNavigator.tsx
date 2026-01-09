@@ -5,12 +5,12 @@ import type { ThemedStyle } from "@/theme"
 import { useAppTheme } from "@/utils/useAppTheme"
 import { BottomTabScreenProps, createBottomTabNavigator } from "@react-navigation/bottom-tabs"
 import { CompositeScreenProps } from "@react-navigation/native"
-import { observer } from "mobx-react-lite"
 import { TextStyle, ViewStyle } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Icon } from "../components"
 import { AppStackParamList, AppStackScreenProps } from "./AppNavigator"
 import { useResetAgentTab } from "./useResetAgentTab"
+import { FC } from "react"
 
 export type AgentTabParamList = {
   Chat: undefined
@@ -31,14 +31,11 @@ export type AgentTabScreenProps<T extends keyof AgentTabParamList> = CompositeSc
 
 const Tab = createBottomTabNavigator<AgentTabParamList>()
 
-/**
- * This is the main navigator for the Letta screens with a bottom tab bar.
- * Each tab is a stack navigator with its own set of screens.
- *
- * More info: https://reactnavigation.org/docs/bottom-tab-navigator/
- * @returns {JSX.Element} The rendered `AgentTabNavigator`.
- */
-export const AgentTabNavigator = observer(function AgentTabNavigator() {
+type AgentTabNavigatorProps = {
+  initialRouteName?: keyof AgentTabParamList
+}
+
+export const AgentTabNavigator: FC<AgentTabNavigatorProps> = ({ initialRouteName = "Chat" }) => {
   const { bottom } = useSafeAreaInsets()
   const {
     themed,
@@ -47,7 +44,7 @@ export const AgentTabNavigator = observer(function AgentTabNavigator() {
   useResetAgentTab()
   return (
     <Tab.Navigator
-      initialRouteName="Chat"
+      initialRouteName={initialRouteName as keyof AgentTabParamList}
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
@@ -105,7 +102,7 @@ export const AgentTabNavigator = observer(function AgentTabNavigator() {
       />
     </Tab.Navigator>
   )
-})
+}
 
 const $tabBar: ThemedStyle<ViewStyle> = ({ colors }) => ({
   backgroundColor: colors.background,

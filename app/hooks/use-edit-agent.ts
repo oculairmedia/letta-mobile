@@ -4,19 +4,17 @@ import { Letta } from "@letta-ai/letta-client"
 import { useMutation, UseMutationOptions, useQueryClient } from "@tanstack/react-query"
 import { getUseAgentStateKey } from "./use-agent"
 import { getAgentsQueryKey } from "./use-agents"
-import { useUserId } from "./use-user-id"
 export function useEditAgent(
   mutationOptions: UseMutationOptions<
     Letta.AgentState,
     Error,
-    Letta.AgentUpdateParams & { id: string }
+    Letta.UpdateAgent & { id: string }
   > = {},
 ) {
   const queryClient = useQueryClient()
   const { lettaClient } = useLettaClient()
-  const { data: userId } = useUserId()
-  return useMutation<Letta.AgentState, Error, Letta.AgentUpdateParams & { id: string }>({
-    mutationFn: async (data: Letta.AgentUpdateParams & { id: string }) => {
+  return useMutation<Letta.AgentState, Error, Letta.UpdateAgent & { id: string }>({
+    mutationFn: async (data: Letta.UpdateAgent & { id: string }) => {
       if (data.tags) {
         data.tags = data.tags.map(foramtToSlug)
       }
@@ -25,9 +23,8 @@ export function useEditAgent(
         data.name = foramtToSlug(data.name)
       }
 
-      return await lettaClient.agents.update(data.id, {
+      return await lettaClient.agents.modify(data.id, {
         ...data,
-        tags: [userId!, ...(data.tags || [])],
       })
     },
 

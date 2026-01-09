@@ -1,13 +1,13 @@
+import type { FC } from "react"
 import { Button, Text, TextField } from "@/components"
 import { Switch } from "@/components/Toggle/Switch"
-import { normalizeName } from "@/shared/utils/normalizers"
+import { useGetLettaEmbeddingModels, useGetLettaModels } from "@/hooks/use-letta-options"
 import type { ThemedStyle } from "@/theme"
 import { colors, spacing } from "@/theme"
+import defaultAgent from "@/utils/default-agent.json"
 import { useAppTheme } from "@/utils/useAppTheme"
-import { createAgentNamePrompt } from "@/utils/agent-name-prompt"
-import { Letta } from "@letta-ai/letta-client"
+import { CreateAgentRequest } from "@letta-ai/letta-client/api"
 import { Eraser, Undo2 } from "lucide-react-native"
-import { observer } from "mobx-react-lite"
 import { Fragment, useMemo, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { Linking, TouchableOpacity, View } from "react-native"
@@ -15,7 +15,7 @@ import RNPickerSelect from "react-native-picker-select"
 import { useLettaHeader } from "../useLettaHeader"
 
 interface StudioAgentFormProps {
-  onSubmit?: (agentData: Letta.AgentCreateParams) => void
+  onSubmit?: (agentData: CreateAgentRequest) => void
   isPending?: boolean
 }
 
@@ -40,10 +40,7 @@ function FieldActions({ onReset, onClear, isModified }: FieldActionsProps) {
   )
 }
 
-export const StudioAgentForm = observer(function StudioAgentForm({
-  onSubmit,
-  isPending,
-}: StudioAgentFormProps) {
+export const StudioAgentForm: FC<StudioAgentFormProps> = ({ onSubmit, isPending }) => {
   const { themed, theme } = useAppTheme()
   const { data: models = [], isLoading: isLoadingModels } = useGetLettaModels()
 
@@ -100,13 +97,13 @@ export const StudioAgentForm = observer(function StudioAgentForm({
       if (model.model.includes("letta")) {
         return "letta/letta-free"
       }
-      return `${model.model_endpoint_type}/${model.model}`
+      return `${model.modelEndpointType}/${model.model}`
     }
 
     return models.map((model) => ({
       label: getModelLabel(model),
       value: getModelValue(model),
-      contextWindow: model.context_window,
+      contextWindow: model.contextWindow,
     }))
   }, [models])
 
@@ -419,7 +416,7 @@ export const StudioAgentForm = observer(function StudioAgentForm({
       />
     </Fragment>
   )
-})
+}
 
 const $sectionTitleText: ThemedStyle<TextStyle> = () => ({})
 

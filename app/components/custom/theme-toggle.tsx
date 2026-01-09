@@ -1,16 +1,20 @@
 import { Button, Icon, Switch } from "@/components"
 import { useAppTheme } from "@/utils/useAppTheme"
-import { observer } from "mobx-react-lite"
 import { FC, Fragment } from "react"
+import { useAppSettingsStore } from "@/stores/appSettingsStore"
 
 interface ThemeToggleProps {
   mode?: "switch" | "icon"
 }
-export const ThemeToggle: FC<ThemeToggleProps> = observer(({ mode = "switch" }) => {
+
+export const ThemeToggle: FC<ThemeToggleProps> = ({ mode = "switch" }) => {
   const { theme, setThemeContextOverride } = useAppTheme()
+  const setAppTheme = useAppSettingsStore((state) => state.setAppTheme)
 
   const handleThemeToggle = () => {
-    setThemeContextOverride(theme.isDark ? "light" : "dark")
+    const newTheme = theme.isDark ? "light" : "dark"
+    setThemeContextOverride(newTheme)
+    setAppTheme(newTheme)
   }
 
   return (
@@ -32,4 +36,4 @@ export const ThemeToggle: FC<ThemeToggleProps> = observer(({ mode = "switch" }) 
       )}
     </Fragment>
   )
-})
+}

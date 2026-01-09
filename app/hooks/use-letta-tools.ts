@@ -1,12 +1,12 @@
 import { useLettaClient } from "@/providers/LettaProvider"
-import { AgentState, AppModel, Tool } from "@letta-ai/letta-client"
+import { AgentState, AppModel, Tool } from "@letta-ai/letta-client/api"
 import { useMutation, UseMutationOptions, useQuery, useQueryClient } from "@tanstack/react-query"
 import { getUseAgentStateKey } from "./use-agent"
 import { getAgentsQueryKey } from "./use-agents"
 export const getLettaToolsQueryKey = () => ["letta-tools"]
 
 const filterTools = (tools: Tool[]) => {
-  return tools.filter((tool) => tool.tool_type === "custom")
+  return tools.filter((tool) => tool.toolType === "custom")
 }
 
 export const useLettaTools = () => {

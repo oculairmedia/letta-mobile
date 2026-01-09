@@ -3,24 +3,23 @@ import { MCPServerForm } from "@/components/custom/forms/mcp-server-form"
 import { ThemedStyle } from "@/theme"
 import { useAppTheme } from "@/utils/useAppTheme"
 import { Letta } from "@letta-ai/letta-client"
-import { observer } from "mobx-react-lite"
-import React, { FC } from "react"
+import type { FC } from "react"
 import { Modal, ViewStyle } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 interface AddMCPServerModalProps {
   visible: boolean
   onDismiss: () => void
-  onSubmit: (serverData: Letta.SseMcpServer | Letta.StdioMcpServer) => void
+  onSubmit: (serverData: Letta.SseServerConfig | Letta.StdioServerConfig) => void
   isPending?: boolean
 }
 
-export const AddMCPServerModal: FC<AddMCPServerModalProps> = observer(function AddMCPServerModal({
+export const AddMCPServerModal: FC<AddMCPServerModalProps> = ({
   visible,
   onDismiss,
   onSubmit,
   isPending,
-}) {
+}) => {
   const { themed } = useAppTheme()
   const { bottom } = useSafeAreaInsets()
 
@@ -40,7 +39,7 @@ export const AddMCPServerModal: FC<AddMCPServerModalProps> = observer(function A
       </Screen>
     </Modal>
   )
-})
+}
 
 const $modalContainer: ThemedStyle<ViewStyle> = ({ colors }) => ({
   flex: 1,

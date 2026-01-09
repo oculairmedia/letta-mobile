@@ -4,17 +4,14 @@ import { useLettaHeader } from "@/components/custom/useLettaHeader"
 import { useEditAgent } from "@/hooks/use-edit-agent"
 import { AppStackScreenProps, navigate } from "@/navigators"
 import { spacing } from "@/theme"
-import { Letta } from "@letta-ai/letta-client"
-import { observer } from "mobx-react-lite"
+import { UpdateAgent } from "@letta-ai/letta-client/api"
 import { FC } from "react"
 import { View, ViewStyle } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 interface EditAgentScreenProps extends AppStackScreenProps<"EditAgent"> {}
 
-export const EditAgentScreen: FC<EditAgentScreenProps> = observer(function EditAgentScreen({
-  route,
-}) {
+export const EditAgentScreen: FC<EditAgentScreenProps> = ({ route }) => {
   useLettaHeader()
   const { mutate: editAgent, isPending: isEditingAgent } = useEditAgent({
     onSuccess: () => {
@@ -22,7 +19,7 @@ export const EditAgentScreen: FC<EditAgentScreenProps> = observer(function EditA
     },
   })
 
-  const handleSubmit = (agentData: Letta.AgentUpdateParams & { id: string }) => {
+  const handleSubmit = (agentData: UpdateAgent & { id: string }) => {
     editAgent(agentData)
   }
 
@@ -39,7 +36,7 @@ export const EditAgentScreen: FC<EditAgentScreenProps> = observer(function EditA
       </View>
     </Screen>
   )
-})
+}
 
 const $root: ViewStyle = {
   flex: 1,

@@ -1,5 +1,5 @@
 import { useLettaClient } from "@/providers/LettaProvider"
-import { SourceCreate } from "@letta-ai/letta-client"
+import { SourceCreate } from "@letta-ai/letta-client/api"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 const getSourcesQueryKey = () => ["sources"]
 

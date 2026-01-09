@@ -7,13 +7,6 @@ const ar: Translations = {
     back: "خلف",
     logOut: "تسجيل خروج",
   },
-  welcomeScreen: {
-    postscript:
-      "ربما لا يكون هذا هو الشكل الذي يبدو عليه تطبيقك مالم يمنحك المصمم هذه الشاشات وشحنها في هذه الحالة",
-    readyForLaunch: "تطبيقك تقريبا جاهز للتشغيل",
-    exciting: "اوه هذا مثير",
-    letsGo: "لنذهب",
-  },
   errorScreen: {
     title: "هناك خطأ ما",
     friendlySubtitle:

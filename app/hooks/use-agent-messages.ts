@@ -9,12 +9,8 @@ export function useAgentMessages(agentId: string, queryOptions?: UseQueryOptions
   const { lettaClient } = useLettaClient()
   return useQuery<AppMessage[]>({
     queryKey: getAgentMessagesQueryKey(agentId),
-    queryFn: async () => {
-      const result = await lettaClient.agents.messages.list(agentId, {
-        use_assistant_message: useAssistantMessage,
-      })
-      return filterMessages(Array.from(result))
-    },
+    queryFn: () =>
+      lettaClient.agents.messages.list(agentId, { useAssistantMessage }).then(filterMessages),
     enabled: !!agentId && !!lettaClient,
     initialData: [],
     ...queryOptions,
@@ -27,11 +23,11 @@ export function useResetChatMessages() {
   return useMutation({
     mutationFn: ({
       agentId,
-      add_default_initial_messages,
+      addDefaultInitialMessages,
     }: {
       agentId: string
-      add_default_initial_messages?: boolean
-    }) => lettaClient.agents.messages.reset(agentId, { add_default_initial_messages }),
+      addDefaultInitialMessages?: boolean
+    }) => lettaClient.agents.messages.reset(agentId, { addDefaultInitialMessages }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: getAgentMessagesQueryKey(variables.agentId) })
     },

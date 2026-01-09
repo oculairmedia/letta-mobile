@@ -6,8 +6,7 @@ import { AttachToolAction } from "@/shared/components/tools/attach-tool-action"
 import { spacing } from "@/theme"
 import { useAppTheme } from "@/utils/useAppTheme"
 import { FlashList } from "@shopify/flash-list"
-import { observer } from "mobx-react-lite"
-import React, { FC, useMemo, useState } from "react"
+import { FC, useMemo, useState } from "react"
 import { Modal, View, ViewStyle } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
@@ -16,10 +15,7 @@ interface CustomToolsModalProps {
   onDismiss: () => void
 }
 
-export const CustomToolsModal: FC<CustomToolsModalProps> = observer(function CustomToolsModal({
-  visible,
-  onDismiss,
-}) {
+export const CustomToolsModal: FC<CustomToolsModalProps> = ({ visible, onDismiss }) => {
   const { themed } = useAppTheme()
   const { bottom } = useSafeAreaInsets()
   const { data: tools } = useLettaTools()
@@ -84,7 +80,7 @@ export const CustomToolsModal: FC<CustomToolsModalProps> = observer(function Cus
       </Screen>
     </Modal>
   )
-})
+}
 
 const $modalContainer: ViewStyle = {
   flex: 1,

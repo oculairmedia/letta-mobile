@@ -19,11 +19,11 @@ export const AgentTools: FC<AgentToolsProps> = ({ style }) => {
 
   const types = useMemo(() => {
     if (!agent) return []
-    return [...new Set(agent.tools.map((tool) => tool.tool_type))].filter(Boolean)
+    return [...new Set(agent.tools.map((tool) => tool.toolType))].filter(Boolean)
   }, [agent])
 
   const filterByType = useCallback(
-    (type: string) => agent?.tools.filter((tool) => tool.tool_type === type),
+    (type: string) => agent?.tools.filter((tool) => tool.toolType === type),
     [agent],
   )
 

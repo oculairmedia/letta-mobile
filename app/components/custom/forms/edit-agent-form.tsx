@@ -1,13 +1,11 @@
 import { Text, TextField } from "@/components"
 import { Switch } from "@/components/Toggle/Switch"
 import { useAgent } from "@/hooks/use-agent"
-import { useUserId } from "@/hooks/use-user-id"
 import type { ThemedStyle } from "@/theme"
 import { colors, spacing } from "@/theme"
 import { useAppTheme } from "@/utils/useAppTheme"
-import { Letta } from "@letta-ai/letta-client"
+import { UpdateAgent } from "@letta-ai/letta-client/api"
 import { Eraser, Undo2 } from "lucide-react-native"
-import { observer } from "mobx-react-lite"
 import { Fragment, useEffect, useMemo, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { TouchableOpacity, View } from "react-native"
@@ -15,7 +13,7 @@ import { useLettaHeader } from "../useLettaHeader"
 
 interface EditAgentFormProps {
   agentId: string
-  onSubmit?: (agentData: Letta.AgentUpdateParams & { id: string }) => void
+  onSubmit?: (agentData: UpdateAgent & { id: string }) => void
   isPending?: boolean
 }
 
@@ -40,7 +38,7 @@ function FieldActions({ onReset, onClear, isModified }: FieldActionsProps) {
   )
 }
 
-export const EditAgentForm = observer(function EditAgentForm({
+export const EditAgentForm = function EditAgentForm({
   agentId,
   onSubmit,
   isPending,
@@ -56,30 +54,33 @@ export const EditAgentForm = observer(function EditAgentForm({
   // Tool Settings
   const [messageBufferAutoclear, setMessageBufferAutoclear] = useState(false)
 
-  const { data: _user } = useUserId()
-  const userId = useMemo(() => _user, [_user])
-  const _tags = useMemo(
-    () => (agent?.tags || []).filter((tag) => tag !== userId).join(", "),
-    [agent, userId],
-  )
+  const initialFormValues = useMemo(() => {
+    if (!agent) return null
+    return {
+      name: agent?.name || "",
+      description: agent?.description || "",
+      tags: agent?.tags.join(", ") || "",
+      messageBufferAutoclear: agent?.messageBufferAutoclear ?? false,
+    }
+  }, [agent])
 
   // Initialize form with agent data
   useEffect(() => {
-    if (agent && !!userId) {
-      setName(agent.name || "")
-      setDescription(agent.description || "")
-      setMessageBufferAutoclear(agent.message_buffer_autoclear ?? false)
-      setTags(_tags)
+    if (initialFormValues) {
+      setName(initialFormValues.name)
+      setDescription(initialFormValues.description)
+      setTags(initialFormValues.tags)
+      setMessageBufferAutoclear(initialFormValues.messageBufferAutoclear)
     }
-  }, [agent, userId])
+  }, [initialFormValues])
 
   const originalValues = useMemo(
     () => ({
       name: agent?.name || "",
       description: agent?.description || "",
-      tags: _tags,
+      tags: agent?.tags.join(", ") || "",
     }),
-    [agent, _tags],
+    [agent],
   )
 
   const handleSubmit = () => {
@@ -177,7 +178,7 @@ export const EditAgentForm = observer(function EditAgentForm({
       </View>
     </Fragment>
   )
-})
+}
 
 const $actions: ViewStyle = {
   flexDirection: "row",

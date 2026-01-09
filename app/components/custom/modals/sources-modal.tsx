@@ -10,10 +10,9 @@ import {
 } from "@/hooks/use-get-sources"
 import { spacing } from "@/theme"
 import { useAppTheme } from "@/utils/useAppTheme"
-import { Source } from "@letta-ai/letta-client"
+import { Source } from "@letta-ai/letta-client/api"
 import { FlashList } from "@shopify/flash-list"
-import { observer } from "mobx-react-lite"
-import React, { FC, useCallback, useMemo, useState } from "react"
+import { FC, useCallback, useMemo, useState } from "react"
 import { Modal, View, ViewStyle } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
@@ -63,10 +62,7 @@ const SourceCard = ({
   )
 }
 
-export const SourcesModal: FC<SourcesModalProps> = observer(function SourcesModal({
-  visible,
-  onDismiss,
-}) {
+export const SourcesModal: FC<SourcesModalProps> = ({ visible, onDismiss }) => {
   const { themed } = useAppTheme()
   const { bottom } = useSafeAreaInsets()
   const [agentId] = useAgentId()
@@ -163,7 +159,7 @@ export const SourcesModal: FC<SourcesModalProps> = observer(function SourcesModa
       </Screen>
     </Modal>
   )
-})
+}
 
 const $modalContainer: ViewStyle = {
   flex: 1,

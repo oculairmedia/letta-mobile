@@ -1,73 +1,139 @@
-import { useAppTheme } from "@/utils/useAppTheme"
-import { observer } from "mobx-react-lite"
-import { Fragment } from "react"
-import { Button, TextField } from "@/components"
-import type { ThemedStyle } from "@/theme"
-import type { ViewStyle } from "react-native"
-import { useLettaClient } from "@/providers/LettaProvider"
-import { useStores } from "@/models"
-import Config from "@/config"
+import { Button, Text, TextField } from "@/components"
+import { Switch } from "@/components/Toggle/Switch"
+import { useLettaConfigStore } from "@/stores/lettaConfigStore"
+import { spacing } from "@/theme"
+import { FC, useEffect, useState } from "react"
+import { View, ViewStyle } from "react-native"
 
-export const LettaConfigsForm = observer(() => {
-  const { setConfig } = useLettaClient()
-  const { themed } = useAppTheme()
+interface LettaConfigsFormProps {
+  onSubmit: (config: {
+    id?: string
+    mode: "cloud" | "selfhosted"
+    serverUrl?: string
+    accessToken: string
+  }) => void
+  isPending?: boolean
+  initialValues?: {
+    id: string
+    mode: "cloud" | "selfhosted"
+    serverUrl: string
+    accessToken: string
+  }
+}
 
-  const {
-    lettaConfigStore: {
-      serverUrl: _serverUrl,
-      accessToken: _accessToken,
-      setServerUrl,
-      setAccessToken,
-    },
-  } = useStores()
+export const LettaConfigsForm: FC<LettaConfigsFormProps> = ({
+  onSubmit,
+  isPending,
+  initialValues,
+}) => {
+  const { deleteConfig } = useLettaConfigStore()
+  const [mode, setMode] = useState<"cloud" | "selfhosted">(initialValues?.mode || "cloud")
+  const [serverUrl, setServerUrl] = useState(initialValues?.serverUrl || "")
+  const [accessToken, setAccessToken] = useState(initialValues?.accessToken || "")
 
-  const serverUrl = _serverUrl || Config.lettaBaseUrl
-  const accessToken = _accessToken || Config.lettaAccessToken
+  useEffect(() => {
+    if (initialValues) {
+      setMode(initialValues.mode)
+      setServerUrl(initialValues.serverUrl)
+      setAccessToken(initialValues.accessToken)
+    }
+  }, [initialValues])
 
-  function saveConfig() {
-    setConfig(serverUrl || Config.lettaBaseUrl, accessToken || Config.lettaAccessToken)
+  const handleSubmit = () => {
+    onSubmit({
+      id: initialValues?.id,
+      mode,
+      serverUrl: mode === "selfhosted" ? serverUrl : undefined,
+      accessToken,
+    })
+  }
+
+  const handleDelete = () => {
+    if (initialValues?.id) {
+      deleteConfig(initialValues.id)
+    }
   }
 
   return (
-    <Fragment>
-      <TextField
-        value={serverUrl}
-        onChangeText={setServerUrl}
-        containerStyle={themed($textField)}
-        autoCapitalize="none"
-        autoCorrect={false}
-        labelTx="developerScreen:serverUrl"
-        placeholderTx="developerScreen:serverUrlPlaceholder"
-        helperTx={!serverUrl ? "developerScreen:serverUrlRequired" : undefined}
-        status={!serverUrl ? "error" : undefined}
-      />
-      <TextField
-        value={accessToken}
-        onChangeText={setAccessToken}
-        containerStyle={themed($textField)}
-        autoCapitalize="none"
-        autoCorrect={false}
-        labelTx="developerScreen:apiKey"
-        placeholderTx="developerScreen:apiKeyPlaceholder"
-        helperTx={!accessToken ? "developerScreen:apiKeyRequired" : undefined}
-        status={!accessToken ? "error" : undefined}
+    <View style={$formContainer}>
+      <Text text="Connection Mode" preset="heading" />
+      <View style={$switchContainer}>
+        <Switch
+          value={mode === "selfhosted"}
+          onValueChange={(value) => setMode(value ? "selfhosted" : "cloud")}
+          label={mode === "selfhosted" ? "Self-hosted" : "Cloud"}
+        />
+      </View>
+      <Text
+        text={
+          mode === "cloud"
+            ? "Connect to Letta's cloud service"
+            : "Connect to your self-hosted Letta instance"
+        }
       />
 
-      <Button
-        testID="save-config-button"
-        tx="developerScreen:save"
-        style={themed($button)}
-        preset="reversed"
-        onPress={saveConfig}
-      />
-    </Fragment>
+      {mode === "selfhosted" && (
+        <View style={$fieldContainer}>
+          <TextField
+            value={serverUrl}
+            onChangeText={setServerUrl}
+            label="Server URL"
+            placeholder="https://your-letta-server.com"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <Text text="Enter the URL of your Letta server" />
+        </View>
+      )}
+
+      <View style={$fieldContainer}>
+        <TextField
+          value={accessToken}
+          onChangeText={setAccessToken}
+          label="Access Token"
+          placeholder="Enter your access token"
+          autoCapitalize="none"
+          autoCorrect={false}
+          secureTextEntry
+        />
+        <Text text="Your Letta access token" />
+      </View>
+
+      <View style={$buttonContainer}>
+        {initialValues && (
+          <Button style={$button} preset="destructive" onPress={handleDelete} text="Delete" />
+        )}
+        <Button
+          style={$button}
+          preset="filled"
+          onPress={handleSubmit}
+          disabled={isPending}
+          text={initialValues ? "Save" : "Add"}
+        />
+      </View>
+    </View>
   )
-})
+}
 
-const $textField: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  marginBottom: spacing.lg,
-})
+const $formContainer: ViewStyle = {
+  flex: 1,
+}
 
-const $button: ThemedStyle<ViewStyle> = ({ spacing }) => ({
-  marginTop: spacing.lg,
-})
+const $switchContainer: ViewStyle = {
+  flexDirection: "row",
+  alignItems: "center",
+  marginVertical: spacing.sm,
+}
+
+const $fieldContainer: ViewStyle = {
+  marginVertical: spacing.sm,
+}
+
+const $buttonContainer: ViewStyle = {
+  flexDirection: "row",
+  gap: spacing.sm,
+}
+
+const $button: ViewStyle = {
+  flex: 1,
+}

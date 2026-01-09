@@ -9,8 +9,7 @@ import { AttachMCPToolAction } from "@/shared/components/tools/attach-mcp-tool-a
 import { spacing } from "@/theme"
 import { useAppTheme } from "@/utils/useAppTheme"
 import { Letta } from "@letta-ai/letta-client"
-import { observer } from "mobx-react-lite"
-import React, { FC, useMemo, useState } from "react"
+import { FC, useMemo, useState } from "react"
 import { Modal, View, ViewStyle } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
@@ -94,10 +93,7 @@ const ServerAccordion: FC<ServerAccordionProps> = ({
   )
 }
 
-export const MCPToolsModal: FC<MCPToolsModalProps> = observer(function MCPToolsModal({
-  visible,
-  onDismiss,
-}) {
+export const MCPToolsModal: FC<MCPToolsModalProps> = ({ visible, onDismiss }) => {
   const { themed } = useAppTheme()
   const { bottom } = useSafeAreaInsets()
   const { data: mcpTools } = useMCPTools()
@@ -191,7 +187,7 @@ export const MCPToolsModal: FC<MCPToolsModalProps> = observer(function MCPToolsM
       </Screen>
     </Modal>
   )
-})
+}
 
 const $modalContainer: ViewStyle = {
   flex: 1,

@@ -35,7 +35,7 @@ export const AgentConfig: FC<AgentConfigProps> = ({ style }) => {
         preset="reversed"
       >
         <View style={themed($configContent)}>
-          <Text text={JSON.stringify(agent.model, null, 2)} />
+          <Text text={JSON.stringify(agent.llmConfig, null, 2)} />
         </View>
       </Accordion>
 
@@ -46,7 +46,7 @@ export const AgentConfig: FC<AgentConfigProps> = ({ style }) => {
         preset="reversed"
       >
         <View style={themed($configContent)}>
-          <Text text={JSON.stringify(agent.embedding_config, null, 2)} />
+          <Text text={JSON.stringify(agent.embeddingConfig, null, 2)} />
         </View>
       </Accordion>
     </View>

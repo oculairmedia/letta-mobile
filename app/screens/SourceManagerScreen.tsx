@@ -16,10 +16,9 @@ import {
 import { BareAccordion } from "@/shared/components/animated/BareAccordion"
 import { spacing, ThemedStyle } from "@/theme"
 import { useAppTheme } from "@/utils/useAppTheme"
-import { FileMetadata, Source } from "@letta-ai/letta-client"
+import { FileMetadata, Source } from "@letta-ai/letta-client/api"
 import * as DocumentPicker from "expo-document-picker"
-import { observer } from "mobx-react-lite"
-import React, { useEffect, useMemo, useState } from "react"
+import { FC, useEffect, useMemo, useState } from "react"
 import {
   Alert,
   GestureResponderEvent,
@@ -36,7 +35,7 @@ interface FileCardProps {
   selectedSourceId: string | null
 }
 
-const FileCard: React.FC<FileCardProps> = observer(({ item, selectedSourceId }) => {
+const FileCard: FC<FileCardProps> = ({ item, selectedSourceId }) => {
   const { themed } = useAppTheme()
   const deleteFile = useDeleteFileFromSource()
 
@@ -93,7 +92,7 @@ const FileCard: React.FC<FileCardProps> = observer(({ item, selectedSourceId }) 
       />
     </SimpleContextMenu>
   )
-})
+}
 
 interface SourceAccordionProps {
   item: Source
@@ -118,171 +117,175 @@ const ALLOWED_FILE_TYPES = [
 
 const RESERVED_FILENAMES = ["CON", "PRN", "AUX", "NUL", "COM1", "COM2", "LPT1", "LPT2"]
 
-const SourceAccordion: React.FC<SourceAccordionProps> = observer(
-  ({ item, selectedSourceId, onSourcePress, files }) => {
-    const { themed } = useAppTheme()
-    const [agentId] = useAgentId()
-    const { data: agentSources } = useGetAgentSources(agentId || "")
-    const attachSource = useAttachSourceToAgent()
-    const detachSource = useDetachSourceFromAgent()
-    const deleteSource = useDeleteSource()
-    const addFile = useAddFileToSource()
+const SourceAccordion: FC<SourceAccordionProps> = ({
+  item,
+  selectedSourceId,
+  onSourcePress,
+  files,
+}) => {
+  const { themed } = useAppTheme()
+  const [agentId] = useAgentId()
+  const { data: agentSources } = useGetAgentSources(agentId || "")
+  const attachSource = useAttachSourceToAgent()
+  const detachSource = useDetachSourceFromAgent()
+  const deleteSource = useDeleteSource()
+  const addFile = useAddFileToSource()
 
-    const isAttached = agentSources?.some((source) => source.id === item.id) ?? false
-    const isLoading = attachSource.isPending || detachSource.isPending || addFile.isPending
+  const isAttached = agentSources?.some((source) => source.id === item.id) ?? false
+  const isLoading = attachSource.isPending || detachSource.isPending || addFile.isPending
 
-    const handleToggleSource = () => {
-      if (isAttached) {
-        detachSource.mutate({ agentId: agentId || "", sourceId: item.id! })
-      } else {
-        attachSource.mutate({ agentId: agentId || "", sourceId: item.id! })
-      }
+  const handleToggleSource = () => {
+    if (isAttached) {
+      detachSource.mutate({ agentId: agentId || "", sourceId: item.id! })
+    } else {
+      attachSource.mutate({ agentId: agentId || "", sourceId: item.id! })
     }
+  }
 
-    const handleDelete = () => {
-      Alert.alert("Delete Source", "Are you sure you want to delete this source?", [
-        { text: "Cancel", style: "cancel" },
+  const handleDelete = () => {
+    Alert.alert("Delete Source", "Are you sure you want to delete this source?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          deleteSource.mutate(item.id!)
+        },
+      },
+    ])
+  }
+
+  const handleUploadFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ALLOWED_FILE_TYPES,
+        copyToCacheDirectory: true,
+        multiple: false,
+      })
+
+      if (result.canceled) {
+        return
+      }
+
+      if (result.assets.length === 0) {
+        return
+      }
+
+      const file = result.assets[0]
+
+      // Check for reserved filenames
+      const fileName = file.name.toUpperCase()
+      if (RESERVED_FILENAMES.some((reserved) => fileName.startsWith(reserved))) {
+        Alert.alert(
+          "Invalid Filename",
+          "This filename is not allowed. Please choose a different name.",
+        )
+        return
+      }
+
+      // Check file size (256MB limit from backend)
+      const MAX_FILE_SIZE = 256 * 1024 * 1024 // 256MB
+      if (file.size && file.size > MAX_FILE_SIZE) {
+        Alert.alert("File Too Large", "The file size exceeds the maximum limit of 256MB.")
+        return
+      }
+
+      // For iOS, we need to handle the file URI differently
+      let fileUri = file.uri
+      if (Platform.OS === "ios") {
+        // Remove the file:// prefix if it exists
+        fileUri = fileUri.replace("file://", "")
+      }
+
+      // Create a File object from the picked document
+      const fileObj = new File([fileUri], file.name, {
+        type: file.mimeType || "application/octet-stream",
+      })
+
+      addFile.mutate(
+        { sourceId: item.id!, file: fileObj },
         {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            deleteSource.mutate(item.id!)
+          onError: () => {
+            Alert.alert(
+              "Upload Failed",
+              "Failed to upload file. Please try again or choose a different file.",
+            )
           },
         },
-      ])
+      )
+    } catch (error) {
+      console.error("File upload error:", error)
+      Alert.alert(
+        "Error",
+        "Failed to upload file. Please make sure the file is in a supported format and try again.",
+      )
     }
+  }
 
-    const handleUploadFile = async () => {
-      try {
-        const result = await DocumentPicker.getDocumentAsync({
-          type: ALLOWED_FILE_TYPES,
-          copyToCacheDirectory: true,
-          multiple: false,
-        })
-
-        if (result.canceled) {
-          return
-        }
-
-        if (result.assets.length === 0) {
-          return
-        }
-
-        const file = result.assets[0]
-
-        // Check for reserved filenames
-        const fileName = file.name.toUpperCase()
-        if (RESERVED_FILENAMES.some((reserved) => fileName.startsWith(reserved))) {
-          Alert.alert(
-            "Invalid Filename",
-            "This filename is not allowed. Please choose a different name.",
-          )
-          return
-        }
-
-        // Check file size (256MB limit from backend)
-        const MAX_FILE_SIZE = 256 * 1024 * 1024 // 256MB
-        if (file.size && file.size > MAX_FILE_SIZE) {
-          Alert.alert("File Too Large", "The file size exceeds the maximum limit of 256MB.")
-          return
-        }
-
-        // For iOS, we need to handle the file URI differently
-        let fileUri = file.uri
-        if (Platform.OS === "ios") {
-          // Remove the file:// prefix if it exists
-          fileUri = fileUri.replace("file://", "")
-        }
-
-        // Create a File object from the picked document
-        const fileObj = new File([fileUri], file.name, {
-          type: file.mimeType || "application/octet-stream",
-        })
-
-        addFile.mutate(
-          { sourceId: item.id!, file: fileObj },
-          {
-            onError: () => {
-              Alert.alert(
-                "Upload Failed",
-                "Failed to upload file. Please try again or choose a different file.",
-              )
+  return (
+    <BareAccordion
+      key={item.id}
+      isExpanded={selectedSourceId === item.id}
+      onToggle={() => onSourcePress(item.id!)}
+      style={$sourceAccordion}
+      disabled={isLoading}
+      wrapperStyleOverride={$sourceAccordionWrapper}
+      triggerNode={({ animatedChevron }) => (
+        <SimpleContextMenu
+          actions={[
+            {
+              key: "attach",
+              title: isAttached ? "Detach from Agent" : "Attach to Agent",
+              iosIconName: { name: isAttached ? "minus.circle" : "plus.circle", weight: "bold" },
+              androidIconName: isAttached ? "ic_menu_remove" : "ic_menu_add",
+              onPress: handleToggleSource,
             },
-          },
-        )
-      } catch (error) {
-        console.error("File upload error:", error)
-        Alert.alert(
-          "Error",
-          "Failed to upload file. Please make sure the file is in a supported format and try again.",
-        )
-      }
-    }
-
-    return (
-      <BareAccordion
-        key={item.id}
-        isExpanded={selectedSourceId === item.id}
-        onToggle={() => onSourcePress(item.id!)}
-        style={$sourceAccordion}
-        wrapperStyleOverride={$sourceAccordionWrapper}
-        triggerNode={({ animatedChevron }) => (
-          <SimpleContextMenu
-            actions={[
-              {
-                key: "attach",
-                title: isAttached ? "Detach from Agent" : "Attach to Agent",
-                iosIconName: { name: isAttached ? "minus.circle" : "plus.circle", weight: "bold" },
-                androidIconName: isAttached ? "ic_menu_remove" : "ic_menu_add",
-                onPress: handleToggleSource,
-              },
-              {
-                key: "upload",
-                title: "Upload File",
-                iosIconName: { name: "arrow.up.doc", weight: "bold" },
-                androidIconName: "ic_menu_upload",
-                onPress: handleUploadFile,
-              },
-              {
-                key: "delete",
-                title: "Delete",
-                iosIconName: { name: "trash", weight: "bold" },
-                androidIconName: "ic_menu_delete",
-                onPress: handleDelete,
-              },
-            ]}
-          >
-            <View style={themed($sourceHeader)}>
-              <View style={$sourceInfo}>
-                <Text text={item.name || "Unnamed Source"} preset="subheading" />
-                <Text
-                  text={item.description || "No description"}
-                  preset="formHelper"
-                  numberOfLines={2}
-                />
-              </View>
-              {animatedChevron}
+            {
+              key: "upload",
+              title: "Upload File",
+              iosIconName: { name: "arrow.up.doc", weight: "bold" },
+              androidIconName: "ic_menu_upload",
+              onPress: handleUploadFile,
+            },
+            {
+              key: "delete",
+              title: "Delete",
+              iosIconName: { name: "trash", weight: "bold" },
+              androidIconName: "ic_menu_delete",
+              onPress: handleDelete,
+            },
+          ]}
+        >
+          <View style={themed($sourceHeader)}>
+            <View style={$sourceInfo}>
+              <Text text={item.name || "Unnamed Source"} preset="subheading" />
+              <Text
+                text={item.description || "No description"}
+                preset="formHelper"
+                numberOfLines={2}
+              />
             </View>
-          </SimpleContextMenu>
-        )}
-      >
-        <View style={$filesContainer}>
-          <ScrollView contentContainerStyle={$filesContainerContent}>
-            {!files?.length ? (
-              <EmptyState heading="No files found" content="Add files to this source" icon="File" />
-            ) : (
-              files?.map((file) => (
-                <FileCard key={file.id} item={file} selectedSourceId={selectedSourceId} />
-              ))
-            )}
-          </ScrollView>
-        </View>
-      </BareAccordion>
-    )
-  },
-)
+            {animatedChevron}
+          </View>
+        </SimpleContextMenu>
+      )}
+    >
+      <View style={$filesContainer}>
+        <ScrollView contentContainerStyle={$filesContainerContent}>
+          {!files?.length ? (
+            <EmptyState heading="No files found" content="Add files to this source" icon="File" />
+          ) : (
+            files?.map((file) => (
+              <FileCard key={file.id} item={file} selectedSourceId={selectedSourceId} />
+            ))
+          )}
+        </ScrollView>
+      </View>
+    </BareAccordion>
+  )
+}
 
-export const SourceManagerScreen = observer(function SourceManagerScreen() {
+export const SourceManagerScreen = () => {
   const { themed } = useAppTheme()
   const { data: sources, isLoading, refetch } = useGetSources()
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null)
@@ -326,7 +329,7 @@ export const SourceManagerScreen = observer(function SourceManagerScreen() {
   const [AnimatedIsVisible, Loader] = useAnimatedLoader()
   useEffect(() => {
     AnimatedIsVisible.value = isLoading
-  }, [isLoading])
+  }, [AnimatedIsVisible, isLoading])
 
   const { bottom, top } = useSafeAreaInsets()
   return (
@@ -379,7 +382,7 @@ export const SourceManagerScreen = observer(function SourceManagerScreen() {
       </View>
     </Screen>
   )
-})
+}
 
 const $screen: ViewStyle = {
   flex: 1,
@@ -470,10 +473,6 @@ const $metadataLabel: TextStyle = {
 
 const $searchContainer: ViewStyle = {
   marginBottom: spacing.sm,
-}
-
-const $searchIcon: ViewStyle = {
-  marginRight: spacing.xs,
 }
 
 // Helper functions

@@ -1,16 +1,16 @@
 import { Letta } from "@letta-ai/letta-client"
+import { AssistantMessageContent } from "@letta-ai/letta-client/api/types/AssistantMessageContent"
 import { AppMessage, MESSAGE_TYPE } from "./types"
-import { AssistantMessage } from "@letta-ai/letta-client/resources/agents/messages.mjs"
 
-export const getMessageId = (message: Letta.LettaMessageContentUnion): string => {
+export const getMessageId = (message: Letta.LettaMessageUnion): string => {
   if ("id" in message) {
-    return message.type + message.id
+    return message.messageType + message.id
   }
 
   return ""
 }
 
-export const extractMessageText = (message: AssistantMessage) => {
+export const extractMessageText = (message: AssistantMessageContent) => {
   if (typeof message === "string") {
     return message
   } else if (Array.isArray(message)) {
@@ -40,14 +40,14 @@ const isHeartbeatMessage = (message: string) => {
   }
 }
 
-export function extractMessage(item: Letta.LettaMessageContentUnion): AppMessage | null {
-  const { type } = item
+export function extractMessage(item: Letta.LettaMessageUnion): AppMessage | null {
+  const { messageType } = item
 
-  if (type === "text") {
-    if (!item.text) {
+  if (messageType === MESSAGE_TYPE.USER_MESSAGE) {
+    if (!item.content) {
       return null
     }
-    const message = item.text
+    const message = extractMessageText(item.content)
     if (!message) {
       return null
     }
@@ -56,71 +56,71 @@ export function extractMessage(item: Letta.LettaMessageContentUnion): AppMessage
     }
     return {
       id: getMessageId(item),
-      date: new Date(), // TODO: add date
+      date: new Date(item.date),
       content: message,
       messageType: MESSAGE_TYPE.USER_MESSAGE,
     }
   }
 
-  if (type === "tool_call") {
-    if (!item.input) {
+  if (messageType === MESSAGE_TYPE.TOOL_CALL_MESSAGE) {
+    if (!item.toolCall?.arguments) {
       return null
     }
     return {
       id: getMessageId(item),
-      date: new Date(), // TODO: add date
-      toolName: item.name,
-      toolCallId: item.id,
-      content: JSON.stringify(item.input),
+      date: new Date(item.date),
+      toolName: item.toolCall.name,
+      toolCallId: item.toolCall.toolCallId,
+      content: item.toolCall.arguments,
       messageType: MESSAGE_TYPE.TOOL_CALL_MESSAGE,
     }
   }
 
-  if (type === "tool_return") {
+  if (messageType === MESSAGE_TYPE.TOOL_RETURN_MESSAGE) {
+    if (!item.toolReturn) {
+      return null
+    }
+    return {
+      id: getMessageId(item),
+      date: new Date(item.date),
+      toolCallId: item.toolCallId,
+      content: item.toolReturn,
+      messageType: MESSAGE_TYPE.TOOL_RETURN_MESSAGE,
+      status: item.status,
+      stdout: item.stdout,
+      stderr: item.stderr,
+    }
+  }
+
+  if (messageType === MESSAGE_TYPE.ASSISTANT_MESSAGE) {
     if (!item.content) {
       return null
     }
     return {
       id: getMessageId(item),
-      date: new Date(), // TODO: add date
-      toolCallId: item.tool_call_id,
-      content: JSON.stringify(item.content),
-      messageType: MESSAGE_TYPE.TOOL_RETURN_MESSAGE,
-      status: item.is_error ? "error" : "success",
-      stdout: [], // TODO: add stdout
-      stderr: [], // TODO: add stderr
+      date: new Date(item.date),
+      content: extractMessageText(item.content),
+      messageType: MESSAGE_TYPE.ASSISTANT_MESSAGE,
     }
   }
 
-  // if (messageType === MESSAGE_TYPE.ASSISTANT_MESSAGE) {
-  //   if (!item.content) {
-  //     return null
-  //   }
-  //   return {
-  //     id: getMessageId(item),
-  //     date: new Date(item.date),
-  //     content: extractMessageText(item.content),
-  //     messageType: MESSAGE_TYPE.ASSISTANT_MESSAGE,
-  //   }
-  // }
+  if (messageType === MESSAGE_TYPE.REASONING_MESSAGE) {
+    if (!item.reasoning) {
+      return null
+    }
 
-  // if (messageType === MESSAGE_TYPE.REASONING_MESSAGE) {
-  //   if (!item.reasoning) {
-  //     return null
-  //   }
-
-  //   return {
-  //     id: getMessageId(item),
-  //     date: new Date(item.date),
-  //     content: item.reasoning,
-  //     messageType: MESSAGE_TYPE.REASONING_MESSAGE,
-  //   }
-  // }
+    return {
+      id: getMessageId(item),
+      date: new Date(item.date),
+      content: item.reasoning,
+      messageType: MESSAGE_TYPE.REASONING_MESSAGE,
+    }
+  }
 
   return null
 }
 
-export function filterMessages(data: Letta.LettaMessageContentUnion[]): AppMessage[] {
+export function filterMessages(data: Letta.LettaMessageUnion[]): AppMessage[] {
   return data
     .map((item) => extractMessage(item))
     .filter(Boolean)

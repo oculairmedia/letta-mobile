@@ -1,0 +1,17 @@
+---
+destinationDir: app/stores
+---
+import { MMKV } from "react-native-mmkv"
+
+/**
+* MMKV storage instance for Zustand persistence
+* This provides encrypted storage for all Zustand stores
+*/
+export const zustandStorage = new MMKV({
+id: "app-storage",
+encryptionKey: "app-storage-key",
+// Enable encryption for sensitive data
+encryption: true,
+// Enable compression for better performance
+compression: true,
+})

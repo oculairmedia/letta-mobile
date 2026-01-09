@@ -3,10 +3,10 @@ import { Icon } from "@/components/Icon"
 import { useAgentId } from "@/hooks/use-agentId-param"
 import { useDetachToolFromAgent } from "@/hooks/use-letta-tools"
 import { colors } from "@/theme"
-import { Letta } from "@letta-ai/letta-client"
+import { Tool } from "@letta-ai/letta-client/api"
 import { Alert } from "react-native"
 
-export const DetachToolAction = ({ tool }: { tool: Letta.Tool }) => {
+export const DetachToolAction = ({ tool }: { tool: Tool }) => {
   const [agentId] = useAgentId()
   const { mutate: removeTool, isPending } = useDetachToolFromAgent()
   return (

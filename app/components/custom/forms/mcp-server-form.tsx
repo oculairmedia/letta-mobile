@@ -4,22 +4,16 @@ import type { ThemedStyle } from "@/theme"
 import { spacing } from "@/theme"
 import { useAppTheme } from "@/utils/useAppTheme"
 import { Letta } from "@letta-ai/letta-client"
-import { observer } from "mobx-react-lite"
-import { Fragment, useMemo, useState } from "react"
+import { FC, Fragment, useMemo, useState } from "react"
 import type { TextStyle, ViewStyle } from "react-native"
 import { View } from "react-native"
 
 interface MCPServerFormProps {
-  onSubmit?: (serverData: Letta.SseMcpServer | Letta.StdioMcpServer) => void
+  onSubmit?: (serverData: Letta.SseServerConfig | Letta.StdioServerConfig) => void
   onCancel?: () => void
   isPending?: boolean
 }
-// TODO: remove defualts once demo is done
-export const MCPServerForm = observer(function MCPServerForm({
-  onSubmit,
-  onCancel,
-  isPending,
-}: MCPServerFormProps) {
+export const MCPServerForm: FC<MCPServerFormProps> = ({ onSubmit, onCancel, isPending }) => {
   const { themed } = useAppTheme()
 
   // Basic Information
@@ -27,11 +21,11 @@ export const MCPServerForm = observer(function MCPServerForm({
   const [isSSE, setIsSSE] = useState(false)
 
   // SSE Configuration
-  const [serverUrl, setServerUrl] = useState("plyawright")
+  const [serverUrl, setServerUrl] = useState("")
 
   // Stdio Configuration
-  const [command, setCommand] = useState("npx")
-  const [args, setArgs] = useState("-y,mcp-server-playwright-headless")
+  const [command, setCommand] = useState("")
+  const [args, setArgs] = useState("")
   const [env, setEnv] = useState("")
 
   const handleSubmit = () => {
@@ -41,37 +35,37 @@ export const MCPServerForm = observer(function MCPServerForm({
       if (!serverUrl.trim()) return
 
       onSubmit?.({
-        server_name: serverName.trim(),
-        mcp_server_type: "sse",
-        server_url: serverUrl.trim(),
+        serverName: serverName.trim(),
+        type: "sse",
+        serverUrl: serverUrl.trim(),
       })
     } else {
       if (!command.trim()) return
 
-      // const build env object from env string
-      const envObject = env
-        .trim()
-        .split(",")
-        .reduce(
-          (acc, curr) => {
-            const [key, value] = curr.split("=").map((s) => s.trim())
-            if (key && value) {
-              acc[key] = value
-            }
-            return acc
-          },
-          {} as { [key: string]: string },
-        )
-
       onSubmit?.({
-        server_name: serverName.trim(),
-        mcp_server_type: "stdio",
+        serverName: serverName.trim(),
+        type: "stdio",
         command: command.trim(),
         args: args
           .split(",")
           .map((arg) => arg.trim())
           .filter(Boolean),
-        env: envObject,
+        ...(env.trim() && {
+          env: env
+            .split(",")
+            .map((e) => e.trim())
+            .filter(Boolean)
+            .reduce(
+              (acc, curr) => {
+                const [key, value] = curr.split("=").map((s) => s.trim())
+                if (key && value) {
+                  acc[key] = value
+                }
+                return acc
+              },
+              {} as Record<string, string | undefined>,
+            ),
+        }),
       })
     }
   }
@@ -203,7 +197,7 @@ export const MCPServerForm = observer(function MCPServerForm({
       </View>
     </Fragment>
   )
-})
+}
 
 const $sectionTitleText: ThemedStyle<TextStyle> = () => ({
   marginTop: spacing.md,

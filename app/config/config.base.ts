@@ -25,14 +25,12 @@ const BaseConfig: ConfigBaseProps = {
   exitRoutes: ["Welcome"],
   /**
    * This is the base URL of the Letta server.
-   * Leave empty to require user configuration.
    */
-  lettaBaseUrl: "",
+  lettaBaseUrl: "https://letta.js.sudorw.com",
   /**
    * This is the access token for the Letta server.
-   * Leave empty to require user configuration.
    */
-  lettaAccessToken: "",
+  lettaAccessToken: "DEFAULT_ACCESS_TOKEN",
 }
 
 export default BaseConfig

@@ -14,11 +14,11 @@ export function ResetChat({ agentId }: ResetChatProps) {
       {
         text: "No",
         style: "cancel",
-        onPress: () => resetChatMessages({ agentId, add_default_initial_messages: false }),
+        onPress: () => resetChatMessages({ agentId, addDefaultInitialMessages: false }),
       },
       {
         text: "Yes",
-        onPress: () => resetChatMessages({ agentId, add_default_initial_messages: true }),
+        onPress: () => resetChatMessages({ agentId, addDefaultInitialMessages: true }),
       },
     ])
   }

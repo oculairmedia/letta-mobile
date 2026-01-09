@@ -2,7 +2,7 @@ import { UseMutationOptions } from "@tanstack/react-query"
 
 import { useQueryClient } from "@tanstack/react-query"
 
-import { agentStore } from "@/providers/AgentProvider"
+import { useAgentStore } from "@/providers/AgentProvider"
 import { useLettaClient } from "@/providers/LettaProvider"
 import { useMutation } from "@tanstack/react-query"
 import { getUseAgentStateKey } from "./use-agent"
@@ -22,7 +22,9 @@ export function useDeleteAgent(
         queryKey: getUseAgentStateKey(variables.agentId),
         exact: true,
       })
-      agentStore.setAgentId("")
+      if (useAgentStore.getState().agentId === variables.agentId) {
+        useAgentStore.getState().setAgentId()
+      }
       mutationOptions?.onSuccess?.(data, variables, context)
     },
     ...mutationOptions,

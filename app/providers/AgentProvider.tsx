@@ -1,26 +1,22 @@
-import { createContext, useContext, Fragment } from "react"
-import { makeAutoObservable } from "mobx"
-import { observer } from "mobx-react-lite"
+import { createContext, useContext } from "react"
+import { create } from "zustand"
 
-class AgentStore {
-  agentId: string = ""
-
-  constructor() {
-    makeAutoObservable(this)
-  }
-
-  setAgentId(id: string) {
-    this.agentId = id
-  }
+interface AgentState {
+  agentId: string
+  setAgentId: (id?: string) => void
 }
 
-export const agentStore = new AgentStore()
+export const useAgentStore = create<AgentState>((set) => ({
+  agentId: "",
+  setAgentId: (id?: string) => set({ agentId: id ?? "" }),
+}))
 
 // Create a React Context
-const AgentContext = createContext<AgentStore | undefined>(undefined)
+const AgentContext = createContext<AgentState | undefined>(undefined)
 
 export const AgentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  return <AgentContext.Provider value={agentStore}>{children}</AgentContext.Provider>
+  const store = useAgentStore()
+  return <AgentContext.Provider value={store}>{children}</AgentContext.Provider>
 }
 
 // Custom hook to use the store
@@ -31,8 +27,3 @@ export const useAgentContext = () => {
   }
   return context
 }
-
-// Ensure MobX reactivity in consuming components
-export const ObserverAgent = observer(({ children }: { children: React.ReactNode }) => (
-  <Fragment>{children}</Fragment>
-))

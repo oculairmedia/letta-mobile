@@ -29,12 +29,12 @@ export function useAgent(
 
 export function useModifyAgent(
   agentId: string,
-  mutationOptions?: UseMutationOptions<Letta.AgentState, Error, Letta.AgentUpdateParams>,
+  mutationOptions?: UseMutationOptions<Letta.AgentState, Error, Letta.UpdateAgent>,
 ) {
   const { lettaClient } = useLettaClient()
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (state: Letta.AgentUpdateParams) => lettaClient.agents.update(agentId, state),
+    mutationFn: (state: Letta.UpdateAgent) => lettaClient.agents.modify(agentId, state),
     onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries({ queryKey: getUseAgentStateKey(agentId) })
       queryClient.invalidateQueries({ queryKey: getAgentsQueryKey() })

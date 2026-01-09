@@ -6,7 +6,6 @@
 import { Platform, NativeModules } from "react-native"
 
 import { ArgType } from "reactotron-core-client"
-import { mst } from "reactotron-mst"
 import mmkvPlugin from "reactotron-react-native-mmkv"
 
 import { storage, clear } from "@/utils/storage"
@@ -14,6 +13,10 @@ import { goBack, resetRoot, navigate } from "@/navigators/navigationUtilities"
 
 import { Reactotron } from "./ReactotronClient"
 import { ReactotronReactNative } from "reactotron-react-native"
+import reactotronZustand from "reactotron-plugin-zustand"
+import { useAppSettingsStore } from "@/stores/appSettingsStore"
+import { useLettaConfigStore } from "@/stores/lettaConfigStore"
+import { useAgentStore } from "@/providers/AgentProvider"
 
 const reactotron = Reactotron.configure({
   name: require("../../package.json").name,
@@ -24,9 +27,13 @@ const reactotron = Reactotron.configure({
 })
 
 reactotron.use(
-  mst({
-    /* ignore some chatty `mobx-state-tree` actions */
-    filter: (event) => /postProcessSnapshot|@APPLY_SNAPSHOT/.test(event.name) === false,
+  reactotronZustand({
+    stores: [
+      { name: "appSettings", store: useAppSettingsStore },
+      { name: "lettaConfig", store: useLettaConfigStore },
+      { name: "agent", store: useAgentStore },
+    ],
+    omitFunctionKeys: true,
   }),
 )
 

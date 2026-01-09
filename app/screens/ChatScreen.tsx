@@ -3,7 +3,6 @@ import { ChatUI } from "@/components/custom/chat-ui"
 import { useLettaHeader } from "@/components/custom/useLettaHeader"
 import { AgentTabScreenProps } from "@/navigators"
 import { spacing } from "@/theme"
-import { observer } from "mobx-react-lite"
 import { FC, ReactNode, useState } from "react"
 import { KeyboardAvoidingView, KeyboardAvoidingViewProps, Platform, ViewStyle } from "react-native"
 import { useKeyboardHandler } from "react-native-keyboard-controller"
@@ -11,7 +10,7 @@ import { runOnJS } from "react-native-reanimated"
 
 interface ChatScreenProps extends AgentTabScreenProps<"Chat"> {}
 
-export const ChatScreen: FC<ChatScreenProps> = observer(function ChatScreen() {
+export const ChatScreen: FC<ChatScreenProps> = () => {
   useLettaHeader()
   return (
     <Screen style={$root} contentContainerStyle={$contentContainer} preset="fixed">
@@ -20,7 +19,7 @@ export const ChatScreen: FC<ChatScreenProps> = observer(function ChatScreen() {
       </KeyboardHandlerView>
     </Screen>
   )
-})
+}
 
 interface KeyboardHandlerViewProps {
   children: ReactNode

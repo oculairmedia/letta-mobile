@@ -3,8 +3,7 @@ import { Badge } from "@/components/Badge"
 import { normalizeName } from "@/shared/utils/normalizers"
 import { spacing } from "@/theme"
 import { useAppTheme } from "@/utils/useAppTheme"
-import { observer } from "mobx-react-lite"
-import React, { FC } from "react"
+import { FC } from "react"
 import { View, ViewStyle } from "react-native"
 
 type ToolType = {
@@ -24,12 +23,7 @@ interface ToolCardProps {
   style?: ViewStyle
 }
 
-export const CustomToolCard: FC<ToolCardProps> = observer(function CustomToolCard({
-  tool,
-  RightComponent,
-  onPress,
-  style,
-}) {
+export const CustomToolCard: FC<ToolCardProps> = ({ tool, RightComponent, onPress, style }) => {
   const { themed } = useAppTheme()
 
   return (
@@ -55,7 +49,7 @@ export const CustomToolCard: FC<ToolCardProps> = observer(function CustomToolCar
       RightComponent={RightComponent}
     />
   )
-})
+}
 
 const $card: ViewStyle = {}
 
@@ -77,12 +71,4 @@ const $toolBadgesContainer: ViewStyle = {
   flexDirection: "row",
   gap: spacing.xs,
   alignItems: "center",
-}
-
-const $serverText: ViewStyle = {
-  opacity: 0.7,
-}
-
-const $typeText: ViewStyle = {
-  opacity: 0.5,
 }

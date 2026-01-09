@@ -3,21 +3,21 @@ import { StudioAgentForm } from "@/components/custom/forms/studio-agent-form"
 import { useLettaHeader } from "@/components/custom/useLettaHeader"
 import { useCreateAgent } from "@/hooks/use-create-agent"
 import { AppStackScreenProps, navigate } from "@/navigators"
-import { agentStore } from "@/providers/AgentProvider"
+import { useAgentStore } from "@/providers/AgentProvider"
 import { spacing } from "@/theme"
-import { Letta } from "@letta-ai/letta-client"
-import { observer } from "mobx-react-lite"
+import { CreateAgentRequest } from "@letta-ai/letta-client/api"
 import { FC } from "react"
 import { View, ViewStyle } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
+
 interface StudioScreenProps extends AppStackScreenProps<"Studio"> {}
 
 const chatWithAgent = (agentId: string) => {
-  agentStore.setAgentId(agentId)
+  useAgentStore.getState().setAgentId(agentId)
   navigate("AgentDrawer", { screen: "AgentTab" })
 }
 
-export const StudioScreen: FC<StudioScreenProps> = observer(function StudioScreen() {
+export const StudioScreen: FC<StudioScreenProps> = () => {
   useLettaHeader()
   const { mutate: createAgent, isPending: isCreatingAgent } = useCreateAgent({
     onSuccess: (data) => {
@@ -25,7 +25,7 @@ export const StudioScreen: FC<StudioScreenProps> = observer(function StudioScree
     },
   })
 
-  const handleSubmit = (agentData: Letta.AgentCreateParams) => {
+  const handleSubmit = (agentData: CreateAgentRequest) => {
     createAgent(agentData)
   }
 
@@ -38,7 +38,7 @@ export const StudioScreen: FC<StudioScreenProps> = observer(function StudioScree
       </View>
     </Screen>
   )
-})
+}
 
 const $root: ViewStyle = {
   flex: 1,

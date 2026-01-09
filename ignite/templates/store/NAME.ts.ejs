@@ -1,0 +1,43 @@
+---
+destinationDir: app/stores
+---
+import { create } from "zustand"
+import { createJSONStorage, persist } from "zustand/middleware"
+import { zustandStorage } from "./store.storage"
+
+/**
+* State interface for <%= props.pascalCaseName %> store
+*/
+interface <%= props.pascalCaseName %>State {
+// State properties
+initialized: boolean
+}
+
+/**
+* Actions interface for <%= props.pascalCaseName %> store
+*/
+interface <%= props.pascalCaseName %>Actions {
+// Action methods
+initialize: () => void
+reset: () => void
+}
+
+/**
+* <%= props.pascalCaseName %> store using Zustand
+*/
+export const use<%= props.pascalCaseName %>Store = create<<%= props.pascalCaseName %>State & <%= props.pascalCaseName %>Actions>()(
+  persist(
+  (set, get) => ({
+  // Initial state
+  initialized: false,
+
+  // Actions
+  initialize: () => set({ initialized: true }),
+  reset: () => set({ initialized: false }),
+  }),
+  {
+  name: "<%= props.camelCaseName %>-store",
+  storage: createJSONStorage(() => zustandStorage),
+  },
+  ),
+  )

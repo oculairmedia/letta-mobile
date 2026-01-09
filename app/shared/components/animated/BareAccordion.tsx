@@ -1,8 +1,15 @@
 import { ButtonProps } from "@/components"
-import { spacing, Theme } from "@/theme"
+import { spacing, ThemedStyle } from "@/theme"
 import { useAppTheme } from "@/utils/useAppTheme"
 import { ChevronDown } from "lucide-react-native"
-import { StyleProp, TouchableOpacity, TouchableOpacityProps, View, ViewStyle } from "react-native"
+import {
+  StyleProp,
+  TextStyle,
+  TouchableOpacity,
+  TouchableOpacityProps,
+  View,
+  ViewStyle,
+} from "react-native"
 import Animated, {
   useAnimatedStyle,
   useDerivedValue,
@@ -126,13 +133,7 @@ export function BareAccordion({
       <TouchableOpacity onPress={onToggle} disabled={disabled} {...touchableOpacityProps}>
         {triggerNode?.({
           animatedChevron: (
-            <Animated.View
-              style={[
-                {
-                  transform: [{ rotate: isExpanded ? "180deg" : "0deg" }],
-                },
-              ]}
-            >
+            <Animated.View style={{ transform: [{ rotate: isExpanded ? "180deg" : "0deg" }] }}>
               <ChevronDown size={20} color={themed($chevronIcon).color} />
             </Animated.View>
           ),
@@ -150,6 +151,10 @@ export function BareAccordion({
   )
 }
 
+const $chevronIcon: ThemedStyle<TextStyle> = ({ colors }) => ({
+  color: colors.tint,
+})
+
 const $container: ViewStyle = {
   overflow: "hidden",
 }
@@ -164,7 +169,3 @@ const $animatedView: ViewStyle = {
   width: "100%",
   overflow: "hidden",
 }
-
-const $chevronIcon = ({ colors }: { colors: Theme["colors"] }) => ({
-  color: colors.tint,
-})

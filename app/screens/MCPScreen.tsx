@@ -9,19 +9,18 @@ import { AppStackScreenProps } from "@/navigators"
 import { spacing, ThemedStyle } from "@/theme"
 import { useAppTheme } from "@/utils/useAppTheme"
 import { Letta } from "@letta-ai/letta-client"
-import { observer } from "mobx-react-lite"
 import { FC, Fragment, useState } from "react"
 import { Alert, FlatList, RefreshControl, TextStyle, View, ViewStyle } from "react-native"
 
 interface MCPServerCardProps {
-  server: Letta.SseMcpServer | Letta.StdioMcpServer
+  server: Letta.SseServerConfig | Letta.StdioServerConfig
   onDelete: () => void
 }
 
 const isSseServer = (
-  server: Letta.SseMcpServer | Letta.StdioMcpServer,
-): server is Letta.SseMcpServer => {
-  return server.mcp_server_type === "sse"
+  server: Letta.SseServerConfig | Letta.StdioServerConfig,
+): server is Letta.SseServerConfig => {
+  return server.type === "sse"
 }
 
 const MCPServerCard: FC<MCPServerCardProps> = ({ server, onDelete }) => {
@@ -40,11 +39,11 @@ const MCPServerCard: FC<MCPServerCardProps> = ({ server, onDelete }) => {
       ]}
     >
       <Card
-        heading={server.server_name || "Unnamed MCP Server"}
+        heading={server.serverName || "Unnamed MCP Server"}
         ContentComponent={
           <View style={$serverContentContainer}>
             {isSseServer(server) ? (
-              <Text style={themed($serverContentTextStyle)}>URL: {server.server_url}</Text>
+              <Text style={themed($serverContentTextStyle)}>URL: {server.serverUrl}</Text>
             ) : (
               <Fragment>
                 <Text style={themed($serverContentTextStyle)}>Command: {server.command}</Text>
@@ -53,13 +52,13 @@ const MCPServerCard: FC<MCPServerCardProps> = ({ server, onDelete }) => {
             )}
           </View>
         }
-        RightComponent={<Badge text={server.mcp_server_type!} />}
+        RightComponent={<Badge text={server.type!} />}
       />
     </SimpleContextMenu>
   )
 }
 
-export const MCPScreen: FC<AppStackScreenProps<"MCP">> = observer(function MCPScreen() {
+export const MCPScreen: FC<AppStackScreenProps<"MCP">> = () => {
   useLettaHeader()
 
   const [isAddModalVisible, setIsAddModalVisible] = useState(false)
@@ -71,7 +70,7 @@ export const MCPScreen: FC<AppStackScreenProps<"MCP">> = observer(function MCPSc
     theme: { colors },
   } = useAppTheme()
 
-  const handleAddServer = (serverData: Letta.SseMcpServer | Letta.StdioMcpServer) => {
+  const handleAddServer = (serverData: Letta.SseServerConfig | Letta.StdioServerConfig) => {
     addServerMutation.mutate(serverData)
     setIsAddModalVisible(false)
   }
@@ -108,11 +107,11 @@ export const MCPScreen: FC<AppStackScreenProps<"MCP">> = observer(function MCPSc
 
       <FlatList
         data={Object.entries(servers || {}).map(([name, server]) => ({
-          ...(server as Letta.SseMcpServer | Letta.StdioMcpServer),
+          ...server,
           serverName: name,
         }))}
         bounces={!!servers && Object.keys(servers).length > 0}
-        keyExtractor={(item) => item.server_name}
+        keyExtractor={(item) => item.serverName}
         refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} />}
         refreshing={isFetching}
         ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
@@ -131,7 +130,7 @@ export const MCPScreen: FC<AppStackScreenProps<"MCP">> = observer(function MCPSc
       />
     </Screen>
   )
-})
+}
 
 const $root: ViewStyle = {
   flex: 1,
