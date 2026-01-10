@@ -11,7 +11,7 @@ export function useAgentMessages(agentId: string, queryOptions?: UseQueryOptions
     queryKey: getAgentMessagesQueryKey(agentId),
     queryFn: () =>
       lettaClient.agents.messages
-        .list(agentId, { use_assistant_message })
+        .list(agentId)
         .then((response) => filterMessages(response.getPaginatedItems())),
     enabled: !!agentId && !!lettaClient,
     initialData: [],

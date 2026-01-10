@@ -1,14 +1,13 @@
 import { Button, Screen, Text, TextField } from "@/components"
 import { EmptyState } from "@/components/EmptyState"
 import { CustomToolCard } from "@/components/custom/tool-card"
-import { useMCPTools } from "@/hooks/use-mcp"
 import { useAgent } from "@/hooks/use-agent"
 import { useAgentId } from "@/hooks/use-agentId-param"
+import { useMCPTools } from "@/hooks/use-mcp"
 import { BareAccordion } from "@/shared/components/animated/BareAccordion"
 import { AttachMCPToolAction } from "@/shared/components/tools/attach-mcp-tool-action"
 import { spacing } from "@/theme"
 import { useAppTheme } from "@/utils/useAppTheme"
-import { Letta } from "@letta-ai/letta-client"
 import { FC, useMemo, useState } from "react"
 import { Modal, View, ViewStyle } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
@@ -22,7 +21,7 @@ interface MCPTool {
   name: string
   description?: string
   serverName: string
-  serverType?: Letta.McpServerType
+  serverType?: "stdio" | "sse" | "streamable_http"
   inputSchema: Record<string, unknown>
 }
 
@@ -136,7 +135,8 @@ export const MCPToolsModal: FC<MCPToolsModalProps> = ({ visible, onDismiss }) =>
         ...tool,
         name: tool.name || "",
         serverName: tool.serverName || "",
-        inputSchema: tool.inputSchema || {},
+        inputSchema: tool.args_json_schema || {},
+        description: tool.description || undefined,
         isAttached: toolAttachmentMap.get(`${tool.name}:${tool.serverName}`) || false,
       })
       return grouped

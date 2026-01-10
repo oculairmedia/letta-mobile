@@ -8,7 +8,7 @@ import { useAddMCPServer, useDeleteMCPServer, useMCPList } from "@/hooks/use-mcp
 import { AppStackScreenProps } from "@/navigators"
 import { spacing, ThemedStyle } from "@/theme"
 import { useAppTheme } from "@/utils/useAppTheme"
-import { CreateSseMcpServer, CreateStdioMcpServer, SseMcpServer, StdioMcpServer, StreamableHTTPMcpServer } from "@letta-ai/letta-client/resources/mcp-servers"
+import { McpServerCreateParams, SseMcpServer, StdioMcpServer, StreamableHTTPMcpServer } from "@letta-ai/letta-client/resources/mcp-servers"
 import { FC, Fragment, useState } from "react"
 import { Alert, FlatList, RefreshControl, TextStyle, View, ViewStyle } from "react-native"
 
@@ -75,7 +75,7 @@ export const MCPScreen: FC<AppStackScreenProps<"MCP">> = () => {
     theme: { colors },
   } = useAppTheme()
 
-  const handleAddServer = (serverData: CreateSseMcpServer | CreateStdioMcpServer) => {
+  const handleAddServer = (serverData: McpServerCreateParams) => {
     addServerMutation.mutate(serverData)
     setIsAddModalVisible(false)
   }

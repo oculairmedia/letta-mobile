@@ -1,63 +1,36 @@
 import { useLettaClient } from "@/providers/LettaProvider"
-import { AgentState, AppModel, Tool } from "@letta-ai/letta-client/api"
+import { AgentState } from "@letta-ai/letta-client/resources/agents/agents"
+import { Tool } from "@letta-ai/letta-client/resources/tools"
 import { useMutation, UseMutationOptions, useQuery, useQueryClient } from "@tanstack/react-query"
 import { getUseAgentStateKey } from "./use-agent"
 import { getAgentsQueryKey } from "./use-agents"
 export const getLettaToolsQueryKey = () => ["letta-tools"]
 
-const filterTools = (tools: Tool[]) => {
-  return tools.filter((tool) => tool.toolType === "custom")
-}
-
 export const useLettaTools = () => {
   const { lettaClient } = useLettaClient()
   return useQuery({
     queryKey: getLettaToolsQueryKey(),
-    queryFn: () => lettaClient.tools.list(),
-    select: filterTools,
-    enabled: !!lettaClient,
-  })
-}
-
-export const getComposioAppsQueryKey = () => ["composio-apps"]
-
-export const useLettaComposioApps = () => {
-  const { lettaClient } = useLettaClient()
-  return useQuery<AppModel[], Error>({
-    queryKey: getComposioAppsQueryKey(),
-    queryFn: () => lettaClient.tools.listComposioApps(),
-    enabled: !!lettaClient,
-  })
-}
-
-export const getComposioToolsQueryKey = () => ["composio-tools"]
-
-export const useLettaComposioTools = () => {
-  const { lettaClient } = useLettaClient()
-  const { data: composioApps } = useLettaComposioApps()
-  return useQuery({
-    queryKey: getComposioToolsQueryKey(),
     queryFn: async () => {
-      if (!composioApps) return []
-      const actions = await Promise.all(
-        composioApps.map((app) => lettaClient.tools.listComposioActionsByApp(app.name)),
-      )
-
-      return actions
+      const page = await lettaClient.tools.list()
+      const tools: Tool[] = []
+      for await (const tool of page) {
+        tools.push(tool)
+      }
+      return tools
     },
-    enabled: !!lettaClient && !!composioApps?.length,
+    enabled: !!lettaClient,
   })
 }
 
 export function useAttachToolToAgent({
   onSuccess,
   ...mutationOptions
-}: UseMutationOptions<AgentState, Error, { agentId: string; toolId: string }> = {}) {
+}: UseMutationOptions<AgentState | null, Error, { agentId: string; toolId: string }> = {}) {
   const { lettaClient } = useLettaClient()
   const queryClient = useQueryClient()
-  return useMutation({
+  return useMutation<AgentState | null, Error, { agentId: string; toolId: string }>({
     mutationFn: ({ agentId, toolId }: { agentId: string; toolId: string }) =>
-      lettaClient.agents.tools.attach(agentId, toolId),
+      lettaClient.agents.tools.attach(toolId, { agent_id: agentId }),
     onSuccess: (...args) => {
       queryClient.invalidateQueries({ queryKey: getUseAgentStateKey(args[1].agentId) })
       queryClient.invalidateQueries({ queryKey: getAgentsQueryKey() })
@@ -70,12 +43,12 @@ export function useAttachToolToAgent({
 export function useDetachToolFromAgent({
   onSuccess,
   ...mutationOptions
-}: UseMutationOptions<AgentState, Error, { agentId: string; toolId: string }> = {}) {
+}: UseMutationOptions<AgentState | null, Error, { agentId: string; toolId: string }> = {}) {
   const { lettaClient } = useLettaClient()
   const queryClient = useQueryClient()
-  return useMutation({
+  return useMutation<AgentState | null, Error, { agentId: string; toolId: string }>({
     mutationFn: ({ agentId, toolId }: { agentId: string; toolId: string }) =>
-      lettaClient.agents.tools.detach(agentId, toolId),
+      lettaClient.agents.tools.detach(toolId, { agent_id: agentId }),
     onSuccess: (...args) => {
       queryClient.invalidateQueries({ queryKey: getUseAgentStateKey(args[1].agentId) })
       queryClient.invalidateQueries({ queryKey: getAgentsQueryKey() })
