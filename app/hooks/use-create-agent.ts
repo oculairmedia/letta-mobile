@@ -35,9 +35,7 @@ export function useCreateAgent(
     onSuccess: async (...args) => {
       queryClient.invalidateQueries({ queryKey: getAgentsQueryKey() })
       // reset chat messages
-      await lettaClient.agents.messages.reset(args[0].id, {
-        add_default_initial_messages: false,
-      })
+      await lettaClient.agents.messages.reset(args[0].id, {})
       mutationOptions?.onSuccess?.(...args)
     },
     onError: (error, variables, context) => {

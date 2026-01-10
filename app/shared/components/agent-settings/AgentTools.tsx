@@ -1,9 +1,11 @@
+import { Button } from "@/components/Button"
 import { useAgent } from "@/hooks/use-agent"
 import { useAgentId } from "@/hooks/use-agentId-param"
+import { useSyncClientTools } from "@/hooks/use-client-tools"
 import { Accordion } from "@/shared/components/animated/Accordion"
 import { ToolCard } from "@/shared/components/tools/tool-card"
-import { spacing } from "@/theme"
 import { normalizeTypeName } from "@/shared/utils/normalizers"
+import { spacing } from "@/theme"
 import { FC, useCallback, useMemo, useState } from "react"
 import { View, ViewStyle } from "react-native"
 import { DetachToolAction } from "../tools/detach-tool-action"
@@ -15,6 +17,7 @@ interface AgentToolsProps {
 export const AgentTools: FC<AgentToolsProps> = ({ style }) => {
   const [agentId] = useAgentId()
   const { data: agent } = useAgent(agentId)
+  const { mutate: syncClientTools, isPending: isSyncing } = useSyncClientTools()
   const [expandedTypes, setExpandedTypes] = useState<Record<string, boolean>>({})
 
   const types = useMemo(() => {
@@ -60,6 +63,13 @@ export const AgentTools: FC<AgentToolsProps> = ({ style }) => {
         </Accordion>
       ))}
       <AddAgentToolButton />
+      <Button
+        onPress={() => syncClientTools({ agentId })}
+        text="Sync Client Tools"
+        preset="default"
+        loading={isSyncing}
+        disabled={isSyncing}
+      />
     </View>
   )
 }

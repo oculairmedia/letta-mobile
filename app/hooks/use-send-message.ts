@@ -4,6 +4,8 @@ import { getAgentMessagesQueryKey } from "./use-agent-messages"
 import { extractMessage, getMessageId } from "./utils"
 
 import { useLettaClient } from "@/providers/LettaProvider"
+import { clientTools } from "@/utils/client-tools/registry"
+import type Letta from "@letta-ai/letta-client"
 import { Message } from "@letta-ai/letta-client/resources/agents/messages"
 import uuid from "react-native-uuid"
 const uuidv4 = uuid.v4
@@ -70,9 +72,84 @@ function updateMessageInQueryData(
   )
 }
 
+interface ProcessMessageStreamProps {
+  messages: any[]
+  agentId: string
+  lettaClient: Letta
+  queryClient: ReturnType<typeof useQueryClient>
+}
+async function processMessageStream({
+  messages,
+  agentId,
+  lettaClient,
+  queryClient,
+}: ProcessMessageStreamProps) {
+  if (!messages) return
+
+  for (const response of messages) {
+    const responseMessageId = getMessageId(response)
+    updateMessageInQueryData(queryClient, agentId, response, responseMessageId)
+
+    // Intercept Approval Request for Client Tools
+    if (response.message_type === 'approval_request_message') {
+      const toolCall = response.tool_call
+      const clientToolFunc = clientTools[toolCall.name]
+
+      if (clientToolFunc) {
+        console.log(`[ClientTool] Intercepting tool call: ${toolCall.name}`)
+
+        let toolReturn = ""
+        let status = "success"
+
+        try {
+          toolReturn = await clientToolFunc(toolCall.arguments)
+        } catch (e: any) {
+          console.error(`[ClientTool] Execution failed:`, e)
+          toolReturn = `Error executing client tool: ${e.message}`
+          status = "error"
+        }
+
+        const nextResponse = await lettaClient.agents.messages.create(
+          agentId,
+          {
+            messages: [
+              {
+                type: "approval",
+                approvals: [
+                  {
+                    type: "tool",
+                    tool_call_id: toolCall.tool_call_id,
+                    tool_return: toolReturn,
+                    status: status === "success" ? "success" : "error",
+                  },
+                ],
+              },
+            ],
+          }
+        ).catch(err => {
+          console.error("[ClientTool] Failed to send approval response:", err)
+          return null
+        })
+
+        if (nextResponse && nextResponse.messages) {
+          await processMessageStream({
+            messages: nextResponse.messages,
+            agentId,
+            lettaClient,
+            queryClient,
+          })
+        }
+      }
+    }
+  }
+}
+
 export function useSendMessageAsync() {
   const { lettaClient } = useLettaClient()
   const queryClient = useQueryClient()
+
+
+
   async function sendMessage(options: UseSendMessageType) {
     const { agentId, text } = options
 
@@ -117,10 +194,12 @@ export function useSendMessageAsync() {
       return
     }
 
-    for await (const response of messagesResponse.messages) {
-      const responseMessageId = getMessageId(response)
-      updateMessageInQueryData(queryClient, agentId, response, responseMessageId)
-    }
+    await processMessageStream({
+      messages: messagesResponse.messages,
+      agentId,
+      lettaClient,
+      queryClient,
+    })
   }
 
   return useMutation<void, undefined, UseSendMessageType>({
