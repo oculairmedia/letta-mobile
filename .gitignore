@@ -90,3 +90,8 @@ web-build/
 
 # Yarn
 .yarn/*
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key

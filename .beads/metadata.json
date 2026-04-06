@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "letta_mobile",
+  "project_id": "9d8d46c2-c475-4fff-b800-452d47841714"
+}
