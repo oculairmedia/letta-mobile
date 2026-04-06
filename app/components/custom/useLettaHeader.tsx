@@ -161,15 +161,15 @@ export function useLettaHeader(headerProps: HeaderProps = {}, deps: any[] = defa
           },
           titleProps: { title: "Providers" },
         })
-      case "FolderManager":
+      case "Conversations":
         return createHeaderProps({
           leftProps: {
-            leftIcon: "back" satisfies IconTypes,
-            onLeftPress: () => navigation.goBack(),
+            leftIcon: "settings" satisfies IconTypes,
+            onLeftPress: () => navigation.navigate("ConfigList" as never),
           },
           rightProps: {},
           titleProps: {
-            title: "Folders",
+            title: "Conversations",
           },
         })
       case "Welcome":

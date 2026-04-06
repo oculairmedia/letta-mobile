@@ -1,5 +1,4 @@
 import { AgentSettingsScreen, ChatScreen } from "@/screens"
-import { FolderManagerScreen } from "@/screens/FolderManagerScreen"
 import { ToolsScreen } from "@/screens/ToolsScreen"
 import type { ThemedStyle } from "@/theme"
 import { useAppTheme } from "@/utils/useAppTheme"
@@ -15,7 +14,6 @@ import { useResetAgentTab } from "./useResetAgentTab"
 export type AgentTabParamList = {
   Chat: undefined
   Settings: undefined
-  FolderManager: undefined
   Tools: undefined
 }
 
@@ -67,16 +65,6 @@ export const AgentTabNavigator: FC<AgentTabNavigatorProps> = ({ initialRouteName
               color={focused ? colors.tint : colors.tintInactive}
               size={26}
             />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="FolderManager"
-        component={FolderManagerScreen}
-        options={{
-          tabBarLabel: "Folders",
-          tabBarIcon: ({ focused }) => (
-            <Icon icon="Folder" color={focused ? colors.tint : colors.tintInactive} size={26} />
           ),
         }}
       />
