@@ -1,7 +1,18 @@
 import { useLettaConfigStore } from "@/stores/lettaConfigStore"
 import Letta from "@letta-ai/letta-client"
-import { useMemo } from "react"
-export const useLettaClient = () => {
+import { createContext, useContext, useMemo, ReactNode } from "react"
+
+interface LettaClientContextValue {
+  lettaClient: Letta | undefined
+}
+
+const LettaClientContext = createContext<LettaClientContextValue | undefined>(undefined)
+
+interface LettaClientProviderProps {
+  children: ReactNode
+}
+
+export function LettaClientProvider({ children }: LettaClientProviderProps) {
   const getActiveConfig = useLettaConfigStore((state) => state.getActiveConfig)
   const activeConfigId = useLettaConfigStore((state) => state.activeConfigId)
 
@@ -13,7 +24,17 @@ export const useLettaClient = () => {
       baseURL: config.serverUrl,
       apiKey: config.accessToken,
     })
-  }, [activeConfigId])
+  }, [activeConfigId, getActiveConfig])
 
-  return { lettaClient: client! }
+  const value = useMemo(() => ({ lettaClient: client }), [client])
+
+  return <LettaClientContext.Provider value={value}>{children}</LettaClientContext.Provider>
+}
+
+export const useLettaClient = () => {
+  const context = useContext(LettaClientContext)
+  if (context === undefined) {
+    throw new Error("useLettaClient must be used within a LettaClientProvider")
+  }
+  return { lettaClient: context.lettaClient! }
 }

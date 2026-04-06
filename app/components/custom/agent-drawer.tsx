@@ -1,5 +1,6 @@
 import { useAgentId } from "@/hooks/use-agentId-param"
 import { useAgentChatContext } from "@/hooks/use-chat-context"
+import { useAgentStore } from "@/providers/AgentProvider"
 import { AgentName } from "@/shared/components/agent-settings"
 import { spacing } from "@/theme"
 import { DrawerContentComponentProps, DrawerContentScrollView } from "@react-navigation/drawer"
@@ -16,6 +17,7 @@ export function AgentDrawerContent({ descriptors, state, ...rest }: DrawerConten
   const { drawerContentStyle, drawerContentContainerStyle } = focusedOptions
 
   const [agentId] = useAgentId()
+  const conversationId = useAgentStore((s) => s.conversationId)
 
   return (
     <DrawerContentScrollView
@@ -27,7 +29,7 @@ export function AgentDrawerContent({ descriptors, state, ...rest }: DrawerConten
       <ChatContext agentId={agentId} />
 
       <View style={$actionsContainer}>
-        <AgentActions agentId={agentId} />
+        <AgentActions agentId={agentId} conversationId={conversationId} />
         <MemoryBlocks agentId={agentId} />
       </View>
     </DrawerContentScrollView>

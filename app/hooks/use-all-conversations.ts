@@ -5,7 +5,7 @@ import { useQuery, UseQueryOptions } from "@tanstack/react-query"
 export const getAllConversationsQueryKey = () => ["allConversations"]
 
 export function useAllConversations(
-  queryOptions?: Omit<UseQueryOptions<Conversation[]>, "queryKey" | "queryFn">
+  queryOptions?: Omit<UseQueryOptions<Conversation[]>, "queryKey" | "queryFn">,
 ) {
   const { lettaClient } = useLettaClient()
   return useQuery<Conversation[]>({

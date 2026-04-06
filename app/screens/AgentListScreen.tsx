@@ -8,6 +8,7 @@ import { STARTER_KITS, useCreateAgent } from "@/hooks/use-create-agent"
 import { useDeleteAgent } from "@/hooks/use-delete-agent"
 import { AppStackScreenProps, navigate } from "@/navigators"
 import { useAgentStore } from "@/providers/AgentProvider"
+import { formatRelativeTime } from "@/shared/utils/formatters"
 import { spacing, ThemedStyle } from "@/theme"
 import { showAgentNamePrompt } from "@/utils/agent-name-prompt"
 import { useAppTheme } from "@/utils/useAppTheme"
@@ -34,22 +35,6 @@ interface AgentCardProps {
 const chatWithAgent = (agentId: string) => {
   useAgentStore.getState().setAgentId(agentId)
   navigate("AgentDrawer", { screen: "AgentTab" })
-}
-
-const formatRelativeTime = (dateString: string | null | undefined): string => {
-  if (!dateString) return ""
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffMins < 1) return "now"
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 7) return `${diffDays}d ago`
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date)
 }
 
 const AgentCard: FC<AgentCardProps> = ({ agent }) => {
@@ -172,7 +157,7 @@ const StarterKits = () => {
             ContentComponent={
               <Fragment>
                 <AutoImage
-                  source={{ uri: `https://app.letta.com${kit.image.src}` }}
+                  source={{ uri: kit.image.blurDataURL }}
                   style={$starterKitImage}
                   maxHeight={120}
                 />
@@ -232,13 +217,13 @@ export const AgentListScreen: FC<AppStackScreenProps<"AgentList">> = () => {
     }
 
     // For multi-word queries, find agents that match all tokens
-    const matchingSets = tokens.map((token) =>
-      new Set(fuse.search(token).map((result) => result.item.id))
+    const matchingSets = tokens.map(
+      (token) => new Set(fuse.search(token).map((result) => result.item.id)),
     )
 
     // Intersect all sets to get agents matching ALL tokens
-    const intersection = matchingSets.reduce((acc, set) =>
-      new Set([...acc].filter((id) => set.has(id)))
+    const intersection = matchingSets.reduce(
+      (acc, set) => new Set([...acc].filter((id) => set.has(id))),
     )
 
     return sorted.filter((agent) => intersection.has(agent.id))
@@ -270,12 +255,7 @@ export const AgentListScreen: FC<AppStackScreenProps<"AgentList">> = () => {
             autoCorrect={false}
           />
           {searchQuery.length > 0 && (
-            <Icon
-              icon="X"
-              size={18}
-              color={colors.textDim}
-              onPress={() => setSearchQuery("")}
-            />
+            <Icon icon="X" size={18} color={colors.textDim} onPress={() => setSearchQuery("")} />
           )}
         </View>
         <View style={$headerRow}>
@@ -319,7 +299,7 @@ export const AgentListScreen: FC<AppStackScreenProps<"AgentList">> = () => {
           searchQuery.trim() ? (
             <View style={$noResultsContainer}>
               <Icon icon="Search" size={48} color={colors.textDim} />
-              <Text style={$noResultsText}>No agents found for "{searchQuery}"</Text>
+              <Text style={$noResultsText}>No agents found for &quot;{searchQuery}&quot;</Text>
             </View>
           ) : (
             <StarterKits />

@@ -5,34 +5,24 @@ import { useAllConversations } from "@/hooks/use-all-conversations"
 import { useCreateConversation } from "@/hooks/use-conversations"
 import { AppStackScreenProps, navigate } from "@/navigators"
 import { useAgentStore } from "@/providers/AgentProvider"
+import { formatRelativeTime } from "@/shared/utils/formatters"
 import { spacing, ThemedStyle } from "@/theme"
 import { useAppTheme } from "@/utils/useAppTheme"
 import { Conversation } from "@letta-ai/letta-client/resources/conversations/conversations"
-import { FC, useMemo } from "react"
+import { Letta } from "@letta-ai/letta-client"
+import { FC, useMemo, useState } from "react"
 import {
+  ActivityIndicator,
   FlatList,
+  Modal,
+  Pressable,
   RefreshControl,
+  ScrollView,
   TextStyle,
   TouchableOpacity,
   View,
   ViewStyle,
 } from "react-native"
-
-const formatRelativeTime = (dateString: string | null | undefined): string => {
-  if (!dateString) return ""
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffMins < 1) return "now"
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 7) return `${diffDays}d ago`
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date)
-}
 
 interface ConversationCardProps {
   conversation: Conversation
@@ -78,6 +68,72 @@ const ConversationCard: FC<ConversationCardProps> = ({ conversation, agentName, 
   )
 }
 
+interface AgentPickerModalProps {
+  visible: boolean
+  agents: Letta.AgentState[] | undefined
+  onSelect: (agentId: string) => void
+  onDismiss: () => void
+  isCreating: boolean
+}
+
+const AgentPickerModal: FC<AgentPickerModalProps> = ({
+  visible,
+  agents,
+  onSelect,
+  onDismiss,
+  isCreating,
+}) => {
+  const { themed, theme } = useAppTheme()
+  const { colors } = theme
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
+      <Pressable style={$modalOverlay} onPress={onDismiss}>
+        <View style={themed($modalContent)}>
+          <View style={$modalHeader}>
+            <Text preset="bold">Select an Agent</Text>
+            <TouchableOpacity onPress={onDismiss}>
+              <Icon icon="X" size={20} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+          <Text size="sm" style={themed($modalSubtext)}>
+            Choose an agent to start a new conversation
+          </Text>
+          <ScrollView style={$agentList}>
+            {agents?.map((agent) => (
+              <TouchableOpacity
+                key={agent.id}
+                style={themed($agentItem)}
+                onPress={() => onSelect(agent.id)}
+                disabled={isCreating}
+              >
+                <View style={$agentItemContent}>
+                  <Icon icon="Bot" size={18} color={colors.tint} />
+                  <View style={$agentItemText}>
+                    <Text preset="bold" size="sm" numberOfLines={1}>
+                      {agent.name || "Unnamed Agent"}
+                    </Text>
+                    {agent.model && (
+                      <Text size="xxs" style={themed($agentModelText)} numberOfLines={1}>
+                        {agent.model}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+                {isCreating ? (
+                  <ActivityIndicator size="small" color={colors.tint} />
+                ) : (
+                  <Icon icon="Plus" size={18} color={colors.tint} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </Pressable>
+    </Modal>
+  )
+}
+
 export const ConversationsScreen: FC<AppStackScreenProps<"Conversations">> = () => {
   useLettaHeader()
 
@@ -86,9 +142,11 @@ export const ConversationsScreen: FC<AppStackScreenProps<"Conversations">> = () 
     themed,
   } = useAppTheme()
 
+  const [showAgentPicker, setShowAgentPicker] = useState(false)
+
   const { data: conversations, refetch, isFetching } = useAllConversations()
   const { data: agents } = useAgents()
-  const { mutate: createConversation } = useCreateConversation()
+  const { mutate: createConversation, isPending: isCreating } = useCreateConversation()
 
   const setAgentId = useAgentStore((s) => s.setAgentId)
   const setConversationId = useAgentStore((s) => s.setConversationId)
@@ -111,8 +169,21 @@ export const ConversationsScreen: FC<AppStackScreenProps<"Conversations">> = () 
   }
 
   const handleNewChat = () => {
-    // Navigate to agent list to select an agent for new chat
-    navigate("AgentList")
+    setShowAgentPicker(true)
+  }
+
+  const handleAgentSelect = (agentId: string) => {
+    createConversation(
+      { agentId },
+      {
+        onSuccess: (newConversation) => {
+          setShowAgentPicker(false)
+          setAgentId(agentId)
+          setConversationId(newConversation.id)
+          navigate("AgentDrawer", { screen: "AgentTab" })
+        },
+      },
+    )
   }
 
   return (
@@ -152,13 +223,17 @@ export const ConversationsScreen: FC<AppStackScreenProps<"Conversations">> = () 
         }
       />
 
-      <TouchableOpacity
-        style={themed($fab)}
-        onPress={handleNewChat}
-        activeOpacity={0.8}
-      >
+      <TouchableOpacity style={themed($fab)} onPress={handleNewChat} activeOpacity={0.8}>
         <Icon icon="Plus" size={24} color="#fff" />
       </TouchableOpacity>
+
+      <AgentPickerModal
+        visible={showAgentPicker}
+        agents={agents}
+        onSelect={handleAgentSelect}
+        onDismiss={() => setShowAgentPicker(false)}
+        isCreating={isCreating}
+      />
     </Screen>
   )
 }
@@ -255,4 +330,62 @@ const $fab: ThemedStyle<ViewStyle> = ({ colors }) => ({
   shadowOffset: { width: 0, height: 2 },
   shadowOpacity: 0.25,
   shadowRadius: 4,
+})
+
+const $modalOverlay: ViewStyle = {
+  flex: 1,
+  backgroundColor: "rgba(0,0,0,0.5)",
+  justifyContent: "center",
+  alignItems: "center",
+  padding: spacing.lg,
+}
+
+const $modalContent: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  backgroundColor: colors.background,
+  borderRadius: 12,
+  width: "100%",
+  maxWidth: 400,
+  maxHeight: "70%",
+  padding: spacing.md,
+})
+
+const $modalHeader: ViewStyle = {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: spacing.xs,
+}
+
+const $modalSubtext: ThemedStyle<TextStyle> = ({ colors }) => ({
+  color: colors.textDim,
+  marginBottom: spacing.md,
+})
+
+const $agentList: ViewStyle = {
+  maxHeight: 300,
+}
+
+const $agentItem: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  paddingVertical: spacing.sm,
+  paddingHorizontal: spacing.sm,
+  borderBottomWidth: 1,
+  borderBottomColor: colors.palette.overlay20,
+})
+
+const $agentItemContent: ViewStyle = {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing.sm,
+  flex: 1,
+}
+
+const $agentItemText: ViewStyle = {
+  flex: 1,
+}
+
+const $agentModelText: ThemedStyle<TextStyle> = ({ colors }) => ({
+  color: colors.textDim,
 })

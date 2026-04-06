@@ -4,9 +4,10 @@ import { useResetChatMessages } from "@/hooks/use-agent-messages"
 
 interface ResetChatProps {
   agentId: string
+  conversationId?: string | null
 }
 
-export function ResetChat({ agentId }: ResetChatProps) {
+export function ResetChat({ agentId, conversationId }: ResetChatProps) {
   const { mutate: resetChatMessages, isPending } = useResetChatMessages()
 
   const handleResetChat = () => {
@@ -14,12 +15,14 @@ export function ResetChat({ agentId }: ResetChatProps) {
       {
         text: "No",
         style: "cancel",
-        onPress: () => resetChatMessages({ agentId, add_default_initial_messages: false }),
+        onPress: () =>
+          resetChatMessages({ agentId, conversationId, add_default_initial_messages: false }),
       },
       {
         text: "Reset and Add Default Messages",
         style: "destructive",
-        onPress: () => resetChatMessages({ agentId, add_default_initial_messages: true }),
+        onPress: () =>
+          resetChatMessages({ agentId, conversationId, add_default_initial_messages: true }),
       },
     ])
   }

@@ -13,17 +13,19 @@ const uuidv4 = uuid.v4
 export interface UseSendMessageType {
   agentId: string
   text: string
+  conversationId?: string | null
 }
 
 function updateMessageInQueryData(
   queryClient: ReturnType<typeof useQueryClient>,
   agentId: string,
+  conversationId: string | null | undefined,
   response: Message,
   responseMessageId: string,
 ) {
   queryClient.setQueriesData<AppMessage[] | undefined>(
     {
-      queryKey: getAgentMessagesQueryKey(agentId),
+      queryKey: getAgentMessagesQueryKey(agentId, conversationId),
     },
     (_data) => {
       if (!_data) {
@@ -75,12 +77,14 @@ function updateMessageInQueryData(
 interface ProcessMessageStreamProps {
   messages: any[]
   agentId: string
+  conversationId?: string | null
   lettaClient: Letta
   queryClient: ReturnType<typeof useQueryClient>
 }
 async function processMessageStream({
   messages,
   agentId,
+  conversationId,
   lettaClient,
   queryClient,
 }: ProcessMessageStreamProps) {
@@ -88,7 +92,7 @@ async function processMessageStream({
 
   for (const response of messages) {
     const responseMessageId = getMessageId(response)
-    updateMessageInQueryData(queryClient, agentId, response, responseMessageId)
+    updateMessageInQueryData(queryClient, agentId, conversationId, response, responseMessageId)
 
     // Intercept Approval Request for Client Tools
     if (response.message_type === "approval_request_message") {
@@ -134,6 +138,7 @@ async function processMessageStream({
           await processMessageStream({
             messages: nextResponse.messages,
             agentId,
+            conversationId,
             lettaClient,
             queryClient,
           })
@@ -148,7 +153,7 @@ export function useSendMessageAsync() {
   const queryClient = useQueryClient()
 
   async function sendMessage(options: UseSendMessageType) {
-    const { agentId, text } = options
+    const { agentId, text, conversationId } = options
 
     const userMessage: AppMessage = {
       id: uuidv4(),
@@ -159,7 +164,7 @@ export function useSendMessageAsync() {
 
     queryClient.setQueriesData<AppMessage[] | undefined>(
       {
-        queryKey: getAgentMessagesQueryKey(agentId),
+        queryKey: getAgentMessagesQueryKey(agentId, conversationId),
       },
       (_data) => {
         const data = _data ?? []
@@ -167,25 +172,54 @@ export function useSendMessageAsync() {
       },
     )
 
-    const messagesResponse = await lettaClient.agents.messages
-      .create(
-        agentId,
-        {
-          use_assistant_message,
-          messages: [
-            {
-              role: ROLE_TYPE.USER,
-              content: text,
-            },
-          ],
-        },
-        {
-          timeout: 120 * 1000,
-        },
-      )
-      .catch((error) => {
-        console.warn("Error sending message:", error)
-      })
+    let messagesResponse
+    try {
+      if (conversationId) {
+        // Send to specific conversation
+        const stream = await lettaClient.conversations.messages.create(
+          conversationId,
+          {
+            use_assistant_message,
+            messages: [
+              {
+                role: ROLE_TYPE.USER,
+                content: text,
+              },
+            ],
+            streaming: false,
+          },
+          {
+            timeout: 120 * 1000,
+          },
+        )
+        // The conversations.messages.create returns a stream by default, we need to collect it
+        const messages: any[] = []
+        for await (const chunk of stream) {
+          messages.push(chunk)
+        }
+        messagesResponse = { messages }
+      } else {
+        // Use agent direct endpoint for default conversation
+        messagesResponse = await lettaClient.agents.messages.create(
+          agentId,
+          {
+            use_assistant_message,
+            messages: [
+              {
+                role: ROLE_TYPE.USER,
+                content: text,
+              },
+            ],
+          },
+          {
+            timeout: 120 * 1000,
+          },
+        )
+      }
+    } catch (error) {
+      console.warn("Error sending message:", error)
+      return
+    }
 
     if (!messagesResponse) {
       return
@@ -194,6 +228,7 @@ export function useSendMessageAsync() {
     await processMessageStream({
       messages: messagesResponse.messages,
       agentId,
+      conversationId,
       lettaClient,
       queryClient,
     })

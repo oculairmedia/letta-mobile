@@ -6,7 +6,7 @@ export const getConversationsQueryKey = (agentId: string) => ["conversations", a
 
 export function useConversations(
   agentId: string,
-  queryOptions?: Omit<UseQueryOptions<Conversation[]>, "queryKey" | "queryFn">
+  queryOptions?: Omit<UseQueryOptions<Conversation[]>, "queryKey" | "queryFn">,
 ) {
   const { lettaClient } = useLettaClient()
   return useQuery<Conversation[]>({

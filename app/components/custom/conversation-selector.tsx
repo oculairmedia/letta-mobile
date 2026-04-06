@@ -45,7 +45,10 @@ export const ConversationSelector: FC = () => {
 
   const selectedConversation = conversations?.find((c) => c.id === conversationId)
   const displayLabel = selectedConversation
-    ? formatConversationLabel(selectedConversation, conversations?.indexOf(selectedConversation) || 0)
+    ? formatConversationLabel(
+        selectedConversation,
+        conversations?.indexOf(selectedConversation) || 0,
+      )
     : "Default"
 
   const handleSelect = (conv: Conversation | null) => {
@@ -61,7 +64,7 @@ export const ConversationSelector: FC = () => {
           setConversationId(newConv.id)
           setModalVisible(false)
         },
-      }
+      },
     )
   }
 

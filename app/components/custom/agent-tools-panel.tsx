@@ -61,7 +61,6 @@ interface CategorySectionProps {
 }
 
 const CategorySection: FC<CategorySectionProps> = ({ title, tools, icon, color }) => {
-  const { themed } = useAppTheme()
   const [expanded, setExpanded] = useState(true)
 
   if (tools.length === 0) return null

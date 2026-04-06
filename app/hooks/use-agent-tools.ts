@@ -6,7 +6,7 @@ export const getAgentToolsQueryKey = (agentId: string) => ["agentTools", agentId
 
 export function useAgentTools(
   agentId: string,
-  queryOptions?: Omit<UseQueryOptions<Tool[]>, "queryKey" | "queryFn">
+  queryOptions?: Omit<UseQueryOptions<Tool[]>, "queryKey" | "queryFn">,
 ) {
   const { lettaClient } = useLettaClient()
   return useQuery<Tool[]>({

@@ -20,7 +20,11 @@ export const AgentEnvVars: FC<AgentEnvVarsProps> = ({ style }) => {
 
   if (!agent?.secrets?.length) {
     return (
-      <Text preset="formHelper" text="No environment variables configured" style={themed($emptyText)} />
+      <Text
+        preset="formHelper"
+        text="No environment variables configured"
+        style={themed($emptyText)}
+      />
     )
   }
 

@@ -3,6 +3,7 @@ import { ChatToolbarInner } from "./chat-toolbar"
 import { useAgentMessages } from "@/hooks/use-agent-messages"
 import { useAgentId } from "@/hooks/use-agentId-param"
 import { useSendMessageAsync } from "@/hooks/use-send-message"
+import { useAgentStore } from "@/providers/AgentProvider"
 
 import { Card } from "@/components/Card"
 import { AppMessage, MESSAGE_TYPE } from "@/hooks/types"
@@ -124,6 +125,7 @@ const renderItem = ({
 
 const StarterPrompts = () => {
   const [agentId] = useAgentId()
+  const conversationId = useAgentStore((s) => s.conversationId)
   const { mutate: sendMessage } = useSendMessageAsync()
 
   const prompts = [
@@ -140,7 +142,7 @@ const StarterPrompts = () => {
           <TouchableOpacity
             key={index}
             style={$promptButton}
-            onPress={() => sendMessage({ agentId, text: prompt.text })}
+            onPress={() => sendMessage({ agentId, text: prompt.text, conversationId })}
           >
             <Card
               style={$promptCard}
@@ -160,20 +162,22 @@ const StarterPrompts = () => {
 
 const EmptyChatState = () => {
   const [agentId] = useAgentId()
+  const conversationId = useAgentStore((s) => s.conversationId)
   const { mutate: sendMessage } = useSendMessageAsync()
   return (
     <EmptyState
       heading="No messages yet"
       content="Start a conversation with the agent"
       button="Start a conversation"
-      buttonOnPress={() => sendMessage({ agentId, text: "Hello" })}
+      buttonOnPress={() => sendMessage({ agentId, text: "Hello", conversationId })}
     />
   )
 }
 
 function MessagesScrollView({ mode }: { mode: ChatUIMode }) {
   const [agentId] = useAgentId()
-  const { data: messages, isLoading: isLoadingMessages } = useAgentMessages(agentId)
+  const conversationId = useAgentStore((s) => s.conversationId)
+  const { data: messages, isLoading: isLoadingMessages } = useAgentMessages(agentId, conversationId)
   const flatListRef = useRef<FlatList>(null!)
   const scrollToBottom = useScrollToBottom(flatListRef)
   useEffect(() => {
@@ -259,10 +263,11 @@ const $chatUIContainer: ViewStyle = {
 
 function ChatToolbar() {
   const [agentId] = useAgentId()
+  const conversationId = useAgentStore((s) => s.conversationId)
   const { mutate: sendMessage, isPending } = useSendMessageAsync()
   const onSubmit = (value: string) => {
     console.log("onSubmit:ChatToolbar", value)
-    sendMessage({ agentId, text: value })
+    sendMessage({ agentId, text: value, conversationId })
   }
 
   const AnimatedIsVisible = useSharedValue(false)

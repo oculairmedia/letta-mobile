@@ -1,6 +1,5 @@
 import { Card, Icon, Screen, Text } from "@/components"
 import { Badge } from "@/components/Badge"
-import { Button } from "@/components/Button"
 import { AddMCPServerModal } from "@/components/custom/modals/add-mcp-server-modal"
 import { useLettaHeader } from "@/components/custom/useLettaHeader"
 import { SimpleContextMenu } from "@/components/simple-context-menu"
@@ -45,13 +44,13 @@ interface MCPServerCardProps {
 }
 
 const isSseServer = (
-  server: SseMcpServer | StdioMcpServer | StreamableHTTPMcpServer
+  server: SseMcpServer | StdioMcpServer | StreamableHTTPMcpServer,
 ): server is SseMcpServer => {
   return (server as SseMcpServer).mcp_server_type === "sse"
 }
 
 const isStreamableHTTPServer = (
-  server: SseMcpServer | StdioMcpServer | StreamableHTTPMcpServer
+  server: SseMcpServer | StdioMcpServer | StreamableHTTPMcpServer,
 ): server is StreamableHTTPMcpServer => {
   return (server as StreamableHTTPMcpServer).mcp_server_type === "streamable_http"
 }
@@ -158,7 +157,7 @@ const MCPServerCard: FC<MCPServerCardProps> = ({ server, tools, isLoadingTools, 
               >
                 <View style={$toolsList}>
                   {tools.map((tool, index) => (
-                    <View key={tool.name + index} style={$toolItem}>
+                    <View key={tool.name + index} style={themed($toolItem)}>
                       <Text preset="bold" size="xs">
                         {tool.name}
                       </Text>
@@ -200,11 +199,7 @@ export const MCPScreen: FC<AppStackScreenProps<"Tools">> = () => {
 
   // MCP servers and tools
   const { data: servers, refetch: refetchServers, isFetching: isFetchingServers } = useMCPList()
-  const {
-    data: mcpTools,
-    isLoading: isLoadingMCPTools,
-    refetch: refetchMCPTools,
-  } = useMCPTools()
+  const { data: mcpTools, isLoading: isLoadingMCPTools, refetch: refetchMCPTools } = useMCPTools()
   const addServerMutation = useAddMCPServer()
   const deleteServerMutation = useDeleteMCPServer()
 
@@ -469,12 +464,12 @@ const $toolsList: ViewStyle = {
   paddingTop: spacing.xs,
 }
 
-const $toolItem: ViewStyle = {
+const $toolItem: ThemedStyle<ViewStyle> = ({ colors }) => ({
   paddingVertical: spacing.xxs,
   paddingHorizontal: spacing.xs,
-  backgroundColor: "rgba(0,0,0,0.05)",
+  backgroundColor: colors.palette.overlay20,
   borderRadius: spacing.xxs,
-}
+})
 
 const $toolDescription: ThemedStyle<TextStyle> = () => ({
   opacity: 0.7,

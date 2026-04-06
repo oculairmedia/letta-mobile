@@ -4,9 +4,7 @@ import { useQuery, UseQueryOptions } from "@tanstack/react-query"
 
 export const getToolsQueryKey = () => ["tools"]
 
-export function useTools(
-  queryOptions?: Omit<UseQueryOptions<Tool[]>, "queryKey" | "queryFn">
-) {
+export function useTools(queryOptions?: Omit<UseQueryOptions<Tool[]>, "queryKey" | "queryFn">) {
   const { lettaClient } = useLettaClient()
   return useQuery<Tool[]>({
     queryKey: getToolsQueryKey(),
