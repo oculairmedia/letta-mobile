@@ -95,7 +95,8 @@ const ServerAccordion: FC<ServerAccordionProps> = ({
 export const MCPToolsModal: FC<MCPToolsModalProps> = ({ visible, onDismiss }) => {
   const { themed } = useAppTheme()
   const { bottom } = useSafeAreaInsets()
-  const { data: mcpTools } = useMCPTools()
+  const { data: mcpToolsData } = useMCPTools()
+  const mcpTools = mcpToolsData?.tools || []
   const [search, setSearch] = useState("")
   const [expandedServers, setExpandedServers] = useState<Record<string, boolean>>({})
   const [agentId] = useAgentId()
@@ -118,7 +119,7 @@ export const MCPToolsModal: FC<MCPToolsModalProps> = ({ visible, onDismiss }) =>
   }, [agent?.tools])
 
   const filteredAndGroupedTools = useMemo(() => {
-    if (!mcpTools) return {}
+    if (!mcpTools.length) return {}
 
     const query = search.toLowerCase()
     const filtered = mcpTools.filter(
