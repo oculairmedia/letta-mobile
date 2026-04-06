@@ -14,12 +14,13 @@ import { spacing, ThemedStyle } from "@/theme"
 import { showAgentNamePrompt } from "@/utils/agent-name-prompt"
 import { useAppTheme } from "@/utils/useAppTheme"
 import { Letta } from "@letta-ai/letta-client"
-import { FC, Fragment, useMemo } from "react"
+import { FC, Fragment, useMemo, useState } from "react"
 import {
   Alert,
   FlatList,
   ImageStyle,
   RefreshControl,
+  TextInput,
   TextStyle,
   View,
   ViewStyle,
@@ -212,17 +213,28 @@ const StarterKits = () => {
 
 export const AgentListScreen: FC<AppStackScreenProps<"AgentList">> = () => {
   useLettaHeader()
+  const [searchQuery, setSearchQuery] = useState("")
 
   const { data: _agents, refetch, isFetching } = useAgents()
 
   const agents = useMemo(() => {
-    return _agents?.sort((a, b) => {
+    const sorted = _agents?.sort((a, b) => {
       return (
         (new Date(b.updated_at || "").getTime() ?? 0) -
         (new Date(a.updated_at || "").getTime() ?? 0)
       )
     })
-  }, [_agents])
+
+    if (!searchQuery.trim()) return sorted
+
+    const query = searchQuery.toLowerCase().trim()
+    return sorted?.filter((agent) => {
+      const nameMatch = agent.name?.toLowerCase().includes(query)
+      const descMatch = agent.description?.toLowerCase().includes(query)
+      const tagMatch = agent.tags?.some((tag) => tag.toLowerCase().includes(query))
+      return nameMatch || descMatch || tagMatch
+    })
+  }, [_agents, searchQuery])
 
   const { mutate: createAgent, isPending: isCreatingAgent } = useCreateAgent({
     onSuccess: (data) => {
@@ -232,11 +244,32 @@ export const AgentListScreen: FC<AppStackScreenProps<"AgentList">> = () => {
 
   const {
     theme: { colors },
+    themed,
   } = useAppTheme()
 
   return (
     <Screen style={$root} preset="fixed" contentContainerStyle={$contentContainer}>
       <View style={$header}>
+        <View style={themed($searchContainer)}>
+          <Icon icon="Search" size={18} color={colors.textDim} />
+          <TextInput
+            style={themed($searchInput)}
+            placeholder="Search agents..."
+            placeholderTextColor={colors.textDim}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {searchQuery.length > 0 && (
+            <Icon
+              icon="X"
+              size={18}
+              color={colors.textDim}
+              onPress={() => setSearchQuery("")}
+            />
+          )}
+        </View>
         <View style={$headerRow}>
           <Button
             onPress={() => navigate("Studio")}
@@ -421,4 +454,21 @@ const $statsRow: ViewStyle = {
 const $badgeStyle: ThemedStyle<ViewStyle> = ({ colors }) => ({
   backgroundColor: colors.elementColors.button.filled.backgroundColor,
   opacity: 0.7,
+})
+
+const $searchContainer: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  flexDirection: "row",
+  alignItems: "center",
+  backgroundColor: colors.palette.overlay20,
+  borderRadius: 8,
+  paddingHorizontal: spacing.sm,
+  paddingVertical: spacing.xs,
+  gap: spacing.xs,
+})
+
+const $searchInput: ThemedStyle<TextStyle> = ({ colors }) => ({
+  flex: 1,
+  fontSize: 16,
+  color: colors.text,
+  paddingVertical: spacing.xxs,
 })
