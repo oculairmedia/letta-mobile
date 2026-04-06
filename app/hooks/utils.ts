@@ -170,7 +170,7 @@ export function filterMessages(data: Message[]): AppMessage[] {
         ) {
           returnsToProcess = toolReturnItem.tool_returns.map((tr) => ({
             toolCallId: tr.tool_call_id,
-            content: tr.tool_return || "",
+            content: extractMessageText(tr.tool_return || ""),
             status: tr.status === "error" ? "error" : "success",
             stdout: tr.stdout || undefined,
             stderr: tr.stderr || undefined,

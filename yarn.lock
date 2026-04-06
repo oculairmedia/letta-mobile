@@ -1871,10 +1871,10 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
-"@letta-ai/letta-client@1.6.5":
-  version "1.6.5"
-  resolved "https://registry.yarnpkg.com/@letta-ai/letta-client/-/letta-client-1.6.5.tgz#f39414a11bdeca3af51bb4498734343a68f57879"
-  integrity sha512-LrJz7xqqYXaoAC6XXUZ/K+YgrCLzoEIRwPCXoOsiN/ehl7hl9kiz1Mw/iYSCK7ZpXS6fnyaIbIwGfxWeCl8z5g==
+"@letta-ai/letta-client@1.10.2":
+  version "1.10.2"
+  resolved "https://registry.yarnpkg.com/@letta-ai/letta-client/-/letta-client-1.10.2.tgz#f497456429b7c688388d5601cd3b786a2cc4bc1d"
+  integrity sha512-BYAPkIl6wHYORJ+zHmlWaPSrlsMbN5YkoSnHnEUvaIJBOpa5kLwldNjzHIALcSAV19Qc0ktRoIQy0i0Vqb21yQ==
 
 "@napi-rs/wasm-runtime@^0.2.7":
   version "0.2.7"
