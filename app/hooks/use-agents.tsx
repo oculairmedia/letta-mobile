@@ -17,10 +17,20 @@ export function useAgents(queryOptions?: UseQueryOptions<AgentState[]>) {
   const { lettaClient } = useLettaClient()
   return useQuery({
     queryKey: getAgentsQueryKey(),
-    queryFn: () =>
-      lettaClient.agents
-        .list({ include: ["agent.blocks", "agent.tools", "agent.tags"] })
-        .then((page) => page.getPaginatedItems()),
+    queryFn: async () => {
+      const allAgents: AgentState[] = []
+      const page = await lettaClient.agents.list({
+        include: ["agent.blocks", "agent.tools", "agent.tags"],
+        limit: 100,
+      })
+
+      // Collect all pages
+      for await (const agent of page) {
+        allAgents.push(agent)
+      }
+
+      return allAgents
+    },
     select: sortByLastCreated,
     enabled: !!lettaClient,
     ...queryOptions,
