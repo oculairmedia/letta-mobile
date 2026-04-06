@@ -1,6 +1,5 @@
 import { Card, Icon, Screen, Text } from "@/components"
 import { AutoImage } from "@/components/AutoImage"
-import { Badge } from "@/components/Badge"
 import { Button } from "@/components/Button"
 import { useLettaHeader } from "@/components/custom/useLettaHeader"
 import { SimpleContextMenu } from "@/components/simple-context-menu"
@@ -9,7 +8,6 @@ import { STARTER_KITS, useCreateAgent } from "@/hooks/use-create-agent"
 import { useDeleteAgent } from "@/hooks/use-delete-agent"
 import { AppStackScreenProps, navigate } from "@/navigators"
 import { useAgentStore } from "@/providers/AgentProvider"
-import { normalizeName } from "@/shared/utils/normalizers"
 import { spacing, ThemedStyle } from "@/theme"
 import { showAgentNamePrompt } from "@/utils/agent-name-prompt"
 import { useAppTheme } from "@/utils/useAppTheme"
@@ -23,6 +21,7 @@ import {
   RefreshControl,
   TextInput,
   TextStyle,
+  TouchableOpacity,
   View,
   ViewStyle,
 } from "react-native"
@@ -37,6 +36,22 @@ const chatWithAgent = (agentId: string) => {
   navigate("AgentDrawer", { screen: "AgentTab" })
 }
 
+const formatRelativeTime = (dateString: string | null | undefined): string => {
+  if (!dateString) return ""
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return "now"
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 7) return `${diffDays}d ago`
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date)
+}
+
 const AgentCard: FC<AgentCardProps> = ({ agent }) => {
   const {
     theme: { colors },
@@ -44,10 +59,6 @@ const AgentCard: FC<AgentCardProps> = ({ agent }) => {
   } = useAppTheme()
 
   const deleteAgent = useDeleteAgent()
-
-  const customTools = useMemo(() => {
-    return agent.tools.filter((t) => t.tool_type === "custom")
-  }, [agent.tools])
 
   return (
     <SimpleContextMenu
@@ -68,48 +79,26 @@ const AgentCard: FC<AgentCardProps> = ({ agent }) => {
           chatWithAgent(agent.id)
         }}
         disabled={deleteAgent.isPending}
-        heading={agent.name || "Unnamed Agent"}
-        ContentComponent={
-          <View style={$agentContentContainer}>
-            <Text style={themed($agentContentTextStyle)} numberOfLines={2}>
-              {agent.description}
+        style={$compactCard}
+        HeadingComponent={
+          <View style={$agentHeaderRow}>
+            <Text preset="bold" numberOfLines={1} style={$agentName}>
+              {agent.name || "Unnamed Agent"}
             </Text>
-            <View style={$agentContentFooter}>
-              <Text size="xxs">
-                last usage:{" "}
-                {new Intl.DateTimeFormat("en-US", {
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric",
-                  hour: "numeric",
-                  minute: "numeric",
-                }).format(new Date(agent.updated_at || ""))}
-              </Text>
-            </View>
-            <View style={$agentMetadataContainer}>
-              {!!agent.tags.length && (
-                <View style={$toolBadgesContainer}>
-                  {agent.tags.map((tag) => (
-                    <Badge key={tag} text={tag} style={themed($badgeStyle)} />
-                  ))}
-                </View>
-              )}
-              <View style={$statsContainer}>
-                <View style={$toolBadgesContainer}>
-                  {customTools.map((t) => (
-                    <Badge key={t.name} text={normalizeName(t.name || "")} />
-                  ))}
-                </View>
-                <View style={$statsRow}>
-                  <Text size="xxs">{agent.model}</Text>
-                  <Text size="xxs">{agent.blocks.length} blocks</Text>
-                </View>
-              </View>
-            </View>
+            <Text size="xxs" style={themed($timeText)}>
+              {formatRelativeTime(agent.updated_at)}
+            </Text>
+          </View>
+        }
+        ContentComponent={
+          <View style={$agentMetaRow}>
+            <Text size="xxs" style={themed($modelText)} numberOfLines={1}>
+              {agent.model}
+            </Text>
           </View>
         }
         RightComponent={
-          <Icon icon="caretRight" size={20} color={colors.elementColors.card.default.content} />
+          <Icon icon="caretRight" size={16} color={colors.elementColors.card.default.content} />
         }
       />
     </SimpleContextMenu>
@@ -291,37 +280,8 @@ export const AgentListScreen: FC<AppStackScreenProps<"AgentList">> = () => {
         </View>
         <View style={$headerRow}>
           <Button
-            onPress={() => navigate("Studio")}
-            text="Studio"
-            style={$headerButton}
-            disabled={isCreatingAgent}
-            LeftAccessory={() => (
-              <Icon
-                icon="FlaskConical"
-                size={20}
-                color={colors.elementColors.card.default.content}
-              />
-            )}
-          />
-          <Button
-            onPress={() => {
-              showAgentNamePrompt({
-                onSubmit: (name) => createAgent({ name }),
-              })
-            }}
-            text="New Agent"
-            style={$headerButton}
-            loading={isCreatingAgent}
-            disabled={isCreatingAgent}
-            LeftAccessory={() => (
-              <Icon icon="Bot" size={20} color={colors.elementColors.card.default.content} />
-            )}
-          />
-        </View>
-        <View style={$headerRow}>
-          <Button
             onPress={() => navigate("Templates")}
-            text="Kits"
+            text="Templates"
             style={$headerButton}
             disabled={isCreatingAgent}
             LeftAccessory={() => (
@@ -329,12 +289,12 @@ export const AgentListScreen: FC<AppStackScreenProps<"AgentList">> = () => {
             )}
           />
           <Button
-            onPress={() => navigate("MCP")}
-            text="MCP"
+            onPress={() => navigate("Tools")}
+            text="Tools"
             style={$headerButton}
             disabled={isCreatingAgent}
             LeftAccessory={() => (
-              <Icon icon="Server" size={20} color={colors.elementColors.card.default.content} />
+              <Icon icon="Wrench" size={20} color={colors.elementColors.card.default.content} />
             )}
           />
         </View>
@@ -345,7 +305,7 @@ export const AgentListScreen: FC<AppStackScreenProps<"AgentList">> = () => {
         keyExtractor={(item) => item.id}
         refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} />}
         refreshing={isFetching}
-        ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
+        ItemSeparatorComponent={() => <View style={{ height: spacing.xs }} />}
         renderItem={({ item }) => (
           <AgentCard
             agent={item}
@@ -366,6 +326,19 @@ export const AgentListScreen: FC<AppStackScreenProps<"AgentList">> = () => {
           )
         }
       />
+
+      <TouchableOpacity
+        style={themed($fab)}
+        onPress={() => {
+          showAgentNamePrompt({
+            onSubmit: (name) => createAgent({ name }),
+          })
+        }}
+        disabled={isCreatingAgent}
+        activeOpacity={0.8}
+      >
+        <Icon icon="Plus" size={24} color="#fff" />
+      </TouchableOpacity>
     </Screen>
   )
 }
@@ -394,6 +367,23 @@ const $headerRow: ViewStyle = {
 const $headerButton: ViewStyle = {
   flex: 1,
 }
+
+const $fab: ThemedStyle<ViewStyle> = ({ colors }) => ({
+  position: "absolute",
+  bottom: spacing.lg,
+  right: spacing.md,
+  width: 56,
+  height: 56,
+  borderRadius: 28,
+  backgroundColor: colors.tint,
+  alignItems: "center",
+  justifyContent: "center",
+  elevation: 4,
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.25,
+  shadowRadius: 4,
+})
 
 const $starterKitsContainer: ViewStyle = {}
 
@@ -444,44 +434,36 @@ const $toolsTitle: TextStyle = {
   marginBottom: spacing.xxs,
 }
 
-const $agentContentTextStyle: ThemedStyle<TextStyle> = () => ({
-  opacity: 0.8,
-})
+const $compactCard: ViewStyle = {
+  minHeight: 0,
+  paddingVertical: spacing.xs,
+}
 
-const $agentContentFooter: ViewStyle = {
+const $agentHeaderRow: ViewStyle = {
   flexDirection: "row",
   justifyContent: "space-between",
   alignItems: "center",
+  gap: spacing.sm,
 }
 
-const $agentContentContainer: ViewStyle = {
+const $agentName: TextStyle = {
   flex: 1,
 }
 
-const $toolBadgesContainer: ViewStyle = {
+const $timeText: ThemedStyle<TextStyle> = ({ colors }) => ({
+  color: colors.textDim,
+})
+
+const $agentMetaRow: ViewStyle = {
   flexDirection: "row",
-  flexWrap: "wrap",
-  gap: spacing.xxs,
-}
-
-const $agentMetadataContainer: ViewStyle = {
-  gap: spacing.xs,
-  marginTop: spacing.xs,
-}
-
-const $statsContainer: ViewStyle = {
-  gap: spacing.xxs,
-}
-
-const $statsRow: ViewStyle = {
-  flexDirection: "row",
-  justifyContent: "space-between",
   alignItems: "center",
+  gap: spacing.sm,
+  marginTop: spacing.xxs,
 }
 
-const $badgeStyle: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  backgroundColor: colors.elementColors.button.filled.backgroundColor,
-  opacity: 0.7,
+const $modelText: ThemedStyle<TextStyle> = ({ colors }) => ({
+  color: colors.textDim,
+  flexShrink: 0,
 })
 
 const $searchContainer: ThemedStyle<ViewStyle> = ({ colors }) => ({
