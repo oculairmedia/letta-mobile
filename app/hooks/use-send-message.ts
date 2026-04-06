@@ -91,7 +91,7 @@ async function processMessageStream({
     updateMessageInQueryData(queryClient, agentId, response, responseMessageId)
 
     // Intercept Approval Request for Client Tools
-    if (response.message_type === 'approval_request_message') {
+    if (response.message_type === "approval_request_message") {
       const toolCall = response.tool_call
       const clientToolFunc = clientTools[toolCall.name]
 
@@ -109,9 +109,8 @@ async function processMessageStream({
           status = "error"
         }
 
-        const nextResponse = await lettaClient.agents.messages.create(
-          agentId,
-          {
+        const nextResponse = await lettaClient.agents.messages
+          .create(agentId, {
             messages: [
               {
                 type: "approval",
@@ -125,11 +124,11 @@ async function processMessageStream({
                 ],
               },
             ],
-          }
-        ).catch(err => {
-          console.error("[ClientTool] Failed to send approval response:", err)
-          return null
-        })
+          })
+          .catch((err) => {
+            console.error("[ClientTool] Failed to send approval response:", err)
+            return null
+          })
 
         if (nextResponse && nextResponse.messages) {
           await processMessageStream({
@@ -147,8 +146,6 @@ async function processMessageStream({
 export function useSendMessageAsync() {
   const { lettaClient } = useLettaClient()
   const queryClient = useQueryClient()
-
-
 
   async function sendMessage(options: UseSendMessageType) {
     const { agentId, text } = options
@@ -183,8 +180,8 @@ export function useSendMessageAsync() {
           ],
         },
         {
-          timeout: 120 * 1000
-        }
+          timeout: 120 * 1000,
+        },
       )
       .catch((error) => {
         console.warn("Error sending message:", error)

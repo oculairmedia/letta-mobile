@@ -3,11 +3,9 @@ import { getDeviceInfo, getDeviceInfoDefinition } from "./definitions/device-inf
 type ClientToolFunction = (args: string) => Promise<string>
 
 export const clientTools: Record<string, ClientToolFunction> = {
-    "get_device_info": async (_args: string) => {
-        return await getDeviceInfo()
-    }
+  get_device_info: async (_args: string) => {
+    return await getDeviceInfo()
+  },
 }
 
-export const clientToolDefinitions = [
-    getDeviceInfoDefinition
-]
+export const clientToolDefinitions = [getDeviceInfoDefinition]

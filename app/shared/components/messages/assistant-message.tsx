@@ -29,7 +29,7 @@ const SaveableImage = memo(function SaveableImage({ src, children }: SaveableIma
       await MediaLibrary.createAlbumAsync("Letta", asset, false)
       await FileSystem.deleteAsync(fileUri)
       Alert.alert("Success", "Image saved to gallery")
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "Failed to save image")
     }
   }
@@ -53,7 +53,7 @@ const SaveableImage = memo(function SaveableImage({ src, children }: SaveableIma
 
 interface AssistantMessageProps extends CardProps {}
 
-function _AssistantMessage({ content, style, ...props }: AssistantMessageProps) {
+function AssistantMessageInner({ content, style, ...props }: AssistantMessageProps) {
   const { theme } = useAppTheme()
 
   return (
@@ -109,7 +109,7 @@ function _AssistantMessage({ content, style, ...props }: AssistantMessageProps) 
   )
 }
 
-export const AssistantMessage = memo(_AssistantMessage)
+export const AssistantMessage = memo(AssistantMessageInner)
 
 const $assistantMessage: ViewStyle = {
   flexWrap: "wrap",

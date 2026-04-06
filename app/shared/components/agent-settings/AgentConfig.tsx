@@ -38,13 +38,9 @@ export const AgentConfig: FC<AgentConfigProps> = ({ style }) => {
           <Text text={agent.model || ""} />
           {Object.entries(agent?.model_settings || {}).map(([key, value]) => {
             if (typeof value === "object") {
-              return (
-                <Text key={key} text={`${key}: ${JSON.stringify(value)}`} />
-              )
+              return <Text key={key} text={`${key}: ${JSON.stringify(value)}`} />
             }
-            return (
-              <Text key={key} text={`${key}: ${value}`} />
-            )
+            return <Text key={key} text={`${key}: ${value}`} />
           })}
         </View>
       </Accordion>

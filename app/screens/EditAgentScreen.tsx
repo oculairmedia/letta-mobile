@@ -9,7 +9,7 @@ import { FC } from "react"
 import { View, ViewStyle } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
-interface EditAgentScreenProps extends AppStackScreenProps<"EditAgent"> { }
+interface EditAgentScreenProps extends AppStackScreenProps<"EditAgent"> {}
 
 export const EditAgentScreen: FC<EditAgentScreenProps> = ({ route }) => {
   useLettaHeader()

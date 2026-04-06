@@ -54,8 +54,8 @@ export const AgentTools: FC<AgentToolsProps> = ({ style }) => {
                 tool={tool}
                 {...(type === "custom" || type === "external_mcp"
                   ? {
-                    RightComponent: <DetachToolAction tool={tool} />,
-                  }
+                      RightComponent: <DetachToolAction tool={tool} />,
+                    }
                   : undefined)}
               />
             ))}

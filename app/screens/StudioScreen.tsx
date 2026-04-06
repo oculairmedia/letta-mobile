@@ -10,7 +10,7 @@ import { FC } from "react"
 import { View, ViewStyle } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
-interface StudioScreenProps extends AppStackScreenProps<"Studio"> { }
+interface StudioScreenProps extends AppStackScreenProps<"Studio"> {}
 
 const chatWithAgent = (agentId: string) => {
   useAgentStore.getState().setAgentId(agentId)

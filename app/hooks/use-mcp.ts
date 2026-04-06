@@ -1,7 +1,5 @@
 import { useLettaClient } from "@/providers/LettaProvider"
-import {
-  McpServerCreateParams
-} from "@letta-ai/letta-client/resources/mcp-servers/mcp-servers"
+import { McpServerCreateParams } from "@letta-ai/letta-client/resources/mcp-servers/mcp-servers"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useMemo } from "react"
 
@@ -63,8 +61,7 @@ export function useAddMCPServer() {
   const { lettaClient } = useLettaClient()
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (payload: McpServerCreateParams) =>
-      lettaClient.mcpServers.create(payload),
+    mutationFn: (payload: McpServerCreateParams) => lettaClient.mcpServers.create(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: getUseMCPListKey() })
       queryClient.invalidateQueries({ queryKey: getUseMCPToolsKey() })

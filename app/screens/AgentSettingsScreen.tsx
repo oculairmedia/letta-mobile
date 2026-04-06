@@ -12,14 +12,14 @@ import {
   AgentEnvVars,
   AgentName,
   AgentSystemPrompt,
-  AgentTags
+  AgentTags,
 } from "@/shared/components/agent-settings"
 import { spacing } from "@/theme"
 import { useAppTheme } from "@/utils/useAppTheme"
 import { FC } from "react"
 import { Alert, View, ViewStyle } from "react-native"
 
-interface AgentSettingsScreenProps extends AgentTabScreenProps<"Settings"> { }
+interface AgentSettingsScreenProps extends AgentTabScreenProps<"Settings"> {}
 
 export const AgentSettingsScreen: FC<AgentSettingsScreenProps> = () => {
   const [agentId] = useAgentId()
@@ -55,7 +55,6 @@ export const AgentSettingsScreen: FC<AgentSettingsScreenProps> = () => {
           <Text preset="heading" text="Description" style={$sectionTitle} />
           <AgentDescription />
         </View>
-
 
         <View style={$sectionContainer}>
           <Text preset="heading" text="Memory Blocks" style={$sectionTitle} />

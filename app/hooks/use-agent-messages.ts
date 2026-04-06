@@ -1,6 +1,6 @@
 import { useLettaClient } from "@/providers/LettaProvider"
 import { useMutation, useQuery, useQueryClient, UseQueryOptions } from "@tanstack/react-query"
-import { AppMessage, use_assistant_message } from "./types"
+import { AppMessage } from "./types"
 import { filterMessages } from "./utils"
 
 export const getAgentMessagesQueryKey = (agentId: string) => ["agentMessages", agentId]

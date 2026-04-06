@@ -6,7 +6,7 @@ import { getUseAgentStateKey } from "./use-agent"
 import { getAgentsQueryKey } from "./use-agents"
 
 export function useEditAgent(
-  mutationOptions?: UseMutationOptions<AgentState, Error, AgentUpdateParams & { id: string }>
+  mutationOptions?: UseMutationOptions<AgentState, Error, AgentUpdateParams & { id: string }>,
 ) {
   const queryClient = useQueryClient()
   const { lettaClient } = useLettaClient()

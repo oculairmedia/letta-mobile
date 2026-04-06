@@ -51,15 +51,27 @@ export const MCPServerForm: FC<MCPServerFormProps> = ({ onSubmit, onCancel, isPe
         config: {
           mcp_server_type: "stdio",
           command: command.trim(),
-          args: args.trim().split(",").map((arg) => arg.trim()).filter(Boolean),
-          env: env.trim().split(",").map((e) => e.trim()).filter(Boolean).reduce((acc, curr) => {
-            const [key, value] = curr.split("=").map((s) => s.trim())
-            if (key && typeof value !== "undefined") {
-              acc[key] = value
-            }
-            return acc
-          }, {} as Record<string, string>),
-        }
+          args: args
+            .trim()
+            .split(",")
+            .map((arg) => arg.trim())
+            .filter(Boolean),
+          env: env
+            .trim()
+            .split(",")
+            .map((e) => e.trim())
+            .filter(Boolean)
+            .reduce(
+              (acc, curr) => {
+                const [key, value] = curr.split("=").map((s) => s.trim())
+                if (key && typeof value !== "undefined") {
+                  acc[key] = value
+                }
+                return acc
+              },
+              {} as Record<string, string>,
+            ),
+        },
       })
     } else {
       if (!serverUrl.trim()) return
@@ -263,6 +275,6 @@ const $switchContainer: ViewStyle = {
   marginTop: spacing.xs,
 }
 
-const $clearButton: ThemedStyle<ViewStyle> = () => ({
+const _$clearButton: ThemedStyle<ViewStyle> = () => ({
   minWidth: 80,
 })

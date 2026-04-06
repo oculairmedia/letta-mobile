@@ -2,8 +2,8 @@ import { useLettaConfigStore } from "@/stores/lettaConfigStore"
 import Letta from "@letta-ai/letta-client"
 import { useMemo } from "react"
 export const useLettaClient = () => {
-  const getActiveConfig = useLettaConfigStore(state => state.getActiveConfig)
-  const activeConfigId = useLettaConfigStore(state => state.activeConfigId)
+  const getActiveConfig = useLettaConfigStore((state) => state.getActiveConfig)
+  const activeConfigId = useLettaConfigStore((state) => state.activeConfigId)
 
   const client = useMemo(() => {
     if (!activeConfigId) return undefined
@@ -17,5 +17,3 @@ export const useLettaClient = () => {
 
   return { lettaClient: client! }
 }
-
-

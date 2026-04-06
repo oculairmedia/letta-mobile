@@ -40,8 +40,19 @@ describe("use-mcp hooks", () => {
   describe("useMCPList", () => {
     it("should fetch MCP servers list", async () => {
       const mockServers = [
-        { id: "1", server_name: "Server 1", mcp_server_type: "sse", server_url: "http://localhost:8080" },
-        { id: "2", server_name: "Server 2", mcp_server_type: "stdio", command: "python", args: ["server.py"] },
+        {
+          id: "1",
+          server_name: "Server 1",
+          mcp_server_type: "sse",
+          server_url: "http://localhost:8080",
+        },
+        {
+          id: "2",
+          server_name: "Server 2",
+          mcp_server_type: "stdio",
+          command: "python",
+          args: ["server.py"],
+        },
       ]
 
       const mockList = jest.fn().mockResolvedValue(mockServers)
@@ -77,9 +88,7 @@ describe("use-mcp hooks", () => {
         { name: "tool2", description: "Tool 2 description" },
       ]
 
-      const mockTools2 = [
-        { name: "tool3", description: "Tool 3 description" },
-      ]
+      const mockTools2 = [{ name: "tool3", description: "Tool 3 description" }]
 
       // Create async iterators for tools
       const createAsyncIterator = (tools: any[]) => ({
@@ -90,7 +99,8 @@ describe("use-mcp hooks", () => {
         },
       })
 
-      const mockListTools = jest.fn()
+      const mockListTools = jest
+        .fn()
         .mockResolvedValueOnce(createAsyncIterator(mockTools1))
         .mockResolvedValueOnce(createAsyncIterator(mockTools2))
 
@@ -107,20 +117,21 @@ describe("use-mcp hooks", () => {
 
       const { result } = renderHook(() => useMCPTools(), { wrapper: createWrapper() })
 
-      await waitFor(() => {
-        expect(result.current.data).toBeDefined()
-      }, { timeout: 5000 })
+      await waitFor(
+        () => {
+          expect(result.current.data).toBeDefined()
+        },
+        { timeout: 5000 },
+      )
 
       // Should have tools from both servers with serverName attached
       expect(result.current.data?.length).toBe(3)
-      expect(result.current.data?.find(t => t.name === "tool1")?.serverName).toBe("Server 1")
-      expect(result.current.data?.find(t => t.name === "tool3")?.serverName).toBe("Server 2")
+      expect(result.current.data?.find((t) => t.name === "tool1")?.serverName).toBe("Server 1")
+      expect(result.current.data?.find((t) => t.name === "tool3")?.serverName).toBe("Server 2")
     })
 
     it("should handle server errors gracefully", async () => {
-      const mockServers = [
-        { id: "server-1", server_name: "Server 1", mcp_server_type: "sse" },
-      ]
+      const mockServers = [{ id: "server-1", server_name: "Server 1", mcp_server_type: "sse" }]
 
       const consoleSpy = jest.spyOn(console, "error").mockImplementation(() => {})
 
@@ -137,10 +148,13 @@ describe("use-mcp hooks", () => {
 
       const { result } = renderHook(() => useMCPTools(), { wrapper: createWrapper() })
 
-      await waitFor(() => {
-        // Wait for data to be defined (query completed)
-        expect(result.current.data).toBeDefined()
-      }, { timeout: 5000 })
+      await waitFor(
+        () => {
+          // Wait for data to be defined (query completed)
+          expect(result.current.data).toBeDefined()
+        },
+        { timeout: 5000 },
+      )
 
       // Should return empty array on error (caught in the try/catch), not throw
       // The hook catches errors per-server and returns [] for that server

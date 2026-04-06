@@ -100,7 +100,7 @@ const AppStack = () => {
   )
 }
 
-export interface NavigationProps extends Partial<ComponentProps<typeof NavigationContainer>> { }
+export interface NavigationProps extends Partial<ComponentProps<typeof NavigationContainer>> {}
 
 export const AppNavigator = (props: NavigationProps) => {
   const { appTheme, setAppTheme } = useAppSettingsStore()

@@ -21,7 +21,6 @@ export interface AppUserMessage extends BaseAppMessage {
   content: string
 }
 
-
 export interface AppReasoningMessage extends BaseAppMessage {
   messageType: MESSAGE_TYPE.REASONING_MESSAGE
   content: string

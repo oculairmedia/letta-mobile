@@ -82,7 +82,7 @@ const renderDebugItem = (item: AppMessage) => {
   return <JsonBlock key={item.id} value={item} />
 }
 
-const renderInteractiveItem = (item: AppMessage, data: AppMessage[]) => {
+const renderInteractiveItem = (item: AppMessage, _data: AppMessage[]) => {
   if (item.messageType === MESSAGE_TYPE.USER_MESSAGE) {
     return <UserMessage key={item.id} content={item.content} footer={item.messageType} />
   }

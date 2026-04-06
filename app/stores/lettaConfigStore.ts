@@ -2,7 +2,6 @@ import { z } from "zod"
 import { create } from "zustand"
 import { createJSONStorage, persist } from "zustand/middleware"
 import { zustandStorage } from "./store.storage"
-import { Letta } from "@letta-ai/letta-client"
 
 type LettaMode = "cloud" | "selfhosted"
 
@@ -31,9 +30,7 @@ const configSchema = z.object({
     .min(1)
     .transform((val) => val.trim())
     .optional(),
-  accessToken: z
-    .string()
-    .transform((val) => val.trim()),
+  accessToken: z.string().transform((val) => val.trim()),
 })
 
 export const isValidConfig = (mode: LettaMode, serverUrl: string, accessToken: string) => {

@@ -7,25 +7,25 @@ import { FC, useState } from "react"
 import { View, ViewStyle } from "react-native"
 
 interface AgentFoldersProps {
-    agentId: string
+  agentId: string
 }
 
 export const AgentFolders: FC<AgentFoldersProps> = ({ agentId }) => {
-    const { data: agentFolders } = useGetAgentFolders(agentId)
-    const [showModal, setShowModal] = useState(false)
+  const { data: agentFolders } = useGetAgentFolders(agentId)
+  const [showModal, setShowModal] = useState(false)
 
-    return (
-        <View style={$container}>
-            <Button
-                onPress={() => setShowModal(true)}
-                text={`${agentFolders?.length || 0} attached folders`}
-                RightAccessory={() => <Icon icon="Plus" size={20} />}
-            />
-            <FoldersModal visible={showModal} onDismiss={() => setShowModal(false)} />
-        </View>
-    )
+  return (
+    <View style={$container}>
+      <Button
+        onPress={() => setShowModal(true)}
+        text={`${agentFolders?.length || 0} attached folders`}
+        RightAccessory={() => <Icon icon="Plus" size={20} />}
+      />
+      <FoldersModal visible={showModal} onDismiss={() => setShowModal(false)} />
+    </View>
+  )
 }
 
 const $container: ViewStyle = {
-    gap: spacing.xs,
+  gap: spacing.xs,
 }

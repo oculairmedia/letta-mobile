@@ -14,16 +14,13 @@ type AgentContextResponse = {
 }
 
 const fetchContextFn = async (client: Letta, agentId: string) => {
-  const response = await fetch(
-    client.baseURL + `/v1/agents/${agentId}/context`,
-    {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${client.apiKey}`,
-      },
-    }
-  )
+  const response = await fetch(client.baseURL + `/v1/agents/${agentId}/context`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${client.apiKey}`,
+    },
+  })
 
   if (!response.ok) {
     throw new Error("Failed to fetch agent chat context")
