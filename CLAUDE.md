@@ -11,7 +11,7 @@ React Native mobile app for Letta AI agents, built with Expo and TypeScript.
 - TypeScript
 - Zustand (state management)
 - TanStack React Query (server state)
-- @letta-ai/letta-client@1.6.8 (Letta SDK)
+- @letta-ai/letta-client@1.9.0 (Letta SDK)
 
 ---
 
