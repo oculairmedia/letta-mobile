@@ -59,7 +59,7 @@ class LettaApiClient @Inject constructor(
                         Log.d("LettaApiClient", message)
                     }
                 }
-                level = if (com.letta.mobile.BuildConfig.DEBUG) LogLevel.HEADERS else LogLevel.NONE
+                level = if (com.letta.mobile.core.BuildConfig.DEBUG) LogLevel.HEADERS else LogLevel.NONE
                 sanitizeHeader { header -> header == "Authorization" }
             }
 

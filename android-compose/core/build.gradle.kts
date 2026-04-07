@@ -21,6 +21,10 @@ android {
         minSdk = 26
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -69,6 +73,9 @@ android {
 dependencies {
     implementation("com.google.dagger:hilt-android:2.54")
     ksp("com.google.dagger:hilt-compiler:2.54")
+
+    // Compose runtime for @Stable and @Immutable annotations
+    implementation("androidx.compose.runtime:runtime:1.7.6")
 
     implementation("io.ktor:ktor-client-core:3.0.3")
     implementation("io.ktor:ktor-client-okhttp:3.0.3")

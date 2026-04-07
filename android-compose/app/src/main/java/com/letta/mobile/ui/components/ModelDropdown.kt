@@ -93,9 +93,9 @@ fun ModelDropdown(
                             text = {
                                 Column {
                                     Text(text = model.name, style = MaterialTheme.typography.bodyMedium)
-                                    if (model.contextWindow != null) {
+                                    model.contextWindow?.let { contextWindow ->
                                         Text(
-                                            text = "${model.contextWindow / 1000}K context",
+                                            text = "${contextWindow / 1000}K context",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )

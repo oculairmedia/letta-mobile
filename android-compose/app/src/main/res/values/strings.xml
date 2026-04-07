@@ -104,11 +104,8 @@
     <string name="screen_conversations_new_action">New Conversation</string>
     <string name="action_edit">Edit</string>
     <string name="action_rename">Rename</string>
-    <string name="action_add">Add</string>
     <string name="screen_conversations_dialog_rename_title">Rename Conversation</string>
-    <string name="screen_conversations_dialog_select_agent_title">Select an Agent</string>
     <string name="screen_conversations_dialog_no_agents">No agents available. Create one first.</string>
-    <string name="common_name">Name</string>
     <string name="screen_nav_templates">Templates</string>
     <string name="screen_nav_mcp_servers">MCP Servers</string>
     <string name="screen_models_title">Models</string>
