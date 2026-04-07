@@ -34,7 +34,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SuggestionChip
+
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -139,7 +139,7 @@ fun AgentListScreen(
                     if (filteredAgents.isEmpty()) {
                         EmptyState(
                             icon = Icons.Default.SmartToy,
-                            message = if (uiState.searchQuery.isBlank()) "No agents yet"
+                            message = if (uiState.searchQuery.isBlank()) stringResource(R.string.screen_agents_empty)
                             else "No agents matching \"${uiState.searchQuery}\"",
                             modifier = Modifier.fillMaxSize(),
                         )

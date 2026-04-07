@@ -174,7 +174,7 @@ private fun ConversationsContent(
     if (state.conversations.isEmpty()) {
         EmptyState(
             icon = Icons.Default.ChatBubbleOutline,
-            message = "No conversations yet",
+            message = stringResource(R.string.screen_conversations_empty),
             modifier = modifier.fillMaxSize()
         )
     } else {

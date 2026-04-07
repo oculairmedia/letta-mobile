@@ -145,7 +145,7 @@ private fun ToolCard(
         AlertDialog(
             onDismissRequest = { showRemoveDialog = false },
             title = { Text(stringResource(R.string.screen_tools_dialog_remove_title)) },
-            text = { Text(stringResource(R.string.screen_tools_dialog_remove_confirm, )) },
+            text = { Text(stringResource(R.string.screen_tools_dialog_remove_confirm, tool.name)) },
             confirmButton = {
                 TextButton(
                     onClick = {

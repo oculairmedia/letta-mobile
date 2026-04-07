@@ -108,7 +108,7 @@ private fun TemplateCard(
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(0.9f),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(12.dp)
     ) {
         Column(
             modifier = Modifier
