@@ -37,7 +37,8 @@ class AgentRepository @Inject constructor(
     }
 
     override suspend fun refreshAgents() {
-        _agents.value = agentApi.listAgents()
+        // Fetch all agents with a large limit for search functionality
+        _agents.value = agentApi.listAgents(limit = 1000)
     }
 
     override fun getAgent(id: String): Flow<Agent> = flow {
