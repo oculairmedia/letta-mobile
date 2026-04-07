@@ -7,12 +7,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.letta.mobile.ui.screens.agentlist.AgentListScreen
+import com.letta.mobile.ui.screens.archival.ArchivalScreen
 import com.letta.mobile.ui.screens.chat.AgentScaffold
 import com.letta.mobile.ui.screens.config.ConfigListScreen
 import com.letta.mobile.ui.screens.config.ConfigScreen
 import com.letta.mobile.ui.screens.conversations.ConversationsScreen
 import com.letta.mobile.ui.screens.editagent.EditAgentScreen
 import com.letta.mobile.ui.screens.mcp.McpScreen
+import com.letta.mobile.ui.screens.models.ModelBrowserScreen
 import com.letta.mobile.ui.screens.templates.TemplatesScreen
 
 @Composable
@@ -98,6 +100,25 @@ fun AppNavGraph(
             arguments = listOf(navArgument("agentId") { type = NavType.StringType })
         ) {
             EditAgentScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable("models") {
+            ModelBrowserScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onModelSelected = { modelId ->
+                    navController.previousBackStackEntry?.savedStateHandle?.set("selectedModel", modelId)
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(
+            route = "agent/{agentId}/archival",
+            arguments = listOf(navArgument("agentId") { type = NavType.StringType })
+        ) {
+            ArchivalScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }
