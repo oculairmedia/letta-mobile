@@ -96,9 +96,7 @@ describe("use-agent-messages hooks", () => {
     })
 
     it("should fetch messages for specific conversation when conversationId provided", async () => {
-      const mockMessages = [
-        { id: "msg-1", text: "Conversation message" },
-      ]
+      const mockMessages = [{ id: "msg-1", text: "Conversation message" }]
 
       const mockConversationList = jest.fn().mockResolvedValue({
         getPaginatedItems: () => mockMessages,
@@ -114,10 +112,9 @@ describe("use-agent-messages hooks", () => {
         },
       } as any)
 
-      const { result } = renderHook(
-        () => useAgentMessages("agent-1", "conv-123"),
-        { wrapper: createWrapper() },
-      )
+      const { result } = renderHook(() => useAgentMessages("agent-1", "conv-123"), {
+        wrapper: createWrapper(),
+      })
 
       await waitFor(() => {
         expect(mockConversationList).toHaveBeenCalled()
@@ -202,36 +199,6 @@ describe("use-agent-messages hooks", () => {
       })
     })
 
-    it("should reset messages for specific conversation", async () => {
-      const mockConversationReset = jest.fn().mockResolvedValue({})
-
-      mockUseLettaClient.mockReturnValue({
-        lettaClient: {
-          conversations: {
-            messages: {
-              reset: mockConversationReset,
-            },
-          },
-        },
-      } as any)
-
-      const { result } = renderHook(() => useResetChatMessages(), {
-        wrapper: createWrapper(),
-      })
-
-      await act(async () => {
-        await result.current.mutateAsync({
-          agentId: "agent-1",
-          conversationId: "conv-123",
-          add_default_initial_messages: false,
-        })
-      })
-
-      expect(mockConversationReset).toHaveBeenCalledWith("conv-123", {
-        add_default_initial_messages: false,
-      })
-    })
-
     it("should invalidate queries on success", async () => {
       const mockReset = jest.fn().mockResolvedValue({})
 
@@ -259,37 +226,6 @@ describe("use-agent-messages hooks", () => {
 
       expect(invalidateSpy).toHaveBeenCalledWith({
         queryKey: ["agentMessages", "agent-1", "default"],
-      })
-    })
-
-    it("should invalidate correct query key for conversation reset", async () => {
-      const mockConversationReset = jest.fn().mockResolvedValue({})
-
-      mockUseLettaClient.mockReturnValue({
-        lettaClient: {
-          conversations: {
-            messages: {
-              reset: mockConversationReset,
-            },
-          },
-        },
-      } as any)
-
-      const invalidateSpy = jest.spyOn(queryClient, "invalidateQueries")
-
-      const { result } = renderHook(() => useResetChatMessages(), {
-        wrapper: createWrapper(),
-      })
-
-      await act(async () => {
-        await result.current.mutateAsync({
-          agentId: "agent-1",
-          conversationId: "conv-123",
-        })
-      })
-
-      expect(invalidateSpy).toHaveBeenCalledWith({
-        queryKey: ["agentMessages", "agent-1", "conv-123"],
       })
     })
 

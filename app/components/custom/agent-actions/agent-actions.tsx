@@ -6,7 +6,7 @@ import { AgentActionsProps } from "./types"
 export function AgentActions({ agentId, conversationId }: AgentActionsProps) {
   return (
     <View style={$container}>
-      <ResetChat agentId={agentId} conversationId={conversationId} />
+      <ResetChat agentId={agentId} />
     </View>
   )
 }

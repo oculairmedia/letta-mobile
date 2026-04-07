@@ -248,9 +248,7 @@ export const ConversationsScreen: FC<AppStackScreenProps<"Conversations">> = () 
       minMatchCharLength: 1,
     })
 
-    return fuse
-      .search(searchQuery.trim())
-      .map((result: Fuse.FuseResult<(typeof sorted)[number]>) => result.item)
+    return fuse.search(searchQuery.trim()).map((result) => result.item)
   }, [rawConversations, agentMap, searchQuery])
 
   const handleConversationPress = (conversation: Conversation) => {

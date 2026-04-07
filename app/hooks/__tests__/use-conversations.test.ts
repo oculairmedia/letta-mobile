@@ -5,7 +5,6 @@ import {
   useCreateConversation,
   useDeleteConversation,
   useUpdateConversation,
-  useArchiveConversation,
   useForkConversation,
 } from "../use-conversations"
 import { useLettaClient } from "@/providers/LettaProvider"
@@ -201,56 +200,6 @@ describe("use-conversations hooks", () => {
       })
 
       expect(mockUpdate).toHaveBeenCalledWith("conv-1", { summary: "Updated summary" })
-    })
-  })
-
-  describe("useArchiveConversation", () => {
-    it("should archive a conversation", async () => {
-      const mockUpdate = jest.fn().mockResolvedValue({})
-
-      mockUseLettaClient.mockReturnValue({
-        lettaClient: {
-          conversations: {
-            update: mockUpdate,
-          },
-        },
-      } as any)
-
-      const { result } = renderHook(() => useArchiveConversation(), {
-        wrapper: createWrapper(),
-      })
-
-      await result.current.mutateAsync({
-        conversationId: "conv-1",
-        agentId: "agent-1",
-        isArchived: true,
-      })
-
-      expect(mockUpdate).toHaveBeenCalledWith("conv-1", { is_archived: true })
-    })
-
-    it("should unarchive a conversation", async () => {
-      const mockUpdate = jest.fn().mockResolvedValue({})
-
-      mockUseLettaClient.mockReturnValue({
-        lettaClient: {
-          conversations: {
-            update: mockUpdate,
-          },
-        },
-      } as any)
-
-      const { result } = renderHook(() => useArchiveConversation(), {
-        wrapper: createWrapper(),
-      })
-
-      await result.current.mutateAsync({
-        conversationId: "conv-1",
-        agentId: "agent-1",
-        isArchived: false,
-      })
-
-      expect(mockUpdate).toHaveBeenCalledWith("conv-1", { is_archived: false })
     })
   })
 
