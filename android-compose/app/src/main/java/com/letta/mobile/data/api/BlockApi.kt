@@ -3,6 +3,7 @@ package com.letta.mobile.data.api
 import com.letta.mobile.data.model.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -15,23 +16,35 @@ class BlockApi @Inject constructor(
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
 
-        return client.get("$baseUrl/v1/agents/$agentId/blocks/$blockLabel").body()
+        val response = client.get("$baseUrl/v1/agents/$agentId/blocks/$blockLabel")
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
     }
 
     suspend fun updateBlock(agentId: String, blockLabel: String, params: BlockUpdateParams): Block {
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
 
-        return client.patch("$baseUrl/v1/agents/$agentId/blocks/$blockLabel") {
+        val response = client.patch("$baseUrl/v1/agents/$agentId/blocks/$blockLabel") {
             contentType(ContentType.Application.Json)
             setBody(params)
-        }.body()
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
     }
 
     suspend fun listBlocks(agentId: String): List<Block> {
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
 
-        return client.get("$baseUrl/v1/agents/$agentId/blocks").body()
+        val response = client.get("$baseUrl/v1/agents/$agentId/blocks")
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
     }
 }

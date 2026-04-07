@@ -3,6 +3,7 @@ package com.letta.mobile.data.api
 import com.letta.mobile.data.model.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,46 +20,65 @@ class ToolApi @Inject constructor(
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
 
-        return client.get("$baseUrl/v1/tools") {
+        val response = client.get("$baseUrl/v1/tools") {
             tags?.forEach { parameter("tags", it) }
             parameter("limit", limit)
             parameter("offset", offset)
-        }.body()
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
     }
 
     suspend fun getTool(toolId: String): Tool {
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
 
-        return client.get("$baseUrl/v1/tools/$toolId").body()
+        val response = client.get("$baseUrl/v1/tools/$toolId")
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
     }
 
     suspend fun createTool(params: ToolCreateParams): Tool {
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
 
-        return client.post("$baseUrl/v1/tools") {
+        val response = client.post("$baseUrl/v1/tools") {
             contentType(ContentType.Application.Json)
             setBody(params)
-        }.body()
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
     }
 
     suspend fun upsertTool(params: ToolCreateParams): Tool {
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
 
-        return client.put("$baseUrl/v1/tools") {
+        val response = client.put("$baseUrl/v1/tools") {
             contentType(ContentType.Application.Json)
             setBody(params)
-        }.body()
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
     }
 
     suspend fun attachTool(agentId: String, toolId: String) {
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
 
-        client.patch("$baseUrl/v1/agents/$agentId/tools/attach/$toolId") {
+        val response = client.patch("$baseUrl/v1/agents/$agentId/tools/attach/$toolId") {
             contentType(ContentType.Application.Json)
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
         }
     }
 
@@ -66,8 +86,11 @@ class ToolApi @Inject constructor(
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
 
-        client.patch("$baseUrl/v1/agents/$agentId/tools/detach/$toolId") {
+        val response = client.patch("$baseUrl/v1/agents/$agentId/tools/detach/$toolId") {
             contentType(ContentType.Application.Json)
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
         }
     }
 }

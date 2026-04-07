@@ -3,6 +3,7 @@ package com.letta.mobile.data.api
 import com.letta.mobile.data.model.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.utils.io.*
 import kotlinx.coroutines.flow.Flow
@@ -17,10 +18,14 @@ class MessageApi @Inject constructor(
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
 
-        return client.post("$baseUrl/v1/agents/$agentId/messages") {
+        val response = client.post("$baseUrl/v1/agents/$agentId/messages") {
             contentType(ContentType.Application.Json)
             setBody(request)
-        }.body()
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
     }
 
     suspend fun sendConversationMessage(
@@ -34,7 +39,9 @@ class MessageApi @Inject constructor(
             contentType(ContentType.Application.Json)
             setBody(request.copy(streaming = true))
         }
-
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
         return response.body()
     }
 
@@ -46,18 +53,25 @@ class MessageApi @Inject constructor(
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
 
-        return client.get("$baseUrl/v1/agents/$agentId/messages") {
+        val response = client.get("$baseUrl/v1/agents/$agentId/messages") {
             parameter("limit", limit)
             parameter("after", after)
-        }.body()
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
     }
 
     suspend fun resetMessages(agentId: String) {
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
 
-        client.patch("$baseUrl/v1/agents/$agentId/reset-messages") {
+        val response = client.patch("$baseUrl/v1/agents/$agentId/reset-messages") {
             contentType(ContentType.Application.Json)
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
         }
     }
 }
