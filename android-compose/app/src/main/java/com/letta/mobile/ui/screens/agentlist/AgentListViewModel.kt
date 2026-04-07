@@ -20,6 +20,8 @@ import javax.inject.Inject
 data class AgentListUiState(
     val searchQuery: String = "",
     val isCreating: Boolean = false,
+    val isLoadingAllAgents: Boolean = false,
+    val allAgents: List<Agent> = emptyList(),
     val error: String? = null
 )
 
@@ -58,6 +60,27 @@ class AgentListViewModel @Inject constructor(
 
     fun updateSearchQuery(query: String) {
         _uiState.value = _uiState.value.copy(searchQuery = query)
+
+        // Load all agents when user starts searching
+        if (query.isNotBlank() && _uiState.value.allAgents.isEmpty() && !_uiState.value.isLoadingAllAgents) {
+            loadAllAgents()
+        }
+    }
+
+    private fun loadAllAgents() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoadingAllAgents = true)
+            try {
+                agentRepository.refreshAgents()
+                val agents = agentRepository.agents.value
+                _uiState.value = _uiState.value.copy(
+                    allAgents = agents,
+                    isLoadingAllAgents = false
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(isLoadingAllAgents = false)
+            }
+        }
     }
 
     fun clearError() {

@@ -77,18 +77,22 @@ fun AgentListScreen(
     var showCreateDialog by remember { mutableStateOf(false) }
     var searchActive by remember { mutableStateOf(false) }
     val searchQuery = uiState.searchQuery
+    val allAgents = uiState.allAgents
 
-    // Get all currently loaded agents for search filtering
+    // Get agents from paging for display when not searching
     val loadedAgents by remember(agentsPaged.itemCount) {
         derivedStateOf {
             (0 until agentsPaged.itemCount).mapNotNull { agentsPaged[it] }
         }
     }
 
+    // Use allAgents for search (fetched from API), fall back to loadedAgents
+    val searchableAgents = if (allAgents.isNotEmpty()) allAgents else loadedAgents
+
     // Filter using fuzzy search
-    val filteredAgents by remember(loadedAgents, searchQuery) {
+    val filteredAgents by remember(searchableAgents, searchQuery) {
         derivedStateOf {
-            agentSearch.search(loadedAgents, searchQuery)
+            agentSearch.search(searchableAgents, searchQuery)
         }
     }
 
