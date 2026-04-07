@@ -1,0 +1,66 @@
+package com.letta.mobile.data.repository
+
+import com.letta.mobile.data.model.McpServerCreateParams
+import com.letta.mobile.testutil.FakeMcpServerApi
+import com.letta.mobile.testutil.TestData
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.buildJsonObject
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class McpServerRepositoryTest {
+
+    private lateinit var fakeApi: FakeMcpServerApi
+    private lateinit var repository: McpServerRepository
+
+    @Before
+    fun setup() {
+        fakeApi = FakeMcpServerApi()
+        repository = McpServerRepository(fakeApi)
+    }
+
+    @Test
+    fun `refreshServers updates StateFlow`() = runTest {
+        fakeApi.servers.addAll(listOf(TestData.mcpServer(id = "1"), TestData.mcpServer(id = "2")))
+        repository.refreshServers()
+        assertEquals(2, repository.servers.value.size)
+    }
+
+    @Test
+    fun `createServer adds and refreshes`() = runTest {
+        val params = McpServerCreateParams(serverName = "New Server", config = buildJsonObject {})
+        val server = repository.createServer(params)
+        assertEquals("New Server", server.serverName)
+        assertTrue(fakeApi.calls.any { it.startsWith("createMcpServer") })
+    }
+
+    @Test
+    fun `deleteServer removes and cleans tools`() = runTest {
+        fakeApi.servers.add(TestData.mcpServer(id = "s1"))
+        repository.refreshServers()
+        repository.deleteServer("s1")
+        assertTrue(repository.servers.value.none { it.id == "s1" })
+    }
+
+    @Test
+    fun `refreshServerTools loads tools`() = runTest {
+        fakeApi.serverTools["s1"] = listOf(TestData.tool(id = "t1"))
+        repository.refreshServerTools("s1")
+        assertTrue(fakeApi.calls.contains("listMcpServerTools:s1"))
+    }
+
+    @Test
+    fun `getServers returns empty initially`() = runTest {
+        assertTrue(repository.servers.value.isEmpty())
+    }
+
+    @Test(expected = com.letta.mobile.data.api.ApiException::class)
+    fun `refreshServers throws on API failure`() = runTest {
+        fakeApi.shouldFail = true
+        repository.refreshServers()
+    }
+}
