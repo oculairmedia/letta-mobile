@@ -14,8 +14,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
+import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.LoadingIndicator
+import com.letta.mobile.ui.components.ModelDropdown
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -24,6 +26,7 @@ fun EditAgentScreen(
     viewModel: EditAgentViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val llmModels by viewModel.llmModels.collectAsStateWithLifecycle()
     val snackbar = LocalSnackbarDispatcher.current
 
     Scaffold(
@@ -47,9 +50,11 @@ fun EditAgentScreen(
             )
             is UiState.Success -> EditAgentContent(
                 state = state.data,
+                llmModels = llmModels,
                 onNameChange = { viewModel.updateName(it) },
                 onDescriptionChange = { viewModel.updateDescription(it) },
                 onModelChange = { viewModel.updateModel(it) },
+                onLoadModels = { viewModel.loadModels() },
                 onPersonaChange = { viewModel.updatePersonaBlock(it) },
                 onHumanChange = { viewModel.updateHumanBlock(it) },
                 onSystemPromptChange = { viewModel.updateSystemPrompt(it) },
@@ -63,9 +68,11 @@ fun EditAgentScreen(
 @Composable
 private fun EditAgentContent(
     state: EditAgentUiState,
+    llmModels: List<LlmModel> = emptyList(),
     onNameChange: (String) -> Unit,
     onDescriptionChange: (String) -> Unit,
     onModelChange: (String) -> Unit,
+    onLoadModels: () -> Unit = {},
     onPersonaChange: (String) -> Unit,
     onHumanChange: (String) -> Unit,
     onSystemPromptChange: (String) -> Unit,
@@ -99,11 +106,13 @@ private fun EditAgentContent(
             minLines = 2
         )
 
-        OutlinedTextField(
-            value = state.model,
-            onValueChange = onModelChange,
-            label = { Text(stringResource(R.string.common_model)) },
-            modifier = Modifier.fillMaxWidth()
+        ModelDropdown(
+            selectedModel = state.model,
+            models = llmModels,
+            onModelSelected = onModelChange,
+            onLoadModels = onLoadModels,
+            modifier = Modifier.fillMaxWidth(),
+            label = stringResource(R.string.common_model),
         )
 
         Divider()

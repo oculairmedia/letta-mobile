@@ -4,6 +4,9 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -13,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Build
@@ -22,7 +26,11 @@ import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -52,8 +60,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.R
+import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.util.formatRelativeTime
 import com.letta.mobile.ui.components.ConnectionState
 import com.letta.mobile.ui.components.ConnectionStatusBanner
 import com.letta.mobile.ui.screens.settings.AgentSettingsScreen
@@ -184,7 +196,109 @@ fun AgentScaffold(
             }
         }
     }
+
+    if (showConversationPicker) {
+        ConversationPickerSheet(
+            agentId = agentId,
+            currentConversationId = conversationId,
+            onDismiss = { showConversationPicker = false },
+            onConversationSelected = { convId ->
+                showConversationPicker = false
+                onSwitchConversation?.invoke(agentId, convId)
+            },
+            onNewConversation = {
+                showConversationPicker = false
+                onSwitchConversation?.invoke(agentId, "")
+            },
+        )
+    }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ConversationPickerSheet(
+    agentId: String,
+    currentConversationId: String?,
+    onDismiss: () -> Unit,
+    onConversationSelected: (String) -> Unit,
+    onNewConversation: () -> Unit,
+) {
+    val conversationRepo: ConversationRepository = hiltViewModel<ConversationPickerViewModel>().conversationRepository
+    val conversations by conversationRepo.getConversations(agentId).collectAsStateWithLifecycle(emptyList())
+
+    LaunchedEffect(agentId) {
+        conversationRepo.refreshConversations(agentId)
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = stringResource(R.string.common_conversations),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+
+            OutlinedButton(
+                onClick = onNewConversation,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(stringResource(R.string.screen_conversations_new_action))
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (conversations.isEmpty()) {
+                Text(
+                    text = "No conversations yet",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 16.dp),
+                )
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.heightIn(max = 400.dp),
+                ) {
+                    items(conversations, key = { it.id }) { conversation ->
+                        val isSelected = conversation.id == currentConversationId
+                        Card(
+                            onClick = { onConversationSelected(conversation.id) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = if (isSelected) CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer
+                            ) else CardDefaults.cardColors(),
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = conversation.summary ?: "Conversation",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                conversation.lastMessageAt?.let { time ->
+                                    Text(
+                                        text = formatRelativeTime(time),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+@HiltViewModel
+class ConversationPickerViewModel @Inject constructor(
+    val conversationRepository: ConversationRepository,
+) : ViewModel()
 
 @Composable
 private fun DrawerContent(

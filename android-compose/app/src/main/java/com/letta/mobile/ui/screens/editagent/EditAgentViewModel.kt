@@ -5,8 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentUpdateParams
+import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.BlockRepository
+import com.letta.mobile.data.repository.ModelRepository
 import com.letta.mobile.ui.common.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,6 +35,7 @@ class EditAgentViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val agentRepository: AgentRepository,
     private val blockRepository: BlockRepository,
+    private val modelRepository: ModelRepository,
 ) : ViewModel() {
 
     private val agentId: String = savedStateHandle.get<String>("agentId") ?: ""
@@ -40,11 +43,22 @@ class EditAgentViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<UiState<EditAgentUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<EditAgentUiState>> = _uiState.asStateFlow()
 
+    val llmModels: StateFlow<List<LlmModel>> = modelRepository.llmModels
+
     @Volatile private var originalPersonaBlock: String = ""
     @Volatile private var originalHumanBlock: String = ""
 
     init {
         loadAgent()
+        loadModels()
+    }
+
+    fun loadModels() {
+        viewModelScope.launch {
+            try {
+                modelRepository.refreshLlmModels()
+            } catch (_: Exception) { }
+        }
     }
 
     fun loadAgent() {

@@ -120,6 +120,13 @@ class SettingsRepository @Inject constructor(
         }
     }
 
+    suspend fun clearAllData() {
+        encryptedPrefs.edit().clear().apply()
+        dataStore.edit { it.clear() }
+        _configs.value = emptyList()
+        _activeConfig.value = null
+    }
+
     suspend fun setTheme(theme: AppTheme) {
         dataStore.edit { prefs ->
             prefs[Keys.THEME] = theme.name

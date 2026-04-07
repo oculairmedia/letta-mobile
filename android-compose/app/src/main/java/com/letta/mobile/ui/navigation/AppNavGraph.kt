@@ -22,15 +22,21 @@ import com.letta.mobile.ui.screens.editagent.EditAgentScreen
 import com.letta.mobile.ui.screens.mcp.McpScreen
 import com.letta.mobile.ui.screens.models.ModelBrowserScreen
 import com.letta.mobile.ui.screens.templates.TemplatesScreen
+import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class NavViewModel @Inject constructor(
-    settingsRepository: SettingsRepository,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
     val hasConfig = settingsRepository.activeConfig.map { it != null }
+
+    fun clearAllData() {
+        viewModelScope.launch { settingsRepository.clearAllData() }
+    }
 }
 
 @Composable
@@ -154,6 +160,7 @@ fun AppNavGraph() {
             AboutScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onLogout = {
+                    navViewModel.clearAllData()
                     navController.navigate("config") {
                         popUpTo(0) { inclusive = true }
                     }
