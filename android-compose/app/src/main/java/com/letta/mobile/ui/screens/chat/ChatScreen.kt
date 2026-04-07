@@ -322,6 +322,8 @@ private fun MessageInputBar(
     isStreaming: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+
     Surface(
         modifier = modifier,
         tonalElevation = 3.dp
@@ -338,7 +340,7 @@ private fun MessageInputBar(
                 modifier = Modifier.weight(1f),
                 placeholder = { Text(stringResource(R.string.screen_chat_input_hint)) },
                 enabled = !isStreaming,
-                maxLines = 4
+                maxLines = 6
             )
 
             Spacer(modifier = Modifier.width(8.dp))
@@ -347,6 +349,7 @@ private fun MessageInputBar(
                 onClick = {
                     if (text.isNotBlank()) {
                         onSend(text)
+                        keyboardController?.hide()
                     }
                 },
                 enabled = text.isNotBlank() && !isStreaming
