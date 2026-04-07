@@ -46,26 +46,6 @@ android {
     sourceSets {
         getByName("main") {
             manifest.srcFile("src/main/AndroidManifest.xml")
-            java.setSrcDirs(
-                listOf(
-                    "src/main/java",
-                    "../app/src/main/java/com/letta/mobile/data",
-                    "../app/src/main/java/com/letta/mobile/domain",
-                    "../app/src/main/java/com/letta/mobile/util"
-                )
-            )
-        }
-        getByName("test") {
-            java.setSrcDirs(
-                listOf(
-                    "../app/src/test/java/com/letta/mobile/data",
-                    "../app/src/test/java/com/letta/mobile/domain",
-                    "../app/src/test/java/com/letta/mobile/util",
-                    "../app/src/test/java/com/letta/mobile/testutil",
-                    "../app/src/test/java/com/letta/mobile/ui/common"
-                )
-            )
-            resources.setSrcDirs(listOf("../app/src/test/resources"))
         }
     }
 }

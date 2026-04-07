@@ -1,0 +1,11 @@
+{
+  "id": "msg-004",
+  "message_type": "tool_call_message",
+  "tool_call": {
+    "id": "tc-001",
+    "name": "web_search",
+    "arguments": "{\"query\":\"Kotlin coroutines\"}",
+    "type": "function"
+  },
+  "date": "2024-03-15T10:00:07Z"
+}

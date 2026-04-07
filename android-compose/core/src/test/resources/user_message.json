@@ -1,0 +1,7 @@
+{
+  "id": "msg-001",
+  "message_type": "user_message",
+  "content": "Hello, how are you?",
+  "date": "2024-03-15T10:00:00Z",
+  "name": "user"
+}

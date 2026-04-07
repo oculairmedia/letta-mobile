@@ -36,12 +36,6 @@ android {
     sourceSets {
         getByName("main") {
             manifest.srcFile("src/main/AndroidManifest.xml")
-            java.setSrcDirs(
-                listOf(
-                    "../app/src/main/java/com/letta/mobile/ui/components",
-                    "../app/src/main/java/com/letta/mobile/ui/theme"
-                )
-            )
         }
     }
 }

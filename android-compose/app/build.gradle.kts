@@ -56,18 +56,7 @@ android {
         compose = true
     }
 
-    sourceSets {
-        getByName("main") {
-            java.setSrcDirs(
-                listOf(
-                    "src/appMain/java",
-                    "src/main/java/com/letta/mobile/di",
-                    "src/main/java/com/letta/mobile/ui/navigation",
-                    "src/main/java/com/letta/mobile/ui/screens"
-                )
-            )
-        }
-    }
+
 }
 
 dependencies {
