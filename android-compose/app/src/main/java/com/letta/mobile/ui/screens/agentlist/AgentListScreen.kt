@@ -1,15 +1,53 @@
 package com.letta.mobile.ui.screens.agentlist
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -31,22 +69,62 @@ fun AgentListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showCreateDialog by remember { mutableStateOf(false) }
+    var showSearch by remember { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.agents)) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, stringResource(R.string.back))
+            Column {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.agents)) },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.Default.ArrowBack, stringResource(R.string.back))
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = {
+                            showSearch = !showSearch
+                            if (!showSearch) {
+                                viewModel.updateSearchQuery("")
+                            }
+                        }) {
+                            Icon(
+                                if (showSearch) Icons.Default.Clear else Icons.Default.Search,
+                                contentDescription = stringResource(R.string.search)
+                            )
+                        }
                     }
-                },
-                actions = {
-                    IconButton(onClick = { }) {
-                        Icon(Icons.Default.Search, stringResource(R.string.search))
-                    }
+                )
+
+                AnimatedVisibility(
+                    visible = showSearch,
+                    enter = expandVertically(),
+                    exit = shrinkVertically(),
+                ) {
+                    OutlinedTextField(
+                        value = (uiState as? UiState.Success)?.data?.searchQuery ?: "",
+                        onValueChange = { viewModel.updateSearchQuery(it) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .focusRequester(focusRequester),
+                        placeholder = { Text(stringResource(R.string.search_agents)) },
+                        singleLine = true,
+                        leadingIcon = {
+                            Icon(Icons.Default.Search, contentDescription = null)
+                        },
+                        trailingIcon = {
+                            val query = (uiState as? UiState.Success)?.data?.searchQuery ?: ""
+                            if (query.isNotEmpty()) {
+                                IconButton(onClick = { viewModel.updateSearchQuery("") }) {
+                                    Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.cancel))
+                                }
+                            }
+                        }
+                    )
                 }
-            )
+            }
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showCreateDialog = true }) {
@@ -61,16 +139,33 @@ fun AgentListScreen(
                 onRetry = { viewModel.loadAgents() },
                 modifier = Modifier.padding(paddingValues)
             )
-            is UiState.Success -> AgentListContent(
-                state = state.data,
-                onAgentClick = { onNavigateToAgent(it.id) },
-                onAgentLongPress = { agent ->
-                    onNavigateToEditAgent(agent.id)
-                },
-                onDeleteAgent = { viewModel.deleteAgent(it.id) },
-                onRefresh = { viewModel.refresh() },
-                modifier = Modifier.padding(paddingValues)
-            )
+            is UiState.Success -> {
+                val filteredAgents by remember(state.data.agents, state.data.searchQuery) {
+                    derivedStateOf {
+                        val query = state.data.searchQuery.trim()
+                        if (query.isBlank()) {
+                            state.data.agents
+                        } else {
+                            state.data.agents.filter { agent ->
+                                agent.name.contains(query, ignoreCase = true) ||
+                                    (agent.description?.contains(query, ignoreCase = true) == true) ||
+                                    (agent.model?.contains(query, ignoreCase = true) == true) ||
+                                    (agent.tags?.any { it.contains(query, ignoreCase = true) } == true)
+                            }
+                        }
+                    }
+                }
+
+                AgentListContent(
+                    agents = filteredAgents,
+                    searchQuery = state.data.searchQuery,
+                    onAgentClick = { onNavigateToAgent(it.id) },
+                    onAgentLongPress = { onNavigateToEditAgent(it.id) },
+                    onDeleteAgent = { viewModel.deleteAgent(it.id) },
+                    onRefresh = { viewModel.refresh() },
+                    modifier = Modifier.padding(paddingValues)
+                )
+            }
         }
     }
 
@@ -89,17 +184,18 @@ fun AgentListScreen(
 
 @Composable
 private fun AgentListContent(
-    state: AgentListUiState,
+    agents: List<Agent>,
+    searchQuery: String,
     onAgentClick: (Agent) -> Unit,
     onAgentLongPress: (Agent) -> Unit,
     onDeleteAgent: (Agent) -> Unit,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (state.agents.isEmpty()) {
+    if (agents.isEmpty()) {
         EmptyState(
             icon = Icons.Default.SmartToy,
-            message = "No agents yet",
+            message = if (searchQuery.isBlank()) "No agents yet" else "No agents matching \"$searchQuery\"",
             modifier = modifier.fillMaxSize()
         )
     } else {
@@ -109,7 +205,7 @@ private fun AgentListContent(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(
-                items = state.agents,
+                items = agents,
                 key = { it.id }
             ) { agent ->
                 AgentCard(
@@ -215,10 +311,10 @@ private fun ErrorContent(
         verticalArrangement = Arrangement.Center
     ) {
         Icon(
-                    imageVector = Icons.Default.Error,
-                    contentDescription = "Error",
-                    tint = MaterialTheme.colorScheme.error
-                )
+            imageVector = Icons.Default.Error,
+            contentDescription = "Error",
+            tint = MaterialTheme.colorScheme.error
+        )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = message,

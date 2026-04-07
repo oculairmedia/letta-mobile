@@ -11,6 +11,7 @@
     <string name="templates">Templates</string>
     
     <string name="search">Search</string>
+    <string name="search_agents">Search agents\u2026</string>
     <string name="create">Create</string>
     <string name="delete">Delete</string>
     <string name="save">Save</string>
