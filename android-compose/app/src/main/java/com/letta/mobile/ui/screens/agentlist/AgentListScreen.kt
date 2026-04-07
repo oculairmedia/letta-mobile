@@ -1,10 +1,8 @@
 package com.letta.mobile.ui.screens.agentlist
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,38 +11,34 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DockedSearchBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -53,19 +47,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.paging.LoadState
-import androidx.paging.compose.LazyPagingItems
-import androidx.paging.compose.collectAsLazyPagingItems
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Agent
-import com.letta.mobile.domain.AgentSearch
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.LoadingIndicator
 
@@ -76,30 +66,13 @@ fun AgentListScreen(
     onNavigateToAgent: (String) -> Unit,
     onNavigateToEditAgent: (String) -> Unit,
     viewModel: AgentListViewModel = hiltViewModel(),
-    agentSearch: AgentSearch = remember { AgentSearch() }
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val agentsPaged = viewModel.agentsPaged.collectAsLazyPagingItems()
     var showCreateDialog by remember { mutableStateOf(false) }
-    var searchActive by remember { mutableStateOf(false) }
-    val searchQuery = uiState.searchQuery
-    val allAgents = uiState.allAgents
+    var showSearch by remember { mutableStateOf(false) }
 
-    // Get agents from paging for display when not searching
-    val loadedAgents by remember(agentsPaged.itemCount) {
-        derivedStateOf {
-            (0 until agentsPaged.itemCount).mapNotNull { agentsPaged[it] }
-        }
-    }
-
-    // Use allAgents for search (fetched from API), fall back to loadedAgents
-    val searchableAgents = if (allAgents.isNotEmpty()) allAgents else loadedAgents
-
-    // Filter using fuzzy search
-    val filteredAgents by remember(searchableAgents, searchQuery) {
-        derivedStateOf {
-            agentSearch.search(searchableAgents, searchQuery)
-        }
+    val filteredAgents by remember(uiState.agents, uiState.searchQuery) {
+        derivedStateOf { viewModel.getFilteredAgents() }
     }
 
     Scaffold(
@@ -111,57 +84,36 @@ fun AgentListScreen(
                         IconButton(onClick = onNavigateBack) {
                             Icon(Icons.Default.ArrowBack, stringResource(R.string.action_back))
                         }
+                    },
+                    actions = {
+                        IconButton(onClick = {
+                            showSearch = !showSearch
+                            if (!showSearch) viewModel.updateSearchQuery("")
+                        }) {
+                            Icon(
+                                if (showSearch) Icons.Default.Clear else Icons.Default.Search,
+                                contentDescription = stringResource(R.string.action_search),
+                            )
+                        }
                     }
                 )
 
-                // Docked Search Bar below the TopAppBar
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                ) {
-                    DockedSearchBar(
-                        inputField = {
-                            SearchBarDefaults.InputField(
-                                query = searchQuery,
-                                onQueryChange = { viewModel.updateSearchQuery(it) },
-                                onSearch = { searchActive = false },
-                                expanded = searchActive,
-                                onExpandedChange = { searchActive = it },
-                                placeholder = { Text(stringResource(R.string.screen_agents_search_hint)) },
-                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
-                                trailingIcon = {
-                                    if (searchQuery.isNotEmpty()) {
-                                        IconButton(onClick = { viewModel.updateSearchQuery("") }) {
-                                            Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.action_cancel))
-                                        }
-                                    }
+                if (showSearch) {
+                    OutlinedTextField(
+                        value = uiState.searchQuery,
+                        onValueChange = { viewModel.updateSearchQuery(it) },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                        placeholder = { Text(stringResource(R.string.screen_agents_search_hint)) },
+                        singleLine = true,
+                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        trailingIcon = {
+                            if (uiState.searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { viewModel.updateSearchQuery("") }) {
+                                    Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.action_cancel))
                                 }
-                            )
-                        },
-                        expanded = searchActive,
-                        onExpandedChange = { searchActive = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .semantics { traversalIndex = 0f }
-                    ) {
-                        // Show suggestions when search is active
-                        if (searchQuery.isNotEmpty() && filteredAgents.isNotEmpty()) {
-                            filteredAgents.take(5).forEach { agent ->
-                                ListItem(
-                                    headlineContent = { Text(agent.name) },
-                                    supportingContent = agent.model?.let { { Text(it) } },
-                                    leadingContent = { Icon(Icons.Default.SmartToy, contentDescription = "Agent") },
-                                    modifier = Modifier
-                                        .clickable {
-                                            searchActive = false
-                                            onNavigateToAgent(agent.id)
-                                        }
-                                        .fillMaxWidth()
-                                )
                             }
-                        }
-                    }
+                        },
+                    )
                 }
             }
         },
@@ -171,21 +123,44 @@ fun AgentListScreen(
             }
         }
     ) { paddingValues ->
-        AgentListContent(
-            agentsPaged = agentsPaged,
-            filteredAgents = filteredAgents,
-            searchQuery = searchQuery,
-            onAgentClick = { onNavigateToAgent(it.id) },
-            onAgentLongPress = { onNavigateToEditAgent(it.id) },
-            onDeleteAgent = { viewModel.deleteAgent(it.id) },
-            onRetry = { agentsPaged.retry() },
-            modifier = Modifier.padding(paddingValues)
-        )
-    }
-
-    // Error snackbar from ViewModel
-    uiState.error?.let { error ->
-        // Could show a snackbar here
+        when {
+            uiState.isLoading -> LoadingIndicator()
+            uiState.error != null && uiState.agents.isEmpty() -> ErrorContent(
+                message = uiState.error!!,
+                onRetry = { viewModel.loadAgents() },
+                modifier = Modifier.padding(paddingValues),
+            )
+            else -> {
+                PullToRefreshBox(
+                    isRefreshing = uiState.isRefreshing,
+                    onRefresh = { viewModel.refresh() },
+                    modifier = Modifier.padding(paddingValues).fillMaxSize(),
+                ) {
+                    if (filteredAgents.isEmpty()) {
+                        EmptyState(
+                            icon = Icons.Default.SmartToy,
+                            message = if (uiState.searchQuery.isBlank()) "No agents yet"
+                            else "No agents matching \"${uiState.searchQuery}\"",
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
+                        LazyColumn(
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            items(filteredAgents, key = { it.id }) { agent ->
+                                AgentCard(
+                                    agent = agent,
+                                    onClick = { onNavigateToAgent(agent.id) },
+                                    onLongPress = { onNavigateToEditAgent(agent.id) },
+                                    onDelete = { viewModel.deleteAgent(agent.id) },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     if (showCreateDialog) {
@@ -196,134 +171,8 @@ fun AgentListScreen(
                     showCreateDialog = false
                     onNavigateToAgent(agentId)
                 }
-            }
+            },
         )
-    }
-}
-
-@Composable
-private fun AgentListContent(
-    agentsPaged: LazyPagingItems<Agent>,
-    filteredAgents: List<Agent>,
-    searchQuery: String,
-    onAgentClick: (Agent) -> Unit,
-    onAgentLongPress: (Agent) -> Unit,
-    onDeleteAgent: (Agent) -> Unit,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val loadState = agentsPaged.loadState
-
-    when {
-        // Initial loading
-        loadState.refresh is LoadState.Loading && agentsPaged.itemCount == 0 -> {
-            LoadingIndicator()
-        }
-        // Initial load error
-        loadState.refresh is LoadState.Error && agentsPaged.itemCount == 0 -> {
-            val error = (loadState.refresh as LoadState.Error).error
-            ErrorContent(
-                message = error.message ?: "Failed to load agents",
-                onRetry = onRetry,
-                modifier = modifier
-            )
-        }
-        // Empty state (no search query, no results)
-        agentsPaged.itemCount == 0 && searchQuery.isBlank() -> {
-            EmptyState(
-                icon = Icons.Default.SmartToy,
-                message = "No agents yet",
-                modifier = modifier.fillMaxSize()
-            )
-        }
-        // Empty search results
-        filteredAgents.isEmpty() && searchQuery.isNotBlank() -> {
-            EmptyState(
-                icon = Icons.Default.SmartToy,
-                message = "No agents matching \"$searchQuery\"",
-                modifier = modifier.fillMaxSize()
-            )
-        }
-        // Show content
-        else -> {
-            val displayAgents = if (searchQuery.isNotBlank()) filteredAgents else null
-
-            LazyColumn(
-                modifier = modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (displayAgents != null) {
-                    // When searching, use filtered list
-                    items(
-                        count = displayAgents.size,
-                        key = { "${displayAgents[it].id}-$it" }
-                    ) { index ->
-                        val agent = displayAgents[index]
-                        AgentCard(
-                            agent = agent,
-                            onClick = { onAgentClick(agent) },
-                            onLongPress = { onAgentLongPress(agent) },
-                            onDelete = { onDeleteAgent(agent) }
-                        )
-                    }
-                } else {
-                    // When not searching, use paged data for infinite scroll
-                    items(
-                        count = agentsPaged.itemCount,
-                        key = { "${agentsPaged[it]?.id ?: "loading"}-$it" }
-                    ) { index ->
-                        val agent = agentsPaged[index]
-                        if (agent != null) {
-                            AgentCard(
-                                agent = agent,
-                                onClick = { onAgentClick(agent) },
-                                onLongPress = { onAgentLongPress(agent) },
-                                onDelete = { onDeleteAgent(agent) }
-                            )
-                        }
-                    }
-
-                    // Loading more indicator
-                    if (loadState.append is LoadState.Loading) {
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator()
-                            }
-                        }
-                    }
-
-                    // Load more error
-                    if (loadState.append is LoadState.Error) {
-                        item {
-                            val error = (loadState.append as LoadState.Error).error
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        text = error.message ?: "Failed to load more",
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Button(onClick = onRetry) {
-                                        Text(stringResource(R.string.action_retry))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -352,33 +201,24 @@ private fun AgentCard(
             ),
         shape = RoundedCornerShape(12.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-        ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Text(
                 text = agent.name,
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = agent.model ?: "No model",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             agent.tags?.takeIf { it.isNotEmpty() }?.let { tags ->
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     tags.take(3).forEach { tag ->
-                        SuggestionChip(
-                            onClick = { },
-                            label = { Text(tag, style = MaterialTheme.typography.labelSmall) }
-                        )
+                        SuggestionChip(onClick = {}, label = { Text(tag, style = MaterialTheme.typography.labelSmall) })
                     }
                 }
             }
@@ -405,12 +245,7 @@ private fun AgentCard(
             title = { Text(stringResource(R.string.screen_agents_dialog_delete_title)) },
             text = { Text(stringResource(R.string.screen_agents_dialog_delete_confirm, agent.name)) },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDeleteDialog = false
-                        onDelete()
-                    }
-                ) {
+                TextButton(onClick = { showDeleteDialog = false; onDelete() }) {
                     Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
                 }
             },
@@ -418,7 +253,7 @@ private fun AgentCard(
                 TextButton(onClick = { showDeleteDialog = false }) {
                     Text(stringResource(R.string.action_cancel))
                 }
-            }
+            },
         )
     }
 }
@@ -432,22 +267,13 @@ private fun ErrorContent(
     Column(
         modifier = modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.Center,
     ) {
-        Icon(
-            imageVector = Icons.Default.Error,
-            contentDescription = "Error",
-            tint = MaterialTheme.colorScheme.error
-        )
+        Icon(Icons.Default.Error, contentDescription = "Error", tint = MaterialTheme.colorScheme.error)
         Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyLarge
-        )
+        Text(text = message, style = MaterialTheme.typography.bodyLarge)
         Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = onRetry) {
-            Text(stringResource(R.string.action_retry))
-        }
+        Button(onClick = onRetry) { Text(stringResource(R.string.action_retry)) }
     }
 }
 
@@ -465,26 +291,18 @@ private fun CreateAgentDialog(
             OutlinedTextField(
                 value = agentName,
                 onValueChange = { agentName = it },
-                label = { Text(stringResource(R.string.screen_agents_dialog_name_label)) },
-                singleLine = true
+                label = { Text(stringResource(R.string.common_name)) },
+                singleLine = true,
             )
         },
         confirmButton = {
             TextButton(
-                onClick = {
-                    if (agentName.isNotBlank()) {
-                        onCreate(agentName)
-                    }
-                },
-                enabled = agentName.isNotBlank()
-            ) {
-                Text(stringResource(R.string.action_create))
-            }
+                onClick = { if (agentName.isNotBlank()) onCreate(agentName) },
+                enabled = agentName.isNotBlank(),
+            ) { Text(stringResource(R.string.action_create)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
-            }
-        }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        },
     )
 }

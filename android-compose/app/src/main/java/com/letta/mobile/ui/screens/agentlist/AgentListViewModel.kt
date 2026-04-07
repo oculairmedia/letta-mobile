@@ -2,31 +2,26 @@ package com.letta.mobile.ui.screens.agentlist
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.paging.PagingData
-import androidx.paging.cachedIn
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.repository.AgentRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @androidx.compose.runtime.Immutable
 data class AgentListUiState(
+    val agents: List<Agent> = emptyList(),
     val searchQuery: String = "",
+    val isLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val isCreating: Boolean = false,
-    val isLoadingAllAgents: Boolean = false,
-    val allAgents: List<Agent> = emptyList(),
-    val error: String? = null
+    val error: String? = null,
 )
 
-@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class AgentListViewModel @Inject constructor(
     private val agentRepository: AgentRepository,
@@ -35,51 +30,72 @@ class AgentListViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(AgentListUiState())
     val uiState: StateFlow<AgentListUiState> = _uiState.asStateFlow()
 
-    private val _refreshTrigger = MutableStateFlow(0)
-
-    val agentsPaged: Flow<PagingData<Agent>> = _refreshTrigger
-        .flatMapLatest {
-            agentRepository.getAgentsPaged()
-        }
-        .cachedIn(viewModelScope)
-
-    fun refresh() {
-        _refreshTrigger.value++
+    init {
+        loadAgents()
     }
 
-    fun deleteAgent(agentId: String, onComplete: () -> Unit = {}) {
+    fun loadAgents() {
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
-                agentRepository.deleteAgent(agentId)
-                refresh()
-                onComplete()
+                agentRepository.refreshAgents()
+                _uiState.value = _uiState.value.copy(
+                    agents = agentRepository.agents.value,
+                    isLoading = false,
+                )
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.message ?: "Failed to delete agent")
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = e.message ?: "Failed to load agents",
+                )
+            }
+        }
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isRefreshing = true)
+            try {
+                agentRepository.refreshAgents()
+                _uiState.value = _uiState.value.copy(
+                    agents = agentRepository.agents.value,
+                    isRefreshing = false,
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isRefreshing = false,
+                    error = e.message ?: "Failed to refresh",
+                )
             }
         }
     }
 
     fun updateSearchQuery(query: String) {
         _uiState.value = _uiState.value.copy(searchQuery = query)
+    }
 
-        // Load all agents when user starts searching
-        if (query.isNotBlank() && _uiState.value.allAgents.isEmpty() && !_uiState.value.isLoadingAllAgents) {
-            loadAllAgents()
+    fun getFilteredAgents(): List<Agent> {
+        val state = _uiState.value
+        if (state.searchQuery.isBlank()) return state.agents
+        val q = state.searchQuery.trim().lowercase()
+        return state.agents.filter { agent ->
+            agent.name.lowercase().contains(q) ||
+                (agent.description?.lowercase()?.contains(q) == true) ||
+                (agent.model?.lowercase()?.contains(q) == true) ||
+                (agent.tags?.any { it.lowercase().contains(q) } == true)
         }
     }
 
-    private fun loadAllAgents() {
+    fun deleteAgent(agentId: String, onComplete: () -> Unit = {}) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoadingAllAgents = true)
             try {
-                agentRepository.refreshAgents()
-                val agents = agentRepository.agents.value
+                agentRepository.deleteAgent(agentId)
                 _uiState.value = _uiState.value.copy(
-                    allAgents = agents,
-                    isLoadingAllAgents = false
+                    agents = _uiState.value.agents.filter { it.id != agentId }
                 )
+                onComplete()
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(isLoadingAllAgents = false)
+                _uiState.value = _uiState.value.copy(error = e.message ?: "Failed to delete agent")
             }
         }
     }
@@ -94,12 +110,12 @@ class AgentListViewModel @Inject constructor(
             try {
                 val agent = agentRepository.createAgent(AgentCreateParams(name = name))
                 _uiState.value = _uiState.value.copy(isCreating = false)
-                refresh()
+                loadAgents()
                 onSuccess(agent.id)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isCreating = false,
-                    error = e.message ?: "Failed to create agent"
+                    error = e.message ?: "Failed to create agent",
                 )
             }
         }
