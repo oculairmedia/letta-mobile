@@ -32,16 +32,12 @@ class MessageRepository @Inject constructor(
         return if (conversationId != null) {
             flow {
                 val cached = _messagesByConversation.value[conversationId]
-                if (cached != null) {
-                    emit(cached)
-                }
+                emit(cached ?: emptyList())
             }
         } else {
             flow {
                 val cached = _messagesByAgent.value[agentId]
-                if (cached != null) {
-                    emit(cached)
-                }
+                emit(cached ?: emptyList())
             }
         }
     }
