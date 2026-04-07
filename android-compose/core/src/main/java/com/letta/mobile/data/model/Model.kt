@@ -25,11 +25,3 @@ data class EmbeddingModel(
 ) {
     val displayName: String get() = handle ?: name.ifBlank { id }
 }
-
-@Serializable
-data class EmbeddingModel(
-    val id: String,
-    val name: String,
-    @SerialName("provider_type") val providerType: String,
-    @SerialName("embedding_dim") val embeddingDim: Int? = null,
-)
