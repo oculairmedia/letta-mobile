@@ -8,13 +8,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import com.letta.mobile.data.repository.api.IToolRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class ToolRepository @Inject constructor(
     private val toolApi: ToolApi,
-) {
+) : IToolRepository {
     private val _tools = MutableStateFlow<List<Tool>>(emptyList())
     private val _toolsByAgent = MutableStateFlow<Map<String, List<Tool>>>(emptyMap())
 

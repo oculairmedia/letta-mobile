@@ -14,13 +14,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
+import com.letta.mobile.data.repository.api.IAgentRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class AgentRepository @Inject constructor(
     private val agentApi: AgentApi,
-) {
+) : IAgentRepository {
     private val _agents = MutableStateFlow<List<Agent>>(emptyList())
     val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
 

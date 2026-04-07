@@ -4,13 +4,14 @@ import com.letta.mobile.data.api.BlockApi
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.BlockUpdateParams
+import com.letta.mobile.data.repository.api.IBlockRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class BlockRepository @Inject constructor(
     private val blockApi: BlockApi,
-) {
+) : IBlockRepository {
     suspend fun getBlocks(agentId: String): List<Block> {
         return blockApi.listBlocks(agentId)
     }

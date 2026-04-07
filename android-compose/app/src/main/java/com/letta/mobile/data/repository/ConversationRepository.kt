@@ -9,13 +9,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import com.letta.mobile.data.repository.api.IConversationRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class ConversationRepository @Inject constructor(
     private val conversationApi: ConversationApi,
-) {
+) : IConversationRepository {
     private val _conversationsByAgent = MutableStateFlow<Map<String, List<Conversation>>>(emptyMap())
 
     fun getConversations(agentId: String): Flow<List<Conversation>> {
