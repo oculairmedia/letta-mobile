@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Letta</string>
+    
+    <string name="conversations">Conversations</string>
+    <string name="agents">Agents</string>
+    <string name="settings">Settings</string>
+    <string name="chat">Chat</string>
+    <string name="tools">Tools</string>
+    <string name="mcp">MCP</string>
+    <string name="templates">Templates</string>
+    
+    <string name="search">Search</string>
+    <string name="create">Create</string>
+    <string name="delete">Delete</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="back">Back</string>
+    <string name="retry">Retry</string>
+    
+    <string name="loading">Loading...</string>
+    <string name="error_generic">An error occurred</string>
+    <string name="empty_conversations">No conversations yet</string>
+    <string name="empty_agents">No agents yet</string>
+    <string name="empty_tools">No tools available</string>
+    
+    <string name="send_message">Send message</string>
+    <string name="type_message">Type a message...</string>
+    
+    <string name="agent_name">Agent Name</string>
+    <string name="agent_description">Description</string>
+    <string name="model">Model</string>
+    <string name="temperature">Temperature</string>
+    <string name="max_tokens">Max Tokens</string>
+    
+    <string name="server_url">Server URL</string>
+    <string name="api_token">API Token</string>
+    <string name="cloud">Cloud</string>
+    <string name="self_hosted">Self-hosted</string>
+    
+    <string name="dark_theme">Dark Theme</string>
+    <string name="light_theme">Light Theme</string>
+</resources>
