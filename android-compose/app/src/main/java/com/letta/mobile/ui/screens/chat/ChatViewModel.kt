@@ -42,7 +42,7 @@ class ChatViewModel @Inject constructor(
 ) : ViewModel() {
 
     val agentId: String = savedStateHandle.get<String>("agentId") ?: ""
-    private val conversationId: String? = savedStateHandle.get<String>("conversationId")
+    val conversationId: String? = savedStateHandle.get<String>("conversationId")
 
     private val _uiState = MutableStateFlow<UiState<ChatUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<ChatUiState>> = _uiState.asStateFlow()

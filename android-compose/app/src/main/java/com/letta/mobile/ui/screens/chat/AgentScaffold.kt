@@ -1,6 +1,8 @@
 package com.letta.mobile.ui.screens.chat
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,7 +12,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Edit
@@ -63,15 +67,18 @@ fun AgentScaffold(
     onNavigateBack: () -> Unit,
     onNavigateToSettings: (String) -> Unit,
     onNavigateToArchival: ((String) -> Unit)? = null,
+    onSwitchConversation: ((String, String) -> Unit)? = null,
     viewModel: ChatViewModel = hiltViewModel()
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var selectedTab by remember { mutableStateOf(0) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var showConversationPicker by remember { mutableStateOf(false) }
 
     val agentName = (uiState as? UiState.Success)?.data?.agentName ?: ""
     val agentId = viewModel.agentId
+    val conversationId = viewModel.conversationId
     val connectivityMonitorAvailable = false
     val connectionState = ConnectionState.Online
 
@@ -104,12 +111,27 @@ fun AgentScaffold(
             topBar = {
                 TopAppBar(
                     title = {
-                        Column {
+                        Column(
+                            modifier = Modifier.clickable { showConversationPicker = true }
+                        ) {
                             Text(
                                 text = agentName.ifBlank { stringResource(R.string.screen_chat_title) },
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = if (conversationId != null) "Conversation" else "Default",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Icon(
+                                    Icons.Default.ArrowDropDown,
+                                    contentDescription = "Switch conversation",
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     },
                     navigationIcon = {

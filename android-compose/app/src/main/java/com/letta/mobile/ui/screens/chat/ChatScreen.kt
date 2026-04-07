@@ -133,9 +133,26 @@ private fun ChatContent(
             }
     }
 
-    val groupedMessages = remember(state.messages) {
+    val dedupedMessages = remember(state.messages) {
+        val result = mutableListOf<UiMessage>()
+        var lastReasoningContent: String? = null
+        for (msg in state.messages) {
+            if (msg.isReasoning) {
+                lastReasoningContent = msg.content
+                result.add(msg)
+            } else if (msg.role == "assistant" && msg.content == lastReasoningContent) {
+                // Skip assistant message that duplicates the reasoning content
+            } else {
+                lastReasoningContent = null
+                result.add(msg)
+            }
+        }
+        result
+    }
+
+    val groupedMessages = remember(dedupedMessages) {
         groupMessages(
-            messages = state.messages,
+            messages = dedupedMessages,
             getRole = { it.role },
             getTimestamp = { it.timestamp },
         )

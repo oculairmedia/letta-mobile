@@ -132,7 +132,12 @@ fun AppNavGraph() {
                 },
                 onNavigateToArchival = { agentId ->
                     navController.navigate("agent/$agentId/archival")
-                }
+                },
+                onSwitchConversation = { agentId, conversationId ->
+                    navController.navigate("agent/$agentId/chat?conversationId=$conversationId") {
+                        popUpTo("conversations")
+                    }
+                },
             )
         }
 
