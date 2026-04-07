@@ -1,9 +1,8 @@
 package com.letta.mobile.ui.screens.agentlist
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,13 +25,16 @@ import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.DockedSearchBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,9 +47,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -69,8 +70,25 @@ fun AgentListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showCreateDialog by remember { mutableStateOf(false) }
-    var showSearch by remember { mutableStateOf(false) }
-    val focusRequester = remember { FocusRequester() }
+    var searchActive by remember { mutableStateOf(false) }
+    val searchQuery = (uiState as? UiState.Success)?.data?.searchQuery ?: ""
+
+    // Get filtered agents for suggestions
+    val allAgents = (uiState as? UiState.Success)?.data?.agents ?: emptyList()
+    val filteredAgents by remember(allAgents, searchQuery) {
+        derivedStateOf {
+            if (searchQuery.isBlank()) {
+                allAgents
+            } else {
+                allAgents.filter { agent ->
+                    agent.name.contains(searchQuery, ignoreCase = true) ||
+                        (agent.description?.contains(searchQuery, ignoreCase = true) == true) ||
+                        (agent.model?.contains(searchQuery, ignoreCase = true) == true) ||
+                        (agent.tags?.any { it.contains(searchQuery, ignoreCase = true) } == true)
+                }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -81,48 +99,57 @@ fun AgentListScreen(
                         IconButton(onClick = onNavigateBack) {
                             Icon(Icons.Default.ArrowBack, stringResource(R.string.back))
                         }
-                    },
-                    actions = {
-                        IconButton(onClick = {
-                            showSearch = !showSearch
-                            if (!showSearch) {
-                                viewModel.updateSearchQuery("")
-                            }
-                        }) {
-                            Icon(
-                                if (showSearch) Icons.Default.Clear else Icons.Default.Search,
-                                contentDescription = stringResource(R.string.search)
-                            )
-                        }
                     }
                 )
 
-                AnimatedVisibility(
-                    visible = showSearch,
-                    enter = expandVertically(),
-                    exit = shrinkVertically(),
+                // Docked Search Bar below the TopAppBar
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
-                    OutlinedTextField(
-                        value = (uiState as? UiState.Success)?.data?.searchQuery ?: "",
-                        onValueChange = { viewModel.updateSearchQuery(it) },
+                    DockedSearchBar(
+                        inputField = {
+                            SearchBarDefaults.InputField(
+                                query = searchQuery,
+                                onQueryChange = { viewModel.updateSearchQuery(it) },
+                                onSearch = { searchActive = false },
+                                expanded = searchActive,
+                                onExpandedChange = { searchActive = it },
+                                placeholder = { Text(stringResource(R.string.search_agents)) },
+                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                                trailingIcon = {
+                                    if (searchQuery.isNotEmpty()) {
+                                        IconButton(onClick = { viewModel.updateSearchQuery("") }) {
+                                            Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.cancel))
+                                        }
+                                    }
+                                }
+                            )
+                        },
+                        expanded = searchActive,
+                        onExpandedChange = { searchActive = it },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                            .focusRequester(focusRequester),
-                        placeholder = { Text(stringResource(R.string.search_agents)) },
-                        singleLine = true,
-                        leadingIcon = {
-                            Icon(Icons.Default.Search, contentDescription = null)
-                        },
-                        trailingIcon = {
-                            val query = (uiState as? UiState.Success)?.data?.searchQuery ?: ""
-                            if (query.isNotEmpty()) {
-                                IconButton(onClick = { viewModel.updateSearchQuery("") }) {
-                                    Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.cancel))
-                                }
+                            .semantics { traversalIndex = 0f }
+                    ) {
+                        // Show suggestions when search is active
+                        if (searchQuery.isNotEmpty() && filteredAgents.isNotEmpty()) {
+                            filteredAgents.take(5).forEach { agent ->
+                                ListItem(
+                                    headlineContent = { Text(agent.name) },
+                                    supportingContent = agent.model?.let { { Text(it) } },
+                                    leadingContent = { Icon(Icons.Default.SmartToy, contentDescription = null) },
+                                    modifier = Modifier
+                                        .clickable {
+                                            searchActive = false
+                                            onNavigateToAgent(agent.id)
+                                        }
+                                        .fillMaxWidth()
+                                )
                             }
                         }
-                    )
+                    }
                 }
             }
         },
@@ -140,25 +167,9 @@ fun AgentListScreen(
                 modifier = Modifier.padding(paddingValues)
             )
             is UiState.Success -> {
-                val filteredAgents by remember(state.data.agents, state.data.searchQuery) {
-                    derivedStateOf {
-                        val query = state.data.searchQuery.trim()
-                        if (query.isBlank()) {
-                            state.data.agents
-                        } else {
-                            state.data.agents.filter { agent ->
-                                agent.name.contains(query, ignoreCase = true) ||
-                                    (agent.description?.contains(query, ignoreCase = true) == true) ||
-                                    (agent.model?.contains(query, ignoreCase = true) == true) ||
-                                    (agent.tags?.any { it.contains(query, ignoreCase = true) } == true)
-                            }
-                        }
-                    }
-                }
-
                 AgentListContent(
                     agents = filteredAgents,
-                    searchQuery = state.data.searchQuery,
+                    searchQuery = searchQuery,
                     onAgentClick = { onNavigateToAgent(it.id) },
                     onAgentLongPress = { onNavigateToEditAgent(it.id) },
                     onDeleteAgent = { viewModel.deleteAgent(it.id) },
