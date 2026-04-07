@@ -4,7 +4,6 @@ import { SimpleContextMenu } from "@/components/simple-context-menu"
 import { useAgents } from "@/hooks/use-agents"
 import { useAllConversations } from "@/hooks/use-all-conversations"
 import {
-  useArchiveConversation,
   useCreateConversation,
   useDeleteConversation,
   useForkConversation,
@@ -17,12 +16,6 @@ import { spacing, ThemedStyle } from "@/theme"
 import { useAppTheme } from "@/utils/useAppTheme"
 import { Conversation } from "@letta-ai/letta-client/resources/conversations/conversations"
 import { Letta } from "@letta-ai/letta-client"
-
-// Extend Conversation type for fields available in client >= 1.10.2
-// Remove this once @letta-ai/letta-client is upgraded
-interface ConversationExtended extends Conversation {
-  is_archived?: boolean
-}
 import Fuse from "fuse.js"
 import { TextInputModal } from "@/components/custom/modals/text-input-modal"
 import { FC, useMemo, useState } from "react"
@@ -47,7 +40,6 @@ interface ConversationCardProps {
   onPress: () => void
   onDelete: () => void
   onEdit: () => void
-  onArchive: () => void
   onFork: () => void
 }
 
@@ -57,7 +49,6 @@ const ConversationCard: FC<ConversationCardProps> = ({
   onPress,
   onDelete,
   onEdit,
-  onArchive,
   onFork,
 }) => {
   const {
@@ -66,8 +57,11 @@ const ConversationCard: FC<ConversationCardProps> = ({
   } = useAppTheme()
 
   const displayTitle = conversation.summary || `Chat with ${agentName}`
-  const timeAgo = formatRelativeTime(conversation.last_message_at || conversation.created_at)
-  const isArchived = (conversation as ConversationExtended).is_archived ?? false
+  // last_message_at exists at runtime but not in SDK types until client >= 1.10.2
+  const timeAgo = formatRelativeTime(
+    (conversation as Conversation & { last_message_at?: string }).last_message_at ||
+      conversation.created_at,
+  )
 
   return (
     <SimpleContextMenu
@@ -85,13 +79,6 @@ const ConversationCard: FC<ConversationCardProps> = ({
           iosIconName: { name: "arrow.branch", weight: "bold" },
           androidIconName: "ic_menu_share",
           onPress: onFork,
-        },
-        {
-          key: "archive",
-          title: isArchived ? "Unarchive" : "Archive",
-          iosIconName: { name: isArchived ? "tray.and.arrow.up" : "archivebox", weight: "bold" },
-          androidIconName: "ic_menu_archive",
-          onPress: onArchive,
         },
         {
           key: "delete",
@@ -207,11 +194,10 @@ export const ConversationsScreen: FC<AppStackScreenProps<"Conversations">> = () 
 
   const [showAgentPicker, setShowAgentPicker] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
-  const [showArchived, setShowArchived] = useState(false)
   const [editingConversation, setEditingConversation] = useState<Conversation | null>(null)
 
   const {
-    data: _conversations,
+    data: rawConversations,
     refetch,
     isFetching,
     fetchNextPage,
@@ -222,7 +208,6 @@ export const ConversationsScreen: FC<AppStackScreenProps<"Conversations">> = () 
   const { mutate: createConversation, isPending: isCreating } = useCreateConversation()
   const { mutate: deleteConversation } = useDeleteConversation()
   const { mutate: updateConversation } = useUpdateConversation()
-  const { mutate: archiveConversation } = useArchiveConversation()
   const { mutate: forkConversation } = useForkConversation()
 
   const setAgentId = useAgentStore((s) => s.setAgentId)
@@ -239,24 +224,18 @@ export const ConversationsScreen: FC<AppStackScreenProps<"Conversations">> = () 
     return map
   }, [agents])
 
-  // Filter conversations by search query and archive status
   const conversations = useMemo(() => {
-    // Add agent names to conversations for searching
     const enriched =
-      _conversations?.map((c) => ({
+      rawConversations?.map((c) => ({
         ...c,
         agentName: agentMap[c.agent_id] || "Unknown Agent",
       })) || []
 
-    // Filter by archive status
-    const filtered = showArchived
-      ? enriched
-      : enriched.filter((c) => !(c as ConversationExtended).is_archived)
-
-    // Sort by most recent first
-    const sorted = filtered.sort((a, b) => {
-      const aDate = new Date(a.last_message_at || a.created_at || 0).getTime() || 0
-      const bDate = new Date(b.last_message_at || b.created_at || 0).getTime() || 0
+    const sorted = enriched.sort((a, b) => {
+      const aTime = (a as Conversation & { last_message_at?: string }).last_message_at
+      const bTime = (b as Conversation & { last_message_at?: string }).last_message_at
+      const aDate = new Date(aTime || a.created_at || 0).getTime() || 0
+      const bDate = new Date(bTime || b.created_at || 0).getTime() || 0
       return bDate - aDate
     })
 
@@ -269,8 +248,10 @@ export const ConversationsScreen: FC<AppStackScreenProps<"Conversations">> = () 
       minMatchCharLength: 1,
     })
 
-    return fuse.search(searchQuery.trim()).map((result) => result.item)
-  }, [_conversations, agentMap, searchQuery, showArchived])
+    return fuse
+      .search(searchQuery.trim())
+      .map((result: Fuse.FuseResult<(typeof sorted)[number]>) => result.item)
+  }, [rawConversations, agentMap, searchQuery])
 
   const handleConversationPress = (conversation: Conversation) => {
     setAgentId(conversation.agent_id)
@@ -310,15 +291,6 @@ export const ConversationsScreen: FC<AppStackScreenProps<"Conversations">> = () 
       })
     }
     setEditingConversation(null)
-  }
-
-  const handleArchiveConversation = (conversation: Conversation) => {
-    const isArchived = (conversation as ConversationExtended).is_archived ?? false
-    archiveConversation({
-      conversationId: conversation.id,
-      agentId: conversation.agent_id,
-      isArchived: !isArchived,
-    })
   }
 
   const handleForkConversation = (conversation: Conversation) => {
@@ -373,16 +345,6 @@ export const ConversationsScreen: FC<AppStackScreenProps<"Conversations">> = () 
             <Icon icon="X" size={18} color={colors.textDim} onPress={() => setSearchQuery("")} />
           )}
         </View>
-        <TouchableOpacity
-          style={themed($archiveToggle)}
-          onPress={() => setShowArchived(!showArchived)}
-        >
-          <Icon
-            icon={showArchived ? "Archive" : "ArchiveX"}
-            size={18}
-            color={showArchived ? colors.tint : colors.textDim}
-          />
-        </TouchableOpacity>
         <TouchableOpacity style={themed($agentsButton)} onPress={() => navigate("AgentList")}>
           <Icon icon="Bot" size={18} color={colors.textDim} />
           <Text size="sm" style={themed($agentsButtonText)}>
@@ -404,7 +366,6 @@ export const ConversationsScreen: FC<AppStackScreenProps<"Conversations">> = () 
             onPress={() => handleConversationPress(item)}
             onDelete={() => handleDeleteConversation(item)}
             onEdit={() => handleEditConversation(item)}
-            onArchive={() => handleArchiveConversation(item)}
             onFork={() => handleForkConversation(item)}
           />
         )}
@@ -642,9 +603,3 @@ const $loadingMore: ViewStyle = {
   paddingVertical: spacing.md,
   alignItems: "center",
 }
-
-const $archiveToggle: ThemedStyle<ViewStyle> = ({ colors }) => ({
-  padding: spacing.xs,
-  backgroundColor: colors.palette.overlay20,
-  borderRadius: 8,
-})

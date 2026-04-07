@@ -52,7 +52,7 @@ const useScrollToBottom = (ref: React.RefObject<FlatList>) => {
   return scrollToBottom
 }
 
-const JsonBlock = ({ value }: { value: any }) => (
+const JsonBlock = ({ value }: { value: unknown }) => (
   <Card
     ContentComponent={
       <ScrollView horizontal>
@@ -273,7 +273,6 @@ function ChatToolbar() {
   const conversationId = useAgentStore((s) => s.conversationId)
   const { mutate: sendMessage, isPending } = useSendMessageAsync()
   const onSubmit = (value: string) => {
-    console.log("onSubmit:ChatToolbar", value)
     sendMessage({ agentId, text: value, conversationId })
   }
 

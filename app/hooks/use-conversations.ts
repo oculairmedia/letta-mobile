@@ -2,6 +2,7 @@ import { useLettaClient } from "@/providers/LettaProvider"
 import { Conversation } from "@letta-ai/letta-client/resources/conversations/conversations"
 import { useMutation, useQuery, useQueryClient, UseQueryOptions } from "@tanstack/react-query"
 import { Alert } from "react-native"
+import { getAllConversationsQueryKey } from "./use-all-conversations"
 
 export const getConversationsQueryKey = (agentId: string) => ["conversations", agentId]
 
@@ -93,41 +94,11 @@ export function useUpdateConversation() {
       })
       // Also invalidate the all conversations query
       queryClient.invalidateQueries({
-        queryKey: ["allConversations"],
+        queryKey: getAllConversationsQueryKey(),
       })
     },
     onError: (error: Error) => {
       Alert.alert("Error", `Failed to update conversation: ${error.message}`)
-    },
-  })
-}
-
-export function useArchiveConversation() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async ({
-      conversationId,
-      agentId,
-    }: {
-      conversationId: string
-      agentId: string
-      isArchived: boolean
-    }): Promise<{ conversationId: string; agentId: string }> => {
-      // Note: is_archived is not currently supported by the Letta SDK
-      // This feature is disabled until SDK support is added
-      throw new Error("Archive feature is not currently supported")
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: getConversationsQueryKey(variables.agentId),
-      })
-      queryClient.invalidateQueries({
-        queryKey: ["allConversations"],
-      })
-    },
-    onError: (error: Error) => {
-      Alert.alert("Error", `Failed to archive conversation: ${error.message}`)
     },
   })
 }
@@ -153,7 +124,7 @@ export function useForkConversation() {
         queryKey: getConversationsQueryKey(variables.agentId),
       })
       queryClient.invalidateQueries({
-        queryKey: ["allConversations"],
+        queryKey: getAllConversationsQueryKey(),
       })
     },
     onError: (error: Error) => {

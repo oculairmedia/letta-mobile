@@ -42,16 +42,13 @@ export function useResetChatMessages() {
       add_default_initial_messages,
     }: {
       agentId: string
-      conversationId?: string | null
       add_default_initial_messages?: boolean
     }) => {
-      // Reset all agent messages (default conversation)
-      // Note: Conversation-specific reset is not supported by the SDK
       return lettaClient.agents.messages.reset(agentId, { add_default_initial_messages })
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
-        queryKey: getAgentMessagesQueryKey(variables.agentId, variables.conversationId),
+        queryKey: getAgentMessagesQueryKey(variables.agentId),
       })
     },
   })
