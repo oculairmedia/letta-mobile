@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bd ready:*)",
+      "Bash(bd list:*)",
+      "Bash(bd show:*)",
+      "Bash(bd update:*)",
+      "Bash(npx tsc:*)",
+      "Bash(bd close:*)",
+      "Bash(bd stats:*)",
+      "Bash(yarn lint:check:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(npx eslint:*)",
+      "Bash(git push:*)",
+      "Bash(yarn test:*)",
+      "Bash(netstat:*)",
+      "Bash(npx expo start:*)",
+      "Bash(adb devices:*)",
+      "Bash(adb reverse:*)",
+      "Bash(adb shell:*)",
+      "Bash(adb shell input tap:*)",
+      "Bash(tasklist:*)",
+      "Bash(curl:*)",
+      "Bash(git pull:*)",
+      "Bash(ls:*)",
+      "Bash(./gradlew:*)",
+      "Bash(JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" ./gradlew:*)",
+      "Bash(git fetch:*)",
+      "Bash(adb logcat:*)",
+      "Bash(adb install:*)",
+      "Bash(git stash:*)",
+      "Bash(JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" ./gradlew installDebug:*)"
+    ]
+  }
+}

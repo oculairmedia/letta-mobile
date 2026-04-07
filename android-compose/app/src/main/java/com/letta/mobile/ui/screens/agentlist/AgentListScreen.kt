@@ -57,6 +57,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.domain.AgentSearch
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.LoadingIndicator
 
@@ -66,27 +67,19 @@ fun AgentListScreen(
     onNavigateBack: () -> Unit,
     onNavigateToAgent: (String) -> Unit,
     onNavigateToEditAgent: (String) -> Unit,
-    viewModel: AgentListViewModel = hiltViewModel()
+    viewModel: AgentListViewModel = hiltViewModel(),
+    agentSearch: AgentSearch = remember { AgentSearch() }
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showCreateDialog by remember { mutableStateOf(false) }
     var searchActive by remember { mutableStateOf(false) }
     val searchQuery = (uiState as? UiState.Success)?.data?.searchQuery ?: ""
 
-    // Get filtered agents for suggestions
+    // Get filtered agents using fuzzy search
     val allAgents = (uiState as? UiState.Success)?.data?.agents ?: emptyList()
     val filteredAgents by remember(allAgents, searchQuery) {
         derivedStateOf {
-            if (searchQuery.isBlank()) {
-                allAgents
-            } else {
-                allAgents.filter { agent ->
-                    agent.name.contains(searchQuery, ignoreCase = true) ||
-                        (agent.description?.contains(searchQuery, ignoreCase = true) == true) ||
-                        (agent.model?.contains(searchQuery, ignoreCase = true) == true) ||
-                        (agent.tags?.any { it.contains(searchQuery, ignoreCase = true) } == true)
-                }
-            }
+            agentSearch.search(allAgents, searchQuery)
         }
     }
 
