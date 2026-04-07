@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.MessageType
+import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.repository.MessageRepository
@@ -18,23 +20,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class Message(
-    val id: String,
-    val role: String,
-    val content: String,
-    val timestamp: String,
-    val isReasoning: Boolean = false,
-    val toolCalls: List<ToolCall>? = null
-)
-
-data class ToolCall(
-    val name: String,
-    val arguments: String,
-    val result: String?
-)
-
 data class ChatUiState(
-    val messages: List<Message> = emptyList(),
+    val messages: List<UiMessage> = emptyList(),
     val isStreaming: Boolean = false,
     val isAgentTyping: Boolean = false,
     val inputText: String = "",
@@ -129,7 +116,7 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    private fun AppMessage.toUiMessage(): Message {
+    private fun AppMessage.toUiMessage(): UiMessage {
         val role = when (messageType) {
             MessageType.USER -> "user"
             MessageType.ASSISTANT -> "assistant"
@@ -138,10 +125,10 @@ class ChatViewModel @Inject constructor(
             MessageType.TOOL_RETURN -> "tool"
         }
         val toolCalls = if (messageType == MessageType.TOOL_CALL && toolName != null) {
-            listOf(ToolCall(name = toolName, arguments = content, result = null))
+            listOf(UiToolCall(name = toolName, arguments = content, result = null))
         } else null
 
-        return Message(
+        return UiMessage(
             id = id,
             role = role,
             content = content,

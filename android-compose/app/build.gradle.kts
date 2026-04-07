@@ -52,9 +52,25 @@ android {
     buildFeatures {
         compose = true
     }
+
+    sourceSets {
+        getByName("main") {
+            java.setSrcDirs(
+                listOf(
+                    "src/appMain/java",
+                    "src/main/java/com/letta/mobile/di",
+                    "src/main/java/com/letta/mobile/ui/navigation",
+                    "src/main/java/com/letta/mobile/ui/screens"
+                )
+            )
+        }
+    }
 }
 
 dependencies {
+    implementation(project(":core"))
+    implementation(project(":designsystem"))
+
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
     implementation(composeBom)
     androidTestImplementation(composeBom)

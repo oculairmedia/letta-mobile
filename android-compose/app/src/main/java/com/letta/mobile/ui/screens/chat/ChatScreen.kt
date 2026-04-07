@@ -42,6 +42,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
+import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.common.groupMessages
@@ -208,7 +210,7 @@ private fun ChatContent(
 
 @Composable
 private fun MessageBubble(
-    message: Message,
+    message: UiMessage,
     groupPosition: GroupPosition = GroupPosition.None,
     isStreaming: Boolean = false,
     modifier: Modifier = Modifier
@@ -272,7 +274,7 @@ private fun MessageBubble(
 
 @Composable
 private fun ToolCallCard(
-    toolCall: ToolCall,
+    toolCall: UiToolCall,
     modifier: Modifier = Modifier
 ) {
     Card(

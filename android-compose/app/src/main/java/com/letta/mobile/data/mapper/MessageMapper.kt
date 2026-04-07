@@ -8,8 +8,8 @@ import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.model.UserMessage
-import com.letta.mobile.ui.screens.chat.Message
-import com.letta.mobile.ui.screens.chat.ToolCall
+import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.UiToolCall
 import java.time.Instant
 
 fun LettaMessage.toAppMessage(): AppMessage? {
@@ -51,7 +51,7 @@ fun LettaMessage.toAppMessage(): AppMessage? {
     }
 }
 
-fun AppMessage.toUiMessage(): Message {
+fun AppMessage.toUiMessage(): UiMessage {
     val role = when (messageType) {
         MessageType.USER -> "user"
         MessageType.ASSISTANT -> "assistant"
@@ -60,10 +60,10 @@ fun AppMessage.toUiMessage(): Message {
         MessageType.TOOL_RETURN -> "tool"
     }
     val toolCalls = if (messageType == MessageType.TOOL_CALL && toolName != null) {
-        listOf(ToolCall(name = toolName, arguments = content, result = null))
+        listOf(UiToolCall(name = toolName, arguments = content, result = null))
     } else null
 
-    return Message(
+    return UiMessage(
         id = id,
         role = role,
         content = content,
