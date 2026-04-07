@@ -17,6 +17,7 @@ enum class ServerMode {
     CLOUD, SELF_HOSTED
 }
 
+@androidx.compose.runtime.Immutable
 data class ConfigUiState(
     val mode: ServerMode = ServerMode.CLOUD,
     val serverUrl: String = "",

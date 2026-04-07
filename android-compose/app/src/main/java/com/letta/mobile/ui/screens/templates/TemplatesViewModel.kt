@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+@androidx.compose.runtime.Immutable
 data class AgentTemplate(
     val id: String,
     val name: String,
@@ -19,6 +20,7 @@ data class AgentTemplate(
     val icon: String
 )
 
+@androidx.compose.runtime.Immutable
 data class TemplatesUiState(
     val templates: List<AgentTemplate> = emptyList()
 )

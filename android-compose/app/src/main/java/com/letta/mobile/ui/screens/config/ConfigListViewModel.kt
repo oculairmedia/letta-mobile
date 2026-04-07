@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+@androidx.compose.runtime.Immutable
 data class ServerConfig(
     val id: String,
     val mode: ServerMode,
@@ -19,6 +20,7 @@ data class ServerConfig(
     val isActive: Boolean
 )
 
+@androidx.compose.runtime.Immutable
 data class ConfigListUiState(
     val configs: List<ServerConfig> = emptyList()
 )

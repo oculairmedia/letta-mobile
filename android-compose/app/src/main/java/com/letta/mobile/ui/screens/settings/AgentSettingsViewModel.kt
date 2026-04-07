@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+@androidx.compose.runtime.Immutable
 data class AgentSettingsUiState(
     val agent: Agent? = null,
     val temperature: Float = 0.7f,

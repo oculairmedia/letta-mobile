@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+@androidx.compose.runtime.Immutable
 data class ChatUiState(
     val messages: List<UiMessage> = emptyList(),
     val isStreaming: Boolean = false,

@@ -15,11 +15,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+@androidx.compose.runtime.Immutable
 data class ConversationDisplay(
     val conversation: Conversation,
     val agentName: String,
 )
 
+@androidx.compose.runtime.Immutable
 data class ConversationsUiState(
     val conversations: List<ConversationDisplay> = emptyList(),
     val agents: List<Agent> = emptyList(),

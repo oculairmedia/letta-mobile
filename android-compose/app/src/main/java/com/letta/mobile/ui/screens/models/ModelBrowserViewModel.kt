@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+@androidx.compose.runtime.Immutable
 data class ModelBrowserUiState(
     val models: List<LlmModel> = emptyList(),
     val searchQuery: String = "",

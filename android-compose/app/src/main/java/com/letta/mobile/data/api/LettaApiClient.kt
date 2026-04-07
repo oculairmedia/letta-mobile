@@ -59,7 +59,8 @@ class LettaApiClient @Inject constructor(
                         Log.d("LettaApiClient", message)
                     }
                 }
-                level = LogLevel.ALL
+                level = if (com.letta.mobile.BuildConfig.DEBUG) LogLevel.HEADERS else LogLevel.NONE
+                sanitizeHeader { header -> header == "Authorization" }
             }
 
             if (apiKey != null) {
@@ -70,6 +71,11 @@ class LettaApiClient @Inject constructor(
                         }
                     }
                 }
+            }
+
+            install(HttpRequestRetry) {
+                retryOnServerErrors(maxRetries = 3)
+                exponentialDelay()
             }
 
             install(HttpTimeout) {

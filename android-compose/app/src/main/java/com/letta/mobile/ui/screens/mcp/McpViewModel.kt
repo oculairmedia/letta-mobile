@@ -16,6 +16,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import javax.inject.Inject
 
+@androidx.compose.runtime.Immutable
 data class McpServer(
     val id: String,
     val name: String,
@@ -24,6 +25,7 @@ data class McpServer(
     val tools: List<String>
 )
 
+@androidx.compose.runtime.Immutable
 data class McpUiState(
     val selectedTab: Int = 0,
     val servers: List<McpServer> = emptyList(),
