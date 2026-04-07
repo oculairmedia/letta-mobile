@@ -18,7 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import com.letta.mobile.R
+import com.letta.mobile.designsystem.R
 import com.letta.mobile.data.model.LlmModel
 
 @OptIn(ExperimentalMaterial3Api::class)

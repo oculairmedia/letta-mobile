@@ -59,10 +59,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.text.style.TextOverflow
 import com.letta.mobile.R
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.util.formatRelativeTime

@@ -9,7 +9,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.ui.res.stringResource
-import com.letta.mobile.R
+import com.letta.mobile.designsystem.R
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
