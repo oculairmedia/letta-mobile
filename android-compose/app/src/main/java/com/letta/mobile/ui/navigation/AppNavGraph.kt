@@ -29,8 +29,8 @@ fun AppNavGraph(
     ) {
         composable("conversations") {
             ConversationsScreen(
-                onNavigateToAgent = { agentId ->
-                    navController.navigate("agent/$agentId/chat")
+                onNavigateToChat = { agentId, conversationId ->
+                    navController.navigate("agent/$agentId/chat?conversationId=$conversationId")
                 },
                 onNavigateToSettings = {
                     navController.navigate("config")
@@ -84,8 +84,11 @@ fun AppNavGraph(
         }
 
         composable(
-            route = "agent/{agentId}/chat",
-            arguments = listOf(navArgument("agentId") { type = NavType.StringType })
+            route = "agent/{agentId}/chat?conversationId={conversationId}",
+            arguments = listOf(
+                navArgument("agentId") { type = NavType.StringType },
+                navArgument("conversationId") { type = NavType.StringType; nullable = true; defaultValue = null },
+            )
         ) {
             AgentScaffold(
                 onNavigateBack = { navController.popBackStack() },

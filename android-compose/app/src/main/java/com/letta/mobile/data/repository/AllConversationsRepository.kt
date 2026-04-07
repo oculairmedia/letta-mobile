@@ -33,7 +33,9 @@ class AllConversationsRepository @Inject constructor(
         }
 
         if (newConversations.isNotEmpty()) {
-            _conversations.value = _conversations.value + newConversations
+            val existingIds = _conversations.value.map { it.id }.toSet()
+            val deduped = newConversations.filter { it.id !in existingIds }
+            _conversations.value = _conversations.value + deduped
             currentCursor = newConversations.last().id
         }
     }
