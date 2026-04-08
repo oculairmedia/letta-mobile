@@ -63,6 +63,27 @@ class ChatViewModel @Inject constructor(
         if (agentId.isBlank()) {
             _uiState.value = _uiState.value.copy(error = "No agent selected")
         } else {
+            resolveConversationAndLoad()
+        }
+    }
+
+    private fun resolveConversationAndLoad() {
+        viewModelScope.launch {
+            if (activeConversationId == null) {
+                try {
+                    conversationRepository.refreshConversations(agentId)
+                    val conversations = conversationRepository.getConversations(agentId).first()
+                    val mostRecent = conversations
+                        .sortedByDescending { it.lastMessageAt ?: it.createdAt ?: "" }
+                        .firstOrNull()
+                    if (mostRecent != null) {
+                        activeConversationId = mostRecent.id
+                        android.util.Log.d("ChatViewModel", "Resolved to most recent conversation: ${mostRecent.id}")
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.w("ChatViewModel", "Failed to resolve conversation", e)
+                }
+            }
             loadMessages()
         }
     }
@@ -74,7 +95,7 @@ class ChatViewModel @Inject constructor(
                 val agent = agentRepository.getAgent(agentId).first()
                 _uiState.value = _uiState.value.copy(agentName = agent.name)
 
-                val appMessages = messageRepository.getMessages(agentId, conversationId).first()
+                val appMessages = messageRepository.getMessages(agentId, activeConversationId).first()
                 val messages = appMessages.map { it.toUiMessage() }
                 if (messages.isNotEmpty()) hasSummary = true
                 _uiState.value = _uiState.value.copy(
