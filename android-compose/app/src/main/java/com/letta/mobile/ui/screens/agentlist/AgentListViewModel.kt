@@ -126,18 +126,18 @@ class AgentListViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(error = null)
     }
 
-    fun createAgent(name: String, onSuccess: (String) -> Unit) {
+    fun createAgent(params: AgentCreateParams, onSuccess: (String) -> Unit) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isCreating = true)
             try {
-                val agent = agentRepository.createAgent(AgentCreateParams(name = name))
+                val agent = agentRepository.createAgent(params)
                 _uiState.value = _uiState.value.copy(isCreating = false)
                 loadAgents()
                 onSuccess(agent.id)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isCreating = false,
-                    error = e.message ?: "Failed to create agent",
+                    error = com.letta.mobile.util.mapErrorToUserMessage(e, "Failed to create agent"),
                 )
             }
         }

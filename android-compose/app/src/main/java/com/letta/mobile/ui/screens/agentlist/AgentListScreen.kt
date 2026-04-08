@@ -65,7 +65,11 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Switch
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.components.ShimmerGrid
@@ -200,8 +204,8 @@ fun AgentListScreen(
     if (showCreateDialog) {
         CreateAgentDialog(
             onDismiss = { showCreateDialog = false },
-            onCreate = { name ->
-                viewModel.createAgent(name) { agentId ->
+            onCreate = { params ->
+                viewModel.createAgent(params) { agentId ->
                     showCreateDialog = false
                     onNavigateToAgent(agentId)
                 }
@@ -477,25 +481,96 @@ private fun ErrorContent(
 @Composable
 private fun CreateAgentDialog(
     onDismiss: () -> Unit,
-    onCreate: (String) -> Unit
+    onCreate: (AgentCreateParams) -> Unit
 ) {
-    var agentName by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var model by remember { mutableStateOf("") }
+    var embedding by remember { mutableStateOf("") }
+    var systemPrompt by remember { mutableStateOf("") }
+    var enableSleeptime by remember { mutableStateOf(false) }
+    var includeBaseTools by remember { mutableStateOf(true) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.screen_agents_dialog_create_title)) },
         text = {
-            OutlinedTextField(
-                value = agentName,
-                onValueChange = { agentName = it },
-                label = { Text(stringResource(R.string.common_name)) },
-                singleLine = true,
-            )
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(stringResource(R.string.common_name)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text(stringResource(R.string.common_description)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = model,
+                    onValueChange = { model = it },
+                    label = { Text(stringResource(R.string.common_model)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("e.g. openai/gpt-4o") },
+                )
+                OutlinedTextField(
+                    value = embedding,
+                    onValueChange = { embedding = it },
+                    label = { Text("Embedding Model") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("e.g. openai/text-embedding-3-small") },
+                )
+                OutlinedTextField(
+                    value = systemPrompt,
+                    onValueChange = { systemPrompt = it },
+                    label = { Text(stringResource(R.string.common_system_prompt)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    maxLines = 5,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Enable Sleeptime", style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = enableSleeptime, onCheckedChange = { enableSleeptime = it })
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Include Base Tools", style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = includeBaseTools, onCheckedChange = { includeBaseTools = it })
+                }
+            }
         },
         confirmButton = {
             TextButton(
-                onClick = { if (agentName.isNotBlank()) onCreate(agentName) },
-                enabled = agentName.isNotBlank(),
+                onClick = {
+                    if (name.isNotBlank() && model.isNotBlank() && embedding.isNotBlank()) {
+                        onCreate(AgentCreateParams(
+                            name = name,
+                            description = description.ifBlank { null },
+                            model = model,
+                            embedding = embedding,
+                            system = systemPrompt.ifBlank { null },
+                            enableSleeptime = enableSleeptime,
+                            includeBaseTools = includeBaseTools,
+                        ))
+                    }
+                },
+                enabled = name.isNotBlank() && model.isNotBlank() && embedding.isNotBlank(),
             ) { Text(stringResource(R.string.action_create)) }
         },
         dismissButton = {
