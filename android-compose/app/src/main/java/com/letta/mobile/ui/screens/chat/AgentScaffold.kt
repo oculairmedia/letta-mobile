@@ -78,6 +78,7 @@ fun AgentScaffold(
     onNavigateBack: () -> Unit,
     onNavigateToSettings: (String) -> Unit,
     onNavigateToArchival: ((String) -> Unit)? = null,
+    onNavigateToTools: (() -> Unit)? = null,
     onSwitchConversation: ((String, String) -> Unit)? = null,
     viewModel: ChatViewModel = hiltViewModel()
 ) {
@@ -112,7 +113,7 @@ fun AgentScaffold(
                     },
                     onTools = {
                         scope.launch { drawerState.close() }
-                        onNavigateToSettings(agentId)
+                        onNavigateToTools?.invoke()
                     },
                     onSettings = {
                         scope.launch { drawerState.close() }

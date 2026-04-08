@@ -43,7 +43,8 @@ class ArchivalViewModel @Inject constructor(
                 val passages = passageRepository.getPassages(agentId).value
                 _uiState.value = UiState.Success(ArchivalUiState(passages = passages))
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "Failed to load passages")
+                android.util.Log.w("ArchivalVM", "Failed to load passages", e)
+                _uiState.value = UiState.Success(ArchivalUiState(passages = emptyList()))
             }
         }
     }
@@ -73,7 +74,7 @@ class ArchivalViewModel @Inject constructor(
                 passageRepository.createPassage(agentId, text)
                 loadPassages()
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "Failed to add passage")
+                _uiState.value = UiState.Error(com.letta.mobile.util.mapErrorToUserMessage(e, "Failed to add passage")
             }
         }
     }
@@ -87,7 +88,7 @@ class ArchivalViewModel @Inject constructor(
                     current.copy(passages = current.passages.filter { it.id != passageId })
                 )
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "Failed to delete passage")
+                _uiState.value = UiState.Error(com.letta.mobile.util.mapErrorToUserMessage(e, "Failed to delete passage")
             }
         }
     }

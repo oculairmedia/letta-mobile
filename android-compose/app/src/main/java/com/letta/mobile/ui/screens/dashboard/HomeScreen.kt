@@ -97,6 +97,21 @@ private fun HomeContent(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
+        state.error?.let { error ->
+            androidx.compose.material3.Surface(
+                color = MaterialTheme.colorScheme.errorContainer,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+            ) {
+                Text(
+                    text = error,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+            }
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
