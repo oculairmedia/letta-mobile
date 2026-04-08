@@ -1,19 +1,14 @@
 package com.letta.mobile.ui.components
 
-import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
+import com.mikepenz.markdown.m3.Markdown
+import com.mikepenz.markdown.m3.markdownColor
+import com.mikepenz.markdown.m3.markdownTypography
 
 @Composable
 fun MarkdownText(
@@ -21,76 +16,34 @@ fun MarkdownText(
     modifier: Modifier = Modifier,
     textColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
-    val annotated = remember(text) { parseMarkdown(text, textColor) }
-    SelectionContainer {
-        Text(
-            text = annotated,
-            modifier = modifier,
-            style = MaterialTheme.typography.bodyLarge.copy(color = textColor),
-        )
-    }
-}
+    if (text.isBlank()) return
 
-private fun parseMarkdown(text: String, defaultColor: Color): AnnotatedString {
-    return buildAnnotatedString {
-        var i = 0
-        val src = text
-        while (i < src.length) {
-            when {
-                src.startsWith("```", i) -> {
-                    val endIdx = src.indexOf("```", i + 3)
-                    if (endIdx != -1) {
-                        val codeContent = src.substring(i + 3, endIdx).trimStart { it != '\n' }.removePrefix("\n")
-                        withStyle(SpanStyle(fontFamily = FontFamily.Monospace, fontSize = androidx.compose.ui.unit.TextUnit.Unspecified)) {
-                            append(codeContent)
-                        }
-                        i = endIdx + 3
-                    } else {
-                        append(src[i])
-                        i++
-                    }
-                }
-                src.startsWith("**", i) -> {
-                    val endIdx = src.indexOf("**", i + 2)
-                    if (endIdx != -1) {
-                        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                            append(src.substring(i + 2, endIdx))
-                        }
-                        i = endIdx + 2
-                    } else {
-                        append(src[i])
-                        i++
-                    }
-                }
-                src.startsWith("*", i) && (i + 1 < src.length && src[i + 1] != '*') -> {
-                    val endIdx = src.indexOf("*", i + 1)
-                    if (endIdx != -1) {
-                        withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
-                            append(src.substring(i + 1, endIdx))
-                        }
-                        i = endIdx + 1
-                    } else {
-                        append(src[i])
-                        i++
-                    }
-                }
-                src.startsWith("`", i) && !src.startsWith("```", i) -> {
-                    val endIdx = src.indexOf("`", i + 1)
-                    if (endIdx != -1) {
-                        withStyle(SpanStyle(fontFamily = FontFamily.Monospace)) {
-                            append(src.substring(i + 1, endIdx))
-                        }
-                        i = endIdx + 1
-                    } else {
-                        append(src[i])
-                        i++
-                    }
-                }
-                else -> {
-                    append(src[i])
-                    i++
-                }
-            }
-        }
-    }
+    Markdown(
+        content = text,
+        modifier = modifier.fillMaxWidth(),
+        colors = markdownColor(
+            text = textColor,
+            codeText = MaterialTheme.colorScheme.onSurfaceVariant,
+            codeBackground = MaterialTheme.colorScheme.surfaceVariant,
+            dividerColor = MaterialTheme.colorScheme.outlineVariant,
+            linkText = MaterialTheme.colorScheme.primary,
+        ),
+        typography = markdownTypography(
+            text = MaterialTheme.typography.bodyLarge.copy(color = textColor),
+            code = MaterialTheme.typography.bodySmall.copy(
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+            h1 = MaterialTheme.typography.headlineSmall.copy(color = textColor),
+            h2 = MaterialTheme.typography.titleLarge.copy(color = textColor),
+            h3 = MaterialTheme.typography.titleMedium.copy(color = textColor),
+            h4 = MaterialTheme.typography.titleSmall.copy(color = textColor),
+            h5 = MaterialTheme.typography.bodyLarge.copy(color = textColor),
+            h6 = MaterialTheme.typography.bodyMedium.copy(color = textColor),
+            quote = MaterialTheme.typography.bodyLarge.copy(color = textColor.copy(alpha = 0.7f)),
+            bullet = MaterialTheme.typography.bodyLarge.copy(color = textColor),
+            list = MaterialTheme.typography.bodyLarge.copy(color = textColor),
+            ordered = MaterialTheme.typography.bodyLarge.copy(color = textColor),
+        ),
+    )
 }

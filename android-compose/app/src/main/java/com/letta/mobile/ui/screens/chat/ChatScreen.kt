@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Button
@@ -34,8 +35,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
@@ -54,9 +57,12 @@ import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.common.groupMessages
 import com.letta.mobile.ui.components.DateSeparator
+import com.letta.mobile.ui.components.Accordions
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.components.MarkdownText
+import com.letta.mobile.ui.components.MessageSkeletonList
+import com.letta.mobile.ui.components.StarterPrompts
 import com.letta.mobile.ui.components.MessageBubbleShape
 import com.letta.mobile.ui.components.ScrollToBottomFab
 import com.letta.mobile.ui.components.ThinkingSection
@@ -73,7 +79,7 @@ fun ChatScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     when (val state = uiState) {
-        is UiState.Loading -> LoadingIndicator()
+        is UiState.Loading -> MessageSkeletonList(modifier = modifier)
         is UiState.Error -> ErrorContent(
             message = state.message,
             onRetry = { viewModel.loadMessages() },
@@ -160,10 +166,9 @@ private fun ChatContent(
 
     Column(modifier = modifier.fillMaxSize()) {
         if (state.messages.isEmpty() && !state.isStreaming) {
-            EmptyState(
-                icon = Icons.Default.ChatBubbleOutline,
-                message = stringResource(R.string.screen_chat_empty),
-                modifier = Modifier.weight(1f)
+            StarterPrompts(
+                onPromptClick = onSendMessage,
+                modifier = Modifier.weight(1f),
             )
         } else {
             Box(modifier = Modifier.weight(1f)) {
@@ -300,6 +305,8 @@ private fun ToolCallCard(
     toolCall: UiToolCall,
     modifier: Modifier = Modifier
 ) {
+    var argsExpanded by remember { mutableStateOf(false) }
+
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -311,20 +318,47 @@ private fun ToolCallCard(
                 Icon(
                     imageVector = Icons.Default.Build,
                     contentDescription = "Tool call",
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.primary,
                 )
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = toolCall.name,
-                    style = MaterialTheme.typography.labelMedium
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.weight(1f),
                 )
+                if (toolCall.result != null) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = "Completed",
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+
+            if (toolCall.arguments.isNotBlank()) {
+                Accordions(
+                    title = "Arguments",
+                    expanded = argsExpanded,
+                    onExpandedChange = { argsExpanded = it },
+                ) {
+                    Text(
+                        text = toolCall.arguments,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        ),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
 
             toolCall.result?.let { result ->
                 Spacer(modifier = Modifier.height(4.dp))
                 MarkdownText(
                     text = result,
-                    textColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    textColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                 )
             }
         }
