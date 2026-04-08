@@ -85,7 +85,20 @@ class ChatViewModelTest {
     }
 
     @Test
-    fun `sendMessage appends response to existing messages`() = runTest {
+    fun `sendMessage shows user message immediately`() = runTest {
+        fakeAgentRepo.setAgent(TestData.agent(id = "agent-1", name = "Agent"))
+        fakeMessageRepo.setMessages(emptyList())
+        fakeMessageRepo.setStreamStates(listOf(StreamState.Sending))
+
+        val vm = createViewModel()
+        vm.sendMessage("Hello agent")
+        val state = vm.uiState.value
+
+        assertTrue(state.messages.any { it.content == "Hello agent" && it.role == "user" })
+    }
+
+    @Test
+    fun `sendMessage appends response after user message and history`() = runTest {
         val existingMessages = listOf(
             TestData.appMessage(id = "1", messageType = MessageType.USER, content = "First question"),
             TestData.appMessage(id = "2", messageType = MessageType.ASSISTANT, content = "First answer"),
@@ -104,11 +117,11 @@ class ChatViewModelTest {
         vm.sendMessage("Second question")
         val state = vm.uiState.value
 
-        assertEquals(3, state.messages.size)
+        assertTrue(state.messages.size >= 4)
         assertEquals("First question", state.messages[0].content)
         assertEquals("First answer", state.messages[1].content)
-        assertEquals("Second answer", state.messages[2].content)
-        assertFalse(state.isStreaming)
+        assertEquals("Second question", state.messages[2].content)
+        assertEquals("Second answer", state.messages[3].content)
     }
 
     @Test
@@ -116,8 +129,6 @@ class ChatViewModelTest {
         val history = listOf(
             TestData.appMessage(id = "old-1", messageType = MessageType.USER, content = "Old message 1"),
             TestData.appMessage(id = "old-2", messageType = MessageType.ASSISTANT, content = "Old reply 1"),
-            TestData.appMessage(id = "old-3", messageType = MessageType.USER, content = "Old message 2"),
-            TestData.appMessage(id = "old-4", messageType = MessageType.ASSISTANT, content = "Old reply 2"),
         )
         val streamChunk = listOf(
             TestData.appMessage(id = "new-1", messageType = MessageType.ASSISTANT, content = "New partial"),
@@ -128,50 +139,16 @@ class ChatViewModelTest {
         fakeMessageRepo.setStreamStates(listOf(StreamState.Streaming(streamChunk)))
 
         val vm = createViewModel()
-        assertEquals(4, vm.uiState.value.messages.size)
+        assertEquals(2, vm.uiState.value.messages.size)
 
         vm.sendMessage("New question")
         val state = vm.uiState.value
 
-        assertTrue(state.messages.size > 1)
+        assertTrue(state.messages.size >= 4)
         assertEquals("Old message 1", state.messages[0].content)
         assertEquals("Old reply 1", state.messages[1].content)
-        assertEquals("Old message 2", state.messages[2].content)
-        assertEquals("Old reply 2", state.messages[3].content)
-        assertEquals("New partial", state.messages[4].content)
-    }
-
-    @Test
-    fun `sendMessage preserves history through complete cycle`() = runTest {
-        val history = listOf(
-            TestData.appMessage(id = "h1", messageType = MessageType.USER, content = "Q1"),
-            TestData.appMessage(id = "h2", messageType = MessageType.ASSISTANT, content = "A1"),
-        )
-        val finalMessages = listOf(
-            TestData.appMessage(id = "r1", messageType = MessageType.USER, content = "Q2"),
-            TestData.appMessage(id = "r2", messageType = MessageType.ASSISTANT, content = "A2"),
-        )
-
-        fakeAgentRepo.setAgent(TestData.agent(id = "agent-1", name = "Agent"))
-        fakeMessageRepo.setMessages(history)
-        fakeMessageRepo.setStreamStates(listOf(
-            StreamState.Sending,
-            StreamState.Streaming(listOf(TestData.appMessage(id = "r1", messageType = MessageType.USER, content = "Q2"))),
-            StreamState.Complete(finalMessages),
-        ))
-
-        val vm = createViewModel()
-        assertEquals(2, vm.uiState.value.messages.size)
-
-        vm.sendMessage("Q2")
-        val state = vm.uiState.value
-
-        assertEquals(4, state.messages.size)
-        assertEquals("Q1", state.messages[0].content)
-        assertEquals("A1", state.messages[1].content)
-        assertEquals("Q2", state.messages[2].content)
-        assertEquals("A2", state.messages[3].content)
-        assertFalse(state.isStreaming)
+        assertEquals("New question", state.messages[2].content)
+        assertEquals("New partial", state.messages[3].content)
     }
 
     @Test

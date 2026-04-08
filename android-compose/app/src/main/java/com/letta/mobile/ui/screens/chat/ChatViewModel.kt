@@ -112,8 +112,19 @@ class ChatViewModel @Inject constructor(
 
     fun sendMessage(text: String) {
         viewModelScope.launch {
-            val existingMessages = _uiState.value.messages
-            _uiState.value = _uiState.value.copy(inputText = "", isStreaming = true, isAgentTyping = true)
+            val userMessage = UiMessage(
+                id = "pending-${System.currentTimeMillis()}",
+                role = "user",
+                content = text,
+                timestamp = java.time.Instant.now().toString(),
+            )
+            val existingMessages = _uiState.value.messages + userMessage
+            _uiState.value = _uiState.value.copy(
+                inputText = "",
+                messages = existingMessages,
+                isStreaming = true,
+                isAgentTyping = true,
+            )
             try {
                 // Auto-create conversation if none exists
                 var convId = activeConversationId
@@ -172,6 +183,7 @@ class ChatViewModel @Inject constructor(
                                 isAgentTyping = false,
                                 pendingTools = emptyList(),
                             )
+                            reloadMessagesFromServer()
                         }
                         is StreamState.Error -> {
                             _uiState.value = _uiState.value.copy(error = state.message, isStreaming = false, isAgentTyping = false)
@@ -180,6 +192,20 @@ class ChatViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = e.message, isStreaming = false, isAgentTyping = false)
+            }
+        }
+    }
+
+    private fun reloadMessagesFromServer() {
+        viewModelScope.launch {
+            try {
+                val appMessages = messageRepository.fetchMessages(agentId, activeConversationId)
+                val messages = appMessages.map { it.toUiMessage() }
+                if (messages.isNotEmpty()) {
+                    _uiState.value = _uiState.value.copy(messages = messages)
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("ChatViewModel", "Silent reload failed", e)
             }
         }
     }
