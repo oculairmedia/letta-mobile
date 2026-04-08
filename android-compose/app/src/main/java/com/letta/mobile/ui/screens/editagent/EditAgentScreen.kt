@@ -21,6 +21,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.InputChip
@@ -118,6 +120,7 @@ fun EditAgentScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun EditAgentContent(
     state: EditAgentUiState,
@@ -287,20 +290,38 @@ private fun EditAgentContent(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 state.blocks.forEach { block ->
-                    Row(verticalAlignment = Alignment.Top) {
-                        OutlinedTextField(
-                            value = block.value,
-                            onValueChange = { onBlockValueChange(block.label, it) },
-                            label = { Text(block.label) },
-                            modifier = Modifier.weight(1f),
-                            minLines = 2,
-                            supportingText = block.limit?.let { limit ->
-                                { Text("${block.value.length}/$limit chars") }
+                    var showDeleteConfirm by remember { mutableStateOf(false) }
+                    OutlinedTextField(
+                        value = block.value,
+                        onValueChange = { onBlockValueChange(block.label, it) },
+                        label = { Text(block.label) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .combinedClickable(
+                                onClick = {},
+                                onLongClick = { showDeleteConfirm = true },
+                            ),
+                        minLines = 2,
+                        supportingText = block.limit?.let { limit ->
+                            { Text("${block.value.length}/$limit chars") }
+                        },
+                    )
+                    if (showDeleteConfirm) {
+                        AlertDialog(
+                            onDismissRequest = { showDeleteConfirm = false },
+                            title = { Text("Delete \"${block.label}\"?") },
+                            text = { Text("This memory block will be permanently removed from the agent.") },
+                            confirmButton = {
+                                TextButton(onClick = { showDeleteConfirm = false; onDeleteBlock(block.id) }) {
+                                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showDeleteConfirm = false }) {
+                                    Text(stringResource(R.string.action_cancel))
+                                }
                             },
                         )
-                        IconButton(onClick = { onDeleteBlock(block.id) }) {
-                            Icon(Icons.Default.Close, contentDescription = "Delete block", tint = MaterialTheme.colorScheme.error)
-                        }
                     }
                 }
                 OutlinedButton(
