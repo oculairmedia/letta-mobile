@@ -4,6 +4,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -94,6 +96,8 @@ fun AgentScaffold(
     val conversationId = viewModel.conversationId
     val connectivityMonitorAvailable = false
     val connectionState = ConnectionState.Online
+    val imeBottom = WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current)
+    val isKeyboardOpen = imeBottom > 0
 
     BackHandler(enabled = drawerState.isOpen) {
         scope.launch { drawerState.close() }
@@ -160,7 +164,7 @@ fun AgentScaffold(
                 )
             },
             bottomBar = {
-                NavigationBar {
+                if (!isKeyboardOpen) NavigationBar {
                     NavigationBarItem(
                         selected = selectedTab == 0,
                         onClick = { selectedTab = 0 },

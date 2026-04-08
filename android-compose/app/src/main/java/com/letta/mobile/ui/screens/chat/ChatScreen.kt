@@ -380,7 +380,7 @@ private fun MessageInputBar(
     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
 
     Surface(
-        modifier = modifier.imePadding(),
+        modifier = modifier,
         tonalElevation = 3.dp
     ) {
         Row(
