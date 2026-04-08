@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,11 +23,15 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,7 +41,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -75,6 +80,11 @@ fun AgentListScreen(
     val filteredAgents by remember(uiState.agents, uiState.searchQuery) {
         derivedStateOf { viewModel.getFilteredAgents() }
     }
+
+    val favoriteAgent = uiState.favoriteAgentId?.let { favId ->
+        uiState.agents.find { it.id == favId }
+    }
+    val gridAgents = filteredAgents.filter { it.id != uiState.favoriteAgentId }
 
     Scaffold(
         topBar = {
@@ -151,12 +161,28 @@ fun AgentListScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            items(filteredAgents, key = { it.id }) { agent ->
+                            if (favoriteAgent != null && uiState.searchQuery.isBlank()) {
+                                item(
+                                    key = "favorite-${favoriteAgent.id}",
+                                    span = { GridItemSpan(3) },
+                                ) {
+                                    FavoriteAgentCard(
+                                        agent = favoriteAgent,
+                                        onClick = { onNavigateToAgent(favoriteAgent.id) },
+                                        onEdit = { onNavigateToEditAgent(favoriteAgent.id) },
+                                        onUnfavorite = { viewModel.toggleFavorite(favoriteAgent.id) },
+                                    )
+                                }
+                            }
+
+                            items(gridAgents, key = { it.id }) { agent ->
                                 AgentCard(
                                     agent = agent,
+                                    isFavorite = agent.id == uiState.favoriteAgentId,
                                     onClick = { onNavigateToAgent(agent.id) },
                                     onLongPress = { onNavigateToEditAgent(agent.id) },
                                     onDelete = { viewModel.deleteAgent(agent.id) },
+                                    onToggleFavorite = { viewModel.toggleFavorite(agent.id) },
                                 )
                             }
                         }
@@ -179,13 +205,80 @@ fun AgentListScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun FavoriteAgentCard(
+    agent: Agent,
+    onClick: () -> Unit,
+    onEdit: () -> Unit,
+    onUnfavorite: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+        ),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Default.Star,
+                contentDescription = "Favorite",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(32.dp),
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = agent.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                Text(
+                    text = agent.model ?: "No model",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                agent.description?.takeIf { it.isNotBlank() }?.let { desc ->
+                    Text(
+                        text = desc,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+            }
+            IconButton(onClick = onEdit) {
+                Icon(
+                    Icons.Default.SmartToy,
+                    contentDescription = "Edit",
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AgentCard(
     agent: Agent,
+    isFavorite: Boolean = false,
     onClick: () -> Unit,
     onLongPress: () -> Unit,
     onDelete: () -> Unit,
+    onToggleFavorite: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showContextMenu by remember { mutableStateOf(false) }
@@ -195,6 +288,7 @@ private fun AgentCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
+            .height(100.dp)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = {
@@ -205,14 +299,15 @@ private fun AgentCard(
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            modifier = Modifier.fillMaxSize().padding(12.dp),
         ) {
             Icon(
                 imageVector = Icons.Default.SmartToy,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 8.dp),
+                modifier = Modifier.size(20.dp),
             )
+            Spacer(modifier = Modifier.weight(1f))
             Text(
                 text = agent.name,
                 style = MaterialTheme.typography.titleSmall,
@@ -233,6 +328,19 @@ private fun AgentCard(
             expanded = showContextMenu,
             onDismissRequest = { showContextMenu = false },
         ) {
+            DropdownMenuItem(
+                text = {
+                    Text(if (isFavorite) "Remove Favorite" else "Set as Favorite")
+                },
+                onClick = { showContextMenu = false; onToggleFavorite() },
+                leadingIcon = {
+                    Icon(
+                        if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = null,
+                        tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                    )
+                },
+            )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.action_edit)) },
                 onClick = { showContextMenu = false; onLongPress() },

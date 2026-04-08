@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.repository.AgentRepository
+import com.letta.mobile.data.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +16,7 @@ import javax.inject.Inject
 @androidx.compose.runtime.Immutable
 data class AgentListUiState(
     val agents: List<Agent> = emptyList(),
+    val favoriteAgentId: String? = null,
     val searchQuery: String = "",
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
@@ -25,6 +27,7 @@ data class AgentListUiState(
 @HiltViewModel
 class AgentListViewModel @Inject constructor(
     private val agentRepository: AgentRepository,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AgentListUiState())
@@ -41,6 +44,7 @@ class AgentListViewModel @Inject constructor(
                 agentRepository.refreshAgents()
                 _uiState.value = _uiState.value.copy(
                     agents = agentRepository.agents.value,
+                    favoriteAgentId = settingsRepository.favoriteAgentId.value,
                     isLoading = false,
                 )
             } catch (e: Exception) {
@@ -59,6 +63,7 @@ class AgentListViewModel @Inject constructor(
                 agentRepository.refreshAgents()
                 _uiState.value = _uiState.value.copy(
                     agents = agentRepository.agents.value,
+                    favoriteAgentId = settingsRepository.favoriteAgentId.value,
                     isRefreshing = false,
                 )
             } catch (e: Exception) {
@@ -98,6 +103,13 @@ class AgentListViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(error = e.message ?: "Failed to delete agent")
             }
         }
+    }
+
+    fun toggleFavorite(agentId: String) {
+        val current = _uiState.value.favoriteAgentId
+        val newFav = if (current == agentId) null else agentId
+        settingsRepository.setFavoriteAgentId(newFav)
+        _uiState.value = _uiState.value.copy(favoriteAgentId = newFav)
     }
 
     fun clearError() {
