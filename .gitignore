@@ -65,6 +65,7 @@ buck-out/
 
 # VS Code
 .vscode
+.opencode/
 
 # Expo
 .expo/*
@@ -82,11 +83,15 @@ npm-debug.*
 *.mobileprovision
 *.orig.*
 web-build/
+dist/
 
 # Configurations
 !env.js
 
 /coverage
+
+# Local packaged plugin artifacts
+plugins/android-tools-mcp-*.zip
 
 # Yarn
 .yarn/*
