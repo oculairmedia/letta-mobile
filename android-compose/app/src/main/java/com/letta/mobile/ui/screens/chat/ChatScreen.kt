@@ -65,6 +65,10 @@ import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.components.MarkdownText
 import com.letta.mobile.ui.components.MessageSkeletonList
 import com.letta.mobile.ui.components.StarterPrompts
+import com.letta.mobile.ui.theme.LettaChatTheme
+import com.letta.mobile.ui.theme.chatColors
+import com.letta.mobile.ui.theme.chatDimens
+import com.letta.mobile.ui.theme.chatTypography
 import com.letta.mobile.ui.components.MessageBubbleShape
 import com.letta.mobile.ui.components.ScrollToBottomFab
 import com.letta.mobile.ui.components.ThinkingSection
@@ -79,6 +83,7 @@ fun ChatScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    LettaChatTheme {
     Column(modifier = modifier.fillMaxSize()) {
         if (state.isLoadingMessages && state.messages.isEmpty()) {
             MessageSkeletonList(modifier = Modifier.weight(1f))
@@ -103,6 +108,7 @@ fun ChatScreen(
             onSend = { viewModel.sendMessage(it) },
             isStreaming = state.isStreaming,
         )
+    }
     }
 }
 
@@ -285,6 +291,10 @@ private fun MessageBubble(
     val isUser = message.role == "user"
     val isLastAssistant = isStreaming && message.role == "assistant"
     val style = bubbleStyle(role = message.role, isStreaming = isLastAssistant)
+    val colors = MaterialTheme.chatColors
+    val dimens = MaterialTheme.chatDimens
+    val typo = MaterialTheme.chatTypography
+    val renderer = remember(message.role, message.toolCalls) { resolveRenderer(message) }
 
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -293,115 +303,27 @@ private fun MessageBubble(
         Surface(
             shape = MessageBubbleShape(radius = 12.dp, isFromUser = isUser, groupPosition = groupPosition),
             color = style.containerColor,
-            border = BorderStroke(1.dp, style.borderColor),
+            border = BorderStroke(dimens.bubbleBorderWidth, style.borderColor),
             tonalElevation = 0.dp,
-            modifier = Modifier.fillMaxWidth(0.88f),
+            modifier = Modifier.fillMaxWidth(dimens.bubbleMaxWidthFraction),
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.padding(
+                    horizontal = dimens.bubblePaddingHorizontal,
+                    vertical = dimens.bubblePaddingVertical,
+                ),
+                verticalArrangement = Arrangement.spacedBy(dimens.messageSpacing),
             ) {
                 if (groupPosition == GroupPosition.First || groupPosition == GroupPosition.None) {
                     Text(
                         text = style.roleLabel,
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                        style = typo.roleLabel,
                         color = style.roleColor,
                     )
                 }
 
-                if (isUser) {
-                    Text(
-                        text = message.content,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White,
-                    )
-                } else {
-                    MarkdownText(
-                        text = message.content,
-                        textColor = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-
-                message.toolCalls?.takeIf { it.isNotEmpty() }?.let { toolCalls ->
-                    Spacer(modifier = Modifier.height(4.dp))
-                    toolCalls.forEach { toolCall ->
-                        ToolCallCard(toolCall = toolCall)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ToolCallCard(
-    toolCall: UiToolCall,
-    modifier: Modifier = Modifier
-) {
-    var argsExpanded by remember { mutableStateOf(false) }
-    val display = remember(toolCall.name) { ToolDisplayRegistry.resolve(toolCall.name, toolCall.arguments) }
-
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-        )
-    ) {
-        Column(modifier = Modifier.padding(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = display.emoji,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = display.label,
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.weight(1f),
-                )
-                if (toolCall.result != null) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Completed",
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
-            display.detailLine?.let { detail ->
-                Text(
-                    text = detail,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-
-            if (toolCall.arguments.isNotBlank()) {
-                Accordions(
-                    title = "Arguments",
-                    expanded = argsExpanded,
-                    onExpandedChange = { argsExpanded = it },
-                ) {
-                    Text(
-                        text = toolCall.arguments,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                        ),
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            toolCall.result?.let { result ->
-                Spacer(modifier = Modifier.height(4.dp))
-                MarkdownText(
-                    text = result,
-                    textColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                )
+                val textColor = if (isUser) colors.userText else colors.agentText
+                renderer.Render(message = message, textColor = textColor, modifier = Modifier)
             }
         }
     }
