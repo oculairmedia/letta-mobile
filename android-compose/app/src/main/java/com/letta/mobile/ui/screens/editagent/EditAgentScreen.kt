@@ -16,10 +16,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Save
-import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.InputChip
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -94,8 +100,11 @@ fun EditAgentScreen(
                 onModelChange = { viewModel.updateModel(it) },
                 onEmbeddingChange = { viewModel.updateEmbedding(it) },
                 onLoadModels = { viewModel.loadModels() },
-                onPersonaChange = { viewModel.updatePersonaBlock(it) },
-                onHumanChange = { viewModel.updateHumanBlock(it) },
+                onBlockValueChange = { label, value -> viewModel.updateBlockValue(label, value) },
+                onAddBlock = { label, value -> viewModel.addBlock(label, value) },
+                onDeleteBlock = { viewModel.deleteBlock(it) },
+                onAddTag = { viewModel.addTag(it) },
+                onRemoveTag = { viewModel.removeTag(it) },
                 onSystemPromptChange = { viewModel.updateSystemPrompt(it) },
                 onTemperatureChange = { viewModel.updateTemperature(it) },
                 onMaxOutputTokensChange = { viewModel.updateMaxOutputTokens(it) },
@@ -118,8 +127,11 @@ private fun EditAgentContent(
     onModelChange: (String) -> Unit,
     onEmbeddingChange: (String) -> Unit,
     onLoadModels: () -> Unit,
-    onPersonaChange: (String) -> Unit,
-    onHumanChange: (String) -> Unit,
+    onBlockValueChange: (String, String) -> Unit,
+    onAddBlock: (String, String) -> Unit,
+    onDeleteBlock: (String) -> Unit,
+    onAddTag: (String) -> Unit,
+    onRemoveTag: (String) -> Unit,
     onSystemPromptChange: (String) -> Unit,
     onTemperatureChange: (Float) -> Unit,
     onMaxOutputTokensChange: (Int) -> Unit,
@@ -262,8 +274,10 @@ private fun EditAgentContent(
         HorizontalDivider()
 
         var memoryExpanded by remember { mutableStateOf(true) }
+        var showAddBlockDialog by remember { mutableStateOf(false) }
         Accordions(
             title = stringResource(R.string.screen_agent_memory_blocks_section),
+            subtitle = "${state.blocks.size} blocks",
             expanded = memoryExpanded,
             onExpandedChange = { memoryExpanded = it },
         ) {
@@ -271,22 +285,67 @@ private fun EditAgentContent(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                OutlinedTextField(
-                    value = state.personaBlock,
-                    onValueChange = onPersonaChange,
-                    label = { Text(stringResource(R.string.common_persona)) },
+                state.blocks.forEach { block ->
+                    Row(verticalAlignment = Alignment.Top) {
+                        OutlinedTextField(
+                            value = block.value,
+                            onValueChange = { onBlockValueChange(block.label, it) },
+                            label = { Text(block.label) },
+                            modifier = Modifier.weight(1f),
+                            minLines = 2,
+                            supportingText = block.limit?.let { limit ->
+                                { Text("${block.value.length}/$limit chars") }
+                            },
+                        )
+                        IconButton(onClick = { onDeleteBlock(block.id) }) {
+                            Icon(Icons.Default.Close, contentDescription = "Delete block", tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+                OutlinedButton(
+                    onClick = { showAddBlockDialog = true },
                     modifier = Modifier.fillMaxWidth(),
-                    minLines = 3
-                )
-
-                OutlinedTextField(
-                    value = state.humanBlock,
-                    onValueChange = onHumanChange,
-                    label = { Text(stringResource(R.string.common_human)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3
-                )
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Add Memory Block")
+                }
             }
+        }
+        if (showAddBlockDialog) {
+            var newLabel by remember { mutableStateOf("") }
+            var newValue by remember { mutableStateOf("") }
+            AlertDialog(
+                onDismissRequest = { showAddBlockDialog = false },
+                title = { Text("Add Memory Block") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = newLabel,
+                            onValueChange = { newLabel = it },
+                            label = { Text("Label") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = newValue,
+                            onValueChange = { newValue = it },
+                            label = { Text("Value") },
+                            minLines = 3,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = { onAddBlock(newLabel, newValue); showAddBlockDialog = false },
+                        enabled = newLabel.isNotBlank(),
+                    ) { Text(stringResource(R.string.action_create)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showAddBlockDialog = false }) { Text(stringResource(R.string.action_cancel)) }
+                },
+            )
         }
 
         HorizontalDivider()
@@ -311,13 +370,38 @@ private fun EditAgentContent(
 
         Text(stringResource(R.string.common_tags), style = MaterialTheme.typography.titleMedium)
 
+        var newTag by remember { mutableStateOf("") }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             state.tags.forEach { tag ->
-                AssistChip(onClick = {}, label = { Text(tag) })
+                InputChip(
+                    selected = false,
+                    onClick = { onRemoveTag(tag) },
+                    label = { Text(tag) },
+                    trailingIcon = { Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(16.dp)) },
+                )
             }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedTextField(
+                value = newTag,
+                onValueChange = { newTag = it },
+                label = { Text("New tag") },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+            FilledTonalButton(
+                onClick = { onAddTag(newTag); newTag = "" },
+                enabled = newTag.isNotBlank(),
+            ) { Text(stringResource(R.string.action_add)) }
         }
 
         Spacer(modifier = Modifier.height(16.dp))

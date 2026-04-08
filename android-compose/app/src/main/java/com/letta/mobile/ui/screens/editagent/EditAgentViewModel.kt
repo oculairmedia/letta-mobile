@@ -19,6 +19,14 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @androidx.compose.runtime.Immutable
+data class EditableBlock(
+    val id: String,
+    val label: String,
+    val value: String,
+    val description: String? = null,
+    val limit: Int? = null,
+)
+
 data class EditAgentUiState(
     val agent: Agent? = null,
     val agentId: String = "",
@@ -26,8 +34,7 @@ data class EditAgentUiState(
     val description: String = "",
     val model: String = "",
     val embedding: String = "",
-    val personaBlock: String = "",
-    val humanBlock: String = "",
+    val blocks: List<EditableBlock> = emptyList(),
     val systemPrompt: String = "",
     val tags: List<String> = emptyList(),
     val temperature: Float = 1.0f,
@@ -81,10 +88,17 @@ class EditAgentViewModel @Inject constructor(
             _uiState.value = UiState.Loading
             try {
                 val agent = agentRepository.getAgent(agentId).first()
-                val persona = agent.blocks?.find { it.label == "persona" }?.value ?: ""
-                val human = agent.blocks?.find { it.label == "human" }?.value ?: ""
-                originalPersonaBlock = persona
-                originalHumanBlock = human
+                val editableBlocks = agent.blocks?.map { block ->
+                    EditableBlock(
+                        id = block.id,
+                        label = block.label,
+                        value = block.value ?: "",
+                        description = block.description,
+                        limit = block.limit,
+                    )
+                } ?: emptyList()
+                originalPersonaBlock = editableBlocks.find { it.label == "persona" }?.value ?: ""
+                originalHumanBlock = editableBlocks.find { it.label == "human" }?.value ?: ""
                 _uiState.value = UiState.Success(
                     EditAgentUiState(
                         agent = agent,
@@ -93,8 +107,7 @@ class EditAgentViewModel @Inject constructor(
                         description = agent.description ?: "",
                         model = agent.model ?: "",
                         embedding = agent.embedding ?: "",
-                        personaBlock = persona,
-                        humanBlock = human,
+                        blocks = editableBlocks,
                         systemPrompt = agent.system ?: "",
                         tags = agent.tags ?: emptyList(),
                         temperature = agent.modelSettings?.temperature?.toFloat() ?: 1.0f,
@@ -152,6 +165,55 @@ class EditAgentViewModel @Inject constructor(
         if (currentState != null) {
             _uiState.value = UiState.Success(currentState.copy(systemPrompt = value))
         }
+    }
+
+    fun updateBlockValue(blockLabel: String, value: String) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(currentState.copy(
+            blocks = currentState.blocks.map {
+                if (it.label == blockLabel) it.copy(value = value) else it
+            }
+        ))
+    }
+
+    fun addBlock(label: String, value: String) {
+        viewModelScope.launch {
+            try {
+                val block = blockRepository.createBlock(
+                    com.letta.mobile.data.model.BlockCreateParams(label = label, value = value)
+                )
+                blockRepository.attachBlock(agentId, block.id)
+                loadAgent()
+            } catch (e: Exception) {
+                android.util.Log.w("EditAgentVM", "Failed to create block", e)
+            }
+        }
+    }
+
+    fun deleteBlock(blockId: String) {
+        viewModelScope.launch {
+            try {
+                blockRepository.detachBlock(agentId, blockId)
+                blockRepository.deleteBlock(blockId)
+                val currentState = (_uiState.value as? UiState.Success)?.data ?: return@launch
+                _uiState.value = UiState.Success(currentState.copy(
+                    blocks = currentState.blocks.filter { it.id != blockId }
+                ))
+            } catch (e: Exception) {
+                android.util.Log.w("EditAgentVM", "Failed to delete block", e)
+            }
+        }
+    }
+
+    fun addTag(tag: String) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        if (tag.isBlank() || currentState.tags.contains(tag)) return
+        _uiState.value = UiState.Success(currentState.copy(tags = currentState.tags + tag))
+    }
+
+    fun removeTag(tag: String) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(currentState.copy(tags = currentState.tags - tag))
     }
 
     fun updateEmbedding(value: String) {
