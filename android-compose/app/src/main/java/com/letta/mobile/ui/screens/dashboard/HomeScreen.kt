@@ -46,6 +46,7 @@ import com.letta.mobile.ui.components.MessageSkeletonList
 fun HomeScreen(
     onNavigateToAgents: () -> Unit,
     onNavigateToConversations: () -> Unit,
+    onNavigateToTools: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToChat: (agentId: String) -> Unit,
     viewModel: DashboardViewModel = hiltViewModel(),
@@ -97,6 +98,7 @@ fun HomeScreen(
                 state = state.data,
                 onNavigateToAgents = onNavigateToAgents,
                 onNavigateToConversations = onNavigateToConversations,
+                onNavigateToTools = onNavigateToTools,
                 onNavigateToChat = onNavigateToChat,
                 modifier = Modifier.padding(paddingValues),
             )
@@ -109,6 +111,7 @@ private fun HomeContent(
     state: DashboardUiState,
     onNavigateToAgents: () -> Unit,
     onNavigateToConversations: () -> Unit,
+    onNavigateToTools: () -> Unit,
     onNavigateToChat: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -135,7 +138,7 @@ private fun HomeContent(
                 label = "Tools",
                 value = state.toolCount.toString(),
                 icon = Icons.Default.Build,
-                onClick = {},
+                onClick = onNavigateToTools,
                 modifier = Modifier.weight(1f),
             )
         }

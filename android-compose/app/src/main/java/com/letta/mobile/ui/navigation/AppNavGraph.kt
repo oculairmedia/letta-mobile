@@ -23,6 +23,7 @@ import com.letta.mobile.ui.screens.editagent.EditAgentScreen
 import com.letta.mobile.ui.screens.mcp.McpScreen
 import com.letta.mobile.ui.screens.models.ModelBrowserScreen
 import com.letta.mobile.ui.screens.templates.TemplatesScreen
+import com.letta.mobile.ui.screens.tools.AllToolsScreen
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.map
@@ -56,6 +57,7 @@ fun AppNavGraph() {
             HomeScreen(
                 onNavigateToAgents = { navController.navigate("agentList") },
                 onNavigateToConversations = { navController.navigate("conversations") },
+                onNavigateToTools = { navController.navigate("allTools") },
                 onNavigateToSettings = { navController.navigate("config") },
                 onNavigateToChat = { agentId ->
                     navController.navigate("agent/$agentId/chat")
@@ -177,6 +179,12 @@ fun AppNavGraph() {
                         popUpTo(0) { inclusive = true }
                     }
                 },
+            )
+        }
+
+        composable("allTools") {
+            AllToolsScreen(
+                onNavigateBack = { navController.popBackStack() },
             )
         }
 
