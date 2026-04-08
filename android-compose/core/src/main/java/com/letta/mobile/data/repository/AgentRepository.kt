@@ -1,9 +1,9 @@
 package com.letta.mobile.data.repository
 
+import android.util.Log
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
-import android.util.Log
 import com.letta.mobile.data.api.AgentApi
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.AgentEntity
@@ -11,14 +11,15 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.paging.AgentPagingSource
+import com.letta.mobile.data.repository.api.IAgentRepository
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
-import com.letta.mobile.data.repository.api.IAgentRepository
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -31,15 +32,13 @@ class AgentRepository @Inject constructor(
     override val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
 
     init {
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-            try {
-                val cached = agentDao.getAllOnce().map { it.toAgent() }
-                if (cached.isNotEmpty() && _agents.value.isEmpty()) {
-                    _agents.value = cached
-                }
-            } catch (e: Exception) {
-                Log.w("AgentRepository", "Failed to load cached agents", e)
+        try {
+            val cached = runBlocking { agentDao.getAllOnce() }.map { it.toAgent() }
+            if (cached.isNotEmpty()) {
+                _agents.value = cached
             }
+        } catch (e: Exception) {
+            Log.w("AgentRepository", "Failed to load cached agents", e)
         }
     }
 
@@ -56,7 +55,7 @@ class AgentRepository @Inject constructor(
 
     override suspend fun refreshAgents() {
         val fresh = agentApi.listAgents(limit = 1000)
-        _agents.value = fresh
+        _agents.update { fresh }
         try {
             val entities = fresh.map { AgentEntity.fromAgent(it) }
             agentDao.insertAll(entities)
@@ -107,13 +106,13 @@ class AgentRepository @Inject constructor(
     }
 
     private fun updateAgentInCache(agent: Agent) {
-        val updatedList = _agents.value.toMutableList()
-        val index = updatedList.indexOfFirst { it.id == agent.id }
-        if (index >= 0) {
-            updatedList[index] = agent
-        } else {
-            updatedList.add(agent)
+        _agents.update { current ->
+            val index = current.indexOfFirst { it.id == agent.id }
+            if (index >= 0) {
+                current.toMutableList().apply { this[index] = agent }
+            } else {
+                current + agent
+            }
         }
-        _agents.value = updatedList
     }
 }

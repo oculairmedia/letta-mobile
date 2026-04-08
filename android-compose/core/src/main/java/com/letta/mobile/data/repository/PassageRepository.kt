@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.PassageCreateParams
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -21,8 +22,8 @@ class PassageRepository @Inject constructor(
 
     suspend fun refreshPassages(agentId: String) {
         val passages = passageApi.listPassages(agentId, limit = 100)
-        _passages.value = _passages.value.toMutableMap().apply {
-            put(agentId, passages)
+        _passages.update { current ->
+            current.toMutableMap().apply { put(agentId, passages) }
         }
     }
 
@@ -34,9 +35,11 @@ class PassageRepository @Inject constructor(
 
     suspend fun deletePassage(agentId: String, passageId: String) {
         passageApi.deletePassage(agentId, passageId)
-        _passages.value = _passages.value.toMutableMap().apply {
-            val existing = get(agentId) ?: emptyList()
-            put(agentId, existing.filter { it.id != passageId })
+        _passages.update { current ->
+            current.toMutableMap().apply {
+                val existing = get(agentId) ?: emptyList()
+                put(agentId, existing.filter { it.id != passageId })
+            }
         }
     }
 

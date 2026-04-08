@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.LlmModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,10 +21,10 @@ class ModelRepository @Inject constructor(
     val embeddingModels: StateFlow<List<EmbeddingModel>> = _embeddingModels.asStateFlow()
 
     suspend fun refreshLlmModels() {
-        _llmModels.value = modelApi.listLlmModels()
+        _llmModels.update { modelApi.listLlmModels() }
     }
 
     suspend fun refreshEmbeddingModels() {
-        _embeddingModels.value = modelApi.listEmbeddingModels()
+        _embeddingModels.update { modelApi.listEmbeddingModels() }
     }
 }

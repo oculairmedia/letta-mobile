@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
@@ -81,41 +82,34 @@ class SettingsRepository @Inject constructor(
     fun getActiveConfig(): Flow<LettaConfig?> = activeConfig
 
     suspend fun saveConfig(config: LettaConfig) {
-        val updatedConfigs = _configs.value.toMutableList()
-        val existingIndex = updatedConfigs.indexOfFirst { it.id == config.id }
-
-        if (existingIndex >= 0) {
-            updatedConfigs[existingIndex] = config
-        } else {
-            updatedConfigs.add(config)
+        _configs.update { current ->
+            val index = current.indexOfFirst { it.id == config.id }
+            if (index >= 0) {
+                current.toMutableList().apply { this[index] = config }
+            } else {
+                current + config
+            }
         }
-
-        _configs.value = updatedConfigs
-        persistConfigs(updatedConfigs)
-
-        // Always set this config as active (either new or updated)
-        _activeConfig.value = config
+        persistConfigs(_configs.value)
+        _activeConfig.update { config }
         encryptedPrefs.edit().putString(Keys.ACTIVE_CONFIG_ID.name, config.id).apply()
     }
 
     suspend fun setActiveConfigId(id: String) {
-        val config = _configs.value.find { it.id == id }
-        if (config != null) {
-            _activeConfig.value = config
-            encryptedPrefs.edit().putString(Keys.ACTIVE_CONFIG_ID.name, id).apply()
-        }
+        val config = _configs.value.find { it.id == id } ?: return
+        _activeConfig.update { config }
+        encryptedPrefs.edit().putString(Keys.ACTIVE_CONFIG_ID.name, id).apply()
     }
 
     suspend fun deleteConfig(id: String) {
-        val updatedConfigs = _configs.value.filter { it.id != id }
-        _configs.value = updatedConfigs
-        persistConfigs(updatedConfigs)
-
+        _configs.update { current -> current.filter { it.id != id } }
+        persistConfigs(_configs.value)
         if (_activeConfig.value?.id == id) {
-            _activeConfig.value = updatedConfigs.firstOrNull()
-            _activeConfig.value?.let { newActive ->
-                encryptedPrefs.edit().putString(Keys.ACTIVE_CONFIG_ID.name, newActive.id).apply()
-            } ?: run {
+            val fallback = _configs.value.firstOrNull()
+            _activeConfig.update { fallback }
+            if (fallback != null) {
+                encryptedPrefs.edit().putString(Keys.ACTIVE_CONFIG_ID.name, fallback.id).apply()
+            } else {
                 encryptedPrefs.edit().remove(Keys.ACTIVE_CONFIG_ID.name).apply()
             }
         }
@@ -131,7 +125,7 @@ class SettingsRepository @Inject constructor(
     }
 
     fun setAdminAgentId(agentId: String?) {
-        _adminAgentId.value = agentId
+        _adminAgentId.update { agentId }
         if (agentId != null) {
             encryptedPrefs.edit().putString(Keys.ADMIN_AGENT_ID.name, agentId).apply()
         } else {
@@ -140,7 +134,7 @@ class SettingsRepository @Inject constructor(
     }
 
     fun setFavoriteAgentId(agentId: String?) {
-        _favoriteAgentId.value = agentId
+        _favoriteAgentId.update { agentId }
         if (agentId != null) {
             encryptedPrefs.edit().putString(Keys.FAVORITE_AGENT_ID.name, agentId).apply()
         } else {
@@ -151,10 +145,10 @@ class SettingsRepository @Inject constructor(
     suspend fun clearAllData() {
         encryptedPrefs.edit().clear().apply()
         dataStore.edit { it.clear() }
-        _configs.value = emptyList()
-        _activeConfig.value = null
-        _favoriteAgentId.value = null
-        _adminAgentId.value = null
+        _configs.update { emptyList() }
+        _activeConfig.update { null }
+        _favoriteAgentId.update { null }
+        _adminAgentId.update { null }
     }
 
     suspend fun setTheme(theme: AppTheme) {

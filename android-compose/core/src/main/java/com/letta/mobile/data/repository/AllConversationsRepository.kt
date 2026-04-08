@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.Conversation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -29,37 +30,39 @@ class AllConversationsRepository @Inject constructor(
         )
 
         if (newConversations.isEmpty() || newConversations.size < PAGE_SIZE) {
-            _hasMore.value = false
+            _hasMore.update { false }
         }
 
         if (newConversations.isNotEmpty()) {
-            val existingIds = _conversations.value.map { it.id }.toSet()
-            val deduped = newConversations.filter { it.id !in existingIds }
-            _conversations.value = _conversations.value + deduped
+            _conversations.update { current ->
+                val existingIds = current.map { it.id }.toSet()
+                val deduped = newConversations.filter { it.id !in existingIds }
+                current + deduped
+            }
             currentCursor = newConversations.last().id
         }
     }
 
     suspend fun refresh() {
         currentCursor = null
-        _conversations.value = emptyList()
-        _hasMore.value = true
+        _conversations.update { emptyList() }
+        _hasMore.update { true }
         loadNextPage()
     }
 
     fun handleOptimisticUpdate(conversation: Conversation) {
-        val updatedList = _conversations.value.toMutableList()
-        val index = updatedList.indexOfFirst { it.id == conversation.id }
-        if (index >= 0) {
-            updatedList[index] = conversation
-        } else {
-            updatedList.add(0, conversation)
+        _conversations.update { current ->
+            val index = current.indexOfFirst { it.id == conversation.id }
+            if (index >= 0) {
+                current.toMutableList().apply { this[index] = conversation }
+            } else {
+                listOf(conversation) + current
+            }
         }
-        _conversations.value = updatedList
     }
 
     fun handleOptimisticDelete(conversationId: String) {
-        _conversations.value = _conversations.value.filter { it.id != conversationId }
+        _conversations.update { current -> current.filter { it.id != conversationId } }
     }
 
     companion object {

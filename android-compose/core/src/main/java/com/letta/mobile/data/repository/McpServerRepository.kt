@@ -29,7 +29,7 @@ class McpServerRepository @Inject constructor(
     }
 
     suspend fun refreshServers() {
-        _servers.value = mcpServerApi.listMcpServers()
+        _servers.update { mcpServerApi.listMcpServers() }
     }
 
     suspend fun refreshServerTools(serverId: String) {

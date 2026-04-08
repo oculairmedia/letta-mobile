@@ -27,7 +27,7 @@ class ToolRepository @Inject constructor(
     }
 
     override suspend fun refreshTools() {
-        _tools.value = toolApi.listTools()
+        _tools.update { toolApi.listTools() }
     }
 
     suspend fun refreshAgentTools(agentId: String, tools: List<Tool>) {
