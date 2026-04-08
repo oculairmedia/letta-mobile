@@ -64,8 +64,7 @@ class EditAgentViewModel @Inject constructor(
     val llmModels: StateFlow<List<LlmModel>> = modelRepository.llmModels
     val embeddingModels: StateFlow<List<com.letta.mobile.data.model.EmbeddingModel>> = modelRepository.embeddingModels
 
-    @Volatile private var originalPersonaBlock: String = ""
-    @Volatile private var originalHumanBlock: String = ""
+    @Volatile private var originalBlockValues: Map<String, String> = emptyMap()
 
     init {
         loadAgent()
@@ -91,14 +90,13 @@ class EditAgentViewModel @Inject constructor(
                 val editableBlocks = agent.blocks?.map { block ->
                     EditableBlock(
                         id = block.id,
-                        label = block.label,
+                        label = block.label ?: "",
                         value = block.value ?: "",
                         description = block.description,
                         limit = block.limit,
                     )
                 } ?: emptyList()
-                originalPersonaBlock = editableBlocks.find { it.label == "persona" }?.value ?: ""
-                originalHumanBlock = editableBlocks.find { it.label == "human" }?.value ?: ""
+                originalBlockValues = editableBlocks.associate { it.label to it.value }
                 _uiState.value = UiState.Success(
                     EditAgentUiState(
                         agent = agent,
@@ -143,20 +141,6 @@ class EditAgentViewModel @Inject constructor(
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
             _uiState.value = UiState.Success(currentState.copy(model = value))
-        }
-    }
-
-    fun updatePersonaBlock(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data
-        if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(personaBlock = value))
-        }
-    }
-
-    fun updateHumanBlock(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data
-        if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(humanBlock = value))
         }
     }
 
@@ -272,11 +256,11 @@ class EditAgentViewModel @Inject constructor(
                         ),
                     )
                 )
-                if (state.personaBlock != originalPersonaBlock) {
-                    blockRepository.updateBlock(agentId, "persona", state.personaBlock)
-                }
-                if (state.humanBlock != originalHumanBlock) {
-                    blockRepository.updateBlock(agentId, "human", state.humanBlock)
+                state.blocks.forEach { block ->
+                    val original = originalBlockValues[block.label]
+                    if (original == null || block.value != original) {
+                        blockRepository.updateBlock(agentId, block.label, block.value)
+                    }
                 }
                 onSuccess()
             } catch (e: Exception) {
