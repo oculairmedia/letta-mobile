@@ -200,6 +200,7 @@ private fun ChatContent(
                 modifier = Modifier.weight(1f),
             )
         } else {
+            val reversed = remember(groupedMessages) { groupedMessages.asReversed() }
             Box(modifier = Modifier.weight(1f)) {
                 LazyColumn(
                     state = listState,
@@ -212,7 +213,6 @@ private fun ChatContent(
                         }
                     }
 
-                    val reversed = remember(groupedMessages) { groupedMessages.asReversed() }
                     reversed.forEachIndexed { index, (message, position) ->
                         val prevDate = reversed.getOrNull(index + 1)?.first?.timestamp?.take(10)
                         val currentDate = message.timestamp.take(10)

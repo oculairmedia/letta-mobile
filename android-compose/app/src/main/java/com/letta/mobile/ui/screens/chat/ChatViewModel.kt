@@ -50,7 +50,8 @@ class ChatViewModel @Inject constructor(
 ) : ViewModel() {
 
     val agentId: String = savedStateHandle.get<String>("agentId") ?: ""
-    val conversationId: String? = savedStateHandle.get<String>("conversationId")
+    private var activeConversationId: String? = savedStateHandle.get<String>("conversationId")
+    val conversationId: String? get() = activeConversationId
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
@@ -92,16 +93,34 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(inputText = "", isStreaming = true, isAgentTyping = true)
             try {
-                if (!hasSummary && conversationId != null) {
+                // Auto-create conversation if none exists
+                var convId = activeConversationId
+                if (convId == null) {
                     try {
                         val summary = text.take(80).let { if (text.length > 80) "$it\u2026" else it }
-                        conversationRepository.updateConversation(conversationId, agentId, summary)
+                        val newConversation = conversationRepository.createConversation(agentId, summary)
+                        convId = newConversation.id
+                        activeConversationId = convId
+                        hasSummary = true
+                        android.util.Log.d("ChatViewModel", "Created new conversation: $convId")
+                    } catch (e: Exception) {
+                        _uiState.value = _uiState.value.copy(
+                            error = "Failed to create conversation: ${e.message}",
+                            isStreaming = false,
+                            isAgentTyping = false
+                        )
+                        return@launch
+                    }
+                } else if (!hasSummary) {
+                    try {
+                        val summary = text.take(80).let { if (text.length > 80) "$it\u2026" else it }
+                        conversationRepository.updateConversation(convId, agentId, summary)
                         hasSummary = true
                     } catch (e: Exception) {
                         android.util.Log.w("ChatViewModel", "Failed to set conversation summary", e)
                     }
                 }
-                messageRepository.sendMessage(agentId, text, conversationId).collect { state ->
+                messageRepository.sendMessage(agentId, text, convId).collect { state ->
                     when (state) {
                         is StreamState.Sending -> {
                             _uiState.value = _uiState.value.copy(isAgentTyping = true)
