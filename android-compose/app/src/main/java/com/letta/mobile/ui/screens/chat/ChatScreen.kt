@@ -87,7 +87,7 @@ fun ChatScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     LettaChatTheme {
-    Column(modifier = modifier.fillMaxSize().imePadding()) {
+    Column(modifier = modifier.fillMaxSize()) {
         if (state.isLoadingMessages && state.messages.isEmpty()) {
             MessageSkeletonList(modifier = Modifier.weight(1f))
         } else if (state.error != null && state.messages.isEmpty()) {
