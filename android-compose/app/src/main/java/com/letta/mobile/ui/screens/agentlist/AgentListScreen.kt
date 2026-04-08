@@ -41,6 +41,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -214,6 +215,9 @@ private fun FavoriteAgentCard(
     onUnfavorite: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+    val subtleColor = contentColor.copy(alpha = 0.6f)
+
     Card(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
@@ -222,51 +226,114 @@ private fun FavoriteAgentCard(
             containerColor = MaterialTheme.colorScheme.primaryContainer,
         ),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = Icons.Default.Star,
-                contentDescription = "Favorite",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(32.dp),
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Star,
+                    contentDescription = "Favorite",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp),
+                )
+                Spacer(modifier = Modifier.width(10.dp))
                 Text(
                     text = agent.name,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = contentColor,
+                    modifier = Modifier.weight(1f),
                 )
-                Text(
-                    text = agent.model ?: "No model",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                agent.description?.takeIf { it.isNotBlank() }?.let { desc ->
-                    Text(
-                        text = desc,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 2.dp),
-                    )
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Default.SmartToy, contentDescription = "Edit", tint = contentColor)
                 }
             }
-            IconButton(onClick = onEdit) {
-                Icon(
-                    Icons.Default.SmartToy,
-                    contentDescription = "Edit",
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+
+            agent.description?.takeIf { it.isNotBlank() }?.let { desc ->
+                Text(
+                    text = desc,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = subtleColor,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                InfoChip(label = "Model", value = agent.model ?: "—", color = subtleColor)
+                agent.embedding?.let { InfoChip(label = "Embed", value = it, color = subtleColor) }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                val toolCount = agent.tools?.size ?: 0
+                val blockCount = agent.blocks?.size ?: 0
+                InfoChip(label = "Tools", value = toolCount.toString(), color = subtleColor)
+                InfoChip(label = "Memory", value = "$blockCount blocks", color = subtleColor)
+                agent.modelSettings?.temperature?.let {
+                    InfoChip(label = "Temp", value = String.format("%.1f", it), color = subtleColor)
+                }
+                if (agent.enableSleeptime == true) {
+                    InfoChip(label = "Sleep", value = "On", color = subtleColor)
+                }
+            }
+
+            agent.tags?.takeIf { it.isNotEmpty() }?.let { tags ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    tags.take(4).forEach { tag ->
+                        SuggestionChip(
+                            onClick = {},
+                            label = { Text(tag, style = MaterialTheme.typography.labelSmall) },
+                        )
+                    }
+                    if (tags.size > 4) {
+                        Text(
+                            "+${tags.size - 4}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = subtleColor,
+                            modifier = Modifier.align(Alignment.CenterVertically),
+                        )
+                    }
+                }
+            }
+
+            agent.createdAt?.let { created ->
+                Text(
+                    text = "Created ${com.letta.mobile.util.formatRelativeTime(created)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = subtleColor.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(top = 6.dp),
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun InfoChip(
+    label: String,
+    value: String,
+    color: androidx.compose.ui.graphics.Color,
+) {
+    Column {
+        Text(text = label, style = MaterialTheme.typography.labelSmall, color = color.copy(alpha = 0.6f))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.labelMedium,
+            color = color,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
