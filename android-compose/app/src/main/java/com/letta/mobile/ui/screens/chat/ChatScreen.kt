@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
+import androidx.compose.material3.FilterChip
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.UiState
@@ -103,6 +104,7 @@ private fun ChatContent(
 ) {
     val listState = rememberLazyListState()
     val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var chatMode by remember { mutableStateOf("interactive") }
 
     val messageCount by rememberUpdatedState(state.messages.size)
     val isStreaming by rememberUpdatedState(state.isStreaming)
@@ -139,7 +141,7 @@ private fun ChatContent(
             }
     }
 
-    val dedupedMessages = remember(state.messages) {
+    val dedupedMessages = remember(state.messages, chatMode) {
         val result = mutableListOf<UiMessage>()
         var lastReasoningContent: String? = null
         for (msg in state.messages) {
@@ -153,7 +155,10 @@ private fun ChatContent(
                 result.add(msg)
             }
         }
-        result
+        when (chatMode) {
+            "simple" -> result.filter { it.role == "user" || (it.role == "assistant" && !it.isReasoning) }
+            else -> result
+        }
     }
 
     val groupedMessages = remember(dedupedMessages) {
@@ -165,6 +170,19 @@ private fun ChatContent(
     }
 
     Column(modifier = modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            listOf("simple", "interactive", "debug").forEach { mode ->
+                FilterChip(
+                    selected = chatMode == mode,
+                    onClick = { chatMode = mode },
+                    label = { Text(mode.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.labelSmall) },
+                )
+            }
+        }
+
         if (state.messages.isEmpty() && !state.isStreaming) {
             StarterPrompts(
                 onPromptClick = onSendMessage,
@@ -194,12 +212,19 @@ private fun ChatContent(
                                 GroupPosition.Middle, GroupPosition.Last -> 2.dp
                                 else -> 6.dp
                             }
-                            MessageBubble(
-                                message = message,
-                                groupPosition = position,
-                                isStreaming = state.isStreaming,
-                                modifier = Modifier.padding(top = spacing)
-                            )
+                            if (chatMode == "debug") {
+                                DebugMessageCard(
+                                    message = message,
+                                    modifier = Modifier.padding(top = spacing),
+                                )
+                            } else {
+                                MessageBubble(
+                                    message = message,
+                                    groupPosition = position,
+                                    isStreaming = state.isStreaming,
+                                    modifier = Modifier.padding(top = spacing),
+                                )
+                            }
                         }
 
                         if (showDate) {
@@ -295,6 +320,19 @@ private fun MessageBubble(
                         ToolCallCard(toolCall = toolCall)
                     }
                 }
+
+                val typeLabel = when (message.role) {
+                    "user" -> "user_message"
+                    "tool" -> if (message.toolCalls != null) "tool_call" else "tool_return"
+                    else -> "assistant_message"
+                }
+                Text(
+                    text = typeLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isUser) Color.White.copy(alpha = 0.5f)
+                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.padding(top = 4.dp),
+                )
             }
         }
     }
@@ -361,6 +399,43 @@ private fun ToolCallCard(
                     textColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun DebugMessageCard(
+    message: UiMessage,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        ),
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            Text(
+                text = "${message.role} | ${message.id}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = buildString {
+                    append("content: ${message.content.take(200)}")
+                    if (message.content.length > 200) append("...")
+                    if (message.isReasoning) append("\nisReasoning: true")
+                    message.toolCalls?.forEach { tc ->
+                        append("\ntool: ${tc.name}(${tc.arguments.take(100)})")
+                        tc.result?.let { append("\nresult: ${it.take(100)}") }
+                    }
+                },
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                ),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
