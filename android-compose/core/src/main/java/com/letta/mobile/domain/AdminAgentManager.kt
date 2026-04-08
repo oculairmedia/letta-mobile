@@ -1,5 +1,6 @@
 package com.letta.mobile.domain
 
+import android.util.Log
 import com.letta.mobile.data.api.AgentApi
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
@@ -14,6 +15,7 @@ class AdminAgentManager @Inject constructor(
     private val settingsRepository: SettingsRepository,
 ) {
     companion object {
+        private const val TAG = "AdminAgentManager"
         const val ADMIN_TAG = "letta-mobile-admin"
         private const val ADMIN_NAME = "Letta Mobile Admin"
         private const val ADMIN_DESCRIPTION = "Server administration assistant for Letta Mobile"
@@ -33,22 +35,42 @@ class AdminAgentManager @Inject constructor(
     }
 
     suspend fun ensureAdminAgent(): Agent {
+        // 1. Check persisted ID first
         val existingId = settingsRepository.adminAgentId.value
         if (existingId != null) {
             try {
-                return agentApi.getAgent(existingId)
-            } catch (_: Exception) {
+                val agent = agentApi.getAgent(existingId)
+                Log.d(TAG, "Found admin agent by saved ID: ${agent.id}")
+                return agent
+            } catch (e: Exception) {
+                Log.w(TAG, "Saved admin agent ID invalid, clearing", e)
                 settingsRepository.setAdminAgentId(null)
             }
         }
 
-        val agents = agentApi.listAgents(tags = listOf(ADMIN_TAG))
-        val existing = agents.firstOrNull()
-        if (existing != null) {
-            settingsRepository.setAdminAgentId(existing.id)
-            return existing
+        // 2. Search ALL agents for one with our tag or name (belt + suspenders)
+        try {
+            val allAgents = agentApi.listAgents(limit = 1000)
+            val byTag = allAgents.find { agent ->
+                agent.tags?.contains(ADMIN_TAG) == true
+            }
+            if (byTag != null) {
+                Log.d(TAG, "Found admin agent by tag: ${byTag.id}")
+                settingsRepository.setAdminAgentId(byTag.id)
+                return byTag
+            }
+            val byName = allAgents.find { it.name == ADMIN_NAME }
+            if (byName != null) {
+                Log.d(TAG, "Found admin agent by name: ${byName.id}")
+                settingsRepository.setAdminAgentId(byName.id)
+                return byName
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to search for existing admin agent", e)
         }
 
+        // 3. Create only if truly not found
+        Log.d(TAG, "No admin agent found, creating new one")
         val created = agentApi.createAgent(
             AgentCreateParams(
                 name = ADMIN_NAME,
@@ -58,15 +80,15 @@ class AdminAgentManager @Inject constructor(
                 system = ADMIN_SYSTEM_PROMPT,
                 tags = listOf(ADMIN_TAG),
                 includeBaseTools = true,
-                enableSleeptime = true,
+                enableSleeptime = false,
                 memoryBlocks = listOf(
                     BlockCreateParams(label = "persona", value = "I am a Letta server admin assistant."),
                     BlockCreateParams(label = "human", value = "The user is a Letta Mobile app user managing their server."),
                 ),
             )
         )
-        )
         settingsRepository.setAdminAgentId(created.id)
+        Log.d(TAG, "Created admin agent: ${created.id}")
         return created
     }
 }
