@@ -19,12 +19,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
-enum class ConnectionState { Online, Offline, Reconnecting }
+enum class ConnectionState {
+    Online,
+    ServerUnreachable,
+    Offline,
+    Reconnecting,
+}
 
 @Composable
 fun ConnectionStatusBanner(
     state: ConnectionState,
     modifier: Modifier = Modifier,
+    statusText: String? = null,
 ) {
     AnimatedVisibility(
         visible = state != ConnectionState.Online,
@@ -34,37 +40,41 @@ fun ConnectionStatusBanner(
     ) {
         val bgColor = when (state) {
             ConnectionState.Offline -> MaterialTheme.colorScheme.error
+            ConnectionState.ServerUnreachable -> Color(0xFFE65100)
             ConnectionState.Reconnecting -> Color(0xFFF9A825)
             ConnectionState.Online -> Color(0xFF2E7D32)
         }
         val textColor = when (state) {
             ConnectionState.Offline -> MaterialTheme.colorScheme.onError
+            ConnectionState.ServerUnreachable -> Color.White
             ConnectionState.Reconnecting -> Color(0xFF1A1A1A)
             ConnectionState.Online -> Color.White
+        }
+        val text = statusText ?: when (state) {
+            ConnectionState.Offline -> "No internet connection"
+            ConnectionState.ServerUnreachable -> "Connected (server offline)"
+            ConnectionState.Reconnecting -> "Reconnecting\u2026"
+            ConnectionState.Online -> "Connected"
         }
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(bgColor)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (state == ConnectionState.Reconnecting) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(14.dp),
-                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(12.dp),
+                    strokeWidth = 1.5.dp,
                     color = textColor,
                 )
                 Spacer(modifier = Modifier.width(8.dp))
             }
             Text(
-                text = when (state) {
-                    ConnectionState.Offline -> "No internet connection"
-                    ConnectionState.Reconnecting -> "Reconnecting\u2026"
-                    ConnectionState.Online -> "Connected"
-                },
-                style = MaterialTheme.typography.labelMedium,
+                text = text,
+                style = MaterialTheme.typography.labelSmall,
                 color = textColor,
             )
         }

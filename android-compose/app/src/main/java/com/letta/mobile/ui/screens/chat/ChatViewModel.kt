@@ -21,11 +21,18 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @androidx.compose.runtime.Immutable
+data class PendingToolCall(
+    val id: String,
+    val name: String,
+    val startedAt: Long = System.currentTimeMillis(),
+)
+
 data class ChatUiState(
     val messages: List<UiMessage> = emptyList(),
     val isLoadingMessages: Boolean = true,
     val isStreaming: Boolean = false,
     val isAgentTyping: Boolean = false,
+    val pendingTools: List<PendingToolCall> = emptyList(),
     val inputText: String = "",
     val agentName: String = "",
     val error: String? = null,
@@ -48,6 +55,7 @@ class ChatViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
+    private val pendingToolsMap = java.util.concurrent.ConcurrentHashMap<String, PendingToolCall>()
     private var hasSummary = false
 
     init {
@@ -103,11 +111,17 @@ class ChatViewModel @Inject constructor(
                             _uiState.value = _uiState.value.copy(messages = messages, isStreaming = true, isAgentTyping = false)
                         }
                         is StreamState.ToolExecution -> {
-                            _uiState.value = _uiState.value.copy(isAgentTyping = true)
+                            val toolCall = PendingToolCall(id = state.toolName, name = state.toolName)
+                            pendingToolsMap[state.toolName] = toolCall
+                            _uiState.value = _uiState.value.copy(
+                                isAgentTyping = true,
+                                pendingTools = pendingToolsMap.values.toList(),
+                            )
                         }
                         is StreamState.Complete -> {
+                            pendingToolsMap.clear()
                             val messages = state.messages.map { it.toUiMessage() }
-                            _uiState.value = _uiState.value.copy(messages = messages, isStreaming = false, isAgentTyping = false)
+                            _uiState.value = _uiState.value.copy(messages = messages, isStreaming = false, isAgentTyping = false, pendingTools = emptyList())
                         }
                         is StreamState.Error -> {
                             _uiState.value = _uiState.value.copy(error = state.message, isStreaming = false, isAgentTyping = false)
