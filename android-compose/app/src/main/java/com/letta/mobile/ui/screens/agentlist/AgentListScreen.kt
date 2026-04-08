@@ -1,8 +1,10 @@
 package com.letta.mobile.ui.screens.agentlist
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -54,6 +56,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
@@ -65,6 +68,7 @@ import com.letta.mobile.R
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.LoadingIndicator
+import com.letta.mobile.ui.components.ShimmerGrid
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -136,7 +140,7 @@ fun AgentListScreen(
         }
     ) { paddingValues ->
         when {
-            uiState.isLoading -> LoadingIndicator()
+            uiState.isLoading -> ShimmerGrid(modifier = Modifier.padding(paddingValues))
             uiState.error != null && uiState.agents.isEmpty() -> ErrorContent(
                 message = uiState.error!!,
                 onRetry = { viewModel.loadAgents() },
@@ -352,10 +356,15 @@ private fun AgentCard(
     var showDeleteDialog by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
+    val agentColor = remember(agent.id) {
+        val hue = (agent.id.hashCode().and(0xFF)) * 360f / 256f
+        android.graphics.Color.HSVToColor(floatArrayOf(hue, 0.3f, 0.9f))
+    }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .height(100.dp)
+            .height(110.dp)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = {
@@ -365,30 +374,38 @@ private fun AgentCard(
             ),
         shape = RoundedCornerShape(12.dp)
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(12.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Default.SmartToy,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp),
+        Box(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(36.dp)
+                    .background(Color(agentColor))
             )
-            Spacer(modifier = Modifier.weight(1f))
-            Text(
-                text = agent.name,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = agent.model ?: "No model",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 2.dp),
-            )
+            Column(
+                modifier = Modifier.fillMaxSize().padding(12.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.SmartToy,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = agent.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = agent.model ?: "No model",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
         }
 
         DropdownMenu(

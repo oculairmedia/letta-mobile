@@ -45,6 +45,7 @@ import com.letta.mobile.data.model.Passage
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.LoadingIndicator
+import com.letta.mobile.ui.components.ShimmerCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,7 +74,7 @@ fun ArchivalScreen(
         },
     ) { paddingValues ->
         when (val state = uiState) {
-            is UiState.Loading -> LoadingIndicator()
+            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
             is UiState.Error -> EmptyState(
                 icon = Icons.Default.Search,
                 message = state.message,

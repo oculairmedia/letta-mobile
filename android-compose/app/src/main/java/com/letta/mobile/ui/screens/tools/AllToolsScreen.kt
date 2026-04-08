@@ -40,6 +40,7 @@ import com.letta.mobile.data.model.Tool
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.LoadingIndicator
+import com.letta.mobile.ui.components.ShimmerGrid
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,7 +63,7 @@ fun AllToolsScreen(
         },
     ) { paddingValues ->
         when (val state = uiState) {
-            is UiState.Loading -> LoadingIndicator()
+            is UiState.Loading -> ShimmerGrid()
             is UiState.Error -> Column(
                 modifier = Modifier.fillMaxSize().padding(paddingValues),
                 horizontalAlignment = Alignment.CenterHorizontally,

@@ -64,6 +64,7 @@ import com.letta.mobile.R
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.LoadingIndicator
+import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.util.formatRelativeTime
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -125,7 +126,7 @@ fun ConversationsScreen(
         }
     ) { paddingValues ->
         when {
-            uiState.isLoading && uiState.conversations.isEmpty() -> LoadingIndicator()
+            uiState.isLoading && uiState.conversations.isEmpty() -> ShimmerCard(modifier = Modifier.padding(16.dp))
             uiState.error != null && uiState.conversations.isEmpty() -> ErrorContent(
                 message = uiState.error!!,
                 onRetry = { viewModel.loadConversations() },

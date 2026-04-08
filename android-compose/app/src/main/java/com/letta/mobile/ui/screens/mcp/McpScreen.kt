@@ -20,6 +20,7 @@ import com.letta.mobile.R
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.LoadingIndicator
+import com.letta.mobile.ui.components.ShimmerCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,7 +52,7 @@ fun McpScreen(
         }
     ) { paddingValues ->
         when (val state = uiState) {
-            is UiState.Loading -> LoadingIndicator()
+            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
             is UiState.Error -> ErrorContent(
                 message = state.message,
                 onRetry = { viewModel.loadData() },
