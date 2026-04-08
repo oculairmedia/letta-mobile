@@ -29,21 +29,21 @@ fun MarkdownText(
             linkText = MaterialTheme.colorScheme.primary,
         ),
         typography = markdownTypography(
-            text = MaterialTheme.typography.bodyLarge.copy(color = textColor),
-            code = MaterialTheme.typography.bodySmall.copy(
+            text = MaterialTheme.typography.bodyMedium.copy(color = textColor),
+            code = MaterialTheme.typography.labelSmall.copy(
                 fontFamily = FontFamily.Monospace,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             ),
-            h1 = MaterialTheme.typography.headlineSmall.copy(color = textColor),
-            h2 = MaterialTheme.typography.titleLarge.copy(color = textColor),
-            h3 = MaterialTheme.typography.titleMedium.copy(color = textColor),
-            h4 = MaterialTheme.typography.titleSmall.copy(color = textColor),
-            h5 = MaterialTheme.typography.bodyLarge.copy(color = textColor),
-            h6 = MaterialTheme.typography.bodyMedium.copy(color = textColor),
-            quote = MaterialTheme.typography.bodyLarge.copy(color = textColor.copy(alpha = 0.7f)),
-            bullet = MaterialTheme.typography.bodyLarge.copy(color = textColor),
-            list = MaterialTheme.typography.bodyLarge.copy(color = textColor),
-            ordered = MaterialTheme.typography.bodyLarge.copy(color = textColor),
+            h1 = MaterialTheme.typography.titleLarge.copy(color = textColor),
+            h2 = MaterialTheme.typography.titleMedium.copy(color = textColor),
+            h3 = MaterialTheme.typography.titleSmall.copy(color = textColor),
+            h4 = MaterialTheme.typography.bodyLarge.copy(color = textColor),
+            h5 = MaterialTheme.typography.bodyMedium.copy(color = textColor),
+            h6 = MaterialTheme.typography.bodySmall.copy(color = textColor),
+            quote = MaterialTheme.typography.bodyMedium.copy(color = textColor.copy(alpha = 0.7f)),
+            bullet = MaterialTheme.typography.bodyMedium.copy(color = textColor),
+            list = MaterialTheme.typography.bodyMedium.copy(color = textColor),
+            ordered = MaterialTheme.typography.bodyMedium.copy(color = textColor),
         ),
     )
 }

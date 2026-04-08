@@ -1,6 +1,6 @@
 package com.letta.mobile.ui.screens.chat
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,8 +43,8 @@ import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -290,53 +290,62 @@ private fun MessageBubble(
         else -> customColors.agentBubbleBgColor
     }
 
+    val roleLabel = when (message.role) {
+        "user" -> "You"
+        "tool" -> "Tool"
+        else -> "Agent"
+    }
+    val borderColor = when {
+        isUser -> customColors.userBubbleBgColor
+        message.role == "tool" -> customColors.toolBubbleBgColor.copy(alpha = 0.5f)
+        else -> MaterialTheme.colorScheme.outlineVariant
+    }
+
     Row(
-        modifier = modifier.fillMaxWidth().padding(
-            start = if (isUser) 48.dp else 0.dp,
-            end = if (isUser) 0.dp else 48.dp
-        ),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
     ) {
-        Box(
-            modifier = Modifier
-                .widthIn(max = 320.dp)
-                .clip(MessageBubbleShape(radius = 16.dp, isFromUser = isUser, groupPosition = groupPosition))
-                .background(bubbleColor)
-                .padding(12.dp)
+        androidx.compose.material3.Surface(
+            shape = MessageBubbleShape(radius = 12.dp, isFromUser = isUser, groupPosition = groupPosition),
+            color = bubbleColor,
+            border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
+            tonalElevation = 0.dp,
+            modifier = Modifier.fillMaxWidth(0.88f),
         ) {
-            Column {
+            Column(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                if (groupPosition == GroupPosition.First || groupPosition == GroupPosition.None) {
+                    Text(
+                        text = roleLabel,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                        ),
+                        color = if (isUser) Color.White.copy(alpha = 0.7f)
+                        else MaterialTheme.colorScheme.primary,
+                    )
+                }
+
                 if (isUser) {
                     Text(
                         text = message.content,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.White
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White,
                     )
                 } else {
                     MarkdownText(
                         text = message.content,
-                        textColor = MaterialTheme.colorScheme.onSurface
+                        textColor = MaterialTheme.colorScheme.onSurface,
                     )
                 }
 
                 message.toolCalls?.takeIf { it.isNotEmpty() }?.let { toolCalls ->
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     toolCalls.forEach { toolCall ->
                         ToolCallCard(toolCall = toolCall)
                     }
                 }
-
-                val typeLabel = when (message.role) {
-                    "user" -> "user_message"
-                    "tool" -> if (message.toolCalls != null) "tool_call" else "tool_return"
-                    else -> "assistant_message"
-                }
-                Text(
-                    text = typeLabel,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (isUser) Color.White.copy(alpha = 0.5f)
-                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                    modifier = Modifier.padding(top = 4.dp),
-                )
             }
         }
     }
