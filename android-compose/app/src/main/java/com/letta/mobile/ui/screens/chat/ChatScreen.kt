@@ -26,6 +26,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -45,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -67,7 +69,6 @@ import com.letta.mobile.ui.components.MessageBubbleShape
 import com.letta.mobile.ui.components.ScrollToBottomFab
 import com.letta.mobile.ui.components.ThinkingSection
 import com.letta.mobile.ui.components.TypingIndicator
-import com.letta.mobile.ui.theme.customColors
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -211,7 +212,7 @@ private fun ChatContent(
                         }
                     }
 
-                    val reversed = groupedMessages.reversed()
+                    val reversed = remember(groupedMessages) { groupedMessages.asReversed() }
                     reversed.forEachIndexed { index, (message, position) ->
                         val prevDate = reversed.getOrNull(index + 1)?.first?.timestamp?.take(10)
                         val currentDate = message.timestamp.take(10)
@@ -272,9 +273,6 @@ private fun MessageBubble(
     isStreaming: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val isUser = message.role == "user"
-    val customColors = MaterialTheme.customColors
-
     if (message.isReasoning) {
         ThinkingSection(
             thinkingText = message.content,
@@ -284,31 +282,18 @@ private fun MessageBubble(
         return
     }
 
-    val bubbleColor = when {
-        isUser -> customColors.userBubbleBgColor
-        message.role == "tool" -> customColors.toolBubbleBgColor
-        else -> customColors.agentBubbleBgColor
-    }
-
-    val roleLabel = when (message.role) {
-        "user" -> "You"
-        "tool" -> "Tool"
-        else -> "Agent"
-    }
-    val borderColor = when {
-        isUser -> customColors.userBubbleBgColor
-        message.role == "tool" -> customColors.toolBubbleBgColor.copy(alpha = 0.5f)
-        else -> MaterialTheme.colorScheme.outlineVariant
-    }
+    val isUser = message.role == "user"
+    val isLastAssistant = isStreaming && message.role == "assistant"
+    val style = bubbleStyle(role = message.role, isStreaming = isLastAssistant)
 
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
+        horizontalArrangement = if (style.alignEnd) Arrangement.End else Arrangement.Start
     ) {
-        androidx.compose.material3.Surface(
+        Surface(
             shape = MessageBubbleShape(radius = 12.dp, isFromUser = isUser, groupPosition = groupPosition),
-            color = bubbleColor,
-            border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
+            color = style.containerColor,
+            border = BorderStroke(1.dp, style.borderColor),
             tonalElevation = 0.dp,
             modifier = Modifier.fillMaxWidth(0.88f),
         ) {
@@ -318,12 +303,9 @@ private fun MessageBubble(
             ) {
                 if (groupPosition == GroupPosition.First || groupPosition == GroupPosition.None) {
                     Text(
-                        text = roleLabel,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-                        ),
-                        color = if (isUser) Color.White.copy(alpha = 0.7f)
-                        else MaterialTheme.colorScheme.primary,
+                        text = style.roleLabel,
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = style.roleColor,
                     )
                 }
 
@@ -357,6 +339,7 @@ private fun ToolCallCard(
     modifier: Modifier = Modifier
 ) {
     var argsExpanded by remember { mutableStateOf(false) }
+    val display = remember(toolCall.name) { ToolDisplayRegistry.resolve(toolCall.name, toolCall.arguments) }
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -366,15 +349,13 @@ private fun ToolCallCard(
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Build,
-                    contentDescription = "Tool call",
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.primary,
+                Text(
+                    text = display.emoji,
+                    modifier = Modifier.size(18.dp),
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = toolCall.name,
+                    text = display.label,
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.weight(1f),
                 )
@@ -386,6 +367,16 @@ private fun ToolCallCard(
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 }
+            }
+            display.detailLine?.let { detail ->
+                Text(
+                    text = detail,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
 
             if (toolCall.arguments.isNotBlank()) {
