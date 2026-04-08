@@ -13,6 +13,7 @@ import androidx.navigation.navArgument
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.ui.screens.about.AboutScreen
 import com.letta.mobile.ui.screens.agentlist.AgentListScreen
+import com.letta.mobile.ui.screens.dashboard.HomeScreen
 import com.letta.mobile.ui.screens.archival.ArchivalScreen
 import com.letta.mobile.ui.screens.chat.AgentScaffold
 import com.letta.mobile.ui.screens.config.ConfigListScreen
@@ -44,13 +45,24 @@ fun AppNavGraph() {
     val navViewModel: NavViewModel = hiltViewModel()
     val hasConfig by navViewModel.hasConfig.collectAsState(initial = true)
 
-    val startDestination = if (hasConfig) "conversations" else "config"
+    val startDestination = if (hasConfig) "home" else "config"
     val navController = rememberNavController()
 
     NavHost(
         navController = navController,
         startDestination = startDestination
     ) {
+        composable("home") {
+            HomeScreen(
+                onNavigateToAgents = { navController.navigate("agentList") },
+                onNavigateToConversations = { navController.navigate("conversations") },
+                onNavigateToSettings = { navController.navigate("config") },
+                onNavigateToChat = { agentId ->
+                    navController.navigate("agent/$agentId/chat")
+                },
+            )
+        }
+
         composable("conversations") {
             ConversationsScreen(
                 onNavigateToChat = { agentId, conversationId ->

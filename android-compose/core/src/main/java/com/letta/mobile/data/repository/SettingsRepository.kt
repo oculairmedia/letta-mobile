@@ -40,17 +40,22 @@ class SettingsRepository @Inject constructor(
     private val _favoriteAgentId = MutableStateFlow<String?>(null)
     val favoriteAgentId: StateFlow<String?> = _favoriteAgentId.asStateFlow()
 
+    private val _adminAgentId = MutableStateFlow<String?>(null)
+    val adminAgentId: StateFlow<String?> = _adminAgentId.asStateFlow()
+
     private object Keys {
         val CONFIGS = stringPreferencesKey("configs")
         val ACTIVE_CONFIG_ID = stringPreferencesKey("active_config_id")
         val THEME = stringPreferencesKey("theme")
         val FAVORITE_AGENT_ID = stringPreferencesKey("favorite_agent_id")
+        val ADMIN_AGENT_ID = stringPreferencesKey("admin_agent_id")
     }
 
     init {
         loadConfigs()
         loadActiveConfig()
         _favoriteAgentId.value = encryptedPrefs.getString(Keys.FAVORITE_AGENT_ID.name, null)
+        _adminAgentId.value = encryptedPrefs.getString(Keys.ADMIN_AGENT_ID.name, null)
     }
 
     private fun loadConfigs() {
@@ -125,6 +130,15 @@ class SettingsRepository @Inject constructor(
         }
     }
 
+    fun setAdminAgentId(agentId: String?) {
+        _adminAgentId.value = agentId
+        if (agentId != null) {
+            encryptedPrefs.edit().putString(Keys.ADMIN_AGENT_ID.name, agentId).apply()
+        } else {
+            encryptedPrefs.edit().remove(Keys.ADMIN_AGENT_ID.name).apply()
+        }
+    }
+
     fun setFavoriteAgentId(agentId: String?) {
         _favoriteAgentId.value = agentId
         if (agentId != null) {
@@ -140,6 +154,7 @@ class SettingsRepository @Inject constructor(
         _configs.value = emptyList()
         _activeConfig.value = null
         _favoriteAgentId.value = null
+        _adminAgentId.value = null
     }
 
     suspend fun setTheme(theme: AppTheme) {
