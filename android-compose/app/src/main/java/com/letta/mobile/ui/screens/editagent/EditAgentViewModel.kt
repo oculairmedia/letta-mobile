@@ -7,9 +7,11 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.ModelRepository
+import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.ui.common.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,6 +42,8 @@ data class EditAgentUiState(
     val blocks: List<EditableBlock> = emptyList(),
     val systemPrompt: String = "",
     val tags: List<String> = emptyList(),
+    val attachedTools: List<Tool> = emptyList(),
+    val availableTools: List<Tool> = emptyList(),
     val providerType: String = "",
     val temperature: Float = 1.0f,
     val maxOutputTokens: Int = 4096,
@@ -57,6 +61,7 @@ class EditAgentViewModel @Inject constructor(
     private val agentRepository: AgentRepository,
     private val blockRepository: BlockRepository,
     private val modelRepository: ModelRepository,
+    private val toolRepository: ToolRepository,
 ) : ViewModel() {
 
     private val agentId: String = savedStateHandle.get<String>("agentId") ?: ""
@@ -101,6 +106,8 @@ class EditAgentViewModel @Inject constructor(
                         readOnly = block.readOnly ?: false,
                     )
                 } ?: emptyList()
+                toolRepository.refreshTools()
+                val availableTools = toolRepository.getTools().first()
                 originalBlocks = editableBlocks.associateBy { it.label }
                 _uiState.value = UiState.Success(
                     EditAgentUiState(
@@ -113,6 +120,8 @@ class EditAgentViewModel @Inject constructor(
                         blocks = editableBlocks,
                         systemPrompt = agent.system ?: "",
                         tags = agent.tags ?: emptyList(),
+                        attachedTools = agent.tools ?: emptyList(),
+                        availableTools = availableTools,
                         providerType = agent.modelSettings?.providerType ?: "",
                         temperature = agent.modelSettings?.temperature?.toFloat() ?: 1.0f,
                         maxOutputTokens = agent.modelSettings?.maxOutputTokens ?: 4096,
@@ -267,6 +276,28 @@ class EditAgentViewModel @Inject constructor(
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
             _uiState.value = UiState.Success(currentState.copy(enableSleeptime = value))
+        }
+    }
+
+    fun attachTool(toolId: String) {
+        viewModelScope.launch {
+            try {
+                toolRepository.attachTool(agentId, toolId)
+                loadAgent()
+            } catch (e: Exception) {
+                _uiState.value = UiState.Error(e.message ?: "Failed to attach tool")
+            }
+        }
+    }
+
+    fun detachTool(toolId: String) {
+        viewModelScope.launch {
+            try {
+                toolRepository.detachTool(agentId, toolId)
+                loadAgent()
+            } catch (e: Exception) {
+                _uiState.value = UiState.Error(e.message ?: "Failed to detach tool")
+            }
         }
     }
 

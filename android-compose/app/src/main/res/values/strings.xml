@@ -85,6 +85,8 @@
     <string name="screen_agent_edit_block_template">Template</string>
     <string name="screen_agent_edit_block_read_only">Read only</string>
     <string name="screen_agent_edit_add_memory_block">Add Memory Block</string>
+    <string name="screen_agent_edit_attach_tools">Attach Tools</string>
+    <string name="screen_agent_edit_attached_tools_count">%1$d attached</string>
     <string name="screen_agent_edit_new_tag">New tag</string>
     <string name="screen_agent_edit_delete_block_title">Delete “%1$s”?</string>
     <string name="screen_agent_edit_delete_block_message">This memory block will be permanently removed from the agent.</string>
@@ -153,6 +155,8 @@
     <string name="screen_agents_create_embedding_placeholder">e.g. openai/text-embedding-3-small</string>
     <string name="screen_agents_create_model_placeholder">e.g. openai/gpt-4o</string>
     <string name="screen_agents_create_include_base_tools">Include Base Tools</string>
+    <string name="screen_agents_create_select_tools">Select Tools</string>
+    <string name="screen_agents_create_selected_tools_count">%1$d selected</string>
     <string name="screen_agents_create_advanced_model_section">Advanced Model Settings</string>
     <string name="screen_agents_create_provider_placeholder">e.g. openai</string>
     <string name="action_dismiss">Dismiss</string>

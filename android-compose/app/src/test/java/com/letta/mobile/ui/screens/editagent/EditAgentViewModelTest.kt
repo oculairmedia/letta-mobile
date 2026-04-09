@@ -8,10 +8,13 @@ import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.BlockUpdateParams
+import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.BlockRepository
+import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeBlockApi
+import com.letta.mobile.testutil.FakeToolApi
 import com.letta.mobile.testutil.TestData
 import com.letta.mobile.ui.common.UiState
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +39,7 @@ class EditAgentViewModelTest {
 
     private lateinit var fakeAgentRepo: FakeAgentRepo
     private lateinit var fakeBlockRepo: FakeBlockRepo
+    private lateinit var fakeToolRepo: FakeToolRepo
     private lateinit var viewModel: EditAgentViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
 
@@ -44,8 +48,9 @@ class EditAgentViewModelTest {
         Dispatchers.setMain(testDispatcher)
         fakeAgentRepo = FakeAgentRepo()
         fakeBlockRepo = FakeBlockRepo()
+        fakeToolRepo = FakeToolRepo()
         val savedState = SavedStateHandle(mapOf("agentId" to "a1"))
-        viewModel = EditAgentViewModel(savedState, fakeAgentRepo, fakeBlockRepo)
+        viewModel = EditAgentViewModel(savedState, fakeAgentRepo, fakeBlockRepo, fakeToolRepo)
     }
 
     @After
@@ -63,6 +68,8 @@ class EditAgentViewModelTest {
             assertEquals("stateful", state.data.agentType)
             assertEquals("openai", state.data.providerType)
             assertEquals(4096, state.data.maxOutputTokens)
+            assertEquals(1, state.data.attachedTools.size)
+            assertEquals(2, state.data.availableTools.size)
         }
     }
 
@@ -133,6 +140,20 @@ class EditAgentViewModelTest {
     }
 
     @Test
+    fun `attachTool delegates to repository`() = runTest {
+        viewModel.attachTool("t2")
+
+        assertEquals(listOf("t2"), fakeToolRepo.attachedToolIds)
+    }
+
+    @Test
+    fun `detachTool delegates to repository`() = runTest {
+        viewModel.detachTool("t1")
+
+        assertEquals(listOf("t1"), fakeToolRepo.detachedToolIds)
+    }
+
+    @Test
     fun `addBlock forwards description and limit`() = runTest {
         viewModel.addBlock("memory", "value", "notes", 512)
 
@@ -181,6 +202,7 @@ class EditAgentViewModelTest {
                 system = "System prompt",
                 agentType = "stateful",
                 enableSleeptime = true,
+                tools = listOf(TestData.tool(id = "t1", name = "attached_tool")),
                 modelSettings = com.letta.mobile.data.model.ModelSettings(
                     providerType = "openai",
                     temperature = 0.9,
@@ -238,6 +260,26 @@ class EditAgentViewModelTest {
 
         override suspend fun attachBlock(agentId: String, blockId: String): Block {
             return TestData.block(id = blockId, label = "attached", value = "value")
+        }
+    }
+
+    private class FakeToolRepo : ToolRepository(FakeToolApi()) {
+        private val availableTools = MutableStateFlow(
+            listOf(
+                TestData.tool(id = "t1", name = "attached_tool"),
+                TestData.tool(id = "t2", name = "second_tool"),
+            )
+        )
+        val attachedToolIds = mutableListOf<String>()
+        val detachedToolIds = mutableListOf<String>()
+
+        override fun getTools(): Flow<List<Tool>> = availableTools
+        override suspend fun refreshTools() {}
+        override suspend fun attachTool(agentId: String, toolId: String) {
+            attachedToolIds.add(toolId)
+        }
+        override suspend fun detachTool(agentId: String, toolId: String) {
+            detachedToolIds.add(toolId)
         }
     }
 }

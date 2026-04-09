@@ -1,21 +1,26 @@
 package com.letta.mobile.ui.screens.agentlist
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.SettingsRepository
+import com.letta.mobile.data.repository.ToolRepository
+import com.letta.mobile.data.model.Tool
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @androidx.compose.runtime.Immutable
 data class AgentListUiState(
     val agents: List<Agent> = emptyList(),
+    val availableTools: List<Tool> = emptyList(),
     val favoriteAgentId: String? = null,
     val searchQuery: String = "",
     val isLoading: Boolean = true,
@@ -28,6 +33,7 @@ data class AgentListUiState(
 class AgentListViewModel @Inject constructor(
     private val agentRepository: AgentRepository,
     private val settingsRepository: SettingsRepository,
+    private val toolRepository: ToolRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AgentListUiState())
@@ -43,6 +49,20 @@ class AgentListViewModel @Inject constructor(
             )
         }
         loadAgents()
+        loadAvailableTools()
+    }
+
+    fun loadAvailableTools() {
+        viewModelScope.launch {
+            try {
+                toolRepository.refreshTools()
+                _uiState.value = _uiState.value.copy(
+                    availableTools = toolRepository.getTools().first(),
+                )
+            } catch (_: Exception) {
+                Log.w("AgentListViewModel", "Failed to load available tools")
+            }
+        }
     }
 
     fun loadAgents() {

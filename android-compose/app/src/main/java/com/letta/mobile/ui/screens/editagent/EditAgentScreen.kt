@@ -56,6 +56,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.Tool
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.Accordions
@@ -63,6 +64,7 @@ import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.components.ModelDropdown
+import com.letta.mobile.ui.screens.tools.ToolPickerDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -111,6 +113,8 @@ fun EditAgentScreen(
                 onDeleteBlock = { viewModel.deleteBlock(it) },
                 onAddTag = { viewModel.addTag(it) },
                 onRemoveTag = { viewModel.removeTag(it) },
+                onAttachTool = { viewModel.attachTool(it) },
+                onDetachTool = { viewModel.detachTool(it) },
                 onSystemPromptChange = { viewModel.updateSystemPrompt(it) },
                 onProviderTypeChange = { viewModel.updateProviderType(it) },
                 onTemperatureChange = { viewModel.updateTemperature(it) },
@@ -147,6 +151,8 @@ private fun EditAgentContent(
     onDeleteBlock: (String) -> Unit,
     onAddTag: (String) -> Unit,
     onRemoveTag: (String) -> Unit,
+    onAttachTool: (String) -> Unit,
+    onDetachTool: (String) -> Unit,
     onSystemPromptChange: (String) -> Unit,
     onProviderTypeChange: (String) -> Unit,
     onTemperatureChange: (Float) -> Unit,
@@ -158,6 +164,7 @@ private fun EditAgentContent(
 ) {
     val context = LocalContext.current
     val snackbar = LocalSnackbarDispatcher.current
+    var showToolPicker by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -472,6 +479,45 @@ private fun EditAgentContent(
 
         HorizontalDivider()
 
+        var toolsExpanded by remember { mutableStateOf(true) }
+        Accordions(
+            title = stringResource(R.string.common_tools),
+            subtitle = stringResource(R.string.screen_agent_edit_attached_tools_count, state.attachedTools.size),
+            expanded = toolsExpanded,
+            onExpandedChange = { toolsExpanded = it },
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (state.attachedTools.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.screen_tools_empty_attached),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    state.attachedTools.forEach { tool ->
+                        AttachedToolRow(
+                            tool = tool,
+                            onDetach = { onDetachTool(tool.id) },
+                        )
+                    }
+                }
+
+                OutlinedButton(
+                    onClick = { showToolPicker = true },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.screen_agent_edit_attach_tools))
+                }
+            }
+        }
+
+        HorizontalDivider()
+
         var systemExpanded by remember { mutableStateOf(false) }
         Accordions(
             title = stringResource(R.string.common_system_prompt),
@@ -541,6 +587,47 @@ private fun EditAgentContent(
             Icon(Icons.Default.Save, null)
             Spacer(modifier = Modifier.width(8.dp))
             Text(stringResource(R.string.action_save_changes))
+        }
+
+        if (showToolPicker) {
+            ToolPickerDialog(
+                tools = state.availableTools.filter { candidate ->
+                    state.attachedTools.none { attached -> attached.id == candidate.id }
+                },
+                selectedToolIds = emptyList(),
+                title = stringResource(R.string.screen_agent_edit_attach_tools),
+                onDismiss = { showToolPicker = false },
+                onConfirm = { selectedIds ->
+                    selectedIds.forEach(onAttachTool)
+                    showToolPicker = false
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun AttachedToolRow(
+    tool: Tool,
+    onDetach: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(tool.name, style = MaterialTheme.typography.bodyMedium)
+            tool.description?.let { description ->
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        TextButton(onClick = onDetach) {
+            Text(stringResource(R.string.action_remove), color = MaterialTheme.colorScheme.error)
         }
     }
 }

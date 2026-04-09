@@ -70,10 +70,12 @@ import androidx.compose.material3.Switch
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.ModelSettings
+import com.letta.mobile.data.model.Tool
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.components.ShimmerGrid
+import com.letta.mobile.ui.screens.tools.ToolPickerDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -205,6 +207,7 @@ fun AgentListScreen(
     if (showCreateDialog) {
         CreateAgentDialog(
             onDismiss = { showCreateDialog = false },
+            availableTools = uiState.availableTools,
             onCreate = { params ->
                 viewModel.createAgent(params) { agentId ->
                     showCreateDialog = false
@@ -463,6 +466,7 @@ private fun AgentCard(
 @Composable
 private fun CreateAgentDialog(
     onDismiss: () -> Unit,
+    availableTools: List<Tool> = emptyList(),
     onCreate: (AgentCreateParams) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
@@ -476,6 +480,8 @@ private fun CreateAgentDialog(
     var parallelToolCalls by remember { mutableStateOf(true) }
     var enableSleeptime by remember { mutableStateOf(false) }
     var includeBaseTools by remember { mutableStateOf(true) }
+    var selectedToolIds by remember { mutableStateOf<List<String>>(emptyList()) }
+    var showToolPicker by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -581,6 +587,30 @@ private fun CreateAgentDialog(
                     Text(stringResource(R.string.screen_agents_create_include_base_tools), style = MaterialTheme.typography.bodyMedium)
                     Switch(checked = includeBaseTools, onCheckedChange = { includeBaseTools = it })
                 }
+                Text(
+                    text = stringResource(R.string.common_tools),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                if (selectedToolIds.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.screen_tools_empty_attached),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Text(
+                        text = stringResource(R.string.screen_agents_create_selected_tools_count, selectedToolIds.size),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                OutlinedButton(
+                    onClick = { showToolPicker = true },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.screen_agents_create_select_tools))
+                }
             }
         },
         confirmButton = {
@@ -598,6 +628,7 @@ private fun CreateAgentDialog(
                                 maxOutputTokens = maxOutputTokens.toIntOrNull(),
                                 parallelToolCalls = parallelToolCalls,
                             ),
+                            toolIds = selectedToolIds.ifEmpty { null },
                             system = systemPrompt.ifBlank { null },
                             enableSleeptime = enableSleeptime,
                             includeBaseTools = includeBaseTools,
@@ -611,4 +642,17 @@ private fun CreateAgentDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
         },
     )
+
+    if (showToolPicker) {
+        ToolPickerDialog(
+            tools = availableTools,
+            selectedToolIds = selectedToolIds,
+            title = stringResource(R.string.screen_agents_create_select_tools),
+            onDismiss = { showToolPicker = false },
+            onConfirm = { selectedIds ->
+                selectedToolIds = selectedIds
+                showToolPicker = false
+            },
+        )
+    }
 }
