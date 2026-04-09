@@ -14,11 +14,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,6 +57,7 @@ fun ArchivalScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showAddDialog by remember { mutableStateOf(false) }
+    var deleteTarget by remember { mutableStateOf<Passage?>(null) }
 
     Scaffold(
         topBar = {
@@ -75,16 +78,19 @@ fun ArchivalScreen(
     ) { paddingValues ->
         when (val state = uiState) {
             is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
-            is UiState.Error -> EmptyState(
-                icon = Icons.Default.Search,
+            is UiState.Error -> com.letta.mobile.ui.components.ErrorContent(
                 message = state.message,
-                modifier = Modifier.padding(paddingValues).fillMaxSize(),
+                onRetry = { viewModel.loadPassages() },
+                modifier = Modifier.padding(paddingValues),
             )
             is UiState.Success -> ArchivalContent(
                 state = state.data,
                 onSearchChange = { viewModel.search(it) },
+                onToggleHasSource = viewModel::setFilterHasSource,
+                onToggleHasMetadata = viewModel::setFilterHasMetadata,
+                filteredPassages = viewModel.getFilteredPassages(),
                 onInspectPassage = { viewModel.inspectPassage(it) },
-                onDeletePassage = { viewModel.deletePassage(it) },
+                onDeletePassage = { deleteTarget = it },
                 modifier = Modifier.padding(paddingValues),
             )
         }
@@ -106,14 +112,40 @@ fun ArchivalScreen(
             onDismiss = { viewModel.clearSelectedPassage() },
         )
     }
+
+    deleteTarget?.let { passage ->
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text(stringResource(R.string.screen_archival_delete_title)) },
+            text = { Text(stringResource(R.string.screen_archival_delete_confirm, passage.id)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deletePassage(passage.id)
+                        deleteTarget = null
+                    }
+                ) {
+                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteTarget = null }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
 }
 
 @Composable
 private fun ArchivalContent(
     state: ArchivalUiState,
     onSearchChange: (String) -> Unit,
+    onToggleHasSource: (Boolean) -> Unit,
+    onToggleHasMetadata: (Boolean) -> Unit,
+    filteredPassages: List<Passage>,
     onInspectPassage: (Passage) -> Unit,
-    onDeletePassage: (String) -> Unit,
+    onDeletePassage: (Passage) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -123,10 +155,33 @@ private fun ArchivalContent(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             placeholder = { Text(stringResource(R.string.screen_archival_search_hint)) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = stringResource(R.string.screen_archival_search_action)) },
+            trailingIcon = {
+                if (state.searchQuery.isNotBlank()) {
+                    IconButton(onClick = { onSearchChange("") }) {
+                        Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.action_close))
+                    }
+                }
+            },
             singleLine = true,
         )
 
-        if (state.passages.isEmpty()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            FilterChip(
+                selected = state.filterHasSource,
+                onClick = { onToggleHasSource(!state.filterHasSource) },
+                label = { Text(stringResource(R.string.screen_archival_filter_has_source)) },
+            )
+            FilterChip(
+                selected = state.filterHasMetadata,
+                onClick = { onToggleHasMetadata(!state.filterHasMetadata) },
+                label = { Text(stringResource(R.string.screen_archival_filter_has_metadata)) },
+            )
+        }
+
+        if (filteredPassages.isEmpty()) {
             EmptyState(
                 icon = Icons.Default.Search,
                 message = if (state.searchQuery.isBlank()) {
@@ -141,11 +196,11 @@ private fun ArchivalContent(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(state.passages, key = { it.id }) { passage ->
+                items(filteredPassages, key = { it.id }) { passage ->
                     PassageCard(
                         passage = passage,
                         onInspect = { onInspectPassage(passage) },
-                        onDelete = { onDeletePassage(passage.id) },
+                        onDelete = { onDeletePassage(passage) },
                     )
                 }
             }

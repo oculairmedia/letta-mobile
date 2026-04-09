@@ -111,6 +111,42 @@ class ArchivalViewModelTest {
     }
 
     @Test
+    fun `filterHasSource filters passages locally`() = runTest {
+        fakeRepo.setPassages(
+            "a1",
+            listOf(
+                Passage(id = "p1", text = "With source", sourceId = "source-1"),
+                Passage(id = "p2", text = "Without source"),
+            )
+        )
+        viewModel.loadPassages()
+
+        viewModel.setFilterHasSource(true)
+
+        val filtered = viewModel.getFilteredPassages()
+        assertEquals(1, filtered.size)
+        assertEquals("p1", filtered.first().id)
+    }
+
+    @Test
+    fun `filterHasMetadata filters passages locally`() = runTest {
+        fakeRepo.setPassages(
+            "a1",
+            listOf(
+                Passage(id = "p1", text = "With metadata", metadata = mapOf("kind" to "note")),
+                Passage(id = "p2", text = "Without metadata"),
+            )
+        )
+        viewModel.loadPassages()
+
+        viewModel.setFilterHasMetadata(true)
+
+        val filtered = viewModel.getFilteredPassages()
+        assertEquals(1, filtered.size)
+        assertEquals("p1", filtered.first().id)
+    }
+
+    @Test
     fun `loadPassages sets Error on failure`() = runTest {
         fakeRepo.shouldFail = true
         viewModel.loadPassages()

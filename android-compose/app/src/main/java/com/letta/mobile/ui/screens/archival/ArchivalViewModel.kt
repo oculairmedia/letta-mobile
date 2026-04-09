@@ -18,6 +18,8 @@ data class ArchivalUiState(
     val passages: List<Passage> = emptyList(),
     val searchQuery: String = "",
     val isSearching: Boolean = false,
+    val filterHasSource: Boolean = false,
+    val filterHasMetadata: Boolean = false,
     val selectedPassage: Passage? = null,
 )
 
@@ -100,6 +102,24 @@ class ArchivalViewModel @Inject constructor(
     fun inspectPassage(passage: Passage) {
         val current = (_uiState.value as? UiState.Success)?.data ?: return
         _uiState.value = UiState.Success(current.copy(selectedPassage = passage))
+    }
+
+    fun setFilterHasSource(value: Boolean) {
+        val current = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(current.copy(filterHasSource = value))
+    }
+
+    fun setFilterHasMetadata(value: Boolean) {
+        val current = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(current.copy(filterHasMetadata = value))
+    }
+
+    fun getFilteredPassages(): List<Passage> {
+        val current = (_uiState.value as? UiState.Success)?.data ?: return emptyList()
+        return current.passages.filter { passage ->
+            (!current.filterHasSource || !passage.sourceId.isNullOrBlank()) &&
+                (!current.filterHasMetadata || !passage.metadata.isNullOrEmpty())
+        }
     }
 
     fun clearSelectedPassage() {
