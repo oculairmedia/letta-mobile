@@ -27,6 +27,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModelTest {
@@ -92,6 +93,31 @@ class ChatViewModelTest {
         assertEquals(2, state.messages.size)
         assertEquals("Test Agent", state.agentName)
         assertFalse(state.isLoadingMessages)
+    }
+
+    @Test
+    fun `loadMessages preserves repository order instead of resorting by date`() = runTest {
+        messages = listOf(
+            AppMessage(
+                id = "assistant-first",
+                date = Instant.parse("2024-03-15T11:00:00Z"),
+                messageType = MessageType.ASSISTANT,
+                content = "Assistant came first in repository order",
+            ),
+            AppMessage(
+                id = "user-second",
+                date = Instant.parse("2024-03-15T10:00:00Z"),
+                messageType = MessageType.USER,
+                content = "User came second in repository order",
+            ),
+        )
+
+        val vm = createViewModel()
+
+        assertEquals(
+            listOf("assistant-first", "user-second"),
+            vm.uiState.value.messages.map { it.id },
+        )
     }
 
     @Test

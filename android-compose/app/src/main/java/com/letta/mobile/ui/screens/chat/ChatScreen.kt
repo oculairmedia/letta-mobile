@@ -163,10 +163,9 @@ private fun ChatContent(
     }
 
     val dedupedMessages = remember(state.messages, chatMode) {
-        val sorted = state.messages.sortedBy { it.timestamp }
         val result = mutableListOf<UiMessage>()
         var lastReasoningContent: String? = null
-        for (msg in sorted) {
+        for (msg in state.messages) {
             if (msg.isReasoning) {
                 lastReasoningContent = msg.content
                 result.add(msg)

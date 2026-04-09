@@ -99,7 +99,7 @@ class ChatViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(agentName = agent.name)
 
                 val appMessages = messageRepository.getMessages(agentId, activeConversationId).first()
-                val messages = appMessages.sortedBy { it.date }.map { it.toUiMessage() }
+                val messages = appMessages.map { it.toUiMessage() }
                 if (messages.isNotEmpty()) hasSummary = true
                 _uiState.value = _uiState.value.copy(
                     messages = messages, isLoadingMessages = false
@@ -203,7 +203,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val appMessages = messageRepository.fetchMessages(agentId, activeConversationId)
-                val messages = appMessages.sortedBy { it.date }.map { it.toUiMessage() }
+                val messages = appMessages.map { it.toUiMessage() }
                 if (messages.isNotEmpty()) {
                     _uiState.value = _uiState.value.copy(messages = messages)
                 }
