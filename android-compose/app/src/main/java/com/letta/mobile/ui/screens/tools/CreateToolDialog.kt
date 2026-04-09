@@ -31,7 +31,7 @@ fun CreateToolDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Create Custom Tool") },
+        title = { Text(stringResource(R.string.screen_create_tool_title)) },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -45,14 +45,14 @@ fun CreateToolDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
-                    text = "Python source code (imports must be inside function):",
+                    text = stringResource(R.string.screen_create_tool_source_code_helper),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 OutlinedTextField(
                     value = sourceCode,
                     onValueChange = { sourceCode = it },
-                    label = { Text("Source Code") },
+                    label = { Text(stringResource(R.string.screen_create_tool_source_code_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 8,
                     maxLines = 15,

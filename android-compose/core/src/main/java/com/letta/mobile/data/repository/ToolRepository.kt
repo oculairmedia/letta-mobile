@@ -3,6 +3,7 @@ package com.letta.mobile.data.repository
 import com.letta.mobile.data.api.ToolApi
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolCreateParams
+import com.letta.mobile.data.model.ToolUpdateParams
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -59,5 +60,24 @@ class ToolRepository @Inject constructor(
         val tool = toolApi.upsertTool(params)
         refreshTools()
         return tool
+    }
+
+    override suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool {
+        val tool = toolApi.updateTool(toolId, params)
+        refreshTools()
+        _toolsByAgent.update { current ->
+            current.mapValues { (_, tools) ->
+                tools.map { existing -> if (existing.id == tool.id) tool else existing }
+            }
+        }
+        return tool
+    }
+
+    override suspend fun deleteTool(toolId: String) {
+        toolApi.deleteTool(toolId)
+        _tools.update { current -> current.filterNot { it.id == toolId } }
+        _toolsByAgent.update { current ->
+            current.mapValues { (_, tools) -> tools.filterNot { it.id == toolId } }
+        }
     }
 }

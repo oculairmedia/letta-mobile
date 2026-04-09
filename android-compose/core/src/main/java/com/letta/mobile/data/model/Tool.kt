@@ -25,3 +25,11 @@ data class ToolCreateParams(
     val description: String? = null,
     val tags: List<String>? = null,
 )
+
+@Serializable
+data class ToolUpdateParams(
+    val name: String? = null,
+    @SerialName("source_code") val sourceCode: String? = null,
+    val description: String? = null,
+    val tags: List<String>? = null,
+)

@@ -158,8 +158,25 @@
     <string name="screen_models_no_models">No models available</string>
 
     <string name="screen_tool_detail_title">Tool Detail</string>
+    <string name="screen_tool_detail_created">Created: %1$s</string>
+    <string name="screen_tool_detail_updated">Updated: %1$s</string>
     <string name="screen_tool_detail_source_code">Source Code</string>
     <string name="screen_tool_detail_json_schema">JSON Schema</string>
     <string name="screen_tool_detail_source_type">Source Type</string>
     <string name="screen_tool_detail_no_description">No description</string>
+    <string name="screen_tool_detail_edit_title">Edit Custom Tool</string>
+    <string name="screen_tool_detail_delete_title">Delete Tool</string>
+    <string name="screen_tool_detail_delete_confirm">Delete %1$s? This action cannot be undone.</string>
+    <string name="screen_tool_detail_read_only">Inspect only</string>
+    <string name="screen_tool_detail_editable">Editable custom tool</string>
+    <string name="screen_tool_detail_tags_label">Tags (comma separated)</string>
+    <string name="screen_tool_detail_edit_action">Edit tool</string>
+    <string name="screen_tool_detail_delete_action">Delete tool</string>
+    <string name="screen_tool_detail_expand">Expand section</string>
+    <string name="screen_tool_detail_collapse">Collapse section</string>
+    <string name="screen_tool_detail_source_code_helper">Python source code for this custom tool</string>
+    <string name="screen_tool_detail_name_helper">Renaming uses Letta's update endpoint and keeps the same tool id.</string>
+    <string name="screen_create_tool_title">Create Custom Tool</string>
+    <string name="screen_create_tool_source_code_label">Source Code</string>
+    <string name="screen_create_tool_source_code_helper">Python source code (imports must be inside the function)</string>
 </resources>

@@ -55,9 +55,48 @@ class ToolRepositoryTest {
 
     @Test
     fun `upsertTool creates and refreshes`() = runTest {
-        val tool = repository.upsertTool(com.letta.mobile.data.model.ToolCreateParams(name = "new_tool"))
+        val tool = repository.upsertTool(
+            com.letta.mobile.data.model.ToolCreateParams(
+                name = "new_tool",
+                sourceCode = "def new_tool():\n    return 'ok'",
+            )
+        )
         assertEquals("new_tool", tool.name)
         assertTrue(fakeApi.calls.any { it.startsWith("upsertTool") })
+    }
+
+    @Test
+    fun `updateTool updates existing cached tool`() = runTest {
+        fakeApi.tools.add(
+            TestData.tool(id = "t1", name = "tool_one", description = "old").copy(
+                sourceCode = "def tool_one():\n    return 'old'",
+                toolType = "custom",
+            )
+        )
+        repository.refreshTools()
+
+        val updated = repository.updateTool(
+            "t1",
+            com.letta.mobile.data.model.ToolUpdateParams(
+                description = "new",
+                sourceCode = "def tool_one():\n    return 'new'",
+            )
+        )
+
+        assertEquals("new", updated.description)
+        assertTrue(fakeApi.calls.contains("updateTool:t1"))
+        assertEquals("new", repository.getTools().first().first().description)
+    }
+
+    @Test
+    fun `deleteTool removes tool from caches`() = runTest {
+        fakeApi.tools.add(TestData.tool(id = "t1", name = "tool_one").copy(toolType = "custom"))
+        repository.refreshTools()
+
+        repository.deleteTool("t1")
+
+        assertTrue(fakeApi.calls.contains("deleteTool:t1"))
+        assertTrue(repository.getTools().first().none { it.id == "t1" })
     }
 
     @Test(expected = com.letta.mobile.data.api.ApiException::class)

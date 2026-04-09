@@ -4,6 +4,7 @@ import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.api.ToolApi
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolCreateParams
+import com.letta.mobile.data.model.ToolUpdateParams
 
 class FakeToolApi : ToolApi(null!!) {
     var tools = mutableListOf<Tool>()
@@ -36,11 +37,48 @@ class FakeToolApi : ToolApi(null!!) {
         return tools.find { it.id == toolId } ?: throw ApiException(404, "Not found")
     }
 
+    override suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool {
+        calls.add("updateTool:$toolId")
+        if (shouldFail) throw ApiException(500, "Server error")
+        val index = tools.indexOfFirst { it.id == toolId }
+        if (index == -1) throw ApiException(404, "Not found")
+        val current = tools[index]
+        val updated = current.copy(
+            name = params.name ?: current.name,
+            description = params.description ?: current.description,
+            sourceCode = params.sourceCode ?: current.sourceCode,
+            tags = params.tags ?: current.tags,
+        )
+        tools[index] = updated
+        return updated
+    }
+
+    override suspend fun deleteTool(toolId: String) {
+        calls.add("deleteTool:$toolId")
+        if (shouldFail) throw ApiException(500, "Server error")
+        if (tools.none { it.id == toolId }) throw ApiException(404, "Not found")
+        tools.removeAll { it.id == toolId }
+        agentTools.replaceAll { _, toolList -> toolList.filterNot { it.id == toolId }.toMutableList() }
+    }
+
     override suspend fun upsertTool(params: ToolCreateParams): Tool {
         calls.add("upsertTool:${params.name}")
         if (shouldFail) throw ApiException(500, "Server error")
-        val tool = TestData.tool(id = "new-${tools.size}", name = params.name ?: "unnamed")
-        tools.add(tool)
+        val existingIndex = tools.indexOfFirst { it.name == params.name }
+        val tool = Tool(
+            id = if (existingIndex >= 0) tools[existingIndex].id else "new-${tools.size}",
+            name = params.name,
+            description = params.description,
+            sourceCode = params.sourceCode,
+            tags = params.tags,
+            toolType = if (existingIndex >= 0) tools[existingIndex].toolType else "custom",
+            sourceType = if (existingIndex >= 0) tools[existingIndex].sourceType else "python",
+        )
+        if (existingIndex >= 0) {
+            tools[existingIndex] = tool
+        } else {
+            tools.add(tool)
+        }
         return tool
     }
 }
