@@ -12,13 +12,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -56,7 +59,9 @@ fun BlockLibraryScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedBlock by remember { mutableStateOf<Block?>(null) }
+    var editTarget by remember { mutableStateOf<Block?>(null) }
     var deleteTarget by remember { mutableStateOf<Block?>(null) }
+    var showCreateDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -69,6 +74,11 @@ fun BlockLibraryScreen(
                 },
             )
         },
+        floatingActionButton = {
+            FloatingActionButton(onClick = { showCreateDialog = true }) {
+                Icon(Icons.Default.Add, stringResource(R.string.screen_blocks_create_title))
+            }
+        },
     ) { paddingValues ->
         when (val state = uiState) {
             is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
@@ -78,6 +88,19 @@ fun BlockLibraryScreen(
                 modifier = Modifier.padding(paddingValues),
             )
             is UiState.Success -> {
+                state.data.operationError?.let { message ->
+                    AlertDialog(
+                        onDismissRequest = viewModel::clearOperationError,
+                        title = { Text(stringResource(R.string.common_error)) },
+                        text = { Text(message) },
+                        confirmButton = {
+                            TextButton(onClick = viewModel::clearOperationError) {
+                                Text(stringResource(R.string.action_close))
+                            }
+                        },
+                    )
+                }
+
                 val filteredBlocks = remember(state.data.blocks, state.data.searchQuery) {
                     viewModel.getFilteredBlocks()
                 }
@@ -117,6 +140,7 @@ fun BlockLibraryScreen(
                                 BlockLibraryCard(
                                     block = block,
                                     onInspect = { selectedBlock = block },
+                                    onEdit = { if (block.readOnly != true) editTarget = block },
                                     onDelete = { if (block.readOnly != true) deleteTarget = block },
                                 )
                             }
@@ -130,7 +154,45 @@ fun BlockLibraryScreen(
     selectedBlock?.let { block ->
         BlockDetailDialog(
             block = block,
+            onEdit = if (block.readOnly == true) null else {
+                {
+                    selectedBlock = null
+                    editTarget = block
+                }
+            },
             onDismiss = { selectedBlock = null },
+        )
+    }
+
+    if (showCreateDialog) {
+        BlockEditorDialog(
+            title = stringResource(R.string.screen_blocks_create_title),
+            confirmLabel = stringResource(R.string.action_create),
+            onDismiss = { showCreateDialog = false },
+            onConfirm = { label, value, description, limit ->
+                viewModel.createBlock(label, value, description, limit) {
+                    showCreateDialog = false
+                }
+            },
+        )
+    }
+
+    editTarget?.let { block ->
+        BlockEditorDialog(
+            title = stringResource(R.string.screen_blocks_edit_title),
+            confirmLabel = stringResource(R.string.action_save),
+            initialLabel = block.label.orEmpty(),
+            initialValue = block.value,
+            initialDescription = block.description.orEmpty(),
+            initialLimit = block.limit?.toString().orEmpty(),
+            labelEnabled = false,
+            onDismiss = { editTarget = null },
+            onConfirm = { _, value, description, limit ->
+                viewModel.updateGlobalBlock(block.id, value, description, limit) {
+                    editTarget = null
+                    selectedBlock = null
+                }
+            },
         )
     }
 
@@ -142,9 +204,10 @@ fun BlockLibraryScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        viewModel.deleteBlock(block.id)
-                        deleteTarget = null
-                        if (selectedBlock?.id == block.id) selectedBlock = null
+                        viewModel.deleteBlock(block.id) {
+                            deleteTarget = null
+                            if (selectedBlock?.id == block.id) selectedBlock = null
+                        }
                     },
                 ) {
                     Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
@@ -163,6 +226,7 @@ fun BlockLibraryScreen(
 private fun BlockLibraryCard(
     block: Block,
     onInspect: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Card(
@@ -192,8 +256,13 @@ private fun BlockLibraryCard(
                     }
                 }
                 if (block.readOnly != true) {
-                    IconButton(onClick = onDelete) {
-                        Icon(Icons.Default.Delete, stringResource(R.string.action_delete))
+                    Row {
+                        IconButton(onClick = onEdit) {
+                            Icon(Icons.Default.Edit, stringResource(R.string.action_edit))
+                        }
+                        IconButton(onClick = onDelete) {
+                            Icon(Icons.Default.Delete, stringResource(R.string.action_delete))
+                        }
                     }
                 }
             }
@@ -220,6 +289,7 @@ private fun BlockLibraryCard(
 @Composable
 private fun BlockDetailDialog(
     block: Block,
+    onEdit: (() -> Unit)?,
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
@@ -257,8 +327,95 @@ private fun BlockDetailDialog(
             }
         },
         confirmButton = {
+            Row {
+                onEdit?.let {
+                    TextButton(onClick = it) {
+                        Text(stringResource(R.string.action_edit))
+                    }
+                }
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.action_close))
+                }
+            }
+        },
+    )
+}
+
+@Composable
+private fun BlockEditorDialog(
+    title: String,
+    confirmLabel: String,
+    initialLabel: String = "",
+    initialValue: String = "",
+    initialDescription: String = "",
+    initialLimit: String = "",
+    labelEnabled: Boolean = true,
+    onDismiss: () -> Unit,
+    onConfirm: (label: String, value: String, description: String, limit: Int?) -> Unit,
+) {
+    var label by remember(initialLabel) { mutableStateOf(initialLabel) }
+    var value by remember(initialValue) { mutableStateOf(initialValue) }
+    var description by remember(initialDescription) { mutableStateOf(initialDescription) }
+    var limit by remember(initialLimit) { mutableStateOf(initialLimit) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (!labelEnabled) {
+                    Text(
+                        text = stringResource(R.string.screen_blocks_global_edit_notice),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                OutlinedTextField(
+                    value = label,
+                    onValueChange = { label = it },
+                    label = { Text(stringResource(R.string.common_name)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = labelEnabled,
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { value = it },
+                    label = { Text(stringResource(R.string.common_value)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text(stringResource(R.string.common_description)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                )
+                OutlinedTextField(
+                    value = limit,
+                    onValueChange = { next ->
+                        if (next.isBlank() || next.toIntOrNull() != null) {
+                            limit = next
+                        }
+                    },
+                    label = { Text(stringResource(R.string.screen_blocks_limit_input_label)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(label.trim(), value, description, limit.toIntOrNull()) },
+                enabled = value.isNotBlank() && (!labelEnabled || label.isNotBlank()),
+            ) {
+                Text(confirmLabel)
+            }
+        },
+        dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_close))
+                Text(stringResource(R.string.action_cancel))
             }
         },
     )

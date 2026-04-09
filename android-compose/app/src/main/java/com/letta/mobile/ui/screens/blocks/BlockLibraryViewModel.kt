@@ -3,6 +3,8 @@ package com.letta.mobile.ui.screens.blocks
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.Block
+import com.letta.mobile.data.model.BlockCreateParams
+import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.repository.api.IBlockRepository
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.util.mapErrorToUserMessage
@@ -19,6 +21,7 @@ data class BlockLibraryUiState(
     val searchQuery: String = "",
     val filterLabel: String? = null,
     val filterTemplate: Boolean? = null,
+    val operationError: String? = null,
 )
 
 @HiltViewModel
@@ -51,6 +54,7 @@ class BlockLibraryViewModel @Inject constructor(
                         searchQuery = searchQuery,
                         filterLabel = filterLabel,
                         filterTemplate = filterTemplate,
+                        operationError = null,
                     )
                 )
             } catch (e: Exception) {
@@ -85,15 +89,86 @@ class BlockLibraryViewModel @Inject constructor(
     }
 
     fun deleteBlock(blockId: String) {
+        deleteBlock(blockId) {}
+    }
+
+    fun deleteBlock(blockId: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
             try {
                 blockRepository.deleteBlock(blockId)
                 loadBlocks()
+                onSuccess()
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(
-                    mapErrorToUserMessage(e, "Failed to delete block")
-                )
+                reportOperationError(mapErrorToUserMessage(e, "Failed to delete block"))
             }
+        }
+    }
+
+    fun createBlock(label: String, value: String, description: String, limit: Int?) {
+        createBlock(label, value, description, limit) {}
+    }
+
+    fun createBlock(label: String, value: String, description: String, limit: Int?, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            try {
+                blockRepository.createBlock(
+                    BlockCreateParams(
+                        label = label.trim(),
+                        value = value,
+                        description = description.ifBlank { null },
+                        limit = limit,
+                    )
+                )
+                loadBlocks()
+                onSuccess()
+            } catch (e: Exception) {
+                reportOperationError(mapErrorToUserMessage(e, "Failed to create block"))
+            }
+        }
+    }
+
+    fun updateBlock(blockId: String, value: String, description: String, limit: Int?) {
+        updateGlobalBlock(blockId, value, description, limit) {}
+    }
+
+    fun updateGlobalBlock(
+        blockId: String,
+        value: String,
+        description: String,
+        limit: Int?,
+        onSuccess: () -> Unit,
+    ) {
+        viewModelScope.launch {
+            try {
+                blockRepository.updateGlobalBlock(
+                    blockId,
+                    BlockUpdateParams(
+                        value = value,
+                        description = description.ifBlank { null },
+                        limit = limit,
+                    ),
+                    clearDescription = description.isBlank(),
+                    clearLimit = limit == null,
+                )
+                loadBlocks()
+                onSuccess()
+            } catch (e: Exception) {
+                reportOperationError(mapErrorToUserMessage(e, "Failed to update block"))
+            }
+        }
+    }
+
+    fun clearOperationError() {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(currentState.copy(operationError = null))
+    }
+
+    private fun reportOperationError(message: String) {
+        val currentState = (_uiState.value as? UiState.Success)?.data
+        if (currentState != null) {
+            _uiState.value = UiState.Success(currentState.copy(operationError = message))
+        } else {
+            _uiState.value = UiState.Error(message)
         }
     }
 }

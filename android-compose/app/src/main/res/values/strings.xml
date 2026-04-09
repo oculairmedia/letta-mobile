@@ -209,8 +209,12 @@
     <string name="screen_blocks_empty_search">No blocks matching “%1$s”</string>
     <string name="screen_blocks_delete_title">Delete Block</string>
     <string name="screen_blocks_delete_confirm">Delete %1$s? This action cannot be undone.</string>
+    <string name="screen_blocks_create_title">Create Block</string>
+    <string name="screen_blocks_edit_title">Edit Block</string>
+    <string name="screen_blocks_global_edit_notice">Changes here update the reusable block itself and can affect every agent attached to it.</string>
     <string name="screen_blocks_limit_chip">Limit %1$d</string>
     <string name="screen_blocks_limit_label">Character limit: %1$d</string>
+    <string name="screen_blocks_limit_input_label">Character Limit</string>
     <string name="screen_blocks_created_label">Created: %1$s</string>
     <string name="screen_blocks_updated_label">Updated: %1$s</string>
     <string name="screen_models_title">Models</string>
