@@ -114,7 +114,7 @@ private fun SettingsContent(
             style = MaterialTheme.typography.bodyMedium
         )
 
-        Divider()
+        HorizontalDivider()
 
         Text(
             text = stringResource(R.string.screen_settings_temperature_value, state.temperature),
@@ -164,7 +164,7 @@ private fun SettingsContent(
             )
         }
 
-        Divider()
+        HorizontalDivider()
 
         Text(
             text = stringResource(R.string.screen_agent_memory_blocks_section),
@@ -187,7 +187,7 @@ private fun SettingsContent(
             minLines = 3
         )
 
-        Divider()
+        HorizontalDivider()
 
         Text(
             text = stringResource(R.string.common_system_prompt),
@@ -202,7 +202,7 @@ private fun SettingsContent(
             minLines = 5
         )
 
-        Divider()
+        HorizontalDivider()
 
         Text(
             text = stringResource(R.string.common_tags),

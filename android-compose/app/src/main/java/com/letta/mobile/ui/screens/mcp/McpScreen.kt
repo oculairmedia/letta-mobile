@@ -20,7 +20,6 @@ import com.letta.mobile.R
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
-import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.components.ShimmerCard
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -270,7 +269,7 @@ private fun ServerCard(
 
             if (expanded && server.tools.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Divider()
+                HorizontalDivider()
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "Tools (${server.tools.size})",
