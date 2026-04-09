@@ -104,7 +104,7 @@ fun EditAgentScreen(
                 onEmbeddingChange = { viewModel.updateEmbedding(it) },
                 onLoadModels = { viewModel.loadModels() },
                 onBlockValueChange = { label, value -> viewModel.updateBlockValue(label, value) },
-                onAddBlock = { label, value -> viewModel.addBlock(label, value) },
+                onAddBlock = { label, value, description, limit -> viewModel.addBlock(label, value, description, limit) },
                 onDeleteBlock = { viewModel.deleteBlock(it) },
                 onAddTag = { viewModel.addTag(it) },
                 onRemoveTag = { viewModel.removeTag(it) },
@@ -132,7 +132,7 @@ private fun EditAgentContent(
     onEmbeddingChange: (String) -> Unit,
     onLoadModels: () -> Unit,
     onBlockValueChange: (String, String) -> Unit,
-    onAddBlock: (String, String) -> Unit,
+    onAddBlock: (String, String, String, Int?) -> Unit,
     onDeleteBlock: (String) -> Unit,
     onAddTag: (String) -> Unit,
     onRemoveTag: (String) -> Unit,
@@ -306,6 +306,39 @@ private fun EditAgentContent(
                             { Text("${block.value.length}/$limit chars") }
                         },
                     )
+                    if (!block.description.isNullOrBlank() || block.isTemplate || block.readOnly) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            block.description?.takeIf { it.isNotBlank() }?.let { description ->
+                                Text(
+                                    text = description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                if (block.isTemplate) {
+                                    InputChip(
+                                        selected = false,
+                                        onClick = {},
+                                        label = { Text("Template") },
+                                    )
+                                }
+                                if (block.readOnly) {
+                                    InputChip(
+                                        selected = false,
+                                        onClick = {},
+                                        label = { Text("Read only") },
+                                    )
+                                }
+                            }
+                        }
+                    }
                     if (showDeleteConfirm) {
                         AlertDialog(
                             onDismissRequest = { showDeleteConfirm = false },
@@ -337,6 +370,8 @@ private fun EditAgentContent(
         if (showAddBlockDialog) {
             var newLabel by remember { mutableStateOf("") }
             var newValue by remember { mutableStateOf("") }
+            var newDescription by remember { mutableStateOf("") }
+            var newLimit by remember { mutableStateOf("") }
             AlertDialog(
                 onDismissRequest = { showAddBlockDialog = false },
                 title = { Text("Add Memory Block") },
@@ -356,11 +391,32 @@ private fun EditAgentContent(
                             minLines = 3,
                             modifier = Modifier.fillMaxWidth(),
                         )
+                        OutlinedTextField(
+                            value = newDescription,
+                            onValueChange = { newDescription = it },
+                            label = { Text("Description") },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 2,
+                        )
+                        OutlinedTextField(
+                            value = newLimit,
+                            onValueChange = { value ->
+                                if (value.isBlank() || value.toIntOrNull() != null) {
+                                    newLimit = value
+                                }
+                            },
+                            label = { Text("Character limit") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                        )
                     }
                 },
                 confirmButton = {
                     TextButton(
-                        onClick = { onAddBlock(newLabel, newValue); showAddBlockDialog = false },
+                        onClick = {
+                            onAddBlock(newLabel, newValue, newDescription, newLimit.toIntOrNull())
+                            showAddBlockDialog = false
+                        },
                         enabled = newLabel.isNotBlank(),
                     ) { Text(stringResource(R.string.action_create)) }
                 },
