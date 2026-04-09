@@ -10,9 +10,11 @@ import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.StreamState
 import com.letta.mobile.testutil.TestData
+import io.mockk.coEvery
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -29,17 +31,36 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModelTest {
 
-    private lateinit var fakeMessageRepo: FakeMessageRepository
-    private lateinit var fakeAgentRepo: FakeAgentRepository
-    private lateinit var fakeConversationRepo: FakeConversationRepository
+    private lateinit var messageRepository: MessageRepository
+    private lateinit var agentRepository: AgentRepository
+    private lateinit var conversationRepository: ConversationRepository
     private val testDispatcher = UnconfinedTestDispatcher()
+    private var messages: List<AppMessage> = emptyList()
+    private var streamStates: List<StreamState> = emptyList()
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        fakeMessageRepo = FakeMessageRepository()
-        fakeAgentRepo = FakeAgentRepository()
-        fakeConversationRepo = FakeConversationRepository()
+        messageRepository = mockk(relaxed = true)
+        agentRepository = mockk(relaxed = true)
+        conversationRepository = mockk(relaxed = true)
+
+        every { messageRepository.getMessages(any(), any()) } answers { flowOf(messages) }
+        coEvery { messageRepository.fetchMessages(any(), any()) } answers { messages }
+        every { messageRepository.sendMessage(any(), any(), any()) } answers {
+            flow {
+                streamStates.forEach { emit(it) }
+            }
+        }
+        every { agentRepository.getAgent(any()) } returns flowOf(TestData.agent(id = "agent-1", name = "Test Agent"))
+        every { conversationRepository.getConversations(any()) } answers {
+            flowOf(listOf(TestData.conversation(id = "conv-1", agentId = firstArg())))
+        }
+        coEvery { conversationRepository.refreshConversations(any()) } returns Unit
+        coEvery { conversationRepository.createConversation(any(), any()) } answers {
+            TestData.conversation(id = "new-conv", agentId = firstArg(), summary = secondArg())
+        }
+        coEvery { conversationRepository.updateConversation(any(), any(), any()) } returns Unit
     }
 
     @After
@@ -55,16 +76,15 @@ class ChatViewModelTest {
             set("agentId", agentId)
             conversationId?.let { set("conversationId", it) }
         }
-        return ChatViewModel(savedState, fakeMessageRepo, fakeAgentRepo, fakeConversationRepo)
+        return ChatViewModel(savedState, messageRepository, agentRepository, conversationRepository)
     }
 
     @Test
     fun `loadMessages populates messages and agent name`() = runTest {
-        fakeAgentRepo.setAgent(TestData.agent(id = "agent-1", name = "Test Agent"))
-        fakeMessageRepo.setMessages(listOf(
+        messages = listOf(
             TestData.appMessage(id = "1", messageType = MessageType.USER, content = "Hello"),
             TestData.appMessage(id = "2", messageType = MessageType.ASSISTANT, content = "Hi"),
-        ))
+        )
 
         val vm = createViewModel()
         val state = vm.uiState.value
@@ -76,7 +96,7 @@ class ChatViewModelTest {
 
     @Test
     fun `loadMessages sets error on failure`() = runTest {
-        fakeAgentRepo.shouldFail = true
+        every { agentRepository.getAgent(any()) } returns flow { throw Exception("Failed to load agent") }
 
         val vm = createViewModel()
         val state = vm.uiState.value
@@ -86,9 +106,8 @@ class ChatViewModelTest {
 
     @Test
     fun `sendMessage shows user message immediately`() = runTest {
-        fakeAgentRepo.setAgent(TestData.agent(id = "agent-1", name = "Agent"))
-        fakeMessageRepo.setMessages(emptyList())
-        fakeMessageRepo.setStreamStates(listOf(StreamState.Sending))
+        messages = emptyList()
+        streamStates = listOf(StreamState.Sending)
 
         val vm = createViewModel()
         vm.sendMessage("Hello agent")
@@ -107,9 +126,8 @@ class ChatViewModelTest {
             TestData.appMessage(id = "3", messageType = MessageType.ASSISTANT, content = "Second answer"),
         )
 
-        fakeAgentRepo.setAgent(TestData.agent(id = "agent-1", name = "Agent"))
-        fakeMessageRepo.setMessages(existingMessages)
-        fakeMessageRepo.setStreamStates(listOf(StreamState.Complete(streamResponse)))
+        messages = existingMessages
+        streamStates = listOf(StreamState.Complete(streamResponse))
 
         val vm = createViewModel()
         assertEquals(2, vm.uiState.value.messages.size)
@@ -134,9 +152,8 @@ class ChatViewModelTest {
             TestData.appMessage(id = "new-1", messageType = MessageType.ASSISTANT, content = "New partial"),
         )
 
-        fakeAgentRepo.setAgent(TestData.agent(id = "agent-1", name = "Agent"))
-        fakeMessageRepo.setMessages(history)
-        fakeMessageRepo.setStreamStates(listOf(StreamState.Streaming(streamChunk)))
+        messages = history
+        streamStates = listOf(StreamState.Streaming(streamChunk))
 
         val vm = createViewModel()
         assertEquals(2, vm.uiState.value.messages.size)
@@ -153,29 +170,25 @@ class ChatViewModelTest {
 
     @Test
     fun `sendMessage clears input and sets streaming`() = runTest {
-        fakeAgentRepo.setAgent(TestData.agent(id = "agent-1", name = "Agent"))
-        fakeMessageRepo.setMessages(emptyList())
-        fakeMessageRepo.setStreamStates(listOf(StreamState.Sending))
+        messages = emptyList()
+        streamStates = listOf(StreamState.Sending)
 
         val vm = createViewModel()
         vm.updateInputText("Hello")
         vm.sendMessage("Hello")
 
-        assertEquals("", vm.uiState.value.inputText)
+        assertEquals("", vm.inputText.value)
         assertTrue(vm.uiState.value.isStreaming)
     }
 
     @Test
     fun `updateInputText only changes input field`() = runTest {
-        fakeAgentRepo.setAgent(TestData.agent(id = "agent-1", name = "Agent"))
-        fakeMessageRepo.setMessages(listOf(
-            TestData.appMessage(id = "1", messageType = MessageType.USER, content = "Msg"),
-        ))
+        messages = listOf(TestData.appMessage(id = "1", messageType = MessageType.USER, content = "Msg"))
 
         val vm = createViewModel()
         vm.updateInputText("typing...")
 
-        assertEquals("typing...", vm.uiState.value.inputText)
+        assertEquals("typing...", vm.inputText.value)
         assertEquals(1, vm.uiState.value.messages.size)
     }
 
@@ -183,41 +196,5 @@ class ChatViewModelTest {
     fun `blank agentId sets error`() = runTest {
         val vm = createViewModel(agentId = "")
         assertTrue(vm.uiState.value.error != null)
-    }
-
-    private class FakeMessageRepository : MessageRepository(null!!, null!!) {
-        private var messages: List<AppMessage> = emptyList()
-        private var streamStates: List<StreamState> = emptyList()
-
-        fun setMessages(list: List<AppMessage>) { messages = list }
-        fun setStreamStates(states: List<StreamState>) { streamStates = states }
-
-        override fun getMessages(agentId: String, conversationId: String?): Flow<List<AppMessage>> = flowOf(messages)
-        override fun sendMessage(agentId: String, text: String, conversationId: String?): Flow<StreamState> = flow {
-            streamStates.forEach { emit(it) }
-        }
-        override suspend fun fetchMessages(agentId: String, conversationId: String?): List<AppMessage> = messages
-    }
-
-    private class FakeAgentRepository : AgentRepository(null!!, null!!) {
-        private var agent: Agent? = null
-        var shouldFail = false
-
-        fun setAgent(a: Agent) { agent = a }
-
-        override fun getAgent(id: String): Flow<Agent> {
-            if (shouldFail || agent == null) return flow { throw Exception("Failed to load agent") }
-            return flowOf(agent!!)
-        }
-    }
-
-    private class FakeConversationRepository : ConversationRepository(null!!) {
-        override fun getConversations(agentId: String): Flow<List<Conversation>> = flowOf(listOf(
-            TestData.conversation(id = "conv-1", agentId = agentId)
-        ))
-        override suspend fun refreshConversations(agentId: String) {}
-        override suspend fun createConversation(agentId: String, summary: String?): Conversation =
-            TestData.conversation(id = "new-conv", agentId = agentId, summary = summary)
-        override suspend fun updateConversation(id: String, agentId: String, summary: String) {}
     }
 }
