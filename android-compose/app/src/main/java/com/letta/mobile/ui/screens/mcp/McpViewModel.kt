@@ -19,11 +19,19 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @androidx.compose.runtime.Immutable
+data class McpServerCheckState(
+    val isChecking: Boolean = false,
+    val isReachable: Boolean? = null,
+    val message: String? = null,
+)
+
+@androidx.compose.runtime.Immutable
 data class McpUiState(
     val selectedTab: Int = 0,
     val servers: List<McpServer> = emptyList(),
     val allTools: List<Tool> = emptyList(),
-    val serverTools: Map<String, List<Tool>> = emptyMap()
+    val serverTools: Map<String, List<Tool>> = emptyMap(),
+    val serverChecks: Map<String, McpServerCheckState> = emptyMap(),
 )
 
 @HiltViewModel
@@ -41,6 +49,7 @@ class McpViewModel @Inject constructor(
 
     fun loadData() {
         viewModelScope.launch {
+            val currentChecks = (_uiState.value as? UiState.Success)?.data?.serverChecks.orEmpty()
             _uiState.value = UiState.Loading
             try {
                 mcpServerRepository.refreshServers()
@@ -60,7 +69,8 @@ class McpViewModel @Inject constructor(
                     McpUiState(
                         servers = servers,
                         allTools = allTools,
-                        serverTools = serverToolsMap
+                        serverTools = serverToolsMap,
+                        serverChecks = currentChecks,
                     )
                 )
             } catch (e: Exception) {
@@ -112,6 +122,51 @@ class McpViewModel @Inject constructor(
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(
                     mapErrorToUserMessage(e, "Failed to update server")
+                )
+            }
+        }
+    }
+
+    fun refreshAll() {
+        loadData()
+    }
+
+    fun checkServer(serverId: String) {
+        viewModelScope.launch {
+            val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
+            _uiState.value = UiState.Success(
+                current.copy(
+                    serverChecks = current.serverChecks + (serverId to McpServerCheckState(isChecking = true))
+                )
+            )
+            try {
+                mcpServerRepository.refreshServerTools(serverId)
+                val tools = mcpServerRepository.getServerTools(serverId).first()
+                val updated = (_uiState.value as? UiState.Success)?.data ?: return@launch
+                _uiState.value = UiState.Success(
+                    updated.copy(
+                        serverTools = updated.serverTools + (serverId to tools),
+                        serverChecks = updated.serverChecks + (
+                            serverId to McpServerCheckState(
+                                isChecking = false,
+                                isReachable = true,
+                                message = if (tools.isEmpty()) "No tools discovered" else "${tools.size} tools discovered",
+                            )
+                        ),
+                    )
+                )
+            } catch (e: Exception) {
+                val updated = (_uiState.value as? UiState.Success)?.data ?: return@launch
+                _uiState.value = UiState.Success(
+                    updated.copy(
+                        serverChecks = updated.serverChecks + (
+                            serverId to McpServerCheckState(
+                                isChecking = false,
+                                isReachable = false,
+                                message = mapErrorToUserMessage(e, "Failed to refresh discovered tools"),
+                            )
+                        )
+                    )
                 )
             }
         }

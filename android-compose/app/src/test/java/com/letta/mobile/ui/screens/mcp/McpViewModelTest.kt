@@ -143,11 +143,43 @@ class McpViewModelTest {
         }
     }
 
+    @Test
+    fun `checkServer marks server reachable on success`() = runTest {
+        val server = TestData.mcpServer(id = "s1")
+        fakeMcpRepo.setServers(listOf(server))
+        fakeMcpRepo.setServerTools("s1", listOf(TestData.tool(id = "t1")))
+        viewModel.loadData()
+
+        viewModel.checkServer("s1")
+
+        viewModel.uiState.test {
+            val state = awaitItem() as UiState.Success
+            assertTrue(state.data.serverChecks["s1"]?.isReachable == true)
+        }
+    }
+
+    @Test
+    fun `checkServer marks server unreachable on failure`() = runTest {
+        val server = TestData.mcpServer(id = "s1")
+        fakeMcpRepo.setServers(listOf(server))
+        viewModel.loadData()
+
+        fakeMcpRepo.failServerChecks = true
+
+        viewModel.checkServer("s1")
+
+        viewModel.uiState.test {
+            val state = awaitItem() as UiState.Success
+            assertTrue(state.data.serverChecks["s1"]?.isReachable == false)
+        }
+    }
+
     private class FakeMcpRepo : McpServerRepository(FakeMcpServerApi()) {
         private val _servers = MutableStateFlow<List<McpServer>>(emptyList())
         private val _toolsByServer = MutableStateFlow<Map<String, List<Tool>>>(emptyMap())
         override val servers: StateFlow<List<McpServer>> = _servers.asStateFlow()
         var shouldFail = false
+        var failServerChecks = false
         val deleteCalls = mutableListOf<String>()
         val createCalls = mutableListOf<String>()
         val updateCalls = mutableListOf<String>()
@@ -159,7 +191,9 @@ class McpViewModelTest {
             }
         }
         override suspend fun refreshServers() { if (shouldFail) throw Exception("Failed") }
-        override suspend fun refreshServerTools(serverId: String) {}
+        override suspend fun refreshServerTools(serverId: String) {
+            if (failServerChecks) throw Exception("check failed")
+        }
         override fun getServerTools(serverId: String): Flow<List<Tool>> {
             return _toolsByServer.map { it[serverId] ?: emptyList() }
         }

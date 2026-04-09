@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -108,6 +109,11 @@ fun McpScreen(
                         Icon(Icons.Default.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
+                actions = {
+                    IconButton(onClick = { viewModel.refreshAll() }) {
+                        Icon(Icons.Default.Refresh, stringResource(R.string.action_refresh))
+                    }
+                },
             )
         },
         floatingActionButton = {
@@ -139,6 +145,7 @@ fun McpScreen(
                     editingServer = it
                     showServerDialog = true
                 },
+                onCheckServer = viewModel::checkServer,
                 modifier = Modifier.padding(paddingValues),
             )
         }
@@ -171,6 +178,7 @@ private fun McpContent(
     onTabSelected: (Int) -> Unit,
     onDeleteServer: (McpServer) -> Unit,
     onEditServer: (McpServer) -> Unit,
+    onCheckServer: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -192,8 +200,10 @@ private fun McpContent(
             1 -> ServersTab(
                 servers = state.servers,
                 serverTools = state.serverTools,
+                serverChecks = state.serverChecks,
                 onDeleteServer = onDeleteServer,
                 onEditServer = onEditServer,
+                onCheckServer = onCheckServer,
             )
         }
     }
@@ -227,8 +237,10 @@ private fun ToolsTab(
 private fun ServersTab(
     servers: List<McpServer>,
     serverTools: Map<String, List<Tool>>,
+    serverChecks: Map<String, McpServerCheckState>,
     onDeleteServer: (McpServer) -> Unit,
     onEditServer: (McpServer) -> Unit,
+    onCheckServer: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (servers.isEmpty()) {
@@ -247,8 +259,10 @@ private fun ServersTab(
                 ServerCard(
                     server = server,
                     tools = serverTools[server.id] ?: emptyList(),
+                    checkState = serverChecks[server.id],
                     onEdit = { onEditServer(server) },
                     onDelete = { onDeleteServer(server) },
+                    onCheck = { onCheckServer(server.id) },
                 )
             }
         }
@@ -307,8 +321,10 @@ private fun ToolCard(
 private fun ServerCard(
     server: McpServer,
     tools: List<Tool>,
+    checkState: McpServerCheckState?,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onCheck: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -401,9 +417,37 @@ private fun ServerCard(
                             color = MaterialTheme.colorScheme.primary,
                         )
                     }
+
+                    Text(
+                        text = when {
+                            checkState?.isChecking == true -> stringResource(R.string.screen_mcp_server_checking)
+                            checkState?.isReachable == true -> stringResource(R.string.screen_mcp_server_reachable)
+                            checkState?.isReachable == false -> stringResource(R.string.screen_mcp_server_unreachable)
+                            else -> stringResource(R.string.screen_mcp_server_unchecked)
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = when (checkState?.isReachable) {
+                            true -> MaterialTheme.colorScheme.primary
+                            false -> MaterialTheme.colorScheme.error
+                            null -> MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                    checkState?.message?.let { message ->
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
 
                 Row {
+                    IconButton(onClick = onCheck) {
+                        Icon(Icons.Default.Refresh, stringResource(R.string.action_check))
+                    }
                     IconButton(onClick = onEdit) {
                         Icon(Icons.Default.Edit, stringResource(R.string.action_edit))
                     }

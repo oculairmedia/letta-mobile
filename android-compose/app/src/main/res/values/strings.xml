@@ -11,6 +11,8 @@
     <string name="common_templates">Templates</string>
     
     <string name="action_search">Search</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="action_check">Check</string>
     <string name="screen_agents_search_hint">Search agents…</string>
     <string name="action_create">Create</string>
     <string name="action_delete">Delete</string>
@@ -139,6 +141,10 @@
     <string name="screen_mcp_server_created">Created: %1$s</string>
     <string name="screen_mcp_server_tools_count">%1$d discovered tools</string>
     <string name="screen_mcp_server_discovered_tools">Discovered Tools</string>
+    <string name="screen_mcp_server_unchecked">Unchecked</string>
+    <string name="screen_mcp_server_checking">Checking…</string>
+    <string name="screen_mcp_server_reachable">Reachable</string>
+    <string name="screen_mcp_server_unreachable">Unreachable</string>
     <string name="screen_tools_empty_attached">No tools attached</string>
     <string name="screen_blocks_empty_available">No reusable blocks available</string>
     <string name="screen_settings_model_section">Model Settings</string>
