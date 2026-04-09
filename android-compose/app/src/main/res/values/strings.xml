@@ -297,6 +297,9 @@
     <string name="screen_tool_detail_delete_confirm">Delete %1$s? This action cannot be undone.</string>
     <string name="screen_tool_detail_read_only">Inspect only</string>
     <string name="screen_tool_detail_editable">Editable custom tool</string>
+    <string name="screen_tool_detail_attach_action">Attach to Agents</string>
+    <string name="screen_tool_detail_no_attached_agents">No agents attached</string>
+    <string name="screen_tool_detail_no_available_agents">No available agents to attach</string>
     <string name="screen_tool_detail_tags_label">Tags (comma separated)</string>
     <string name="screen_tool_detail_edit_action">Edit tool</string>
     <string name="screen_tool_detail_delete_action">Delete tool</string>

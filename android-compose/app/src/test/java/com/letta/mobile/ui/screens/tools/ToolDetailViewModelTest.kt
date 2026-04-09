@@ -2,7 +2,10 @@ package com.letta.mobile.ui.screens.tools
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.ToolRepository
+import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeToolApi
 import com.letta.mobile.testutil.TestData
 import com.letta.mobile.ui.common.UiState
@@ -23,6 +26,7 @@ class ToolDetailViewModelTest {
 
     private lateinit var fakeToolApi: FakeToolApi
     private lateinit var toolRepository: ToolRepository
+    private lateinit var agentRepository: AgentRepository
     private val testDispatcher = UnconfinedTestDispatcher()
 
     @Before
@@ -30,6 +34,7 @@ class ToolDetailViewModelTest {
         Dispatchers.setMain(testDispatcher)
         fakeToolApi = FakeToolApi()
         toolRepository = ToolRepository(fakeToolApi)
+        agentRepository = FakeAgentRepository()
     }
 
     @After
@@ -40,7 +45,7 @@ class ToolDetailViewModelTest {
         val tool = TestData.tool(id = "t1", name = "my_tool", description = "Does things")
         fakeToolApi.tools.add(tool.copy(toolType = "custom", sourceCode = "def my_tool():\n    return 'ok'"))
         val savedState = SavedStateHandle(mapOf("toolId" to "t1"))
-        val viewModel = ToolDetailViewModel(savedState, fakeToolApi, toolRepository)
+        val viewModel = ToolDetailViewModel(savedState, fakeToolApi, toolRepository, agentRepository)
         viewModel.uiState.test {
             val state = awaitItem() as UiState.Success
             assertEquals("my_tool", state.data.name)
@@ -52,14 +57,14 @@ class ToolDetailViewModelTest {
     fun `loadTool sets Error on failure`() = runTest {
         fakeToolApi.shouldFail = true
         val savedState = SavedStateHandle(mapOf("toolId" to "t1"))
-        val viewModel = ToolDetailViewModel(savedState, fakeToolApi, toolRepository)
+        val viewModel = ToolDetailViewModel(savedState, fakeToolApi, toolRepository, agentRepository)
         viewModel.uiState.test { assertTrue(awaitItem() is UiState.Error) }
     }
 
     @Test
     fun `loadTool sets Error for missing tool`() = runTest {
         val savedState = SavedStateHandle(mapOf("toolId" to "nonexistent"))
-        val viewModel = ToolDetailViewModel(savedState, fakeToolApi, toolRepository)
+        val viewModel = ToolDetailViewModel(savedState, fakeToolApi, toolRepository, agentRepository)
         viewModel.uiState.test { assertTrue(awaitItem() is UiState.Error) }
     }
 
@@ -72,7 +77,7 @@ class ToolDetailViewModelTest {
             )
         )
         val savedState = SavedStateHandle(mapOf("toolId" to "t1"))
-        val viewModel = ToolDetailViewModel(savedState, fakeToolApi, toolRepository)
+        val viewModel = ToolDetailViewModel(savedState, fakeToolApi, toolRepository, agentRepository)
 
         viewModel.updateTool(
             name = "my_tool_v2",
@@ -95,7 +100,7 @@ class ToolDetailViewModelTest {
             TestData.tool(id = "t1", name = "my_tool").copy(toolType = "custom", sourceCode = "def my_tool():\n    return 'ok'")
         )
         val savedState = SavedStateHandle(mapOf("toolId" to "t1"))
-        val viewModel = ToolDetailViewModel(savedState, fakeToolApi, toolRepository)
+        val viewModel = ToolDetailViewModel(savedState, fakeToolApi, toolRepository, agentRepository)
 
         viewModel.deleteTool()
 
@@ -109,7 +114,7 @@ class ToolDetailViewModelTest {
     fun `deleteTool sets error on failure`() = runTest {
         fakeToolApi.shouldFail = true
         val savedState = SavedStateHandle(mapOf("toolId" to "t1"))
-        val viewModel = ToolDetailViewModel(savedState, fakeToolApi, toolRepository)
+        val viewModel = ToolDetailViewModel(savedState, fakeToolApi, toolRepository, agentRepository)
 
         viewModel.deleteTool()
 
@@ -117,5 +122,58 @@ class ToolDetailViewModelTest {
             awaitItem()
             assertTrue(awaitItem() is UiState.Error)
         }
+    }
+
+    @Test
+    fun `attachToAgent delegates to repository`() = runTest {
+        fakeToolApi.tools.add(TestData.tool(id = "t1", name = "my_tool"))
+        val savedState = SavedStateHandle(mapOf("toolId" to "t1"))
+        val toolRepo = FakeToolRepository(fakeToolApi)
+        val viewModel = ToolDetailViewModel(savedState, fakeToolApi, toolRepo, agentRepository)
+
+        viewModel.attachToAgent("a1")
+
+        assertEquals(listOf("a1"), toolRepo.attachedAgents)
+    }
+
+    @Test
+    fun `detachFromAgent delegates to repository`() = runTest {
+        fakeToolApi.tools.add(TestData.tool(id = "t1", name = "my_tool"))
+        val savedState = SavedStateHandle(mapOf("toolId" to "t1"))
+        val toolRepo = FakeToolRepository(fakeToolApi)
+        val viewModel = ToolDetailViewModel(savedState, fakeToolApi, toolRepo, agentRepository)
+
+        viewModel.detachFromAgent("a1")
+
+        assertEquals(listOf("a1"), toolRepo.detachedAgents)
+    }
+
+    private class FakeToolRepository(api: FakeToolApi) : ToolRepository(api) {
+        val attachedAgents = mutableListOf<String>()
+        val detachedAgents = mutableListOf<String>()
+
+        override suspend fun attachTool(agentId: String, toolId: String) {
+            attachedAgents.add(agentId)
+        }
+
+        override suspend fun detachTool(agentId: String, toolId: String) {
+            detachedAgents.add(agentId)
+        }
+    }
+
+    private class FakeAgentRepository : AgentRepository(FakeAgentApi()) {
+        private val agentsFlow = kotlinx.coroutines.flow.MutableStateFlow(
+            listOf(
+                Agent(id = "a1", name = "Agent One", tools = listOf(TestData.tool(id = "t1", name = "my_tool"))),
+                Agent(id = "a2", name = "Agent Two", tools = emptyList()),
+            )
+        )
+
+        override val agents = agentsFlow
+        override suspend fun refreshAgents() {}
+        override fun getAgent(id: String) = kotlinx.coroutines.flow.flow { emit(agentsFlow.value.first { it.id == id }) }
+        override suspend fun createAgent(params: com.letta.mobile.data.model.AgentCreateParams) = agentsFlow.value.first()
+        override suspend fun updateAgent(id: String, params: com.letta.mobile.data.model.AgentUpdateParams) = agentsFlow.value.first { it.id == id }
+        override suspend fun deleteAgent(id: String) {}
     }
 }

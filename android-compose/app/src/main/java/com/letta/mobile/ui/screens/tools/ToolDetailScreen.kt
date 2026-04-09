@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Build
@@ -65,9 +66,11 @@ fun ToolDetailScreen(
     viewModel: ToolDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val agentState by viewModel.agentState.collectAsStateWithLifecycle()
     val deleteState by viewModel.deleteState.collectAsStateWithLifecycle()
     var showEditDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showAttachDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(deleteState) {
         if (deleteState is UiState.Success) {
@@ -90,12 +93,17 @@ fun ToolDetailScreen(
                 },
                 actions = {
                     val tool = (uiState as? UiState.Success)?.data
-                    if (tool != null && isEditableTool(tool)) {
-                        IconButton(onClick = { showEditDialog = true }) {
-                            Icon(Icons.Default.Edit, stringResource(R.string.screen_tool_detail_edit_action))
+                    if (tool != null) {
+                        IconButton(onClick = { showAttachDialog = true }) {
+                            Icon(Icons.Default.Build, stringResource(R.string.screen_tool_detail_attach_action))
                         }
-                        IconButton(onClick = { showDeleteDialog = true }) {
-                            Icon(Icons.Default.Delete, stringResource(R.string.screen_tool_detail_delete_action))
+                        if (isEditableTool(tool)) {
+                            IconButton(onClick = { showEditDialog = true }) {
+                                Icon(Icons.Default.Edit, stringResource(R.string.screen_tool_detail_edit_action))
+                            }
+                            IconButton(onClick = { showDeleteDialog = true }) {
+                                Icon(Icons.Default.Delete, stringResource(R.string.screen_tool_detail_delete_action))
+                            }
                         }
                     }
                 },
@@ -115,6 +123,8 @@ fun ToolDetailScreen(
             )
             is UiState.Success -> ToolDetailContent(
                 tool = state.data,
+                attachedAgents = agentState.attachedAgents,
+                onDetachAgent = viewModel::detachFromAgent,
                 modifier = Modifier.padding(paddingValues),
             )
         }
@@ -143,6 +153,17 @@ fun ToolDetailScreen(
         )
     }
 
+    if (showAttachDialog) {
+        AgentAttachDialog(
+            agents = agentState.availableAgents,
+            onDismiss = { showAttachDialog = false },
+            onAttach = { selectedIds ->
+                selectedIds.forEach(viewModel::attachToAgent)
+                showAttachDialog = false
+            },
+        )
+    }
+
     val deleteError = (deleteState as? UiState.Error)?.message
     if (deleteError != null) {
         AlertDialog(
@@ -162,6 +183,8 @@ fun ToolDetailScreen(
 @Composable
 private fun ToolDetailContent(
     tool: Tool,
+    attachedAgents: List<com.letta.mobile.data.model.Agent>,
+    onDetachAgent: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -262,6 +285,36 @@ private fun ToolDetailContent(
             }
         }
 
+        item {
+            HorizontalDivider()
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.common_agents),
+                style = MaterialTheme.typography.labelLarge,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            if (attachedAgents.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.screen_tool_detail_no_attached_agents),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                attachedAgents.forEach { agent ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(agent.name, style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = { onDetachAgent(agent.id) }) {
+                            Text(stringResource(R.string.action_remove), color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+            }
+        }
+
         tool.jsonSchema?.let { schema ->
             item {
                 HorizontalDivider()
@@ -286,6 +339,52 @@ private fun ToolDetailContent(
             }
         }
     }
+}
+
+@Composable
+private fun AgentAttachDialog(
+    agents: List<com.letta.mobile.data.model.Agent>,
+    onDismiss: () -> Unit,
+    onAttach: (List<String>) -> Unit,
+) {
+    var selection by remember(agents) { mutableStateOf(emptySet<String>()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.screen_tool_detail_attach_action)) },
+        text = {
+            if (agents.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.screen_tool_detail_no_available_agents),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(agents, key = { it.id }) { agent ->
+                        TextButton(
+                            onClick = {
+                                selection = if (agent.id in selection) selection - agent.id else selection + agent.id
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(agent.name, modifier = Modifier.weight(1f))
+                            Text(if (agent.id in selection) stringResource(R.string.action_remove) else stringResource(R.string.action_attach))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onAttach(selection.toList()) }, enabled = selection.isNotEmpty()) {
+                Text(stringResource(R.string.action_attach))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        },
+    )
 }
 
 @Composable

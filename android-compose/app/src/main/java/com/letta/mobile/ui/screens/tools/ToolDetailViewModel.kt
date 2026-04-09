@@ -4,8 +4,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.api.ToolApi
+import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolUpdateParams
+import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.util.mapErrorToUserMessage
@@ -21,6 +23,7 @@ class ToolDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val toolApi: ToolApi,
     private val toolRepository: ToolRepository,
+    private val agentRepository: AgentRepository,
 ) : ViewModel() {
 
     private val toolId: String = savedStateHandle.get<String>("toolId") ?: ""
@@ -31,8 +34,12 @@ class ToolDetailViewModel @Inject constructor(
     private val _deleteState = MutableStateFlow<UiState<Unit>?>(null)
     val deleteState: StateFlow<UiState<Unit>?> = _deleteState.asStateFlow()
 
+    private val _agentState = MutableStateFlow<ToolAgentAttachmentUiState>(ToolAgentAttachmentUiState())
+    val agentState: StateFlow<ToolAgentAttachmentUiState> = _agentState.asStateFlow()
+
     init {
         loadTool()
+        loadAgentAttachments()
     }
 
     fun loadTool() {
@@ -87,4 +94,47 @@ class ToolDetailViewModel @Inject constructor(
     fun clearDeleteState() {
         _deleteState.value = null
     }
+
+    fun loadAgentAttachments() {
+        viewModelScope.launch {
+            try {
+                agentRepository.refreshAgents()
+                val agents = agentRepository.agents.value
+                _agentState.value = ToolAgentAttachmentUiState(
+                    attachedAgents = agents.filter { agent -> agent.tools?.any { it.id == toolId } == true },
+                    availableAgents = agents.filter { agent -> agent.tools?.any { it.id == toolId } != true },
+                )
+            } catch (e: Exception) {
+                _deleteState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to load agent attachments"))
+            }
+        }
+    }
+
+    fun attachToAgent(agentId: String) {
+        viewModelScope.launch {
+            try {
+                toolRepository.attachTool(agentId, toolId)
+                loadAgentAttachments()
+            } catch (e: Exception) {
+                _deleteState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to attach tool to agent"))
+            }
+        }
+    }
+
+    fun detachFromAgent(agentId: String) {
+        viewModelScope.launch {
+            try {
+                toolRepository.detachTool(agentId, toolId)
+                loadAgentAttachments()
+            } catch (e: Exception) {
+                _deleteState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to detach tool from agent"))
+            }
+        }
+    }
 }
+
+@androidx.compose.runtime.Immutable
+data class ToolAgentAttachmentUiState(
+    val attachedAgents: List<Agent> = emptyList(),
+    val availableAgents: List<Agent> = emptyList(),
+)
