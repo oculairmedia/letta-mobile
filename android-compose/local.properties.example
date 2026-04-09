@@ -1,0 +1,7 @@
+sdk.dir=/path/to/Android/Sdk
+
+# Windows example:
+# sdk.dir=C:\Users\<you>\AppData\Local\Android\Sdk
+
+# Linux example:
+# sdk.dir=/usr/lib/android-sdk
