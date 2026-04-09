@@ -9,13 +9,22 @@ class FakeBlockApi : BlockApi(null!!) {
     var blocks = mutableMapOf<String, MutableList<Block>>()
     var shouldFail = false
     val calls = mutableListOf<String>()
+    var lastUpdateParams: BlockUpdateParams? = null
 
     override suspend fun updateBlock(agentId: String, blockLabel: String, params: BlockUpdateParams): Block {
         calls.add("updateBlock:$agentId:$blockLabel")
+        lastUpdateParams = params
         if (shouldFail) throw ApiException(500, "Server error")
         val agentBlocks = blocks.getOrPut(agentId) { mutableListOf() }
         val index = agentBlocks.indexOfFirst { it.label == blockLabel }
-        val updated = TestData.block(label = blockLabel, value = params.value ?: "")
+        val existing = agentBlocks.getOrNull(index)
+        val updated = Block(
+            id = existing?.id ?: "block-${blockLabel}",
+            label = blockLabel,
+            value = params.value ?: existing?.value ?: "",
+            description = params.description ?: existing?.description,
+            limit = params.limit ?: existing?.limit,
+        )
         if (index >= 0) {
             agentBlocks[index] = updated
         } else {

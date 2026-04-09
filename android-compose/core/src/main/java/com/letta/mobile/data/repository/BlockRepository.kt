@@ -16,8 +16,7 @@ class BlockRepository @Inject constructor(
         return blockApi.listBlocks(agentId)
     }
 
-    override suspend fun updateBlock(agentId: String, blockLabel: String, value: String): Block {
-        val params = BlockUpdateParams(value = value)
+    override suspend fun updateBlock(agentId: String, blockLabel: String, params: BlockUpdateParams): Block {
         return blockApi.updateBlock(agentId, blockLabel, params)
     }
 
