@@ -261,9 +261,10 @@ private fun PassageDetailDialog(
                 passage.createdAt?.let {
                     Text(stringResource(R.string.screen_archival_created_label, it), style = MaterialTheme.typography.bodySmall)
                 }
-                if (!passage.metadata.isNullOrEmpty()) {
+                val meta = passage.metadata
+                if (!meta.isNullOrEmpty()) {
                     Text(stringResource(R.string.screen_archival_metadata_title), style = MaterialTheme.typography.labelLarge)
-                    passage.metadata.entries.forEach { (key, value) ->
+                    meta.entries.forEach { (key, value) ->
                         Text(
                             text = "$key: $value",
                             style = MaterialTheme.typography.bodySmall,
