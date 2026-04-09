@@ -16,13 +16,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.letta.mobile.data.model.ToolCreateParams
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -45,13 +42,14 @@ import com.letta.mobile.R
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.EmptyState
-import com.letta.mobile.ui.components.LoadingIndicator
+import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerGrid
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AllToolsScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToToolDetail: (String) -> Unit = {},
     viewModel: AllToolsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -76,17 +74,11 @@ fun AllToolsScreen(
     ) { paddingValues ->
         when (val state = uiState) {
             is UiState.Loading -> ShimmerGrid()
-            is UiState.Error -> Column(
-                modifier = Modifier.fillMaxSize().padding(paddingValues),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Icon(Icons.Default.Error, contentDescription = "Error", tint = MaterialTheme.colorScheme.error)
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(state.message)
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = { viewModel.loadTools() }) { Text(stringResource(R.string.action_retry)) }
-            }
+            is UiState.Error -> ErrorContent(
+                message = state.message,
+                onRetry = { viewModel.loadTools() },
+                modifier = Modifier.padding(paddingValues),
+            )
             is UiState.Success -> {
                 PullToRefreshBox(
                     isRefreshing = false,
@@ -107,7 +99,10 @@ fun AllToolsScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             items(state.data, key = { it.id }) { tool ->
-                                ToolTile(tool = tool)
+                                ToolTile(
+                                    tool = tool,
+                                    onClick = { onNavigateToToolDetail(tool.id) },
+                                )
                             }
                         }
                     }
@@ -118,11 +113,14 @@ fun AllToolsScreen(
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun ToolTile(
     tool: Tool,
+    onClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Card(
+        onClick = onClick,
         modifier = modifier.fillMaxWidth().height(100.dp),
     ) {
         Column(

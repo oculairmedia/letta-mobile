@@ -89,6 +89,10 @@
     <string name="screen_mcp_server_name_label">Server Name</string>
     <string name="action_add">Add</string>
     <string name="screen_mcp_empty">No MCP servers configured</string>
+    <string name="screen_mcp_server_command">Command:</string>
+    <string name="screen_mcp_server_created">Created %1$s</string>
+    <string name="screen_mcp_server_tools_count">%1$d tools</string>
+    <string name="screen_mcp_server_discovered_tools">Discovered Tools</string>
     <string name="screen_tools_empty_attached">No tools attached</string>
     <string name="screen_settings_model_section">Model Settings</string>
     <string name="screen_settings_no_model">No model</string>
@@ -136,4 +140,15 @@
     <string name="action_copy">Copy</string>
     <string name="action_regenerate">Regenerate</string>
     <string name="screen_models_no_models">No models available</string>
+
+    <string name="screen_mcp_server_command">Command:</string>
+    <string name="screen_mcp_server_created">Created: %1$s</string>
+    <string name="screen_mcp_server_tools_count">%1$d discovered tools</string>
+    <string name="screen_mcp_server_discovered_tools">Discovered Tools</string>
+
+    <string name="screen_tool_detail_title">Tool Detail</string>
+    <string name="screen_tool_detail_source_code">Source Code</string>
+    <string name="screen_tool_detail_json_schema">JSON Schema</string>
+    <string name="screen_tool_detail_source_type">Source Type</string>
+    <string name="screen_tool_detail_no_description">No description</string>
 </resources>

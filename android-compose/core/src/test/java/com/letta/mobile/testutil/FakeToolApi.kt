@@ -30,6 +30,12 @@ class FakeToolApi : ToolApi(null!!) {
         agentTools[agentId]?.removeAll { it.id == toolId }
     }
 
+    override suspend fun getTool(toolId: String): Tool {
+        calls.add("getTool:$toolId")
+        if (shouldFail) throw ApiException(500, "Server error")
+        return tools.find { it.id == toolId } ?: throw ApiException(404, "Not found")
+    }
+
     override suspend fun upsertTool(params: ToolCreateParams): Tool {
         calls.add("upsertTool:${params.name}")
         if (shouldFail) throw ApiException(500, "Server error")

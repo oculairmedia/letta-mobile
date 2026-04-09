@@ -24,6 +24,7 @@ import com.letta.mobile.ui.screens.mcp.McpScreen
 import com.letta.mobile.ui.screens.models.ModelBrowserScreen
 import com.letta.mobile.ui.screens.templates.TemplatesScreen
 import com.letta.mobile.ui.screens.tools.AllToolsScreen
+import com.letta.mobile.ui.screens.tools.ToolDetailScreen
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.map
@@ -187,6 +188,18 @@ fun AppNavGraph() {
 
         composable("allTools") {
             AllToolsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToToolDetail = { toolId ->
+                    navController.navigate("toolDetail/$toolId")
+                },
+            )
+        }
+
+        composable(
+            route = "toolDetail/{toolId}",
+            arguments = listOf(navArgument("toolId") { type = NavType.StringType })
+        ) {
+            ToolDetailScreen(
                 onNavigateBack = { navController.popBackStack() },
             )
         }
