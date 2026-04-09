@@ -57,8 +57,9 @@ class EditAgentViewModelTest {
         viewModel.uiState.test {
             val state = awaitItem() as UiState.Success
             assertEquals("Test Agent", state.data.name)
-            assertEquals("persona value", state.data.personaBlock)
-            assertEquals("human value", state.data.humanBlock)
+            assertEquals(2, state.data.blocks.size)
+            assertEquals("persona value", state.data.blocks.first { it.label == "persona" }.value)
+            assertEquals("human value", state.data.blocks.first { it.label == "human" }.value)
         }
     }
 
@@ -79,11 +80,12 @@ class EditAgentViewModelTest {
     }
 
     @Test
-    fun `updatePersonaBlock changes persona`() = runTest {
+    fun `updateBlockValue changes matching block`() = runTest {
         viewModel.loadAgent()
-        viewModel.updatePersonaBlock("New persona")
+        viewModel.updateBlockValue("persona", "New persona")
         viewModel.uiState.test {
-            assertEquals("New persona", (awaitItem() as UiState.Success).data.personaBlock)
+            val state = (awaitItem() as UiState.Success).data
+            assertEquals("New persona", state.blocks.first { it.label == "persona" }.value)
         }
     }
 
