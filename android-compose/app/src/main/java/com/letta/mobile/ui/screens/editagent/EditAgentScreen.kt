@@ -104,6 +104,8 @@ fun EditAgentScreen(
                 onEmbeddingChange = { viewModel.updateEmbedding(it) },
                 onLoadModels = { viewModel.loadModels() },
                 onBlockValueChange = { label, value -> viewModel.updateBlockValue(label, value) },
+                onBlockDescriptionChange = { label, value -> viewModel.updateBlockDescription(label, value) },
+                onBlockLimitChange = { label, value -> viewModel.updateBlockLimit(label, value) },
                 onAddBlock = { label, value, description, limit -> viewModel.addBlock(label, value, description, limit) },
                 onDeleteBlock = { viewModel.deleteBlock(it) },
                 onAddTag = { viewModel.addTag(it) },
@@ -132,6 +134,8 @@ private fun EditAgentContent(
     onEmbeddingChange: (String) -> Unit,
     onLoadModels: () -> Unit,
     onBlockValueChange: (String, String) -> Unit,
+    onBlockDescriptionChange: (String, String) -> Unit,
+    onBlockLimitChange: (String, Int?) -> Unit,
     onAddBlock: (String, String, String, Int?) -> Unit,
     onDeleteBlock: (String) -> Unit,
     onAddTag: (String) -> Unit,
@@ -291,51 +295,66 @@ private fun EditAgentContent(
             ) {
                 state.blocks.forEach { block ->
                     var showDeleteConfirm by remember { mutableStateOf(false) }
-                    OutlinedTextField(
-                        value = block.value,
-                        onValueChange = { onBlockValueChange(block.label, it) },
-                        label = { Text(block.label) },
-                        modifier = Modifier
+                    val editableModifier = if (block.readOnly) {
+                        Modifier.fillMaxWidth()
+                    } else {
+                        Modifier
                             .fillMaxWidth()
                             .combinedClickable(
                                 onClick = {},
                                 onLongClick = { showDeleteConfirm = true },
-                            ),
+                            )
+                    }
+
+                    OutlinedTextField(
+                        value = block.value,
+                        onValueChange = { onBlockValueChange(block.label, it) },
+                        label = { Text(block.label) },
+                        modifier = editableModifier,
                         minLines = 2,
+                        enabled = !block.readOnly,
                         supportingText = block.limit?.let { limit ->
                             { Text("${block.value.length}/$limit chars") }
                         },
                     )
-                    if (!block.description.isNullOrBlank() || block.isTemplate || block.readOnly) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                    OutlinedTextField(
+                        value = block.description.orEmpty(),
+                        onValueChange = { onBlockDescriptionChange(block.label, it) },
+                        label = { Text("Description") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        enabled = !block.readOnly,
+                    )
+                    OutlinedTextField(
+                        value = block.limit?.toString().orEmpty(),
+                        onValueChange = { value ->
+                            if (value.isBlank() || value.toIntOrNull() != null) {
+                                onBlockLimitChange(block.label, value.toIntOrNull())
+                            }
+                        },
+                        label = { Text("Character limit") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        enabled = !block.readOnly,
+                    )
+                    if (block.isTemplate || block.readOnly) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            block.description?.takeIf { it.isNotBlank() }?.let { description ->
-                                Text(
-                                    text = description,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            if (block.isTemplate) {
+                                InputChip(
+                                    selected = false,
+                                    onClick = {},
+                                    label = { Text("Template") },
                                 )
                             }
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                if (block.isTemplate) {
-                                    InputChip(
-                                        selected = false,
-                                        onClick = {},
-                                        label = { Text("Template") },
-                                    )
-                                }
-                                if (block.readOnly) {
-                                    InputChip(
-                                        selected = false,
-                                        onClick = {},
-                                        label = { Text("Read only") },
-                                    )
-                                }
+                            if (block.readOnly) {
+                                InputChip(
+                                    selected = false,
+                                    onClick = {},
+                                    label = { Text("Read only") },
+                                )
                             }
                         }
                     }
