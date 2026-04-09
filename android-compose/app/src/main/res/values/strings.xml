@@ -178,6 +178,7 @@
     <string name="screen_conversations_dialog_no_agents">No agents available. Create one first.</string>
     <string name="screen_nav_templates">Templates</string>
     <string name="screen_nav_blocks">Blocks</string>
+    <string name="screen_nav_schedules">Schedules</string>
     <string name="screen_nav_mcp_servers">MCP Servers</string>
     <string name="screen_blocks_title">Block Library</string>
     <string name="screen_blocks_search_hint">Search blocks…</string>
@@ -196,6 +197,18 @@
     <string name="screen_archival_search_hint">Search archival memory…</string>
     <string name="screen_archival_add_title">Add Passage</string>
     <string name="screen_archival_passage_label">Passage text</string>
+    <string name="screen_schedules_title">Schedules</string>
+    <string name="screen_schedules_empty">No schedules configured</string>
+    <string name="screen_schedules_add_title">Add Schedule</string>
+    <string name="screen_schedules_delete_title">Delete Schedule</string>
+    <string name="screen_schedules_delete_confirm">Delete schedule %1$s?</string>
+    <string name="screen_schedules_message_label">Message</string>
+    <string name="screen_schedules_recurring_toggle">Recurring</string>
+    <string name="screen_schedules_cron_label">Cron Expression</string>
+    <string name="screen_schedules_scheduled_at_label">Scheduled At (epoch seconds)</string>
+    <string name="screen_schedules_scheduled_at_placeholder">1700000000</string>
+    <string name="screen_schedules_one_time_label">One-time: %1$s</string>
+    <string name="screen_schedules_recurring_label">Recurring: %1$s</string>
     <string name="screen_drawer_edit_agent">Edit Agent</string>
     <string name="screen_drawer_archival">Archival Memory</string>
     <string name="screen_about_title">About</string>

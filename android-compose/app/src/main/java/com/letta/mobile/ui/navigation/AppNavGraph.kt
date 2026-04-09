@@ -23,6 +23,7 @@ import com.letta.mobile.ui.screens.conversations.ConversationsScreen
 import com.letta.mobile.ui.screens.editagent.EditAgentScreen
 import com.letta.mobile.ui.screens.mcp.McpScreen
 import com.letta.mobile.ui.screens.models.ModelBrowserScreen
+import com.letta.mobile.ui.screens.schedules.ScheduleListScreen
 import com.letta.mobile.ui.screens.templates.TemplatesScreen
 import com.letta.mobile.ui.screens.tools.AllToolsScreen
 import com.letta.mobile.ui.screens.tools.ToolDetailScreen
@@ -84,6 +85,9 @@ fun AppNavGraph() {
                 onNavigateToBlocks = {
                     navController.navigate("blocks")
                 },
+                onNavigateToSchedules = {
+                    navController.navigate("schedules")
+                },
                 onNavigateToMcp = {
                     navController.navigate("mcp")
                 },
@@ -139,6 +143,12 @@ fun AppNavGraph() {
 
         composable("blocks") {
             BlockLibraryScreen(
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+
+        composable("schedules") {
+            ScheduleListScreen(
                 onNavigateBack = { navController.popBackStack() },
             )
         }
