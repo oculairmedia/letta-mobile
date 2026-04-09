@@ -163,6 +163,7 @@ fun ConversationsScreen(
                 onConversationClick = { display ->
                     onNavigateToChat(display.conversation.agentId, display.conversation.id)
                 },
+                onOpenAdmin = { display -> viewModel.openConversationAdmin(display) },
                 onDeleteConversation = { viewModel.deleteConversation(it.conversation.id) },
                 onRenameConversation = { display, newName ->
                     viewModel.renameConversation(display.conversation.id, display.conversation.agentId, newName)
@@ -191,12 +192,27 @@ fun ConversationsScreen(
             }
         )
     }
+
+    uiState.selectedConversation?.let { display ->
+        ConversationAdminDialog(
+            display = display,
+            recompilePreview = uiState.recompilePreview,
+            onDismiss = { viewModel.closeConversationAdmin() },
+            onRename = { newName -> viewModel.renameConversation(display.conversation.id, display.conversation.agentId, newName) },
+            onToggleArchived = { archived -> viewModel.setConversationArchived(display, archived) },
+            onFork = { viewModel.forkConversation(display.conversation.id, display.conversation.agentId) { } },
+            onCancelRuns = { viewModel.cancelConversationRuns(display) },
+            onRecompile = { viewModel.recompileConversation(display) },
+            onDelete = { viewModel.deleteConversation(display.conversation.id) },
+        )
+    }
 }
 
 @Composable
 private fun ConversationsContent(
     state: ConversationsUiState,
     onConversationClick: (ConversationDisplay) -> Unit,
+    onOpenAdmin: (ConversationDisplay) -> Unit,
     onDeleteConversation: (ConversationDisplay) -> Unit,
     onRenameConversation: (ConversationDisplay, String) -> Unit,
     onForkConversation: (ConversationDisplay) -> Unit,
@@ -227,6 +243,7 @@ private fun ConversationsContent(
                     ConversationCard(
                         display = display,
                         onClick = { onConversationClick(display) },
+                    onOpenAdmin = { onOpenAdmin(display) },
                     onDelete = { onDeleteConversation(display) },
                     onRename = { newName -> onRenameConversation(display, newName) },
                     onFork = { onForkConversation(display) },
@@ -242,6 +259,7 @@ private fun ConversationsContent(
 private fun ConversationCard(
     display: ConversationDisplay,
     onClick: () -> Unit,
+    onOpenAdmin: () -> Unit,
     onDelete: () -> Unit,
     onRename: (String) -> Unit,
     onFork: () -> Unit,
@@ -312,6 +330,13 @@ private fun ConversationCard(
             onDismissRequest = { showContextMenu = false },
         ) {
             DropdownMenuItem(
+                text = { Text(stringResource(R.string.screen_conversations_admin_details)) },
+                onClick = {
+                    showContextMenu = false
+                    onOpenAdmin()
+                },
+            )
+            DropdownMenuItem(
                 text = { Text(stringResource(R.string.action_rename)) },
                 onClick = {
                     showContextMenu = false
@@ -319,7 +344,7 @@ private fun ConversationCard(
                 },
             )
             DropdownMenuItem(
-                text = { Text("Fork") },
+                text = { Text(stringResource(R.string.action_fork)) },
                 onClick = {
                     showContextMenu = false
                     onFork()
@@ -382,6 +407,76 @@ private fun ConversationCard(
             }
         )
     }
+}
+
+@Composable
+private fun ConversationAdminDialog(
+    display: ConversationDisplay,
+    recompilePreview: String?,
+    onDismiss: () -> Unit,
+    onRename: (String) -> Unit,
+    onToggleArchived: (Boolean) -> Unit,
+    onFork: () -> Unit,
+    onCancelRuns: () -> Unit,
+    onRecompile: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    var renameText by remember(display.conversation.id) { mutableStateOf(display.conversation.summary ?: "") }
+    val conversation = display.conversation
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.screen_conversations_admin_details)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(conversation.id, style = MaterialTheme.typography.titleSmall)
+                Text(display.agentName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    text = if (conversation.archived == true) stringResource(R.string.screen_conversations_archived_label)
+                    else stringResource(R.string.screen_conversations_active_label),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                conversation.createdAt?.let {
+                    Text(stringResource(R.string.screen_conversations_created_label, formatRelativeTime(it)))
+                }
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    label = { Text(stringResource(R.string.common_name)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { if (renameText.isNotBlank()) onRename(renameText) }) {
+                        Text(stringResource(R.string.action_save))
+                    }
+                    TextButton(onClick = { onToggleArchived(conversation.archived != true) }) {
+                        Text(
+                            if (conversation.archived == true) stringResource(R.string.screen_conversations_unarchive_action)
+                            else stringResource(R.string.screen_conversations_archive_action)
+                        )
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onFork) { Text(stringResource(R.string.action_fork)) }
+                    TextButton(onClick = onCancelRuns) { Text(stringResource(R.string.screen_conversations_cancel_runs_action)) }
+                    TextButton(onClick = onRecompile) { Text(stringResource(R.string.screen_conversations_recompile_action)) }
+                }
+                if (!recompilePreview.isNullOrBlank()) {
+                    Text(stringResource(R.string.screen_conversations_recompile_preview_title), style = MaterialTheme.typography.labelLarge)
+                    Text(recompilePreview, style = MaterialTheme.typography.bodySmall)
+                }
+                TextButton(onClick = onDelete) {
+                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_close))
+            }
+        },
+    )
 }
 
 @Composable

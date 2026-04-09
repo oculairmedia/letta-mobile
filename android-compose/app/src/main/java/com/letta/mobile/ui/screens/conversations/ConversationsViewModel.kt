@@ -28,6 +28,8 @@ data class ConversationsUiState(
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val searchQuery: String = "",
+    val selectedConversation: ConversationDisplay? = null,
+    val recompilePreview: String? = null,
     val error: String? = null,
 )
 
@@ -104,10 +106,20 @@ class ConversationsViewModel @Inject constructor(
     }
 
     fun deleteConversation(conversationId: String) {
-        allConversationsRepository.handleOptimisticDelete(conversationId)
-        _uiState.value = _uiState.value.copy(
-            conversations = _uiState.value.conversations.filter { it.conversation.id != conversationId }
-        )
+        viewModelScope.launch {
+            val display = _uiState.value.conversations.firstOrNull { it.conversation.id == conversationId } ?: return@launch
+            try {
+                allConversationsRepository.handleOptimisticDelete(conversationId)
+                _uiState.value = _uiState.value.copy(
+                    conversations = _uiState.value.conversations.filter { it.conversation.id != conversationId },
+                    selectedConversation = if (_uiState.value.selectedConversation?.conversation?.id == conversationId) null else _uiState.value.selectedConversation,
+                )
+                conversationRepository.deleteConversation(conversationId, display.conversation.agentId)
+            } catch (e: Exception) {
+                Log.w("ConversationsVM", "Delete failed", e)
+                loadConversations()
+            }
+        }
     }
 
     fun updateSearchQuery(query: String) {
@@ -118,12 +130,16 @@ class ConversationsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 conversationRepository.updateConversation(conversationId, agentId, newName)
+                val selectedConversation = _uiState.value.selectedConversation
                 _uiState.value = _uiState.value.copy(
                     conversations = _uiState.value.conversations.map {
                         if (it.conversation.id == conversationId) {
                             it.copy(conversation = it.conversation.copy(summary = newName))
                         } else it
-                    }
+                    },
+                    selectedConversation = selectedConversation?.takeIf { it.conversation.id == conversationId }
+                        ?.copy(conversation = selectedConversation.conversation.copy(summary = newName))
+                        ?: selectedConversation,
                 )
             } catch (e: Exception) {
                 Log.w("ConversationsVM", "Rename failed", e)
@@ -139,6 +155,65 @@ class ConversationsViewModel @Inject constructor(
                 loadConversations()
             } catch (e: Exception) {
                 Log.w("ConversationsVM", "Fork failed", e)
+            }
+        }
+    }
+
+    fun openConversationAdmin(display: ConversationDisplay) {
+        viewModelScope.launch {
+            try {
+                val conversation = conversationRepository.getConversation(display.conversation.id)
+                _uiState.value = _uiState.value.copy(
+                    selectedConversation = display.copy(conversation = conversation),
+                    recompilePreview = null,
+                )
+            } catch (e: Exception) {
+                Log.w("ConversationsVM", "Admin detail load failed", e)
+            }
+        }
+    }
+
+    fun closeConversationAdmin() {
+        _uiState.value = _uiState.value.copy(selectedConversation = null, recompilePreview = null)
+    }
+
+    fun setConversationArchived(display: ConversationDisplay, archived: Boolean) {
+        viewModelScope.launch {
+            try {
+                conversationRepository.setConversationArchived(display.conversation.id, display.conversation.agentId, archived)
+                _uiState.value = _uiState.value.copy(
+                    conversations = _uiState.value.conversations.map {
+                        if (it.conversation.id == display.conversation.id) {
+                            it.copy(conversation = it.conversation.copy(archived = archived))
+                        } else it
+                    },
+                    selectedConversation = _uiState.value.selectedConversation?.takeIf { it.conversation.id == display.conversation.id }
+                        ?.copy(conversation = display.conversation.copy(archived = archived))
+                        ?: _uiState.value.selectedConversation,
+                )
+            } catch (e: Exception) {
+                Log.w("ConversationsVM", "Archive toggle failed", e)
+            }
+        }
+    }
+
+    fun cancelConversationRuns(display: ConversationDisplay) {
+        viewModelScope.launch {
+            try {
+                conversationRepository.cancelConversation(display.conversation.id, display.conversation.agentId)
+            } catch (e: Exception) {
+                Log.w("ConversationsVM", "Cancel failed", e)
+            }
+        }
+    }
+
+    fun recompileConversation(display: ConversationDisplay) {
+        viewModelScope.launch {
+            try {
+                val result = conversationRepository.recompileConversation(display.conversation.id, false, display.conversation.agentId)
+                _uiState.value = _uiState.value.copy(recompilePreview = result)
+            } catch (e: Exception) {
+                Log.w("ConversationsVM", "Recompile failed", e)
             }
         }
     }
