@@ -128,15 +128,6 @@ private fun ChatContent(
     var chatMode by remember { mutableStateOf("interactive") }
 
     val messageCount by rememberUpdatedState(state.messages.size)
-    val isStreaming by rememberUpdatedState(state.isStreaming)
-
-    LaunchedEffect(Unit) {
-        snapshotFlow { messageCount }
-            .distinctUntilChanged()
-            .collect {
-                if (it > 0) listState.animateScrollToItem(0)
-            }
-    }
 
     val isAtBottom by remember {
         derivedStateOf {
@@ -153,11 +144,11 @@ private fun ChatContent(
     }
 
     LaunchedEffect(Unit) {
-        snapshotFlow { isStreaming }
+        snapshotFlow { messageCount }
             .distinctUntilChanged()
-            .collect { streaming ->
-                if (streaming && isAtBottom) {
-                    listState.animateScrollToItem(0)
+            .collect {
+                if (it > 0 && isAtBottom) {
+                    listState.scrollToItem(0)
                 }
             }
     }
