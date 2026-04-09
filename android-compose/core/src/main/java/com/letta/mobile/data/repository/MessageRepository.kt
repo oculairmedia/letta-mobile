@@ -51,12 +51,12 @@ class MessageRepository @Inject constructor(
         // Try to fetch from API
         return try {
             val lettaMessages = if (conversationId != null) {
-                messageApi.listConversationMessages(conversationId, limit = 100)
+                messageApi.listConversationMessages(conversationId, limit = 100, order = "asc")
             } else {
-                messageApi.listMessages(agentId, limit = 100)
+                messageApi.listMessages(agentId, limit = 100, order = "asc")
             }
 
-            val appMessages = lettaMessages.mapNotNull { it.toAppMessage() }.sortedBy { it.date }
+            val appMessages = lettaMessages.mapNotNull { it.toAppMessage() }
 
             // Update cache
             if (conversationId != null) {
@@ -201,8 +201,8 @@ class MessageRepository @Inject constructor(
                 }
 
             emit(StreamState.Complete(messages))
-            
-            updateMessagesInCache(agentId, conversationId, messages)
+
+            mergeMessagesIntoCache(agentId, conversationId, messages)
 
         } catch (e: Exception) {
             emit(StreamState.Error(e.message ?: "Unknown error"))
@@ -230,15 +230,24 @@ class MessageRepository @Inject constructor(
         }
     }
 
-    private fun updateMessagesInCache(agentId: String, conversationId: String?, messages: List<AppMessage>) {
+    private fun mergeMessagesIntoCache(agentId: String, conversationId: String?, messages: List<AppMessage>) {
         if (conversationId != null) {
             _messagesByConversation.update { current -> current.toMutableMap().apply {
-                        put(conversationId, messages)
+                        val existing = get(conversationId) ?: emptyList()
+                        put(conversationId, mergeMessageLists(existing, messages))
                     } }
         } else {
             _messagesByAgent.update { current -> current.toMutableMap().apply {
-                        put(agentId, messages)
+                        val existing = get(agentId) ?: emptyList()
+                        put(agentId, mergeMessageLists(existing, messages))
                     } }
         }
+    }
+
+    private fun mergeMessageLists(existing: List<AppMessage>, incoming: List<AppMessage>): List<AppMessage> {
+        val merged = LinkedHashMap<String, AppMessage>()
+        existing.forEach { merged[it.id] = it }
+        incoming.forEach { merged[it.id] = it }
+        return merged.values.toList()
     }
 }

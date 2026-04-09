@@ -48,7 +48,8 @@ class MessageApi @Inject constructor(
     suspend fun listMessages(
         agentId: String,
         limit: Int? = null,
-        after: String? = null
+        after: String? = null,
+        order: String? = null,
     ): List<LettaMessage> {
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
@@ -56,6 +57,7 @@ class MessageApi @Inject constructor(
         val response = client.get("$baseUrl/v1/agents/$agentId/messages") {
             parameter("limit", limit)
             parameter("after", after)
+            parameter("order", order)
         }
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())
@@ -66,7 +68,8 @@ class MessageApi @Inject constructor(
     suspend fun listConversationMessages(
         conversationId: String,
         limit: Int? = null,
-        after: String? = null
+        after: String? = null,
+        order: String? = null,
     ): List<LettaMessage> {
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
@@ -74,6 +77,7 @@ class MessageApi @Inject constructor(
         val response = client.get("$baseUrl/v1/conversations/$conversationId/messages") {
             parameter("limit", limit)
             parameter("after", after)
+            parameter("order", order)
         }
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())
