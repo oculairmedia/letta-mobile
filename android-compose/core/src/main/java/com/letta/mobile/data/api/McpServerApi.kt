@@ -54,6 +54,20 @@ class McpServerApi @Inject constructor(
         return response.body()
     }
 
+    suspend fun updateMcpServer(serverId: String, params: McpServerUpdateParams): McpServer {
+        val client = apiClient.getClient()
+        val baseUrl = apiClient.getBaseUrl()
+
+        val response = client.patch("$baseUrl/v1/mcp-servers/$serverId") {
+            contentType(ContentType.Application.Json)
+            setBody(params)
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
+    }
+
     suspend fun deleteMcpServer(serverId: String) {
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()

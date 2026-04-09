@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.McpServerCreateParams
+import com.letta.mobile.data.model.McpServerUpdateParams
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.repository.McpServerRepository
 import com.letta.mobile.data.repository.ToolRepository
@@ -15,8 +16,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 import javax.inject.Inject
 
 @androidx.compose.runtime.Immutable
@@ -50,7 +49,6 @@ class McpViewModel @Inject constructor(
                 val servers = mcpServerRepository.servers.value
                 val serverToolsMap = mutableMapOf<String, List<Tool>>()
                 
-                // Load discovered tools for each server
                 servers.forEach { server ->
                     mcpServerRepository.refreshServerTools(server.id)
                     val tools = mcpServerRepository.getServerTools(server.id).first()
@@ -93,18 +91,27 @@ class McpViewModel @Inject constructor(
         }
     }
 
-    fun addServer(name: String, url: String) {
+    fun addServer(params: McpServerCreateParams) {
         viewModelScope.launch {
             try {
-                val params = McpServerCreateParams(
-                    serverName = name,
-                    config = buildJsonObject { put("url", JsonPrimitive(url)) }
-                )
                 mcpServerRepository.createServer(params)
                 loadData()
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(
                     mapErrorToUserMessage(e, "Failed to add server")
+                )
+            }
+        }
+    }
+
+    fun updateServer(serverId: String, params: McpServerUpdateParams) {
+        viewModelScope.launch {
+            try {
+                mcpServerRepository.updateServer(serverId, params)
+                loadData()
+            } catch (e: Exception) {
+                _uiState.value = UiState.Error(
+                    mapErrorToUserMessage(e, "Failed to update server")
                 )
             }
         }

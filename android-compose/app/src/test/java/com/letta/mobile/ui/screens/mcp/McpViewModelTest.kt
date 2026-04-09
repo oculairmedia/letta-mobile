@@ -3,6 +3,7 @@ package com.letta.mobile.ui.screens.mcp
 import app.cash.turbine.test
 import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.McpServerCreateParams
+import com.letta.mobile.data.model.McpServerUpdateParams
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.repository.McpServerRepository
 import com.letta.mobile.data.repository.ToolRepository
@@ -21,6 +22,8 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -90,8 +93,32 @@ class McpViewModelTest {
 
     @Test
     fun `addServer calls repo`() = runTest {
-        viewModel.addServer("New", "http://localhost")
+        viewModel.addServer(
+            McpServerCreateParams(
+                serverName = "New",
+                config = buildJsonObject {
+                    put("mcp_server_type", "streamable_http")
+                    put("server_url", "http://localhost")
+                }
+            )
+        )
         assertTrue(fakeMcpRepo.createCalls.isNotEmpty())
+    }
+
+    @Test
+    fun `updateServer calls repo`() = runTest {
+        fakeMcpRepo.setServers(listOf(TestData.mcpServer(id = "s1")))
+        viewModel.updateServer(
+            "s1",
+            McpServerUpdateParams(
+                serverName = "Updated",
+                config = buildJsonObject {
+                    put("mcp_server_type", "stdio")
+                    put("command", "python")
+                }
+            )
+        )
+        assertTrue(fakeMcpRepo.updateCalls.contains("s1"))
     }
 
     @Test
@@ -123,6 +150,7 @@ class McpViewModelTest {
         var shouldFail = false
         val deleteCalls = mutableListOf<String>()
         val createCalls = mutableListOf<String>()
+        val updateCalls = mutableListOf<String>()
 
         fun setServers(list: List<McpServer>) { _servers.value = list }
         fun setServerTools(serverId: String, tools: List<Tool>) {
@@ -143,6 +171,16 @@ class McpViewModelTest {
         override suspend fun createServer(params: McpServerCreateParams): McpServer {
             createCalls.add(params.serverName)
             return TestData.mcpServer(serverName = params.serverName)
+        }
+        override suspend fun updateServer(id: String, params: McpServerUpdateParams): McpServer {
+            updateCalls.add(id)
+            val updated = TestData.mcpServer(
+                id = id,
+                serverName = params.serverName ?: "Updated",
+                serverUrl = params.config?.get("server_url")?.toString()?.trim('"')
+            )
+            _servers.value = _servers.value.map { if (it.id == id) updated else it }
+            return updated
         }
     }
 

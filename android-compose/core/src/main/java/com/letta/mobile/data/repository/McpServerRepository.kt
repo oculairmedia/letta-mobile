@@ -3,6 +3,7 @@ package com.letta.mobile.data.repository
 import com.letta.mobile.data.api.McpServerApi
 import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.McpServerCreateParams
+import com.letta.mobile.data.model.McpServerUpdateParams
 import com.letta.mobile.data.model.Tool
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +42,12 @@ class McpServerRepository @Inject constructor(
 
     suspend fun createServer(params: McpServerCreateParams): McpServer {
         val server = mcpServerApi.createMcpServer(params)
+        refreshServers()
+        return server
+    }
+
+    suspend fun updateServer(id: String, params: McpServerUpdateParams): McpServer {
+        val server = mcpServerApi.updateMcpServer(id, params)
         refreshServers()
         return server
     }

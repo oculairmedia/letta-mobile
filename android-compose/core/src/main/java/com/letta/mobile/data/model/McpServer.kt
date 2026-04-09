@@ -22,3 +22,9 @@ data class McpServerCreateParams(
     @SerialName("server_name") val serverName: String,
     val config: JsonObject,
 )
+
+@Serializable
+data class McpServerUpdateParams(
+    @SerialName("server_name") val serverName: String? = null,
+    val config: JsonObject? = null,
+)

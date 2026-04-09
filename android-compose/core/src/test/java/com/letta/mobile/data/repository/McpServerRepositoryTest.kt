@@ -1,11 +1,13 @@
 package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.McpServerCreateParams
+import com.letta.mobile.data.model.McpServerUpdateParams
 import com.letta.mobile.testutil.FakeMcpServerApi
 import com.letta.mobile.testutil.TestData
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -36,6 +38,24 @@ class McpServerRepositoryTest {
         val server = repository.createServer(params)
         assertEquals("New Server", server.serverName)
         assertTrue(fakeApi.calls.any { it.startsWith("createMcpServer") })
+    }
+
+    @Test
+    fun `updateServer updates and refreshes`() = runTest {
+        fakeApi.servers.add(TestData.mcpServer(id = "s1", serverName = "Old Server"))
+        val params = McpServerUpdateParams(
+            serverName = "Updated Server",
+            config = buildJsonObject {
+                put("mcp_server_type", "streamable_http")
+                put("server_url", "https://example.com/mcp")
+            }
+        )
+
+        val updated = repository.updateServer("s1", params)
+
+        assertEquals("Updated Server", updated.serverName)
+        assertEquals("https://example.com/mcp", updated.serverUrl)
+        assertTrue(fakeApi.calls.contains("updateMcpServer:s1"))
     }
 
     @Test
