@@ -18,6 +18,8 @@
     <string name="action_cancel">Cancel</string>
     <string name="action_back">Back</string>
     <string name="action_retry">Retry</string>
+    <string name="action_export_agent">Export Agent</string>
+    <string name="action_reset_messages">Reset Messages</string>
     
     <string name="common_loading">Loading...</string>
     <string name="error_generic">An error occurred</string>
@@ -94,8 +96,17 @@
     <string name="screen_settings_temperature_value">Temperature: %.2f</string>
     <string name="common_max_output_tokens">Max Output Tokens</string>
     <string name="common_parallel_tool_calls">Parallel Tool Calls</string>
+    <string name="common_enable_sleeptime">Enable Sleeptime</string>
     <string name="action_save_settings">Save Settings</string>
     <string name="screen_agents_dialog_delete_confirm_permanent">Are you sure you want to delete this agent? This action cannot be undone.</string>
+    <string name="screen_settings_saved">Settings saved</string>
+    <string name="screen_settings_export_ready">Agent export ready to share</string>
+    <string name="screen_settings_export_unavailable">No compatible app found to share the export</string>
+    <string name="screen_settings_messages_reset">Messages reset</string>
+    <string name="screen_settings_admin_actions_section">Admin Actions</string>
+    <string name="screen_settings_reset_messages_title">Reset Message History</string>
+    <string name="screen_settings_reset_messages_confirm">This clears the agent message history stored by Letta. This action cannot be undone.</string>
+    <string name="screen_settings_export_subject">Letta agent export</string>
     <string name="action_dismiss">Dismiss</string>
     <string name="common_error">Error</string>
     <string name="screen_config_list_empty">No saved configurations</string>

@@ -1,5 +1,8 @@
 package com.letta.mobile.ui.screens.settings
 
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -8,6 +11,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -16,7 +20,6 @@ import com.letta.mobile.R
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ErrorContent
-import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.components.ShimmerCard
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -28,6 +31,7 @@ fun AgentSettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbar = LocalSnackbarDispatcher.current
+    val context = LocalContext.current
 
     when (val state = uiState) {
         is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
@@ -42,8 +46,24 @@ fun AgentSettingsScreen(
             onParallelToolCallsChange = { viewModel.updateParallelToolCalls(it) },
             onPersonaChange = { viewModel.updatePersonaBlock(it) },
             onHumanChange = { viewModel.updateHumanBlock(it) },
+            onSleeptimeChange = { viewModel.updateSleeptime(it) },
             onSystemPromptChange = { viewModel.updateSystemPrompt(it) },
-            onSave = { viewModel.saveSettings(); snackbar.dispatch("Settings saved") },
+            onSave = { viewModel.saveSettings { snackbar.dispatch(context.getString(R.string.screen_settings_saved)) } },
+            onExport = {
+                viewModel.exportAgent { exportData ->
+                    val exported = shareAgentExport(context, exportData)
+                    snackbar.dispatch(
+                        context.getString(
+                            if (exported) R.string.screen_settings_export_ready else R.string.screen_settings_export_unavailable
+                        )
+                    )
+                }
+            },
+            onResetMessages = {
+                viewModel.resetMessages {
+                    snackbar.dispatch(context.getString(R.string.screen_settings_messages_reset))
+                }
+            },
             onDelete = { viewModel.deleteAgent(onNavigateBack) },
             modifier = modifier
         )
@@ -58,12 +78,16 @@ private fun SettingsContent(
     onParallelToolCallsChange: (Boolean) -> Unit,
     onPersonaChange: (String) -> Unit,
     onHumanChange: (String) -> Unit,
+    onSleeptimeChange: (Boolean) -> Unit,
     onSystemPromptChange: (String) -> Unit,
     onSave: () -> Unit,
+    onExport: () -> Unit,
+    onResetMessages: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showResetDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -126,6 +150,20 @@ private fun SettingsContent(
             )
         }
 
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = stringResource(R.string.common_enable_sleeptime),
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Switch(
+                checked = state.enableSleeptime,
+                onCheckedChange = onSleeptimeChange
+            )
+        }
+
         Divider()
 
         Text(
@@ -185,11 +223,37 @@ private fun SettingsContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        Text(
+            text = stringResource(R.string.screen_settings_admin_actions_section),
+            style = MaterialTheme.typography.titleMedium
+        )
+
         Button(
             onClick = onSave,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(stringResource(R.string.action_save_settings))
+        }
+
+        OutlinedButton(
+            onClick = onExport,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Icon(Icons.Default.Share, null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(stringResource(R.string.action_export_agent))
+        }
+
+        OutlinedButton(
+            onClick = { showResetDialog = true },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.error
+            )
+        ) {
+            Icon(Icons.Default.Refresh, null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(stringResource(R.string.action_reset_messages))
         }
 
         OutlinedButton(
@@ -203,6 +267,29 @@ private fun SettingsContent(
             Spacer(modifier = Modifier.width(8.dp))
             Text(stringResource(R.string.screen_agents_dialog_delete_title))
         }
+    }
+
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = { Text(stringResource(R.string.screen_settings_reset_messages_title)) },
+            text = { Text(stringResource(R.string.screen_settings_reset_messages_confirm)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showResetDialog = false
+                        onResetMessages()
+                    }
+                ) {
+                    Text(stringResource(R.string.action_reset_messages), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDialog = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
     }
 
     if (showDeleteDialog) {
@@ -226,5 +313,23 @@ private fun SettingsContent(
                 }
             }
         )
+    }
+}
+
+private fun shareAgentExport(context: Context, exportData: String): Boolean {
+    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, exportData)
+        putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.screen_settings_export_subject))
+    }
+
+    val chooser = Intent.createChooser(shareIntent, context.getString(R.string.action_export_agent))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    try {
+        context.startActivity(chooser)
+        return true
+    } catch (_: ActivityNotFoundException) {
+        return false
     }
 }
