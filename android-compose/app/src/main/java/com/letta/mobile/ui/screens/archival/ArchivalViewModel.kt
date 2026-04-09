@@ -18,6 +18,7 @@ data class ArchivalUiState(
     val passages: List<Passage> = emptyList(),
     val searchQuery: String = "",
     val isSearching: Boolean = false,
+    val selectedPassage: Passage? = null,
 )
 
 @HiltViewModel
@@ -85,11 +86,24 @@ class ArchivalViewModel @Inject constructor(
                 passageRepository.deletePassage(agentId, passageId)
                 val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
                 _uiState.value = UiState.Success(
-                    current.copy(passages = current.passages.filter { it.id != passageId })
+                    current.copy(
+                        passages = current.passages.filter { it.id != passageId },
+                        selectedPassage = if (current.selectedPassage?.id == passageId) null else current.selectedPassage,
+                    )
                 )
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(com.letta.mobile.util.mapErrorToUserMessage(e, "Failed to delete passage"))
             }
         }
+    }
+
+    fun inspectPassage(passage: Passage) {
+        val current = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(current.copy(selectedPassage = passage))
+    }
+
+    fun clearSelectedPassage() {
+        val current = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(current.copy(selectedPassage = null))
     }
 }

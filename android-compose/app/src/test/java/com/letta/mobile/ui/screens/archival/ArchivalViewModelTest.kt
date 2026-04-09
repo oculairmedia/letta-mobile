@@ -82,6 +82,35 @@ class ArchivalViewModelTest {
     }
 
     @Test
+    fun `inspectPassage stores selected passage`() = runTest {
+        val passage = Passage(id = "p1", text = "Some knowledge", sourceId = "source-1")
+        fakeRepo.setPassages("a1", listOf(passage))
+        viewModel.loadPassages()
+
+        viewModel.inspectPassage(passage)
+
+        viewModel.uiState.test {
+            val state = awaitItem() as UiState.Success
+            assertEquals("p1", state.data.selectedPassage?.id)
+        }
+    }
+
+    @Test
+    fun `clearSelectedPassage clears selected passage`() = runTest {
+        val passage = Passage(id = "p1", text = "Some knowledge", sourceId = "source-1")
+        fakeRepo.setPassages("a1", listOf(passage))
+        viewModel.loadPassages()
+        viewModel.inspectPassage(passage)
+
+        viewModel.clearSelectedPassage()
+
+        viewModel.uiState.test {
+            val state = awaitItem() as UiState.Success
+            assertEquals(null, state.data.selectedPassage)
+        }
+    }
+
+    @Test
     fun `loadPassages sets Error on failure`() = runTest {
         fakeRepo.shouldFail = true
         viewModel.loadPassages()

@@ -62,14 +62,14 @@ fun ArchivalScreen(
                 title = { Text(stringResource(R.string.screen_archival_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
             )
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddDialog = true }) {
-                Icon(Icons.Default.Add, contentDescription = "Add passage")
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.screen_archival_add_action))
             }
         },
     ) { paddingValues ->
@@ -83,6 +83,7 @@ fun ArchivalScreen(
             is UiState.Success -> ArchivalContent(
                 state = state.data,
                 onSearchChange = { viewModel.search(it) },
+                onInspectPassage = { viewModel.inspectPassage(it) },
                 onDeletePassage = { viewModel.deletePassage(it) },
                 modifier = Modifier.padding(paddingValues),
             )
@@ -98,12 +99,20 @@ fun ArchivalScreen(
             },
         )
     }
+
+    (uiState as? UiState.Success)?.data?.selectedPassage?.let { passage ->
+        PassageDetailDialog(
+            passage = passage,
+            onDismiss = { viewModel.clearSelectedPassage() },
+        )
+    }
 }
 
 @Composable
 private fun ArchivalContent(
     state: ArchivalUiState,
     onSearchChange: (String) -> Unit,
+    onInspectPassage: (Passage) -> Unit,
     onDeletePassage: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -113,14 +122,18 @@ private fun ArchivalContent(
             onValueChange = onSearchChange,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             placeholder = { Text(stringResource(R.string.screen_archival_search_hint)) },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = stringResource(R.string.screen_archival_search_action)) },
             singleLine = true,
         )
 
         if (state.passages.isEmpty()) {
             EmptyState(
                 icon = Icons.Default.Search,
-                message = if (state.searchQuery.isBlank()) "No archival passages" else "No results for \"${state.searchQuery}\"",
+                message = if (state.searchQuery.isBlank()) {
+                    stringResource(R.string.screen_archival_empty)
+                } else {
+                    stringResource(R.string.screen_archival_empty_search, state.searchQuery)
+                },
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
@@ -131,6 +144,7 @@ private fun ArchivalContent(
                 items(state.passages, key = { it.id }) { passage ->
                     PassageCard(
                         passage = passage,
+                        onInspect = { onInspectPassage(passage) },
                         onDelete = { onDeletePassage(passage.id) },
                     )
                 }
@@ -142,10 +156,11 @@ private fun ArchivalContent(
 @Composable
 private fun PassageCard(
     passage: Passage,
+    onInspect: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(modifier = modifier.fillMaxWidth()) {
+    Card(onClick = onInspect, modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -160,7 +175,7 @@ private fun PassageCard(
                     modifier = Modifier.weight(1f),
                 )
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete passage")
+                    Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.screen_archival_delete_action))
                 }
             }
             passage.createdAt?.let { createdAt ->
@@ -173,6 +188,44 @@ private fun PassageCard(
             }
         }
     }
+}
+
+@Composable
+private fun PassageDetailDialog(
+    passage: Passage,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.screen_archival_detail_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                passage.sourceId?.let {
+                    Text(stringResource(R.string.screen_archival_source_id_label, it), style = MaterialTheme.typography.bodySmall)
+                }
+                passage.createdAt?.let {
+                    Text(stringResource(R.string.screen_archival_created_label, it), style = MaterialTheme.typography.bodySmall)
+                }
+                if (!passage.metadata.isNullOrEmpty()) {
+                    Text(stringResource(R.string.screen_archival_metadata_title), style = MaterialTheme.typography.labelLarge)
+                    passage.metadata.entries.forEach { (key, value) ->
+                        Text(
+                            text = "$key: $value",
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                Text(passage.text, style = MaterialTheme.typography.bodyMedium)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_close))
+            }
+        },
+    )
 }
 
 @Composable

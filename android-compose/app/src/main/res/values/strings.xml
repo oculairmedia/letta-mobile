@@ -207,8 +207,17 @@
     <string name="screen_models_filter_all">All</string>
     <string name="screen_archival_title">Archival Memory</string>
     <string name="screen_archival_search_hint">Search archival memory…</string>
+    <string name="screen_archival_search_action">Search archival passages</string>
     <string name="screen_archival_add_title">Add Passage</string>
+    <string name="screen_archival_add_action">Add passage</string>
     <string name="screen_archival_passage_label">Passage text</string>
+    <string name="screen_archival_detail_title">Passage Details</string>
+    <string name="screen_archival_empty">No archival passages</string>
+    <string name="screen_archival_empty_search">No results for “%1$s”</string>
+    <string name="screen_archival_delete_action">Delete passage</string>
+    <string name="screen_archival_source_id_label">Source ID: %1$s</string>
+    <string name="screen_archival_created_label">Created: %1$s</string>
+    <string name="screen_archival_metadata_title">Metadata</string>
     <string name="screen_schedules_title">Schedules</string>
     <string name="screen_schedules_empty">No schedules configured</string>
     <string name="screen_schedules_add_title">Add Schedule</string>
