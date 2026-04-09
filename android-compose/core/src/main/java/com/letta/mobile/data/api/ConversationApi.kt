@@ -16,7 +16,10 @@ class ConversationApi @Inject constructor(
         agentId: String? = null,
         limit: Int? = null,
         after: String? = null,
-        archiveStatus: String? = null
+        archiveStatus: String? = null,
+        summarySearch: String? = null,
+        order: String? = null,
+        orderBy: String? = null,
     ): List<Conversation> {
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
@@ -26,6 +29,9 @@ class ConversationApi @Inject constructor(
             parameter("limit", limit)
             parameter("after", after)
             parameter("archive_status", archiveStatus)
+            parameter("summary_search", summarySearch)
+            parameter("order", order)
+            parameter("order_by", orderBy)
         }
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())
@@ -90,6 +96,42 @@ class ConversationApi @Inject constructor(
         val response = client.post("$baseUrl/v1/conversations/$conversationId/fork") {
             contentType(ContentType.Application.Json)
             agentId?.let { parameter("agent_id", it) }
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
+    }
+
+    suspend fun cancelConversation(conversationId: String, agentId: String? = null) {
+        val client = apiClient.getClient()
+        val baseUrl = apiClient.getBaseUrl()
+
+        val response = client.post("$baseUrl/v1/conversations/$conversationId/cancel") {
+            contentType(ContentType.Application.Json)
+            agentId?.let { parameter("agent_id", it) }
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+    }
+
+    suspend fun recompileConversation(
+        conversationId: String,
+        dryRun: Boolean = false,
+        agentId: String? = null,
+    ): String {
+        val client = apiClient.getClient()
+        val baseUrl = apiClient.getBaseUrl()
+
+        val response = client.post("$baseUrl/v1/conversations/$conversationId/recompile") {
+            contentType(ContentType.Application.Json)
+            parameter("dry_run", dryRun)
+            setBody(
+                buildMap<String, String?> {
+                    put("agent_id", agentId)
+                }.filterValues { it != null }
+            )
         }
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())

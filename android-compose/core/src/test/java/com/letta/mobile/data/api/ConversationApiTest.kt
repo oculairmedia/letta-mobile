@@ -50,6 +50,16 @@ class ConversationApiTest {
     }
 
     @Test
+    fun `listConversations passes summary search and order params`() = runTest {
+        var url: String? = null
+        val api = createApi { req -> url = req.url.toString(); respond("[]", HttpStatusCode.OK, jsonHeaders) }
+        api.listConversations(summarySearch = "hello", order = "desc", orderBy = "last_message_at")
+        assertTrue(url!!.contains("summary_search=hello"))
+        assertTrue(url!!.contains("order=desc"))
+        assertTrue(url!!.contains("order_by=last_message_at"))
+    }
+
+    @Test
     fun `createConversation sends POST`() = runTest {
         var method: HttpMethod? = null
         val api = createApi { req ->
@@ -66,6 +76,22 @@ class ConversationApiTest {
         val api = createApi { req -> method = req.method; respond("", HttpStatusCode.OK, jsonHeaders) }
         api.deleteConversation("c1")
         assertEquals(HttpMethod.Delete, method)
+    }
+
+    @Test
+    fun `cancelConversation sends POST`() = runTest {
+        var method: HttpMethod? = null
+        val api = createApi { req -> method = req.method; respond("{}", HttpStatusCode.OK, jsonHeaders) }
+        api.cancelConversation("c1")
+        assertEquals(HttpMethod.Post, method)
+    }
+
+    @Test
+    fun `recompileConversation sends POST`() = runTest {
+        var method: HttpMethod? = null
+        val api = createApi { req -> method = req.method; respond("recompiled-system-prompt", HttpStatusCode.OK, jsonHeaders) }
+        api.recompileConversation("c1")
+        assertEquals(HttpMethod.Post, method)
     }
 
     @Test(expected = ApiException::class)

@@ -111,6 +111,39 @@ class ConversationRepositoryTest {
     }
 
     @Test
+    fun `getConversation retrieves a conversation by id`() = runTest {
+        fakeApi.conversations.add(TestData.conversation(id = "1", agentId = "a1"))
+
+        val conversation = repository.getConversation("1")
+
+        assertEquals("1", conversation.id)
+    }
+
+    @Test
+    fun `setConversationArchived updates archived state optimistically`() = runTest {
+        fakeApi.conversations.add(TestData.conversation(id = "1", agentId = "a1", summary = "Old").copy(archived = false))
+        repository.refreshConversations("a1")
+
+        repository.setConversationArchived("1", "a1", true)
+        val result = repository.getConversations("a1").first()
+
+        assertTrue(result.first().archived == true)
+    }
+
+    @Test
+    fun `cancelConversation delegates to api`() = runTest {
+        repository.cancelConversation("1", "a1")
+        assertTrue(fakeApi.calls.contains("cancelConversation:1"))
+    }
+
+    @Test
+    fun `recompileConversation delegates to api`() = runTest {
+        val result = repository.recompileConversation("1", false, "a1")
+        assertEquals("recompiled-system-prompt", result)
+        assertTrue(fakeApi.calls.contains("recompileConversation:1"))
+    }
+
+    @Test
     fun `getConversations returns empty for unknown agent`() = runTest {
         val result = repository.getConversations("unknown").first()
         assertTrue(result.isEmpty())

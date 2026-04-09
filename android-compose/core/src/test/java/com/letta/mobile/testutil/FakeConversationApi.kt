@@ -11,13 +11,30 @@ class FakeConversationApi : ConversationApi(null!!) {
     var shouldFail = false
     val calls = mutableListOf<String>()
 
-    override suspend fun listConversations(agentId: String?, limit: Int?, after: String?): List<Conversation> {
+    override suspend fun listConversations(
+        agentId: String?,
+        limit: Int?,
+        after: String?,
+        archiveStatus: String?,
+        summarySearch: String?,
+        order: String?,
+        orderBy: String?,
+    ): List<Conversation> {
         calls.add("listConversations")
         if (shouldFail) throw ApiException(500, "Server error")
-        return if (agentId != null) {
+        val filtered = if (agentId != null) {
             conversations.filter { it.agentId == agentId }
         } else {
             conversations.toList()
+        }
+        return filtered.filter { conversation ->
+            when (archiveStatus) {
+                "archived" -> conversation.archived == true
+                "unarchived" -> conversation.archived != true
+                else -> true
+            }
+        }.filter { conversation ->
+            summarySearch == null || conversation.summary?.contains(summarySearch, ignoreCase = true) == true
         }
     }
 
@@ -51,5 +68,16 @@ class FakeConversationApi : ConversationApi(null!!) {
         val forked = TestData.conversation(id = "fork-${conversations.size}", agentId = agentId)
         conversations.add(forked)
         return forked
+    }
+
+    override suspend fun cancelConversation(conversationId: String, agentId: String?) {
+        calls.add("cancelConversation:$conversationId")
+        if (shouldFail) throw ApiException(500, "Server error")
+    }
+
+    override suspend fun recompileConversation(conversationId: String, dryRun: Boolean, agentId: String?): String {
+        calls.add("recompileConversation:$conversationId")
+        if (shouldFail) throw ApiException(500, "Server error")
+        return "recompiled-system-prompt"
     }
 }
