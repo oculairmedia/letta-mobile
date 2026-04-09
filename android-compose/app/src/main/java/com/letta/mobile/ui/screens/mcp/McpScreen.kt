@@ -94,6 +94,7 @@ private data class McpServerFormState(
 @Composable
 fun McpScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToServerTools: (String) -> Unit = {},
     viewModel: McpViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -146,6 +147,7 @@ fun McpScreen(
                     showServerDialog = true
                 },
                 onCheckServer = viewModel::checkServer,
+                onNavigateToServerTools = onNavigateToServerTools,
                 modifier = Modifier.padding(paddingValues),
             )
         }
@@ -179,6 +181,7 @@ private fun McpContent(
     onDeleteServer: (McpServer) -> Unit,
     onEditServer: (McpServer) -> Unit,
     onCheckServer: (String) -> Unit,
+    onNavigateToServerTools: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -196,7 +199,11 @@ private fun McpContent(
         }
 
         when (state.selectedTab) {
-            0 -> ToolsTab(tools = state.allTools)
+            0 -> ToolsTab(
+                tools = state.allTools,
+                toolParents = state.toolParents,
+                onNavigateToServerTools = onNavigateToServerTools,
+            )
             1 -> ServersTab(
                 servers = state.servers,
                 serverTools = state.serverTools,
@@ -212,6 +219,8 @@ private fun McpContent(
 @Composable
 private fun ToolsTab(
     tools: List<Tool>,
+    toolParents: Map<String, McpToolParent>,
+    onNavigateToServerTools: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (tools.isEmpty()) {
@@ -227,7 +236,11 @@ private fun ToolsTab(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(tools, key = { it.id }) { tool ->
-                ToolCard(tool = tool)
+                ToolCard(
+                    tool = tool,
+                    parent = toolParents[tool.id],
+                    onNavigateToServerTools = onNavigateToServerTools,
+                )
             }
         }
     }
@@ -273,6 +286,8 @@ private fun ServersTab(
 @Composable
 private fun ToolCard(
     tool: Tool,
+    parent: McpToolParent?,
+    onNavigateToServerTools: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -310,6 +325,19 @@ private fun ToolCard(
                 AssistChip(
                     onClick = {},
                     label = { Text(toolType, style = MaterialTheme.typography.labelSmall) },
+                )
+            }
+
+            parent?.let {
+                Spacer(modifier = Modifier.height(8.dp))
+                AssistChip(
+                    onClick = { onNavigateToServerTools(it.serverId) },
+                    label = {
+                        Text(
+                            stringResource(R.string.screen_mcp_tool_parent_server, it.serverName),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    },
                 )
             }
         }

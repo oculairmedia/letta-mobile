@@ -174,6 +174,23 @@ class McpViewModelTest {
         }
     }
 
+    @Test
+    fun `loadData maps tools to parent MCP server`() = runTest {
+        val server = TestData.mcpServer(id = "s1", serverName = "Server 1")
+        val tool = TestData.tool(id = "t1", name = "tool1")
+        fakeMcpRepo.setServers(listOf(server))
+        fakeMcpRepo.setServerTools("s1", listOf(tool))
+        fakeToolRepo.setTools(listOf(tool))
+
+        viewModel.loadData()
+
+        viewModel.uiState.test {
+            val state = awaitItem() as UiState.Success
+            assertEquals("s1", state.data.toolParents["t1"]?.serverId)
+            assertEquals("Server 1", state.data.toolParents["t1"]?.serverName)
+        }
+    }
+
     private class FakeMcpRepo : McpServerRepository(FakeMcpServerApi()) {
         private val _servers = MutableStateFlow<List<McpServer>>(emptyList())
         private val _toolsByServer = MutableStateFlow<Map<String, List<Tool>>>(emptyMap())

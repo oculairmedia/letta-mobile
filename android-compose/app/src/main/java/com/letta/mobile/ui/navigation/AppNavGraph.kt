@@ -23,6 +23,7 @@ import com.letta.mobile.ui.screens.conversations.ConversationsScreen
 import com.letta.mobile.ui.screens.editagent.EditAgentScreen
 import com.letta.mobile.ui.screens.identities.IdentityListScreen
 import com.letta.mobile.ui.screens.mcp.McpScreen
+import com.letta.mobile.ui.screens.mcp.McpServerToolsScreen
 import com.letta.mobile.ui.screens.models.ModelBrowserScreen
 import com.letta.mobile.ui.screens.runs.RunMonitorScreen
 import com.letta.mobile.ui.screens.schedules.ScheduleListScreen
@@ -175,7 +176,19 @@ fun AppNavGraph() {
 
         composable("mcp") {
             McpScreen(
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToServerTools = { serverId ->
+                    navController.navigate("mcpServerTools/$serverId")
+                }
+            )
+        }
+
+        composable(
+            route = "mcpServerTools/{serverId}",
+            arguments = listOf(navArgument("serverId") { type = NavType.StringType })
+        ) {
+            McpServerToolsScreen(
+                onNavigateBack = { navController.popBackStack() },
             )
         }
 

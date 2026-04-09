@@ -26,12 +26,19 @@ data class McpServerCheckState(
 )
 
 @androidx.compose.runtime.Immutable
+data class McpToolParent(
+    val serverId: String,
+    val serverName: String,
+)
+
+@androidx.compose.runtime.Immutable
 data class McpUiState(
     val selectedTab: Int = 0,
     val servers: List<McpServer> = emptyList(),
     val allTools: List<Tool> = emptyList(),
     val serverTools: Map<String, List<Tool>> = emptyMap(),
     val serverChecks: Map<String, McpServerCheckState> = emptyMap(),
+    val toolParents: Map<String, McpToolParent> = emptyMap(),
 )
 
 @HiltViewModel
@@ -57,11 +64,18 @@ class McpViewModel @Inject constructor(
                 
                 val servers = mcpServerRepository.servers.value
                 val serverToolsMap = mutableMapOf<String, List<Tool>>()
+                val toolParents = mutableMapOf<String, McpToolParent>()
                 
                 servers.forEach { server ->
                     mcpServerRepository.refreshServerTools(server.id)
                     val tools = mcpServerRepository.getServerTools(server.id).first()
                     serverToolsMap[server.id] = tools
+                    tools.forEach { tool ->
+                        toolParents.putIfAbsent(
+                            tool.id,
+                            McpToolParent(serverId = server.id, serverName = server.serverName),
+                        )
+                    }
                 }
                 
                 val allTools = toolRepository.getTools().first()
@@ -71,6 +85,7 @@ class McpViewModel @Inject constructor(
                         allTools = allTools,
                         serverTools = serverToolsMap,
                         serverChecks = currentChecks,
+                        toolParents = toolParents,
                     )
                 )
             } catch (e: Exception) {
