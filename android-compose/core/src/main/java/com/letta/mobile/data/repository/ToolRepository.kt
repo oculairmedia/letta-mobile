@@ -27,6 +27,8 @@ class ToolRepository @Inject constructor(
         return _toolsByAgent.map { it[agentId] ?: emptyList() }
     }
 
+    override suspend fun countTools(): Int = toolApi.countTools()
+
     override suspend fun refreshTools() {
         _tools.update { toolApi.listTools() }
     }

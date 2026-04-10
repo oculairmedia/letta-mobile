@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
 interface IToolRepository {
     fun getTools(): Flow<List<Tool>>
     fun getAgentTools(agentId: String): Flow<List<Tool>>
+    suspend fun countTools(): Int
     suspend fun refreshTools()
     suspend fun attachTool(agentId: String, toolId: String)
     suspend fun detachTool(agentId: String, toolId: String)
