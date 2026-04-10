@@ -34,6 +34,40 @@ data class Run(
 )
 
 @Serializable
+data class RunMetrics(
+    val id: String,
+    @SerialName("agent_id") val agentId: String? = null,
+    @SerialName("run_start_ns") val runStartNs: Long? = null,
+    @SerialName("run_ns") val runNs: Long? = null,
+    @SerialName("num_steps") val numSteps: Int? = null,
+    @SerialName("tools_used") val toolsUsed: List<String>? = null,
+    @SerialName("base_template_id") val baseTemplateId: String? = null,
+)
+
+@Serializable
+data class RunStep(
+    val id: String,
+    val origin: String? = null,
+    @SerialName("run_id") val runId: String? = null,
+    @SerialName("agent_id") val agentId: String? = null,
+    @SerialName("provider_name") val providerName: String? = null,
+    @SerialName("provider_category") val providerCategory: String? = null,
+    val model: String? = null,
+    @SerialName("prompt_tokens") val promptTokens: Int? = null,
+    @SerialName("completion_tokens") val completionTokens: Int? = null,
+    @SerialName("total_tokens") val totalTokens: Int? = null,
+    @SerialName("trace_id") val traceId: String? = null,
+    @SerialName("stop_reason") val stopReason: String? = null,
+    @SerialName("error_type") val errorType: String? = null,
+    val status: String? = null,
+)
+
+@Serializable
+data class RunCancelParams(
+    @SerialName("run_ids") val runIds: List<String>,
+)
+
+@Serializable
 data class RunListParams(
     val active: Boolean? = null,
     val after: String? = null,
