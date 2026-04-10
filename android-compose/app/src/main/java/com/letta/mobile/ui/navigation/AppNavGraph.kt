@@ -13,6 +13,7 @@ import androidx.navigation.navArgument
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.ui.screens.about.AboutScreen
 import com.letta.mobile.ui.screens.agentlist.AgentListScreen
+import com.letta.mobile.ui.screens.archives.ArchiveAdminScreen
 import com.letta.mobile.ui.screens.dashboard.HomeScreen
 import com.letta.mobile.ui.screens.archival.ArchivalScreen
 import com.letta.mobile.ui.screens.blocks.BlockLibraryScreen
@@ -21,6 +22,7 @@ import com.letta.mobile.ui.screens.config.ConfigListScreen
 import com.letta.mobile.ui.screens.config.ConfigScreen
 import com.letta.mobile.ui.screens.conversations.ConversationsScreen
 import com.letta.mobile.ui.screens.editagent.EditAgentScreen
+import com.letta.mobile.ui.screens.folders.FolderAdminScreen
 import com.letta.mobile.ui.screens.identities.IdentityListScreen
 import com.letta.mobile.ui.screens.jobs.JobMonitorScreen
 import com.letta.mobile.ui.screens.mcp.McpScreen
@@ -87,6 +89,12 @@ fun AppNavGraph() {
                 onNavigateToTemplates = {
                     navController.navigate("templates")
                 },
+                onNavigateToArchives = {
+                    navController.navigate("archives")
+                },
+                onNavigateToFolders = {
+                    navController.navigate("folders")
+                },
                 onNavigateToBlocks = {
                     navController.navigate("blocks")
                 },
@@ -152,6 +160,18 @@ fun AppNavGraph() {
                 onNavigateToAgent = { agentId ->
                     navController.navigate("agent/$agentId/chat")
                 }
+            )
+        }
+
+        composable("archives") {
+            ArchiveAdminScreen(
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+
+        composable("folders") {
+            FolderAdminScreen(
+                onNavigateBack = { navController.popBackStack() },
             )
         }
 
