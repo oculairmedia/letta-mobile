@@ -1,9 +1,6 @@
 package com.letta.mobile.ui.screens.chat
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,13 +13,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.ChatBubbleOutline
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Button
@@ -33,7 +26,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -47,9 +39,6 @@ import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -58,23 +47,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import androidx.compose.material3.FilterChip
 import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.common.groupMessages
 import com.letta.mobile.ui.components.DateSeparator
-import com.letta.mobile.ui.components.Accordions
-import com.letta.mobile.ui.components.EmptyState
-import com.letta.mobile.ui.components.LoadingIndicator
-import com.letta.mobile.ui.components.MarkdownText
 import com.letta.mobile.ui.components.MessageSkeletonList
 import com.letta.mobile.ui.components.StarterPrompts
 import com.letta.mobile.ui.theme.LettaChatTheme
-import com.letta.mobile.ui.theme.chatColors
-import com.letta.mobile.ui.theme.chatDimens
-import com.letta.mobile.ui.theme.chatTypography
-import com.letta.mobile.ui.components.MessageBubbleShape
 import com.letta.mobile.ui.components.ScrollToBottomFab
-import com.letta.mobile.ui.components.ThinkingSection
 import com.letta.mobile.ui.components.TypingIndicator
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -230,7 +209,7 @@ private fun ChatContent(
                                     modifier = Modifier.padding(top = spacing),
                                 )
                             } else {
-                                MessageBubble(
+                                ChatMessageItem(
                                     message = message,
                                     groupPosition = position,
                                     isStreaming = state.isStreaming,
@@ -264,63 +243,6 @@ private fun ChatContent(
             }
         }
 
-    }
-}
-
-@Composable
-private fun MessageBubble(
-    message: UiMessage,
-    groupPosition: GroupPosition = GroupPosition.None,
-    isStreaming: Boolean = false,
-    modifier: Modifier = Modifier
-) {
-    if (message.isReasoning) {
-        ThinkingSection(
-            thinkingText = message.content,
-            inProgress = isStreaming,
-            modifier = modifier
-        )
-        return
-    }
-
-    val isUser = message.role == "user"
-    val isLastAssistant = isStreaming && message.role == "assistant"
-    val style = bubbleStyle(role = message.role, isStreaming = isLastAssistant)
-    val colors = MaterialTheme.chatColors
-    val dimens = MaterialTheme.chatDimens
-    val typo = MaterialTheme.chatTypography
-    val renderer = remember(message.role, message.toolCalls) { resolveRenderer(message) }
-
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = if (style.alignEnd) Arrangement.End else Arrangement.Start
-    ) {
-        Surface(
-            shape = MessageBubbleShape(radius = 12.dp, isFromUser = isUser, groupPosition = groupPosition),
-            color = style.containerColor,
-            border = BorderStroke(dimens.bubbleBorderWidth, style.borderColor),
-            tonalElevation = 0.dp,
-            modifier = Modifier.fillMaxWidth(dimens.bubbleMaxWidthFraction),
-        ) {
-            Column(
-                modifier = Modifier.padding(
-                    horizontal = dimens.bubblePaddingHorizontal,
-                    vertical = dimens.bubblePaddingVertical,
-                ),
-                verticalArrangement = Arrangement.spacedBy(dimens.messageSpacing),
-            ) {
-                if (groupPosition == GroupPosition.First || groupPosition == GroupPosition.None) {
-                    Text(
-                        text = style.roleLabel,
-                        style = typo.roleLabel,
-                        color = style.roleColor,
-                    )
-                }
-
-                val textColor = if (isUser) colors.userText else colors.agentText
-                renderer.Render(message = message, textColor = textColor, modifier = Modifier)
-            }
-        }
     }
 }
 
