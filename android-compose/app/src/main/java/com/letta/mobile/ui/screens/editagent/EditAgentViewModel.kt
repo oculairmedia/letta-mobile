@@ -117,7 +117,10 @@ class EditAgentViewModel @Inject constructor(
                         name = agent.name,
                         description = agent.description ?: "",
                         model = agent.model ?: "",
-                        embedding = agent.embedding ?: "",
+                        embedding = agent.embedding
+                            ?: agent.embeddingConfig?.handle
+                            ?: agent.embeddingConfig?.embeddingModel
+                            ?: "",
                         blocks = editableBlocks,
                         systemPrompt = agent.system ?: "",
                         tags = agent.tags,

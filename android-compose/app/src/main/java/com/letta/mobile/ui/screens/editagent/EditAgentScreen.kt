@@ -259,7 +259,7 @@ private fun EditAgentContent(
             onExpandedChange = { llmConfigExpanded = it },
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.padding(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 OutlinedTextField(
@@ -304,18 +304,16 @@ private fun EditAgentContent(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(stringResource(R.string.common_enable_sleeptime), style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = state.enableSleeptime, onCheckedChange = onEnableSleeptimeChange)
+                }
             }
-        }
-
-        HorizontalDivider()
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(stringResource(R.string.common_enable_sleeptime), style = MaterialTheme.typography.bodyMedium)
-            Switch(checked = state.enableSleeptime, onCheckedChange = onEnableSleeptimeChange)
         }
 
         HorizontalDivider()
@@ -330,7 +328,7 @@ private fun EditAgentContent(
             onExpandedChange = { memoryExpanded = it },
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.padding(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 state.blocks.forEach { block ->
@@ -507,7 +505,7 @@ private fun EditAgentContent(
             onExpandedChange = { toolsExpanded = it },
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.padding(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (state.attachedTools.isEmpty()) {
@@ -557,7 +555,7 @@ private fun EditAgentContent(
                 value = state.systemPrompt,
                 onValueChange = onSystemPromptChange,
                 label = { Text(stringResource(R.string.common_system_prompt)) },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 minLines = 5
             )
         }
