@@ -68,13 +68,14 @@ class AgentSettingsViewModel @Inject constructor(
                         agent = agent,
                         agentType = agent.agentType ?: "",
                         contextWindow = agent.contextWindowLimit ?: agent.llmConfig?.contextWindow ?: 0,
-                        temperature = agent.modelSettings?.temperature?.toFloat() ?: 0.7f,
-                        maxTokens = agent.modelSettings?.maxOutputTokens ?: 2000,
-                        parallelToolCalls = agent.modelSettings?.parallelToolCalls ?: true,
+                        temperature = agent.modelSettings?.temperature?.toFloat() ?: agent.llmConfig?.temperature?.toFloat() ?: 0.7f,
+                        maxTokens = agent.modelSettings?.maxOutputTokens ?: agent.llmConfig?.maxTokens ?: 2000,
+                        parallelToolCalls = agent.modelSettings?.parallelToolCalls ?: agent.llmConfig?.parallelToolCalls ?: true,
                         personaBlock = persona,
                         humanBlock = human,
                         systemPrompt = agent.system ?: "",
                         enableSleeptime = agent.enableSleeptime ?: false,
+                        secrets = agent.secrets.associate { it.key to (it.value ?: "") },
                     )
                 )
             } catch (e: Exception) {

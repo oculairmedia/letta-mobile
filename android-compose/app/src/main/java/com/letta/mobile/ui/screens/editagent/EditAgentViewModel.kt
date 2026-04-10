@@ -122,13 +122,15 @@ class EditAgentViewModel @Inject constructor(
                         tags = agent.tags,
                         attachedTools = agent.tools,
                         availableTools = availableTools,
-                        providerType = agent.modelSettings?.providerType ?: "",
-                        temperature = agent.modelSettings?.temperature?.toFloat() ?: 1.0f,
-                        maxOutputTokens = agent.modelSettings?.maxOutputTokens ?: 4096,
-                        parallelToolCalls = agent.modelSettings?.parallelToolCalls ?: true,
+                        providerType = agent.modelSettings?.providerType ?: agent.llmConfig?.modelEndpointType ?: "",
+                        temperature = agent.modelSettings?.temperature?.toFloat() ?: agent.llmConfig?.temperature?.toFloat() ?: 1.0f,
+                        maxOutputTokens = agent.modelSettings?.maxOutputTokens ?: agent.llmConfig?.maxTokens ?: 4096,
+                        parallelToolCalls = agent.modelSettings?.parallelToolCalls ?: agent.llmConfig?.parallelToolCalls ?: true,
                         contextWindow = agent.contextWindowLimit ?: agent.llmConfig?.contextWindow ?: 0,
                         enableSleeptime = agent.enableSleeptime ?: false,
                         agentType = agent.agentType ?: "",
+                        embeddingDim = agent.embeddingConfig?.embeddingDim,
+                        embeddingChunkSize = agent.embeddingConfig?.embeddingChunkSize,
                     )
                 )
             } catch (e: Exception) {
