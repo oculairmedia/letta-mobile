@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -216,22 +217,33 @@ private fun SettingsContent(
         }
 
         if (state.tools.isNotEmpty()) {
-            CardGroup(title = { Text(stringResource(R.string.common_tools)) }) {
-                item(
-                    headlineContent = {
-                        @OptIn(ExperimentalLayoutApi::class)
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            state.tools.forEach { tool ->
-                                AssistChip(
-                                    onClick = {},
-                                    label = { Text(tool.name) },
+            var selectedTool by remember { mutableStateOf<com.letta.mobile.data.model.Tool?>(null) }
+
+            CardGroup(title = { Text(stringResource(R.string.common_tools) + " (${state.tools.size})") }) {
+                state.tools.forEach { tool ->
+                    item(
+                        onClick = { selectedTool = tool },
+                        headlineContent = { Text(tool.name) },
+                        supportingContent = tool.description?.let { desc ->
+                            {
+                                Text(
+                                    text = desc,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
-                        }
-                    },
+                        },
+                        leadingContent = {
+                            Icon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(20.dp))
+                        },
+                    )
+                }
+            }
+
+            selectedTool?.let { tool ->
+                ToolDetailDialog(
+                    tool = tool,
+                    onDismiss = { selectedTool = null },
                 )
             }
         }
@@ -323,6 +335,73 @@ private fun SettingsContent(
         onConfirm = { showDeleteDialog = false; onDelete() },
         onDismiss = { showDeleteDialog = false },
         destructive = true,
+    )
+}
+
+@Composable
+private fun ToolDetailDialog(
+    tool: com.letta.mobile.data.model.Tool,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Icon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(tool.name)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                tool.description?.let { desc ->
+                    Text(
+                        text = desc,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                tool.toolType?.let { type ->
+                    Row {
+                        Text(
+                            text = stringResource(R.string.common_type) + ": ",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = type,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
+                if (tool.tags.isNotEmpty()) {
+                    Column {
+                        Text(
+                            text = stringResource(R.string.common_tags),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        @OptIn(ExperimentalLayoutApi::class)
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            tool.tags.forEach { tag ->
+                                AssistChip(
+                                    onClick = {},
+                                    label = { Text(tag, style = MaterialTheme.typography.labelSmall) },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_close))
+            }
+        },
     )
 }
 
