@@ -54,6 +54,49 @@ class RunRepositoryTest {
     }
 
     @Test
+    fun `getRunMessages delegates to api`() = runTest {
+        fakeApi.runs.add(sampleRun("r1", "a1"))
+
+        val result = repository.getRunMessages("r1")
+
+        assertEquals(1, result.size)
+        assertTrue(fakeApi.calls.contains("listRunMessages:r1"))
+    }
+
+    @Test
+    fun `getRunMetrics delegates to api`() = runTest {
+        fakeApi.runs.add(sampleRun("r1", "a1"))
+
+        val result = repository.getRunMetrics("r1")
+
+        assertEquals("r1", result.id)
+        assertTrue(fakeApi.calls.contains("retrieveRunMetrics:r1"))
+    }
+
+    @Test
+    fun `cancelRun refreshes cached run`() = runTest {
+        fakeApi.runs.add(sampleRun("r1", "a1"))
+        repository.refreshRuns()
+
+        val result = repository.cancelRun(repository.runs.first().first())
+
+        assertEquals("cancelled", result.status)
+        assertEquals("cancelled", repository.runs.first().first().status)
+        assertTrue(fakeApi.calls.contains("cancelRun:a1:r1"))
+    }
+
+    @Test
+    fun `deleteRun removes cached run`() = runTest {
+        fakeApi.runs.addAll(listOf(sampleRun("r1", "a1"), sampleRun("r2", "a2")))
+        repository.refreshRuns()
+
+        repository.deleteRun("r1")
+
+        assertEquals(listOf("r2"), repository.runs.first().map { it.id })
+        assertTrue(fakeApi.calls.contains("deleteRun:r1"))
+    }
+
+    @Test
     fun `upsertRun updates cached run`() = runTest {
         repository.upsertRun(sampleRun("r1", "a1"))
         repository.upsertRun(sampleRun("r1", "a1").copy(status = "completed"))

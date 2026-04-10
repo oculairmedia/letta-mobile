@@ -1,8 +1,12 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.api.RunApi
 import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.model.RunListParams
+import com.letta.mobile.data.model.RunMetrics
+import com.letta.mobile.data.model.RunStep
+import com.letta.mobile.data.model.UsageStatistics
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,6 +27,34 @@ class RunRepository @Inject constructor(
 
     suspend fun getRun(runId: String): Run {
         return runApi.retrieveRun(runId)
+    }
+
+    suspend fun getRunMessages(runId: String): List<LettaMessage> {
+        return runApi.listRunMessages(runId = runId, order = "asc")
+    }
+
+    suspend fun getRunUsage(runId: String): UsageStatistics {
+        return runApi.retrieveRunUsage(runId)
+    }
+
+    suspend fun getRunMetrics(runId: String): RunMetrics {
+        return runApi.retrieveRunMetrics(runId)
+    }
+
+    suspend fun getRunSteps(runId: String): List<RunStep> {
+        return runApi.listRunSteps(runId = runId, order = "desc")
+    }
+
+    suspend fun cancelRun(run: Run): Run {
+        runApi.cancelRun(agentId = run.agentId, runId = run.id)
+        val refreshed = runApi.retrieveRun(run.id)
+        upsertRun(refreshed)
+        return refreshed
+    }
+
+    suspend fun deleteRun(runId: String) {
+        runApi.deleteRun(runId)
+        _runs.update { current -> current.filterNot { it.id == runId } }
     }
 
     fun upsertRun(run: Run) {
