@@ -196,4 +196,46 @@ class AgentApiTest {
         assertTrue(capturedUrl!!.contains("/v1/agents/import"))
         assertEquals(listOf("a2"), response.agentIds)
     }
+
+    @Test
+    fun `attachArchive sends PATCH to agent archive attach endpoint`() = runTest {
+        var capturedMethod: HttpMethod? = null
+        var capturedUrl: String? = null
+        val client = HttpClient(MockEngine { request ->
+            capturedMethod = request.method
+            capturedUrl = request.url.toString()
+            respond("", HttpStatusCode.NoContent, jsonHeaders)
+        }) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true; isLenient = true })
+            }
+        }
+        val api = createApi(client)
+
+        api.attachArchive("agent-1", "archive-1")
+
+        assertEquals(HttpMethod.Patch, capturedMethod)
+        assertTrue(capturedUrl!!.contains("/v1/agents/agent-1/archives/attach/archive-1"))
+    }
+
+    @Test
+    fun `detachArchive sends PATCH to agent archive detach endpoint`() = runTest {
+        var capturedMethod: HttpMethod? = null
+        var capturedUrl: String? = null
+        val client = HttpClient(MockEngine { request ->
+            capturedMethod = request.method
+            capturedUrl = request.url.toString()
+            respond("", HttpStatusCode.NoContent, jsonHeaders)
+        }) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true; isLenient = true })
+            }
+        }
+        val api = createApi(client)
+
+        api.detachArchive("agent-1", "archive-1")
+
+        assertEquals(HttpMethod.Patch, capturedMethod)
+        assertTrue(capturedUrl!!.contains("/v1/agents/agent-1/archives/detach/archive-1"))
+    }
 }

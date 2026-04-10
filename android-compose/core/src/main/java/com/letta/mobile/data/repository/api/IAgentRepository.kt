@@ -24,4 +24,6 @@ interface IAgentRepository {
         projectId: String? = null,
         stripMessages: Boolean? = null,
     ): ImportedAgentsResponse
+    suspend fun attachArchive(agentId: String, archiveId: String)
+    suspend fun detachArchive(agentId: String, archiveId: String)
 }

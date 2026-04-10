@@ -134,6 +134,16 @@ class AgentRepository @Inject constructor(
         return response
     }
 
+    override suspend fun attachArchive(agentId: String, archiveId: String) {
+        agentApi.attachArchive(agentId, archiveId)
+        refreshAgents()
+    }
+
+    override suspend fun detachArchive(agentId: String, archiveId: String) {
+        agentApi.detachArchive(agentId, archiveId)
+        refreshAgents()
+    }
+
     private fun updateAgentInCache(agent: Agent) {
         _agents.update { current ->
             val index = current.indexOfFirst { it.id == agent.id }

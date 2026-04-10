@@ -85,4 +85,14 @@ class FakeAgentApi : AgentApi(mockk(relaxed = true)) {
         agents.add(TestData.agent(id = importedId, name = importedName))
         return ImportedAgentsResponse(agentIds = listOf(importedId))
     }
+
+    override suspend fun attachArchive(agentId: String, archiveId: String) {
+        calls.add("attachArchive:$agentId:$archiveId")
+        if (shouldFail) throw ApiException(failCode, failMessage)
+    }
+
+    override suspend fun detachArchive(agentId: String, archiveId: String) {
+        calls.add("detachArchive:$agentId:$archiveId")
+        if (shouldFail) throw ApiException(failCode, failMessage)
+    }
 }

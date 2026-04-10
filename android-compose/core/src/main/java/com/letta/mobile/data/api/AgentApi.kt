@@ -132,4 +132,24 @@ open class AgentApi @Inject constructor(
         }
         return response.body()
     }
+
+    open suspend fun attachArchive(agentId: String, archiveId: String) {
+        val client = apiClient.getClient()
+        val baseUrl = apiClient.getBaseUrl()
+
+        val response = client.patch("$baseUrl/v1/agents/$agentId/archives/attach/$archiveId")
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+    }
+
+    open suspend fun detachArchive(agentId: String, archiveId: String) {
+        val client = apiClient.getClient()
+        val baseUrl = apiClient.getBaseUrl()
+
+        val response = client.patch("$baseUrl/v1/agents/$agentId/archives/detach/$archiveId")
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+    }
 }
