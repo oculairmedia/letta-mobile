@@ -124,4 +124,84 @@ open class MessageApi @Inject constructor(
         }
         return response.body()
     }
+
+    open suspend fun createBatch(request: CreateBatchMessagesRequest): Job {
+        val client = apiClient.getClient()
+        val baseUrl = apiClient.getBaseUrl()
+
+        val response = client.post("$baseUrl/v1/messages/batches") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
+    }
+
+    open suspend fun retrieveBatch(batchId: String): Job {
+        val client = apiClient.getClient()
+        val baseUrl = apiClient.getBaseUrl()
+
+        val response = client.get("$baseUrl/v1/messages/batches/$batchId")
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
+    }
+
+    open suspend fun listBatches(
+        limit: Int? = null,
+        before: String? = null,
+        after: String? = null,
+        order: String? = null,
+    ): List<Job> {
+        val client = apiClient.getClient()
+        val baseUrl = apiClient.getBaseUrl()
+
+        val response = client.get("$baseUrl/v1/messages/batches") {
+            parameter("limit", limit)
+            parameter("before", before)
+            parameter("after", after)
+            parameter("order", order)
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
+    }
+
+    open suspend fun listBatchMessages(
+        batchId: String,
+        limit: Int? = null,
+        before: String? = null,
+        after: String? = null,
+        order: String? = null,
+        agentId: String? = null,
+    ): BatchMessagesResponse {
+        val client = apiClient.getClient()
+        val baseUrl = apiClient.getBaseUrl()
+
+        val response = client.get("$baseUrl/v1/messages/batches/$batchId/messages") {
+            parameter("limit", limit)
+            parameter("before", before)
+            parameter("after", after)
+            parameter("order", order)
+            parameter("agent_id", agentId)
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
+    }
+
+    open suspend fun cancelBatch(batchId: String) {
+        val client = apiClient.getClient()
+        val baseUrl = apiClient.getBaseUrl()
+
+        val response = client.patch("$baseUrl/v1/messages/batches/$batchId/cancel")
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+    }
 }

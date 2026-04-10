@@ -8,8 +8,11 @@ import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.BatchMessagesResponse
+import com.letta.mobile.data.model.CreateBatchMessagesRequest
 import com.letta.mobile.data.model.EventMessage
 import com.letta.mobile.data.model.HiddenReasoningMessage
+import com.letta.mobile.data.model.Job
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreate
 import com.letta.mobile.data.model.MessageCreateRequest
@@ -114,6 +117,26 @@ open class MessageRepository @Inject constructor(
 
     suspend fun searchMessages(request: MessageSearchRequest): List<MessageSearchResult> {
         return messageApi.searchMessages(request)
+    }
+
+    suspend fun createBatch(request: CreateBatchMessagesRequest): Job {
+        return messageApi.createBatch(request)
+    }
+
+    suspend fun retrieveBatch(batchId: String): Job {
+        return messageApi.retrieveBatch(batchId)
+    }
+
+    suspend fun listBatches(): List<Job> {
+        return messageApi.listBatches(limit = 1000)
+    }
+
+    suspend fun listBatchMessages(batchId: String, agentId: String? = null): BatchMessagesResponse {
+        return messageApi.listBatchMessages(batchId = batchId, limit = 1000, agentId = agentId)
+    }
+
+    suspend fun cancelBatch(batchId: String) {
+        messageApi.cancelBatch(batchId)
     }
 
     open suspend fun fetchConversationInspectorMessages(conversationId: String): List<ConversationInspectorMessage> {
