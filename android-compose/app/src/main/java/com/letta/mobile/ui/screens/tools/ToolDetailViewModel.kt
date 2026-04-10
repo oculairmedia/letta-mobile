@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.api.ToolApi
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.ToolSchemaGenerateParams
 import com.letta.mobile.data.model.ToolUpdateParams
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.ToolRepository
@@ -56,15 +57,24 @@ class ToolDetailViewModel @Inject constructor(
         }
     }
 
-    fun updateTool(name: String, description: String?, sourceCode: String, tags: List<String>?) {
+    fun updateTool(description: String?, sourceCode: String, tags: List<String>?) {
         viewModelScope.launch {
             try {
+                val currentTool = (uiState.value as? UiState.Success)?.data
+                val sourceType = currentTool?.sourceType ?: "python"
+                val jsonSchema = toolApi.generateJsonSchema(
+                    ToolSchemaGenerateParams(
+                        code = sourceCode,
+                        sourceType = sourceType,
+                    )
+                )
                 val updated = toolRepository.updateTool(
                     toolId = toolId,
                     params = ToolUpdateParams(
-                        name = name,
                         description = description,
                         sourceCode = sourceCode,
+                        sourceType = sourceType,
+                        jsonSchema = jsonSchema,
                         tags = tags,
                     )
                 )

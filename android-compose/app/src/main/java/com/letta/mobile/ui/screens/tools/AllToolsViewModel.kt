@@ -109,10 +109,10 @@ class AllToolsViewModel @Inject constructor(
         }
     }
 
-    fun createTool(name: String, sourceCode: String) {
+    fun createTool(sourceCode: String) {
         viewModelScope.launch {
             try {
-                toolRepository.upsertTool(ToolCreateParams(name = name, sourceCode = sourceCode))
+                toolRepository.upsertTool(ToolCreateParams(sourceCode = sourceCode))
                 loadTools()
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to create tool"))

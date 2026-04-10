@@ -187,6 +187,16 @@ fun AllToolsScreen(
             }
         }
     }
+
+    if (showCreateDialog) {
+        CreateToolDialog(
+            onDismiss = { showCreateDialog = false },
+            onCreate = { sourceCode ->
+                viewModel.createTool(sourceCode)
+                showCreateDialog = false
+            },
+        )
+    }
 }
 
 @Composable

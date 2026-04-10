@@ -136,8 +136,8 @@ fun ToolDetailScreen(
         EditToolDialog(
             tool = tool,
             onDismiss = { showEditDialog = false },
-            onSave = { name, description, sourceCode, tags ->
-                viewModel.updateTool(name, description, sourceCode, tags)
+            onSave = { description, sourceCode, tags ->
+                viewModel.updateTool(description, sourceCode, tags)
                 showEditDialog = false
             },
         )
@@ -392,9 +392,8 @@ private fun AgentAttachDialog(
 private fun EditToolDialog(
     tool: Tool,
     onDismiss: () -> Unit,
-    onSave: (String, String?, String, List<String>?) -> Unit,
+    onSave: (String?, String, List<String>?) -> Unit,
 ) {
-    var name by remember(tool.id) { mutableStateOf(tool.name) }
     var description by remember(tool.id) { mutableStateOf(tool.description.orEmpty()) }
     var tagsText by remember(tool.id) { mutableStateOf(tool.tags.joinToString(", ")) }
     var sourceCode by remember(tool.id) { mutableStateOf(tool.sourceCode.orEmpty()) }
@@ -404,14 +403,6 @@ private fun EditToolDialog(
         title = { Text(stringResource(R.string.screen_tool_detail_edit_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text(stringResource(R.string.common_name)) },
-                    supportingText = { Text(stringResource(R.string.screen_tool_detail_name_helper)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
@@ -440,13 +431,12 @@ private fun EditToolDialog(
             TextButton(
                 onClick = {
                     onSave(
-                        name.trim(),
                         description.trim().ifBlank { null },
                         sourceCode,
                         tagsText.split(',').map { it.trim() }.filter { it.isNotBlank() }.ifEmpty { null },
                     )
                 },
-                enabled = name.isNotBlank() && sourceCode.isNotBlank(),
+                enabled = sourceCode.isNotBlank(),
             ) {
                 Text(stringResource(R.string.action_save))
             }

@@ -581,9 +581,8 @@
     <string name="screen_tool_detail_delete_action">Delete tool</string>
     <string name="screen_tool_detail_expand">Expand section</string>
     <string name="screen_tool_detail_collapse">Collapse section</string>
-    <string name="screen_tool_detail_source_code_helper">Python source code for this custom tool</string>
-    <string name="screen_tool_detail_name_helper">Renaming uses Letta\'s update endpoint and keeps the same tool id.</string>
+    <string name="screen_tool_detail_source_code_helper">Tool name and schema are derived from the source code when you save.</string>
     <string name="screen_create_tool_title">Create Custom Tool</string>
     <string name="screen_create_tool_source_code_label">Source Code</string>
-    <string name="screen_create_tool_source_code_helper">Python source code (imports must be inside the function)</string>
+    <string name="screen_create_tool_source_code_helper">Python source code (imports must be inside the function). The tool name is derived from the function definition.</string>
 </resources>

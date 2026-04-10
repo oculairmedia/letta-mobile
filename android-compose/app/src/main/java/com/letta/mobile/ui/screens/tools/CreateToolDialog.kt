@@ -24,9 +24,8 @@ import com.letta.mobile.R
 @Composable
 fun CreateToolDialog(
     onDismiss: () -> Unit,
-    onCreate: (name: String, sourceCode: String) -> Unit,
+    onCreate: (sourceCode: String) -> Unit,
 ) {
-    var name by remember { mutableStateOf("") }
     var sourceCode by remember { mutableStateOf("def my_tool(arg: str) -> str:\n    \"\"\"Describe what this tool does.\"\"\"\n    return f\"Result: {arg}\"\n") }
 
     AlertDialog(
@@ -37,13 +36,6 @@ fun CreateToolDialog(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text(stringResource(R.string.common_name)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
                 Text(
                     text = stringResource(R.string.screen_create_tool_source_code_helper),
                     style = MaterialTheme.typography.labelSmall,
@@ -62,8 +54,8 @@ fun CreateToolDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { onCreate(name, sourceCode) },
-                enabled = name.isNotBlank() && sourceCode.isNotBlank(),
+                onClick = { onCreate(sourceCode) },
+                enabled = sourceCode.isNotBlank(),
             ) { Text(stringResource(R.string.action_create)) }
         },
         dismissButton = {
