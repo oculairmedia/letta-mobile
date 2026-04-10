@@ -36,6 +36,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.effectiveServerType
+import com.letta.mobile.data.model.effectiveServerUrl
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
@@ -82,7 +84,12 @@ fun McpServerToolsScreen(
                         .fillMaxSize()
                         .padding(paddingValues),
                 ) {
-                    ServerSummaryCard(state.data.server.serverName, state.data.server.serverUrl, state.data.server.mcpServerType, state.data.tools.size)
+                    ServerSummaryCard(
+                        state.data.server.serverName,
+                        state.data.server.effectiveServerUrl(),
+                        state.data.server.effectiveServerType(),
+                        state.data.tools.size,
+                    )
                     if (state.data.tools.isEmpty()) {
                         EmptyState(
                             icon = Icons.Default.Build,

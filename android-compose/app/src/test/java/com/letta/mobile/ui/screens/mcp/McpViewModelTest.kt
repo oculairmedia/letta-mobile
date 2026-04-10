@@ -5,6 +5,10 @@ import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.McpServerCreateParams
 import com.letta.mobile.data.model.McpServerUpdateParams
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.effectiveAuthHeader
+import com.letta.mobile.data.model.effectiveAuthToken
+import com.letta.mobile.data.model.effectiveCustomHeaders
+import com.letta.mobile.data.model.effectiveEnv
 import com.letta.mobile.data.repository.McpServerRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.testutil.FakeMcpServerApi
@@ -188,6 +192,35 @@ class McpViewModelTest {
             val state = awaitItem() as UiState.Success
             assertEquals("s1", state.data.toolParents["t1"]?.serverId)
             assertEquals("Server 1", state.data.toolParents["t1"]?.serverName)
+        }
+    }
+
+    @Test
+    fun `server parity fields survive loadData`() = runTest {
+        val server = TestData.mcpServer(id = "s1", serverName = "Server 1").copy(
+            authHeader = "Authorization",
+            authToken = "Bearer secret",
+            customHeaders = mapOf("X-Test" to "true"),
+            env = mapOf("TOKEN" to "abc"),
+            organizationId = "org-1",
+            createdById = "user-1",
+            lastUpdatedById = "user-2",
+        )
+        fakeMcpRepo.setServers(listOf(server))
+        fakeToolRepo.setTools(emptyList())
+
+        viewModel.loadData()
+
+        viewModel.uiState.test {
+            val state = awaitItem() as UiState.Success
+            val loaded = state.data.servers.first()
+            assertEquals("Authorization", loaded.effectiveAuthHeader())
+            assertEquals("Bearer secret", loaded.effectiveAuthToken())
+            assertEquals("true", loaded.effectiveCustomHeaders()?.get("X-Test"))
+            assertEquals("abc", loaded.effectiveEnv()?.get("TOKEN"))
+            assertEquals("org-1", loaded.organizationId)
+            assertEquals("user-1", loaded.createdById)
+            assertEquals("user-2", loaded.lastUpdatedById)
         }
     }
 

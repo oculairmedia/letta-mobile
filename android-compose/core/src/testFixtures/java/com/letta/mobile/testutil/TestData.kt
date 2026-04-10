@@ -82,6 +82,7 @@ object TestData {
         id = id,
         serverName = serverName,
         serverUrl = serverUrl,
+        type = "streamable_http",
     )
 
     fun lettaConfig(

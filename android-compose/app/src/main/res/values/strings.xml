@@ -151,7 +151,16 @@
     <string name="action_add">Add</string>
     <string name="screen_mcp_empty">No MCP servers configured</string>
     <string name="screen_mcp_server_command">Command:</string>
+    <string name="screen_mcp_server_auth_header">Auth header: %1$s</string>
+    <string name="screen_mcp_server_token_present">Token configured</string>
+    <string name="screen_mcp_server_custom_headers_count">Custom headers: %1$d</string>
+    <string name="screen_mcp_server_env_count">Environment variables: %1$d</string>
+    <string name="screen_mcp_server_organization">Organization: %1$s</string>
     <string name="screen_mcp_server_created">Created: %1$s</string>
+    <string name="screen_mcp_server_updated">Updated: %1$s</string>
+    <string name="screen_mcp_server_created_by">Created by: %1$s</string>
+    <string name="screen_mcp_server_updated_by">Updated by: %1$s</string>
+    <string name="screen_mcp_server_metadata_count">Metadata entries: %1$d</string>
     <string name="screen_mcp_server_tools_count">%1$d discovered tools</string>
     <string name="screen_mcp_server_discovered_tools">Discovered Tools</string>
     <string name="screen_mcp_server_unchecked">Unchecked</string>

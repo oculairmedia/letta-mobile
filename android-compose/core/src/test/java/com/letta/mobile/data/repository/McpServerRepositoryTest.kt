@@ -2,6 +2,7 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.McpServerCreateParams
 import com.letta.mobile.data.model.McpServerUpdateParams
+import com.letta.mobile.data.model.effectiveServerType
 import com.letta.mobile.testutil.FakeMcpServerApi
 import com.letta.mobile.testutil.TestData
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -46,8 +47,10 @@ class McpServerRepositoryTest {
         val params = McpServerUpdateParams(
             serverName = "Updated Server",
             config = buildJsonObject {
+                put("type", "streamable_http")
                 put("mcp_server_type", "streamable_http")
                 put("server_url", "https://example.com/mcp")
+                put("auth_header", "Authorization")
             }
         )
 
@@ -55,6 +58,8 @@ class McpServerRepositoryTest {
 
         assertEquals("Updated Server", updated.serverName)
         assertEquals("https://example.com/mcp", updated.serverUrl)
+        assertEquals("Authorization", updated.authHeader)
+        assertEquals("streamable_http", updated.effectiveServerType())
         assertTrue(fakeApi.calls.contains("updateMcpServer:s1"))
     }
 

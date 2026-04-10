@@ -63,6 +63,14 @@ import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.McpServerCreateParams
 import com.letta.mobile.data.model.McpServerUpdateParams
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.effectiveArgs
+import com.letta.mobile.data.model.effectiveAuthHeader
+import com.letta.mobile.data.model.effectiveAuthToken
+import com.letta.mobile.data.model.effectiveCommand
+import com.letta.mobile.data.model.effectiveCustomHeaders
+import com.letta.mobile.data.model.effectiveEnv
+import com.letta.mobile.data.model.effectiveServerType
+import com.letta.mobile.data.model.effectiveServerUrl
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
@@ -387,7 +395,7 @@ private fun ServerCard(
                             text = server.serverName,
                             style = MaterialTheme.typography.titleMedium,
                         )
-                        server.mcpServerType?.let { serverType ->
+                        server.effectiveServerType()?.let { serverType ->
                             Spacer(modifier = Modifier.width(8.dp))
                             AssistChip(
                                 onClick = {},
@@ -396,7 +404,7 @@ private fun ServerCard(
                         }
                     }
 
-                    server.serverUrl?.let { url ->
+                    server.effectiveServerUrl()?.let { url ->
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = url,
@@ -407,7 +415,7 @@ private fun ServerCard(
                         )
                     }
 
-                    server.command?.let { command ->
+                    server.effectiveCommand()?.let { command ->
                         Spacer(modifier = Modifier.height(4.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
@@ -425,7 +433,7 @@ private fun ServerCard(
                         }
                     }
 
-                    server.args?.takeIf { it.isNotEmpty() }?.let { args ->
+                    server.effectiveArgs().takeIf { it.isNotEmpty() }?.let { args ->
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = args.joinToString(" "),
@@ -440,6 +448,93 @@ private fun ServerCard(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = stringResource(R.string.screen_mcp_server_created, createdAt),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
+                    server.updatedAt?.let { updatedAt ->
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = stringResource(R.string.screen_mcp_server_updated, updatedAt),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
+                    server.effectiveAuthHeader()?.let { authHeader ->
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = stringResource(R.string.screen_mcp_server_auth_header, authHeader),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
+                    server.effectiveAuthToken()?.let {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = stringResource(R.string.screen_mcp_server_token_present),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
+                    server.effectiveCustomHeaders()?.takeIf { it.isNotEmpty() }?.let { headers ->
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = stringResource(R.string.screen_mcp_server_custom_headers_count, headers.size),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
+                    server.effectiveEnv()?.takeIf { it.isNotEmpty() }?.let { env ->
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = stringResource(R.string.screen_mcp_server_env_count, env.size),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
+                    server.organizationId?.let { organizationId ->
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = stringResource(R.string.screen_mcp_server_organization, organizationId),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+
+                    server.createdById?.let { createdById ->
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = stringResource(R.string.screen_mcp_server_created_by, createdById),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+
+                    server.lastUpdatedById?.let { lastUpdatedById ->
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = stringResource(R.string.screen_mcp_server_updated_by, lastUpdatedById),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+
+                    if (server.metadata.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = stringResource(R.string.screen_mcp_server_metadata_count, server.metadata.size),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -727,22 +822,21 @@ private fun ServerFormDialog(
 private fun initialFormState(server: McpServer?): McpServerFormState {
     if (server == null) return McpServerFormState()
 
-    val config = server.config
-    val envText = config?.get("env")?.jsonObject?.entries
-        ?.joinToString("\n") { (key, value) -> "$key=${value.jsonPrimitive.content}" }
+    val envText = server.effectiveEnv()?.entries
+        ?.joinToString("\n") { (key, value) -> "$key=$value" }
         .orEmpty()
-    val customHeadersText = config?.get("custom_headers")?.jsonObject?.entries
-        ?.joinToString("\n") { (key, value) -> "$key=${value.jsonPrimitive.content}" }
+    val customHeadersText = server.effectiveCustomHeaders()?.entries
+        ?.joinToString("\n") { (key, value) -> "$key=$value" }
         .orEmpty()
 
     return McpServerFormState(
         serverName = server.serverName,
-        transportType = server.mcpServerType ?: if (server.command != null) MCP_TYPE_STDIO else MCP_TYPE_STREAMABLE_HTTP,
-        serverUrl = server.serverUrl.orEmpty(),
-        command = server.command.orEmpty(),
-        argsText = server.args?.joinToString(" ").orEmpty(),
-        authHeader = config?.get("auth_header")?.jsonPrimitive?.content.orEmpty(),
-        authToken = config?.get("auth_token")?.jsonPrimitive?.content.orEmpty(),
+        transportType = server.effectiveServerType() ?: if (server.effectiveCommand() != null) MCP_TYPE_STDIO else MCP_TYPE_STREAMABLE_HTTP,
+        serverUrl = server.effectiveServerUrl().orEmpty(),
+        command = server.effectiveCommand().orEmpty(),
+        argsText = server.effectiveArgs().joinToString(" "),
+        authHeader = server.effectiveAuthHeader().orEmpty(),
+        authToken = server.effectiveAuthToken().orEmpty(),
         customHeadersText = customHeadersText,
         envText = envText,
         rawConfigText = "",

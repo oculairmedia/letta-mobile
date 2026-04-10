@@ -7,6 +7,8 @@ import com.letta.mobile.data.model.McpServerCreateParams
 import com.letta.mobile.data.model.McpServerUpdateParams
 import com.letta.mobile.data.model.Tool
 import io.mockk.mockk
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 class FakeMcpServerApi : McpServerApi(mockk(relaxed = true)) {
     var servers = mutableListOf<McpServer>()
@@ -35,6 +37,12 @@ class FakeMcpServerApi : McpServerApi(mockk(relaxed = true)) {
                 ?.split(",")
                 ?.map { it.trim().trim('"') }
                 ?.filter { it.isNotBlank() } ?: emptyList(),
+            env = config["env"]?.jsonObject?.mapValues { (_, value) -> value.jsonPrimitive.content },
+            authHeader = config["auth_header"]?.toString()?.trim('"'),
+            authToken = config["auth_token"]?.toString()?.trim('"') ?: config["token"]?.toString()?.trim('"'),
+            customHeaders = config["custom_headers"]?.jsonObject?.mapValues { (_, value) -> value.jsonPrimitive.content },
+            type = config["type"]?.toString()?.trim('"'),
+            serverType = config["server_type"]?.toString()?.trim('"'),
             mcpServerType = config["mcp_server_type"]?.toString()?.trim('"'),
             config = config,
         )
@@ -58,6 +66,12 @@ class FakeMcpServerApi : McpServerApi(mockk(relaxed = true)) {
                 ?.map { it.trim().trim('"') }
                 ?.filter { it.isNotBlank() }
                 ?: current.args,
+            env = config?.get("env")?.jsonObject?.mapValues { (_, value) -> value.jsonPrimitive.content } ?: current.env,
+            authHeader = config?.get("auth_header")?.toString()?.trim('"') ?: current.authHeader,
+            authToken = config?.get("auth_token")?.toString()?.trim('"') ?: config?.get("token")?.toString()?.trim('"') ?: current.authToken,
+            customHeaders = config?.get("custom_headers")?.jsonObject?.mapValues { (_, value) -> value.jsonPrimitive.content } ?: current.customHeaders,
+            type = config?.get("type")?.toString()?.trim('"') ?: current.type,
+            serverType = config?.get("server_type")?.toString()?.trim('"') ?: current.serverType,
             mcpServerType = config?.get("mcp_server_type")?.toString()?.trim('"') ?: current.mcpServerType,
             config = config,
         )
