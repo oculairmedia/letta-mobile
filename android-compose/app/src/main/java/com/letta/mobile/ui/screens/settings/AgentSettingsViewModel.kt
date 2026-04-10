@@ -59,8 +59,8 @@ class AgentSettingsViewModel @Inject constructor(
             _uiState.value = UiState.Loading
             try {
                 val agent = agentRepository.getAgent(agentId).first()
-                val persona = agent.blocks?.find { it.label == "persona" }?.value ?: ""
-                val human = agent.blocks?.find { it.label == "human" }?.value ?: ""
+                val persona = agent.blocks.find { it.label == "persona" }?.value ?: ""
+                val human = agent.blocks.find { it.label == "human" }?.value ?: ""
                 originalPersonaBlock = persona
                 originalHumanBlock = human
                 _uiState.value = UiState.Success(

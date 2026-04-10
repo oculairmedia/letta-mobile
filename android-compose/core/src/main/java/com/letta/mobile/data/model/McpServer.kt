@@ -10,7 +10,7 @@ data class McpServer(
     @SerialName("server_name") val serverName: String,
     @SerialName("server_url") val serverUrl: String? = null,
     val command: String? = null,
-    val args: List<String>? = null,
+    val args: List<String> = emptyList(),
     @SerialName("mcp_server_type") val mcpServerType: String? = null,
     val config: JsonObject? = null,
     @SerialName("created_at") val createdAt: String? = null,

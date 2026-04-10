@@ -101,8 +101,8 @@ class ToolDetailViewModel @Inject constructor(
                 agentRepository.refreshAgents()
                 val agents = agentRepository.agents.value
                 _agentState.value = ToolAgentAttachmentUiState(
-                    attachedAgents = agents.filter { agent -> agent.tools?.any { it.id == toolId } == true },
-                    availableAgents = agents.filter { agent -> agent.tools?.any { it.id == toolId } != true },
+                    attachedAgents = agents.filter { agent -> agent.tools.any { it.id == toolId } },
+                    availableAgents = agents.filter { agent -> agent.tools.none { it.id == toolId } },
                 )
             } catch (e: Exception) {
                 _deleteState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to load agent attachments"))

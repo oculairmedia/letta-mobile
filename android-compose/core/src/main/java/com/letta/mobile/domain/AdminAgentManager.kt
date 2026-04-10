@@ -52,7 +52,7 @@ class AdminAgentManager @Inject constructor(
         try {
             val allAgents = agentApi.listAgents(limit = 1000)
             val byTag = allAgents.find { agent ->
-                agent.tags?.contains(ADMIN_TAG) == true
+                agent.tags.contains(ADMIN_TAG)
             }
             if (byTag != null) {
                 Log.d(TAG, "Found admin agent by tag: ${byTag.id}")

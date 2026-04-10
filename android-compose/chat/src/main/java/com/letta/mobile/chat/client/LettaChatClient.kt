@@ -214,8 +214,9 @@ class LettaChatClient(
             MessageType.TOOL_CALL -> MessageRole.Tool
             MessageType.TOOL_RETURN -> MessageRole.Tool
         }
-        val toolCalls = if (messageType == MessageType.TOOL_CALL && toolName != null) {
-            listOf(ChatToolCall(name = toolName, arguments = content, result = null))
+        val name = toolName
+        val toolCalls = if (messageType == MessageType.TOOL_CALL && name != null) {
+            listOf(ChatToolCall(name = name, arguments = content, result = null))
         } else null
 
         return ChatMessage(

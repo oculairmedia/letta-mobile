@@ -10,7 +10,7 @@ data class Passage(
     @SerialName("agent_id") val agentId: String? = null,
     @SerialName("source_id") val sourceId: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
-    val metadata: Map<String, String>? = null,
+    val metadata: Map<String, String> = emptyMap(),
 )
 
 @Serializable

@@ -29,7 +29,7 @@ data class AgentEntity(
         enableSleeptime = enableSleeptime,
         createdAt = createdAt,
         updatedAt = updatedAt,
-        tags = tagsJson?.split(",")?.filter { it.isNotBlank() },
+        tags = tagsJson?.split(",")?.filter { it.isNotBlank() } ?: emptyList(),
     )
 
     companion object {
@@ -43,9 +43,9 @@ data class AgentEntity(
             enableSleeptime = agent.enableSleeptime,
             createdAt = agent.createdAt,
             updatedAt = agent.updatedAt,
-            tagsJson = agent.tags?.joinToString(","),
-            toolCount = agent.tools?.size ?: 0,
-            blockCount = agent.blocks?.size ?: 0,
+            tagsJson = agent.tags.joinToString(","),
+            toolCount = agent.tools.size,
+            blockCount = agent.blocks.size,
         )
     }
 }

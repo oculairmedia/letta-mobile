@@ -89,7 +89,7 @@ class BlockLibraryViewModel @Inject constructor(
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
         val agentsByBlock = agents
             .flatMap { agent ->
-                agent.blocks?.map { block -> block.id to agent } ?: emptyList()
+                agent.blocks.map { block -> block.id to agent }
             }
             .groupBy({ it.first }, { it.second })
         _uiState.value = UiState.Success(

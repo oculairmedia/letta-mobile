@@ -43,9 +43,9 @@ class AgentSearch @Inject constructor() {
         maxPossibleWeight += NAME_WEIGHT
 
         // Tags matching
-        val tagScores = agent.tags?.map { tag ->
+        val tagScores = agent.tags.map { tag ->
             getBestMatchScore(tag, query)
-        } ?: emptyList()
+        }
         if (tagScores.isNotEmpty()) {
             totalScore += (tagScores.maxOrNull() ?: 0) * TAG_WEIGHT
             maxPossibleWeight += TAG_WEIGHT

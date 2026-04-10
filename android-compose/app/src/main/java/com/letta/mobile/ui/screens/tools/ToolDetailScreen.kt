@@ -247,7 +247,7 @@ private fun ToolDetailContent(
             }
         }
 
-        if (!tool.tags.isNullOrEmpty()) {
+        if (tool.tags.isNotEmpty()) {
             item {
                 HorizontalDivider()
                 Spacer(modifier = Modifier.height(4.dp))
@@ -257,7 +257,7 @@ private fun ToolDetailContent(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    tool.tags?.forEach { tag ->
+                    tool.tags.forEach { tag ->
                         AssistChip(onClick = {}, label = { Text(tag, style = MaterialTheme.typography.labelSmall) })
                     }
                 }
@@ -395,7 +395,7 @@ private fun EditToolDialog(
 ) {
     var name by remember(tool.id) { mutableStateOf(tool.name) }
     var description by remember(tool.id) { mutableStateOf(tool.description.orEmpty()) }
-    var tagsText by remember(tool.id) { mutableStateOf(tool.tags?.joinToString(", ").orEmpty()) }
+    var tagsText by remember(tool.id) { mutableStateOf(tool.tags.joinToString(", ")) }
     var sourceCode by remember(tool.id) { mutableStateOf(tool.sourceCode.orEmpty()) }
 
     AlertDialog(

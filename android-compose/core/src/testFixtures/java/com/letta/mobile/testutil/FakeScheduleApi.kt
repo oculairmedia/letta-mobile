@@ -37,7 +37,7 @@ class FakeScheduleApi : ScheduleApi(mockk(relaxed = true)) {
             message = com.letta.mobile.data.model.SchedulePayload(
                 messages = params.messages,
                 callbackUrl = params.callbackUrl,
-                includeReturnMessageTypes = params.includeReturnMessageTypes,
+                includeReturnMessageTypes = params.includeReturnMessageTypes ?: emptyList(),
                 maxSteps = params.maxSteps,
             ),
             schedule = params.schedule,

@@ -327,7 +327,7 @@ private fun RunDetailDialog(
                     Text(stringResource(R.string.screen_runs_metrics_title), style = MaterialTheme.typography.labelLarge)
                     it.numSteps?.let { numSteps -> Text(stringResource(R.string.screen_runs_metrics_num_steps_label, numSteps)) }
                     it.runNs?.let { runNs -> Text(stringResource(R.string.screen_runs_metrics_run_ns_label, runNs)) }
-                    if (!it.toolsUsed.isNullOrEmpty()) {
+                    if (it.toolsUsed.isNotEmpty()) {
                         Text(stringResource(R.string.screen_runs_metrics_tools_used_label, it.toolsUsed.joinToString(", ")))
                     }
                 }

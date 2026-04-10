@@ -13,8 +13,8 @@ data class Conversation(
     @SerialName("last_message_at") val lastMessageAt: String? = null,
     val archived: Boolean? = null,
     @SerialName("archived_at") val archivedAt: String? = null,
-    @SerialName("in_context_message_ids") val inContextMessageIds: List<String>? = null,
-    @SerialName("isolated_block_ids") val isolatedBlockIds: List<String>? = null,
+    @SerialName("in_context_message_ids") val inContextMessageIds: List<String> = emptyList(),
+    @SerialName("isolated_block_ids") val isolatedBlockIds: List<String> = emptyList(),
 )
 
 @Serializable

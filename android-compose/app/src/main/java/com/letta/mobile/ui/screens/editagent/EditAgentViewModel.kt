@@ -95,7 +95,7 @@ class EditAgentViewModel @Inject constructor(
             _uiState.value = UiState.Loading
             try {
                 val agent = agentRepository.getAgent(agentId).first()
-                val editableBlocks = agent.blocks?.map { block ->
+                val editableBlocks = agent.blocks.map { block ->
                     EditableBlock(
                         id = block.id,
                         label = block.label ?: "",
@@ -105,7 +105,7 @@ class EditAgentViewModel @Inject constructor(
                         isTemplate = block.isTemplate ?: false,
                         readOnly = block.readOnly ?: false,
                     )
-                } ?: emptyList()
+                }
                 toolRepository.refreshTools()
                 val availableTools = toolRepository.getTools().first()
                 originalBlocks = editableBlocks.associateBy { it.label }
@@ -119,8 +119,8 @@ class EditAgentViewModel @Inject constructor(
                         embedding = agent.embedding ?: "",
                         blocks = editableBlocks,
                         systemPrompt = agent.system ?: "",
-                        tags = agent.tags ?: emptyList(),
-                        attachedTools = agent.tools ?: emptyList(),
+                        tags = agent.tags,
+                        attachedTools = agent.tools,
                         availableTools = availableTools,
                         providerType = agent.modelSettings?.providerType ?: "",
                         temperature = agent.modelSettings?.temperature?.toFloat() ?: 1.0f,

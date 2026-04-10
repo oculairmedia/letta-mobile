@@ -294,8 +294,8 @@ private fun FavoriteAgentCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                val toolCount = agent.tools?.size ?: 0
-                val blockCount = agent.blocks?.size ?: 0
+                val toolCount = agent.tools.size
+                val blockCount = agent.blocks.size
                 InfoChip(label = "Tools", value = toolCount.toString(), color = subtleColor)
                 InfoChip(label = "Memory", value = "$blockCount blocks", color = subtleColor)
                 agent.modelSettings?.temperature?.let {
@@ -306,7 +306,7 @@ private fun FavoriteAgentCard(
                 }
             }
 
-            agent.tags?.takeIf { it.isNotEmpty() }?.let { tags ->
+            agent.tags.takeIf { it.isNotEmpty() }?.let { tags ->
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     tags.take(4).forEach { tag ->

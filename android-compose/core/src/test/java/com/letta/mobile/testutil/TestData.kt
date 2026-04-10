@@ -16,9 +16,9 @@ object TestData {
         name: String = "Test Agent",
         model: String? = "letta/letta-free",
         description: String? = "A test agent",
-        tags: List<String>? = listOf("test"),
+        tags: List<String> = listOf("test"),
         system: String? = null,
-        blocks: List<Block>? = null,
+        blocks: List<Block> = emptyList(),
     ) = Agent(
         id = id,
         name = name,

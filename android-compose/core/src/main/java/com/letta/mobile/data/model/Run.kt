@@ -25,7 +25,7 @@ data class Run(
     @SerialName("completed_at") val completedAt: String? = null,
     @SerialName("conversation_id") val conversationId: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
-    val metadata: Map<String, JsonElement>? = null,
+    val metadata: Map<String, JsonElement> = emptyMap(),
     @SerialName("request_config") val requestConfig: RunRequestConfig? = null,
     val status: String? = null,
     @SerialName("stop_reason") val stopReason: String? = null,
@@ -40,7 +40,7 @@ data class RunMetrics(
     @SerialName("run_start_ns") val runStartNs: Long? = null,
     @SerialName("run_ns") val runNs: Long? = null,
     @SerialName("num_steps") val numSteps: Int? = null,
-    @SerialName("tools_used") val toolsUsed: List<String>? = null,
+    @SerialName("tools_used") val toolsUsed: List<String> = emptyList(),
     @SerialName("base_template_id") val baseTemplateId: String? = null,
 )
 

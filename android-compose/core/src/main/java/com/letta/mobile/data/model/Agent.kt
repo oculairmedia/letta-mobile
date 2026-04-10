@@ -13,15 +13,15 @@ data class Agent(
     @SerialName("model_settings") val modelSettings: ModelSettings? = null,
     @SerialName("llm_config") val llmConfig: LlmConfig? = null,
     @SerialName("context_window_limit") val contextWindowLimit: Int? = null,
-    val blocks: List<Block>? = null,
-    val tools: List<Tool>? = null,
-    val tags: List<String>? = null,
+    val blocks: List<Block> = emptyList(),
+    val tools: List<Tool> = emptyList(),
+    val tags: List<String> = emptyList(),
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null,
     val system: String? = null,
     @SerialName("enable_sleeptime") val enableSleeptime: Boolean? = null,
     @SerialName("agent_type") val agentType: String? = null,
-    @SerialName("message_ids") val messageIds: List<String>? = null,
+    @SerialName("message_ids") val messageIds: List<String> = emptyList(),
 )
 
 @Serializable

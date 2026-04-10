@@ -118,7 +118,7 @@ class ArchivalViewModel @Inject constructor(
         val current = (_uiState.value as? UiState.Success)?.data ?: return emptyList()
         return current.passages.filter { passage ->
             (!current.filterHasSource || !passage.sourceId.isNullOrBlank()) &&
-                (!current.filterHasMetadata || !passage.metadata.isNullOrEmpty())
+                (!current.filterHasMetadata || passage.metadata.isNotEmpty())
         }
     }
 

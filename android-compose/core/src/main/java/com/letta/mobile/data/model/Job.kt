@@ -11,7 +11,7 @@ data class Job(
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("completed_at") val completedAt: String? = null,
     @SerialName("stop_reason") val stopReason: String? = null,
-    val metadata: Map<String, JsonElement>? = null,
+    val metadata: Map<String, JsonElement> = emptyMap(),
     @SerialName("job_type") val jobType: String? = null,
     val background: Boolean? = null,
     @SerialName("agent_id") val agentId: String? = null,

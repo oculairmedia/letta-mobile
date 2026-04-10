@@ -34,7 +34,7 @@ class FakeMcpServerApi : McpServerApi(mockk(relaxed = true)) {
                 ?.removeSuffix("]")
                 ?.split(",")
                 ?.map { it.trim().trim('"') }
-                ?.filter { it.isNotBlank() },
+                ?.filter { it.isNotBlank() } ?: emptyList(),
             mcpServerType = config["mcp_server_type"]?.toString()?.trim('"'),
             config = config,
         )

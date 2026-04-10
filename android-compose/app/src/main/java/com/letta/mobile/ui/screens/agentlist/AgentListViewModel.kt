@@ -139,7 +139,7 @@ class AgentListViewModel @Inject constructor(
             agent.name.lowercase().contains(q) ||
                 (agent.description?.lowercase()?.contains(q) == true) ||
                 (agent.model?.lowercase()?.contains(q) == true) ||
-                (agent.tags?.any { it.lowercase().contains(q) } == true)
+                agent.tags.any { it.lowercase().contains(q) }
         }
     }
 

@@ -13,7 +13,7 @@ data class Tool(
     @SerialName("source_code") val sourceCode: String? = null,
     @SerialName("source_type") val sourceType: String? = null,
     @SerialName("json_schema") val jsonSchema: JsonObject? = null,
-    val tags: List<String>? = null,
+    val tags: List<String> = emptyList(),
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null,
 )

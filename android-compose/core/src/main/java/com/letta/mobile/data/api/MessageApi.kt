@@ -11,10 +11,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class MessageApi @Inject constructor(
+open class MessageApi @Inject constructor(
     private val apiClient: LettaApiClient
 ) {
-    suspend fun sendMessage(agentId: String, request: MessageCreateRequest): LettaResponse {
+    open suspend fun sendMessage(agentId: String, request: MessageCreateRequest): LettaResponse {
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
 
@@ -28,7 +28,7 @@ class MessageApi @Inject constructor(
         return response.body()
     }
 
-    suspend fun sendConversationMessage(
+    open suspend fun sendConversationMessage(
         conversationId: String,
         request: MessageCreateRequest
     ): ByteReadChannel {
@@ -45,7 +45,7 @@ class MessageApi @Inject constructor(
         return response.body()
     }
 
-    suspend fun listMessages(
+    open suspend fun listMessages(
         agentId: String,
         limit: Int? = null,
         after: String? = null,
@@ -65,7 +65,7 @@ class MessageApi @Inject constructor(
         return response.body()
     }
 
-    suspend fun listConversationMessages(
+    open suspend fun listConversationMessages(
         conversationId: String,
         limit: Int? = null,
         after: String? = null,
@@ -85,7 +85,7 @@ class MessageApi @Inject constructor(
         return response.body()
     }
 
-    suspend fun resetMessages(agentId: String) {
+    open suspend fun resetMessages(agentId: String) {
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
 

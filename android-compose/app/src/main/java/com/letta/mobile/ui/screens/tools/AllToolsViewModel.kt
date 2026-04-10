@@ -134,7 +134,7 @@ class AllToolsViewModel @Inject constructor(
                 (tool.description?.lowercase()?.contains(q) == true) ||
                 (tool.toolType?.lowercase()?.contains(q) == true) ||
                 (tool.sourceType?.lowercase()?.contains(q) == true) ||
-                (tool.tags?.any { it.lowercase().contains(q) } == true)
+                tool.tags.any { it.lowercase().contains(q) }
         }
     }
 }

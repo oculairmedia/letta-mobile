@@ -259,7 +259,7 @@ data class UsageStatistics(
     @SerialName("cache_write_tokens") val cacheWriteTokens: Int? = null,
     @SerialName("reasoning_tokens") val reasoningTokens: Int? = null,
     @SerialName("context_tokens") val contextTokens: Int? = null,
-    @SerialName("run_ids") val runIds: List<String>? = null,
+    @SerialName("run_ids") val runIds: List<String> = emptyList(),
     @SerialName("message_type") val messageType: String = "usage_statistics",
 )
 

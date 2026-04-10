@@ -28,6 +28,7 @@ open class LettaApiClient @Inject constructor(
         isLenient = true
         encodeDefaults = true
         explicitNulls = false
+        coerceInputValues = true
     }
 
     private val mutex = Mutex()

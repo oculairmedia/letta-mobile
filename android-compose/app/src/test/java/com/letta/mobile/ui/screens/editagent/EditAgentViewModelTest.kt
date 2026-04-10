@@ -247,7 +247,7 @@ class EditAgentViewModelTest {
                 model = params.model,
                 embedding = params.embedding,
                 system = params.system,
-                tags = params.tags,
+                tags = params.tags ?: emptyList(),
                 enableSleeptime = params.enableSleeptime,
                 agentType = "stateful",
                 modelSettings = params.modelSettings,

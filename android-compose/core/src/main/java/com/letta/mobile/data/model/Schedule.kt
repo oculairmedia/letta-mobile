@@ -24,7 +24,7 @@ data class ScheduleDefinition(
 data class SchedulePayload(
     val messages: List<ScheduleMessage>,
     @SerialName("callback_url") val callbackUrl: String? = null,
-    @SerialName("include_return_message_types") val includeReturnMessageTypes: List<String>? = null,
+    @SerialName("include_return_message_types") val includeReturnMessageTypes: List<String> = emptyList(),
     @SerialName("max_steps") val maxSteps: Double? = null,
 )
 

@@ -78,7 +78,7 @@ class FakeToolApi : ToolApi(mockk(relaxed = true)) {
             name = params.name,
             description = params.description,
             sourceCode = params.sourceCode,
-            tags = params.tags,
+            tags = params.tags ?: emptyList(),
             toolType = if (existingIndex >= 0) tools[existingIndex].toolType else "custom",
             sourceType = if (existingIndex >= 0) tools[existingIndex].sourceType else "python",
         )
