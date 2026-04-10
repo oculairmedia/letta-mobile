@@ -22,13 +22,15 @@ class PassageApi @Inject constructor(
         agentId: String,
         limit: Int? = null,
         after: String? = null,
+        search: String? = null,
     ): List<Passage> {
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
 
-        val response = client.get("$baseUrl/v1/agents/$agentId/passages") {
+        val response = client.get("$baseUrl/v1/agents/$agentId/archival-memory") {
             parameter("limit", limit)
             parameter("after", after)
+            parameter("search", search)
         }
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())
@@ -40,21 +42,29 @@ class PassageApi @Inject constructor(
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
 
-        val response = client.post("$baseUrl/v1/agents/$agentId/passages") {
+        val response = client.post("$baseUrl/v1/agents/$agentId/archival-memory") {
             contentType(ContentType.Application.Json)
             setBody(params)
         }
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())
         }
-        return response.body()
+        val createdPassages: List<Passage> = response.body()
+        return when (createdPassages.size) {
+            1 -> createdPassages.single()
+            0 -> throw ApiException(response.status.value, "Archival memory create returned no passages")
+            else -> throw ApiException(
+                response.status.value,
+                "Archival memory create returned ${createdPassages.size} passages; expected exactly one"
+            )
+        }
     }
 
     suspend fun deletePassage(agentId: String, passageId: String) {
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
 
-        val response = client.delete("$baseUrl/v1/agents/$agentId/passages/$passageId")
+        val response = client.delete("$baseUrl/v1/agents/$agentId/archival-memory/$passageId")
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())
         }
@@ -65,16 +75,6 @@ class PassageApi @Inject constructor(
         query: String,
         limit: Int? = null,
     ): List<Passage> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
-
-        val response = client.get("$baseUrl/v1/agents/$agentId/archival") {
-            parameter("query", query)
-            parameter("limit", limit)
-        }
-        if (response.status.value !in 200..299) {
-            throw ApiException(response.status.value, response.bodyAsText())
-        }
-        return response.body()
+        return listPassages(agentId = agentId, limit = limit, search = query)
     }
 }
