@@ -103,6 +103,6 @@ data: {"id":"2","message_type":"assistant_message","content":"OK"}
         val results = SseParser.parse(channelFrom(sse)).toList()
         assertEquals(1, results.size)
         assertTrue(results[0] is ToolCallMessage)
-        assertEquals("search", (results[0] as ToolCallMessage).toolCall.name)
+        assertEquals("search", (results[0] as ToolCallMessage).toolCall?.name)
     }
 }

@@ -48,10 +48,12 @@ class LettaMessageSerializerTest {
         val msg = json.decodeFromString<LettaMessage>(raw)
         assertTrue(msg is ToolCallMessage)
         val tcm = msg as ToolCallMessage
+        val toolCall = tcm.toolCall
         assertEquals("msg-004", tcm.id)
-        assertEquals("web_search", tcm.toolCall.name)
-        assertEquals("tc-001", tcm.toolCall.effectiveId)
-        assertTrue(tcm.toolCall.arguments.contains("Kotlin"))
+        assertNotNull(toolCall)
+        assertEquals("web_search", toolCall?.name)
+        assertEquals("tc-001", toolCall?.effectiveId)
+        assertTrue(toolCall?.arguments?.contains("Kotlin") == true)
     }
 
     @Test
