@@ -98,6 +98,7 @@ fun ConversationsScreen(
     onNavigateToSchedules: () -> Unit = {},
     onNavigateToRuns: () -> Unit = {},
     onNavigateToJobs: () -> Unit = {},
+    onNavigateToMessageBatches: () -> Unit = {},
     onNavigateToMcp: () -> Unit = {},
     onNavigateToAbout: () -> Unit = {},
     viewModel: ConversationsViewModel = hiltViewModel()
@@ -177,6 +178,11 @@ fun ConversationsScreen(
                             text = { Text(stringResource(R.string.screen_nav_jobs)) },
                             onClick = { showOverflowMenu = false; onNavigateToJobs() },
                             leadingIcon = { Icon(Icons.Default.AccessTime, contentDescription = null) },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.screen_nav_message_batches)) },
+                            onClick = { showOverflowMenu = false; onNavigateToMessageBatches() },
+                            leadingIcon = { Icon(Icons.Default.ChatBubbleOutline, contentDescription = null) },
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.screen_nav_mcp_servers)) },
