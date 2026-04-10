@@ -14,6 +14,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
+import com.letta.mobile.data.model.AppTheme
+import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.CardGroup
@@ -60,6 +62,8 @@ fun ConfigScreen(
                 onServerUrlChange = { viewModel.updateServerUrl(it) },
                 onApiTokenChange = { viewModel.updateApiToken(it) },
                 onThemeChange = { viewModel.updateTheme(it) },
+                onThemePresetChange = { viewModel.updateThemePreset(it) },
+                onAmoledDarkModeChange = { viewModel.updateAmoledDarkMode(it) },
                 onSave = {
                     viewModel.saveConfig(
                         onSuccess = { snackbar.dispatch("Configuration saved"); onNavigateBack() },
@@ -78,7 +82,9 @@ private fun ConfigContent(
     onModeChange: (ServerMode) -> Unit,
     onServerUrlChange: (String) -> Unit,
     onApiTokenChange: (String) -> Unit,
-    onThemeChange: (Boolean) -> Unit,
+    onThemeChange: (AppTheme) -> Unit,
+    onThemePresetChange: (ThemePreset) -> Unit,
+    onAmoledDarkModeChange: (Boolean) -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -141,11 +147,60 @@ private fun ConfigContent(
 
         CardGroup(title = { Text(stringResource(R.string.screen_config_appearance_section)) }) {
             item(
-                headlineContent = { Text(stringResource(R.string.common_dark_theme)) },
+                headlineContent = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(stringResource(R.string.screen_config_theme_mode))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            FilterChip(
+                                selected = state.theme == AppTheme.SYSTEM,
+                                onClick = { onThemeChange(AppTheme.SYSTEM) },
+                                label = { Text(stringResource(R.string.screen_config_theme_mode_system)) },
+                                modifier = Modifier.weight(1f),
+                            )
+                            FilterChip(
+                                selected = state.theme == AppTheme.LIGHT,
+                                onClick = { onThemeChange(AppTheme.LIGHT) },
+                                label = { Text(stringResource(R.string.common_light_theme)) },
+                                modifier = Modifier.weight(1f),
+                            )
+                            FilterChip(
+                                selected = state.theme == AppTheme.DARK,
+                                onClick = { onThemeChange(AppTheme.DARK) },
+                                label = { Text(stringResource(R.string.common_dark_theme)) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                },
+            )
+            item(
+                headlineContent = {
+                    @OptIn(ExperimentalLayoutApi::class)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        ThemePreset.entries.forEach { preset ->
+                            FilterChip(
+                                selected = state.themePreset == preset,
+                                onClick = { onThemePresetChange(preset) },
+                                label = { Text(themePresetLabel(preset)) },
+                            )
+                        }
+                    }
+                },
+                supportingContent = { Text(stringResource(R.string.screen_config_theme_preset)) },
+            )
+            item(
+                headlineContent = { Text(stringResource(R.string.screen_config_amoled_dark_mode)) },
                 trailingContent = {
                     Switch(
-                        checked = state.isDarkTheme,
-                        onCheckedChange = onThemeChange,
+                        checked = state.amoledDarkMode,
+                        onCheckedChange = onAmoledDarkModeChange,
+                        enabled = state.theme != AppTheme.LIGHT,
                     )
                 },
             )
@@ -158,5 +213,16 @@ private fun ConfigContent(
                 leadingContent = { Icon(Icons.Default.Save, contentDescription = null) },
             )
         }
+    }
+}
+
+@Composable
+private fun themePresetLabel(themePreset: ThemePreset): String {
+    return when (themePreset) {
+        ThemePreset.DEFAULT -> stringResource(R.string.screen_config_theme_preset_default)
+        ThemePreset.SAKURA -> stringResource(R.string.screen_config_theme_preset_sakura)
+        ThemePreset.OCEAN -> stringResource(R.string.screen_config_theme_preset_ocean)
+        ThemePreset.AUTUMN -> stringResource(R.string.screen_config_theme_preset_autumn)
+        ThemePreset.SPRING -> stringResource(R.string.screen_config_theme_preset_spring)
     }
 }

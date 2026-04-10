@@ -5,10 +5,12 @@ import android.content.SharedPreferences
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.util.EncryptedPrefsHelper
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -48,6 +50,8 @@ class SettingsRepository @Inject constructor(
         val CONFIGS = stringPreferencesKey("configs")
         val ACTIVE_CONFIG_ID = stringPreferencesKey("active_config_id")
         val THEME = stringPreferencesKey("theme")
+        val THEME_PRESET = stringPreferencesKey("theme_preset")
+        val AMOLED_DARK_MODE = booleanPreferencesKey("amoled_dark_mode")
         val FAVORITE_AGENT_ID = stringPreferencesKey("favorite_agent_id")
         val ADMIN_AGENT_ID = stringPreferencesKey("admin_agent_id")
     }
@@ -124,6 +128,19 @@ class SettingsRepository @Inject constructor(
         }
     }
 
+    fun getThemePreset(): Flow<ThemePreset> = dataStore.data.map { prefs ->
+        val presetName = prefs[Keys.THEME_PRESET] ?: ThemePreset.DEFAULT.name
+        try {
+            ThemePreset.valueOf(presetName)
+        } catch (e: IllegalArgumentException) {
+            ThemePreset.DEFAULT
+        }
+    }
+
+    fun getAmoledDarkMode(): Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[Keys.AMOLED_DARK_MODE] ?: false
+    }
+
     fun setAdminAgentId(agentId: String?) {
         _adminAgentId.update { agentId }
         if (agentId != null) {
@@ -154,6 +171,18 @@ class SettingsRepository @Inject constructor(
     suspend fun setTheme(theme: AppTheme) {
         dataStore.edit { prefs ->
             prefs[Keys.THEME] = theme.name
+        }
+    }
+
+    suspend fun setThemePreset(themePreset: ThemePreset) {
+        dataStore.edit { prefs ->
+            prefs[Keys.THEME_PRESET] = themePreset.name
+        }
+    }
+
+    suspend fun setAmoledDarkMode(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[Keys.AMOLED_DARK_MODE] = enabled
         }
     }
 

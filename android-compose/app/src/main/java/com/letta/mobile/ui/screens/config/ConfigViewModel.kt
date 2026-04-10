@@ -2,13 +2,16 @@ package com.letta.mobile.ui.screens.config
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.ui.common.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -22,7 +25,9 @@ data class ConfigUiState(
     val mode: ServerMode = ServerMode.CLOUD,
     val serverUrl: String = "",
     val apiToken: String = "",
-    val isDarkTheme: Boolean = true
+    val theme: AppTheme = AppTheme.SYSTEM,
+    val themePreset: ThemePreset = ThemePreset.DEFAULT,
+    val amoledDarkMode: Boolean = false,
 )
 
 @HiltViewModel
@@ -42,14 +47,24 @@ class ConfigViewModel @Inject constructor(
             _uiState.value = UiState.Loading
             try {
                 val config = settingsRepository.activeConfig.value
+                val appTheme = settingsRepository.getTheme().first()
+                val themePreset = settingsRepository.getThemePreset().first()
+                val amoledDarkMode = settingsRepository.getAmoledDarkMode().first()
                 val configUiState = if (config != null) {
                     ConfigUiState(
                         mode = if (config.mode == LettaConfig.Mode.CLOUD) ServerMode.CLOUD else ServerMode.SELF_HOSTED,
                         serverUrl = config.serverUrl,
-                        apiToken = config.accessToken ?: ""
+                        apiToken = config.accessToken ?: "",
+                        theme = appTheme,
+                        themePreset = themePreset,
+                        amoledDarkMode = amoledDarkMode,
                     )
                 } else {
-                    ConfigUiState()
+                    ConfigUiState(
+                        theme = appTheme,
+                        themePreset = themePreset,
+                        amoledDarkMode = amoledDarkMode,
+                    )
                 }
                 _uiState.value = UiState.Success(configUiState)
             } catch (e: Exception) {
@@ -79,10 +94,24 @@ class ConfigViewModel @Inject constructor(
         }
     }
 
-    fun updateTheme(isDark: Boolean) {
+    fun updateTheme(theme: AppTheme) {
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(isDarkTheme = isDark))
+            _uiState.value = UiState.Success(currentState.copy(theme = theme))
+        }
+    }
+
+    fun updateThemePreset(themePreset: ThemePreset) {
+        val currentState = (_uiState.value as? UiState.Success)?.data
+        if (currentState != null) {
+            _uiState.value = UiState.Success(currentState.copy(themePreset = themePreset))
+        }
+    }
+
+    fun updateAmoledDarkMode(enabled: Boolean) {
+        val currentState = (_uiState.value as? UiState.Success)?.data
+        if (currentState != null) {
+            _uiState.value = UiState.Success(currentState.copy(amoledDarkMode = enabled))
         }
     }
 
@@ -107,6 +136,9 @@ class ConfigViewModel @Inject constructor(
                     accessToken = state.apiToken.trim().ifBlank { null }
                 )
                 settingsRepository.saveConfig(config)
+                settingsRepository.setTheme(state.theme)
+                settingsRepository.setThemePreset(state.themePreset)
+                settingsRepository.setAmoledDarkMode(state.amoledDarkMode)
                 onSuccess()
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(e.message ?: "Failed to save config")

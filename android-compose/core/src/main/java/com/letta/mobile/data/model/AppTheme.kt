@@ -5,3 +5,11 @@ enum class AppTheme {
     DARK,
     SYSTEM
 }
+
+enum class ThemePreset {
+    DEFAULT,
+    SAKURA,
+    OCEAN,
+    AUTUMN,
+    SPRING,
+}
