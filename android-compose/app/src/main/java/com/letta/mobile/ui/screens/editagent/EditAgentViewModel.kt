@@ -74,6 +74,7 @@ class EditAgentViewModel @Inject constructor(
     val embeddingModels: StateFlow<List<com.letta.mobile.data.model.EmbeddingModel>> = modelRepository.embeddingModels
 
     @Volatile private var originalBlocks: Map<String, EditableBlock> = emptyMap()
+    @Volatile private var originalEmbedding: String = ""
 
     init {
         loadAgent()
@@ -110,6 +111,11 @@ class EditAgentViewModel @Inject constructor(
                 toolRepository.refreshTools()
                 val availableTools = toolRepository.getTools().first()
                 originalBlocks = editableBlocks.associateBy { it.label }
+                val resolvedEmbedding = agent.embedding
+                    ?: agent.embeddingConfig?.handle
+                    ?: agent.embeddingConfig?.embeddingModel
+                    ?: ""
+                originalEmbedding = resolvedEmbedding
                 _uiState.value = UiState.Success(
                     EditAgentUiState(
                         agent = agent,
@@ -117,10 +123,7 @@ class EditAgentViewModel @Inject constructor(
                         name = agent.name,
                         description = agent.description ?: "",
                         model = agent.model ?: "",
-                        embedding = agent.embedding
-                            ?: agent.embeddingConfig?.handle
-                            ?: agent.embeddingConfig?.embeddingModel
-                            ?: "",
+                        embedding = resolvedEmbedding,
                         blocks = editableBlocks,
                         systemPrompt = agent.system ?: "",
                         tags = agent.tags,
@@ -321,13 +324,14 @@ class EditAgentViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val state = (_uiState.value as? UiState.Success)?.data ?: return@launch
+                val embeddingChanged = state.embedding != originalEmbedding
                 agentRepository.updateAgent(
                     agentId,
                     AgentUpdateParams(
                         name = state.name,
                         description = state.description,
                         model = state.model,
-                        embedding = state.embedding.ifBlank { null },
+                        embedding = if (embeddingChanged) state.embedding.ifBlank { null } else null,
                         system = state.systemPrompt,
                         tags = state.tags,
                         enableSleeptime = state.enableSleeptime,
