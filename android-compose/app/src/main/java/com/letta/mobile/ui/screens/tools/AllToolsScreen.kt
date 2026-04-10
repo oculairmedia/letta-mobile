@@ -122,7 +122,7 @@ fun AllToolsScreen(
         },
     ) { paddingValues ->
         when (val state = uiState) {
-            is UiState.Loading -> ShimmerGrid()
+            is UiState.Loading -> ShimmerGrid(modifier = Modifier.padding(paddingValues))
             is UiState.Error -> ErrorContent(
                 message = state.message,
                 onRetry = { viewModel.loadTools() },

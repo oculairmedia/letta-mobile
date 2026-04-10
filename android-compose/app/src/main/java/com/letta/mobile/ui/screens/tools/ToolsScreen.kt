@@ -1,9 +1,11 @@
 package com.letta.mobile.ui.screens.tools
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -21,8 +23,8 @@ import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
-import com.letta.mobile.ui.components.LoadingIndicator
-import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.components.ShimmerBox
+import com.letta.mobile.ui.components.shimmerColor
 
 @Composable
 fun ToolsScreen(
@@ -32,7 +34,7 @@ fun ToolsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     when (val state = uiState) {
-        is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
+        is UiState.Loading -> ToolsSkeletonList(modifier = modifier)
         is UiState.Error -> ErrorContent(
             message = state.message,
             onRetry = { viewModel.loadTools() },
@@ -154,4 +156,54 @@ private fun ToolCard(
         onDismiss = { showRemoveDialog = false },
         destructive = true,
     )
+}
+
+@Composable
+private fun ToolsSkeletonList(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        repeat(4) {
+            ToolCardSkeleton()
+        }
+    }
+}
+
+@Composable
+private fun ToolCardSkeleton(modifier: Modifier = Modifier) {
+    val color = shimmerColor()
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(color)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    ShimmerBox(widthFraction = 0.5f, height = 16.dp)
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                ShimmerBox(widthFraction = 0.8f, height = 12.dp)
+                Spacer(modifier = Modifier.height(8.dp))
+                ShimmerBox(widthFraction = 0.25f, height = 24.dp, cornerRadius = 12.dp)
+            }
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(color)
+            )
+        }
+    }
 }
