@@ -28,7 +28,11 @@ import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.automirrored.filled.ManageSearch
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.ForkRight
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SmartToy
@@ -69,6 +73,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.repository.ConversationInspectorMessage
+import com.letta.mobile.ui.components.ActionSheet
+import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.LoadingIndicator
@@ -344,39 +350,34 @@ private fun ConversationCard(
             }
         }
 
-        DropdownMenu(
-            expanded = showContextMenu,
-            onDismissRequest = { showContextMenu = false },
-        ) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.screen_conversations_admin_details)) },
-                onClick = {
-                    showContextMenu = false
-                    onOpenAdmin()
-                },
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.action_rename)) },
-                onClick = {
-                    showContextMenu = false
-                    showRenameDialog = true
-                },
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.action_fork)) },
-                onClick = {
-                    showContextMenu = false
-                    onFork()
-                },
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) },
-                onClick = {
-                    showContextMenu = false
-                    showDeleteDialog = true
-                },
-            )
-        }
+    }
+
+    ActionSheet(
+        show = showContextMenu,
+        onDismiss = { showContextMenu = false },
+        title = title,
+    ) {
+        ActionSheetItem(
+            text = stringResource(R.string.screen_conversations_admin_details),
+            icon = Icons.AutoMirrored.Filled.ManageSearch,
+            onClick = { showContextMenu = false; onOpenAdmin() },
+        )
+        ActionSheetItem(
+            text = stringResource(R.string.action_rename),
+            icon = Icons.Default.Edit,
+            onClick = { showContextMenu = false; showRenameDialog = true },
+        )
+        ActionSheetItem(
+            text = stringResource(R.string.action_fork),
+            icon = Icons.Default.ForkRight,
+            onClick = { showContextMenu = false; onFork() },
+        )
+        ActionSheetItem(
+            text = stringResource(R.string.action_delete),
+            icon = Icons.Default.Delete,
+            onClick = { showContextMenu = false; showDeleteDialog = true },
+            destructive = true,
+        )
     }
 
     ConfirmDialog(

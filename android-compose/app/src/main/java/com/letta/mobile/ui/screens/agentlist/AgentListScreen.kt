@@ -24,6 +24,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Search
@@ -33,8 +35,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -77,6 +77,8 @@ import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ModelSettings
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.ui.components.ActionSheet
+import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.ModelDropdown
 import com.letta.mobile.ui.components.EmptyState
@@ -431,32 +433,29 @@ private fun AgentCard(
             }
         }
 
-        DropdownMenu(
-            expanded = showContextMenu,
-            onDismissRequest = { showContextMenu = false },
-        ) {
-            DropdownMenuItem(
-                text = {
-                    Text(if (isFavorite) "Remove Favorite" else "Set as Favorite")
-                },
-                onClick = { showContextMenu = false; onToggleFavorite() },
-                leadingIcon = {
-                    Icon(
-                        if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = null,
-                        tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-                    )
-                },
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.action_edit)) },
-                onClick = { showContextMenu = false; onLongPress() },
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) },
-                onClick = { showContextMenu = false; showDeleteDialog = true },
-            )
-        }
+    }
+
+    ActionSheet(
+        show = showContextMenu,
+        onDismiss = { showContextMenu = false },
+        title = agent.name,
+    ) {
+        ActionSheetItem(
+            text = if (isFavorite) "Remove Favorite" else "Set as Favorite",
+            icon = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+            onClick = { showContextMenu = false; onToggleFavorite() },
+        )
+        ActionSheetItem(
+            text = stringResource(R.string.action_edit),
+            icon = Icons.Default.Edit,
+            onClick = { showContextMenu = false; onLongPress() },
+        )
+        ActionSheetItem(
+            text = stringResource(R.string.action_delete),
+            icon = Icons.Default.Delete,
+            onClick = { showContextMenu = false; showDeleteDialog = true },
+            destructive = true,
+        )
     }
 
     ConfirmDialog(
