@@ -35,6 +35,22 @@ class FakeBlockApi : BlockApi(mockk(relaxed = true)) {
         return updated
     }
 
+    override suspend fun attachBlock(agentId: String, blockId: String) {
+        calls.add("attachBlock:$agentId:$blockId")
+        if (shouldFail) throw ApiException(500, "Server error")
+    }
+
+    override suspend fun detachBlock(agentId: String, blockId: String) {
+        calls.add("detachBlock:$agentId:$blockId")
+        if (shouldFail) throw ApiException(500, "Server error")
+    }
+
+    override suspend fun listBlocks(agentId: String): List<Block> {
+        calls.add("listBlocks:$agentId")
+        if (shouldFail) throw ApiException(500, "Server error")
+        return blocks[agentId]?.toList() ?: emptyList()
+    }
+
     override suspend fun updateGlobalBlock(
         blockId: String,
         params: BlockUpdateParams,

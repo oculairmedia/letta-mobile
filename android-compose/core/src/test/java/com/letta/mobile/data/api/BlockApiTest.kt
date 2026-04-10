@@ -41,7 +41,7 @@ class BlockApiTest {
         var url: String? = null
         val api = createApi { req -> url = req.url.toString(); respond("[]", HttpStatusCode.OK, jsonHeaders) }
         api.listBlocks("a1")
-        assertTrue(url!!.contains("/v1/agents/a1/blocks"))
+        assertTrue(url!!.contains("/v1/agents/a1/core-memory/blocks"))
     }
 
     @Test
@@ -66,12 +66,47 @@ class BlockApiTest {
     @Test
     fun `updateAgentBlock sends PATCH`() = runTest {
         var method: HttpMethod? = null
+        var url: String? = null
         val api = createApi { req ->
             method = req.method
+            url = req.url.toString()
             respond("""{"id":"b1","label":"persona","value":"updated"}""", HttpStatusCode.OK, jsonHeaders)
         }
         api.updateAgentBlock("a1", "persona", com.letta.mobile.data.model.BlockUpdateParams(value = "updated"))
         assertEquals(HttpMethod.Patch, method)
+        assertTrue(url!!.contains("/v1/agents/a1/core-memory/blocks/persona"))
+    }
+
+    @Test
+    fun `attachBlock sends PATCH to core memory attach endpoint`() = runTest {
+        var method: HttpMethod? = null
+        var url: String? = null
+        val api = createApi { req ->
+            method = req.method
+            url = req.url.toString()
+            respond("""{"id":"a1","name":"agent"}""", HttpStatusCode.OK, jsonHeaders)
+        }
+
+        api.attachBlock("a1", "b1")
+
+        assertEquals(HttpMethod.Patch, method)
+        assertTrue(url!!.contains("/v1/agents/a1/core-memory/blocks/attach/b1"))
+    }
+
+    @Test
+    fun `detachBlock sends PATCH to core memory detach endpoint`() = runTest {
+        var method: HttpMethod? = null
+        var url: String? = null
+        val api = createApi { req ->
+            method = req.method
+            url = req.url.toString()
+            respond("""{"id":"a1","name":"agent"}""", HttpStatusCode.OK, jsonHeaders)
+        }
+
+        api.detachBlock("a1", "b1")
+
+        assertEquals(HttpMethod.Patch, method)
+        assertTrue(url!!.contains("/v1/agents/a1/core-memory/blocks/detach/b1"))
     }
 
     @Test
