@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -30,7 +31,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -40,7 +43,11 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
+import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.RunMetrics
+import com.letta.mobile.data.model.RunStep
 import com.letta.mobile.data.model.Run
+import com.letta.mobile.data.model.UsageStatistics
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
@@ -54,6 +61,8 @@ fun RunMonitorScreen(
     viewModel: RunMonitorViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var cancelTarget by remember { mutableStateOf<Run?>(null) }
+    var deleteTarget by remember { mutableStateOf<Run?>(null) }
 
     Scaffold(
         topBar = {
@@ -139,9 +148,86 @@ fun RunMonitorScreen(
 
     val selectedRun = (uiState as? UiState.Success)?.data?.selectedRun
     selectedRun?.let { run ->
+        val state = (uiState as? UiState.Success)?.data
         RunDetailDialog(
             run = run,
+            messages = state?.selectedRunMessages.orEmpty(),
+            usage = state?.selectedRunUsage,
+            metrics = state?.selectedRunMetrics,
+            steps = state?.selectedRunSteps.orEmpty(),
             onDismiss = { viewModel.clearSelectedRun() },
+            onCancel = if (run.isTerminalStatus()) null else {
+                {
+                    viewModel.clearSelectedRun()
+                    cancelTarget = run
+                }
+            },
+            onDelete = if (run.isTerminalStatus()) {
+                {
+                    viewModel.clearSelectedRun()
+                    deleteTarget = run
+                }
+            } else null,
+        )
+    }
+
+    cancelTarget?.let { run ->
+        AlertDialog(
+            onDismissRequest = { cancelTarget = null },
+            title = { Text(stringResource(R.string.screen_runs_cancel_title)) },
+            text = { Text(stringResource(R.string.screen_runs_cancel_confirm, run.id)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.cancelRun(run.id)
+                        cancelTarget = null
+                    },
+                ) {
+                    Text(stringResource(R.string.action_cancel_run), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { cancelTarget = null }) {
+                    Text(stringResource(R.string.action_close))
+                }
+            },
+        )
+    }
+
+    deleteTarget?.let { run ->
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text(stringResource(R.string.screen_runs_delete_title)) },
+            text = { Text(stringResource(R.string.screen_runs_delete_confirm, run.id)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteRun(run.id)
+                        deleteTarget = null
+                    },
+                ) {
+                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteTarget = null }) {
+                    Text(stringResource(R.string.action_close))
+                }
+            },
+        )
+    }
+
+    val operationError = (uiState as? UiState.Success)?.data?.operationError
+    if (operationError != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.clearOperationError() },
+            title = { Text(stringResource(R.string.common_error)) },
+            text = { Text(operationError) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearOperationError() }) {
+                    Text(stringResource(R.string.action_dismiss))
+                }
+            },
         )
     }
 }
@@ -194,6 +280,13 @@ private fun RunCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            if (run.isTerminalStatus()) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
@@ -201,7 +294,13 @@ private fun RunCard(
 @Composable
 private fun RunDetailDialog(
     run: Run,
+    messages: List<LettaMessage>,
+    usage: UsageStatistics?,
+    metrics: RunMetrics?,
+    steps: List<RunStep>,
     onDismiss: () -> Unit,
+    onCancel: (() -> Unit)?,
+    onDelete: (() -> Unit)?,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -218,12 +317,89 @@ private fun RunDetailDialog(
                 run.callbackStatusCode?.let { Text(stringResource(R.string.screen_runs_callback_status_label, it)) }
                 run.totalDurationNs?.let { Text(stringResource(R.string.screen_runs_total_duration_label, it)) }
                 run.ttftNs?.let { Text(stringResource(R.string.screen_runs_ttft_label, it)) }
+                usage?.let {
+                    Text(stringResource(R.string.screen_runs_usage_title), style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.screen_runs_usage_prompt_tokens_label, it.promptTokens ?: 0))
+                    Text(stringResource(R.string.screen_runs_usage_completion_tokens_label, it.completionTokens ?: 0))
+                    Text(stringResource(R.string.screen_runs_usage_total_tokens_label, it.totalTokens ?: 0))
+                }
+                metrics?.let {
+                    Text(stringResource(R.string.screen_runs_metrics_title), style = MaterialTheme.typography.labelLarge)
+                    it.numSteps?.let { numSteps -> Text(stringResource(R.string.screen_runs_metrics_num_steps_label, numSteps)) }
+                    it.runNs?.let { runNs -> Text(stringResource(R.string.screen_runs_metrics_run_ns_label, runNs)) }
+                    if (!it.toolsUsed.isNullOrEmpty()) {
+                        Text(stringResource(R.string.screen_runs_metrics_tools_used_label, it.toolsUsed.joinToString(", ")))
+                    }
+                }
+                if (steps.isNotEmpty()) {
+                    Text(stringResource(R.string.screen_runs_steps_title), style = MaterialTheme.typography.labelLarge)
+                    steps.take(5).forEach { step ->
+                        Text(
+                            text = buildString {
+                                append(step.id)
+                                step.status?.let { append(" • ").append(it) }
+                                step.model?.let { append(" • ").append(it) }
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                if (messages.isNotEmpty()) {
+                    Text(stringResource(R.string.screen_runs_messages_title), style = MaterialTheme.typography.labelLarge)
+                    messages.takeLast(5).forEach { message ->
+                        Text(
+                            text = stringResource(
+                                R.string.screen_runs_message_entry,
+                                message.messageType,
+                                messageSummary(message),
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (onCancel != null) {
+                    TextButton(onClick = onCancel) {
+                        Text(stringResource(R.string.action_cancel_run), color = MaterialTheme.colorScheme.error)
+                    }
+                }
+                if (onDelete != null) {
+                    TextButton(onClick = onDelete) {
+                        Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+        },
+        dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.action_close))
             }
         },
     )
+}
+
+private fun messageSummary(message: LettaMessage): String {
+    return when (message) {
+        is com.letta.mobile.data.model.UserMessage -> message.content
+        is com.letta.mobile.data.model.AssistantMessage -> message.content
+        is com.letta.mobile.data.model.ReasoningMessage -> message.reasoning
+        is com.letta.mobile.data.model.ToolCallMessage -> message.toolCall.name
+        is com.letta.mobile.data.model.ToolReturnMessage -> message.toolReturn.funcResponse.orEmpty()
+        is com.letta.mobile.data.model.ApprovalRequestMessage -> message.toolCalls?.joinToString { it.name }.orEmpty()
+        is com.letta.mobile.data.model.ApprovalResponseMessage -> message.approvals?.joinToString { it.status.orEmpty() }.orEmpty()
+        is com.letta.mobile.data.model.HiddenReasoningMessage -> message.hiddenReasoning.orEmpty()
+        is com.letta.mobile.data.model.EventMessage -> message.eventType
+        is com.letta.mobile.data.model.UnknownMessage -> message.messageType
+    }
+}
+
+private fun Run.isTerminalStatus(): Boolean {
+    return status in setOf("completed", "failed", "cancelled", "expired")
 }
