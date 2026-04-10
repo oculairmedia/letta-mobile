@@ -249,6 +249,7 @@
     <string name="screen_archival_metadata_title">Metadata</string>
     <string name="screen_schedules_title">Schedules</string>
     <string name="screen_schedules_empty">No schedules configured</string>
+    <string name="screen_schedules_unavailable">Schedule admin isn&apos;t available on this Letta server.</string>
     <string name="screen_schedules_add_title">Add Schedule</string>
     <string name="screen_schedules_delete_title">Delete Schedule</string>
     <string name="screen_schedules_delete_confirm">Delete schedule %1$s?</string>

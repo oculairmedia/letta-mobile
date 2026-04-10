@@ -62,6 +62,7 @@ fun ScheduleListScreen(
     viewModel: ScheduleListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val successState = uiState as? UiState.Success
     var showCreateDialog by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<ScheduledMessage?>(null) }
 
@@ -77,8 +78,10 @@ fun ScheduleListScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showCreateDialog = true }) {
-                Icon(Icons.Default.Add, stringResource(R.string.screen_schedules_add_title))
+            if (successState?.data?.scheduleAdminAvailable != false) {
+                FloatingActionButton(onClick = { showCreateDialog = true }) {
+                    Icon(Icons.Default.Add, stringResource(R.string.screen_schedules_add_title))
+                }
             }
         },
     ) { paddingValues ->
@@ -98,8 +101,8 @@ fun ScheduleListScreen(
         }
     }
 
-    val state = (uiState as? UiState.Success)?.data
-    if (showCreateDialog && state != null) {
+    val state = successState?.data
+    if (showCreateDialog && state != null && state.scheduleAdminAvailable) {
         CreateScheduleDialog(
             agents = state.agents,
             selectedAgentId = state.selectedAgentId,
@@ -150,7 +153,13 @@ private fun ScheduleListContent(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
 
-        if (state.selectedAgentId == null) {
+        if (!state.scheduleAdminAvailable) {
+            EmptyState(
+                icon = Icons.Default.AccessTime,
+                message = state.scheduleAdminMessage ?: stringResource(R.string.screen_schedules_unavailable),
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else if (state.selectedAgentId == null) {
             EmptyState(
                 icon = Icons.Default.AccessTime,
                 message = stringResource(R.string.screen_conversations_dialog_no_agents),

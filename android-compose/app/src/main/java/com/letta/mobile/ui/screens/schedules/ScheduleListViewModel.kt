@@ -2,6 +2,7 @@ package com.letta.mobile.ui.screens.schedules
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduledMessage
@@ -22,6 +23,8 @@ data class ScheduleListUiState(
     val agents: List<Agent> = emptyList(),
     val selectedAgentId: String? = null,
     val schedules: List<ScheduledMessage> = emptyList(),
+    val scheduleAdminAvailable: Boolean = true,
+    val scheduleAdminMessage: String? = null,
 )
 
 @HiltViewModel
@@ -56,10 +59,24 @@ class ScheduleListViewModel @Inject constructor(
                         agents = agents,
                         selectedAgentId = selectedAgentId,
                         schedules = schedules,
+                        scheduleAdminAvailable = true,
+                        scheduleAdminMessage = null,
                     )
                 )
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to load schedules"))
+                if (e.isScheduleAdminUnavailable()) {
+                    _uiState.value = UiState.Success(
+                        ScheduleListUiState(
+                            agents = agentRepository.agents.value,
+                            selectedAgentId = agentRepository.agents.value.firstOrNull()?.id,
+                            schedules = emptyList(),
+                            scheduleAdminAvailable = false,
+                            scheduleAdminMessage = SCHEDULE_ADMIN_UNAVAILABLE_MESSAGE,
+                        )
+                    )
+                } else {
+                    _uiState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to load schedules"))
+                }
             }
         }
     }
@@ -74,10 +91,23 @@ class ScheduleListViewModel @Inject constructor(
                     current.copy(
                         selectedAgentId = agentId,
                         schedules = schedules,
+                        scheduleAdminAvailable = true,
+                        scheduleAdminMessage = null,
                     )
                 )
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to load schedules"))
+                if (e.isScheduleAdminUnavailable()) {
+                    _uiState.value = UiState.Success(
+                        current.copy(
+                            selectedAgentId = agentId,
+                            schedules = emptyList(),
+                            scheduleAdminAvailable = false,
+                            scheduleAdminMessage = SCHEDULE_ADMIN_UNAVAILABLE_MESSAGE,
+                        )
+                    )
+                } else {
+                    _uiState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to load schedules"))
+                }
             }
         }
     }
@@ -92,10 +122,23 @@ class ScheduleListViewModel @Inject constructor(
                     current.copy(
                         selectedAgentId = agentId,
                         schedules = schedules,
+                        scheduleAdminAvailable = true,
+                        scheduleAdminMessage = null,
                     )
                 )
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to create schedule"))
+                if (e.isScheduleAdminUnavailable()) {
+                    _uiState.value = UiState.Success(
+                        current.copy(
+                            selectedAgentId = agentId,
+                            schedules = emptyList(),
+                            scheduleAdminAvailable = false,
+                            scheduleAdminMessage = SCHEDULE_ADMIN_UNAVAILABLE_MESSAGE,
+                        )
+                    )
+                } else {
+                    _uiState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to create schedule"))
+                }
             }
         }
     }
@@ -109,8 +152,26 @@ class ScheduleListViewModel @Inject constructor(
                 val schedules = scheduleRepository.getSchedules(agentId).first()
                 _uiState.value = UiState.Success(current.copy(schedules = schedules))
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to delete schedule"))
+                if (e.isScheduleAdminUnavailable()) {
+                    _uiState.value = UiState.Success(
+                        current.copy(
+                            schedules = emptyList(),
+                            scheduleAdminAvailable = false,
+                            scheduleAdminMessage = SCHEDULE_ADMIN_UNAVAILABLE_MESSAGE,
+                        )
+                    )
+                } else {
+                    _uiState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to delete schedule"))
+                }
             }
         }
+    }
+
+    private fun Exception.isScheduleAdminUnavailable(): Boolean {
+        return this is ApiException && code in setOf(404, 405, 501)
+    }
+
+    private companion object {
+        const val SCHEDULE_ADMIN_UNAVAILABLE_MESSAGE = "Schedule admin isn't available on this Letta server."
     }
 }

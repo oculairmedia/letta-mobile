@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.schedules
 
+import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleDefinition
@@ -88,6 +89,29 @@ class ScheduleListViewModelTest {
         assertEquals(listOf("s1"), fakeScheduleRepo.deletedScheduleIds)
     }
 
+    @Test
+    fun `loadData shows unavailable state when schedule routes are missing`() = runTest {
+        fakeScheduleRepo.error = ApiException(404, "Not found")
+
+        viewModel.loadData()
+
+        val state = viewModel.uiState.value as com.letta.mobile.ui.common.UiState.Success
+        assertEquals(false, state.data.scheduleAdminAvailable)
+        assertEquals("Schedule admin isn't available on this Letta server.", state.data.scheduleAdminMessage)
+        assertEquals(0, state.data.schedules.size)
+    }
+
+    @Test
+    fun `selectAgent shows unavailable state when schedule routes are missing`() = runTest {
+        fakeScheduleRepo.error = ApiException(404, "Not found")
+
+        viewModel.selectAgent("a2")
+
+        val state = viewModel.uiState.value as com.letta.mobile.ui.common.UiState.Success
+        assertEquals("a2", state.data.selectedAgentId)
+        assertEquals(false, state.data.scheduleAdminAvailable)
+    }
+
     private class FakeAgentRepo : AgentRepository(FakeAgentApi(), mockk(relaxed = true)) {
         private val _agents = MutableStateFlow(
             listOf(
@@ -109,6 +133,7 @@ class ScheduleListViewModelTest {
             "a1" to mutableListOf(sampleSchedule("s1", "a1")),
             "a2" to mutableListOf(sampleSchedule("s2", "a2")),
         )
+        var error: Exception? = null
         val createdSchedules = mutableListOf<ScheduleCreateParams>()
         val deletedScheduleIds = mutableListOf<String>()
 
@@ -116,9 +141,12 @@ class ScheduleListViewModelTest {
             emit(schedulesByAgent[agentId].orEmpty())
         }
 
-        override suspend fun refreshSchedules(agentId: String, limit: Int?, after: String?) {}
+        override suspend fun refreshSchedules(agentId: String, limit: Int?, after: String?) {
+            error?.let { throw it }
+        }
 
         override suspend fun createSchedule(agentId: String, params: ScheduleCreateParams): ScheduledMessage {
+            error?.let { throw it }
             createdSchedules.add(params)
             val schedule = sampleSchedule("created-${createdSchedules.size}", agentId)
             schedulesByAgent.getOrPut(agentId) { mutableListOf() }.add(schedule)
@@ -126,6 +154,7 @@ class ScheduleListViewModelTest {
         }
 
         override suspend fun deleteSchedule(agentId: String, scheduledMessageId: String) {
+            error?.let { throw it }
             deletedScheduleIds.add(scheduledMessageId)
             schedulesByAgent[agentId]?.removeAll { it.id == scheduledMessageId }
         }
