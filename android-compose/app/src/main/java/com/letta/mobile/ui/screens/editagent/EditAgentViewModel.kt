@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -94,7 +95,7 @@ class EditAgentViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = UiState.Loading
             try {
-                val agent = agentRepository.getAgent(agentId).first()
+                val agent = agentRepository.getAgent(agentId).last()
                 val editableBlocks = agent.blocks.map { block ->
                     EditableBlock(
                         id = block.id,

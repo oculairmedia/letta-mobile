@@ -215,6 +215,27 @@ private fun SettingsContent(
             )
         }
 
+        if (state.tools.isNotEmpty()) {
+            CardGroup(title = { Text(stringResource(R.string.common_tools)) }) {
+                item(
+                    headlineContent = {
+                        @OptIn(ExperimentalLayoutApi::class)
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            state.tools.forEach { tool ->
+                                AssistChip(
+                                    onClick = {},
+                                    label = { Text(tool.name) },
+                                )
+                            }
+                        }
+                    },
+                )
+            }
+        }
+
         if (!state.agent?.tags.isNullOrEmpty()) {
             CardGroup(title = { Text(stringResource(R.string.common_tags)) }) {
                 item(

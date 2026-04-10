@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.model.ModelSettings
+import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.MessageRepository
@@ -15,7 +16,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -31,6 +32,7 @@ data class AgentSettingsUiState(
     val humanBlock: String = "",
     val systemPrompt: String = "",
     val enableSleeptime: Boolean = false,
+    val tools: List<Tool> = emptyList(),
     val secrets: Map<String, String> = emptyMap(),
 )
 
@@ -58,7 +60,7 @@ class AgentSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = UiState.Loading
             try {
-                val agent = agentRepository.getAgent(agentId).first()
+                val agent = agentRepository.getAgent(agentId).last()
                 val persona = agent.blocks.find { it.label == "persona" }?.value ?: ""
                 val human = agent.blocks.find { it.label == "human" }?.value ?: ""
                 originalPersonaBlock = persona
@@ -75,6 +77,7 @@ class AgentSettingsViewModel @Inject constructor(
                         humanBlock = human,
                         systemPrompt = agent.system ?: "",
                         enableSleeptime = agent.enableSleeptime ?: false,
+                        tools = agent.tools,
                         secrets = agent.secrets.associate { it.key to (it.value ?: "") },
                     )
                 )
