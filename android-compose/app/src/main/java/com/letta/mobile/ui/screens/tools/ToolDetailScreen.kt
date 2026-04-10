@@ -54,6 +54,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
 
@@ -464,23 +465,15 @@ private fun DeleteToolDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.screen_tool_detail_delete_title)) },
-        text = { Text(stringResource(R.string.screen_tool_detail_delete_confirm, toolName)) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(
-                    text = stringResource(R.string.action_delete),
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
-            }
-        },
+    ConfirmDialog(
+        show = true,
+        title = stringResource(R.string.screen_tool_detail_delete_title),
+        message = stringResource(R.string.screen_tool_detail_delete_confirm, toolName),
+        confirmText = stringResource(R.string.action_delete),
+        dismissText = stringResource(R.string.action_cancel),
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
+        destructive = true,
     )
 }
 

@@ -29,6 +29,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,6 +52,7 @@ import com.letta.mobile.data.model.RunStep
 import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.model.UsageStatistics
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
@@ -64,15 +68,19 @@ fun RunMonitorScreen(
     var cancelTarget by remember { mutableStateOf<Run?>(null) }
     var deleteTarget by remember { mutableStateOf<Run?>(null) }
 
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            LargeFlexibleTopAppBar(
                 title = { Text(stringResource(R.string.screen_runs_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
+                scrollBehavior = scrollBehavior,
             )
         },
     ) { paddingValues ->
@@ -172,48 +180,34 @@ fun RunMonitorScreen(
     }
 
     cancelTarget?.let { run ->
-        AlertDialog(
-            onDismissRequest = { cancelTarget = null },
-            title = { Text(stringResource(R.string.screen_runs_cancel_title)) },
-            text = { Text(stringResource(R.string.screen_runs_cancel_confirm, run.id)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.cancelRun(run.id)
-                        cancelTarget = null
-                    },
-                ) {
-                    Text(stringResource(R.string.action_cancel_run), color = MaterialTheme.colorScheme.error)
-                }
+        ConfirmDialog(
+            show = true,
+            title = stringResource(R.string.screen_runs_cancel_title),
+            message = stringResource(R.string.screen_runs_cancel_confirm, run.id),
+            confirmText = stringResource(R.string.action_cancel_run),
+            dismissText = stringResource(R.string.action_close),
+            onConfirm = {
+                viewModel.cancelRun(run.id)
+                cancelTarget = null
             },
-            dismissButton = {
-                TextButton(onClick = { cancelTarget = null }) {
-                    Text(stringResource(R.string.action_close))
-                }
-            },
+            onDismiss = { cancelTarget = null },
+            destructive = true,
         )
     }
 
     deleteTarget?.let { run ->
-        AlertDialog(
-            onDismissRequest = { deleteTarget = null },
-            title = { Text(stringResource(R.string.screen_runs_delete_title)) },
-            text = { Text(stringResource(R.string.screen_runs_delete_confirm, run.id)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deleteRun(run.id)
-                        deleteTarget = null
-                    },
-                ) {
-                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
-                }
+        ConfirmDialog(
+            show = true,
+            title = stringResource(R.string.screen_runs_delete_title),
+            message = stringResource(R.string.screen_runs_delete_confirm, run.id),
+            confirmText = stringResource(R.string.action_delete),
+            dismissText = stringResource(R.string.action_close),
+            onConfirm = {
+                viewModel.deleteRun(run.id)
+                deleteTarget = null
             },
-            dismissButton = {
-                TextButton(onClick = { deleteTarget = null }) {
-                    Text(stringResource(R.string.action_close))
-                }
-            },
+            onDismiss = { deleteTarget = null },
+            destructive = true,
         )
     }
 

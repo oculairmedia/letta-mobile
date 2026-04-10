@@ -47,6 +47,8 @@ import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -56,6 +58,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -74,6 +77,7 @@ import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ModelSettings
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.ModelDropdown
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
@@ -102,11 +106,15 @@ fun AgentListScreen(
     }
     val gridAgents = filteredAgents.filter { it.id != uiState.favoriteAgentId }
 
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             Column {
-                TopAppBar(
+                LargeFlexibleTopAppBar(
                     title = { Text(stringResource(R.string.common_agents)) },
+                    scrollBehavior = scrollBehavior,
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
                             Icon(Icons.Default.ArrowBack, stringResource(R.string.action_back))
@@ -451,23 +459,16 @@ private fun AgentCard(
         }
     }
 
-    if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text(stringResource(R.string.screen_agents_dialog_delete_title)) },
-            text = { Text(stringResource(R.string.screen_agents_dialog_delete_confirm, agent.name)) },
-            confirmButton = {
-                TextButton(onClick = { showDeleteDialog = false; onDelete() }) {
-                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            },
-        )
-    }
+    ConfirmDialog(
+        show = showDeleteDialog,
+        title = stringResource(R.string.screen_agents_dialog_delete_title),
+        message = stringResource(R.string.screen_agents_dialog_delete_confirm, agent.name),
+        confirmText = stringResource(R.string.action_delete),
+        dismissText = stringResource(R.string.action_cancel),
+        onConfirm = { showDeleteDialog = false; onDelete() },
+        onDismiss = { showDeleteDialog = false },
+        destructive = true,
+    )
 }
 
 @Composable

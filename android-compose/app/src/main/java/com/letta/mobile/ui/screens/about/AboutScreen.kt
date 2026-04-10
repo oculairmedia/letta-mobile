@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -19,7 +17,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,6 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.R
+import com.letta.mobile.ui.components.ConfirmDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -96,21 +94,14 @@ fun AboutScreen(
         }
     }
 
-    if (showLogoutDialog) {
-        AlertDialog(
-            onDismissRequest = { showLogoutDialog = false },
-            title = { Text(stringResource(R.string.screen_about_clear_data_dialog_title)) },
-            text = { Text(stringResource(R.string.screen_about_clear_data_dialog_message)) },
-            confirmButton = {
-                TextButton(onClick = { showLogoutDialog = false; onLogout() }) {
-                    Text(stringResource(R.string.screen_about_clear_data_confirm), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showLogoutDialog = false }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            },
-        )
-    }
+    ConfirmDialog(
+        show = showLogoutDialog,
+        title = stringResource(R.string.screen_about_clear_data_dialog_title),
+        message = stringResource(R.string.screen_about_clear_data_dialog_message),
+        confirmText = stringResource(R.string.screen_about_clear_data_confirm),
+        dismissText = stringResource(R.string.action_cancel),
+        onConfirm = { showLogoutDialog = false; onLogout() },
+        onDismiss = { showLogoutDialog = false },
+        destructive = true,
+    )
 }

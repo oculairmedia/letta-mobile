@@ -30,6 +30,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
@@ -49,6 +52,7 @@ import com.letta.mobile.data.model.Identity
 import com.letta.mobile.data.model.IdentityCreateParams
 import com.letta.mobile.data.model.IdentityUpdateParams
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
@@ -65,15 +69,19 @@ fun IdentityListScreen(
     var editTarget by remember { mutableStateOf<Identity?>(null) }
     var attachTarget by remember { mutableStateOf<Identity?>(null) }
 
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            LargeFlexibleTopAppBar(
                 title = { Text(stringResource(R.string.screen_identities_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
+                scrollBehavior = scrollBehavior,
             )
         },
         floatingActionButton = {
@@ -216,25 +224,18 @@ fun IdentityListScreen(
     }
 
     deleteTarget?.let { identity ->
-        AlertDialog(
-            onDismissRequest = { deleteTarget = null },
-            title = { Text(stringResource(R.string.screen_identities_delete_title)) },
-            text = { Text(stringResource(R.string.screen_identities_delete_confirm, identity.name)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deleteIdentity(identity.id)
-                        deleteTarget = null
-                    },
-                ) {
-                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
-                }
+        ConfirmDialog(
+            show = true,
+            title = stringResource(R.string.screen_identities_delete_title),
+            message = stringResource(R.string.screen_identities_delete_confirm, identity.name),
+            confirmText = stringResource(R.string.action_delete),
+            dismissText = stringResource(R.string.action_cancel),
+            onConfirm = {
+                viewModel.deleteIdentity(identity.id)
+                deleteTarget = null
             },
-            dismissButton = {
-                TextButton(onClick = { deleteTarget = null }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            },
+            onDismiss = { deleteTarget = null },
+            destructive = true,
         )
     }
 

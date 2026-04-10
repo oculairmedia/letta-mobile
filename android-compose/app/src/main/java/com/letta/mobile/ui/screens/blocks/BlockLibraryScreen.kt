@@ -38,6 +38,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,6 +47,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
@@ -55,6 +58,7 @@ import com.letta.mobile.R
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
@@ -73,15 +77,19 @@ fun BlockLibraryScreen(
     var attachTarget by remember { mutableStateOf<Block?>(null) }
     var detachTarget by remember { mutableStateOf<Pair<Block, Agent>?>(null) }
 
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            LargeFlexibleTopAppBar(
                 title = { Text(stringResource(R.string.screen_blocks_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
+                scrollBehavior = scrollBehavior,
             )
         },
         floatingActionButton = {
@@ -210,57 +218,41 @@ fun BlockLibraryScreen(
     }
 
     deleteTarget?.let { block ->
-        AlertDialog(
-            onDismissRequest = { deleteTarget = null },
-            title = { Text(stringResource(R.string.screen_blocks_delete_title)) },
-            text = { Text(stringResource(R.string.screen_blocks_delete_confirm, block.label ?: stringResource(R.string.common_unknown))) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deleteBlock(block.id) {
-                            deleteTarget = null
-                            if (selectedBlock?.id == block.id) selectedBlock = null
-                        }
-                    },
-                ) {
-                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
+        ConfirmDialog(
+            show = true,
+            title = stringResource(R.string.screen_blocks_delete_title),
+            message = stringResource(R.string.screen_blocks_delete_confirm, block.label ?: stringResource(R.string.common_unknown)),
+            confirmText = stringResource(R.string.action_delete),
+            dismissText = stringResource(R.string.action_cancel),
+            onConfirm = {
+                viewModel.deleteBlock(block.id) {
+                    deleteTarget = null
+                    if (selectedBlock?.id == block.id) selectedBlock = null
                 }
             },
-            dismissButton = {
-                TextButton(onClick = { deleteTarget = null }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            },
+            onDismiss = { deleteTarget = null },
+            destructive = true,
         )
     }
 
     detachTarget?.let { (block, agent) ->
-        AlertDialog(
-            onDismissRequest = { detachTarget = null },
-            title = { Text(stringResource(R.string.screen_blocks_detach_title)) },
-            text = {
-                Text(stringResource(
-                    R.string.screen_blocks_detach_confirm,
-                    block.label ?: stringResource(R.string.common_unknown),
-                    agent.name,
-                ))
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.detachBlockFromAgent(block.id, agent.id) {
-                            detachTarget = null
-                        }
-                    },
-                ) {
-                    Text(stringResource(R.string.action_remove), color = MaterialTheme.colorScheme.error)
+        ConfirmDialog(
+            show = true,
+            title = stringResource(R.string.screen_blocks_detach_title),
+            message = stringResource(
+                R.string.screen_blocks_detach_confirm,
+                block.label ?: stringResource(R.string.common_unknown),
+                agent.name,
+            ),
+            confirmText = stringResource(R.string.action_remove),
+            dismissText = stringResource(R.string.action_cancel),
+            onConfirm = {
+                viewModel.detachBlockFromAgent(block.id, agent.id) {
+                    detachTarget = null
                 }
             },
-            dismissButton = {
-                TextButton(onClick = { detachTarget = null }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            },
+            onDismiss = { detachTarget = null },
+            destructive = true,
         )
     }
 

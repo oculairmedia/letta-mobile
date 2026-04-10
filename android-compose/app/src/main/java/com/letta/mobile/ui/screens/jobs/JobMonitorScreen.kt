@@ -29,6 +29,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,6 +48,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Job
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
@@ -60,15 +64,19 @@ fun JobMonitorScreen(
     var cancelTarget by remember { mutableStateOf<Job?>(null) }
     var deleteTarget by remember { mutableStateOf<Job?>(null) }
 
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            LargeFlexibleTopAppBar(
                 title = { Text(stringResource(R.string.screen_jobs_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
+                scrollBehavior = scrollBehavior,
             )
         },
     ) { paddingValues ->
@@ -163,48 +171,34 @@ fun JobMonitorScreen(
     }
 
     cancelTarget?.let { job ->
-        AlertDialog(
-            onDismissRequest = { cancelTarget = null },
-            title = { Text(stringResource(R.string.screen_jobs_cancel_title)) },
-            text = { Text(stringResource(R.string.screen_jobs_cancel_confirm, job.id)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.cancelJob(job.id)
-                        cancelTarget = null
-                    },
-                ) {
-                    Text(stringResource(R.string.action_cancel_job), color = MaterialTheme.colorScheme.error)
-                }
+        ConfirmDialog(
+            show = true,
+            title = stringResource(R.string.screen_jobs_cancel_title),
+            message = stringResource(R.string.screen_jobs_cancel_confirm, job.id),
+            confirmText = stringResource(R.string.action_cancel_job),
+            dismissText = stringResource(R.string.action_close),
+            onConfirm = {
+                viewModel.cancelJob(job.id)
+                cancelTarget = null
             },
-            dismissButton = {
-                TextButton(onClick = { cancelTarget = null }) {
-                    Text(stringResource(R.string.action_close))
-                }
-            },
+            onDismiss = { cancelTarget = null },
+            destructive = true,
         )
     }
 
     deleteTarget?.let { job ->
-        AlertDialog(
-            onDismissRequest = { deleteTarget = null },
-            title = { Text(stringResource(R.string.screen_jobs_delete_title)) },
-            text = { Text(stringResource(R.string.screen_jobs_delete_confirm, job.id)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deleteJob(job.id)
-                        deleteTarget = null
-                    },
-                ) {
-                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
-                }
+        ConfirmDialog(
+            show = true,
+            title = stringResource(R.string.screen_jobs_delete_title),
+            message = stringResource(R.string.screen_jobs_delete_confirm, job.id),
+            confirmText = stringResource(R.string.action_delete),
+            dismissText = stringResource(R.string.action_close),
+            onConfirm = {
+                viewModel.deleteJob(job.id)
+                deleteTarget = null
             },
-            dismissButton = {
-                TextButton(onClick = { deleteTarget = null }) {
-                    Text(stringResource(R.string.action_close))
-                }
-            },
+            onDismiss = { deleteTarget = null },
+            destructive = true,
         )
     }
 

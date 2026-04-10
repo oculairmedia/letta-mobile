@@ -35,11 +35,14 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -63,7 +66,10 @@ fun AllToolsScreen(
     var showCreateDialog by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
 
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         floatingActionButton = {
             FloatingActionButton(onClick = { showCreateDialog = true }) {
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.screen_tools_create_action))
@@ -71,8 +77,9 @@ fun AllToolsScreen(
         },
         topBar = {
             Column {
-                TopAppBar(
+                LargeFlexibleTopAppBar(
                     title = { Text(stringResource(R.string.common_tools)) },
+                    scrollBehavior = scrollBehavior,
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
                             Icon(Icons.Default.ArrowBack, stringResource(R.string.action_back))

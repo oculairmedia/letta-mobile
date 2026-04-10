@@ -20,6 +20,7 @@ import com.letta.mobile.R
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.CardGroup
+import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
 
@@ -281,51 +282,27 @@ private fun SettingsContent(
         }
     }
 
-    if (showResetDialog) {
-        AlertDialog(
-            onDismissRequest = { showResetDialog = false },
-            title = { Text(stringResource(R.string.screen_settings_reset_messages_title)) },
-            text = { Text(stringResource(R.string.screen_settings_reset_messages_confirm)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showResetDialog = false
-                        onResetMessages()
-                    }
-                ) {
-                    Text(stringResource(R.string.action_reset_messages), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showResetDialog = false }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            }
-        )
-    }
+    ConfirmDialog(
+        show = showResetDialog,
+        title = stringResource(R.string.screen_settings_reset_messages_title),
+        message = stringResource(R.string.screen_settings_reset_messages_confirm),
+        confirmText = stringResource(R.string.action_reset_messages),
+        dismissText = stringResource(R.string.action_cancel),
+        onConfirm = { showResetDialog = false; onResetMessages() },
+        onDismiss = { showResetDialog = false },
+        destructive = true,
+    )
 
-    if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text(stringResource(R.string.screen_agents_dialog_delete_title)) },
-            text = { Text(stringResource(R.string.screen_agents_dialog_delete_confirm_permanent)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDeleteDialog = false
-                        onDelete()
-                    }
-                ) {
-                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            }
-        )
-    }
+    ConfirmDialog(
+        show = showDeleteDialog,
+        title = stringResource(R.string.screen_agents_dialog_delete_title),
+        message = stringResource(R.string.screen_agents_dialog_delete_confirm_permanent),
+        confirmText = stringResource(R.string.action_delete),
+        dismissText = stringResource(R.string.action_cancel),
+        onConfirm = { showDeleteDialog = false; onDelete() },
+        onDismiss = { showDeleteDialog = false },
+        destructive = true,
+    )
 }
 
 private fun shareAgentExport(context: Context, exportData: String): Boolean {

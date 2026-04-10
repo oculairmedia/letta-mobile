@@ -48,6 +48,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +57,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
@@ -66,9 +69,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.repository.ConversationInspectorMessage
+import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.components.TextInputDialog
 import com.letta.mobile.util.formatRelativeTime
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,10 +96,14 @@ fun ConversationsScreen(
     var showAgentPickerDialog by remember { mutableStateOf(false) }
     var showOverflowMenu by remember { mutableStateOf(false) }
 
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            LargeFlexibleTopAppBar(
                 title = { Text(stringResource(R.string.common_conversations)) },
+                scrollBehavior = scrollBehavior,
                 actions = {
                     IconButton(onClick = onNavigateToAgentList) {
                         Icon(Icons.Default.AccountCircle, stringResource(R.string.common_agents))
@@ -370,53 +379,27 @@ private fun ConversationCard(
         }
     }
 
-    if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text(stringResource(R.string.screen_conversations_dialog_delete_title)) },
-            text = { Text(stringResource(R.string.screen_conversations_dialog_delete_confirm)) },
-            confirmButton = {
-                TextButton(onClick = { showDeleteDialog = false; onDelete() }) {
-                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            }
-        )
-    }
+    ConfirmDialog(
+        show = showDeleteDialog,
+        title = stringResource(R.string.screen_conversations_dialog_delete_title),
+        message = stringResource(R.string.screen_conversations_dialog_delete_confirm),
+        confirmText = stringResource(R.string.action_delete),
+        dismissText = stringResource(R.string.action_cancel),
+        onConfirm = { showDeleteDialog = false; onDelete() },
+        onDismiss = { showDeleteDialog = false },
+        destructive = true,
+    )
 
-    if (showRenameDialog) {
-        var renameText by remember { mutableStateOf(conversation.summary ?: "") }
-        AlertDialog(
-            onDismissRequest = { showRenameDialog = false },
-            title = { Text(stringResource(R.string.screen_conversations_dialog_rename_title)) },
-            text = {
-                OutlinedTextField(
-                    value = renameText,
-                    onValueChange = { renameText = it },
-                    label = { Text(stringResource(R.string.common_name)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = { showRenameDialog = false; onRename(renameText) },
-                    enabled = renameText.isNotBlank(),
-                ) {
-                    Text(stringResource(R.string.action_save))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRenameDialog = false }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            }
-        )
-    }
+    TextInputDialog(
+        show = showRenameDialog,
+        title = stringResource(R.string.screen_conversations_dialog_rename_title),
+        label = stringResource(R.string.common_name),
+        confirmText = stringResource(R.string.action_save),
+        dismissText = stringResource(R.string.action_cancel),
+        onConfirm = { showRenameDialog = false; onRename(it) },
+        onDismiss = { showRenameDialog = false },
+        initialValue = conversation.summary ?: "",
+    )
 }
 
 @Composable

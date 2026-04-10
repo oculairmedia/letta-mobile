@@ -30,6 +30,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -45,9 +48,11 @@ import com.letta.mobile.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.data.model.Passage
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.components.TextInputDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,15 +64,19 @@ fun ArchivalScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<Passage?>(null) }
 
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            LargeFlexibleTopAppBar(
                 title = { Text(stringResource(R.string.screen_archival_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
+                scrollBehavior = scrollBehavior,
             )
         },
         floatingActionButton = {
@@ -114,25 +123,18 @@ fun ArchivalScreen(
     }
 
     deleteTarget?.let { passage ->
-        AlertDialog(
-            onDismissRequest = { deleteTarget = null },
-            title = { Text(stringResource(R.string.screen_archival_delete_title)) },
-            text = { Text(stringResource(R.string.screen_archival_delete_confirm, passage.id)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deletePassage(passage.id)
-                        deleteTarget = null
-                    }
-                ) {
-                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
-                }
+        ConfirmDialog(
+            show = true,
+            title = stringResource(R.string.screen_archival_delete_title),
+            message = stringResource(R.string.screen_archival_delete_confirm, passage.id),
+            confirmText = stringResource(R.string.action_delete),
+            dismissText = stringResource(R.string.action_cancel),
+            onConfirm = {
+                viewModel.deletePassage(passage.id)
+                deleteTarget = null
             },
-            dismissButton = {
-                TextButton(onClick = { deleteTarget = null }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            },
+            onDismiss = { deleteTarget = null },
+            destructive = true,
         )
     }
 }
@@ -289,27 +291,15 @@ private fun AddPassageDialog(
     onDismiss: () -> Unit,
     onAdd: (String) -> Unit,
 ) {
-    var text by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.screen_archival_add_title)) },
-        text = {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                label = { Text(stringResource(R.string.screen_archival_passage_label)) },
-                minLines = 3,
-                maxLines = 6,
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = { onAdd(text) }, enabled = text.isNotBlank()) {
-                Text(stringResource(R.string.action_add))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-        },
+    TextInputDialog(
+        show = true,
+        title = stringResource(R.string.screen_archival_add_title),
+        label = stringResource(R.string.screen_archival_passage_label),
+        confirmText = stringResource(R.string.action_add),
+        dismissText = stringResource(R.string.action_cancel),
+        onConfirm = { onAdd(it) },
+        onDismiss = onDismiss,
+        singleLine = false,
+        minLines = 3,
     )
 }

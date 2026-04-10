@@ -18,6 +18,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.LoadingIndicator
@@ -143,26 +144,14 @@ private fun ToolCard(
         }
     }
 
-    if (showRemoveDialog) {
-        AlertDialog(
-            onDismissRequest = { showRemoveDialog = false },
-            title = { Text(stringResource(R.string.screen_tools_dialog_remove_title)) },
-            text = { Text(stringResource(R.string.screen_tools_dialog_remove_confirm, tool.name)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showRemoveDialog = false
-                        onRemove()
-                    }
-                ) {
-                    Text(stringResource(R.string.action_remove), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRemoveDialog = false }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            }
-        )
-    }
+    ConfirmDialog(
+        show = showRemoveDialog,
+        title = stringResource(R.string.screen_tools_dialog_remove_title),
+        message = stringResource(R.string.screen_tools_dialog_remove_confirm, tool.name),
+        confirmText = stringResource(R.string.action_remove),
+        dismissText = stringResource(R.string.action_cancel),
+        onConfirm = { showRemoveDialog = false; onRemove() },
+        onDismiss = { showRemoveDialog = false },
+        destructive = true,
+    )
 }

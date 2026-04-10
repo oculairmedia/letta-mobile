@@ -61,6 +61,7 @@ import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.screens.blocks.BlockPickerDialog
 import com.letta.mobile.ui.components.Accordions
+import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.components.ShimmerCard
@@ -394,23 +395,16 @@ private fun EditAgentContent(
                             }
                         }
                     }
-                    if (showDeleteConfirm) {
-                        AlertDialog(
-                            onDismissRequest = { showDeleteConfirm = false },
-                            title = { Text(stringResource(R.string.screen_agent_edit_detach_block_title, block.label)) },
-                            text = { Text(stringResource(R.string.screen_agent_edit_detach_block_message)) },
-                            confirmButton = {
-                                TextButton(onClick = { showDeleteConfirm = false; onDeleteBlock(block.id) }) {
-                                    Text(stringResource(R.string.action_remove), color = MaterialTheme.colorScheme.error)
-                                }
-                            },
-                            dismissButton = {
-                                TextButton(onClick = { showDeleteConfirm = false }) {
-                                    Text(stringResource(R.string.action_cancel))
-                                }
-                            },
-                        )
-                    }
+                    ConfirmDialog(
+                        show = showDeleteConfirm,
+                        title = stringResource(R.string.screen_agent_edit_detach_block_title, block.label),
+                        message = stringResource(R.string.screen_agent_edit_detach_block_message),
+                        confirmText = stringResource(R.string.action_remove),
+                        dismissText = stringResource(R.string.action_cancel),
+                        onConfirm = { showDeleteConfirm = false; onDeleteBlock(block.id) },
+                        onDismiss = { showDeleteConfirm = false },
+                        destructive = true,
+                    )
                 }
                 OutlinedButton(
                     onClick = { showAddBlockDialog = true },

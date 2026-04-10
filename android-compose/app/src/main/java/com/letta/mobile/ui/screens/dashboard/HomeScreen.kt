@@ -27,10 +27,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -53,9 +56,12 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            LargeFlexibleTopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Letta", fontWeight = FontWeight.Bold)
@@ -75,6 +81,7 @@ fun HomeScreen(
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
                 },
+                scrollBehavior = scrollBehavior,
             )
         },
     ) { paddingValues ->

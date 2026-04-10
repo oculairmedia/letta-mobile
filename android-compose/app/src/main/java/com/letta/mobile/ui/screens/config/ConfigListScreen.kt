@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -17,6 +18,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.LoadingIndicator
@@ -30,15 +32,19 @@ fun ConfigListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            LargeFlexibleTopAppBar(
                 title = { Text(stringResource(R.string.screen_config_list_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, stringResource(R.string.action_back))
                     }
-                }
+                },
+                scrollBehavior = scrollBehavior,
             )
         }
     ) { paddingValues ->
@@ -167,26 +173,17 @@ private fun ConfigCard(
         }
     }
 
-    if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text(stringResource(R.string.screen_config_dialog_delete_title)) },
-            text = { Text(stringResource(R.string.screen_config_dialog_delete_confirm)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDeleteDialog = false
-                        onDelete()
-                    }
-                ) {
-                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
-            }
-        )
-    }
+    ConfirmDialog(
+        show = showDeleteDialog,
+        title = stringResource(R.string.screen_config_dialog_delete_title),
+        message = stringResource(R.string.screen_config_dialog_delete_confirm),
+        confirmText = stringResource(R.string.action_delete),
+        dismissText = stringResource(R.string.action_cancel),
+        onConfirm = {
+            showDeleteDialog = false
+            onDelete()
+        },
+        onDismiss = { showDeleteDialog = false },
+        destructive = true,
+    )
 }
