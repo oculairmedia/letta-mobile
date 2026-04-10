@@ -1,13 +1,16 @@
 package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.McpServerCreateParams
+import com.letta.mobile.data.model.McpServerResyncResult
 import com.letta.mobile.data.model.McpServerUpdateParams
+import com.letta.mobile.data.model.McpToolExecuteParams
 import com.letta.mobile.data.model.effectiveServerType
 import com.letta.mobile.testutil.FakeMcpServerApi
 import com.letta.mobile.testutil.TestData
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.putJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -81,6 +84,45 @@ class McpServerRepositoryTest {
     @Test
     fun `getServers returns empty initially`() = runTest {
         assertTrue(repository.servers.value.isEmpty())
+    }
+
+    @Test
+    fun `resyncServerTools returns backend summary and refreshes cache`() = runTest {
+        val refreshedTools = listOf(TestData.tool(id = "tool-2", name = "updatedTool"))
+        fakeApi.serverTools["s1"] = refreshedTools
+        fakeApi.resyncResults["s1"] = McpServerResyncResult(
+            deleted = listOf("oldTool"),
+            updated = listOf("updatedTool"),
+            added = listOf("newTool"),
+        )
+
+        val result = repository.resyncServerTools("s1")
+
+        assertEquals(listOf("oldTool"), result.deleted)
+        assertEquals(listOf("updatedTool"), result.updated)
+        assertEquals(listOf("newTool"), result.added)
+        assertTrue(fakeApi.calls.contains("refreshMcpServerTools:s1"))
+    }
+
+    @Test
+    fun `runServerTool delegates args and returns execution result`() = runTest {
+        fakeApi.toolExecutionResults["s1" to "tool-1"] = TestData.mcpToolExecutionResult(status = "success")
+
+        val result = repository.runServerTool(
+            serverId = "s1",
+            toolId = "tool-1",
+            params = McpToolExecuteParams(
+                buildJsonObject {
+                    put("query", "hello")
+                    putJsonObject("filters") {
+                        put("enabled", "true")
+                    }
+                }
+            ),
+        )
+
+        assertEquals("success", result.status)
+        assertTrue(fakeApi.calls.any { it.startsWith("runMcpServerTool:s1:tool-1:") })
     }
 
     @Test(expected = com.letta.mobile.data.api.ApiException::class)

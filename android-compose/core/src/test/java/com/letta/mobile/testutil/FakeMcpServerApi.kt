@@ -4,15 +4,21 @@ import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.api.McpServerApi
 import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.McpServerCreateParams
+import com.letta.mobile.data.model.McpServerResyncResult
 import com.letta.mobile.data.model.McpServerUpdateParams
+import com.letta.mobile.data.model.McpToolExecuteParams
+import com.letta.mobile.data.model.McpToolExecutionResult
 import com.letta.mobile.data.model.Tool
 import io.mockk.mockk
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 class FakeMcpServerApi : McpServerApi(mockk(relaxed = true)) {
     var servers = mutableListOf<McpServer>()
     var serverTools = mutableMapOf<String, List<Tool>>()
+    var resyncResults = mutableMapOf<String, McpServerResyncResult>()
+    var toolExecutionResults = mutableMapOf<Pair<String, String>, McpToolExecutionResult>()
     var shouldFail = false
     val calls = mutableListOf<String>()
 
@@ -89,5 +95,22 @@ class FakeMcpServerApi : McpServerApi(mockk(relaxed = true)) {
         calls.add("listMcpServerTools:$serverId")
         if (shouldFail) throw ApiException(500, "Server error")
         return serverTools[serverId] ?: emptyList()
+    }
+
+    override suspend fun refreshMcpServerTools(serverId: String): McpServerResyncResult {
+        calls.add("refreshMcpServerTools:$serverId")
+        if (shouldFail) throw ApiException(500, "Server error")
+        return resyncResults[serverId] ?: McpServerResyncResult()
+    }
+
+    override suspend fun runMcpServerTool(
+        serverId: String,
+        toolId: String,
+        params: McpToolExecuteParams,
+    ): McpToolExecutionResult {
+        calls.add("runMcpServerTool:$serverId:$toolId:${params.args}")
+        if (shouldFail) throw ApiException(500, "Server error")
+        return toolExecutionResults[serverId to toolId]
+            ?: McpToolExecutionResult(status = "success", funcReturn = JsonPrimitive("ok"))
     }
 }

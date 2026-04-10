@@ -3,6 +3,7 @@ package com.letta.mobile.ui.screens.mcp
 import app.cash.turbine.test
 import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.McpServerCreateParams
+import com.letta.mobile.data.model.McpServerResyncResult
 import com.letta.mobile.data.model.McpServerUpdateParams
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.effectiveAuthHeader
@@ -152,6 +153,7 @@ class McpViewModelTest {
         val server = TestData.mcpServer(id = "s1")
         fakeMcpRepo.setServers(listOf(server))
         fakeMcpRepo.setServerTools("s1", listOf(TestData.tool(id = "t1")))
+        fakeMcpRepo.resyncResult = McpServerResyncResult(added = listOf("t1"))
         viewModel.loadData()
 
         viewModel.checkServer("s1")
@@ -159,6 +161,7 @@ class McpViewModelTest {
         viewModel.uiState.test {
             val state = awaitItem() as UiState.Success
             assertTrue(state.data.serverChecks["s1"]?.isReachable == true)
+            assertTrue(state.data.serverChecks["s1"]?.message?.contains("+1 added") == true)
         }
     }
 
@@ -230,6 +233,7 @@ class McpViewModelTest {
         override val servers: StateFlow<List<McpServer>> = _servers.asStateFlow()
         var shouldFail = false
         var failServerChecks = false
+        var resyncResult = McpServerResyncResult()
         val deleteCalls = mutableListOf<String>()
         val createCalls = mutableListOf<String>()
         val updateCalls = mutableListOf<String>()
@@ -243,6 +247,10 @@ class McpViewModelTest {
         override suspend fun refreshServers() { if (shouldFail) throw Exception("Failed") }
         override suspend fun refreshServerTools(serverId: String) {
             if (failServerChecks) throw Exception("check failed")
+        }
+        override suspend fun resyncServerTools(serverId: String): McpServerResyncResult {
+            if (failServerChecks) throw Exception("check failed")
+            return resyncResult
         }
         override fun getServerTools(serverId: String): Flow<List<Tool>> {
             return _toolsByServer.map { it[serverId] ?: emptyList() }

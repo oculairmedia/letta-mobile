@@ -3,7 +3,10 @@ package com.letta.mobile.data.repository
 import com.letta.mobile.data.api.McpServerApi
 import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.McpServerCreateParams
+import com.letta.mobile.data.model.McpServerResyncResult
 import com.letta.mobile.data.model.McpServerUpdateParams
+import com.letta.mobile.data.model.McpToolExecuteParams
+import com.letta.mobile.data.model.McpToolExecutionResult
 import com.letta.mobile.data.model.Tool
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +41,20 @@ class McpServerRepository @Inject constructor(
         _toolsByServer.update { current -> current.toMutableMap().apply {
                     put(serverId, tools)
                 } }
+    }
+
+    suspend fun resyncServerTools(serverId: String): McpServerResyncResult {
+        val result = mcpServerApi.refreshMcpServerTools(serverId)
+        refreshServerTools(serverId)
+        return result
+    }
+
+    suspend fun runServerTool(
+        serverId: String,
+        toolId: String,
+        params: McpToolExecuteParams,
+    ): McpToolExecutionResult {
+        return mcpServerApi.runMcpServerTool(serverId, toolId, params)
     }
 
     suspend fun fetchAllMcpTools(): List<Tool> {

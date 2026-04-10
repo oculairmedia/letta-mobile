@@ -155,7 +155,7 @@ class McpViewModel @Inject constructor(
                 )
             )
             try {
-                mcpServerRepository.refreshServerTools(serverId)
+                val resync = mcpServerRepository.resyncServerTools(serverId)
                 val tools = mcpServerRepository.getServerTools(serverId).first()
                 val updated = (_uiState.value as? UiState.Success)?.data ?: return@launch
                 _uiState.value = UiState.Success(
@@ -165,7 +165,7 @@ class McpViewModel @Inject constructor(
                             serverId to McpServerCheckState(
                                 isChecking = false,
                                 isReachable = true,
-                                message = if (tools.isEmpty()) "No tools discovered" else "${tools.size} tools discovered",
+                                message = buildReachabilityMessage(tools.size, resync),
                             )
                         ),
                     )
@@ -185,5 +185,24 @@ class McpViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    private fun buildReachabilityMessage(
+        toolCount: Int,
+        resync: com.letta.mobile.data.model.McpServerResyncResult,
+    ): String {
+        val summaryParts = buildList {
+            if (resync.added.isNotEmpty()) add("+${resync.added.size} added")
+            if (resync.updated.isNotEmpty()) add("~${resync.updated.size} updated")
+            if (resync.deleted.isNotEmpty()) add("-${resync.deleted.size} deleted")
+        }
+
+        val discovery = if (toolCount == 0) {
+            "No tools discovered"
+        } else {
+            "$toolCount tools discovered"
+        }
+
+        return if (summaryParts.isEmpty()) discovery else "$discovery · ${summaryParts.joinToString(", ")}"
     }
 }

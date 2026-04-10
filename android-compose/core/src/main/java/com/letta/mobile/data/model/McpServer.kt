@@ -44,6 +44,27 @@ data class McpServerUpdateParams(
     val config: JsonObject? = null,
 )
 
+@Serializable
+data class McpServerResyncResult(
+    val deleted: List<String> = emptyList(),
+    val updated: List<String> = emptyList(),
+    val added: List<String> = emptyList(),
+)
+
+@Serializable
+data class McpToolExecuteParams(
+    val args: JsonObject = JsonObject(emptyMap()),
+)
+
+@Serializable
+data class McpToolExecutionResult(
+    val status: String,
+    @SerialName("func_return") val funcReturn: JsonElement? = null,
+    val stdout: List<String>? = null,
+    val stderr: List<String>? = null,
+    @SerialName("sandbox_config_fingerprint") val sandboxConfigFingerprint: String? = null,
+)
+
 fun McpServer.effectiveServerType(): String? =
     type ?: serverType ?: mcpServerType ?: config.stringValue("type", "server_type", "mcp_server_type")
 

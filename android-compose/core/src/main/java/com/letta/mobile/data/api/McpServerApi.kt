@@ -88,4 +88,33 @@ open class McpServerApi @Inject constructor(
         }
         return response.body()
     }
+
+    open suspend fun refreshMcpServerTools(serverId: String): McpServerResyncResult {
+        val client = apiClient.getClient()
+        val baseUrl = apiClient.getBaseUrl()
+
+        val response = client.patch("$baseUrl/v1/mcp-servers/$serverId/refresh")
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
+    }
+
+    open suspend fun runMcpServerTool(
+        serverId: String,
+        toolId: String,
+        params: McpToolExecuteParams,
+    ): McpToolExecutionResult {
+        val client = apiClient.getClient()
+        val baseUrl = apiClient.getBaseUrl()
+
+        val response = client.post("$baseUrl/v1/mcp-servers/$serverId/tools/$toolId/run") {
+            contentType(ContentType.Application.Json)
+            setBody(params)
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
+    }
 }

@@ -577,7 +577,7 @@ private fun ServerCard(
 
                 Row {
                     IconButton(onClick = onCheck) {
-                        Icon(Icons.Default.Refresh, stringResource(R.string.action_check))
+                        Icon(Icons.Default.Refresh, stringResource(R.string.screen_mcp_server_resync_action))
                     }
                     IconButton(onClick = onEdit) {
                         Icon(Icons.Default.Edit, stringResource(R.string.action_edit))
