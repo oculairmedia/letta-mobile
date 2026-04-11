@@ -32,7 +32,8 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -42,6 +43,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,6 +67,7 @@ import com.letta.mobile.ui.navigation.optionalSharedElement
 import kotlinx.coroutines.launch
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LettaTopBarDefaults
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,6 +88,7 @@ fun AgentScaffold(
     val agentName = uiState.agentName
     val agentId = viewModel.agentId
     val conversationId = viewModel.conversationId
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     BackHandler(enabled = drawerState.isOpen) {
         scope.launch { drawerState.close() }
@@ -122,8 +126,10 @@ fun AgentScaffold(
         }
     ) {
         Scaffold(
+            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+            containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
             topBar = {
-                TopAppBar(
+                LargeFlexibleTopAppBar(
                     title = {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -160,6 +166,8 @@ fun AgentScaffold(
                             }
                         }
                     },
+                    colors = LettaTopBarDefaults.largeTopAppBarColors(),
+                    scrollBehavior = scrollBehavior,
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
                             Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))

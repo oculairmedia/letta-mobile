@@ -68,7 +68,7 @@ fun ChatScreen(
     val inputText by viewModel.inputText.collectAsStateWithLifecycle()
 
     val backgroundModifier = when (chatBackground) {
-        is ChatBackground.Default -> Modifier
+        is ChatBackground.Default -> Modifier.background(MaterialTheme.colorScheme.surfaceContainer)
         is ChatBackground.SolidColor -> Modifier.background(chatBackground.color)
         is ChatBackground.Gradient -> Modifier.background(chatBackground.toBrush())
     }

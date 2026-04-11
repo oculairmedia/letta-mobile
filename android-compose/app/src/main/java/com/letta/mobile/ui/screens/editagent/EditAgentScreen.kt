@@ -27,13 +27,14 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -64,6 +66,7 @@ import com.letta.mobile.ui.components.ModelDropdown
 import com.letta.mobile.ui.screens.tools.ToolPickerDialog
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LettaTopBarDefaults
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,11 +79,16 @@ fun EditAgentScreen(
     val embeddingModels by viewModel.embeddingModels.collectAsStateWithLifecycle()
     val snackbar = LocalSnackbarDispatcher.current
     val context = LocalContext.current
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
         topBar = {
-            TopAppBar(
+            LargeFlexibleTopAppBar(
                 title = { Text(stringResource(R.string.screen_agent_edit_title)) },
+                colors = LettaTopBarDefaults.largeTopAppBarColors(),
+                scrollBehavior = scrollBehavior,
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
