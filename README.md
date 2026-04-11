@@ -1,41 +1,54 @@
 # Letta Mobile
 
-Native Android client for [Letta](https://github.com/letta-ai/letta) AI agents — built with Kotlin and Jetpack Compose.
+Native Android client for [Letta](https://github.com/letta-ai/letta), built with Kotlin and Jetpack Compose.
 
-## Features
+`main` now represents the Kotlin app. The previous React Native app has been retired.
 
-- 📱 Native Android experience with Material 3 design
-- 🤖 Full agent management — create, edit, clone, delete
-- 💬 Rich chat with tool output rendering, code highlighting, and thinking indicators
-- 🧠 Memory management — core memory, archival search, block library
-- 🔧 Tool & MCP server administration
-- 📊 Job monitoring, run tracking, and schedule management
-- 🎨 Custom Lucide icon library, shared element transitions, chat background themes
+## What this app includes
 
-## Getting Started
+- Agent management: create, edit, clone, import, delete, and organize agents
+- Rich chat: tool outputs, code blocks, reasoning display, chat backgrounds, and shared transitions
+- Memory administration: core memory, archival passages, block library, and archive attachment flows
+- Admin tooling: models, providers, tools, MCP servers, identities, folders, groups, schedules, jobs, and runs
+- Native Android UI polish with Material 3 and a centralized Lucide icon system
 
-The app lives in `android-compose/`. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions.
+## Project layout
+
+The Android project lives in `android-compose/`.
+
+| Path                            | Purpose                                                  |
+| ------------------------------- | -------------------------------------------------------- |
+| `android-compose/app/`          | Android app module: screens, navigation, ViewModels, DI  |
+| `android-compose/core/`         | API client, Room database, repositories, models          |
+| `android-compose/designsystem/` | Reusable Compose UI, theming, icons, dialogs, markdown   |
+| `android-compose/chat/`         | Streaming chat client primitives and chat-domain support |
+
+## Quick start
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor setup. The shortest path to a local build is:
 
 ```bash
 cd android-compose
-cp local.properties.example local.properties  # Set your SDK path
+cp local.properties.example local.properties
 export JAVA_HOME="/path/to/Android Studio/jbr"
-./gradlew :app:assembleDebug
+./gradlew --no-daemon :app:assembleDebug
 ```
 
-## Architecture
+## Recommended checks
 
-| Module | Purpose |
-|--------|---------|
-| `core/` | Data layer — API client, Room database, repositories, models |
-| `designsystem/` | Reusable Compose components, theming, LettaIcons |
-| `app/` | UI screens, ViewModels, navigation, Hilt DI |
-
-## Development
+Run these from `android-compose/` before pushing changes:
 
 ```bash
-./gradlew :app:compileDebugKotlin    # Compile check
-./gradlew :app:testDebugUnitTest     # Unit tests
-./gradlew :app:assembleDebug         # Build APK
-./gradlew installDebug               # Install on device
+./gradlew --no-daemon :app:compileDebugKotlin
+./gradlew --no-daemon :app:testDebugUnitTest
 ```
+
+## CI
+
+GitHub Actions builds and tests `android-compose/` on pushes and pull requests targeting `main`.
+
+## Development notes
+
+- This repo uses `bd` (beads) for task tracking.
+- The included pre-push hook compiles `:app:compileDebugKotlin` from `android-compose/`.
+- If Gradle or KSP gets into a bad state locally, rerun with a clean build from `android-compose/`.

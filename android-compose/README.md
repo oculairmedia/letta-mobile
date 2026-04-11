@@ -1,22 +1,31 @@
-# Android Compose Development
+# Android Compose App
 
-This directory contains the active Android admin app.
+This directory contains the production Letta Mobile Android app.
+
+## Modules
+
+| Module         | Purpose                                                   |
+| -------------- | --------------------------------------------------------- |
+| `app`          | Screens, navigation, Hilt wiring, Android entrypoints     |
+| `core`         | Data models, Ktor API client, Room, repositories, mappers |
+| `designsystem` | Shared Compose components, theme, dialogs, `LettaIcons`   |
+| `chat`         | Streaming chat client and chat-domain support             |
 
 ## Prerequisites
 
-- Android Studio with SDK Platform 35 and Build-Tools 34 installed
-- Android Studio bundled JBR
-- Android SDK path available for `local.properties`
+- Android Studio with Android SDK Platform 35 and Build-Tools 34 installed
+- A full JDK/JBR via Android Studio or Java 17
+- `local.properties` pointing at your Android SDK
 
 ## Local setup
 
-Create `local.properties` from the example file:
+Create `local.properties` from the example file and set `sdk.dir` for your machine:
 
 ```bash
 cp local.properties.example local.properties
 ```
 
-Set `JAVA_HOME` to Android Studio's bundled JBR before running Gradle:
+Set `JAVA_HOME` before running Gradle:
 
 ```bash
 export JAVA_HOME="/path/to/Android Studio/jbr"
@@ -24,16 +33,39 @@ export JAVA_HOME="/path/to/Android Studio/jbr"
 
 ## Common commands
 
+Run Gradle commands from this directory.
+
 ```bash
-./gradlew :app:compileDebugKotlin
-./gradlew :app:testDebugUnitTest
-./gradlew :app:assembleDebug
-./gradlew installDebug
-./gradlew detekt
+./gradlew --no-daemon :app:compileDebugKotlin
+./gradlew --no-daemon :app:testDebugUnitTest
+./gradlew --no-daemon :app:assembleDebug
+./gradlew --no-daemon installDebug
+./gradlew --no-daemon detekt
 ```
+
+## Recommended verification flow
+
+For normal application changes:
+
+```bash
+./gradlew --no-daemon :app:compileDebugKotlin
+./gradlew --no-daemon :app:testDebugUnitTest
+```
+
+For shared model / repository / serialization changes, it is safer to verify the full stack in order:
+
+```bash
+./gradlew --no-daemon clean :core:compileDebugKotlin
+./gradlew --no-daemon :designsystem:compileDebugKotlin
+./gradlew --no-daemon :app:compileDebugKotlin
+./gradlew --no-daemon :app:testDebugUnitTest
+```
+
+Run those commands sequentially. KSP state can become unreliable if you try to overlap Gradle work.
 
 ## Troubleshooting
 
 - If Gradle reports missing Android SDK components, install Platform 35 and Build-Tools 34 in Android Studio.
 - If Gradle reports missing `JAVA_COMPILER`, make sure `JAVA_HOME` points to a full JDK/JBR, not a JRE.
 - If Gradle cannot find the SDK, verify `local.properties` contains the correct `sdk.dir` for your machine.
+- If Kotlin or KSP behaves inconsistently after dependency or generated-code changes, rerun with `clean` before compiling again.
