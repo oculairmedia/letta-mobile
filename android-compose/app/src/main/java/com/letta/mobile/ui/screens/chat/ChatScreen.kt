@@ -16,9 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -59,6 +56,7 @@ import com.letta.mobile.ui.components.ScrollToBottomFab
 import com.letta.mobile.ui.components.TypingIndicator
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import com.letta.mobile.ui.icons.LettaIcons
 
 @Composable
 fun ChatScreen(
@@ -347,7 +345,7 @@ private fun MessageInputBar(
                 },
                 enabled = text.isNotBlank() && !isStreaming
             ) {
-                Icon(Icons.Default.Send, contentDescription = stringResource(R.string.action_send_message))
+                Icon(LettaIcons.Send, contentDescription = stringResource(R.string.action_send_message))
             }
         }
     }
@@ -365,7 +363,7 @@ private fun ErrorContent(
         verticalArrangement = Arrangement.Center
     ) {
         Icon(
-            imageVector = Icons.Default.Error,
+            imageVector = LettaIcons.Error,
             contentDescription = "Error",
             modifier = Modifier.size(64.dp),
             tint = MaterialTheme.colorScheme.error

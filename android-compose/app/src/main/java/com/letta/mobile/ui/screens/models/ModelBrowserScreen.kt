@@ -15,10 +15,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
@@ -53,6 +49,7 @@ import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.icons.LettaIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,7 +69,7 @@ fun ModelBrowserScreen(
                 title = { Text(stringResource(R.string.screen_models_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(LettaIcons.ArrowBack, contentDescription = "Back")
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -82,7 +79,7 @@ fun ModelBrowserScreen(
         when (val state = uiState) {
             is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
             is UiState.Error -> EmptyState(
-                icon = Icons.Default.Search,
+                icon = LettaIcons.Search,
                 message = state.message,
                 modifier = Modifier
                     .padding(paddingValues)
@@ -157,7 +154,7 @@ private fun ModelBrowserContent(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             placeholder = { Text(stringResource(R.string.screen_models_search_hint)) },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            leadingIcon = { Icon(LettaIcons.Search, contentDescription = null) },
             singleLine = true,
         )
 
@@ -178,7 +175,7 @@ private fun ModelBrowserContent(
                     onClick = { onProviderSelect(provider) },
                     label = { Text(provider) },
                     leadingIcon = if (state.selectedProvider == provider) {
-                        { Icon(Icons.Default.Check, contentDescription = "Selected", modifier = Modifier.height(16.dp)) }
+                        { Icon(LettaIcons.Check, contentDescription = "Selected", modifier = Modifier.height(16.dp)) }
                     } else {
                         null
                     },
@@ -192,7 +189,7 @@ private fun ModelBrowserContent(
             ModelTab.LLM -> {
                 if (filteredModels.isEmpty()) {
                     EmptyState(
-                        icon = Icons.Default.Search,
+                        icon = LettaIcons.Search,
                         message = stringResource(R.string.screen_models_no_models),
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -213,7 +210,7 @@ private fun ModelBrowserContent(
             ModelTab.EMBEDDING -> {
                 if (filteredEmbeddingModels.isEmpty()) {
                     EmptyState(
-                        icon = Icons.Default.Search,
+                        icon = LettaIcons.Search,
                         message = stringResource(R.string.screen_models_no_embedding_models),
                         modifier = Modifier.fillMaxSize(),
                     )

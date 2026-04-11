@@ -10,10 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChatBubbleOutline
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -25,6 +21,7 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.theme.LettaTheme
 import com.letta.mobile.ui.theme.customColors
+import com.letta.mobile.ui.icons.LettaIcons
 
 @PreviewLightDark
 @Composable
@@ -89,7 +86,7 @@ internal fun PreviewEmptyStateContent() {
     LettaTheme(dynamicColor = false) {
         Surface {
             EmptyState(
-                icon = Icons.Default.ChatBubbleOutline,
+                icon = LettaIcons.ChatOutline,
                 message = "Start a conversation",
                 modifier = Modifier.height(200.dp),
             )
@@ -112,12 +109,12 @@ internal fun PreviewMessageActionButtonsContent() {
             ) {
                 MessageActionButton(
                     label = "Copy",
-                    icon = Icons.Default.ContentCopy,
+                    icon = LettaIcons.Copy,
                     onClick = {},
                 )
                 MessageActionButton(
                     label = "Regenerate",
-                    icon = Icons.Default.Refresh,
+                    icon = LettaIcons.Refresh,
                     onClick = {},
                 )
             }

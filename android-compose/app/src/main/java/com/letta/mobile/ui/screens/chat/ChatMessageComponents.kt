@@ -17,11 +17,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -52,6 +47,7 @@ import com.letta.mobile.ui.components.ThinkingSection
 import com.letta.mobile.ui.theme.chatColors
 import com.letta.mobile.ui.theme.chatDimens
 import com.letta.mobile.ui.theme.chatTypography
+import com.letta.mobile.ui.icons.LettaIcons
 
 private fun UiMessage.displayRoleLabel(defaultLabel: String): String {
     val toolCall = toolCalls?.singleOrNull()
@@ -204,8 +200,8 @@ internal fun MessageAvatar(
 ) {
     val isUser = role == "user"
     val icon = when (role) {
-        "tool" -> Icons.Default.Build
-        "assistant" -> Icons.Default.SmartToy
+        "tool" -> LettaIcons.Tool
+        "assistant" -> LettaIcons.Agent
         else -> null
     }
     val containerColor = if (isUser) {
@@ -302,14 +298,14 @@ private fun ToolCallCard(toolCall: UiToolCall) {
                 )
                 if (isError) {
                     Icon(
-                        imageVector = Icons.Default.Error,
+                        imageVector = LettaIcons.Error,
                         contentDescription = "Error",
                         modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.error,
                     )
                 } else if (toolCall.result != null) {
                     Icon(
-                        imageVector = Icons.Default.CheckCircle,
+                        imageVector = LettaIcons.CheckCircle,
                         contentDescription = "Success",
                         modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.primary,

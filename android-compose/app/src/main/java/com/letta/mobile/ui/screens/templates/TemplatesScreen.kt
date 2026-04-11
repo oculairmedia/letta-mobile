@@ -5,9 +5,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,6 +21,7 @@ import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.icons.LettaIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,7 +42,7 @@ fun TemplatesScreen(
                 title = { Text(stringResource(R.string.screen_templates_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
+                        Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -91,7 +89,7 @@ private fun TemplatesContent(
 
         if (state.templates.isEmpty()) {
             EmptyState(
-                icon = Icons.Default.Apps,
+                icon = LettaIcons.Apps,
                 message = stringResource(R.string.screen_templates_empty),
                 modifier = Modifier.fillMaxSize()
             )
@@ -149,7 +147,7 @@ private fun StarterAgentsInfoCard(
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilledTonalButton(onClick = onNavigateToAgentList) {
-                    Icon(Icons.Default.SmartToy, contentDescription = null)
+                    Icon(LettaIcons.Agent, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(stringResource(R.string.screen_templates_manage_agents_action))
                 }

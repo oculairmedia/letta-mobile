@@ -8,8 +8,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,6 +25,7 @@ import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerBox
 import com.letta.mobile.ui.components.shimmerColor
+import com.letta.mobile.ui.icons.LettaIcons
 
 @Composable
 fun ToolsScreen(
@@ -60,7 +59,7 @@ private fun ToolsContent(
 
     if (state.tools.isEmpty()) {
         EmptyState(
-            icon = Icons.Default.Build,
+            icon = LettaIcons.Tool,
             message = stringResource(R.string.screen_tools_empty_attached),
             modifier = modifier.fillMaxSize()
         )
@@ -120,7 +119,7 @@ private fun ToolCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = Icons.Default.Build,
+                imageVector = LettaIcons.Tool,
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.primary,
@@ -144,7 +143,7 @@ private fun ToolCard(
                 }
             }
             Icon(
-                imageVector = Icons.Default.ChevronRight,
+                imageVector = LettaIcons.ChevronRight,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -173,7 +172,7 @@ private fun ToolDetailDialog(
         onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(20.dp))
+                Icon(LettaIcons.Tool, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(tool.name)
             }

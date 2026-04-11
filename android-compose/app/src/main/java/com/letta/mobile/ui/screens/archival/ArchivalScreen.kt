@@ -11,12 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -53,6 +47,7 @@ import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.components.TextInputDialog
+import com.letta.mobile.ui.icons.LettaIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,7 +68,7 @@ fun ArchivalScreen(
                 title = { Text(stringResource(R.string.screen_archival_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
+                        Icon(LettaIcons.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -81,7 +76,7 @@ fun ArchivalScreen(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddDialog = true }) {
-                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.screen_archival_add_action))
+                Icon(LettaIcons.Add, contentDescription = stringResource(R.string.screen_archival_add_action))
             }
         },
     ) { paddingValues ->
@@ -156,11 +151,11 @@ private fun ArchivalContent(
             onValueChange = onSearchChange,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             placeholder = { Text(stringResource(R.string.screen_archival_search_hint)) },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = stringResource(R.string.screen_archival_search_action)) },
+            leadingIcon = { Icon(LettaIcons.Search, contentDescription = stringResource(R.string.screen_archival_search_action)) },
             trailingIcon = {
                 if (state.searchQuery.isNotBlank()) {
                     IconButton(onClick = { onSearchChange("") }) {
-                        Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.action_close))
+                        Icon(LettaIcons.Clear, contentDescription = stringResource(R.string.action_close))
                     }
                 }
             },
@@ -185,7 +180,7 @@ private fun ArchivalContent(
 
         if (filteredPassages.isEmpty()) {
             EmptyState(
-                icon = Icons.Default.Search,
+                icon = LettaIcons.Search,
                 message = if (state.searchQuery.isBlank()) {
                     stringResource(R.string.screen_archival_empty)
                 } else {
@@ -232,7 +227,7 @@ private fun PassageCard(
                     modifier = Modifier.weight(1f),
                 )
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.screen_archival_delete_action))
+                    Icon(LettaIcons.Delete, contentDescription = stringResource(R.string.screen_archival_delete_action))
                 }
             }
             passage.createdAt?.let { createdAt ->

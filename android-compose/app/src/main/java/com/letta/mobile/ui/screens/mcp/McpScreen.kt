@@ -18,14 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -84,6 +76,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import com.letta.mobile.ui.icons.LettaIcons
 
 private const val MCP_TYPE_STDIO = "stdio"
 private const val MCP_TYPE_SSE = "sse"
@@ -125,12 +118,12 @@ fun McpScreen(
                 title = { Text(stringResource(R.string.screen_mcp_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
+                        Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.refreshAll() }) {
-                        Icon(Icons.Default.Refresh, stringResource(R.string.action_refresh))
+                        Icon(LettaIcons.Refresh, stringResource(R.string.action_refresh))
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -145,7 +138,7 @@ fun McpScreen(
                         showServerDialog = true
                     }
                 ) {
-                    Icon(Icons.Default.Add, stringResource(R.string.screen_mcp_dialog_add_title))
+                    Icon(LettaIcons.Add, stringResource(R.string.screen_mcp_dialog_add_title))
                 }
             }
         },
@@ -260,7 +253,7 @@ private fun ToolsTab(
 ) {
     if (tools.isEmpty()) {
         EmptyState(
-            icon = Icons.Default.Build,
+            icon = LettaIcons.Tool,
             message = stringResource(R.string.screen_tools_empty),
             modifier = modifier.fillMaxSize(),
         )
@@ -300,7 +293,7 @@ private fun ServersTab(
 
         if (servers.isEmpty()) {
             EmptyState(
-                icon = Icons.Default.Storage,
+                icon = LettaIcons.Storage,
                 message = stringResource(R.string.screen_mcp_empty),
                 modifier = Modifier.fillMaxSize(),
             )
@@ -374,7 +367,7 @@ private fun ToolCard(
                 .padding(16.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Build, null, modifier = Modifier.size(20.dp))
+                Icon(LettaIcons.Tool, null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = tool.name,
@@ -635,13 +628,13 @@ private fun ServerCard(
 
                 Row {
                     IconButton(onClick = onCheck) {
-                        Icon(Icons.Default.Refresh, stringResource(R.string.screen_mcp_server_resync_action))
+                        Icon(LettaIcons.Refresh, stringResource(R.string.screen_mcp_server_resync_action))
                     }
                     IconButton(onClick = onEdit) {
-                        Icon(Icons.Default.Edit, stringResource(R.string.action_edit))
+                        Icon(LettaIcons.Edit, stringResource(R.string.action_edit))
                     }
                     IconButton(onClick = { showDeleteDialog = true }) {
-                        Icon(Icons.Default.Delete, stringResource(R.string.action_delete))
+                        Icon(LettaIcons.Delete, stringResource(R.string.action_delete))
                     }
                 }
             }

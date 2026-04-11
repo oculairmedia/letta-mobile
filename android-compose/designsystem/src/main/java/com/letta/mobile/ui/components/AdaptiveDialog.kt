@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -19,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.letta.mobile.ui.icons.LettaIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,7 +41,7 @@ fun AdaptiveDialog(
                             title = { Text(title) },
                             navigationIcon = {
                                 IconButton(onClick = onDismiss) {
-                                    Icon(Icons.Default.Close, contentDescription = "Close")
+                                    Icon(LettaIcons.Close, contentDescription = "Close")
                                 }
                             },
                         )
@@ -71,7 +70,7 @@ fun AdaptiveDialog(
                         title = { Text(title) },
                         navigationIcon = {
                             IconButton(onClick = onDismiss) {
-                                Icon(Icons.Default.Close, contentDescription = "Close")
+                                Icon(LettaIcons.Close, contentDescription = "Close")
                             }
                         },
                     )

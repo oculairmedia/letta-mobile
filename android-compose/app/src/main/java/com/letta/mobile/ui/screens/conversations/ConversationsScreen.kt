@@ -19,23 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ChatBubbleOutline
-import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.automirrored.filled.ManageSearch
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.ForkRight
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -81,6 +64,7 @@ import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.components.TextInputDialog
 import com.letta.mobile.util.formatRelativeTime
+import com.letta.mobile.ui.icons.LettaIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -117,13 +101,13 @@ fun ConversationsScreen(
                 scrollBehavior = scrollBehavior,
                 actions = {
                     IconButton(onClick = onNavigateToAgentList) {
-                        Icon(Icons.Default.AccountCircle, stringResource(R.string.common_agents))
+                        Icon(LettaIcons.AccountCircle, stringResource(R.string.common_agents))
                     }
                     IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Default.Settings, stringResource(R.string.common_settings))
+                        Icon(LettaIcons.Settings, stringResource(R.string.common_settings))
                     }
                     IconButton(onClick = { showOverflowMenu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "More")
+                        Icon(LettaIcons.MoreVert, contentDescription = "More")
                     }
                     DropdownMenu(
                         expanded = showOverflowMenu,
@@ -132,67 +116,67 @@ fun ConversationsScreen(
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.screen_nav_templates)) },
                             onClick = { showOverflowMenu = false; onNavigateToTemplates() },
-                            leadingIcon = { Icon(Icons.Default.Dashboard, contentDescription = null) },
+                            leadingIcon = { Icon(LettaIcons.Dashboard, contentDescription = null) },
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.screen_nav_archives)) },
                             onClick = { showOverflowMenu = false; onNavigateToArchives() },
-                            leadingIcon = { Icon(Icons.Default.Storage, contentDescription = null) },
+                            leadingIcon = { Icon(LettaIcons.Storage, contentDescription = null) },
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.screen_nav_folders)) },
                             onClick = { showOverflowMenu = false; onNavigateToFolders() },
-                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.ManageSearch, contentDescription = null) },
+                            leadingIcon = { Icon(LettaIcons.ManageSearch, contentDescription = null) },
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.screen_nav_groups)) },
                             onClick = { showOverflowMenu = false; onNavigateToGroups() },
-                            leadingIcon = { Icon(Icons.Default.ForkRight, contentDescription = null) },
+                            leadingIcon = { Icon(LettaIcons.ForkRight, contentDescription = null) },
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.screen_nav_providers)) },
                             onClick = { showOverflowMenu = false; onNavigateToProviders() },
-                            leadingIcon = { Icon(Icons.Default.Cloud, contentDescription = null) },
+                            leadingIcon = { Icon(LettaIcons.Cloud, contentDescription = null) },
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.screen_nav_blocks)) },
                             onClick = { showOverflowMenu = false; onNavigateToBlocks() },
-                            leadingIcon = { Icon(Icons.Default.Storage, contentDescription = null) },
+                            leadingIcon = { Icon(LettaIcons.Storage, contentDescription = null) },
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.screen_nav_identities)) },
                             onClick = { showOverflowMenu = false; onNavigateToIdentities() },
-                            leadingIcon = { Icon(Icons.Default.AccountCircle, contentDescription = null) },
+                            leadingIcon = { Icon(LettaIcons.AccountCircle, contentDescription = null) },
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.screen_nav_schedules)) },
                             onClick = { showOverflowMenu = false; onNavigateToSchedules() },
-                            leadingIcon = { Icon(Icons.Default.AccessTime, contentDescription = null) },
+                            leadingIcon = { Icon(LettaIcons.AccessTime, contentDescription = null) },
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.screen_nav_runs)) },
                             onClick = { showOverflowMenu = false; onNavigateToRuns() },
-                            leadingIcon = { Icon(Icons.Default.ChatBubbleOutline, contentDescription = null) },
+                            leadingIcon = { Icon(LettaIcons.ChatOutline, contentDescription = null) },
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.screen_nav_jobs)) },
                             onClick = { showOverflowMenu = false; onNavigateToJobs() },
-                            leadingIcon = { Icon(Icons.Default.AccessTime, contentDescription = null) },
+                            leadingIcon = { Icon(LettaIcons.AccessTime, contentDescription = null) },
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.screen_nav_message_batches)) },
                             onClick = { showOverflowMenu = false; onNavigateToMessageBatches() },
-                            leadingIcon = { Icon(Icons.Default.ChatBubbleOutline, contentDescription = null) },
+                            leadingIcon = { Icon(LettaIcons.ChatOutline, contentDescription = null) },
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.screen_nav_mcp_servers)) },
                             onClick = { showOverflowMenu = false; onNavigateToMcp() },
-                            leadingIcon = { Icon(Icons.Default.Cloud, contentDescription = null) },
+                            leadingIcon = { Icon(LettaIcons.Cloud, contentDescription = null) },
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.screen_about_title)) },
                             onClick = { showOverflowMenu = false; onNavigateToAbout() },
-                            leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) },
+                            leadingIcon = { Icon(LettaIcons.Info, contentDescription = null) },
                         )
                     }
                 }
@@ -200,7 +184,7 @@ fun ConversationsScreen(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showAgentPickerDialog = true }) {
-                Icon(Icons.Default.Add, stringResource(R.string.screen_conversations_new_action))
+                Icon(LettaIcons.Add, stringResource(R.string.screen_conversations_new_action))
             }
         }
     ) { paddingValues ->
@@ -276,7 +260,7 @@ private fun ConversationsContent(
 ) {
     if (state.conversations.isEmpty()) {
         EmptyState(
-            icon = Icons.Default.ChatBubbleOutline,
+            icon = LettaIcons.ChatOutline,
             message = stringResource(R.string.screen_conversations_empty),
             modifier = modifier.fillMaxSize()
         )
@@ -353,7 +337,7 @@ private fun ConversationCard(
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    imageVector = Icons.Default.SmartToy,
+                    imageVector = LettaIcons.Agent,
                     contentDescription = "Agent",
                     modifier = Modifier.size(14.dp),
                     tint = MaterialTheme.colorScheme.primary,
@@ -389,22 +373,22 @@ private fun ConversationCard(
     ) {
         ActionSheetItem(
             text = stringResource(R.string.screen_conversations_admin_details),
-            icon = Icons.AutoMirrored.Filled.ManageSearch,
+            icon = LettaIcons.ManageSearch,
             onClick = { showContextMenu = false; onOpenAdmin() },
         )
         ActionSheetItem(
             text = stringResource(R.string.action_rename),
-            icon = Icons.Default.Edit,
+            icon = LettaIcons.Edit,
             onClick = { showContextMenu = false; showRenameDialog = true },
         )
         ActionSheetItem(
             text = stringResource(R.string.action_fork),
-            icon = Icons.Default.ForkRight,
+            icon = LettaIcons.ForkRight,
             onClick = { showContextMenu = false; onFork() },
         )
         ActionSheetItem(
             text = stringResource(R.string.action_delete),
-            icon = Icons.Default.Delete,
+            icon = LettaIcons.Delete,
             onClick = { showContextMenu = false; showDeleteDialog = true },
             destructive = true,
         )
@@ -589,7 +573,7 @@ private fun ErrorContent(
         verticalArrangement = Arrangement.Center
     ) {
         Icon(
-            imageVector = Icons.Default.Error,
+            imageVector = LettaIcons.Error,
             contentDescription = "Error",
             tint = MaterialTheme.colorScheme.error
         )

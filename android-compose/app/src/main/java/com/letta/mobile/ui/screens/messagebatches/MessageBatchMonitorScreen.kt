@@ -12,11 +12,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.ChatBubbleOutline
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
@@ -58,6 +53,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import com.letta.mobile.ui.icons.LettaIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,7 +73,7 @@ fun MessageBatchMonitorScreen(
                 title = { Text(stringResource(R.string.screen_message_batches_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
+                        Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -112,7 +108,7 @@ fun MessageBatchMonitorScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         placeholder = { Text(stringResource(R.string.screen_message_batches_search_hint)) },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        leadingIcon = { Icon(LettaIcons.Search, contentDescription = null) },
                         singleLine = true,
                     )
 
@@ -135,7 +131,7 @@ fun MessageBatchMonitorScreen(
 
                     if (filteredBatches.isEmpty()) {
                         EmptyState(
-                            icon = Icons.Default.ChatBubbleOutline,
+                            icon = LettaIcons.ChatOutline,
                             message = if (state.data.searchQuery.isBlank()) {
                                 stringResource(R.string.screen_message_batches_empty)
                             } else {

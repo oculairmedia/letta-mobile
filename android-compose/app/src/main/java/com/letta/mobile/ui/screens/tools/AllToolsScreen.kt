@@ -15,12 +15,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
@@ -57,6 +51,7 @@ import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerGrid
+import com.letta.mobile.ui.icons.LettaIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,7 +70,7 @@ fun AllToolsScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         floatingActionButton = {
             FloatingActionButton(onClick = { showCreateDialog = true }) {
-                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.screen_tools_create_action))
+                Icon(LettaIcons.Add, contentDescription = stringResource(R.string.screen_tools_create_action))
             }
         },
         topBar = {
@@ -85,7 +80,7 @@ fun AllToolsScreen(
                     scrollBehavior = scrollBehavior,
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
+                            Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
                         }
                     },
                     actions = {
@@ -94,7 +89,7 @@ fun AllToolsScreen(
                             if (!showSearch) viewModel.updateSearchQuery("")
                         }) {
                             Icon(
-                                if (showSearch) Icons.Default.Clear else Icons.Default.Search,
+                                if (showSearch) LettaIcons.Clear else LettaIcons.Search,
                                 contentDescription = stringResource(R.string.action_search),
                             )
                         }
@@ -111,11 +106,11 @@ fun AllToolsScreen(
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         placeholder = { Text(stringResource(R.string.screen_tools_search_hint)) },
                         singleLine = true,
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        leadingIcon = { Icon(LettaIcons.Search, contentDescription = null) },
                         trailingIcon = {
                             if (searchQuery.isNotEmpty()) {
                                 IconButton(onClick = { viewModel.updateSearchQuery("") }) {
-                                    Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.action_cancel))
+                                    Icon(LettaIcons.Clear, contentDescription = stringResource(R.string.action_cancel))
                                 }
                             }
                         },
@@ -171,7 +166,7 @@ fun AllToolsScreen(
                 ) {
                     if (filteredTools.isEmpty()) {
                         EmptyState(
-                            icon = Icons.Default.Build,
+                            icon = LettaIcons.Tool,
                             message = if (state.data.searchQuery.isBlank()) {
                                 stringResource(R.string.screen_tools_empty)
                             } else {
@@ -246,7 +241,7 @@ private fun ToolTile(
             modifier = Modifier.fillMaxSize().padding(12.dp),
         ) {
             Icon(
-                imageVector = Icons.Default.Build,
+                imageVector = LettaIcons.Tool,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier

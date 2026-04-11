@@ -5,12 +5,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.Icon
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.letta.mobile.ui.icons.LettaIcons
 
 @Composable
 fun ScrollToBottomFab(
@@ -26,7 +25,7 @@ fun ScrollToBottomFab(
     ) {
         SmallFloatingActionButton(onClick = onClick) {
             Icon(
-                imageVector = Icons.Default.KeyboardArrowDown,
+                imageVector = LettaIcons.KeyboardArrowDown,
                 contentDescription = "Scroll to bottom",
             )
         }

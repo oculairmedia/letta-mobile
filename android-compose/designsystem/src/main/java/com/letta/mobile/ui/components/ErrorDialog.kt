@@ -1,7 +1,5 @@
 package com.letta.mobile.ui.components
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -11,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.letta.mobile.designsystem.R
+import com.letta.mobile.ui.icons.LettaIcons
 
 @Composable
 fun ErrorDialog(
@@ -25,7 +24,7 @@ fun ErrorDialog(
         modifier = modifier,
         icon = {
             Icon(
-                imageVector = Icons.Default.Error,
+                imageVector = LettaIcons.Error,
                 contentDescription = stringResource(R.string.common_error),
                 tint = MaterialTheme.colorScheme.error
             )

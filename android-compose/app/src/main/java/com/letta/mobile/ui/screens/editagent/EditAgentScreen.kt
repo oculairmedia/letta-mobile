@@ -15,14 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.material3.AlertDialog
@@ -70,6 +62,7 @@ import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.components.ModelDropdown
 import com.letta.mobile.ui.screens.tools.ToolPickerDialog
+import com.letta.mobile.ui.icons.LettaIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,7 +82,7 @@ fun EditAgentScreen(
                 title = { Text(stringResource(R.string.screen_agent_edit_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
+                        Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
                     }
                 }
             )
@@ -202,7 +195,7 @@ private fun EditAgentContent(
                 clipboard.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.common_id), state.agentId))
                 snackbar.dispatch(context.getString(R.string.screen_agent_edit_agent_id_copied))
             }) {
-                Icon(Icons.Default.ContentCopy, contentDescription = stringResource(R.string.screen_agent_edit_copy_agent_id))
+                Icon(LettaIcons.Copy, contentDescription = stringResource(R.string.screen_agent_edit_copy_agent_id))
             }
         }
 
@@ -411,7 +404,7 @@ private fun EditAgentContent(
                     onClick = { showAddBlockDialog = true },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(LettaIcons.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(stringResource(R.string.screen_agent_edit_add_memory_block))
                 }
@@ -419,7 +412,7 @@ private fun EditAgentContent(
                     onClick = { showAttachBlockDialog = true },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(LettaIcons.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(stringResource(R.string.screen_agent_edit_attach_existing_block))
                 }
@@ -528,7 +521,7 @@ private fun EditAgentContent(
                     onClick = { showToolPicker = true },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(LettaIcons.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(stringResource(R.string.screen_agent_edit_attach_tools))
                 }
@@ -577,7 +570,7 @@ private fun EditAgentContent(
                     label = { Text(tag) },
                     trailingIcon = {
                         Icon(
-                            Icons.Default.Close,
+                            LettaIcons.Close,
                             contentDescription = stringResource(R.string.screen_agent_edit_remove_tag),
                             modifier = Modifier.size(16.dp),
                         )
@@ -610,7 +603,7 @@ private fun EditAgentContent(
             onClick = onSave,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Icon(Icons.Default.Save, null)
+            Icon(LettaIcons.Save, null)
             Spacer(modifier = Modifier.width(8.dp))
             Text(stringResource(R.string.action_save_changes))
         }
@@ -655,7 +648,7 @@ private fun AttachedToolRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            imageVector = Icons.Default.Build,
+            imageVector = LettaIcons.Tool,
             contentDescription = null,
             modifier = Modifier.size(20.dp),
             tint = MaterialTheme.colorScheme.primary,
@@ -679,7 +672,7 @@ private fun AttachedToolRow(
             }
         }
         Icon(
-            imageVector = Icons.Default.ChevronRight,
+            imageVector = LettaIcons.ChevronRight,
             contentDescription = null,
             modifier = Modifier.size(16.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -707,7 +700,7 @@ private fun ToolDetailDialog(
         onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(20.dp))
+                Icon(LettaIcons.Tool, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(tool.name)
             }

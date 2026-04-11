@@ -16,15 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Schema
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -58,6 +49,7 @@ import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.icons.LettaIcons
 
 private const val CUSTOM_TOOL_TYPE = "custom"
 
@@ -90,21 +82,21 @@ fun ToolDetailScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
+                        Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
                 actions = {
                     val tool = (uiState as? UiState.Success)?.data
                     if (tool != null) {
                         IconButton(onClick = { showAttachDialog = true }) {
-                            Icon(Icons.Default.Build, stringResource(R.string.screen_tool_detail_attach_action))
+                            Icon(LettaIcons.Tool, stringResource(R.string.screen_tool_detail_attach_action))
                         }
                         if (isEditableTool(tool)) {
                             IconButton(onClick = { showEditDialog = true }) {
-                                Icon(Icons.Default.Edit, stringResource(R.string.screen_tool_detail_edit_action))
+                                Icon(LettaIcons.Edit, stringResource(R.string.screen_tool_detail_edit_action))
                             }
                             IconButton(onClick = { showDeleteDialog = true }) {
-                                Icon(Icons.Default.Delete, stringResource(R.string.screen_tool_detail_delete_action))
+                                Icon(LettaIcons.Delete, stringResource(R.string.screen_tool_detail_delete_action))
                             }
                         }
                     }
@@ -198,7 +190,7 @@ private fun ToolDetailContent(
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Default.Build,
+                        imageVector = LettaIcons.Tool,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.optionalSharedElement("tool_icon_${tool.id}"),
@@ -324,7 +316,7 @@ private fun ToolDetailContent(
                 Spacer(modifier = Modifier.height(4.dp))
                 CollapsibleCodeBlock(
                     title = stringResource(R.string.screen_tool_detail_json_schema),
-                    icon = Icons.Default.Schema,
+                    icon = LettaIcons.Schema,
                     content = schema.toString(),
                 )
             }
@@ -336,7 +328,7 @@ private fun ToolDetailContent(
                 Spacer(modifier = Modifier.height(4.dp))
                 CollapsibleCodeBlock(
                     title = stringResource(R.string.screen_tool_detail_source_code),
-                    icon = Icons.Default.Code,
+                    icon = LettaIcons.Code,
                     content = code,
                 )
             }
@@ -502,7 +494,7 @@ private fun CollapsibleCodeBlock(
                 modifier = Modifier.weight(1f),
             )
             Icon(
-                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                imageVector = if (expanded) LettaIcons.ExpandLess else LettaIcons.ExpandMore,
                 contentDescription = if (expanded) {
                     stringResource(R.string.screen_tool_detail_collapse)
                 } else {

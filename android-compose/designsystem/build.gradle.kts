@@ -55,6 +55,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material:material-icons-extended")
+    api("com.composables:icons-lucide:1.1.0")
     implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.28.0")
     implementation("com.mikepenz:multiplatform-markdown-renderer-coil3:0.28.0")
     implementation("com.mikepenz:multiplatform-markdown-renderer-code:0.28.0")

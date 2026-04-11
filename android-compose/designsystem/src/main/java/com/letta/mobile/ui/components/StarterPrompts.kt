@@ -6,11 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Help
-import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.Psychology
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
@@ -20,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.icons.LettaIcons
 
 data class StarterPrompt(
     val text: String,
@@ -27,10 +23,10 @@ data class StarterPrompt(
 )
 
 val defaultStarterPrompts = listOf(
-    StarterPrompt("What can you help me with?", Icons.Default.AutoAwesome),
-    StarterPrompt("Tell me about your capabilities", Icons.Default.Psychology),
-    StarterPrompt("How do I get started?", Icons.Default.Help),
-    StarterPrompt("What are your limitations?", Icons.Default.Lightbulb),
+    StarterPrompt("What can you help me with?", LettaIcons.AutoAwesome),
+    StarterPrompt("Tell me about your capabilities", LettaIcons.Psychology),
+    StarterPrompt("How do I get started?", LettaIcons.Help),
+    StarterPrompt("What are your limitations?", LettaIcons.Lightbulb),
 )
 
 @Composable

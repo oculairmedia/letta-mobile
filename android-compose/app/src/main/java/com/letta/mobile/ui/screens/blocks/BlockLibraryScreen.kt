@@ -14,14 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.LinkOff
-import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -62,6 +54,7 @@ import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.icons.LettaIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,7 +79,7 @@ fun BlockLibraryScreen(
                 title = { Text(stringResource(R.string.screen_blocks_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
+                        Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -94,7 +87,7 @@ fun BlockLibraryScreen(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showCreateDialog = true }) {
-                Icon(Icons.Default.Add, stringResource(R.string.screen_blocks_create_title))
+                Icon(LettaIcons.Add, stringResource(R.string.screen_blocks_create_title))
             }
         },
     ) { paddingValues ->
@@ -135,13 +128,13 @@ fun BlockLibraryScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         placeholder = { Text(stringResource(R.string.screen_blocks_search_hint)) },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        leadingIcon = { Icon(LettaIcons.Search, contentDescription = null) },
                         singleLine = true,
                     )
 
                     if (filteredBlocks.isEmpty()) {
                         EmptyState(
-                            icon = Icons.Default.Search,
+                            icon = LettaIcons.Search,
                             message = if (state.data.searchQuery.isBlank()) {
                                 stringResource(R.string.screen_blocks_empty)
                             } else {
@@ -313,10 +306,10 @@ private fun BlockLibraryCard(
                 if (block.readOnly != true) {
                     Row {
                         IconButton(onClick = onEdit) {
-                            Icon(Icons.Default.Edit, stringResource(R.string.action_edit))
+                            Icon(LettaIcons.Edit, stringResource(R.string.action_edit))
                         }
                         IconButton(onClick = onDelete) {
-                            Icon(Icons.Default.Delete, stringResource(R.string.action_delete))
+                            Icon(LettaIcons.Delete, stringResource(R.string.action_delete))
                         }
                     }
                 }
@@ -357,14 +350,14 @@ private fun BlockLibraryCard(
                             label = { Text(agent.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             leadingIcon = {
                                 Icon(
-                                    Icons.Default.People,
+                                    LettaIcons.People,
                                     contentDescription = null,
                                     modifier = Modifier.size(AssistChipDefaults.IconSize),
                                 )
                             },
                             trailingIcon = {
                                 Icon(
-                                    Icons.Default.LinkOff,
+                                    LettaIcons.LinkOff,
                                     contentDescription = null,
                                     modifier = Modifier.size(AssistChipDefaults.IconSize),
                                 )
@@ -377,7 +370,7 @@ private fun BlockLibraryCard(
                     label = { Text(stringResource(R.string.action_attach)) },
                     leadingIcon = {
                         Icon(
-                            Icons.Default.Add,
+                            LettaIcons.Add,
                             contentDescription = null,
                             modifier = Modifier.size(AssistChipDefaults.IconSize),
                         )

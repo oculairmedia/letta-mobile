@@ -11,13 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
@@ -56,6 +49,7 @@ import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.icons.LettaIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,7 +72,7 @@ fun IdentityListScreen(
                 title = { Text(stringResource(R.string.screen_identities_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
+                        Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -86,7 +80,7 @@ fun IdentityListScreen(
         },
         floatingActionButton = {
             androidx.compose.material3.FloatingActionButton(onClick = { showCreateDialog = true }) {
-                Icon(Icons.Default.Add, stringResource(R.string.screen_identities_add_title))
+                Icon(LettaIcons.Add, stringResource(R.string.screen_identities_add_title))
             }
         },
     ) { paddingValues ->
@@ -114,13 +108,13 @@ fun IdentityListScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         placeholder = { Text(stringResource(R.string.screen_identities_search_hint)) },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        leadingIcon = { Icon(LettaIcons.Search, contentDescription = null) },
                         singleLine = true,
                     )
 
                     if (filteredIdentities.isEmpty()) {
                         EmptyState(
-                            icon = Icons.Default.AccountCircle,
+                            icon = LettaIcons.AccountCircle,
                             message = if (state.data.searchQuery.isBlank()) {
                                 stringResource(R.string.screen_identities_empty)
                             } else {
@@ -283,10 +277,10 @@ private fun IdentityCard(
                 }
                 Row {
                     IconButton(onClick = onEdit) {
-                        Icon(Icons.Default.Edit, stringResource(R.string.action_edit))
+                        Icon(LettaIcons.Edit, stringResource(R.string.action_edit))
                     }
                     IconButton(onClick = onDelete) {
-                        Icon(Icons.Default.Delete, stringResource(R.string.action_delete))
+                        Icon(LettaIcons.Delete, stringResource(R.string.action_delete))
                     }
                 }
             }

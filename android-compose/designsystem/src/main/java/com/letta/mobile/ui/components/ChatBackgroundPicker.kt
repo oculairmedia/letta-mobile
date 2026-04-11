@@ -13,8 +13,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,6 +24,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.theme.ChatBackground
+import com.letta.mobile.ui.icons.LettaIcons
 
 @Composable
 fun ChatBackgroundPicker(
@@ -93,7 +92,7 @@ private fun BackgroundSwatch(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.Default.Check,
+                    LettaIcons.Check,
                     contentDescription = "Selected",
                     modifier = Modifier.size(14.dp),
                     tint = MaterialTheme.colorScheme.onPrimary,

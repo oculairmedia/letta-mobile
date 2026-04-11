@@ -11,13 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.Circle
-import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.ui.components.LoadingIndicator
+import com.letta.mobile.ui.icons.LettaIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,7 +62,7 @@ fun HomeScreen(
                         if (uiState.isConnected) {
                             Spacer(modifier = Modifier.width(8.dp))
                             Icon(
-                                Icons.Default.Circle,
+                                LettaIcons.Circle,
                                 contentDescription = "Connected",
                                 tint = Color(0xFF4CAF50),
                                 modifier = Modifier.size(8.dp),
@@ -78,7 +72,7 @@ fun HomeScreen(
                 },
                 actions = {
                     IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        Icon(LettaIcons.Settings, contentDescription = "Settings")
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -130,28 +124,28 @@ private fun HomeContent(
             StatCard(
                 label = "Agents",
                 value = state.agentCount?.toString(),
-                icon = Icons.Default.People,
+                icon = LettaIcons.People,
                 onClick = onNavigateToAgents,
                 modifier = Modifier.weight(1f),
             )
             StatCard(
                 label = "Chats",
                 value = state.conversationCount?.toString(),
-                icon = Icons.Default.Chat,
+                icon = LettaIcons.Chat,
                 onClick = onNavigateToConversations,
                 modifier = Modifier.weight(1f),
             )
             StatCard(
                 label = "Tools",
                 value = state.toolCount?.toString(),
-                icon = Icons.Default.Build,
+                icon = LettaIcons.Tool,
                 onClick = onNavigateToTools,
                 modifier = Modifier.weight(1f),
             )
             StatCard(
                 label = "Blocks",
                 value = state.blockCount?.toString(),
-                icon = Icons.Default.ViewModule,
+                icon = LettaIcons.ViewModule,
                 onClick = onNavigateToBlocks,
                 modifier = Modifier.weight(1f),
             )
@@ -193,7 +187,7 @@ private fun HomeContent(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
-                        Icons.Default.Chat,
+                        LettaIcons.Chat,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     )

@@ -3,10 +3,6 @@ package com.letta.mobile.ui.screens.config
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -23,6 +19,7 @@ import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.icons.LettaIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,12 +37,12 @@ fun ConfigScreen(
                 title = { Text(stringResource(R.string.common_settings)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
+                        Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = onNavigateToConfigList) {
-                        Icon(Icons.AutoMirrored.Filled.List, stringResource(R.string.screen_config_list_title))
+                        Icon(LettaIcons.ListIcon, stringResource(R.string.screen_config_list_title))
                     }
                 }
             )
@@ -128,7 +125,7 @@ private fun ConfigContent(
                             label = { Text(stringResource(R.string.common_server_url)) },
                             placeholder = { Text(stringResource(R.string.screen_config_server_url_placeholder)) },
                             modifier = Modifier.fillMaxWidth(),
-                            leadingIcon = { Icon(Icons.Default.Link, null) },
+                            leadingIcon = { Icon(LettaIcons.Link, null) },
                         )
                     },
                 )
@@ -141,7 +138,7 @@ private fun ConfigContent(
                         label = { Text(stringResource(R.string.common_api_token)) },
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier.fillMaxWidth(),
-                        leadingIcon = { Icon(Icons.Default.Key, null) },
+                        leadingIcon = { Icon(LettaIcons.Key, null) },
                     )
                 },
             )
@@ -212,7 +209,7 @@ private fun ConfigContent(
             item(
                 onClick = onSave,
                 headlineContent = { Text(stringResource(R.string.action_save_configuration)) },
-                leadingContent = { Icon(Icons.Default.Save, contentDescription = null) },
+                leadingContent = { Icon(LettaIcons.Save, contentDescription = null) },
             )
         }
     }

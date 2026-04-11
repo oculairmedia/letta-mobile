@@ -15,19 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DrawerValue
@@ -75,6 +63,7 @@ import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.util.ConnectivityMonitor
 import com.letta.mobile.ui.navigation.optionalSharedElement
 import kotlinx.coroutines.launch
+import com.letta.mobile.ui.icons.LettaIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -140,7 +129,7 @@ fun AgentScaffold(
                             modifier = Modifier.clickable { showConversationPicker = true },
                         ) {
                             Icon(
-                                Icons.Default.SmartToy,
+                                LettaIcons.Agent,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier
@@ -161,7 +150,7 @@ fun AgentScaffold(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                     Icon(
-                                        Icons.Default.ArrowDropDown,
+                                        LettaIcons.ArrowDropDown,
                                         contentDescription = "Switch conversation",
                                         modifier = Modifier.size(16.dp),
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -172,12 +161,12 @@ fun AgentScaffold(
                     },
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
+                            Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
                         }
                     },
                     actions = {
                         IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(Icons.Default.Menu, "Menu")
+                            Icon(LettaIcons.Menu, "Menu")
                         }
                     }
                 )
@@ -235,7 +224,7 @@ private fun ConversationPickerSheet(
                 onClick = onNewConversation,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(LettaIcons.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(stringResource(R.string.screen_conversations_new_action))
             }
@@ -314,7 +303,7 @@ private fun DrawerContent(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                Icons.Default.SmartToy,
+                LettaIcons.Agent,
                 contentDescription = "Agent",
                 tint = MaterialTheme.colorScheme.primary,
             )
@@ -340,21 +329,21 @@ private fun DrawerContent(
         Spacer(modifier = Modifier.height(8.dp))
 
         NavigationDrawerItem(
-            icon = { Icon(Icons.Default.Edit, contentDescription = "Edit") },
+            icon = { Icon(LettaIcons.Edit, contentDescription = "Edit") },
             label = { Text(stringResource(R.string.screen_drawer_edit_agent)) },
             selected = false,
             onClick = onEditAgent,
         )
 
         NavigationDrawerItem(
-            icon = { Icon(Icons.Default.Inventory2, contentDescription = "Archival") },
+            icon = { Icon(LettaIcons.Inventory, contentDescription = "Archival") },
             label = { Text(stringResource(R.string.screen_drawer_archival)) },
             selected = false,
             onClick = onArchivalMemory,
         )
 
         NavigationDrawerItem(
-            icon = { Icon(Icons.Default.Build, contentDescription = "Tools") },
+            icon = { Icon(LettaIcons.Tool, contentDescription = "Tools") },
             label = { Text(stringResource(R.string.common_tools)) },
             selected = false,
             onClick = onTools,
@@ -363,7 +352,7 @@ private fun DrawerContent(
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
         NavigationDrawerItem(
-            icon = { Icon(Icons.Default.Delete, contentDescription = "Reset") },
+            icon = { Icon(LettaIcons.Delete, contentDescription = "Reset") },
             label = { Text("Reset Messages") },
             selected = false,
             onClick = onResetMessages,

@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -24,6 +22,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.icons.LettaIcons
 
 @Composable
 fun Accordions(
@@ -67,7 +66,7 @@ fun Accordions(
             }
             Spacer(modifier = Modifier.width(8.dp))
             Icon(
-                imageVector = Icons.Default.ExpandMore,
+                imageVector = LettaIcons.ExpandMore,
                 contentDescription = if (expanded) "Collapse" else "Expand",
                 modifier = Modifier.rotate(chevronRotation),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -11,14 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.ForkRight
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
@@ -63,6 +55,7 @@ import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.components.TextInputDialog
+import com.letta.mobile.ui.icons.LettaIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,7 +79,7 @@ fun GroupAdminScreen(
                 title = { Text(stringResource(R.string.screen_groups_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
+                        Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -94,7 +87,7 @@ fun GroupAdminScreen(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showCreateDialog = true }) {
-                Icon(Icons.Default.Add, stringResource(R.string.screen_groups_add_title))
+                Icon(LettaIcons.Add, stringResource(R.string.screen_groups_add_title))
             }
         },
     ) { paddingValues ->
@@ -119,13 +112,13 @@ fun GroupAdminScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         placeholder = { Text(stringResource(R.string.screen_groups_search_hint)) },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        leadingIcon = { Icon(LettaIcons.Search, contentDescription = null) },
                         singleLine = true,
                     )
 
                     if (filtered.isEmpty()) {
                         EmptyState(
-                            icon = Icons.Default.ForkRight,
+                            icon = LettaIcons.ForkRight,
                             message = if (state.data.searchQuery.isBlank()) {
                                 stringResource(R.string.screen_groups_empty)
                             } else {
@@ -298,10 +291,10 @@ private fun GroupCard(
                 }
                 Row {
                     IconButton(onClick = onEdit) {
-                        Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.screen_groups_edit_title))
+                        Icon(LettaIcons.Edit, contentDescription = stringResource(R.string.screen_groups_edit_title))
                     }
                     IconButton(onClick = onDelete) {
-                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.action_delete))
+                        Icon(LettaIcons.Delete, contentDescription = stringResource(R.string.action_delete))
                     }
                 }
             }

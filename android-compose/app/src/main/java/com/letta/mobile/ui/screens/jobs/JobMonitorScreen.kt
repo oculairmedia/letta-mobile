@@ -11,11 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
@@ -53,6 +48,7 @@ import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.util.formatRelativeTime
+import com.letta.mobile.ui.icons.LettaIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,7 +69,7 @@ fun JobMonitorScreen(
                 title = { Text(stringResource(R.string.screen_jobs_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
+                        Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -104,7 +100,7 @@ fun JobMonitorScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         placeholder = { Text(stringResource(R.string.screen_jobs_search_hint)) },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        leadingIcon = { Icon(LettaIcons.Search, contentDescription = null) },
                         singleLine = true,
                     )
 
@@ -124,7 +120,7 @@ fun JobMonitorScreen(
 
                     if (filteredJobs.isEmpty()) {
                         EmptyState(
-                            icon = Icons.Default.AccessTime,
+                            icon = LettaIcons.AccessTime,
                             message = if (state.data.searchQuery.isBlank()) {
                                 stringResource(R.string.screen_jobs_empty)
                             } else {
@@ -240,7 +236,7 @@ private fun JobCard(
                 )
                 if (job.isTerminalStatus()) {
                     Icon(
-                        imageVector = Icons.Default.Delete,
+                        imageVector = LettaIcons.Delete,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -41,6 +39,7 @@ import com.mikepenz.markdown.model.markdownExtendedSpans
 import dev.snipme.highlights.Highlights
 import dev.snipme.highlights.model.SyntaxThemes
 import org.intellij.markdown.ast.ASTNode
+import com.letta.mobile.ui.icons.LettaIcons
 
 @Composable
 fun MarkdownText(
@@ -167,7 +166,7 @@ private fun CodeFenceWithHeader(
                         ),
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.ContentCopy,
+                            imageVector = LettaIcons.Copy,
                             contentDescription = "Copy code",
                             modifier = Modifier.padding(4.dp),
                         )

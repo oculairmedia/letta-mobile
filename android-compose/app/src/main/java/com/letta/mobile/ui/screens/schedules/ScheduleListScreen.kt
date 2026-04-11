@@ -11,12 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
@@ -58,6 +52,7 @@ import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.icons.LettaIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -79,7 +74,7 @@ fun ScheduleListScreen(
                 title = { Text(stringResource(R.string.screen_schedules_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
+                        Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -88,7 +83,7 @@ fun ScheduleListScreen(
         floatingActionButton = {
             if (successState?.data?.scheduleAdminAvailable != false) {
                 FloatingActionButton(onClick = { showCreateDialog = true }) {
-                    Icon(Icons.Default.Add, stringResource(R.string.screen_schedules_add_title))
+                    Icon(LettaIcons.Add, stringResource(R.string.screen_schedules_add_title))
                 }
             }
         },
@@ -156,19 +151,19 @@ private fun ScheduleListContent(
 
         if (!state.scheduleAdminAvailable) {
             EmptyState(
-                icon = Icons.Default.AccessTime,
+                icon = LettaIcons.AccessTime,
                 message = state.scheduleAdminMessage ?: stringResource(R.string.screen_schedules_unavailable),
                 modifier = Modifier.fillMaxSize(),
             )
         } else if (state.selectedAgentId == null) {
             EmptyState(
-                icon = Icons.Default.AccessTime,
+                icon = LettaIcons.AccessTime,
                 message = stringResource(R.string.screen_conversations_dialog_no_agents),
                 modifier = Modifier.fillMaxSize(),
             )
         } else if (state.schedules.isEmpty()) {
             EmptyState(
-                icon = Icons.Default.AccessTime,
+                icon = LettaIcons.AccessTime,
                 message = stringResource(R.string.screen_schedules_empty),
                 modifier = Modifier.fillMaxSize(),
             )
@@ -214,7 +209,7 @@ private fun AgentSelector(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Icon(Icons.Default.ExpandMore, contentDescription = null)
+            Icon(LettaIcons.ExpandMore, contentDescription = null)
         }
         DropdownMenu(
             expanded = expanded,
@@ -264,7 +259,7 @@ private fun ScheduleCard(
                     )
                 }
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, stringResource(R.string.action_delete))
+                    Icon(LettaIcons.Delete, stringResource(R.string.action_delete))
                 }
             }
         }

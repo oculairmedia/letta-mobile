@@ -17,11 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
@@ -60,6 +55,7 @@ import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.icons.LettaIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,12 +85,12 @@ fun McpServerToolsScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
+                        Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.refreshServerTools() }) {
-                        Icon(Icons.Default.Refresh, stringResource(R.string.action_refresh))
+                        Icon(LettaIcons.Refresh, stringResource(R.string.action_refresh))
                     }
                 },
             )
@@ -122,7 +118,7 @@ fun McpServerToolsScreen(
                     )
                     if (state.data.tools.isEmpty()) {
                         EmptyState(
-                            icon = Icons.Default.Build,
+                            icon = LettaIcons.Tool,
                             message = stringResource(R.string.screen_mcp_server_tools_empty),
                             modifier = Modifier.fillMaxSize(),
                         )
@@ -231,7 +227,7 @@ private fun McpServerToolCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(tool.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                 TextButton(onClick = onRun, enabled = !isRunning) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null)
+                    Icon(LettaIcons.Play, contentDescription = null)
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         if (isRunning) {

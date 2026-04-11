@@ -6,8 +6,6 @@ import android.content.Intent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -24,6 +22,7 @@ import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.icons.LettaIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -250,7 +249,7 @@ private fun SettingsContent(
                             }
                         },
                         leadingContent = {
-                            Icon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Icon(LettaIcons.Tool, contentDescription = null, modifier = Modifier.size(20.dp))
                         },
                     )
                 }
@@ -289,12 +288,12 @@ private fun SettingsContent(
             item(
                 onClick = onSave,
                 headlineContent = { Text(stringResource(R.string.action_save_settings)) },
-                leadingContent = { Icon(Icons.Default.Check, contentDescription = null) },
+                leadingContent = { Icon(LettaIcons.Check, contentDescription = null) },
             )
             item(
                 onClick = onExport,
                 headlineContent = { Text(stringResource(R.string.action_export_agent)) },
-                leadingContent = { Icon(Icons.Default.Share, contentDescription = null) },
+                leadingContent = { Icon(LettaIcons.Share, contentDescription = null) },
             )
             item(
                 onClick = { showCloneDialog = true },
@@ -302,7 +301,7 @@ private fun SettingsContent(
                 supportingContent = {
                     Text(stringResource(R.string.screen_settings_clone_helper))
                 },
-                leadingContent = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
+                leadingContent = { Icon(LettaIcons.Copy, contentDescription = null) },
             )
             item(
                 onClick = { showResetDialog = true },
@@ -314,7 +313,7 @@ private fun SettingsContent(
                 },
                 leadingContent = {
                     Icon(
-                        Icons.Default.Refresh,
+                        LettaIcons.Refresh,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.error,
                     )
@@ -330,7 +329,7 @@ private fun SettingsContent(
                 },
                 leadingContent = {
                     Icon(
-                        Icons.Default.Delete,
+                        LettaIcons.Delete,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.error,
                     )
@@ -383,7 +382,7 @@ private fun ToolDetailDialog(
         onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Icon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(20.dp))
+                Icon(LettaIcons.Tool, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(tool.name)
             }

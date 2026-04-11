@@ -4,9 +4,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,6 +21,7 @@ import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.icons.LettaIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,7 +40,7 @@ fun ConfigListScreen(
                 title = { Text(stringResource(R.string.screen_config_list_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
+                        Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -75,7 +73,7 @@ private fun ConfigListContent(
 ) {
     if (state.configs.isEmpty()) {
         EmptyState(
-            icon = Icons.Default.Settings,
+            icon = LettaIcons.Settings,
             message = stringResource(R.string.screen_config_list_empty),
             modifier = modifier.fillMaxSize()
         )
@@ -168,7 +166,7 @@ private fun ConfigCard(
                 }
                 
                 IconButton(onClick = { showDeleteDialog = true }) {
-                    Icon(Icons.Default.Delete, stringResource(R.string.action_delete))
+                    Icon(LettaIcons.Delete, stringResource(R.string.action_delete))
                 }
             }
         }

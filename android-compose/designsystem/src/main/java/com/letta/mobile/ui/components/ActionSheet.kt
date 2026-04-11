@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.icons.LettaIcons
 
 
 /**
@@ -27,8 +28,8 @@ import androidx.compose.ui.unit.dp
  * Usage:
  * ```
  * ActionSheet(show = showSheet, onDismiss = { showSheet = false }) {
- *     ActionSheetItem(text = "Edit", icon = Icons.Default.Edit, onClick = { ... })
- *     ActionSheetItem(text = "Delete", icon = Icons.Default.Delete, onClick = { ... }, destructive = true)
+ *     ActionSheetItem(text = "Edit", icon = LettaIcons.Edit, onClick = { ... })
+ *     ActionSheetItem(text = "Delete", icon = LettaIcons.Delete, onClick = { ... }, destructive = true)
  * }
  * ```
  */

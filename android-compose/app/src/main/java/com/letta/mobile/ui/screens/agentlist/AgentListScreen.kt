@@ -26,19 +26,6 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.FileOpen
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.SmartToy
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -102,6 +89,7 @@ import com.letta.mobile.ui.components.ShimmerGrid
 import com.letta.mobile.ui.navigation.optionalSharedElement
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.screens.tools.ToolPickerDialog
+import com.letta.mobile.ui.icons.LettaIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -170,13 +158,13 @@ fun AgentListScreen(
                     scrollBehavior = scrollBehavior,
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.action_back))
+                            Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
                         }
                     },
                     actions = {
                         IconButton(onClick = { showImportDialog = true }) {
                             Icon(
-                                Icons.Default.FileOpen,
+                                LettaIcons.FileOpen,
                                 contentDescription = stringResource(R.string.action_import_agent),
                             )
                         }
@@ -185,7 +173,7 @@ fun AgentListScreen(
                             if (!showSearch) viewModel.updateSearchQuery("")
                         }) {
                             Icon(
-                                if (showSearch) Icons.Default.Clear else Icons.Default.Search,
+                                if (showSearch) LettaIcons.Clear else LettaIcons.Search,
                                 contentDescription = stringResource(R.string.action_search),
                             )
                         }
@@ -199,11 +187,11 @@ fun AgentListScreen(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                         placeholder = { Text(stringResource(R.string.screen_agents_search_hint)) },
                         singleLine = true,
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                        leadingIcon = { Icon(LettaIcons.Search, contentDescription = null) },
                         trailingIcon = {
                             if (uiState.searchQuery.isNotEmpty()) {
                                 IconButton(onClick = { viewModel.updateSearchQuery("") }) {
-                                    Icon(Icons.Default.Clear, contentDescription = stringResource(R.string.action_cancel))
+                                    Icon(LettaIcons.Clear, contentDescription = stringResource(R.string.action_cancel))
                                 }
                             }
                         },
@@ -257,7 +245,7 @@ fun AgentListScreen(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showCreateDialog = true }) {
-                Icon(Icons.Default.Add, "Create Agent")
+                Icon(LettaIcons.Add, "Create Agent")
             }
         }
     ) { paddingValues ->
@@ -276,7 +264,7 @@ fun AgentListScreen(
                 ) {
                     if (filteredAgents.isEmpty()) {
                         EmptyState(
-                            icon = Icons.Default.SmartToy,
+                            icon = LettaIcons.Agent,
                             message = if (uiState.searchQuery.isBlank()) stringResource(R.string.screen_agents_empty)
                             else "No agents matching \"${uiState.searchQuery}\"",
                             modifier = Modifier.fillMaxSize(),
@@ -402,7 +390,7 @@ private fun FavoriteAgentCard(
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
-                    imageVector = Icons.Default.Star,
+                    imageVector = LettaIcons.Star,
                     contentDescription = "Favorite",
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(28.dp),
@@ -417,7 +405,7 @@ private fun FavoriteAgentCard(
                     modifier = Modifier.weight(1f),
                 )
                 IconButton(onClick = onEdit) {
-                    Icon(Icons.Default.SmartToy, contentDescription = "Edit", tint = contentColor)
+                    Icon(LettaIcons.Agent, contentDescription = "Edit", tint = contentColor)
                 }
             }
 
@@ -560,7 +548,7 @@ private fun AgentCard(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        imageVector = Icons.Default.SmartToy,
+                        imageVector = LettaIcons.Agent,
                         contentDescription = null,
                         tint = Color.White,
                         modifier = Modifier.size(24.dp),
@@ -582,14 +570,14 @@ private fun AgentCard(
                     )
                     if (isFavorite) {
                         Icon(
-                            imageVector = Icons.Default.Favorite,
+                            imageVector = LettaIcons.Favorite,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(18.dp),
                         )
                     }
                     IconButton(onClick = { showContextMenu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = null)
+                        Icon(LettaIcons.MoreVert, contentDescription = null)
                     }
                 }
 
@@ -642,17 +630,17 @@ private fun AgentCard(
     ) {
         ActionSheetItem(
             text = if (isFavorite) "Remove Favorite" else "Set as Favorite",
-            icon = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+            icon = if (isFavorite) LettaIcons.Favorite else LettaIcons.FavoriteBorder,
             onClick = { showContextMenu = false; onToggleFavorite() },
         )
         ActionSheetItem(
             text = stringResource(R.string.action_edit),
-            icon = Icons.Default.Edit,
+            icon = LettaIcons.Edit,
             onClick = { showContextMenu = false; onLongPress() },
         )
         ActionSheetItem(
             text = stringResource(R.string.action_delete),
-            icon = Icons.Default.Delete,
+            icon = LettaIcons.Delete,
             onClick = { showContextMenu = false; showDeleteDialog = true },
             destructive = true,
         )
@@ -716,7 +704,7 @@ private fun CompactAgentCard(
                     .padding(12.dp),
             ) {
                 Icon(
-                    imageVector = Icons.Default.SmartToy,
+                    imageVector = LettaIcons.Agent,
                     contentDescription = null,
                     tint = Color.White,
                     modifier = Modifier
@@ -749,17 +737,17 @@ private fun CompactAgentCard(
     ) {
         ActionSheetItem(
             text = if (isFavorite) "Remove Favorite" else "Set as Favorite",
-            icon = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+            icon = if (isFavorite) LettaIcons.Favorite else LettaIcons.FavoriteBorder,
             onClick = { showContextMenu = false; onToggleFavorite() },
         )
         ActionSheetItem(
             text = stringResource(R.string.action_edit),
-            icon = Icons.Default.Edit,
+            icon = LettaIcons.Edit,
             onClick = { showContextMenu = false; onLongPress() },
         )
         ActionSheetItem(
             text = stringResource(R.string.action_delete),
-            icon = Icons.Default.Delete,
+            icon = LettaIcons.Delete,
             onClick = { showContextMenu = false; showDeleteDialog = true },
             destructive = true,
         )
@@ -968,7 +956,7 @@ private fun CreateAgentDialog(
                     onClick = { showToolPicker = true },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null)
+                    Icon(LettaIcons.Add, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(stringResource(R.string.screen_agents_create_select_tools))
                 }
