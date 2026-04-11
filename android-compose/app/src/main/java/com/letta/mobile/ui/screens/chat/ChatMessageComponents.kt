@@ -53,7 +53,18 @@ import com.letta.mobile.ui.theme.chatDimens
 import com.letta.mobile.ui.theme.chatTypography
 
 private fun UiMessage.displayRoleLabel(defaultLabel: String): String {
-    val toolCall = toolCalls?.singleOrNull() ?: return defaultLabel
+    val toolCall = toolCalls?.singleOrNull()
+    if (toolCall == null) {
+        return if (role == "tool") {
+            if (content.isNotBlank()) {
+                "Tool output"
+            } else {
+                "Tool activity"
+            }
+        } else {
+            defaultLabel
+        }
+    }
     return ToolDisplayRegistry.resolve(toolCall.name, toolCall.arguments).label
 }
 

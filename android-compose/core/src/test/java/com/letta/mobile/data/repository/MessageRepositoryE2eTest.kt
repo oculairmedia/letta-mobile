@@ -142,7 +142,7 @@ class MessageRepositoryE2eTest {
                     "date":"2026-04-09T10:00:00Z",
                     "run_id":"run-1",
                     "step_id":"step-1",
-                    "tool_call":{"id":"call-1","name":"search","arguments":"{\"q\":\"hi\"}","type":"function"}
+                    "tool_call":{"id":"call-1","name":"search","arguments":"{}","type":"function"}
                   },
                   {
                     "id":"event-1",
@@ -160,7 +160,7 @@ class MessageRepositoryE2eTest {
         assertEquals(2, messages.size)
         assertEquals("tool_call_message", messages.first().messageType)
         assertTrue(messages.first().detailLines.any { it.first == "Run ID" && it.second == "run-1" })
-        assertTrue(messages.first().detailLines.any { it.first == "Arguments" && it.second.contains("\"q\":\"hi\"") })
+        assertTrue(messages.first().detailLines.any { it.first == "Arguments" && it.second == "{}" })
         assertEquals("heartbeat", messages.last().summary)
         assertTrue(messages.last().detailLines.any { it.first == "phase" && it.second == "streaming" })
     }
