@@ -1,12 +1,21 @@
-name: Android CI
+name: Android APK CI
 
 on:
   push:
     branches: [main]
-    paths: ["android-compose/**"]
+    paths:
+      - ".github/workflows/android.yml"
+      - "android-compose/**"
   pull_request:
     branches: [main]
-    paths: ["android-compose/**"]
+    paths:
+      - ".github/workflows/android.yml"
+      - "android-compose/**"
+  workflow_dispatch:
+
+concurrency:
+  group: android-apk-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -27,12 +36,24 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Run unit tests
-        run: ./gradlew :core:testDebugUnitTest :app:testDebugUnitTest --no-daemon
+      - name: Compile app and run unit tests
+        run: ./gradlew :app:compileDebugKotlin :core:testDebugUnitTest :app:testDebugUnitTest --no-daemon
 
-  build:
+  build-apk:
     runs-on: ubuntu-latest
     needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: debug
+            gradle_task: :app:assembleDebug
+            artifact_name: app-debug-apk
+            artifact_path: android-compose/app/build/outputs/apk/debug/*.apk
+          - variant: release
+            gradle_task: :app:assembleRelease
+            artifact_name: app-release-apk
+            artifact_path: android-compose/app/build/outputs/apk/release/*.apk
     defaults:
       run:
         working-directory: android-compose
@@ -49,11 +70,12 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build debug APK
-        run: ./gradlew :app:assembleDebug --no-daemon
+      - name: Build ${{ matrix.variant }} APK
+        run: ./gradlew ${{ matrix.gradle_task }} --no-daemon
 
-      - name: Upload APK
+      - name: Upload ${{ matrix.variant }} APK
         uses: actions/upload-artifact@v4
         with:
-          name: debug-apk
-          path: android-compose/app/build/outputs/apk/debug/*.apk
+          name: ${{ matrix.artifact_name }}-${{ github.run_number }}
+          path: ${{ matrix.artifact_path }}
+          if-no-files-found: error
