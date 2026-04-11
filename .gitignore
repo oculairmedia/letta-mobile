@@ -100,3 +100,12 @@ plugins/android-tools-mcp-*.zip
 .dolt/
 *.db
 .beads-credential-key
+
+# Kotlin compiler error logs
+android-compose/.kotlin/
+
+# Letta local config
+.letta/
+
+# Generated reports
+LETTA_ADMIN_API_REPORT.md
