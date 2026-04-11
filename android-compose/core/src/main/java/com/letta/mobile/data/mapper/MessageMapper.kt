@@ -73,6 +73,7 @@ private fun LettaMessage.toAppMessage(toolCallsById: MutableMap<String, ToolCall
                 content = toolReturn.funcResponse ?: "",
                 toolName = context?.name,
                 toolCallId = toolCallId,
+                toolReturnStatus = toolReturn.status,
             )
         }
         else -> null
@@ -100,6 +101,7 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                 val name = msg.toolName
                 val arguments = msg.content
                 val returnContent = matchedReturn?.content
+                val returnStatus = matchedReturn?.toolReturnStatus
 
                 // send_message is Letta's reply tool — promote to assistant bubble
                 if (name == "send_message" && returnContent != null) {
@@ -119,6 +121,7 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                     name = name ?: "tool",
                     arguments = arguments,
                     result = returnContent,
+                    status = returnStatus,
                 )
                 result.add(UiMessage(
                     id = msg.id,
@@ -147,6 +150,7 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                     name = name,
                     arguments = "",
                     result = msg.content.ifBlank { null },
+                    status = msg.toolReturnStatus,
                 )
                 result.add(UiMessage(
                     id = msg.id,

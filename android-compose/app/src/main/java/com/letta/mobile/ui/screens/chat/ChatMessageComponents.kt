@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Card
@@ -65,7 +66,7 @@ private fun UiMessage.displayRoleLabel(defaultLabel: String): String {
             defaultLabel
         }
     }
-    return ToolDisplayRegistry.resolve(toolCall.name, toolCall.arguments).label
+    return toolCall.name
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -275,7 +276,11 @@ internal fun MessageToolCalls(
 @Composable
 private fun ToolCallCard(toolCall: UiToolCall) {
     var argsExpanded by remember { mutableStateOf(false) }
-    val display = remember(toolCall.name) { ToolDisplayRegistry.resolve(toolCall.name, toolCall.arguments) }
+    var resultExpanded by remember { mutableStateOf(false) }
+    val display = remember(toolCall.name, toolCall.arguments) {
+        ToolDisplayRegistry.resolve(toolCall.name, toolCall.arguments)
+    }
+    val isError = toolCall.status != null && toolCall.status != "success"
 
     Card(
         colors = CardDefaults.cardColors(
@@ -283,32 +288,51 @@ private fun ToolCallCard(toolCall: UiToolCall) {
         ),
     ) {
         Column(modifier = Modifier.padding(8.dp)) {
+            // Header: emoji + tool name + status icon
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(display.emoji, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.size(6.dp))
                 Text(
-                    text = display.label,
+                    text = toolCall.name,
                     style = MaterialTheme.chatTypography.toolLabel,
+                    fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                if (toolCall.result != null) {
+                if (isError) {
+                    Icon(
+                        imageVector = Icons.Default.Error,
+                        contentDescription = "Error",
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                } else if (toolCall.result != null) {
                     Icon(
                         imageVector = Icons.Default.CheckCircle,
-                        contentDescription = null,
+                        contentDescription = "Success",
                         modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
+            // Friendly description
+            Text(
+                text = display.label,
+                style = MaterialTheme.chatTypography.toolDetail,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            // Detail line (extracted from arguments)
             display.detailLine?.let { detail ->
                 Text(
                     text = detail,
-                    style = MaterialTheme.chatTypography.toolDetail,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    style = MaterialTheme.chatTypography.codeBlock,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            // Arguments accordion
             if (toolCall.arguments.isNotBlank()) {
                 Accordions(
                     title = "Arguments",
@@ -323,12 +347,37 @@ private fun ToolCallCard(toolCall: UiToolCall) {
                     )
                 }
             }
+            // Result accordion
             toolCall.result?.let { result ->
-                Spacer(modifier = Modifier.size(4.dp))
-                MarkdownText(
-                    text = result,
-                    textColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                )
+                val preview = if (result.length > 120) result.take(120) + "…" else result
+                Accordions(
+                    title = if (isError) "Error" else "Result",
+                    expanded = resultExpanded,
+                    onExpandedChange = { resultExpanded = it },
+                ) {
+                    MarkdownText(
+                        text = result,
+                        textColor = if (isError) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        },
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    )
+                }
+                if (!resultExpanded) {
+                    Text(
+                        text = preview,
+                        style = MaterialTheme.chatTypography.codeBlock,
+                        color = if (isError) {
+                            MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        },
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }

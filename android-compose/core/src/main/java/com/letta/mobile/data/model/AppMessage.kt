@@ -13,6 +13,7 @@ data class AppMessage(
     val content: String,
     val toolName: String? = null,
     val toolCallId: String? = null,
+    val toolReturnStatus: String? = null,
 )
 
 enum class MessageType {

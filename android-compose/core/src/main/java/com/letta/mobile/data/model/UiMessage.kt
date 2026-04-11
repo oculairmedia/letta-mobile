@@ -16,5 +16,6 @@ data class UiMessage(
 data class UiToolCall(
     val name: String,
     val arguments: String,
-    val result: String?
+    val result: String?,
+    val status: String? = null,
 )
