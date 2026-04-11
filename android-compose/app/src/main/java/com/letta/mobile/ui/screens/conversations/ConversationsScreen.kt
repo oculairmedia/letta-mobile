@@ -59,12 +59,23 @@ import com.letta.mobile.data.repository.ConversationInspectorMessage
 import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.DateSeparator
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.components.TextInputDialog
+import com.letta.mobile.ui.theme.dialogSectionHeading
+import com.letta.mobile.ui.theme.listItemHeadline
+import com.letta.mobile.ui.theme.listItemMetadata
+import com.letta.mobile.ui.theme.listItemMetadataMonospace
+import com.letta.mobile.ui.theme.listItemSupporting
+import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.util.formatRelativeTime
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.navigation.optionalSharedElement
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -207,6 +218,7 @@ fun ConversationsScreen(
                 onRenameConversation = { display, newName ->
                     viewModel.renameConversation(display.conversation.id, display.conversation.agentId, newName)
                 },
+                onTogglePinned = viewModel::toggleConversationPinned,
                 onForkConversation = { display ->
                     viewModel.forkConversation(display.conversation.id, display.conversation.agentId) { newConvId ->
                         onNavigateToChat(display.conversation.agentId, newConvId)
@@ -249,6 +261,7 @@ fun ConversationsScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ConversationsContent(
     state: ConversationsUiState,
@@ -256,6 +269,7 @@ private fun ConversationsContent(
     onOpenAdmin: (ConversationDisplay) -> Unit,
     onDeleteConversation: (ConversationDisplay) -> Unit,
     onRenameConversation: (ConversationDisplay, String) -> Unit,
+    onTogglePinned: (ConversationDisplay) -> Unit,
     onForkConversation: (ConversationDisplay) -> Unit,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
@@ -273,22 +287,34 @@ private fun ConversationsContent(
             onRefresh = onRefresh,
             modifier = modifier.fillMaxSize(),
         ) {
+            val sections = remember(state.conversations) {
+                buildConversationSections(state.conversations)
+            }
             LazyColumn(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(
-                    items = state.conversations,
-                    key = { it.conversation.id }
-                ) { display ->
-                    ConversationCard(
-                        display = display,
-                        onClick = { onConversationClick(display) },
-                    onOpenAdmin = { onOpenAdmin(display) },
-                    onDelete = { onDeleteConversation(display) },
-                    onRename = { newName -> onRenameConversation(display, newName) },
-                    onFork = { onForkConversation(display) },
-                    )
+                sections.forEach { section ->
+                    item(key = section.key) {
+                        when {
+                            section.isPinned -> ConversationPinnedHeader()
+                            section.date != null -> DateSeparator(date = section.date)
+                        }
+                    }
+                    items(
+                        items = section.items,
+                        key = { it.conversation.id }
+                    ) { display ->
+                        ConversationCard(
+                            display = display,
+                            onClick = { onConversationClick(display) },
+                            onOpenAdmin = { onOpenAdmin(display) },
+                            onDelete = { onDeleteConversation(display) },
+                            onRename = { newName -> onRenameConversation(display, newName) },
+                            onTogglePinned = { onTogglePinned(display) },
+                            onFork = { onForkConversation(display) },
+                        )
+                    }
                 }
             }
         }
@@ -303,6 +329,7 @@ private fun ConversationCard(
     onOpenAdmin: () -> Unit,
     onDelete: () -> Unit,
     onRename: (String) -> Unit,
+    onTogglePinned: () -> Unit,
     onFork: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -330,10 +357,28 @@ private fun ConversationCard(
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.listItemHeadline,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
+
+            if (display.isPinned) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = LettaIcons.Star,
+                        contentDescription = "Pinned",
+                        modifier = Modifier.size(LettaIconSizing.Inline),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Pinned",
+                        style = MaterialTheme.typography.listItemMetadata,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(4.dp))
 
@@ -341,13 +386,15 @@ private fun ConversationCard(
                 Icon(
                     imageVector = LettaIcons.Agent,
                     contentDescription = "Agent",
-                    modifier = Modifier.size(14.dp),
+                    modifier = Modifier
+                        .size(LettaIconSizing.Inline)
+                        .optionalSharedElement("agent_avatar_${conversation.agentId}"),
                     tint = MaterialTheme.colorScheme.primary,
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = display.agentName,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.listItemSupporting,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.primary,
                     maxLines = 1,
@@ -360,7 +407,7 @@ private fun ConversationCard(
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = timeText,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.listItemMetadata,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -377,6 +424,11 @@ private fun ConversationCard(
             text = stringResource(R.string.screen_conversations_admin_details),
             icon = LettaIcons.ManageSearch,
             onClick = { showContextMenu = false; onOpenAdmin() },
+        )
+        ActionSheetItem(
+            text = if (display.isPinned) "Unpin" else "Pin",
+            icon = LettaIcons.Star,
+            onClick = { showContextMenu = false; onTogglePinned() },
         )
         ActionSheetItem(
             text = stringResource(R.string.action_rename),
@@ -420,6 +472,72 @@ private fun ConversationCard(
 }
 
 @Composable
+private fun ConversationPinnedHeader() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = LettaIcons.Star,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(LettaIconSizing.Inline),
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = "Pinned",
+            style = MaterialTheme.typography.listItemMetadata,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+private data class ConversationSection(
+    val key: String,
+    val date: LocalDate? = null,
+    val isPinned: Boolean = false,
+    val items: List<ConversationDisplay>,
+)
+
+private fun buildConversationSections(conversations: List<ConversationDisplay>): List<ConversationSection> {
+    if (conversations.isEmpty()) return emptyList()
+
+    val pinned = conversations.filter { it.isPinned }
+    val regular = conversations.filterNot { it.isPinned }
+
+    val sections = mutableListOf<ConversationSection>()
+    if (pinned.isNotEmpty()) {
+        sections += ConversationSection(
+            key = "pinned",
+            isPinned = true,
+            items = pinned,
+        )
+    }
+
+    regular
+        .groupBy { conversationLocalDate(it.conversation) }
+        .forEach { (date, items) ->
+            sections += ConversationSection(
+                key = "date_$date",
+                date = date,
+                items = items,
+            )
+        }
+
+    return sections
+}
+
+private fun conversationLocalDate(conversation: com.letta.mobile.data.model.Conversation): LocalDate {
+    val timestamp = conversation.lastMessageAt ?: conversation.createdAt ?: Instant.EPOCH.toString()
+    return runCatching {
+        Instant.parse(timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
+    }.getOrDefault(LocalDate.now())
+}
+
+@Composable
 private fun ConversationAdminDialog(
     display: ConversationDisplay,
     recompilePreview: String?,
@@ -441,12 +559,20 @@ private fun ConversationAdminDialog(
         title = { Text(stringResource(R.string.screen_conversations_admin_details)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(conversation.id, style = MaterialTheme.typography.titleSmall)
-                Text(display.agentName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    conversation.id,
+                    style = MaterialTheme.typography.listItemMetadataMonospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    display.agentName,
+                    style = MaterialTheme.typography.listItemSupporting,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Text(
                     text = if (conversation.archived == true) stringResource(R.string.screen_conversations_archived_label)
                     else stringResource(R.string.screen_conversations_active_label),
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.listItemMetadata,
                 )
                 conversation.createdAt?.let {
                     Text(stringResource(R.string.screen_conversations_created_label, formatRelativeTime(it)))
@@ -476,18 +602,18 @@ private fun ConversationAdminDialog(
                 }
                 Text(
                     text = stringResource(R.string.screen_conversations_message_inspector_title),
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.dialogSectionHeading,
                 )
                 if (!inspectorError.isNullOrBlank()) {
                     Text(
                         text = inspectorError,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.listItemSupporting,
                         color = MaterialTheme.colorScheme.error,
                     )
                 } else if (inspectorMessages.isEmpty()) {
                     Text(
                         text = stringResource(R.string.screen_conversations_message_inspector_empty),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.listItemSupporting,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
@@ -503,8 +629,8 @@ private fun ConversationAdminDialog(
                     }
                 }
                 if (!recompilePreview.isNullOrBlank()) {
-                    Text(stringResource(R.string.screen_conversations_recompile_preview_title), style = MaterialTheme.typography.labelLarge)
-                    Text(recompilePreview, style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.screen_conversations_recompile_preview_title), style = MaterialTheme.typography.dialogSectionHeading)
+                    Text(recompilePreview, style = MaterialTheme.typography.listItemSupporting)
                 }
                 TextButton(onClick = onDelete) {
                     Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
@@ -536,11 +662,11 @@ private fun ConversationInspectorCard(message: ConversationInspectorMessage) {
             ) {
                 Text(
                     text = message.messageType,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.listItemMetadata,
                 )
                 Text(
                     text = message.id,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.listItemMetadataMonospace,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -548,12 +674,12 @@ private fun ConversationInspectorCard(message: ConversationInspectorMessage) {
             }
             Text(
                 text = message.summary,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.listItemSupporting,
             )
             message.detailLines.forEach { (label, value) ->
                 Text(
                     text = "$label: $value",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.listItemSupporting,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 4,
                     overflow = TextOverflow.Ellipsis,
@@ -613,12 +739,12 @@ private fun AgentPickerDialog(
                             Column(modifier = Modifier.padding(12.dp)) {
                                 Text(
                                     text = agent.name,
-                                    style = MaterialTheme.typography.titleSmall,
+                                    style = MaterialTheme.typography.listItemHeadline,
                                 )
                                 agent.model?.let { model ->
                                     Text(
                                         text = model,
-                                        style = MaterialTheme.typography.bodySmall,
+                                        style = MaterialTheme.typography.listItemSupporting,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }

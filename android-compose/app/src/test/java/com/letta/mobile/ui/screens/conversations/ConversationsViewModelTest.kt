@@ -7,12 +7,14 @@ import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.ConversationInspectorMessage
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.repository.MessageRepository
+import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.testutil.FakeMessageApi
 import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.TestData
 import io.mockk.mockk
+import io.mockk.every
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,7 +30,12 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], manifest = Config.NONE)
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConversationsViewModelTest {
 
@@ -36,8 +43,10 @@ class ConversationsViewModelTest {
     private lateinit var fakeConvRepo: FakeConversationRepository
     private lateinit var fakeAgentRepo: FakeAgentRepository
     private lateinit var fakeMessageRepo: FakeMessageRepository
+    private lateinit var settingsRepository: SettingsRepository
     private lateinit var viewModel: ConversationsViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
+    private val pinnedConversationIds = MutableStateFlow<Set<String>>(emptySet())
 
     @Before
     fun setup() {
@@ -46,7 +55,15 @@ class ConversationsViewModelTest {
         fakeConvRepo = FakeConversationRepository()
         fakeAgentRepo = FakeAgentRepository()
         fakeMessageRepo = FakeMessageRepository()
-        viewModel = ConversationsViewModel(fakeAllRepo, fakeConvRepo, fakeAgentRepo, fakeMessageRepo)
+        settingsRepository = mockk(relaxed = true)
+        every { settingsRepository.getPinnedConversationIds() } returns pinnedConversationIds
+        viewModel = ConversationsViewModel(
+            fakeAllRepo,
+            fakeConvRepo,
+            fakeAgentRepo,
+            fakeMessageRepo,
+            settingsRepository,
+        )
     }
 
     @After

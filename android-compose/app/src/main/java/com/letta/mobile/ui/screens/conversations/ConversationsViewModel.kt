@@ -10,17 +10,21 @@ import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.repository.MessageRepository
+import com.letta.mobile.data.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.time.Instant
 import javax.inject.Inject
 
 @androidx.compose.runtime.Immutable
 data class ConversationDisplay(
     val conversation: Conversation,
     val agentName: String,
+    val isPinned: Boolean = false,
 )
 
 @androidx.compose.runtime.Immutable
@@ -43,14 +47,28 @@ class ConversationsViewModel @Inject constructor(
     private val conversationRepository: ConversationRepository,
     private val agentRepository: AgentRepository,
     private val messageRepository: MessageRepository,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ConversationsUiState())
     val uiState: StateFlow<ConversationsUiState> = _uiState.asStateFlow()
 
     private var agentNameCache = mutableMapOf<String, String>()
+    private var pinnedConversationIds: Set<String> = emptySet()
 
     init {
+        viewModelScope.launch {
+            settingsRepository.getPinnedConversationIds().collectLatest { pinnedIds ->
+                pinnedConversationIds = pinnedIds
+                val selectedConversation = _uiState.value.selectedConversation
+                _uiState.value = _uiState.value.copy(
+                    conversations = applyPinnedState(_uiState.value.conversations),
+                    selectedConversation = selectedConversation?.let {
+                        it.copy(isPinned = it.conversation.id in pinnedIds)
+                    },
+                )
+            }
+        }
         val cachedAgents = agentRepository.agents.value
         if (cachedAgents.isNotEmpty()) {
             agentNameCache = cachedAgents.associate { it.id to it.name }.toMutableMap()
@@ -58,7 +76,7 @@ class ConversationsViewModel @Inject constructor(
         val cachedConversations = allConversationsRepository.conversations.value
         if (cachedConversations.isNotEmpty()) {
             _uiState.value = _uiState.value.copy(
-                conversations = cachedConversations.map { it.toDisplay() },
+                conversations = applyPinnedState(cachedConversations.map { it.toDisplay() }),
                 agents = cachedAgents,
                 isLoading = false,
             )
@@ -79,7 +97,7 @@ class ConversationsViewModel @Inject constructor(
 
                 allConversationsRepository.refresh()
                 _uiState.value = _uiState.value.copy(
-                    conversations = allConversationsRepository.conversations.value.map { it.toDisplay() },
+                    conversations = applyPinnedState(allConversationsRepository.conversations.value.map { it.toDisplay() }),
                     agents = agentRepository.agents.value,
                     isLoading = false,
                     error = null,
@@ -100,7 +118,7 @@ class ConversationsViewModel @Inject constructor(
             try {
                 allConversationsRepository.refresh()
                 _uiState.value = _uiState.value.copy(
-                    conversations = allConversationsRepository.conversations.value.map { it.toDisplay() },
+                    conversations = applyPinnedState(allConversationsRepository.conversations.value.map { it.toDisplay() }),
                     agents = agentRepository.agents.value,
                     isRefreshing = false,
                 )
@@ -245,7 +263,7 @@ class ConversationsViewModel @Inject constructor(
                 onSuccess(conversation.id)
                 allConversationsRepository.handleOptimisticUpdate(conversation)
                 _uiState.value = _uiState.value.copy(
-                    conversations = _uiState.value.conversations + conversation.toDisplay()
+                    conversations = applyPinnedState(_uiState.value.conversations + conversation.toDisplay())
                 )
             } catch (e: Exception) {
                 Log.w("ConversationsVM", "Create failed", e)
@@ -253,8 +271,42 @@ class ConversationsViewModel @Inject constructor(
         }
     }
 
+    fun toggleConversationPinned(display: ConversationDisplay) {
+        viewModelScope.launch {
+            val nextPinned = !display.isPinned
+            settingsRepository.setConversationPinned(display.conversation.id, nextPinned)
+            val updatedPinnedIds = if (nextPinned) {
+                pinnedConversationIds + display.conversation.id
+            } else {
+                pinnedConversationIds - display.conversation.id
+            }
+            pinnedConversationIds = updatedPinnedIds
+            _uiState.value = _uiState.value.copy(
+                conversations = applyPinnedState(_uiState.value.conversations, updatedPinnedIds),
+                selectedConversation = _uiState.value.selectedConversation?.takeIf {
+                    it.conversation.id == display.conversation.id
+                }?.copy(isPinned = nextPinned) ?: _uiState.value.selectedConversation,
+            )
+        }
+    }
+
     private fun Conversation.toDisplay() = ConversationDisplay(
         conversation = this,
         agentName = agentNameCache[agentId] ?: agentId.take(8),
+        isPinned = id in pinnedConversationIds,
     )
+
+    private fun applyPinnedState(
+        displays: List<ConversationDisplay>,
+        pinnedIds: Set<String> = pinnedConversationIds,
+    ): List<ConversationDisplay> = displays
+        .map { it.copy(isPinned = it.conversation.id in pinnedIds) }
+        .sortedWith(
+            compareByDescending<ConversationDisplay> { it.isPinned }
+                .thenByDescending { conversationSortInstant(it.conversation) }
+        )
+
+    private fun conversationSortInstant(conversation: Conversation): Instant = runCatching {
+        Instant.parse(conversation.lastMessageAt ?: conversation.createdAt ?: Instant.EPOCH.toString())
+    }.getOrDefault(Instant.EPOCH)
 }

@@ -1,9 +1,15 @@
 package com.letta.mobile.ui.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -50,6 +56,32 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+private const val DrillTransitionDurationMs = 320
+
+private val drillInEnter: AnimatedContentTransitionScope<*>.() -> EnterTransition = {
+    slideIntoContainer(
+        towards = AnimatedContentTransitionScope.SlideDirection.Start,
+        animationSpec = tween(DrillTransitionDurationMs),
+        initialOffset = { distance -> distance / 8 },
+    ) + fadeIn(animationSpec = tween(DrillTransitionDurationMs))
+}
+
+private val drillInExit: AnimatedContentTransitionScope<*>.() -> ExitTransition = {
+    fadeOut(animationSpec = tween(DrillTransitionDurationMs / 2))
+}
+
+private val drillInPopEnter: AnimatedContentTransitionScope<*>.() -> EnterTransition = {
+    fadeIn(animationSpec = tween(DrillTransitionDurationMs / 2))
+}
+
+private val drillInPopExit: AnimatedContentTransitionScope<*>.() -> ExitTransition = {
+    slideOutOfContainer(
+        towards = AnimatedContentTransitionScope.SlideDirection.End,
+        animationSpec = tween(DrillTransitionDurationMs),
+        targetOffset = { distance -> distance / 8 },
+    ) + fadeOut(animationSpec = tween(DrillTransitionDurationMs))
+}
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
@@ -113,60 +145,74 @@ fun AppNavGraph(
             )
         }
 
-        composable("conversations") {
-            ConversationsScreen(
-                onNavigateToChat = { agentId, conversationId ->
-                    navController.navigate("agent/$agentId/chat?conversationId=$conversationId")
-                },
-                onNavigateToSettings = {
-                    navController.navigate("config")
-                },
-                onNavigateToAgentList = {
-                    navController.navigate("agentList")
-                },
-                onNavigateToTemplates = {
-                    navController.navigate("templates")
-                },
-                onNavigateToArchives = {
-                    navController.navigate("archives")
-                },
-                onNavigateToFolders = {
-                    navController.navigate("folders")
-                },
-                onNavigateToGroups = {
-                    navController.navigate("groups")
-                },
-                onNavigateToProviders = {
-                    navController.navigate("providers")
-                },
-                onNavigateToBlocks = {
-                    navController.navigate("blocks")
-                },
-                onNavigateToIdentities = {
-                    navController.navigate("identities")
-                },
-                onNavigateToSchedules = {
-                    navController.navigate("schedules")
-                },
-                onNavigateToRuns = {
-                    navController.navigate("runs")
-                },
-                onNavigateToJobs = {
-                    navController.navigate("jobs")
-                },
-                onNavigateToMessageBatches = {
-                    navController.navigate("messageBatches")
-                },
-                onNavigateToMcp = {
-                    navController.navigate("mcp")
-                },
-                onNavigateToAbout = {
-                    navController.navigate("about")
-                },
-            )
+        composable(
+            route = "conversations",
+            enterTransition = drillInPopEnter,
+            exitTransition = drillInExit,
+            popEnterTransition = drillInPopEnter,
+            popExitTransition = drillInPopExit,
+        ) {
+            CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+                ConversationsScreen(
+                    onNavigateToChat = { agentId, conversationId ->
+                        navController.navigate("agent/$agentId/chat?conversationId=$conversationId")
+                    },
+                    onNavigateToSettings = {
+                        navController.navigate("config")
+                    },
+                    onNavigateToAgentList = {
+                        navController.navigate("agentList")
+                    },
+                    onNavigateToTemplates = {
+                        navController.navigate("templates")
+                    },
+                    onNavigateToArchives = {
+                        navController.navigate("archives")
+                    },
+                    onNavigateToFolders = {
+                        navController.navigate("folders")
+                    },
+                    onNavigateToGroups = {
+                        navController.navigate("groups")
+                    },
+                    onNavigateToProviders = {
+                        navController.navigate("providers")
+                    },
+                    onNavigateToBlocks = {
+                        navController.navigate("blocks")
+                    },
+                    onNavigateToIdentities = {
+                        navController.navigate("identities")
+                    },
+                    onNavigateToSchedules = {
+                        navController.navigate("schedules")
+                    },
+                    onNavigateToRuns = {
+                        navController.navigate("runs")
+                    },
+                    onNavigateToJobs = {
+                        navController.navigate("jobs")
+                    },
+                    onNavigateToMessageBatches = {
+                        navController.navigate("messageBatches")
+                    },
+                    onNavigateToMcp = {
+                        navController.navigate("mcp")
+                    },
+                    onNavigateToAbout = {
+                        navController.navigate("about")
+                    },
+                )
+            }
         }
 
-        composable("agentList") {
+        composable(
+            route = "agentList",
+            enterTransition = drillInEnter,
+            exitTransition = drillInExit,
+            popEnterTransition = drillInPopEnter,
+            popExitTransition = drillInPopExit,
+        ) {
             CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
                 AgentListScreen(
                     onNavigateBack = { navController.popBackStack() },
@@ -203,7 +249,13 @@ fun AppNavGraph(
             )
         }
 
-        composable("templates") {
+        composable(
+            route = "templates",
+            enterTransition = drillInEnter,
+            exitTransition = drillInExit,
+            popEnterTransition = drillInPopEnter,
+            popExitTransition = drillInPopExit,
+        ) {
             TemplatesScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToAgent = { agentId ->
@@ -298,7 +350,11 @@ fun AppNavGraph(
             arguments = listOf(
                 navArgument("agentId") { type = NavType.StringType },
                 navArgument("conversationId") { type = NavType.StringType; nullable = true; defaultValue = null },
-            )
+            ),
+            enterTransition = drillInEnter,
+            exitTransition = drillInExit,
+            popEnterTransition = drillInPopEnter,
+            popExitTransition = drillInPopExit,
         ) {
             CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
                 AgentScaffold(
@@ -342,7 +398,13 @@ fun AppNavGraph(
             )
         }
 
-        composable("allTools") {
+        composable(
+            route = "allTools",
+            enterTransition = drillInEnter,
+            exitTransition = drillInExit,
+            popEnterTransition = drillInPopEnter,
+            popExitTransition = drillInPopExit,
+        ) {
             CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
                 AllToolsScreen(
                     onNavigateBack = { navController.popBackStack() },
@@ -355,7 +417,11 @@ fun AppNavGraph(
 
         composable(
             route = "toolDetail/{toolId}",
-            arguments = listOf(navArgument("toolId") { type = NavType.StringType })
+            arguments = listOf(navArgument("toolId") { type = NavType.StringType }),
+            enterTransition = drillInEnter,
+            exitTransition = drillInExit,
+            popEnterTransition = drillInPopEnter,
+            popExitTransition = drillInPopExit,
         ) {
             CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
                 ToolDetailScreen(
