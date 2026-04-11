@@ -99,6 +99,7 @@ import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.components.ShimmerGrid
+import com.letta.mobile.ui.navigation.optionalSharedElement
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.screens.tools.ToolPickerDialog
 
@@ -551,7 +552,9 @@ private fun AgentCard(
             verticalAlignment = Alignment.Top,
         ) {
             Surface(
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier
+                    .size(48.dp)
+                    .optionalSharedElement("agent_avatar_${agent.id}"),
                 shape = RoundedCornerShape(16.dp),
                 color = Color(agentColor),
             ) {
@@ -716,7 +719,9 @@ private fun CompactAgentCard(
                     imageVector = Icons.Default.SmartToy,
                     contentDescription = null,
                     tint = Color.White,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier
+                        .size(20.dp)
+                        .optionalSharedElement("agent_avatar_${agent.id}"),
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 Text(

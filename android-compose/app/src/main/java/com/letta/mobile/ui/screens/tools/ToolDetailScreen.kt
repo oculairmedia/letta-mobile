@@ -53,6 +53,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.ui.navigation.optionalSharedElement
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.ErrorContent
@@ -200,6 +201,7 @@ private fun ToolDetailContent(
                         imageVector = Icons.Default.Build,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.optionalSharedElement("tool_icon_${tool.id}"),
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(

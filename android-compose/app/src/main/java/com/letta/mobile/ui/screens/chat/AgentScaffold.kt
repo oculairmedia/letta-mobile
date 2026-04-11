@@ -73,6 +73,7 @@ import com.letta.mobile.ui.components.ConnectionStatusBanner
 import com.letta.mobile.ui.theme.ChatBackground
 
 import com.letta.mobile.util.ConnectivityMonitor
+import com.letta.mobile.ui.navigation.optionalSharedElement
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -134,26 +135,38 @@ fun AgentScaffold(
             topBar = {
                 TopAppBar(
                     title = {
-                        Column(
-                            modifier = Modifier.clickable { showConversationPicker = true }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable { showConversationPicker = true },
                         ) {
-                            Text(
-                                text = agentName.ifBlank { stringResource(R.string.screen_chat_title) },
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
+                            Icon(
+                                Icons.Default.SmartToy,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .optionalSharedElement("agent_avatar_$agentId"),
                             )
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
                                 Text(
-                                    text = if (conversationId != null) "Conversation" else "Default",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    text = agentName.ifBlank { stringResource(R.string.screen_chat_title) },
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
-                                Icon(
-                                    Icons.Default.ArrowDropDown,
-                                    contentDescription = "Switch conversation",
-                                    modifier = Modifier.size(16.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = if (conversationId != null) "Conversation" else "Default",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Icon(
+                                        Icons.Default.ArrowDropDown,
+                                        contentDescription = "Switch conversation",
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                         }
                     },

@@ -1,8 +1,14 @@
 package com.letta.mobile.ui.navigation
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -45,6 +51,11 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+@OptIn(ExperimentalSharedTransitionApi::class)
+val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
+
+val LocalAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
+
 @HiltViewModel
 class NavViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
@@ -82,10 +93,13 @@ fun AppNavGraph(
         onNotificationTargetConsumed()
     }
 
-    NavHost(
-        navController = navController,
-        startDestination = startDestination
-    ) {
+    @OptIn(ExperimentalSharedTransitionApi::class)
+    SharedTransitionLayout {
+        CompositionLocalProvider(LocalSharedTransitionScope provides this) {
+            NavHost(
+                navController = navController,
+                startDestination = startDestination
+            ) {
         composable("home") {
             HomeScreen(
                 onNavigateToAgents = { navController.navigate("agentList") },
@@ -153,15 +167,17 @@ fun AppNavGraph(
         }
 
         composable("agentList") {
-            AgentListScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToAgent = { agentId ->
-                    navController.navigate("agent/$agentId/chat")
-                },
-                onNavigateToEditAgent = { agentId ->
-                    navController.navigate("editAgent/$agentId")
-                }
-            )
+            CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+                AgentListScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToAgent = { agentId ->
+                        navController.navigate("agent/$agentId/chat")
+                    },
+                    onNavigateToEditAgent = { agentId ->
+                        navController.navigate("editAgent/$agentId")
+                    },
+                )
+            }
         }
 
         composable("config") {
@@ -284,23 +300,25 @@ fun AppNavGraph(
                 navArgument("conversationId") { type = NavType.StringType; nullable = true; defaultValue = null },
             )
         ) {
-            AgentScaffold(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToSettings = { agentId ->
-                    navController.navigate("editAgent/$agentId")
-                },
-                onNavigateToArchival = { agentId ->
-                    navController.navigate("agent/$agentId/archival")
-                },
-                onNavigateToTools = {
-                    navController.navigate("allTools")
-                },
-                onSwitchConversation = { agentId, conversationId ->
-                    navController.navigate("agent/$agentId/chat?conversationId=$conversationId") {
-                        popUpTo("conversations")
-                    }
-                },
-            )
+            CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+                AgentScaffold(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToSettings = { agentId ->
+                        navController.navigate("editAgent/$agentId")
+                    },
+                    onNavigateToArchival = { agentId ->
+                        navController.navigate("agent/$agentId/archival")
+                    },
+                    onNavigateToTools = {
+                        navController.navigate("allTools")
+                    },
+                    onSwitchConversation = { agentId, conversationId ->
+                        navController.navigate("agent/$agentId/chat?conversationId=$conversationId") {
+                            popUpTo("conversations")
+                        }
+                    },
+                )
+            }
         }
 
         composable(
@@ -325,21 +343,25 @@ fun AppNavGraph(
         }
 
         composable("allTools") {
-            AllToolsScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToToolDetail = { toolId ->
-                    navController.navigate("toolDetail/$toolId")
-                },
-            )
+            CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+                AllToolsScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToToolDetail = { toolId ->
+                        navController.navigate("toolDetail/$toolId")
+                    },
+                )
+            }
         }
 
         composable(
             route = "toolDetail/{toolId}",
             arguments = listOf(navArgument("toolId") { type = NavType.StringType })
         ) {
-            ToolDetailScreen(
-                onNavigateBack = { navController.popBackStack() },
-            )
+            CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+                ToolDetailScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                )
+            }
         }
 
         composable("models") {
@@ -359,6 +381,8 @@ fun AppNavGraph(
             ArchivalScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
+        }
+    }
         }
     }
 }

@@ -22,6 +22,7 @@ class FakeMessageApi : MessageApi(mockk(relaxed = true)) {
         limit: Int?,
         after: String?,
         order: String?,
+        conversationId: String?,
     ): List<LettaMessage> {
         calls.add("listMessages:$agentId")
         if (shouldFail) throw ApiException(500, "Server error")
