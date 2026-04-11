@@ -22,6 +22,7 @@ class MessageProcessor @Inject constructor(
     ): Flow<AppMessage> = flow {
         val messages = mutableListOf<AppMessage>()
         val contentAccumulator = mutableMapOf<String, StringBuilder>()
+        val toolCallsById = mutableMapOf<String, String>()
 
         processStreamRecursive(
             stream = stream,
@@ -30,6 +31,7 @@ class MessageProcessor @Inject constructor(
             messageApi = messageApi,
             messages = messages,
             contentAccumulator = contentAccumulator,
+            toolCallsById = toolCallsById,
             depth = 0
         ) { message ->
             emit(message)
@@ -43,6 +45,7 @@ class MessageProcessor @Inject constructor(
         messageApi: MessageApi,
         messages: MutableList<AppMessage>,
         contentAccumulator: MutableMap<String, StringBuilder>,
+        toolCallsById: MutableMap<String, String>,
         depth: Int,
         onEmit: suspend (AppMessage) -> Unit,
     ) {
@@ -108,25 +111,32 @@ class MessageProcessor @Inject constructor(
 
                         is ToolCallMessage -> {
                             val firstToolCall = lettaMessage.effectiveToolCalls.firstOrNull()
+                            val toolCallId = firstToolCall?.effectiveId
+                            val toolName = firstToolCall?.name
+                            if (!toolCallId.isNullOrBlank() && !toolName.isNullOrBlank()) {
+                                toolCallsById[toolCallId] = toolName
+                            }
                             val appMessage = AppMessage(
                                 id = lettaMessage.id,
                                 date = parseInstant(lettaMessage.date),
                                 messageType = MessageType.TOOL_CALL,
                                 content = firstToolCall?.arguments.orEmpty(),
-                                toolName = firstToolCall?.name,
-                                toolCallId = firstToolCall?.effectiveId
+                                toolName = toolName,
+                                toolCallId = toolCallId,
                             )
                             messages.add(appMessage)
                             onEmit(appMessage)
                         }
 
                         is ToolReturnMessage -> {
+                            val toolCallId = lettaMessage.toolReturn.toolCallId
                             val appMessage = AppMessage(
                                 id = lettaMessage.id,
                                 date = parseInstant(lettaMessage.date),
                                 messageType = MessageType.TOOL_RETURN,
                                 content = lettaMessage.toolReturn.funcResponse ?: "",
-                                toolCallId = lettaMessage.toolReturn.toolCallId
+                                toolName = toolCallId?.let(toolCallsById::get),
+                                toolCallId = toolCallId,
                             )
                             messages.add(appMessage)
                             onEmit(appMessage)

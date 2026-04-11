@@ -3,15 +3,8 @@ package com.letta.mobile.data.paging
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.letta.mobile.data.api.MessageApi
+import com.letta.mobile.data.mapper.toAppMessages
 import com.letta.mobile.data.model.AppMessage
-import com.letta.mobile.data.model.AssistantMessage
-import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.model.MessageType
-import com.letta.mobile.data.model.ReasoningMessage
-import com.letta.mobile.data.model.ToolCallMessage
-import com.letta.mobile.data.model.ToolReturnMessage
-import com.letta.mobile.data.model.UserMessage
-import java.time.Instant
 
 class MessagePagingSource(
     private val messageApi: MessageApi,
@@ -43,7 +36,7 @@ class MessagePagingSource(
                 emptyList()
             }
 
-            val appMessages = lettaMessages.mapNotNull { it.toAppMessage() }
+            val appMessages = lettaMessages.toAppMessages()
 
             // Use last message ID as cursor for next page
             val nextKey = if (lettaMessages.size < params.loadSize) {
@@ -64,52 +57,5 @@ class MessagePagingSource(
 
     override fun getRefreshKey(state: PagingState<String, AppMessage>): String? {
         return null // Always refresh from the beginning
-    }
-
-    private fun LettaMessage.toAppMessage(): AppMessage? {
-        return when (this) {
-            is UserMessage -> AppMessage(
-                id = id,
-                date = date?.let { parseDate(it) } ?: Instant.now(),
-                messageType = MessageType.USER,
-                content = content
-            )
-            is AssistantMessage -> AppMessage(
-                id = id,
-                date = date?.let { parseDate(it) } ?: Instant.now(),
-                messageType = MessageType.ASSISTANT,
-                content = content
-            )
-            is ReasoningMessage -> AppMessage(
-                id = id,
-                date = date?.let { parseDate(it) } ?: Instant.now(),
-                messageType = MessageType.REASONING,
-                content = reasoning
-            )
-            is ToolCallMessage -> AppMessage(
-                id = id,
-                date = date?.let { parseDate(it) } ?: Instant.now(),
-                messageType = MessageType.TOOL_CALL,
-                content = effectiveToolCalls.firstOrNull()?.arguments.orEmpty(),
-                toolName = effectiveToolCalls.firstOrNull()?.name,
-                toolCallId = effectiveToolCalls.firstOrNull()?.effectiveId
-            )
-            is ToolReturnMessage -> AppMessage(
-                id = id,
-                date = date?.let { parseDate(it) } ?: Instant.now(),
-                messageType = MessageType.TOOL_RETURN,
-                content = toolReturn.funcResponse ?: "",
-                toolCallId = toolReturn.toolCallId
-            )
-            else -> null
-        }
-    }
-
-    private fun parseDate(dateString: String): Instant {
-        return try {
-            Instant.parse(dateString)
-        } catch (e: Exception) {
-            Instant.now()
-        }
     }
 }

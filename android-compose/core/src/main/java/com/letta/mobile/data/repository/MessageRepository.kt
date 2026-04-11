@@ -4,6 +4,7 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import com.letta.mobile.data.api.MessageApi
+import com.letta.mobile.data.mapper.toAppMessages
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.ApprovalResponseMessage
@@ -82,7 +83,7 @@ open class MessageRepository @Inject constructor(
                 messageApi.listMessages(agentId, limit = 100, order = "asc")
             }
 
-            val appMessages = lettaMessages.mapNotNull { it.toAppMessage() }
+            val appMessages = lettaMessages.toAppMessages()
 
             // Update cache
             if (conversationId != null) {
@@ -142,45 +143,6 @@ open class MessageRepository @Inject constructor(
     open suspend fun fetchConversationInspectorMessages(conversationId: String): List<ConversationInspectorMessage> {
         return messageApi.listConversationMessages(conversationId, limit = 200, order = "asc")
             .map { it.toInspectorMessage() }
-    }
-
-    private fun LettaMessage.toAppMessage(): AppMessage? {
-        return when (this) {
-            is UserMessage -> AppMessage(
-                id = id,
-                date = date?.let { parseDate(it) } ?: Instant.now(),
-                messageType = MessageType.USER,
-                content = content
-            )
-            is AssistantMessage -> AppMessage(
-                id = id,
-                date = date?.let { parseDate(it) } ?: Instant.now(),
-                messageType = MessageType.ASSISTANT,
-                content = content
-            )
-            is ReasoningMessage -> AppMessage(
-                id = id,
-                date = date?.let { parseDate(it) } ?: Instant.now(),
-                messageType = MessageType.REASONING,
-                content = reasoning
-            )
-            is ToolCallMessage -> AppMessage(
-                id = id,
-                date = date?.let { parseDate(it) } ?: Instant.now(),
-                messageType = MessageType.TOOL_CALL,
-                content = effectiveToolCalls.firstOrNull()?.arguments.orEmpty(),
-                toolName = effectiveToolCalls.firstOrNull()?.name,
-                toolCallId = effectiveToolCalls.firstOrNull()?.effectiveId
-            )
-            is ToolReturnMessage -> AppMessage(
-                id = id,
-                date = date?.let { parseDate(it) } ?: Instant.now(),
-                messageType = MessageType.TOOL_RETURN,
-                content = toolReturn.funcResponse ?: "",
-                toolCallId = toolReturn.toolCallId
-            )
-            else -> null // Skip other message types like HiddenReasoningMessage, EventMessage, etc.
-        }
     }
 
     private fun LettaMessage.toInspectorMessage(): ConversationInspectorMessage {

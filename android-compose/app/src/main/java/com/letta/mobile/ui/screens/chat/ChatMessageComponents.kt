@@ -52,6 +52,11 @@ import com.letta.mobile.ui.theme.chatColors
 import com.letta.mobile.ui.theme.chatDimens
 import com.letta.mobile.ui.theme.chatTypography
 
+private fun UiMessage.displayRoleLabel(defaultLabel: String): String {
+    val toolCall = toolCalls?.singleOrNull() ?: return defaultLabel
+    return ToolDisplayRegistry.resolve(toolCall.name, toolCall.arguments).label
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ChatMessageItem(
@@ -168,7 +173,11 @@ private fun MessageBubbleSurface(
         ) {
             if (groupPosition == GroupPosition.First || groupPosition == GroupPosition.None) {
                 Text(
-                    text = style.roleLabel,
+                    text = if (message.role == "tool" && !message.toolCalls.isNullOrEmpty()) {
+                        message.displayRoleLabel(style.roleLabel)
+                    } else {
+                        style.roleLabel
+                    },
                     style = typo.roleLabel,
                     color = style.roleColor,
                 )

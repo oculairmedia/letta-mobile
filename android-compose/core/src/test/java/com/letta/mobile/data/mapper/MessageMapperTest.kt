@@ -41,14 +41,18 @@ class MessageMapperTest : WordSpec({
             uiMsg.toolCalls?.first()?.name shouldBe "web_search"
         }
 
-        "map tool return messages to tool role without tool calls" {
+        "map tool return messages to tool role with tool result details" {
             val uiMsg = TestData.appMessage(
                 messageType = MessageType.TOOL_RETURN,
                 content = "Search results...",
+                toolName = "web_search",
                 toolCallId = "tc-1"
             ).toUiMessage()
             uiMsg.role shouldBe "tool"
-            uiMsg.toolCalls.shouldBeNull()
+            uiMsg.content shouldBe ""
+            uiMsg.toolCalls?.size shouldBe 1
+            uiMsg.toolCalls?.first()?.name shouldBe "web_search"
+            uiMsg.toolCalls?.first()?.result shouldBe "Search results..."
         }
 
         "preserve timestamp" {
