@@ -3,7 +3,10 @@ package com.letta.mobile.ui.theme
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -207,6 +210,7 @@ private fun deriveCustomColors(colorScheme: ColorScheme): CustomColors = CustomC
     iconPrimary = colorScheme.onSurface,
     iconSecondary = colorScheme.onSurfaceVariant,
     iconAccent = colorScheme.primary,
+    listItemContainerColor = colorScheme.surfaceBright,
     borderDefault = colorScheme.outlineVariant,
     borderFocused = colorScheme.primary,
     borderCritical = colorScheme.error,
@@ -258,6 +262,56 @@ private val OceanThemeColors = PresetThemeColors(
     ),
 )
 
+private val AmoledBlackThemeColors = PresetThemeColors(
+    lightScheme = buildLightScheme(
+        primary = Color(0xFF2E2E2E),
+        primaryContainer = Color(0xFFE4E4E4),
+        secondary = Color(0xFF5B5B5B),
+        tertiary = Color(0xFF767676),
+        background = Color(0xFFFAFAFA),
+        surface = Color(0xFFFFFFFF),
+        surfaceVariant = Color(0xFFF0F0F0),
+        outline = Color(0xFFC8C8C8),
+    ),
+    darkScheme = darkColorScheme(
+        primary = Color(0xFFE6E6E6),
+        onPrimary = Color.Black,
+        primaryContainer = Color(0xFF1A1A1A),
+        onPrimaryContainer = Color(0xFFF3F3F3),
+        secondary = Color(0xFFCFCFCF),
+        onSecondary = Color.Black,
+        secondaryContainer = Color(0xFF101010),
+        onSecondaryContainer = Color(0xFFE6E6E6),
+        tertiary = Color(0xFFB8B8B8),
+        onTertiary = Color.Black,
+        tertiaryContainer = Color(0xFF151515),
+        onTertiaryContainer = Color(0xFFE0E0E0),
+        error = DarkError,
+        onError = DarkOnError,
+        errorContainer = Color(0xFF93000A),
+        onErrorContainer = Color(0xFFFFDAD6),
+        background = Color.Black,
+        onBackground = Color(0xFFF5F5F5),
+        surface = Color.Black,
+        onSurface = Color(0xFFF5F5F5),
+        surfaceVariant = Color(0xFF101010),
+        onSurfaceVariant = Color(0xFFBDBDBD),
+        outline = Color(0xFF3F3F3F),
+        outlineVariant = Color(0xFF262626),
+        scrim = Color.Black,
+        inverseSurface = Color(0xFFF5F5F5),
+        inverseOnSurface = Color.Black,
+        inversePrimary = Color(0xFF2E2E2E),
+        surfaceDim = Color.Black,
+        surfaceBright = Color(0xFF121212),
+        surfaceContainerLowest = Color.Black,
+        surfaceContainerLow = Color.Black,
+        surfaceContainer = Color(0xFF101010),
+        surfaceContainerHigh = Color(0xFF141414),
+        surfaceContainerHighest = Color(0xFF1A1A1A),
+    ),
+)
+
 private val AutumnThemeColors = PresetThemeColors(
     lightScheme = buildLightScheme(
         primary = Color(0xFF9A4F1A),
@@ -306,30 +360,18 @@ private val SpringThemeColors = PresetThemeColors(
 
 private fun presetThemeColors(themePreset: ThemePreset): PresetThemeColors = when (themePreset) {
     ThemePreset.DEFAULT -> DefaultThemeColors
-    ThemePreset.SAKURA -> SakuraThemeColors
     ThemePreset.OCEAN -> OceanThemeColors
+    ThemePreset.AMOLED_BLACK -> AmoledBlackThemeColors
+    ThemePreset.SAKURA -> SakuraThemeColors
     ThemePreset.AUTUMN -> AutumnThemeColors
     ThemePreset.SPRING -> SpringThemeColors
 }
 
-private fun applyAmoled(colorScheme: ColorScheme): ColorScheme = colorScheme.copy(
-    background = Color.Black,
-    surface = Color.Black,
-    surfaceDim = Color.Black,
-    surfaceBright = Color(0xFF121212),
-    surfaceContainerLowest = Color.Black,
-    surfaceContainerLow = Color.Black,
-    surfaceContainer = Color(0xFF101010),
-    surfaceContainerHigh = Color(0xFF141414),
-    surfaceContainerHighest = Color(0xFF1A1A1A),
-    scrim = Color.Black,
-)
-
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun LettaTheme(
     appTheme: AppTheme = AppTheme.SYSTEM,
     themePreset: ThemePreset = ThemePreset.DEFAULT,
-    amoledDarkMode: Boolean = false,
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {
@@ -342,12 +384,11 @@ fun LettaTheme(
     }
 
     val presetColors = presetThemeColors(themePreset)
-    val useDynamicColor = themePreset == ThemePreset.DEFAULT && dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val useDynamicColor = dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
     val colorScheme = when {
         useDynamicColor && useDarkTheme -> dynamicDarkColorScheme(context)
         useDynamicColor && !useDarkTheme -> dynamicLightColorScheme(context)
-        useDarkTheme && amoledDarkMode -> applyAmoled(presetColors.darkScheme)
         useDarkTheme -> presetColors.darkScheme
         else -> presetColors.lightScheme
     }
@@ -355,9 +396,10 @@ fun LettaTheme(
     val customColors = deriveCustomColors(colorScheme)
 
     CompositionLocalProvider(LocalCustomColors provides customColors) {
-        MaterialTheme(
+        MaterialExpressiveTheme(
             colorScheme = colorScheme,
             typography = Typography,
+            motionScheme = MotionScheme.expressive(),
             content = content,
         )
     }

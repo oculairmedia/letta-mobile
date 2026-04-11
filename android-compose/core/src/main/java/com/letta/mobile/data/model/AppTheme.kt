@@ -8,8 +8,9 @@ enum class AppTheme {
 
 enum class ThemePreset {
     DEFAULT,
-    SAKURA,
     OCEAN,
+    AMOLED_BLACK,
+    SAKURA,
     AUTUMN,
     SPRING,
 }

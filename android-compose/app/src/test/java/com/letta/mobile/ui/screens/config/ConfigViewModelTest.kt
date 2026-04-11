@@ -11,6 +11,7 @@ import com.letta.mobile.util.EncryptedPrefsHelper
 import com.letta.mobile.ui.common.UiState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -72,7 +73,7 @@ class ConfigViewModelTest {
             assertEquals("", successState.apiToken)
             assertEquals(AppTheme.SYSTEM, successState.theme)
             assertEquals(ThemePreset.DEFAULT, successState.themePreset)
-            assertEquals(false, successState.amoledDarkMode)
+            assertEquals(true, successState.dynamicColor)
         }
     }
 
@@ -289,22 +290,38 @@ class ConfigViewModelTest {
             assertTrue(state is UiState.Success)
             val successState = (state as UiState.Success).data
             assertEquals(ThemePreset.SAKURA, successState.themePreset)
+            assertEquals(false, successState.dynamicColor)
         }
     }
 
     @Test
-    fun updateAmoledDarkMode_updatesStateCorrectly() = runTest {
+    fun updateDynamicColor_updatesStateCorrectly() = runTest {
         fakeRepository.setActiveConfig(null)
         viewModel.loadConfig()
 
-        viewModel.updateAmoledDarkMode(true)
+        viewModel.updateDynamicColor(false)
 
         viewModel.uiState.test {
             val state = awaitItem()
             assertTrue(state is UiState.Success)
             val successState = (state as UiState.Success).data
-            assertEquals(true, successState.amoledDarkMode)
+            assertEquals(false, successState.dynamicColor)
         }
+    }
+
+    @Test
+    fun saveConfig_persistsThemePresetAndDynamicColor() = runTest {
+        fakeRepository.setActiveConfig(null)
+        viewModel.loadConfig()
+
+        viewModel.updateThemePreset(ThemePreset.AMOLED_BLACK)
+        viewModel.updateDynamicColor(false)
+        viewModel.updateServerUrl("https://api.letta.com")
+
+        viewModel.saveConfig(onSuccess = {})
+
+        assertEquals(ThemePreset.AMOLED_BLACK, fakeRepository.getThemePreset().first())
+        assertEquals(false, fakeRepository.getDynamicColor().first())
     }
 
     private class FakeSettingsRepository(context: Context) : SettingsRepository(context) {
@@ -316,7 +333,7 @@ class ConfigViewModelTest {
 
         private val themeFlow = MutableStateFlow(AppTheme.SYSTEM)
         private val themePresetFlow = MutableStateFlow(ThemePreset.DEFAULT)
-        private val amoledDarkModeFlow = MutableStateFlow(false)
+        private val dynamicColorFlow = MutableStateFlow(true)
 
         private var savedConfig: LettaConfig? = null
 
@@ -351,10 +368,10 @@ class ConfigViewModelTest {
             themePresetFlow.value = themePreset
         }
 
-        override fun getAmoledDarkMode() = amoledDarkModeFlow
+        override fun getDynamicColor() = dynamicColorFlow
 
-        override suspend fun setAmoledDarkMode(enabled: Boolean) {
-            amoledDarkModeFlow.value = enabled
+        override suspend fun setDynamicColor(enabled: Boolean) {
+            dynamicColorFlow.value = enabled
         }
     }
 }

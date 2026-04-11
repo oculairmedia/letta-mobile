@@ -27,7 +27,7 @@ data class ConfigUiState(
     val apiToken: String = "",
     val theme: AppTheme = AppTheme.SYSTEM,
     val themePreset: ThemePreset = ThemePreset.DEFAULT,
-    val amoledDarkMode: Boolean = false,
+    val dynamicColor: Boolean = false,
 )
 
 @HiltViewModel
@@ -49,7 +49,7 @@ class ConfigViewModel @Inject constructor(
                 val config = settingsRepository.activeConfig.value
                 val appTheme = settingsRepository.getTheme().first()
                 val themePreset = settingsRepository.getThemePreset().first()
-                val amoledDarkMode = settingsRepository.getAmoledDarkMode().first()
+                val dynamicColor = settingsRepository.getDynamicColor().first()
                 val configUiState = if (config != null) {
                     ConfigUiState(
                         mode = if (config.mode == LettaConfig.Mode.CLOUD) ServerMode.CLOUD else ServerMode.SELF_HOSTED,
@@ -57,13 +57,13 @@ class ConfigViewModel @Inject constructor(
                         apiToken = config.accessToken ?: "",
                         theme = appTheme,
                         themePreset = themePreset,
-                        amoledDarkMode = amoledDarkMode,
+                        dynamicColor = dynamicColor,
                     )
                 } else {
                     ConfigUiState(
                         theme = appTheme,
                         themePreset = themePreset,
-                        amoledDarkMode = amoledDarkMode,
+                        dynamicColor = dynamicColor,
                     )
                 }
                 _uiState.value = UiState.Success(configUiState)
@@ -104,14 +104,19 @@ class ConfigViewModel @Inject constructor(
     fun updateThemePreset(themePreset: ThemePreset) {
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(themePreset = themePreset))
+            _uiState.value = UiState.Success(
+                currentState.copy(
+                    themePreset = themePreset,
+                    dynamicColor = if (themePreset == ThemePreset.DEFAULT) currentState.dynamicColor else false,
+                )
+            )
         }
     }
 
-    fun updateAmoledDarkMode(enabled: Boolean) {
+    fun updateDynamicColor(enabled: Boolean) {
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(amoledDarkMode = enabled))
+            _uiState.value = UiState.Success(currentState.copy(dynamicColor = enabled))
         }
     }
 
@@ -138,7 +143,7 @@ class ConfigViewModel @Inject constructor(
                 settingsRepository.saveConfig(config)
                 settingsRepository.setTheme(state.theme)
                 settingsRepository.setThemePreset(state.themePreset)
-                settingsRepository.setAmoledDarkMode(state.amoledDarkMode)
+                settingsRepository.setDynamicColor(state.dynamicColor)
                 onSuccess()
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(e.message ?: "Failed to save config")

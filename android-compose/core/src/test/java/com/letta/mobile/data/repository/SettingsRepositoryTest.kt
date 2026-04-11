@@ -2,7 +2,9 @@ package com.letta.mobile.data.repository
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
+import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.ThemePreset
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -128,13 +130,49 @@ class SettingsRepositoryTest {
     @Test
     fun `getTheme returns SYSTEM by default`() = runTest {
         val theme = repository.getTheme().first()
-        assertEquals(com.letta.mobile.data.model.AppTheme.SYSTEM, theme)
+        assertEquals(AppTheme.SYSTEM, theme)
     }
 
     @Test
     fun `setTheme persists theme`() = runTest {
-        repository.setTheme(com.letta.mobile.data.model.AppTheme.DARK)
+        repository.setTheme(AppTheme.DARK)
         val theme = repository.getTheme().first()
-        assertEquals(com.letta.mobile.data.model.AppTheme.DARK, theme)
+        assertEquals(AppTheme.DARK, theme)
+    }
+
+    @Test
+    fun `getThemePreset returns DEFAULT by default`() = runTest {
+        val preset = repository.getThemePreset().first()
+        assertEquals(ThemePreset.DEFAULT, preset)
+    }
+
+    @Test
+    fun `setThemePreset persists preset`() = runTest {
+        repository.setThemePreset(ThemePreset.AMOLED_BLACK)
+
+        val preset = repository.getThemePreset().first()
+        assertEquals(ThemePreset.AMOLED_BLACK, preset)
+    }
+
+    @Test
+    fun `legacy amoled dark mode maps to amoled preset`() = runTest {
+        repository.setAmoledDarkMode(true)
+
+        val preset = repository.getThemePreset().first()
+        assertEquals(ThemePreset.AMOLED_BLACK, preset)
+    }
+
+    @Test
+    fun `dynamic color defaults on for default preset on android 12 plus`() = runTest {
+        val dynamicColor = repository.getDynamicColor().first()
+        assertTrue(dynamicColor)
+    }
+
+    @Test
+    fun `setDynamicColor persists selection`() = runTest {
+        repository.setDynamicColor(false)
+
+        val dynamicColor = repository.getDynamicColor().first()
+        assertEquals(false, dynamicColor)
     }
 }

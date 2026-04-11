@@ -49,7 +49,7 @@ class MainActivity : ComponentActivity() {
             val snackbarHostState = remember { SnackbarHostState() }
             val appTheme = settingsRepository.getTheme().collectAsState(initial = AppTheme.SYSTEM)
             val themePreset = settingsRepository.getThemePreset().collectAsState(initial = ThemePreset.DEFAULT)
-            val amoledDarkMode = settingsRepository.getAmoledDarkMode().collectAsState(initial = false)
+            val dynamicColor = settingsRepository.getDynamicColor().collectAsState(initial = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
             val notificationPermissionLauncher = rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.RequestPermission(),
                 onResult = {},
@@ -78,7 +78,7 @@ class MainActivity : ComponentActivity() {
             LettaTheme(
                 appTheme = appTheme.value,
                 themePreset = themePreset.value,
-                amoledDarkMode = amoledDarkMode.value,
+                dynamicColor = dynamicColor.value,
             ) {
                 CompositionLocalProvider(LocalSnackbarDispatcher provides snackbarDispatcher) {
                     Scaffold(

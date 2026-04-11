@@ -2,11 +2,13 @@ package com.letta.mobile.data.repository
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.Build
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
@@ -51,10 +53,12 @@ class SettingsRepository @Inject constructor(
         val ACTIVE_CONFIG_ID = stringPreferencesKey("active_config_id")
         val THEME = stringPreferencesKey("theme")
         val THEME_PRESET = stringPreferencesKey("theme_preset")
+        val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val AMOLED_DARK_MODE = booleanPreferencesKey("amoled_dark_mode")
         val CHAT_BACKGROUND = stringPreferencesKey("chat_background")
         val FAVORITE_AGENT_ID = stringPreferencesKey("favorite_agent_id")
         val ADMIN_AGENT_ID = stringPreferencesKey("admin_agent_id")
+        val PINNED_CONVERSATION_IDS = stringSetPreferencesKey("pinned_conversation_ids")
     }
 
     init {
@@ -130,12 +134,22 @@ class SettingsRepository @Inject constructor(
     }
 
     fun getThemePreset(): Flow<ThemePreset> = dataStore.data.map { prefs ->
+        val legacyAmoledDarkMode = prefs[Keys.AMOLED_DARK_MODE] ?: false
+        if (legacyAmoledDarkMode) {
+            return@map ThemePreset.AMOLED_BLACK
+        }
         val presetName = prefs[Keys.THEME_PRESET] ?: ThemePreset.DEFAULT.name
         try {
             ThemePreset.valueOf(presetName)
         } catch (e: IllegalArgumentException) {
             ThemePreset.DEFAULT
         }
+    }
+
+    fun getDynamicColor(): Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[Keys.DYNAMIC_COLOR]
+            ?: ((prefs[Keys.THEME_PRESET] ?: ThemePreset.DEFAULT.name) == ThemePreset.DEFAULT.name &&
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
     }
 
     fun getAmoledDarkMode(): Flow<Boolean> = dataStore.data.map { prefs ->
@@ -178,6 +192,13 @@ class SettingsRepository @Inject constructor(
     suspend fun setThemePreset(themePreset: ThemePreset) {
         dataStore.edit { prefs ->
             prefs[Keys.THEME_PRESET] = themePreset.name
+            prefs[Keys.AMOLED_DARK_MODE] = false
+        }
+    }
+
+    suspend fun setDynamicColor(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[Keys.DYNAMIC_COLOR] = enabled
         }
     }
 
@@ -189,6 +210,21 @@ class SettingsRepository @Inject constructor(
 
     fun getChatBackgroundKey(): Flow<String> = dataStore.data.map { prefs ->
         prefs[Keys.CHAT_BACKGROUND] ?: "default"
+    }
+
+    fun getPinnedConversationIds(): Flow<Set<String>> = dataStore.data.map { prefs ->
+        prefs[Keys.PINNED_CONVERSATION_IDS] ?: emptySet()
+    }
+
+    suspend fun setConversationPinned(conversationId: String, pinned: Boolean) {
+        dataStore.edit { prefs ->
+            val current = prefs[Keys.PINNED_CONVERSATION_IDS] ?: emptySet()
+            prefs[Keys.PINNED_CONVERSATION_IDS] = if (pinned) {
+                current + conversationId
+            } else {
+                current - conversationId
+            }
+        }
     }
 
     suspend fun setChatBackgroundKey(key: String) {

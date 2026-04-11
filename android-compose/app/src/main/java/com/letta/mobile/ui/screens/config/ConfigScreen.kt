@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.config
 
+import android.os.Build
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -62,7 +63,7 @@ fun ConfigScreen(
                 onApiTokenChange = { viewModel.updateApiToken(it) },
                 onThemeChange = { viewModel.updateTheme(it) },
                 onThemePresetChange = { viewModel.updateThemePreset(it) },
-                onAmoledDarkModeChange = { viewModel.updateAmoledDarkMode(it) },
+                onDynamicColorChange = { viewModel.updateDynamicColor(it) },
                 onSave = {
                     viewModel.saveConfig(
                         onSuccess = { snackbar.dispatch("Configuration saved"); onNavigateBack() },
@@ -83,10 +84,12 @@ private fun ConfigContent(
     onApiTokenChange: (String) -> Unit,
     onThemeChange: (AppTheme) -> Unit,
     onThemePresetChange: (ThemePreset) -> Unit,
-    onAmoledDarkModeChange: (Boolean) -> Unit,
+    onDynamicColorChange: (Boolean) -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val dynamicColorSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -176,6 +179,27 @@ private fun ConfigContent(
                 },
             )
             item(
+                headlineContent = { Text(stringResource(R.string.screen_config_dynamic_color)) },
+                supportingContent = {
+                    Text(
+                        stringResource(
+                            if (dynamicColorSupported) {
+                                R.string.screen_config_dynamic_color_supported
+                            } else {
+                                R.string.screen_config_dynamic_color_unsupported
+                            }
+                        )
+                    )
+                },
+                trailingContent = {
+                    Switch(
+                        checked = state.dynamicColor,
+                        onCheckedChange = onDynamicColorChange,
+                        enabled = dynamicColorSupported,
+                    )
+                },
+            )
+            item(
                 headlineContent = {
                     @OptIn(ExperimentalLayoutApi::class)
                     FlowRow(
@@ -191,15 +215,15 @@ private fun ConfigContent(
                         }
                     }
                 },
-                supportingContent = { Text(stringResource(R.string.screen_config_theme_preset)) },
-            )
-            item(
-                headlineContent = { Text(stringResource(R.string.screen_config_amoled_dark_mode)) },
-                trailingContent = {
-                    Switch(
-                        checked = state.amoledDarkMode,
-                        onCheckedChange = onAmoledDarkModeChange,
-                        enabled = state.theme != AppTheme.LIGHT,
+                supportingContent = {
+                    Text(
+                        stringResource(
+                            if (state.dynamicColor && dynamicColorSupported) {
+                                R.string.screen_config_theme_preset_overridden
+                            } else {
+                                R.string.screen_config_theme_preset
+                            }
+                        )
                     )
                 },
             )
@@ -219,8 +243,9 @@ private fun ConfigContent(
 private fun themePresetLabel(themePreset: ThemePreset): String {
     return when (themePreset) {
         ThemePreset.DEFAULT -> stringResource(R.string.screen_config_theme_preset_default)
-        ThemePreset.SAKURA -> stringResource(R.string.screen_config_theme_preset_sakura)
         ThemePreset.OCEAN -> stringResource(R.string.screen_config_theme_preset_ocean)
+        ThemePreset.AMOLED_BLACK -> stringResource(R.string.screen_config_theme_preset_amoled_black)
+        ThemePreset.SAKURA -> stringResource(R.string.screen_config_theme_preset_sakura)
         ThemePreset.AUTUMN -> stringResource(R.string.screen_config_theme_preset_autumn)
         ThemePreset.SPRING -> stringResource(R.string.screen_config_theme_preset_spring)
     }
