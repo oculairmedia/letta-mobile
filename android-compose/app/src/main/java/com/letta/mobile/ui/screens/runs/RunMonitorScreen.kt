@@ -71,6 +71,7 @@ fun RunMonitorScreen(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
         topBar = {
             LargeFlexibleTopAppBar(
                 title = { Text(stringResource(R.string.screen_runs_title)) },
@@ -79,6 +80,7 @@ fun RunMonitorScreen(
                         Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
+                colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.largeTopAppBarColors(),
                 scrollBehavior = scrollBehavior,
             )
         },

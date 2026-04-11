@@ -35,6 +35,7 @@ fun ConfigListScreen(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
         topBar = {
             LargeFlexibleTopAppBar(
                 title = { Text(stringResource(R.string.screen_config_list_title)) },
@@ -43,6 +44,7 @@ fun ConfigListScreen(
                         Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
+                colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.largeTopAppBarColors(),
                 scrollBehavior = scrollBehavior,
             )
         }

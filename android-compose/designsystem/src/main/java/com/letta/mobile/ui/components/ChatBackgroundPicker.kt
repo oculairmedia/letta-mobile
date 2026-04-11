@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -67,8 +66,6 @@ private fun BackgroundSwatch(
     modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(8.dp)
-    val borderColor = if (isSelected) MaterialTheme.colorScheme.primary
-    else MaterialTheme.colorScheme.outlineVariant
 
     Box(
         modifier = modifier
@@ -81,14 +78,16 @@ private fun BackgroundSwatch(
                     is ChatBackground.Gradient -> Modifier.background(background.toBrush(), shape)
                 }
             )
-            .border(
-                width = if (isSelected) 2.dp else 1.dp,
-                color = borderColor,
-                shape = shape,
-            )
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
+        if (isSelected) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f), shape)
+            )
+        }
         if (isSelected) {
             Box(
                 modifier = Modifier

@@ -64,6 +64,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -151,11 +152,13 @@ fun AgentListScreen(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
         topBar = {
             Column {
                 LargeFlexibleTopAppBar(
                     title = { Text(stringResource(R.string.common_agents)) },
                     scrollBehavior = scrollBehavior,
+                    colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.largeTopAppBarColors(),
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
                             Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
@@ -520,9 +523,10 @@ private fun AgentCard(
     val toolCount = agent.tools.size
     val blockCount = agent.blocks.size
 
-    Card(
+    Surface(
         modifier = modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = {
@@ -530,13 +534,19 @@ private fun AgentCard(
                     showContextMenu = true
                 },
             ),
-        shape = RoundedCornerShape(18.dp)
+        shape = RoundedCornerShape(28.dp),
+        color = if (isFavorite) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
+        } else {
+            MaterialTheme.colorScheme.surfaceBright
+        },
+        tonalElevation = 0.dp,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.Top,
         ) {
             Surface(
@@ -558,7 +568,7 @@ private fun AgentCard(
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -586,14 +596,14 @@ private fun AgentCard(
                         text = description,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
 
                 FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     AgentMetaChip(text = agent.model ?: "No model")
                     AgentMetaChip(text = "$toolCount ${stringResource(R.string.common_tools)}")
@@ -678,10 +688,11 @@ private fun CompactAgentCard(
         android.graphics.Color.HSVToColor(floatArrayOf(hue, 0.3f, 0.9f))
     }
 
-    Card(
+    Surface(
         modifier = modifier
             .fillMaxWidth()
-            .height(110.dp)
+            .height(96.dp)
+            .clip(RoundedCornerShape(28.dp))
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = {
@@ -689,19 +700,25 @@ private fun CompactAgentCard(
                     showContextMenu = true
                 },
             ),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(28.dp),
+        color = if (isFavorite) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
+        } else {
+            MaterialTheme.colorScheme.surfaceBright
+        },
+        tonalElevation = 0.dp,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(36.dp)
+                    .height(30.dp)
                     .background(Color(agentColor)),
             )
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(12.dp),
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
             ) {
                 Icon(
                     imageVector = LettaIcons.Agent,

@@ -3,42 +3,39 @@ package com.letta.mobile.ui.screens.chat
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import com.letta.mobile.ui.theme.customColors
 
 data class ChatBubbleStyle(
     val alignEnd: Boolean,
     val containerColor: Color,
-    val borderColor: Color,
     val roleColor: Color,
     val roleLabel: String,
 )
 
 @Composable
 fun bubbleStyle(role: String, isStreaming: Boolean = false): ChatBubbleStyle {
-    val customColors = MaterialTheme.customColors
-    val accent = MaterialTheme.colorScheme.primary
+    val colorScheme = MaterialTheme.colorScheme
+    val accent = colorScheme.primary
 
     return when (role) {
         "user" -> ChatBubbleStyle(
             alignEnd = true,
-            containerColor = customColors.userBubbleBgColor,
-            borderColor = customColors.userBubbleBgColor,
-            roleColor = Color.White.copy(alpha = 0.7f),
+            containerColor = colorScheme.primaryContainer,
+            roleColor = colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
             roleLabel = "You",
         )
+
         "tool" -> ChatBubbleStyle(
             alignEnd = false,
-            containerColor = customColors.toolBubbleBgColor,
-            borderColor = customColors.toolBubbleBgColor.copy(alpha = 0.5f),
-            roleColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            containerColor = colorScheme.secondaryContainer,
+            roleColor = colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
             roleLabel = "Tool",
         )
+
         else -> ChatBubbleStyle(
             alignEnd = false,
-            containerColor = customColors.agentBubbleBgColor,
-            borderColor = if (isStreaming) accent else MaterialTheme.colorScheme.outlineVariant,
+            containerColor = colorScheme.surfaceContainerLow,
             roleColor = accent,
-            roleLabel = if (isStreaming) "Agent \u00B7 Live" else "Agent",
+            roleLabel = if (isStreaming) "Agent · Live" else "Agent",
         )
     }
 }

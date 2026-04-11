@@ -17,16 +17,12 @@ import androidx.compose.ui.unit.sp
 
 data class ChatColors(
     val userBubble: Color,
-    val userBubbleBorder: Color,
     val userText: Color,
     val userRoleLabel: Color,
     val agentBubble: Color,
-    val agentBubbleBorder: Color,
-    val agentBubbleBorderStreaming: Color,
     val agentText: Color,
     val agentRoleLabel: Color,
     val toolBubble: Color,
-    val toolBubbleBorder: Color,
     val toolEmoji: Color,
 )
 
@@ -49,7 +45,6 @@ data class ChatDimens(
     val bubblePaddingHorizontal: Dp = 10.dp,
     val bubblePaddingVertical: Dp = 7.dp,
     val bubbleMaxWidthFraction: Float = 0.88f,
-    val bubbleBorderWidth: Dp = 1.dp,
     val messageSpacing: Dp = 2.dp,
     val groupedMessageSpacing: Dp = 2.dp,
     val ungroupedMessageSpacing: Dp = 6.dp,
@@ -65,21 +60,17 @@ val LocalChatDimens = staticCompositionLocalOf { ChatDimens() }
 fun LettaChatTheme(
     content: @Composable () -> Unit,
 ) {
-    val customColors = MaterialTheme.customColors
+    val colorScheme = MaterialTheme.colorScheme
 
     val chatColors = ChatColors(
-        userBubble = customColors.userBubbleBgColor,
-        userBubbleBorder = customColors.userBubbleBgColor,
-        userText = Color.White,
-        userRoleLabel = Color.White.copy(alpha = 0.7f),
-        agentBubble = customColors.agentBubbleBgColor,
-        agentBubbleBorder = MaterialTheme.colorScheme.outlineVariant,
-        agentBubbleBorderStreaming = MaterialTheme.colorScheme.primary,
-        agentText = MaterialTheme.colorScheme.onSurface,
-        agentRoleLabel = MaterialTheme.colorScheme.primary,
-        toolBubble = customColors.toolBubbleBgColor,
-        toolBubbleBorder = customColors.toolBubbleBgColor.copy(alpha = 0.5f),
-        toolEmoji = MaterialTheme.colorScheme.onSurfaceVariant,
+        userBubble = colorScheme.primaryContainer,
+        userText = colorScheme.onPrimaryContainer,
+        userRoleLabel = colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+        agentBubble = colorScheme.surfaceContainerLow,
+        agentText = colorScheme.onSurface,
+        agentRoleLabel = colorScheme.primary,
+        toolBubble = colorScheme.secondaryContainer,
+        toolEmoji = colorScheme.onSecondaryContainer,
     )
 
     val chatTypography = ChatTypography(
@@ -98,7 +89,7 @@ fun LettaChatTheme(
             fontFamily = FontFamily.Monospace,
         ),
         timestamp = MaterialTheme.typography.labelSmall.copy(
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+            color = colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
         ),
     )
 

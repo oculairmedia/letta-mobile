@@ -113,6 +113,7 @@ fun McpScreen(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
         topBar = {
             LargeFlexibleTopAppBar(
                 title = { Text(stringResource(R.string.screen_mcp_title)) },
@@ -126,6 +127,7 @@ fun McpScreen(
                         Icon(LettaIcons.Refresh, stringResource(R.string.action_refresh))
                     }
                 },
+                colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.largeTopAppBarColors(),
                 scrollBehavior = scrollBehavior,
             )
         },

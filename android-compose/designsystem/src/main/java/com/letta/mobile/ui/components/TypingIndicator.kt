@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -28,7 +27,7 @@ fun TypingIndicator(
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = bubbleColor,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+        tonalElevation = 1.dp,
         modifier = modifier,
     ) {
         Row(

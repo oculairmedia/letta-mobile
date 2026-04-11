@@ -95,10 +95,12 @@ fun ConversationsScreen(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
         topBar = {
             LargeFlexibleTopAppBar(
                 title = { Text(stringResource(R.string.common_conversations)) },
                 scrollBehavior = scrollBehavior,
+                colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.largeTopAppBarColors(),
                 actions = {
                     IconButton(onClick = onNavigateToAgentList) {
                         Icon(LettaIcons.AccountCircle, stringResource(R.string.common_agents))

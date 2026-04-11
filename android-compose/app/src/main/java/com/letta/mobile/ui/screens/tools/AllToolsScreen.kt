@@ -68,6 +68,7 @@ fun AllToolsScreen(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
         floatingActionButton = {
             FloatingActionButton(onClick = { showCreateDialog = true }) {
                 Icon(LettaIcons.Add, contentDescription = stringResource(R.string.screen_tools_create_action))
@@ -78,6 +79,7 @@ fun AllToolsScreen(
                 LargeFlexibleTopAppBar(
                     title = { Text(stringResource(R.string.common_tools)) },
                     scrollBehavior = scrollBehavior,
+                    colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.largeTopAppBarColors(),
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
                             Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))

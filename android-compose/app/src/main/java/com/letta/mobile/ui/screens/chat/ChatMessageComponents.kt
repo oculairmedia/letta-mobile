@@ -8,7 +8,6 @@ import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -165,7 +164,6 @@ private fun MessageBubbleSurface(
     Surface(
         shape = bubbleShape,
         color = style.containerColor,
-        border = BorderStroke(dimens.bubbleBorderWidth, style.borderColor),
         tonalElevation = 0.dp,
         modifier = if (onLongClick != null) {
             Modifier
@@ -223,7 +221,6 @@ internal fun MessageAvatar(
         modifier = modifier.size(32.dp),
         shape = MaterialTheme.shapes.medium,
         color = containerColor,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
     ) {
         Box(contentAlignment = Alignment.Center) {
             if (icon != null) {

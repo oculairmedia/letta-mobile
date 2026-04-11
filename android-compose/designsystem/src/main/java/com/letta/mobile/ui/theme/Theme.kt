@@ -18,8 +18,6 @@ import com.letta.mobile.data.model.ThemePreset
 private data class PresetThemeColors(
     val lightScheme: ColorScheme,
     val darkScheme: ColorScheme,
-    val lightCustomColors: CustomColors,
-    val darkCustomColors: CustomColors,
 )
 
 private val DefaultThemeColors = PresetThemeColors(
@@ -93,8 +91,6 @@ private val DefaultThemeColors = PresetThemeColors(
         surfaceContainerHigh = DarkSurfaceContainer,
         surfaceContainerHighest = Color(0xFF353535),
     ),
-    lightCustomColors = lightCustomColors,
-    darkCustomColors = darkCustomColors,
 )
 
 private fun buildLightScheme(
@@ -187,25 +183,34 @@ private fun buildDarkScheme(
     surfaceContainerHighest = primaryContainer.copy(alpha = 0.85f),
 )
 
-private fun buildCustomColors(primary: Color, accent: Color, dark: Boolean) = if (dark) {
-    darkCustomColors.copy(
-        userBubbleBgColor = primary,
-        reasoningBubbleBgColor = accent.copy(alpha = 0.35f),
-        toolBubbleBgColor = primary.copy(alpha = 0.28f),
-        iconAccent = primary,
-        borderFocused = primary,
-        textLink = accent,
-    )
-} else {
-    lightCustomColors.copy(
-        userBubbleBgColor = primary,
-        reasoningBubbleBgColor = accent.copy(alpha = 0.18f),
-        toolBubbleBgColor = primary.copy(alpha = 0.16f),
-        iconAccent = primary,
-        borderFocused = primary,
-        textLink = accent,
-    )
-}
+private fun deriveCustomColors(colorScheme: ColorScheme): CustomColors = CustomColors(
+    userBubbleBgColor = colorScheme.primaryContainer,
+    agentBubbleBgColor = colorScheme.surfaceContainerLow,
+    reasoningBubbleBgColor = colorScheme.tertiaryContainer.copy(alpha = 0.45f),
+    toolBubbleBgColor = colorScheme.secondaryContainer,
+    systemMessageColor = colorScheme.surfaceContainerHigh,
+    dateSeparatorColor = colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+    textPrimary = colorScheme.onSurface,
+    textSecondary = colorScheme.onSurfaceVariant,
+    textDisabled = colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+    textLink = colorScheme.primary,
+    textOnPrimary = colorScheme.onPrimaryContainer,
+    errorTextColor = colorScheme.onErrorContainer,
+    errorContainerColor = colorScheme.errorContainer,
+    warningTextColor = colorScheme.onTertiaryContainer,
+    warningContainerColor = colorScheme.tertiaryContainer,
+    successColor = colorScheme.primary,
+    successContainerColor = colorScheme.primaryContainer,
+    onlineColor = colorScheme.primary,
+    offlineColor = colorScheme.error,
+    reconnectingColor = colorScheme.secondary,
+    iconPrimary = colorScheme.onSurface,
+    iconSecondary = colorScheme.onSurfaceVariant,
+    iconAccent = colorScheme.primary,
+    borderDefault = colorScheme.outlineVariant,
+    borderFocused = colorScheme.primary,
+    borderCritical = colorScheme.error,
+)
 
 private val SakuraThemeColors = PresetThemeColors(
     lightScheme = buildLightScheme(
@@ -228,8 +233,6 @@ private val SakuraThemeColors = PresetThemeColors(
         surfaceVariant = Color(0xFF35232D),
         outline = Color(0xFF76505F),
     ),
-    lightCustomColors = buildCustomColors(Color(0xFFB45C7B), Color(0xFF9C6B9D), dark = false),
-    darkCustomColors = buildCustomColors(Color(0xFFF0A8C1), Color(0xFFD7A8D9), dark = true),
 )
 
 private val OceanThemeColors = PresetThemeColors(
@@ -253,8 +256,6 @@ private val OceanThemeColors = PresetThemeColors(
         surfaceVariant = Color(0xFF14313A),
         outline = Color(0xFF41616B),
     ),
-    lightCustomColors = buildCustomColors(Color(0xFF006D8F), Color(0xFF007C91), dark = false),
-    darkCustomColors = buildCustomColors(Color(0xFF6FD8F6), Color(0xFF66D9E8), dark = true),
 )
 
 private val AutumnThemeColors = PresetThemeColors(
@@ -278,8 +279,6 @@ private val AutumnThemeColors = PresetThemeColors(
         surfaceVariant = Color(0xFF362720),
         outline = Color(0xFF725746),
     ),
-    lightCustomColors = buildCustomColors(Color(0xFF9A4F1A), Color(0xFFC16A2A), dark = false),
-    darkCustomColors = buildCustomColors(Color(0xFFFFB689), Color(0xFFFFA763), dark = true),
 )
 
 private val SpringThemeColors = PresetThemeColors(
@@ -303,8 +302,6 @@ private val SpringThemeColors = PresetThemeColors(
         surfaceVariant = Color(0xFF243124),
         outline = Color(0xFF4C674D),
     ),
-    lightCustomColors = buildCustomColors(Color(0xFF2D7D46), Color(0xFF4E9D64), dark = false),
-    darkCustomColors = buildCustomColors(Color(0xFF8FDC9B), Color(0xFF9FE0A8), dark = true),
 )
 
 private fun presetThemeColors(themePreset: ThemePreset): PresetThemeColors = when (themePreset) {
@@ -326,12 +323,6 @@ private fun applyAmoled(colorScheme: ColorScheme): ColorScheme = colorScheme.cop
     surfaceContainerHigh = Color(0xFF141414),
     surfaceContainerHighest = Color(0xFF1A1A1A),
     scrim = Color.Black,
-)
-
-private fun applyAmoled(customColors: CustomColors): CustomColors = customColors.copy(
-    agentBubbleBgColor = Color(0xFF101010),
-    toolBubbleBgColor = customColors.toolBubbleBgColor.copy(alpha = 0.22f),
-    reasoningBubbleBgColor = customColors.reasoningBubbleBgColor.copy(alpha = 0.22f),
 )
 
 @Composable
@@ -361,11 +352,7 @@ fun LettaTheme(
         else -> presetColors.lightScheme
     }
 
-    val customColors = when {
-        useDarkTheme && amoledDarkMode -> applyAmoled(presetColors.darkCustomColors)
-        useDarkTheme -> presetColors.darkCustomColors
-        else -> presetColors.lightCustomColors
-    }
+    val customColors = deriveCustomColors(colorScheme)
 
     CompositionLocalProvider(LocalCustomColors provides customColors) {
         MaterialTheme(

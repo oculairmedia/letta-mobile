@@ -64,6 +64,7 @@ fun ModelBrowserScreen(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
         topBar = {
             LargeFlexibleTopAppBar(
                 title = { Text(stringResource(R.string.screen_models_title)) },
@@ -72,6 +73,7 @@ fun ModelBrowserScreen(
                         Icon(LettaIcons.ArrowBack, contentDescription = "Back")
                     }
                 },
+                colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.largeTopAppBarColors(),
                 scrollBehavior = scrollBehavior,
             )
         },
