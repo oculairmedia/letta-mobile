@@ -75,13 +75,16 @@ open class MessageRepository @Inject constructor(
     }
 
     suspend fun fetchMessages(agentId: String, conversationId: String? = null): List<AppMessage> {
-        // Try to fetch from API
+        // Always use the agent messages endpoint — it returns tool_call_message types
+        // which are needed for resolving tool names. The conversation_id parameter
+        // filters to the specific conversation when provided.
         return try {
-            val lettaMessages = if (conversationId != null) {
-                messageApi.listConversationMessages(conversationId, limit = 100, order = "asc")
-            } else {
-                messageApi.listMessages(agentId, limit = 100, order = "asc")
-            }
+            val lettaMessages = messageApi.listMessages(
+                agentId = agentId,
+                limit = 100,
+                order = "asc",
+                conversationId = conversationId,
+            )
 
             val appMessages = lettaMessages.toAppMessages()
 

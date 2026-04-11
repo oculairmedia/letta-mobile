@@ -1,6 +1,7 @@
 package com.letta.mobile.data.mapper
 
 import com.letta.mobile.data.model.AppMessage
+import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageType
@@ -63,6 +64,26 @@ private fun LettaMessage.toAppMessage(toolCallsById: MutableMap<String, ToolCall
                 toolCallId = toolCallId,
             )
         }
+        is ApprovalRequestMessage -> {
+            // ApprovalRequestMessage carries tool call details (name, arguments, id)
+            // just like ToolCallMessage — the server returns these instead of
+            // tool_call_message for agents with approval enabled.
+            val toolCall = effectiveToolCalls.firstOrNull()
+            val toolCallId = toolCall?.effectiveId
+            val toolName = toolCall?.name
+            val arguments = toolCall?.arguments.orEmpty()
+            if (!toolCallId.isNullOrBlank() && !toolName.isNullOrBlank()) {
+                toolCallsById[toolCallId] = ToolCallContext(name = toolName, arguments = arguments)
+            }
+            AppMessage(
+                id = id,
+                date = date?.toInstant() ?: Instant.now(),
+                messageType = MessageType.TOOL_CALL,
+                content = arguments,
+                toolName = toolName,
+                toolCallId = toolCallId,
+            )
+        }
         is ToolReturnMessage -> {
             val toolCallId = toolReturn.toolCallId
             val context = toolCallId?.let(toolCallsById::get)
@@ -71,7 +92,7 @@ private fun LettaMessage.toAppMessage(toolCallsById: MutableMap<String, ToolCall
                 date = date?.toInstant() ?: Instant.now(),
                 messageType = MessageType.TOOL_RETURN,
                 content = toolReturn.funcResponse ?: "",
-                toolName = context?.name,
+                toolName = context?.name ?: name,
                 toolCallId = toolCallId,
                 toolReturnStatus = toolReturn.status,
             )

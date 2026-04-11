@@ -135,19 +135,40 @@ class MessageProcessor @Inject constructor(
                                 date = parseInstant(lettaMessage.date),
                                 messageType = MessageType.TOOL_RETURN,
                                 content = lettaMessage.toolReturn.funcResponse ?: "",
-                                toolName = toolCallId?.let(toolCallsById::get),
+                                toolName = toolCallId?.let(toolCallsById::get) ?: lettaMessage.name,
                                 toolCallId = toolCallId,
+                                toolReturnStatus = lettaMessage.toolReturn.status,
                             )
                             messages.add(appMessage)
                             onEmit(appMessage)
                         }
 
                         is ApprovalRequestMessage -> {
+                            // ApprovalRequestMessage carries tool call details —
+                            // emit as TOOL_CALL and populate toolCallsById for name resolution
+                            val firstToolCall = lettaMessage.effectiveToolCalls.firstOrNull()
+                            val toolCallId = firstToolCall?.effectiveId
+                            val toolName = firstToolCall?.name
+                            if (!toolCallId.isNullOrBlank() && !toolName.isNullOrBlank()) {
+                                toolCallsById[toolCallId] = toolName
+                            }
+                            val appMessage = AppMessage(
+                                id = lettaMessage.id,
+                                date = parseInstant(lettaMessage.date),
+                                messageType = MessageType.TOOL_CALL,
+                                content = firstToolCall?.arguments.orEmpty(),
+                                toolName = toolName,
+                                toolCallId = toolCallId,
+                            )
+                            messages.add(appMessage)
+                            onEmit(appMessage)
+
+                            // Execute client tools if applicable
                             lettaMessage.effectiveToolCalls.forEach { toolCall ->
-                                val toolName = toolCall.name ?: return@forEach
+                                val name = toolCall.name ?: return@forEach
                                 val arguments = toolCall.arguments ?: return@forEach
-                                if (clientToolRegistry.isClientTool(toolName)) {
-                                    val result = clientToolRegistry.execute(toolName, arguments)
+                                if (clientToolRegistry.isClientTool(name)) {
+                                    clientToolRegistry.execute(name, arguments)
                                 }
                             }
                         }

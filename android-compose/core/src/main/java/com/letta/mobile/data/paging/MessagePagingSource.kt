@@ -20,17 +20,14 @@ class MessagePagingSource(
         val afterCursor = params.key
 
         return try {
-            val lettaMessages = if (conversationId != null) {
-                messageApi.listConversationMessages(
-                    conversationId = conversationId,
-                    limit = params.loadSize,
-                    after = afterCursor
-                )
-            } else if (agentId != null) {
+            // Always use the agent messages endpoint — it returns tool_call_message
+            // types needed for resolving tool names. Use conversation_id to filter.
+            val lettaMessages = if (agentId != null) {
                 messageApi.listMessages(
                     agentId = agentId,
                     limit = params.loadSize,
-                    after = afterCursor
+                    after = afterCursor,
+                    conversationId = conversationId,
                 )
             } else {
                 emptyList()

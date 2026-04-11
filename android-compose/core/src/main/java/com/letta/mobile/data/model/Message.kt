@@ -155,14 +155,31 @@ data class ToolReturnMessage(
     @SerialName("message_type") override val messageType: String = "tool_return_message",
 ) : LettaMessage {
     val toolReturn: ToolReturn
-        get() = toolReturns?.firstOrNull() ?: when {
-            toolReturnRaw is JsonPrimitive && toolReturnRaw.isString -> ToolReturn(
-                toolCallId = toolCallId ?: "",
-                status = status ?: "success",
-                funcResponse = toolReturnRaw.content
-            ).copy(stdout = stdout, stderr = stderr)
-            toolReturnRaw is JsonObject -> Json.decodeFromJsonElement(ToolReturn.serializer(), toolReturnRaw)
-            else -> ToolReturn(toolCallId = toolCallId ?: "", status = status ?: "unknown", funcResponse = null, stdout = stdout, stderr = stderr)
+        get() {
+            val rawFuncResponse = when {
+                toolReturnRaw is JsonPrimitive && toolReturnRaw.isString -> toolReturnRaw.content
+                else -> null
+            }
+            val fromList = toolReturns?.firstOrNull()
+            if (fromList != null) {
+                // Enrich with funcResponse from tool_return raw if missing
+                return if (fromList.funcResponse == null && rawFuncResponse != null) {
+                    fromList.copy(funcResponse = rawFuncResponse, stdout = fromList.stdout ?: stdout, stderr = fromList.stderr ?: stderr)
+                } else {
+                    fromList
+                }
+            }
+            return when {
+                rawFuncResponse != null -> ToolReturn(
+                    toolCallId = toolCallId ?: "",
+                    status = status ?: "success",
+                    funcResponse = rawFuncResponse,
+                    stdout = stdout,
+                    stderr = stderr,
+                )
+                toolReturnRaw is JsonObject -> Json.decodeFromJsonElement(ToolReturn.serializer(), toolReturnRaw)
+                else -> ToolReturn(toolCallId = toolCallId ?: "", status = status ?: "unknown", funcResponse = null, stdout = stdout, stderr = stderr)
+            }
         }
 }
 

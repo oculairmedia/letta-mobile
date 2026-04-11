@@ -50,6 +50,7 @@ open class MessageApi @Inject constructor(
         limit: Int? = null,
         after: String? = null,
         order: String? = null,
+        conversationId: String? = null,
     ): List<LettaMessage> {
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
@@ -58,6 +59,7 @@ open class MessageApi @Inject constructor(
             parameter("limit", limit)
             parameter("after", after)
             parameter("order", order)
+            conversationId?.let { parameter("conversation_id", it) }
         }
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())
