@@ -147,7 +147,7 @@ class AllToolsViewModel @Inject constructor(
             }
         }
 
-        return result
+        return result.distinctBy { it.id }
     }
 
     fun getAllTags(): List<String> {

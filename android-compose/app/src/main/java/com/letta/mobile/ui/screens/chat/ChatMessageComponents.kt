@@ -5,8 +5,12 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +18,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -40,9 +46,7 @@ import com.letta.mobile.R
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
-import com.letta.mobile.ui.components.Accordions
 import com.letta.mobile.ui.components.MessageBubbleShape
-import com.letta.mobile.ui.components.MarkdownText
 import com.letta.mobile.ui.components.ThinkingSection
 import com.letta.mobile.ui.theme.chatColors
 import com.letta.mobile.ui.theme.chatDimens
@@ -271,108 +275,127 @@ internal fun MessageToolCalls(
 
 @Composable
 private fun ToolCallCard(toolCall: UiToolCall) {
-    var argsExpanded by remember { mutableStateOf(false) }
-    var resultExpanded by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
     val display = remember(toolCall.name, toolCall.arguments) {
         ToolDisplayRegistry.resolve(toolCall.name, toolCall.arguments)
     }
     val isError = toolCall.status != null && toolCall.status != "success"
+    val codeStyle = MaterialTheme.chatTypography.codeBlock
 
     Card(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
         ),
     ) {
-        Column(modifier = Modifier.padding(8.dp)) {
-            // Header: emoji + tool name + status icon
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(display.emoji, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.size(6.dp))
+        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
+            // Single-line header — tap to expand/collapse
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(display.emoji, style = codeStyle)
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = toolCall.name,
-                    style = MaterialTheme.chatTypography.toolLabel,
-                    fontWeight = FontWeight.SemiBold,
+                    text = display.label,
+                    style = codeStyle,
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (isError) {
                     Icon(
                         imageVector = LettaIcons.Error,
                         contentDescription = "Error",
-                        modifier = Modifier.size(14.dp),
+                        modifier = Modifier.size(12.dp),
                         tint = MaterialTheme.colorScheme.error,
                     )
                 } else if (toolCall.result != null) {
                     Icon(
                         imageVector = LettaIcons.CheckCircle,
                         contentDescription = "Success",
-                        modifier = Modifier.size(14.dp),
+                        modifier = Modifier.size(12.dp),
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 }
-            }
-            // Friendly description
-            Text(
-                text = display.label,
-                style = MaterialTheme.chatTypography.toolDetail,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            // Detail line (extracted from arguments)
-            display.detailLine?.let { detail ->
-                Text(
-                    text = detail,
-                    style = MaterialTheme.chatTypography.codeBlock,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                Icon(
+                    imageVector = LettaIcons.ExpandMore,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    modifier = Modifier
+                        .size(16.dp)
+                        .rotate(if (expanded) 180f else 0f),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                 )
             }
-            // Arguments accordion
-            if (toolCall.arguments.isNotBlank()) {
-                Accordions(
-                    title = "Arguments",
-                    expanded = argsExpanded,
-                    onExpandedChange = { argsExpanded = it },
-                ) {
+
+            // Expanded content
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically(),
+                exit = shrinkVertically(),
+            ) {
+                Column(modifier = Modifier.padding(top = 4.dp)) {
+                    // Tool name
                     Text(
-                        text = toolCall.arguments,
-                        style = MaterialTheme.chatTypography.codeBlock,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = toolCall.name,
+                        style = codeStyle,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     )
-                }
-            }
-            // Result accordion
-            toolCall.result?.let { result ->
-                val preview = if (result.length > 120) result.take(120) + "…" else result
-                Accordions(
-                    title = if (isError) "Error" else "Result",
-                    expanded = resultExpanded,
-                    onExpandedChange = { resultExpanded = it },
-                ) {
-                    MarkdownText(
-                        text = result,
-                        textColor = if (isError) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                        },
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    )
-                }
-                if (!resultExpanded) {
-                    Text(
-                        text = preview,
-                        style = MaterialTheme.chatTypography.codeBlock,
-                        color = if (isError) {
-                            MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                        },
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    // Detail line (extracted from arguments)
+                    display.detailLine?.let { detail ->
+                        Text(
+                            text = detail,
+                            style = codeStyle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    // Arguments
+                    if (toolCall.arguments.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Arguments",
+                            style = codeStyle,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        )
+                        Text(
+                            text = toolCall.arguments,
+                            style = codeStyle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 6,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    // Result
+                    toolCall.result?.let { result ->
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (isError) "Error" else "Result",
+                            style = codeStyle,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isError) {
+                                MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            },
+                        )
+                        Text(
+                            text = result,
+                            style = codeStyle,
+                            color = if (isError) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            maxLines = 10,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }

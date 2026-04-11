@@ -6,7 +6,7 @@ import androidx.compose.ui.graphics.Color
 
 sealed class ChatBackground(val key: String, val label: String) {
 
-    data object Default : ChatBackground("default", "Default")
+    object Default : ChatBackground("default", "Default")
 
     data class SolidColor(val color: Color, val name: String) :
         ChatBackground("solid_${name.lowercase().replace(' ', '_')}", name)
@@ -37,11 +37,21 @@ sealed class ChatBackground(val key: String, val label: String) {
             Gradient(listOf(Color(0xFFFCE4EC), Color(0xFFF8BBD0)), "Blush"),
         )
 
-        val allPresets: List<ChatBackground> =
-            listOf(Default) + solidPresets + gradientPresets
+        // Build with a cast through Any? so the Kotlin compiler retains
+        // null-safety checks — R8 can produce JVM-level nulls for object
+        // singletons on some Android configurations.
+        val allPresets: List<ChatBackground> by lazy {
+            val raw: List<Any?> = listOf(Default) + solidPresets + gradientPresets
+            raw.filterNotNull().filterIsInstance<ChatBackground>()
+        }
 
-        fun fromKey(key: String): ChatBackground =
-            allPresets.find { it.key == key } ?: Default
+        fun fromKey(key: String): ChatBackground {
+            return try {
+                allPresets.firstOrNull { it.key == key } ?: Default
+            } catch (_: Exception) {
+                Default
+            }
+        }
     }
 }
 
