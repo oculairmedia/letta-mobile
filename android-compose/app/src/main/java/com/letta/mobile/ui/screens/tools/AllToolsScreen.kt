@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -118,6 +120,35 @@ fun AllToolsScreen(
                         },
                     )
                 }
+
+                val allToolTags = remember(uiState) {
+                    viewModel.getAllTags()
+                }
+                if (allToolTags.isNotEmpty()) {
+                    val selectedToolTags = (uiState as? UiState.Success)?.data?.selectedTags.orEmpty()
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        item {
+                            FilterChip(
+                                selected = selectedToolTags.isEmpty(),
+                                onClick = { viewModel.clearTags() },
+                                label = { Text(stringResource(R.string.screen_tools_filter_all)) },
+                            )
+                        }
+                        items(allToolTags.size) { index ->
+                            val tag = allToolTags[index]
+                            FilterChip(
+                                selected = tag in selectedToolTags,
+                                onClick = { viewModel.toggleTag(tag) },
+                                label = { Text(tag) },
+                            )
+                        }
+                    }
+                }
             }
         },
     ) { paddingValues ->
@@ -129,7 +160,7 @@ fun AllToolsScreen(
                 modifier = Modifier.padding(paddingValues),
             )
             is UiState.Success -> {
-                val filteredTools = remember(state.data.tools, state.data.searchQuery) {
+                val filteredTools = remember(state.data.tools, state.data.searchQuery, state.data.selectedTags) {
                     viewModel.getFilteredTools()
                 }
                 PullToRefreshBox(

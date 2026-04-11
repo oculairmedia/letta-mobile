@@ -16,6 +16,8 @@
     <string name="screen_agents_search_hint">Search agents…</string>
     <string name="screen_agents_view_list">List</string>
     <string name="screen_agents_view_grid">Grid</string>
+    <string name="screen_agents_filter_all">All</string>
+    <string name="screen_tools_filter_all">All</string>
     <string name="action_create">Create</string>
     <string name="action_delete">Delete</string>
     <string name="action_save">Save</string>

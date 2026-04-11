@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items as lazyItems
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -148,7 +149,7 @@ fun AgentListScreen(
         }
     }
 
-    val filteredAgents = remember(uiState.agents, uiState.searchQuery) {
+    val filteredAgents = remember(uiState.agents, uiState.searchQuery, uiState.selectedTags) {
         viewModel.getFilteredAgents()
     }
 
@@ -224,6 +225,32 @@ fun AgentListScreen(
                         onClick = { showGrid = true },
                         label = { Text(stringResource(R.string.screen_agents_view_grid)) },
                     )
+                }
+
+                val allTags = remember(uiState.agents) { viewModel.getAllTags() }
+                if (allTags.isNotEmpty()) {
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        item {
+                            FilterChip(
+                                selected = uiState.selectedTags.isEmpty(),
+                                onClick = { viewModel.clearTags() },
+                                label = { Text(stringResource(R.string.screen_agents_filter_all)) },
+                            )
+                        }
+                        items(allTags.size) { index ->
+                            val tag = allTags[index]
+                            FilterChip(
+                                selected = tag in uiState.selectedTags,
+                                onClick = { viewModel.toggleTag(tag) },
+                                label = { Text(tag) },
+                            )
+                        }
+                    }
                 }
             }
         },

@@ -25,6 +25,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -142,5 +143,121 @@ class AgentListViewModelTest {
                 stripMessages = true,
             )
         }
+    }
+
+    @Test
+    fun `getAllTags returns sorted distinct tags from all agents`() = runTest {
+        every { agentRepository.agents } returns MutableStateFlow(
+            listOf(
+                Agent(id = "a1", name = "Agent1", tags = listOf("beta", "alpha")),
+                Agent(id = "a2", name = "Agent2", tags = listOf("alpha", "gamma")),
+                Agent(id = "a3", name = "Agent3", tags = emptyList()),
+            )
+        )
+        viewModel = AgentListViewModel(agentRepository, settingsRepository, toolRepository, modelRepository)
+
+        val tags = viewModel.getAllTags()
+        assertEquals(listOf("alpha", "beta", "gamma"), tags)
+    }
+
+    @Test
+    fun `getAllTags returns empty list when no agents have tags`() = runTest {
+        every { agentRepository.agents } returns MutableStateFlow(
+            listOf(
+                Agent(id = "a1", name = "Agent1"),
+                Agent(id = "a2", name = "Agent2"),
+            )
+        )
+        viewModel = AgentListViewModel(agentRepository, settingsRepository, toolRepository, modelRepository)
+
+        assertTrue(viewModel.getAllTags().isEmpty())
+    }
+
+    @Test
+    fun `toggleTag adds tag to selectedTags`() = runTest {
+        viewModel.toggleTag("alpha")
+        assertEquals(setOf("alpha"), viewModel.uiState.value.selectedTags)
+    }
+
+    @Test
+    fun `toggleTag removes tag when already selected`() = runTest {
+        viewModel.toggleTag("alpha")
+        viewModel.toggleTag("alpha")
+        assertTrue(viewModel.uiState.value.selectedTags.isEmpty())
+    }
+
+    @Test
+    fun `toggleTag supports multi-select`() = runTest {
+        viewModel.toggleTag("alpha")
+        viewModel.toggleTag("beta")
+        assertEquals(setOf("alpha", "beta"), viewModel.uiState.value.selectedTags)
+    }
+
+    @Test
+    fun `clearTags resets selectedTags to empty`() = runTest {
+        viewModel.toggleTag("alpha")
+        viewModel.toggleTag("beta")
+        viewModel.clearTags()
+        assertTrue(viewModel.uiState.value.selectedTags.isEmpty())
+    }
+
+    @Test
+    fun `getFilteredAgents filters by selected tags with AND logic`() = runTest {
+        every { agentRepository.agents } returns MutableStateFlow(
+            listOf(
+                Agent(id = "a1", name = "Agent1", tags = listOf("alpha", "beta")),
+                Agent(id = "a2", name = "Agent2", tags = listOf("alpha")),
+                Agent(id = "a3", name = "Agent3", tags = listOf("beta", "gamma")),
+            )
+        )
+        viewModel = AgentListViewModel(agentRepository, settingsRepository, toolRepository, modelRepository)
+
+        // No filter — all agents
+        assertEquals(3, viewModel.getFilteredAgents().size)
+
+        // Single tag filter
+        viewModel.toggleTag("alpha")
+        val alphaFiltered = viewModel.getFilteredAgents()
+        assertEquals(2, alphaFiltered.size)
+        assertTrue(alphaFiltered.any { it.id == "a1" })
+        assertTrue(alphaFiltered.any { it.id == "a2" })
+
+        // AND logic: alpha + beta — only a1 has both
+        viewModel.toggleTag("beta")
+        val andFiltered = viewModel.getFilteredAgents()
+        assertEquals(1, andFiltered.size)
+        assertEquals("a1", andFiltered.first().id)
+    }
+
+    @Test
+    fun `getFilteredAgents combines tag filter with search query`() = runTest {
+        every { agentRepository.agents } returns MutableStateFlow(
+            listOf(
+                Agent(id = "a1", name = "ChatBot", tags = listOf("production")),
+                Agent(id = "a2", name = "HelperBot", tags = listOf("production")),
+                Agent(id = "a3", name = "TestBot", tags = listOf("staging")),
+            )
+        )
+        viewModel = AgentListViewModel(agentRepository, settingsRepository, toolRepository, modelRepository)
+
+        viewModel.toggleTag("production")
+        viewModel.updateSearchQuery("Chat")
+
+        val results = viewModel.getFilteredAgents()
+        assertEquals(1, results.size)
+        assertEquals("a1", results.first().id)
+    }
+
+    @Test
+    fun `getFilteredAgents returns all when no tags selected and no search`() = runTest {
+        every { agentRepository.agents } returns MutableStateFlow(
+            listOf(
+                Agent(id = "a1", name = "Agent1", tags = listOf("alpha")),
+                Agent(id = "a2", name = "Agent2"),
+            )
+        )
+        viewModel = AgentListViewModel(agentRepository, settingsRepository, toolRepository, modelRepository)
+
+        assertEquals(2, viewModel.getFilteredAgents().size)
     }
 }

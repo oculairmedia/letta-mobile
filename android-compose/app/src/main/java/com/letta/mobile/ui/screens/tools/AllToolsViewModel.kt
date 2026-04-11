@@ -21,6 +21,7 @@ data class AllToolsUiState(
     val tools: List<Tool> = emptyList(),
     val mcpToolIds: Set<String> = emptySet(),
     val searchQuery: String = "",
+    val selectedTags: Set<String> = emptySet(),
     val isLoadingMore: Boolean = false,
     val hasMorePages: Boolean = true,
     val currentOffset: Int = 0,
@@ -127,14 +128,45 @@ class AllToolsViewModel @Inject constructor(
 
     fun getFilteredTools(): List<Tool> {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return emptyList()
-        if (currentState.searchQuery.isBlank()) return currentState.tools
-        val q = currentState.searchQuery.trim().lowercase()
-        return currentState.tools.filter { tool ->
-            tool.name.lowercase().contains(q) ||
-                (tool.description?.lowercase()?.contains(q) == true) ||
-                (tool.toolType?.lowercase()?.contains(q) == true) ||
-                (tool.sourceType?.lowercase()?.contains(q) == true) ||
-                tool.tags.any { it.lowercase().contains(q) }
+        var result = currentState.tools
+
+        if (currentState.selectedTags.isNotEmpty()) {
+            result = result.filter { tool ->
+                currentState.selectedTags.all { tag -> tag in tool.tags }
+            }
         }
+
+        if (currentState.searchQuery.isNotBlank()) {
+            val q = currentState.searchQuery.trim().lowercase()
+            result = result.filter { tool ->
+                tool.name.lowercase().contains(q) ||
+                    (tool.description?.lowercase()?.contains(q) == true) ||
+                    (tool.toolType?.lowercase()?.contains(q) == true) ||
+                    (tool.sourceType?.lowercase()?.contains(q) == true) ||
+                    tool.tags.any { it.lowercase().contains(q) }
+            }
+        }
+
+        return result
+    }
+
+    fun getAllTags(): List<String> {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return emptyList()
+        return currentState.tools
+            .flatMap { it.tags }
+            .distinct()
+            .sorted()
+    }
+
+    fun toggleTag(tag: String) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        val current = currentState.selectedTags
+        val updated = if (tag in current) current - tag else current + tag
+        _uiState.value = UiState.Success(currentState.copy(selectedTags = updated))
+    }
+
+    fun clearTags() {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(currentState.copy(selectedTags = emptySet()))
     }
 }

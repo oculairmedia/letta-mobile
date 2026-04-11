@@ -30,6 +30,7 @@ data class AgentListUiState(
     val embeddingModels: List<EmbeddingModel> = emptyList(),
     val favoriteAgentId: String? = null,
     val searchQuery: String = "",
+    val selectedTags: Set<String> = emptySet(),
     val isImporting: Boolean = false,
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
@@ -136,14 +137,42 @@ class AgentListViewModel @Inject constructor(
 
     fun getFilteredAgents(): List<Agent> {
         val state = _uiState.value
-        if (state.searchQuery.isBlank()) return state.agents
-        val q = state.searchQuery.trim().lowercase()
-        return state.agents.filter { agent ->
-            agent.name.lowercase().contains(q) ||
-                (agent.description?.lowercase()?.contains(q) == true) ||
-                (agent.model?.lowercase()?.contains(q) == true) ||
-                agent.tags.any { it.lowercase().contains(q) }
+        var result = state.agents
+
+        if (state.selectedTags.isNotEmpty()) {
+            result = result.filter { agent ->
+                state.selectedTags.all { tag -> tag in agent.tags }
+            }
         }
+
+        if (state.searchQuery.isNotBlank()) {
+            val q = state.searchQuery.trim().lowercase()
+            result = result.filter { agent ->
+                agent.name.lowercase().contains(q) ||
+                    (agent.description?.lowercase()?.contains(q) == true) ||
+                    (agent.model?.lowercase()?.contains(q) == true) ||
+                    agent.tags.any { it.lowercase().contains(q) }
+            }
+        }
+
+        return result
+    }
+
+    fun getAllTags(): List<String> {
+        return _uiState.value.agents
+            .flatMap { it.tags }
+            .distinct()
+            .sorted()
+    }
+
+    fun toggleTag(tag: String) {
+        val current = _uiState.value.selectedTags
+        val updated = if (tag in current) current - tag else current + tag
+        _uiState.value = _uiState.value.copy(selectedTags = updated)
+    }
+
+    fun clearTags() {
+        _uiState.value = _uiState.value.copy(selectedTags = emptySet())
     }
 
     fun deleteAgent(agentId: String, onComplete: () -> Unit = {}) {
