@@ -64,13 +64,18 @@ Use these rules for all new UI work and UI refactors in this repo. The app alrea
   - optional FAB slot
   - standardized loading / error / empty / content states
 - Reuse existing design-system components instead of rebuilding screen structure per feature.
+- `AllToolsScreen`, `AgentListScreen`, and `McpScreen` are the current reference implementations for this shell pattern.
+- The first dedicated reusable scaffold adopters should be `letta-mobile-bz40.2.2` (project grid home screen) and `letta-mobile-bz40.2.6` (active agents dashboard), then back-port the extracted scaffold to older admin/list screens as they are touched.
 
 ### 4. Use Material components by interaction semantics
 
 - Use **segmented buttons** or another mutually-exclusive selector pattern for binary/mode switches when only one option can be active.
 - Use **chips** for filters, tags, or multi-select style controls.
+- Use **input chips** for user-added items such as editable tags or removable selections.
+- Use **assist chips** for read-only metadata or lightweight status labels.
 - Use **bottom sheets** / `ActionSheet` for contextual and destructive action menus.
 - Use **dialogs** / `ConfirmDialog` for confirmation and blocking decisions.
+- Use **switches** for direct on/off settings, not for choosing between multiple modes.
 - Use **cards** and **surfaces** to communicate emphasis and hierarchy, not arbitrary decoration.
 
 ### 5. Motion policy
@@ -146,6 +151,33 @@ Use these rules for all new UI work and UI refactors in this repo. The app alrea
 - `letta-mobile-iqwq` — Build reusable searchable list screen scaffold
 - `letta-mobile-pkzn` — Define motion and navigation transition policy
 - `letta-mobile-ns9n` — Standardize selection and emphasis components
+
+### 10. Current design-system migration checklist
+
+- **ActionSheet targets**
+  - `FolderAdminScreen`, `ProviderAdminScreen`, `IdentityListScreen`, and other admin list cards with inline edit/delete icon rows should converge on an overflow or long-press `ActionSheet` for contextual actions.
+  - Detail screens that currently expose multiple secondary actions inside dialogs should prefer `ActionSheet` when the action set is contextual rather than confirmational.
+- **ConfirmDialog / TextInputDialog targets**
+  - Use `ConfirmDialog` for dismissible error/info dialogs only when the interaction is a single acknowledge/confirm step; keep destructive confirmations on `ConfirmDialog` rather than raw `AlertDialog`.
+  - Use `TextInputDialog` for single-field rename/create flows before reaching for raw `AlertDialog`.
+  - Multi-field editor flows such as `FolderAdminScreen`, `ProviderAdminScreen`, `ScheduleListScreen`, `EditAgentScreen`, `McpScreen`, and `AgentListScreen` should converge on reusable dialog wrappers instead of bespoke `AlertDialog` forms over time.
+- **FormItem targets**
+  - `AgentListScreen` create/import dialogs and `ScheduleListScreen` create dialog should use `FormItem` for label + helper + switch rows.
+  - `McpScreen` server form, `ProviderAdminScreen` editor dialog, `FolderAdminScreen` editor dialog, and `EditAgentScreen` block/tag sections are the next targets for `FormItem` adoption.
+- **CardGroup targets**
+  - `ConfigScreen` and `AgentSettingsScreen` are the reference implementations.
+  - Grouped admin/detail surfaces in `FolderAdminScreen`, `ProviderAdminScreen`, `IdentityListScreen`, `ArchiveAdminScreen`, `McpServerToolsScreen`, `RunMonitorScreen`, `JobMonitorScreen`, `MessageBatchMonitorScreen`, and `ToolDetailScreen` should migrate from flat `Column` dialog bodies toward `CardGroup` sections.
+- Treat this checklist as the default migration map when touching any of the above screens. Reuse the existing designsystem component before inventing a new layout or dialog pattern.
+
+### 11. Current old-style screen audit
+
+- Most primary screens already use `LettaTopBarDefaults` plus the standardized `Scaffold` / top-bar shell. Treat shell migration as largely complete.
+- Remaining modernization work is concentrated in **dialogs, pickers, and admin/detail surfaces**, not the screen chrome itself.
+- The highest-value remaining targets are:
+  - `ToolPickerDialog`, `CreateToolDialog`, `BlockPickerDialog` — migrate bespoke dialog bodies toward reusable dialog wrappers and semantic typography.
+  - `FolderAdminScreen`, `ProviderAdminScreen`, `GroupAdminScreen`, `IdentityListScreen`, `ArchiveAdminScreen`, `McpServerToolsScreen`, `ToolDetailScreen` — replace flat detail columns and raw dialogs with `CardGroup`, `ConfirmDialog`, `TextInputDialog`, and `ActionSheet` where semantics match.
+  - `EditAgentScreen`, `ScheduleListScreen`, `McpScreen`, `AgentListScreen` — continue migrating multi-field forms toward `FormItem` and reusable dialog structure.
+- When auditing a screen now, prioritize: (1) raw `AlertDialog` replacement, (2) grouped detail surfaces, (3) semantic typography, and only then shell-level chrome changes.
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 
