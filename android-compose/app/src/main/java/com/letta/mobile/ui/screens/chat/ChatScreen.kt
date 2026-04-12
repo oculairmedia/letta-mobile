@@ -18,13 +18,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -39,10 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -56,6 +49,7 @@ import com.letta.mobile.ui.components.MessageSkeletonList
 import com.letta.mobile.ui.components.StarterPrompts
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.ChatBackground
+import com.letta.mobile.ui.components.LettaInputBar
 import com.letta.mobile.ui.components.ScrollToBottomFab
 import com.letta.mobile.ui.components.TypingIndicator
 import kotlinx.coroutines.delay
@@ -98,11 +92,19 @@ fun ChatScreen(
             )
         }
 
-        MessageInputBar(
+        LettaInputBar(
             text = inputText,
-            onTextChange = { viewModel.updateInputText(it) },
+            onTextChange = { newText ->
+                if (newText.endsWith("\n") && !state.isStreaming && inputText.isNotBlank()) {
+                    viewModel.sendMessage(inputText)
+                } else {
+                    viewModel.updateInputText(newText)
+                }
+            },
             onSend = { viewModel.sendMessage(it) },
-            isStreaming = state.isStreaming,
+            placeholder = stringResource(R.string.screen_chat_input_hint),
+            sendContentDescription = stringResource(R.string.action_send_message),
+            enabled = !state.isStreaming,
         )
     }
     }
@@ -336,86 +338,6 @@ private fun DebugMessageCard(
     }
 }
 
-@Composable
-private fun MessageInputBar(
-    text: String,
-    onTextChange: (String) -> Unit,
-    onSend: (String) -> Unit,
-    isStreaming: Boolean,
-    modifier: Modifier = Modifier
-) {
-    val colorScheme = MaterialTheme.colorScheme
-
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.Bottom,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        TextField(
-            value = text,
-            onValueChange = { newText ->
-                if (newText.endsWith("\n") && !isStreaming && text.isNotBlank()) {
-                    onSend(text)
-                } else {
-                    onTextChange(newText)
-                }
-            },
-            modifier = Modifier.weight(1f),
-            placeholder = {
-                Text(
-                    stringResource(R.string.screen_chat_input_hint),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = colorScheme.onSurfaceVariant,
-                )
-            },
-            textStyle = MaterialTheme.typography.bodyLarge.copy(
-                color = colorScheme.onSurface,
-            ),
-            maxLines = 4,
-            shape = RoundedCornerShape(24.dp),
-            colors = TextFieldDefaults.colors(
-                unfocusedContainerColor = colorScheme.surfaceContainerHigh,
-                focusedContainerColor = colorScheme.surfaceContainerHigh,
-                unfocusedIndicatorColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent,
-                disabledIndicatorColor = Color.Transparent,
-                cursorColor = colorScheme.primary,
-            ),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-            keyboardActions = KeyboardActions(
-                onSend = {
-                    if (text.isNotBlank() && !isStreaming) {
-                        onSend(text)
-                    }
-                },
-            ),
-        )
-
-        FilledIconButton(
-            onClick = {
-                if (text.isNotBlank()) {
-                    onSend(text)
-                }
-            },
-            enabled = text.isNotBlank() && !isStreaming,
-            modifier = Modifier.size(48.dp),
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = colorScheme.primary,
-                contentColor = colorScheme.onPrimary,
-                disabledContainerColor = colorScheme.surfaceContainerHigh,
-                disabledContentColor = colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
-            ),
-        ) {
-            Icon(
-                LettaIcons.Send,
-                contentDescription = stringResource(R.string.action_send_message),
-                modifier = Modifier.size(20.dp),
-            )
-        }
-    }
-}
 
 @Composable
 private fun ErrorContent(

@@ -8,22 +8,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -42,7 +39,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -54,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.ParsedSearchMessage
+import com.letta.mobile.ui.components.LettaInputBar
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.statValue
@@ -131,7 +128,7 @@ private fun HomeContent(
     onNavigateToChatMessage: (String, String, String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
+    Column(modifier = modifier.fillMaxSize().imePadding()) {
         state.error?.let { error ->
             androidx.compose.material3.Surface(
                 color = MaterialTheme.colorScheme.errorContainer,
@@ -251,8 +248,17 @@ private fun HomeContent(
             Spacer(modifier = Modifier.weight(1f))
 
             if (state.favoriteAgentId != null) {
-                HomeChatInputBar(
-                    onSend = { message -> onNavigateToChat(state.favoriteAgentId, message) },
+                var homeChatText by remember { mutableStateOf("") }
+                LettaInputBar(
+                    text = homeChatText,
+                    onTextChange = { homeChatText = it },
+                    onSend = { message ->
+                        onNavigateToChat(state.favoriteAgentId, message)
+                        homeChatText = ""
+                    },
+                    placeholder = stringResource(R.string.screen_home_chat_placeholder),
+                    sendContentDescription = stringResource(R.string.action_send_message),
+                    maxLines = 1,
                 )
             }
         }
@@ -426,80 +432,6 @@ private fun PinnedAgentCard(
     }
 }
 
-@Composable
-private fun HomeChatInputBar(
-    onSend: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var text by remember { mutableStateOf("") }
-    val colorScheme = MaterialTheme.colorScheme
-
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.Bottom,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        TextField(
-            value = text,
-            onValueChange = { text = it },
-            modifier = Modifier.weight(1f),
-            placeholder = {
-                Text(
-                    stringResource(R.string.screen_home_chat_placeholder),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = colorScheme.onSurfaceVariant,
-                )
-            },
-            textStyle = MaterialTheme.typography.bodyLarge.copy(
-                color = colorScheme.onSurface,
-            ),
-            singleLine = true,
-            shape = RoundedCornerShape(24.dp),
-            colors = TextFieldDefaults.colors(
-                unfocusedContainerColor = colorScheme.surfaceContainerHigh,
-                focusedContainerColor = colorScheme.surfaceContainerHigh,
-                unfocusedIndicatorColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent,
-                disabledIndicatorColor = Color.Transparent,
-                cursorColor = colorScheme.primary,
-            ),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-            keyboardActions = KeyboardActions(
-                onSend = {
-                    if (text.isNotBlank()) {
-                        onSend(text)
-                        text = ""
-                    }
-                },
-            ),
-        )
-
-        FilledIconButton(
-            onClick = {
-                if (text.isNotBlank()) {
-                    onSend(text)
-                    text = ""
-                }
-            },
-            enabled = text.isNotBlank(),
-            modifier = Modifier.size(48.dp),
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = colorScheme.primary,
-                contentColor = colorScheme.onPrimary,
-                disabledContainerColor = colorScheme.surfaceContainerHigh,
-                disabledContentColor = colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
-            ),
-        ) {
-            Icon(
-                LettaIcons.Send,
-                contentDescription = stringResource(R.string.action_send_message),
-                modifier = Modifier.size(20.dp),
-            )
-        }
-    }
-}
 
 @Composable
 private fun SearchResultsContent(
