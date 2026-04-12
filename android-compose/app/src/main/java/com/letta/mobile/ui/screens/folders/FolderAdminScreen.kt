@@ -20,7 +20,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import com.letta.mobile.ui.components.LettaSearchBar
+import com.letta.mobile.ui.components.ExpandableTitleSearch
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,6 +58,7 @@ fun FolderAdminScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showCreateDialog by remember { mutableStateOf(false) }
+    var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf<Folder?>(null) }
     var deleteTarget by remember { mutableStateOf<Folder?>(null) }
 
@@ -67,7 +69,19 @@ fun FolderAdminScreen(
         containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
         topBar = {
             LargeFlexibleTopAppBar(
-                title = { Text(stringResource(R.string.screen_folders_title)) },
+                title = {
+                    ExpandableTitleSearch(
+                        query = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty(),
+                        onQueryChange = viewModel::updateSearchQuery,
+                        onClear = { viewModel.updateSearchQuery("") },
+                        expanded = isSearchExpanded,
+                        onExpandedChange = { isSearchExpanded = it },
+                        placeholder = stringResource(R.string.screen_folders_search_hint),
+                        openSearchContentDescription = stringResource(R.string.action_search),
+                        closeSearchContentDescription = stringResource(R.string.action_close),
+                        titleContent = { Text(stringResource(R.string.screen_folders_title)) },
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
@@ -97,15 +111,6 @@ fun FolderAdminScreen(
                         .fillMaxSize()
                         .padding(paddingValues),
                 ) {
-                    LettaSearchBar(
-                        query = state.data.searchQuery,
-                        onQueryChange = viewModel::updateSearchQuery,
-                        onClear = { viewModel.updateSearchQuery("") },
-                        placeholder = stringResource(R.string.screen_folders_search_hint),
-                        compact = true,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
-
                     state.data.folderMetadata?.let { metadata ->
                         Row(
                             modifier = Modifier.padding(horizontal = 16.dp),
