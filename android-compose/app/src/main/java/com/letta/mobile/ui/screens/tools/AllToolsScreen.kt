@@ -77,7 +77,7 @@ fun AllToolsScreen(
             }
         },
         topBar = {
-            Column {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 LargeFlexibleTopAppBar(
                     title = { Text(stringResource(R.string.common_tools)) },
                     scrollBehavior = scrollBehavior,

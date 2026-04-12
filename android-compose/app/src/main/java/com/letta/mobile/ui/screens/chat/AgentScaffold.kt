@@ -308,9 +308,10 @@ private fun ConversationPickerSheet(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
-                                conversation.lastMessageAt?.let { time ->
+                                val timeText = formatRelativeTime(conversation.lastMessageAt ?: conversation.createdAt)
+                                if (timeText.isNotBlank()) {
                                     Text(
-                                        text = formatRelativeTime(time),
+                                        text = timeText,
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )

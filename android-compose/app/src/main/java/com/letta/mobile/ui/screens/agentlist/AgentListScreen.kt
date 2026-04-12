@@ -169,7 +169,7 @@ fun AgentListScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
         topBar = {
-            Column {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 LargeFlexibleTopAppBar(
                     title = { Text(stringResource(R.string.common_agents)) },
                     scrollBehavior = scrollBehavior,
