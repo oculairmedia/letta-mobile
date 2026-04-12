@@ -32,6 +32,8 @@ fun LettaSearchBar(
     modifier: Modifier = Modifier,
     placeholder: String = "Search\u2026",
     compact: Boolean = false,
+    searchIconContentDescription: String? = null,
+    clearIconContentDescription: String = "Clear search",
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val iconSize = if (compact) 18.dp else 20.dp
@@ -50,7 +52,7 @@ fun LettaSearchBar(
         leadingIcon = {
             Icon(
                 LettaIcons.Search,
-                contentDescription = "Search",
+                contentDescription = searchIconContentDescription,
                 modifier = Modifier.size(iconSize),
             )
         },
@@ -59,7 +61,7 @@ fun LettaSearchBar(
                 IconButton(onClick = onClear) {
                     Icon(
                         LettaIcons.Clear,
-                        contentDescription = "Clear",
+                        contentDescription = clearIconContentDescription,
                         modifier = Modifier.size(iconSize),
                     )
                 }

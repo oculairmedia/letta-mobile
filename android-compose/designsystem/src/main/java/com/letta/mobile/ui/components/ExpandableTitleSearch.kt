@@ -24,6 +24,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -43,8 +47,9 @@ fun ExpandableTitleSearch(
     compactMaxWidth: Dp = 160.dp,
     enabled: Boolean = true,
     clearQueryOnCollapse: Boolean = false,
-    openSearchContentDescription: String = collapsedHint,
+    openSearchContentDescription: String = "Open search",
     closeSearchContentDescription: String = "Close search",
+    clearSearchContentDescription: String = "Clear search",
 ) {
     val focusRequester = remember { FocusRequester() }
 
@@ -68,6 +73,8 @@ fun ExpandableTitleSearch(
                 onClear = onClear,
                 placeholder = placeholder,
                 compact = false,
+                searchIconContentDescription = null,
+                clearIconContentDescription = clearSearchContentDescription,
                 modifier = Modifier
                     .weight(1f)
                     .focusRequester(focusRequester),
@@ -96,7 +103,12 @@ fun ExpandableTitleSearch(
             Surface(
                 shape = RoundedCornerShape(20.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.clickable(enabled = enabled) { onExpandedChange(true) },
+                modifier = Modifier
+                    .semantics(mergeDescendants = true) {
+                        role = Role.Button
+                        contentDescription = openSearchContentDescription
+                    }
+                    .clickable(enabled = enabled) { onExpandedChange(true) },
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
