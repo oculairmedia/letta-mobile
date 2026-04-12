@@ -74,7 +74,7 @@ dependencies {
     implementation("io.ktor:ktor-client-auth:3.0.3")
 
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
     implementation("androidx.paging:paging-runtime-ktx:3.3.5")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
@@ -87,7 +87,7 @@ dependencies {
     ksp("androidx.room:room-compiler:2.7.0")
 
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     testImplementation("io.ktor:ktor-client-mock:3.0.3")
     testImplementation("app.cash.turbine:turbine:1.2.0")
     testImplementation("io.mockk:mockk:1.13.13")
