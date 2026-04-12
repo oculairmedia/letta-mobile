@@ -313,6 +313,7 @@ class ConfigViewModelTest {
     fun saveConfig_persistsThemePresetAndDynamicColor() = runTest {
         fakeRepository.setActiveConfig(null)
         viewModel.loadConfig()
+        fakeRepository.setChatBackgroundKey("solid_charcoal")
 
         viewModel.updateThemePreset(ThemePreset.AMOLED_BLACK)
         viewModel.updateDynamicColor(false)
@@ -322,6 +323,7 @@ class ConfigViewModelTest {
 
         assertEquals(ThemePreset.AMOLED_BLACK, fakeRepository.getThemePreset().first())
         assertEquals(false, fakeRepository.getDynamicColor().first())
+        assertEquals("default", fakeRepository.getChatBackgroundKey().first())
     }
 
     private class FakeSettingsRepository(context: Context) : SettingsRepository(context) {
@@ -334,6 +336,7 @@ class ConfigViewModelTest {
         private val themeFlow = MutableStateFlow(AppTheme.SYSTEM)
         private val themePresetFlow = MutableStateFlow(ThemePreset.DEFAULT)
         private val dynamicColorFlow = MutableStateFlow(true)
+        private val chatBackgroundFlow = MutableStateFlow("default")
 
         private var savedConfig: LettaConfig? = null
 
@@ -360,18 +363,26 @@ class ConfigViewModelTest {
 
         override suspend fun setTheme(theme: AppTheme) {
             themeFlow.value = theme
+            chatBackgroundFlow.value = "default"
         }
 
         override fun getThemePreset() = themePresetFlow
 
         override suspend fun setThemePreset(themePreset: ThemePreset) {
             themePresetFlow.value = themePreset
+            chatBackgroundFlow.value = "default"
         }
 
         override fun getDynamicColor() = dynamicColorFlow
 
         override suspend fun setDynamicColor(enabled: Boolean) {
             dynamicColorFlow.value = enabled
+        }
+
+        override fun getChatBackgroundKey() = chatBackgroundFlow
+
+        override suspend fun setChatBackgroundKey(key: String) {
+            chatBackgroundFlow.value = key
         }
     }
 }
