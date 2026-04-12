@@ -27,7 +27,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -36,6 +35,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.customColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,7 +65,7 @@ fun HomeScreen(
                             Icon(
                                 LettaIcons.Circle,
                                 contentDescription = "Connected",
-                                tint = Color(0xFF4CAF50),
+                                tint = MaterialTheme.customColors.onlineColor,
                                 modifier = Modifier.size(8.dp),
                             )
                         }
