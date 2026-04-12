@@ -81,7 +81,7 @@ class McpViewModel @Inject constructor(
                     }
                 }
                 
-                val allTools = toolRepository.getTools().first()
+                val allTools = toolRepository.getTools().value
                 _uiState.value = UiState.Success(
                     McpUiState(
                         servers = servers.toImmutableList(),

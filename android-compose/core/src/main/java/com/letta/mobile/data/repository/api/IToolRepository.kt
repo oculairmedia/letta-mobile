@@ -4,9 +4,10 @@ import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolCreateParams
 import com.letta.mobile.data.model.ToolUpdateParams
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 
 interface IToolRepository {
-    fun getTools(): Flow<List<Tool>>
+    fun getTools(): StateFlow<List<Tool>>
     fun getAgentTools(agentId: String): Flow<List<Tool>>
     suspend fun countTools(): Int
     suspend fun refreshTools()

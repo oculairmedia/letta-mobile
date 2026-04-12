@@ -62,7 +62,7 @@ class ChatViewModel @Inject constructor(
         private const val CONVERSATION_CACHE_TTL_MS = 30_000L
     }
 
-    val agentId: String = savedStateHandle.get<String>("agentId") ?: ""
+    val agentId: String = savedStateHandle.get<String>("agentId")!!
     private var activeConversationId: String? = savedStateHandle.get<String>("conversationId")
     private val initialMessage: String? = savedStateHandle.get<String>("initialMessage")
     val scrollToMessageId: String? = savedStateHandle.get<String>("scrollToMessageId")

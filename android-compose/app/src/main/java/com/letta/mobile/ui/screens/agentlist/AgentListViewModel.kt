@@ -8,20 +8,22 @@ import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.ModelRepository
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.repository.ToolRepository
-import com.letta.mobile.data.model.Tool
 import com.letta.mobile.util.mapErrorToUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -53,39 +55,67 @@ class AgentListViewModel @Inject constructor(
         private const val LIST_CACHE_TTL_MS = 30_000L
     }
 
-    private val _uiState = MutableStateFlow(AgentListUiState())
-    val uiState: StateFlow<AgentListUiState> = _uiState.asStateFlow()
+    private data class TransientState(
+        val searchQuery: String = "",
+        val selectedTags: Set<String> = emptySet(),
+        val isLoading: Boolean = true,
+        val isRefreshing: Boolean = false,
+        val isCreating: Boolean = false,
+        val isImporting: Boolean = false,
+        val error: String? = null,
+    )
+
+    private val _transient = MutableStateFlow(
+        TransientState(isLoading = agentRepository.agents.value.isEmpty())
+    )
+
+    /** Pre-combine models + transient into a single flow to stay within combine()'s 5-param limit. */
+    private data class Overlay(
+        val llm: List<LlmModel>,
+        val emb: List<EmbeddingModel>,
+        val transient: TransientState,
+    )
+
+    private val overlay = combine(
+        modelRepository.llmModels,
+        modelRepository.embeddingModels,
+        _transient,
+    ) { llm, emb, transient -> Overlay(llm, emb, transient) }
+
+    val uiState: StateFlow<AgentListUiState> = combine(
+        agentRepository.agents,
+        settingsRepository.favoriteAgentId,
+        settingsRepository.getPinnedAgentIds(),
+        toolRepository.getTools(),
+        overlay,
+    ) { agents, favId, pinnedIds, tools, overlay ->
+        AgentListUiState(
+            agents = agents.toImmutableList(),
+            availableTools = tools.toImmutableList(),
+            llmModels = overlay.llm.toImmutableList(),
+            embeddingModels = overlay.emb.toImmutableList(),
+            favoriteAgentId = favId,
+            pinnedAgentIds = pinnedIds,
+            searchQuery = overlay.transient.searchQuery,
+            selectedTags = overlay.transient.selectedTags,
+            isLoading = overlay.transient.isLoading,
+            isRefreshing = overlay.transient.isRefreshing,
+            isCreating = overlay.transient.isCreating,
+            isImporting = overlay.transient.isImporting,
+            error = overlay.transient.error,
+        )
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, AgentListUiState())
 
     init {
-        val cached = agentRepository.agents.value
-        if (cached.isNotEmpty()) {
-            _uiState.value = _uiState.value.copy(
-                agents = cached.toImmutableList(),
-                favoriteAgentId = settingsRepository.favoriteAgentId.value,
-                isLoading = false,
-            )
-        }
         loadAgents()
         loadAvailableTools()
         loadAvailableModels()
-        observePinnedAgents()
-    }
-
-    private fun observePinnedAgents() {
-        viewModelScope.launch {
-            settingsRepository.getPinnedAgentIds().collect { ids ->
-                _uiState.value = _uiState.value.copy(pinnedAgentIds = ids)
-            }
-        }
     }
 
     fun loadAvailableTools() {
         viewModelScope.launch {
             try {
                 toolRepository.refreshToolsIfStale(LIST_CACHE_TTL_MS)
-                _uiState.value = _uiState.value.copy(
-                    availableTools = toolRepository.getTools().first().toImmutableList(),
-                )
             } catch (_: Exception) {
                 Log.w("AgentListViewModel", "Failed to load available tools")
             }
@@ -97,10 +127,6 @@ class AgentListViewModel @Inject constructor(
             try {
                 modelRepository.refreshLlmModels()
                 modelRepository.refreshEmbeddingModels()
-                _uiState.value = _uiState.value.copy(
-                    llmModels = modelRepository.llmModels.value.toImmutableList(),
-                    embeddingModels = modelRepository.embeddingModels.value.toImmutableList(),
-                )
             } catch (_: Exception) {
                 Log.w("AgentListViewModel", "Failed to load available models")
             }
@@ -109,50 +135,48 @@ class AgentListViewModel @Inject constructor(
 
     fun loadAgents() {
         viewModelScope.launch {
-            if (_uiState.value.agents.isEmpty()) {
-                _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            if (agentRepository.agents.value.isEmpty()) {
+                _transient.update { it.copy(isLoading = true, error = null) }
             }
             try {
                 agentRepository.refreshAgentsIfStale(LIST_CACHE_TTL_MS)
-                _uiState.value = _uiState.value.copy(
-                    agents = agentRepository.agents.value.toImmutableList(),
-                    favoriteAgentId = settingsRepository.favoriteAgentId.value,
-                    isLoading = false,
-                )
+                _transient.update { it.copy(isLoading = false) }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error = if (_uiState.value.agents.isEmpty()) e.message ?: "Failed to load agents" else null,
-                )
+                _transient.update {
+                    it.copy(
+                        isLoading = false,
+                        error = if (agentRepository.agents.value.isEmpty()) {
+                            e.message ?: "Failed to load agents"
+                        } else null,
+                    )
+                }
             }
         }
     }
 
     fun refresh() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isRefreshing = true)
+            _transient.update { it.copy(isRefreshing = true) }
             try {
                 agentRepository.refreshAgents()
-                _uiState.value = _uiState.value.copy(
-                    agents = agentRepository.agents.value.toImmutableList(),
-                    favoriteAgentId = settingsRepository.favoriteAgentId.value,
-                    isRefreshing = false,
-                )
+                _transient.update { it.copy(isRefreshing = false) }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isRefreshing = false,
-                    error = e.message ?: "Failed to refresh",
-                )
+                _transient.update {
+                    it.copy(
+                        isRefreshing = false,
+                        error = e.message ?: "Failed to refresh",
+                    )
+                }
             }
         }
     }
 
     fun updateSearchQuery(query: String) {
-        _uiState.value = _uiState.value.copy(searchQuery = query)
+        _transient.update { it.copy(searchQuery = query) }
     }
 
     fun getFilteredAgents(): List<Agent> {
-        val state = _uiState.value
+        val state = uiState.value
         var result: List<Agent> = state.agents
 
         if (state.selectedTags.isNotEmpty()) {
@@ -175,72 +199,73 @@ class AgentListViewModel @Inject constructor(
     }
 
     fun getAllTags(): List<String> {
-        return _uiState.value.agents
+        return uiState.value.agents
             .flatMap { it.tags }
             .distinct()
             .sorted()
     }
 
     fun toggleTag(tag: String) {
-        val current = _uiState.value.selectedTags
-        val updated = if (tag in current) current - tag else current + tag
-        _uiState.value = _uiState.value.copy(selectedTags = updated)
+        _transient.update { current ->
+            val updated = if (tag in current.selectedTags) {
+                current.selectedTags - tag
+            } else {
+                current.selectedTags + tag
+            }
+            current.copy(selectedTags = updated)
+        }
     }
 
     fun clearTags() {
-        _uiState.value = _uiState.value.copy(selectedTags = emptySet())
+        _transient.update { it.copy(selectedTags = emptySet()) }
     }
 
     fun deleteAgent(agentId: String, onComplete: () -> Unit = {}) {
         viewModelScope.launch {
             try {
                 agentRepository.deleteAgent(agentId)
-                val wasFavorite = _uiState.value.favoriteAgentId == agentId
-                if (wasFavorite) {
+                if (uiState.value.favoriteAgentId == agentId) {
                     settingsRepository.setFavoriteAgentId(null)
                 }
-                _uiState.value = _uiState.value.copy(
-                    agents = agentRepository.agents.value.toImmutableList(),
-                    favoriteAgentId = if (wasFavorite) null else _uiState.value.favoriteAgentId,
-                )
                 onComplete()
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(error = e.message ?: "Failed to delete agent")
+                _transient.update { it.copy(error = e.message ?: "Failed to delete agent") }
             }
         }
     }
 
     fun toggleFavorite(agentId: String) {
-        val current = _uiState.value.favoriteAgentId
+        val current = uiState.value.favoriteAgentId
         val newFav = if (current == agentId) null else agentId
         settingsRepository.setFavoriteAgentId(newFav)
-        _uiState.value = _uiState.value.copy(favoriteAgentId = newFav)
     }
 
     fun togglePinned(agentId: String) {
         viewModelScope.launch {
-            val isPinned = agentId in _uiState.value.pinnedAgentIds
+            val isPinned = agentId in uiState.value.pinnedAgentIds
             settingsRepository.setAgentPinned(agentId, !isPinned)
         }
     }
 
     fun clearError() {
-        _uiState.value = _uiState.value.copy(error = null)
+        _transient.update { it.copy(error = null) }
     }
 
     fun createAgent(params: AgentCreateParams, onSuccess: (String) -> Unit) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isCreating = true)
+            _transient.update { it.copy(isCreating = true) }
             try {
                 val agent = agentRepository.createAgent(params)
-                _uiState.value = _uiState.value.copy(isCreating = false)
-                loadAgents()
+                _transient.update { it.copy(isCreating = false) }
+                agentRepository.refreshAgents()
                 onSuccess(agent.id)
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isCreating = false,
-                    error = com.letta.mobile.util.mapErrorToUserMessage(e, "Failed to create agent"),
-                )
+                _transient.update {
+                    it.copy(
+                        isCreating = false,
+                        error = mapErrorToUserMessage(e, "Failed to create agent"),
+                    )
+                }
             }
         }
     }
@@ -254,7 +279,7 @@ class AgentListViewModel @Inject constructor(
         onSuccess: (ImportedAgentsResponse) -> Unit,
     ) {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isImporting = true, error = null)
+            _transient.update { it.copy(isImporting = true, error = null) }
             try {
                 val response = agentRepository.importAgent(
                     fileName = fileName,
@@ -263,16 +288,15 @@ class AgentListViewModel @Inject constructor(
                     overrideExistingTools = overrideExistingTools,
                     stripMessages = stripMessages,
                 )
-                _uiState.value = _uiState.value.copy(
-                    isImporting = false,
-                    agents = agentRepository.agents.value.toImmutableList(),
-                )
+                _transient.update { it.copy(isImporting = false) }
                 onSuccess(response)
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isImporting = false,
-                    error = mapErrorToUserMessage(e, "Failed to import agent"),
-                )
+                _transient.update {
+                    it.copy(
+                        isImporting = false,
+                        error = mapErrorToUserMessage(e, "Failed to import agent"),
+                    )
+                }
             }
         }
     }

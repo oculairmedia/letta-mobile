@@ -19,7 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flowOf
+
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -51,7 +51,8 @@ class AgentListViewModelTest {
 
         every { agentRepository.agents } returns MutableStateFlow(emptyList())
         every { settingsRepository.favoriteAgentId } returns MutableStateFlow(null)
-        every { toolRepository.getTools() } returns flowOf(
+        every { settingsRepository.getPinnedAgentIds() } returns MutableStateFlow(emptySet())
+        every { toolRepository.getTools() } returns MutableStateFlow(
             listOf(
                 Tool(id = "t1", name = "tool_one"),
                 Tool(id = "t2", name = "tool_two"),
@@ -270,8 +271,10 @@ class AgentListViewModelTest {
                 Agent(id = "a2", name = "Agent2"),
             )
         )
+        val favFlow = MutableStateFlow<String?>("a1")
         every { agentRepository.agents } returns agentsFlow
-        every { settingsRepository.favoriteAgentId } returns MutableStateFlow("a1")
+        every { settingsRepository.favoriteAgentId } returns favFlow
+        every { settingsRepository.setFavoriteAgentId(any()) } answers { favFlow.value = firstArg() }
         coEvery { agentRepository.deleteAgent("a1") } answers {
             agentsFlow.value = agentsFlow.value.filterNot { it.id == "a1" }
         }

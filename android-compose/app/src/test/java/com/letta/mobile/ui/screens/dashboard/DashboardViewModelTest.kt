@@ -93,7 +93,7 @@ class DashboardViewModelTest {
         coEvery { conversationsRepository.refresh() } returns Unit
 
         toolRepository = mockk(relaxed = true)
-        every { toolRepository.getTools() } returns flowOf(
+        every { toolRepository.getTools() } returns MutableStateFlow(
             listOf(
                 TestData.tool(id = "tool-1"),
                 TestData.tool(id = "tool-2"),

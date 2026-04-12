@@ -50,7 +50,7 @@ class AgentSettingsViewModel @Inject constructor(
     private val messageRepository: MessageRepository,
 ) : ViewModel() {
 
-    private val agentId: String = savedStateHandle.get<String>("agentId") ?: ""
+    private val agentId: String = savedStateHandle.get<String>("agentId")!!
 
     private val _uiState = MutableStateFlow<UiState<AgentSettingsUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<AgentSettingsUiState>> = _uiState.asStateFlow()

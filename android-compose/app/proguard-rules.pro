@@ -53,6 +53,12 @@
     public static ** valueOf(java.lang.String);
 }
 
+# Navigation type-safe routes (kotlinx.serialization)
+-keepclassmembers class com.letta.mobile.ui.navigation.** {
+    <fields>;
+    <init>(...);
+}
+
 # Remove logging in release
 -assumenosideeffects class android.util.Log {
     public static int v(...);

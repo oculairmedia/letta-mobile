@@ -319,7 +319,7 @@ class EditAgentViewModelTest {
         val attachedToolIds = mutableListOf<String>()
         val detachedToolIds = mutableListOf<String>()
 
-        override fun getTools(): Flow<List<Tool>> = availableTools
+        override fun getTools(): StateFlow<List<Tool>> = availableTools
         override suspend fun refreshTools() {}
         override suspend fun attachTool(agentId: String, toolId: String) {
             attachedToolIds.add(toolId)

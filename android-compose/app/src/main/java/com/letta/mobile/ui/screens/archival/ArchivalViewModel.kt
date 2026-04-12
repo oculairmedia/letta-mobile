@@ -32,7 +32,7 @@ class ArchivalViewModel @Inject constructor(
     private val passageRepository: PassageRepository,
 ) : ViewModel() {
 
-    private val agentId: String = savedStateHandle.get<String>("agentId") ?: ""
+    private val agentId: String = savedStateHandle.get<String>("agentId")!!
 
     private val _uiState = MutableStateFlow<UiState<ArchivalUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<ArchivalUiState>> = _uiState.asStateFlow()

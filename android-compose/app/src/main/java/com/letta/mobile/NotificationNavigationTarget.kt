@@ -2,13 +2,16 @@ package com.letta.mobile
 
 import android.content.Context
 import android.content.Intent
+import com.letta.mobile.ui.navigation.AgentChatRoute
 
 data class NotificationNavigationTarget(
     val agentId: String,
     val conversationId: String,
 ) {
-    val route: String
-        get() = "agent/$agentId/chat?conversationId=$conversationId"
+    fun toRoute(): AgentChatRoute = AgentChatRoute(
+        agentId = agentId,
+        conversationId = conversationId,
+    )
 
     fun createIntent(context: Context): Intent {
         return Intent(context, MainActivity::class.java).apply {

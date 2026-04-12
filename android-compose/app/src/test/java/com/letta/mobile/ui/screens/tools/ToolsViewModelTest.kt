@@ -10,8 +10,9 @@ import com.letta.mobile.testutil.TestData
 import com.letta.mobile.ui.common.UiState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -79,7 +80,7 @@ class ToolsViewModelTest {
         val detachCalls = mutableListOf<String>()
 
         fun setTools(list: List<Tool>) { _tools.value = list }
-        override fun getTools(): Flow<List<Tool>> = _tools
+        override fun getTools(): StateFlow<List<Tool>> = _tools.asStateFlow()
         override suspend fun refreshTools() { if (shouldFail) throw Exception("Failed") }
         override suspend fun attachTool(agentId: String, toolId: String) { attachCalls.add("$agentId:$toolId") }
         override suspend fun detachTool(agentId: String, toolId: String) { detachCalls.add("$agentId:$toolId") }

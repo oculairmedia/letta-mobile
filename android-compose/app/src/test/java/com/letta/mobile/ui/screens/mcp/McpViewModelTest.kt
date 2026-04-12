@@ -279,7 +279,7 @@ class McpViewModelTest {
     private class FakeToolRepo : ToolRepository(FakeToolApi()) {
         private val _tools = MutableStateFlow<List<Tool>>(emptyList())
         fun setTools(list: List<Tool>) { _tools.value = list }
-        override fun getTools(): Flow<List<Tool>> = _tools
+        override fun getTools(): StateFlow<List<Tool>> = _tools.asStateFlow()
         override suspend fun refreshTools() {}
     }
 }

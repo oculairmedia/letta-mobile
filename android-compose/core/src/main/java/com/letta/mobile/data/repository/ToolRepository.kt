@@ -22,7 +22,7 @@ class ToolRepository @Inject constructor(
     private val _toolsByAgent = MutableStateFlow<Map<String, List<Tool>>>(emptyMap())
     private var lastRefreshAtMillis: Long = 0L
 
-    override fun getTools(): Flow<List<Tool>> = _tools
+    override fun getTools(): StateFlow<List<Tool>> = _tools.asStateFlow()
 
     override fun getAgentTools(agentId: String): Flow<List<Tool>> {
         return _toolsByAgent.map { it[agentId] ?: emptyList() }

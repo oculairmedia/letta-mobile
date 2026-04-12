@@ -47,7 +47,7 @@ class McpServerToolsViewModel @Inject constructor(
     private val mcpServerRepository: McpServerRepository,
 ) : ViewModel() {
 
-    private val serverId: String = savedStateHandle.get<String>("serverId") ?: ""
+    private val serverId: String = savedStateHandle.get<String>("serverId")!!
 
     private val _uiState = MutableStateFlow<UiState<McpServerToolsUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<McpServerToolsUiState>> = _uiState.asStateFlow()

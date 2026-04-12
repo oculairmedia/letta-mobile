@@ -20,7 +20,7 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
+
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -68,7 +68,7 @@ class EditAgentViewModel @Inject constructor(
     private val toolRepository: ToolRepository,
 ) : ViewModel() {
 
-    private val agentId: String = savedStateHandle.get<String>("agentId") ?: ""
+    private val agentId: String = savedStateHandle.get<String>("agentId")!!
 
     private val _uiState = MutableStateFlow<UiState<EditAgentUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<EditAgentUiState>> = _uiState.asStateFlow()
@@ -113,7 +113,7 @@ class EditAgentViewModel @Inject constructor(
                     )
                 }
                 toolRepository.refreshTools()
-                val availableTools = toolRepository.getTools().first()
+                val availableTools = toolRepository.getTools().value
                 originalBlocks = editableBlocks.associateBy { it.label }
                 val resolvedEmbedding = agent.embedding
                     ?: agent.embeddingConfig?.handle

@@ -19,11 +19,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
 import com.letta.mobile.NotificationNavigationTarget
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.ui.screens.about.AboutScreen
@@ -52,6 +50,7 @@ import com.letta.mobile.ui.screens.templates.TemplatesScreen
 import com.letta.mobile.ui.screens.tools.AllToolsScreen
 import com.letta.mobile.ui.screens.tools.ToolDetailScreen
 import androidx.lifecycle.viewModelScope
+import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -107,18 +106,18 @@ fun AppNavGraph(
     val navViewModel: NavViewModel = hiltViewModel()
     val hasConfig by navViewModel.hasConfig.collectAsState(initial = true)
 
-    val initialNotificationRoute = remember { notificationTarget?.route }
-    val startDestination = when {
-        hasConfig && initialNotificationRoute != null -> initialNotificationRoute
-        hasConfig -> "home"
-        else -> "config"
+    val initialNotificationTarget = remember { notificationTarget }
+    val startDestination: Any = when {
+        hasConfig && initialNotificationTarget != null -> initialNotificationTarget.toRoute()
+        hasConfig -> HomeRoute
+        else -> ConfigRoute
     }
     val navController = rememberNavController()
 
-    LaunchedEffect(notificationTarget?.route) {
-        val route = notificationTarget?.route ?: return@LaunchedEffect
-        if (route != startDestination) {
-            navController.navigate(route) {
+    LaunchedEffect(notificationTarget) {
+        val target = notificationTarget ?: return@LaunchedEffect
+        if (target != initialNotificationTarget) {
+            navController.navigate(target.toRoute()) {
                 launchSingleTop = true
             }
         }
@@ -132,34 +131,32 @@ fun AppNavGraph(
                 navController = navController,
                 startDestination = startDestination
             ) {
-        composable("home") {
+        composable<HomeRoute> {
             HomeScreen(
-                onNavigateToAgents = { navController.navigate("agentList") },
-                onNavigateToConversations = { navController.navigate("conversations") },
-                onNavigateToTools = { navController.navigate("allTools") },
-                onNavigateToBlocks = { navController.navigate("blocks") },
-                onNavigateToSettings = { navController.navigate("config") },
+                onNavigateToAgents = { navController.navigate(AgentListRoute) },
+                onNavigateToConversations = { navController.navigate(ConversationsRoute) },
+                onNavigateToTools = { navController.navigate(AllToolsRoute) },
+                onNavigateToBlocks = { navController.navigate(BlocksRoute) },
+                onNavigateToSettings = { navController.navigate(ConfigRoute) },
                 onNavigateToChat = { agentId, initialMessage ->
-                    if (initialMessage != null) {
-                        val encoded = java.net.URLEncoder.encode(initialMessage, "UTF-8")
-                        navController.navigate("agent/$agentId/chat?initialMessage=$encoded")
-                    } else {
-                        navController.navigate("agent/$agentId/chat")
-                    }
+                    navController.navigate(AgentChatRoute(agentId = agentId, initialMessage = initialMessage))
                 },
                 onNavigateToChatMessage = { agentId, conversationId, messageId ->
                     navController.navigate(
-                        "agent/$agentId/chat?conversationId=$conversationId&scrollToMessageId=$messageId"
+                        AgentChatRoute(
+                            agentId = agentId,
+                            conversationId = conversationId,
+                            scrollToMessageId = messageId,
+                        )
                     )
                 },
                 onNavigateToEditAgent = { agentId ->
-                    navController.navigate("editAgent/$agentId")
+                    navController.navigate(EditAgentRoute(agentId))
                 },
             )
         }
 
-        composable(
-            route = "conversations",
+        composable<ConversationsRoute>(
             enterTransition = drillInPopEnter,
             exitTransition = drillInExit,
             popEnterTransition = drillInPopEnter,
@@ -168,59 +165,28 @@ fun AppNavGraph(
             CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
                 ConversationsScreen(
                     onNavigateToChat = { agentId, conversationId ->
-                        navController.navigate("agent/$agentId/chat?conversationId=$conversationId")
+                        navController.navigate(AgentChatRoute(agentId = agentId, conversationId = conversationId))
                     },
-                    onNavigateToSettings = {
-                        navController.navigate("config")
-                    },
-                    onNavigateToAgentList = {
-                        navController.navigate("agentList")
-                    },
-                    onNavigateToTemplates = {
-                        navController.navigate("templates")
-                    },
-                    onNavigateToArchives = {
-                        navController.navigate("archives")
-                    },
-                    onNavigateToFolders = {
-                        navController.navigate("folders")
-                    },
-                    onNavigateToGroups = {
-                        navController.navigate("groups")
-                    },
-                    onNavigateToProviders = {
-                        navController.navigate("providers")
-                    },
-                    onNavigateToBlocks = {
-                        navController.navigate("blocks")
-                    },
-                    onNavigateToIdentities = {
-                        navController.navigate("identities")
-                    },
-                    onNavigateToSchedules = {
-                        navController.navigate("schedules")
-                    },
-                    onNavigateToRuns = {
-                        navController.navigate("runs")
-                    },
-                    onNavigateToJobs = {
-                        navController.navigate("jobs")
-                    },
-                    onNavigateToMessageBatches = {
-                        navController.navigate("messageBatches")
-                    },
-                    onNavigateToMcp = {
-                        navController.navigate("mcp")
-                    },
-                    onNavigateToAbout = {
-                        navController.navigate("about")
-                    },
+                    onNavigateToSettings = { navController.navigate(ConfigRoute) },
+                    onNavigateToAgentList = { navController.navigate(AgentListRoute) },
+                    onNavigateToTemplates = { navController.navigate(TemplatesRoute) },
+                    onNavigateToArchives = { navController.navigate(ArchivesRoute) },
+                    onNavigateToFolders = { navController.navigate(FoldersRoute) },
+                    onNavigateToGroups = { navController.navigate(GroupsRoute) },
+                    onNavigateToProviders = { navController.navigate(ProvidersRoute) },
+                    onNavigateToBlocks = { navController.navigate(BlocksRoute) },
+                    onNavigateToIdentities = { navController.navigate(IdentitiesRoute) },
+                    onNavigateToSchedules = { navController.navigate(SchedulesRoute) },
+                    onNavigateToRuns = { navController.navigate(RunsRoute) },
+                    onNavigateToJobs = { navController.navigate(JobsRoute) },
+                    onNavigateToMessageBatches = { navController.navigate(MessageBatchesRoute) },
+                    onNavigateToMcp = { navController.navigate(McpRoute) },
+                    onNavigateToAbout = { navController.navigate(AboutRoute) },
                 )
             }
         }
 
-        composable(
-            route = "agentList",
+        composable<AgentListRoute>(
             enterTransition = drillInEnter,
             exitTransition = drillInExit,
             popEnterTransition = drillInPopEnter,
@@ -230,40 +196,39 @@ fun AppNavGraph(
                 AgentListScreen(
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToAgent = { agentId ->
-                        navController.navigate("agent/$agentId/chat")
+                        navController.navigate(AgentChatRoute(agentId = agentId))
                     },
                     onNavigateToEditAgent = { agentId ->
-                        navController.navigate("editAgent/$agentId")
+                        navController.navigate(EditAgentRoute(agentId))
                     },
                 )
             }
         }
 
-        composable("config") {
+        composable<ConfigRoute> {
             ConfigScreen(
                 onNavigateBack = {
                     if (navController.previousBackStackEntry != null) {
                         navController.popBackStack()
                     } else {
-                        navController.navigate("conversations") {
-                            popUpTo("config") { inclusive = true }
+                        navController.navigate(ConversationsRoute) {
+                            popUpTo<ConfigRoute> { inclusive = true }
                         }
                     }
                 },
                 onNavigateToConfigList = {
-                    navController.navigate("configList")
+                    navController.navigate(ConfigListRoute)
                 }
             )
         }
 
-        composable("configList") {
+        composable<ConfigListRoute> {
             ConfigListScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }
 
-        composable(
-            route = "templates",
+        composable<TemplatesRoute>(
             enterTransition = drillInEnter,
             exitTransition = drillInExit,
             popEnterTransition = drillInPopEnter,
@@ -272,100 +237,90 @@ fun AppNavGraph(
             TemplatesScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToAgent = { agentId ->
-                    navController.navigate("agent/$agentId/chat")
+                    navController.navigate(AgentChatRoute(agentId = agentId))
                 },
                 onNavigateToAgentList = {
-                    navController.navigate("agentList")
+                    navController.navigate(AgentListRoute)
                 },
             )
         }
 
-        composable("archives") {
+        composable<ArchivesRoute> {
             ArchiveAdminScreen(
                 onNavigateBack = { navController.popBackStack() },
             )
         }
 
-        composable("folders") {
+        composable<FoldersRoute> {
             FolderAdminScreen(
                 onNavigateBack = { navController.popBackStack() },
             )
         }
 
-        composable("groups") {
+        composable<GroupsRoute> {
             GroupAdminScreen(
                 onNavigateBack = { navController.popBackStack() },
             )
         }
 
-        composable("providers") {
+        composable<ProvidersRoute> {
             ProviderAdminScreen(
                 onNavigateBack = { navController.popBackStack() },
             )
         }
 
-        composable("blocks") {
+        composable<BlocksRoute> {
             BlockLibraryScreen(
                 onNavigateBack = { navController.popBackStack() },
             )
         }
 
-        composable("identities") {
+        composable<IdentitiesRoute> {
             IdentityListScreen(
                 onNavigateBack = { navController.popBackStack() },
             )
         }
 
-        composable("schedules") {
+        composable<SchedulesRoute> {
             ScheduleListScreen(
                 onNavigateBack = { navController.popBackStack() },
             )
         }
 
-        composable("runs") {
+        composable<RunsRoute> {
             RunMonitorScreen(
                 onNavigateBack = { navController.popBackStack() },
             )
         }
 
-        composable("jobs") {
+        composable<JobsRoute> {
             JobMonitorScreen(
                 onNavigateBack = { navController.popBackStack() },
             )
         }
 
-        composable("messageBatches") {
+        composable<MessageBatchesRoute> {
             MessageBatchMonitorScreen(
                 onNavigateBack = { navController.popBackStack() },
             )
         }
 
-        composable("mcp") {
+        composable<McpRoute> {
             McpScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToServerTools = { serverId ->
-                    navController.navigate("mcpServerTools/$serverId")
+                    navController.navigate(McpServerToolsRoute(serverId))
                 }
             )
         }
 
-        composable(
-            route = "mcpServerTools/{serverId}",
-            arguments = listOf(navArgument("serverId") { type = NavType.StringType })
-        ) {
+        composable<McpServerToolsRoute> {
             McpServerToolsScreen(
                 onNavigateBack = { navController.popBackStack() },
             )
         }
 
-        composable(
-            route = "agent/{agentId}/chat?conversationId={conversationId}&initialMessage={initialMessage}&scrollToMessageId={scrollToMessageId}",
-            arguments = listOf(
-                navArgument("agentId") { type = NavType.StringType },
-                navArgument("conversationId") { type = NavType.StringType; nullable = true; defaultValue = null },
-                navArgument("initialMessage") { type = NavType.StringType; nullable = true; defaultValue = null },
-                navArgument("scrollToMessageId") { type = NavType.StringType; nullable = true; defaultValue = null },
-            ),
+        composable<AgentChatRoute>(
             enterTransition = drillInEnter,
             exitTransition = drillInExit,
             popEnterTransition = drillInPopEnter,
@@ -375,46 +330,42 @@ fun AppNavGraph(
                 AgentScaffold(
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToSettings = { agentId ->
-                        navController.navigate("editAgent/$agentId")
+                        navController.navigate(EditAgentRoute(agentId))
                     },
                     onNavigateToArchival = { agentId ->
-                        navController.navigate("agent/$agentId/archival")
+                        navController.navigate(ArchivalRoute(agentId))
                     },
                     onNavigateToTools = {
-                        navController.navigate("allTools")
+                        navController.navigate(AllToolsRoute)
                     },
                     onSwitchConversation = { agentId, conversationId ->
-                        navController.navigate("agent/$agentId/chat?conversationId=$conversationId") {
-                            popUpTo("conversations")
+                        navController.navigate(AgentChatRoute(agentId = agentId, conversationId = conversationId)) {
+                            popUpTo<ConversationsRoute>()
                         }
                     },
                 )
             }
         }
 
-        composable(
-            route = "editAgent/{agentId}",
-            arguments = listOf(navArgument("agentId") { type = NavType.StringType })
-        ) {
+        composable<EditAgentRoute> {
             EditAgentScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }
 
-        composable("about") {
+        composable<AboutRoute> {
             AboutScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onLogout = {
                     navViewModel.clearAllData()
-                    navController.navigate("config") {
+                    navController.navigate(ConfigRoute) {
                         popUpTo(0) { inclusive = true }
                     }
                 },
             )
         }
 
-        composable(
-            route = "allTools",
+        composable<AllToolsRoute>(
             enterTransition = drillInEnter,
             exitTransition = drillInExit,
             popEnterTransition = drillInPopEnter,
@@ -424,15 +375,13 @@ fun AppNavGraph(
                 AllToolsScreen(
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToToolDetail = { toolId ->
-                        navController.navigate("toolDetail/$toolId")
+                        navController.navigate(ToolDetailRoute(toolId))
                     },
                 )
             }
         }
 
-        composable(
-            route = "toolDetail/{toolId}",
-            arguments = listOf(navArgument("toolId") { type = NavType.StringType }),
+        composable<ToolDetailRoute>(
             enterTransition = drillInEnter,
             exitTransition = drillInExit,
             popEnterTransition = drillInPopEnter,
@@ -445,7 +394,7 @@ fun AppNavGraph(
             }
         }
 
-        composable("models") {
+        composable<ModelsRoute> {
             ModelBrowserScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onModelSelected = { modelId ->
@@ -455,10 +404,7 @@ fun AppNavGraph(
             )
         }
 
-        composable(
-            route = "agent/{agentId}/archival",
-            arguments = listOf(navArgument("agentId") { type = NavType.StringType })
-        ) {
+        composable<ArchivalRoute> {
             ArchivalScreen(
                 onNavigateBack = { navController.popBackStack() }
             )

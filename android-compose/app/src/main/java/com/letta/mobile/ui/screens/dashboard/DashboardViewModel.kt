@@ -28,6 +28,7 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -85,8 +86,7 @@ class DashboardViewModel @Inject constructor(
     init {
         migrateAdminToFavorite()
         loadProgressively()
-        observeFavoriteAgent()
-        observePinnedAgents()
+        observeFavoriteAndPinned()
         setupSearch()
     }
 
@@ -98,42 +98,29 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    private fun observeFavoriteAgent() {
+    private fun observeFavoriteAndPinned() {
         viewModelScope.launch {
-            settingsRepository.favoriteAgentId.collect { favId ->
-                if (favId != null) {
-                    val agent = agentRepository.getCachedAgent(favId)
+            combine(
+                settingsRepository.favoriteAgentId,
+                settingsRepository.getPinnedAgentIds(),
+            ) { favId, pinnedIds -> favId to pinnedIds }
+                .collect { (favId, pinnedIds) ->
+                    val favName = favId?.let { agentRepository.getCachedAgent(it)?.name }
+                    val pinned = pinnedIds.mapNotNull { id ->
+                        agentRepository.getCachedAgent(id)?.let { PinnedAgent(it.id, it.name) }
+                    }
                     _uiState.value = _uiState.value.copy(
                         favoriteAgentId = favId,
-                        favoriteAgentName = agent?.name,
+                        favoriteAgentName = favName,
+                        pinnedAgents = pinned.toImmutableList(),
                     )
-                    if (agent == null) {
+                    if (favId != null && favName == null) {
                         try {
                             val fetched = agentRepository.getAgent(favId).first()
-                            _uiState.value = _uiState.value.copy(
-                                favoriteAgentName = fetched.name,
-                            )
+                            _uiState.value = _uiState.value.copy(favoriteAgentName = fetched.name)
                         } catch (_: Exception) { }
                     }
-                } else {
-                    _uiState.value = _uiState.value.copy(
-                        favoriteAgentId = null,
-                        favoriteAgentName = null,
-                    )
                 }
-            }
-        }
-    }
-
-    private fun observePinnedAgents() {
-        viewModelScope.launch {
-            settingsRepository.getPinnedAgentIds().collect { ids ->
-                val pinned = ids.mapNotNull { id ->
-                    val agent = agentRepository.getCachedAgent(id)
-                    if (agent != null) PinnedAgent(agent.id, agent.name) else null
-                }
-                _uiState.value = _uiState.value.copy(pinnedAgents = pinned.toImmutableList())
-            }
         }
     }
 
@@ -179,12 +166,10 @@ class DashboardViewModel @Inject constructor(
                         agent.name.lowercase().contains(q) ||
                             (agent.description?.lowercase()?.contains(q) == true)
                     }
-                    val tools = try {
-                        toolRepository.getTools().first().filter { tool ->
-                            tool.name.lowercase().contains(q) ||
-                                (tool.description?.lowercase()?.contains(q) == true)
-                        }
-                    } catch (_: Exception) { emptyList() }
+                    val tools = toolRepository.getTools().value.filter { tool ->
+                        tool.name.lowercase().contains(q) ||
+                            (tool.description?.lowercase()?.contains(q) == true)
+                    }
                     val blocks = cachedBlocks.filter { block ->
                         (block.label?.lowercase()?.contains(q) == true) ||
                             (block.description?.lowercase()?.contains(q) == true) ||
@@ -256,7 +241,7 @@ class DashboardViewModel @Inject constructor(
             try {
                 toolRepository.refreshTools()
                 _uiState.value = _uiState.value.copy(
-                    toolCount = toolRepository.getTools().first().size,
+                    toolCount = toolRepository.getTools().value.size,
                 )
             } catch (e: Exception) {
                 Log.w("DashboardVM", "Tool count failed", e)

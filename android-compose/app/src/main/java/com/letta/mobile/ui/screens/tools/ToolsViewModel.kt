@@ -13,7 +13,7 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
+
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -28,7 +28,7 @@ class ToolsViewModel @Inject constructor(
     private val toolRepository: ToolRepository,
 ) : ViewModel() {
 
-    private val agentId: String = savedStateHandle.get<String>("agentId") ?: ""
+    private val agentId: String = savedStateHandle.get<String>("agentId")!!
 
     private val _uiState = MutableStateFlow<UiState<ToolsUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<ToolsUiState>> = _uiState.asStateFlow()
@@ -42,7 +42,7 @@ class ToolsViewModel @Inject constructor(
             _uiState.value = UiState.Loading
             try {
                 toolRepository.refreshTools()
-                val tools = toolRepository.getTools().first()
+                val tools = toolRepository.getTools().value
                 _uiState.value = UiState.Success(ToolsUiState(tools = tools.toImmutableList()))
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(e.message ?: "Failed to load tools")

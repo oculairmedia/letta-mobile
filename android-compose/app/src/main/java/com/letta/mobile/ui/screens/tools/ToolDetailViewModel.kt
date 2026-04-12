@@ -33,7 +33,7 @@ class ToolDetailViewModel @Inject constructor(
         private const val AGENT_ATTACHMENT_CACHE_TTL_MS = 30_000L
     }
 
-    private val toolId: String = savedStateHandle.get<String>("toolId") ?: ""
+    private val toolId: String = savedStateHandle.get<String>("toolId")!!
 
     private val _uiState = MutableStateFlow<UiState<Tool>>(UiState.Loading)
     val uiState: StateFlow<UiState<Tool>> = _uiState.asStateFlow()
