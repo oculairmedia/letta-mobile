@@ -120,23 +120,31 @@ class ChatViewModel @Inject constructor(
     }
 
     private suspend fun loadMessagesInternal() {
+        val requestedConversationId = activeConversationId
         val cachedAgent = agentRepository.getCachedAgent(agentId)
-        val cachedMessages = messageRepository.getCachedMessages(agentId, activeConversationId)
+        val cachedMessages = messageRepository.getCachedMessages(agentId, requestedConversationId)
         if (cachedAgent != null || cachedMessages.isNotEmpty()) {
-            _uiState.value = _uiState.value.copy(
-                agentName = cachedAgent?.name ?: _uiState.value.agentName,
-                messages = if (cachedMessages.isNotEmpty()) cachedMessages.toUiMessages() else _uiState.value.messages,
-                isLoadingMessages = cachedMessages.isEmpty(),
-                error = null,
-            )
+            if (requestedConversationId == activeConversationId) {
+                _uiState.value = _uiState.value.copy(
+                    agentName = cachedAgent?.name ?: _uiState.value.agentName,
+                    messages = if (cachedMessages.isNotEmpty()) cachedMessages.toUiMessages() else _uiState.value.messages,
+                    isLoadingMessages = cachedMessages.isEmpty(),
+                    error = null,
+                )
+            }
         } else {
-            _uiState.value = _uiState.value.copy(isLoadingMessages = true)
+            if (requestedConversationId == activeConversationId) {
+                _uiState.value = _uiState.value.copy(isLoadingMessages = true)
+            }
         }
         try {
             val (agent, appMessages) = supervisorScope {
                 val agentDeferred = async { agentRepository.getAgent(agentId).first() }
-                val messagesDeferred = async { messageRepository.fetchMessages(agentId, activeConversationId) }
+                val messagesDeferred = async { messageRepository.fetchMessages(agentId, requestedConversationId) }
                 agentDeferred.await() to messagesDeferred.await()
+            }
+            if (requestedConversationId != activeConversationId) {
+                return
             }
             _uiState.value = _uiState.value.copy(agentName = agent.name)
             val messages = appMessages.toUiMessages()
@@ -145,6 +153,9 @@ class ChatViewModel @Inject constructor(
                 messages = messages, isLoadingMessages = false
             )
         } catch (e: Exception) {
+            if (requestedConversationId != activeConversationId) {
+                return
+            }
             _uiState.value = _uiState.value.copy(
                 isLoadingMessages = false,
                 error = e.message ?: "Failed to load messages",
@@ -245,7 +256,11 @@ class ChatViewModel @Inject constructor(
     private fun reloadMessagesFromServer() {
         viewModelScope.launch {
             try {
-                val appMessages = messageRepository.fetchMessages(agentId, activeConversationId)
+                val requestedConversationId = activeConversationId
+                val appMessages = messageRepository.fetchMessages(agentId, requestedConversationId)
+                if (requestedConversationId != activeConversationId) {
+                    return@launch
+                }
                 val messages = appMessages.toUiMessages()
                 if (messages.isNotEmpty()) {
                     _uiState.value = _uiState.value.copy(messages = messages)

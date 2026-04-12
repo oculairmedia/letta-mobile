@@ -35,6 +35,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.serialization.json.Json
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -42,6 +43,18 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModelE2eTest {
+    private val trackedClients = mutableListOf<HttpClient>()
+
+    private fun trackClient(client: HttpClient): HttpClient {
+        trackedClients += client
+        return client
+    }
+
+    @After
+    fun closeTrackedClients() {
+        trackedClients.forEach { it.close() }
+        trackedClients.clear()
+    }
 
     @Test
     fun `sendMessage processes SSE stream end to end for existing conversation`() = runTest {
@@ -167,13 +180,13 @@ class ChatViewModelE2eTest {
         var getCount = 0
         val jsonHeaders = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
         val sseHeaders = headersOf(HttpHeaders.ContentType, "text/event-stream")
-        val client = HttpClient(MockEngine { req ->
+        val client = trackClient(HttpClient(MockEngine { req ->
             val url = req.url.toString()
             when {
                 req.method == HttpMethod.Post && url.contains("/v1/conversations/$streamConversationId/messages") -> {
                     respond(ByteReadChannel(ssePayload.toByteArray()), HttpStatusCode.OK, sseHeaders)
                 }
-                req.method == HttpMethod.Get && url.contains("/v1/conversations/$streamConversationId/messages") -> {
+                req.method == HttpMethod.Get && url.contains("/v1/agents/") && url.contains("/messages") && req.url.parameters["conversation_id"] == streamConversationId -> {
                     getCount += 1
                     val body = if (getCount == 1) initialMessagesJson else reloadedMessagesJson
                     respond(body, HttpStatusCode.OK, jsonHeaders)
@@ -184,7 +197,7 @@ class ChatViewModelE2eTest {
             install(ContentNegotiation) {
                 json(Json { ignoreUnknownKeys = true; isLenient = true })
             }
-        }
+        })
 
         val apiClient = mockk<LettaApiClient> {
             coEvery { getClient() } returns client
