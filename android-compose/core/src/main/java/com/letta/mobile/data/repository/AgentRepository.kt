@@ -121,7 +121,12 @@ class AgentRepository @Inject constructor(
 
     override suspend fun deleteAgent(id: String) {
         agentApi.deleteAgent(id)
-        refreshAgents()
+        _agents.update { current -> current.filterNot { it.id == id } }
+        try {
+            agentDao.deleteExcept(_agents.value.map { it.id })
+        } catch (e: Exception) {
+            Log.w("AgentRepository", "Failed to update cached agents after delete", e)
+        }
     }
 
     override suspend fun exportAgent(id: String): String {
