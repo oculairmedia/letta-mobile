@@ -10,3 +10,17 @@ plugins {
     id("io.gitlab.arturbosch.detekt") version "1.23.8" apply false
     id("org.jetbrains.kotlin.plugin.allopen") version "2.3.20" apply false
 }
+
+// ---------------------------------------------------------------------------
+// cleanKotlinIC — wipe Kotlin incremental compilation caches across all
+// modules.  Run this when builds fail with .tab corruption errors instead
+// of nuking the entire build/ tree.
+//
+//   ./gradlew cleanKotlinIC
+// ---------------------------------------------------------------------------
+tasks.register<Delete>("cleanKotlinIC") {
+    description = "Delete Kotlin IC caches from all modules to recover from .tab corruption."
+    group = "build"
+    delete(allprojects.map { it.layout.buildDirectory.dir("kotlin") })
+    delete(allprojects.map { it.layout.buildDirectory.dir("tmp/kotlin-classes") })
+}

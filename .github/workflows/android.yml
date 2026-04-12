@@ -37,7 +37,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Compile app and run unit tests
-        run: ./gradlew :app:compileDebugKotlin :core:testDebugUnitTest :app:testDebugUnitTest --no-daemon
+        run: ./gradlew :app:compileDebugKotlin :core:testDebugUnitTest :app:testDebugUnitTest --no-daemon --build-cache
 
   build-apk:
     runs-on: ubuntu-latest
@@ -71,7 +71,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build ${{ matrix.variant }} APK
-        run: ./gradlew ${{ matrix.gradle_task }} --no-daemon
+        run: ./gradlew ${{ matrix.gradle_task }} --no-daemon --build-cache
 
       - name: Upload ${{ matrix.variant }} APK
         uses: actions/upload-artifact@v4

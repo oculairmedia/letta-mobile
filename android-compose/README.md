@@ -69,3 +69,23 @@ Run those commands sequentially. KSP state can become unreliable if you try to o
 - If Gradle reports missing `JAVA_COMPILER`, make sure `JAVA_HOME` points to a full JDK/JBR, not a JRE.
 - If Gradle cannot find the SDK, verify `local.properties` contains the correct `sdk.dir` for your machine.
 - If Kotlin or KSP behaves inconsistently after dependency or generated-code changes, rerun with `clean` before compiling again.
+
+### Kotlin incremental compilation errors
+
+If you see `.tab` file corruption errors (`source-to-classes.tab already registered`, `lookups.tab`, `class-attributes.tab`, or missing backup file errors), run:
+
+```bash
+./gradlew cleanKotlinIC
+```
+
+This wipes Kotlin IC caches from all modules without nuking the entire `build/` tree. The next build will recompile from scratch and rebuild clean caches.
+
+If corruption persists, kill stale daemons and do a full clean:
+
+```bash
+./gradlew --stop
+pkill -f kotlin-daemon 2>/dev/null || true
+./gradlew clean
+```
+
+See `gradle.properties` for IC hardening settings that reduce these failures.
