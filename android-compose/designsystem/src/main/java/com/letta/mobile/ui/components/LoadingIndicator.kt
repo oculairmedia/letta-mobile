@@ -3,6 +3,7 @@ package com.letta.mobile.ui.components
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator as ExpressiveLoadingIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -16,6 +17,6 @@ fun LoadingIndicator(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        androidx.compose.material3.LoadingIndicator()
+        ExpressiveLoadingIndicator()
     }
 }

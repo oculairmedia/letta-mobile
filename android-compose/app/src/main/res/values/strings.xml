@@ -21,6 +21,14 @@
     <string name="action_configure_agent">Configure</string>
     <string name="action_remove_favorite">Remove Favourite</string>
     <string name="action_unpin_agent">Unpin from Homepage</string>
+    <string name="screen_home_usage_title">Usage</string>
+    <string name="screen_home_usage_subtitle">Last 24 hours</string>
+    <string name="screen_home_usage_empty">No token activity recorded in the last 24 hours.</string>
+    <string name="screen_home_usage_total_label">Total tokens</string>
+    <string name="screen_home_usage_hourly_label">Tokens / hour</string>
+    <string name="screen_home_usage_model_split_title">Model split</string>
+    <string name="screen_home_usage_model_tokens_label">%1$s tokens</string>
+    <string name="screen_home_usage_model_share_label">%1$d%%</string>
 
     <string name="action_search">Search</string>
     <string name="action_refresh">Refresh</string>

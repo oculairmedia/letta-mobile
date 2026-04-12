@@ -32,6 +32,16 @@ class StepRepositoryTest {
     }
 
     @Test
+    fun `listSteps delegates to api`() = runTest {
+        fakeApi.steps.addAll(listOf(fakeApi.sampleStep("step-1"), fakeApi.sampleStep("step-2")))
+
+        val result = repository.listSteps()
+
+        assertEquals(2, result.size)
+        assertTrue(fakeApi.calls.contains("listSteps"))
+    }
+
+    @Test
     fun `getStepMetrics delegates to api`() = runTest {
         val result = repository.getStepMetrics("step-1")
 

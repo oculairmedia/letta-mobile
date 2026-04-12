@@ -25,6 +25,10 @@ class StepRepository @Inject constructor(
         _steps.value = stepApi.listSteps(params)
     }
 
+    suspend fun listSteps(params: StepListParams = StepListParams()): List<Step> {
+        return stepApi.listSteps(params)
+    }
+
     suspend fun getStep(stepId: String): Step {
         return stepApi.retrieveStep(stepId)
     }

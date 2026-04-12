@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -24,7 +25,9 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -64,6 +67,7 @@ import com.letta.mobile.ui.components.LettaInputBar
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.statValue
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -210,6 +214,7 @@ private fun HomeContent(
         } else {
             Column(
                 modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
@@ -245,7 +250,11 @@ private fun HomeContent(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
+                UsageAnalyticsCard(
+                    usageSummary = state.usageSummary,
+                    isLoading = state.isUsageLoading,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                )
 
                 FavoriteAgentCard(
                     favoriteAgentId = state.favoriteAgentId,
@@ -285,6 +294,169 @@ private fun HomeContent(
                 )
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun UsageAnalyticsCard(
+    usageSummary: DashboardUsageSummary?,
+    isLoading: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.screen_home_usage_title),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        text = stringResource(R.string.screen_home_usage_subtitle),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Icon(
+                    imageVector = LettaIcons.Sparkles,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+
+            when {
+                isLoading -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        ContainedLoadingIndicator()
+                    }
+                }
+
+                usageSummary == null || usageSummary.sampledSteps == 0 -> {
+                    Text(
+                        text = stringResource(R.string.screen_home_usage_empty),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                else -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        UsageMetricCard(
+                            label = stringResource(R.string.screen_home_usage_total_label),
+                            value = formatNumber(usageSummary.totalTokens),
+                            icon = LettaIcons.Database,
+                            modifier = Modifier.weight(1f),
+                        )
+                        UsageMetricCard(
+                            label = stringResource(R.string.screen_home_usage_hourly_label),
+                            value = formatNumber(usageSummary.averageTokensPerHour),
+                            icon = LettaIcons.AccessTime,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+
+                    HorizontalDivider()
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = stringResource(R.string.screen_home_usage_model_split_title),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        usageSummary.modelUsage.take(5).forEachIndexed { index, modelUsage ->
+                            ModelUsageRow(modelUsage = modelUsage)
+                            if (index < usageSummary.modelUsage.take(5).lastIndex) {
+                                HorizontalDivider()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UsageMetricCard(
+    label: String,
+    value: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(text = value, style = MaterialTheme.typography.statValue)
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ModelUsageRow(
+    modelUsage: ModelTokenUsage,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = modelUsage.model,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = stringResource(R.string.screen_home_usage_model_tokens_label, formatNumber(modelUsage.totalTokens)),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            text = stringResource(R.string.screen_home_usage_model_share_label, modelUsage.sharePercent),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
     }
 }
 
@@ -516,6 +688,7 @@ private fun PinnedAgentCard(
 }
 
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun SearchResultsContent(
     agentResults: List<Agent>,
@@ -625,7 +798,6 @@ private fun SearchResultsContent(
 
         if (isSearching) {
             item(key = "loading") {
-                @OptIn(ExperimentalMaterial3ExpressiveApi::class)
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                     horizontalArrangement = Arrangement.Center,
@@ -682,6 +854,8 @@ private fun highlightMatches(
         cursor = matchIndex + lowerQuery.length
     }
 }
+
+private fun formatNumber(value: Int): String = String.format(Locale.US, "%,d", value)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

@@ -11,9 +11,12 @@ import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.SettingsRepository
+import com.letta.mobile.data.repository.StepRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,6 +37,8 @@ data class DashboardUiState(
     val conversationCount: Int? = null,
     val toolCount: Int? = null,
     val blockCount: Int? = null,
+    val usageSummary: DashboardUsageSummary? = null,
+    val isUsageLoading: Boolean = true,
     val favoriteAgentId: String? = null,
     val favoriteAgentName: String? = null,
     val pinnedAgents: List<PinnedAgent> = emptyList(),
@@ -54,6 +59,7 @@ class DashboardViewModel @Inject constructor(
     private val blockRepository: IBlockRepository,
     private val settingsRepository: SettingsRepository,
     private val messageRepository: MessageRepository,
+    private val stepRepository: StepRepository,
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -238,6 +244,29 @@ class DashboardViewModel @Inject constructor(
                 )
             } catch (e: Exception) {
                 Log.w("DashboardVM", "Block count failed", e)
+            }
+        }
+
+        viewModelScope.launch {
+            try {
+                val windowEnd = Instant.now()
+                val windowStart = windowEnd.minus(24, ChronoUnit.HOURS)
+                val steps = stepRepository.listSteps(
+                    com.letta.mobile.data.model.StepListParams(
+                        startDate = windowStart.toString(),
+                        endDate = windowEnd.toString(),
+                        limit = 200,
+                        order = "desc",
+                        orderBy = "created_at",
+                    )
+                )
+                _uiState.value = _uiState.value.copy(
+                    usageSummary = DashboardUsageCalculator.calculate(steps),
+                    isUsageLoading = false,
+                )
+            } catch (e: Exception) {
+                Log.w("DashboardVM", "Usage summary failed", e)
+                _uiState.value = _uiState.value.copy(isUsageLoading = false)
             }
         }
     }
