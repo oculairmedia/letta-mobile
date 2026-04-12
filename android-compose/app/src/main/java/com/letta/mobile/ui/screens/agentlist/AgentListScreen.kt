@@ -20,11 +20,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items as lazyItems
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -46,6 +48,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.LargeFlexibleTopAppBar
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -152,7 +155,10 @@ fun AgentListScreen(
     }
     val gridAgents = filteredAgents.filter { it.id != uiState.favoriteAgentId }
 
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
+    val topAppBarState = rememberTopAppBarState()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(state = topAppBarState)
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -279,6 +285,7 @@ fun AgentListScreen(
                     } else {
                         if (showGrid) {
                             LazyVerticalGrid(
+                                state = gridState,
                                 columns = GridCells.Fixed(3),
                                 contentPadding = PaddingValues(12.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -311,6 +318,7 @@ fun AgentListScreen(
                             }
                         } else {
                             LazyColumn(
+                                state = listState,
                                 contentPadding = PaddingValues(12.dp),
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
