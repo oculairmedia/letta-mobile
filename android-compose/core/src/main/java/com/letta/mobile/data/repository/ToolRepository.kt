@@ -20,6 +20,7 @@ class ToolRepository @Inject constructor(
 ) : IToolRepository {
     private val _tools = MutableStateFlow<List<Tool>>(emptyList())
     private val _toolsByAgent = MutableStateFlow<Map<String, List<Tool>>>(emptyMap())
+    private var lastRefreshAtMillis: Long = 0L
 
     override fun getTools(): Flow<List<Tool>> = _tools
 
@@ -31,6 +32,17 @@ class ToolRepository @Inject constructor(
 
     override suspend fun refreshTools() {
         _tools.update { toolApi.listTools() }
+        lastRefreshAtMillis = System.currentTimeMillis()
+    }
+
+    fun hasFreshTools(maxAgeMs: Long): Boolean {
+        return _tools.value.isNotEmpty() && System.currentTimeMillis() - lastRefreshAtMillis <= maxAgeMs
+    }
+
+    suspend fun refreshToolsIfStale(maxAgeMs: Long): Boolean {
+        if (hasFreshTools(maxAgeMs)) return false
+        refreshTools()
+        return true
     }
 
     suspend fun fetchToolsPage(limit: Int, offset: Int): List<Tool> {
@@ -64,13 +76,18 @@ class ToolRepository @Inject constructor(
 
     override suspend fun upsertTool(params: ToolCreateParams): Tool {
         val tool = toolApi.upsertTool(params)
-        refreshTools()
+        _tools.update { current ->
+            val index = current.indexOfFirst { it.id == tool.id }
+            if (index >= 0) current.toMutableList().apply { this[index] = tool } else current + tool
+        }
         return tool
     }
 
     override suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool {
         val tool = toolApi.updateTool(toolId, params)
-        refreshTools()
+        _tools.update { current ->
+            current.map { existing -> if (existing.id == tool.id) tool else existing }
+        }
         _toolsByAgent.update { current ->
             current.mapValues { (_, tools) ->
                 tools.map { existing -> if (existing.id == tool.id) tool else existing }

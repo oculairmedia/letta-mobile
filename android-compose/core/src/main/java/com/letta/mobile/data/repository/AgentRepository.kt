@@ -35,6 +35,7 @@ class AgentRepository @Inject constructor(
     private val _agents = MutableStateFlow<List<Agent>>(emptyList())
     override val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
     private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var lastRefreshAtMillis: Long = 0L
 
     init {
         repositoryScope.launch {
@@ -65,6 +66,7 @@ class AgentRepository @Inject constructor(
     override suspend fun refreshAgents() {
         val fresh = agentApi.listAgents(limit = 1000)
         _agents.update { fresh }
+        lastRefreshAtMillis = System.currentTimeMillis()
         try {
             val entities = fresh.map { AgentEntity.fromAgent(it) }
             agentDao.insertAll(entities)
@@ -72,6 +74,18 @@ class AgentRepository @Inject constructor(
         } catch (e: Exception) {
             Log.w("AgentRepository", "Failed to cache agents to Room", e)
         }
+    }
+
+    fun getCachedAgent(id: String): Agent? = _agents.value.find { it.id == id }
+
+    fun hasFreshAgents(maxAgeMs: Long): Boolean {
+        return _agents.value.isNotEmpty() && System.currentTimeMillis() - lastRefreshAtMillis <= maxAgeMs
+    }
+
+    suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean {
+        if (hasFreshAgents(maxAgeMs)) return false
+        refreshAgents()
+        return true
     }
 
     override fun getAgent(id: String): Flow<Agent> = flow {

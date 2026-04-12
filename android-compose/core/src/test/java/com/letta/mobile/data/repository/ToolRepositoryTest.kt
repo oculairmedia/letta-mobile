@@ -33,6 +33,17 @@ class ToolRepositoryTest {
     }
 
     @Test
+    fun `refreshToolsIfStale skips fresh cache`() = runTest {
+        fakeApi.tools.add(TestData.tool(id = "1"))
+        repository.refreshTools()
+        fakeApi.calls.clear()
+
+        repository.refreshToolsIfStale(maxAgeMs = 60_000)
+
+        assertTrue(fakeApi.calls.none { it == "listTools" })
+    }
+
+    @Test
     fun `getTools returns empty initially`() = runTest {
         val result = repository.getTools().first()
         assertTrue(result.isEmpty())
@@ -74,6 +85,7 @@ class ToolRepositoryTest {
         )
         assertEquals("new_tool", tool.name)
         assertTrue(fakeApi.calls.any { it.startsWith("upsertTool") })
+        assertTrue(repository.getTools().first().any { it.id == tool.id })
     }
 
     @Test
