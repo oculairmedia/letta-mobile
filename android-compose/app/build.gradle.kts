@@ -145,7 +145,7 @@ dependencies {
     testImplementation("io.mockk:mockk:1.13.13")
     testImplementation("io.kotest:kotest-runner-junit5:5.9.1")
     testImplementation("io.kotest:kotest-assertions-core:5.9.1")
-    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("org.robolectric:robolectric:4.16.1")
     testImplementation("androidx.test:core-ktx:1.6.1")
     testImplementation("androidx.test.ext:junit-ktx:1.2.1")
     testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.10.2")
