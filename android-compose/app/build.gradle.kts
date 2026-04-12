@@ -111,7 +111,7 @@ dependencies {
     implementation("io.ktor:ktor-client-auth:3.4.2")
 
     // Kotlinx Serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
 
     // DataStore + Encrypted SharedPreferences
     implementation("androidx.datastore:datastore-preferences:1.1.1")

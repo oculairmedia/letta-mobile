@@ -73,7 +73,7 @@ dependencies {
     implementation("io.ktor:ktor-client-logging:3.4.2")
     implementation("io.ktor:ktor-client-auth:3.4.2")
 
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
     implementation("androidx.paging:paging-runtime-ktx:3.3.5")
