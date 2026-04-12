@@ -59,7 +59,7 @@ class PassageApiTest {
         val api = createApi { req ->
             method = req.method
             url = req.url.toString()
-            respond("""[{\"id\":\"p1\",\"text\":\"hello\",\"agent_id\":\"a1\"}]""", HttpStatusCode.OK, jsonHeaders)
+            respond("""[{"id":"p1","text":"hello","agent_id":"a1"}]""", HttpStatusCode.OK, jsonHeaders)
         }
 
         val passage = api.createPassage("a1", PassageCreateParams(text = "hello"))
@@ -80,7 +80,7 @@ class PassageApiTest {
     fun `createPassage throws when archival memory create returns multiple passages`() = runTest {
         val api = createApi {
             respond(
-                """[{\"id\":\"p1\",\"text\":\"hello\"},{\"id\":\"p2\",\"text\":\"hello again\"}]""",
+                """[{"id":"p1","text":"hello"},{"id":"p2","text":"hello again"}]""",
                 HttpStatusCode.OK,
                 jsonHeaders,
             )
