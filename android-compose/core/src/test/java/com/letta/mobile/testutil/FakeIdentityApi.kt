@@ -88,7 +88,7 @@ class FakeIdentityApi : IdentityApi(mockk(relaxed = true)) {
         calls.add("attachIdentity:$agentId:$identityId")
         if (shouldFail) throw ApiException(500, "Server error")
         val index = identities.indexOfFirst { it.id == identityId }
-        if (index < 0) throw ApiException(404, "Not found")
+        if (index < 0) return
         val current = identities[index]
         if (agentId !in current.agentIds) {
             identities[index] = current.copy(agentIds = current.agentIds + agentId)
@@ -99,7 +99,7 @@ class FakeIdentityApi : IdentityApi(mockk(relaxed = true)) {
         calls.add("detachIdentity:$agentId:$identityId")
         if (shouldFail) throw ApiException(500, "Server error")
         val index = identities.indexOfFirst { it.id == identityId }
-        if (index < 0) throw ApiException(404, "Not found")
+        if (index < 0) return
         val current = identities[index]
         identities[index] = current.copy(agentIds = current.agentIds.filterNot { it == agentId })
     }

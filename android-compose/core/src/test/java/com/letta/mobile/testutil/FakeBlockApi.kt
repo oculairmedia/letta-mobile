@@ -35,6 +35,35 @@ class FakeBlockApi : BlockApi(mockk(relaxed = true)) {
         return updated
     }
 
+    override suspend fun updateGlobalBlock(
+        blockId: String,
+        params: BlockUpdateParams,
+        clearDescription: Boolean,
+        clearLimit: Boolean,
+    ): Block {
+        calls.add("updateGlobalBlock:$blockId:$clearDescription:$clearLimit")
+        lastUpdateParams = params
+        if (shouldFail) throw ApiException(500, "Server error")
+
+        val index = allBlocks.indexOfFirst { it.id == blockId }
+        val existing = allBlocks.getOrNull(index) ?: throw ApiException(404, "Not found")
+        val updated = existing.copy(
+            value = params.value ?: existing.value,
+            description = when {
+                params.description != null -> params.description
+                clearDescription -> null
+                else -> existing.description
+            },
+            limit = when {
+                params.limit != null -> params.limit
+                clearLimit -> null
+                else -> existing.limit
+            },
+        )
+        allBlocks[index] = updated
+        return updated
+    }
+
     override suspend fun attachBlock(agentId: String, blockId: String) {
         calls.add("attachBlock:$agentId:$blockId")
         if (shouldFail) throw ApiException(500, "Server error")
