@@ -66,12 +66,12 @@ dependencies {
     // Compose runtime for @Stable and @Immutable annotations
     implementation("androidx.compose.runtime:runtime:1.8.3")
 
-    implementation("io.ktor:ktor-client-core:3.0.3")
-    implementation("io.ktor:ktor-client-okhttp:3.0.3")
-    implementation("io.ktor:ktor-client-content-negotiation:3.0.3")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.3")
-    implementation("io.ktor:ktor-client-logging:3.0.3")
-    implementation("io.ktor:ktor-client-auth:3.0.3")
+    implementation("io.ktor:ktor-client-core:3.1.3")
+    implementation("io.ktor:ktor-client-okhttp:3.1.3")
+    implementation("io.ktor:ktor-client-content-negotiation:3.1.3")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.1.3")
+    implementation("io.ktor:ktor-client-logging:3.1.3")
+    implementation("io.ktor:ktor-client-auth:3.1.3")
 
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
@@ -88,7 +88,7 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
-    testImplementation("io.ktor:ktor-client-mock:3.0.3")
+    testImplementation("io.ktor:ktor-client-mock:3.1.3")
     testImplementation("app.cash.turbine:turbine:1.2.0")
     testImplementation("io.mockk:mockk:1.13.17")
     testImplementation("io.kotest:kotest-runner-junit5:5.9.1")
