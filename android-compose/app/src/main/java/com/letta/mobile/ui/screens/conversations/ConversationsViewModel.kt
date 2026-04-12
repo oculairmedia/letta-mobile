@@ -15,6 +15,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -49,6 +50,9 @@ class ConversationsViewModel @Inject constructor(
     private val messageRepository: MessageRepository,
     private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
+    companion object {
+        private const val LIST_CACHE_TTL_MS = 30_000L
+    }
 
     private val _uiState = MutableStateFlow(ConversationsUiState())
     val uiState: StateFlow<ConversationsUiState> = _uiState.asStateFlow()
@@ -90,12 +94,13 @@ class ConversationsViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(isLoading = true)
             }
             try {
-                agentRepository.refreshAgents()
+                val agentsChanged = async { agentRepository.refreshAgentsIfStale(LIST_CACHE_TTL_MS) }
+                val conversationsChanged = async { allConversationsRepository.refreshIfStale(LIST_CACHE_TTL_MS) }
+                agentsChanged.await()
+                conversationsChanged.await()
                 agentNameCache = agentRepository.agents.value
                     .associate { it.id to it.name }
                     .toMutableMap()
-
-                allConversationsRepository.refresh()
                 _uiState.value = _uiState.value.copy(
                     conversations = applyPinnedState(allConversationsRepository.conversations.value.map { it.toDisplay() }),
                     agents = agentRepository.agents.value,

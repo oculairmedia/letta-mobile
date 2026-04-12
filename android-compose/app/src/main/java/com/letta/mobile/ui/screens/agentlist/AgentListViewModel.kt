@@ -45,6 +45,9 @@ class AgentListViewModel @Inject constructor(
     private val toolRepository: ToolRepository,
     private val modelRepository: ModelRepository,
 ) : ViewModel() {
+    companion object {
+        private const val LIST_CACHE_TTL_MS = 30_000L
+    }
 
     private val _uiState = MutableStateFlow(AgentListUiState())
     val uiState: StateFlow<AgentListUiState> = _uiState.asStateFlow()
@@ -66,7 +69,7 @@ class AgentListViewModel @Inject constructor(
     fun loadAvailableTools() {
         viewModelScope.launch {
             try {
-                toolRepository.refreshTools()
+                toolRepository.refreshToolsIfStale(LIST_CACHE_TTL_MS)
                 _uiState.value = _uiState.value.copy(
                     availableTools = toolRepository.getTools().first(),
                 )
@@ -97,7 +100,7 @@ class AgentListViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             }
             try {
-                agentRepository.refreshAgents()
+                agentRepository.refreshAgentsIfStale(LIST_CACHE_TTL_MS)
                 _uiState.value = _uiState.value.copy(
                     agents = agentRepository.agents.value,
                     favoriteAgentId = settingsRepository.favoriteAgentId.value,

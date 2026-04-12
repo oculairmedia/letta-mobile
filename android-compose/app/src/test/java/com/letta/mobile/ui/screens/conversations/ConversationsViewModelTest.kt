@@ -25,6 +25,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import org.junit.Assert.assertFalse
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -78,6 +79,20 @@ class ConversationsViewModelTest {
         viewModel.loadConversations()
 
         assertEquals(1, viewModel.uiState.value.conversations.size)
+    }
+
+    @Test
+    fun `loadConversations skips refresh when caches are fresh`() = runTest {
+        fakeAllRepo.setConversations(listOf(TestData.conversation(id = "1", agentId = "a1")))
+        fakeAllRepo.fresh = true
+        fakeAgentRepo.fresh = true
+        fakeAllRepo.didRefresh = false
+        fakeAgentRepo.didRefresh = false
+
+        viewModel.loadConversations()
+
+        assertFalse(fakeAllRepo.didRefresh)
+        assertFalse(fakeAgentRepo.didRefresh)
     }
 
     @Test
@@ -149,9 +164,16 @@ class ConversationsViewModelTest {
     private class FakeAllConversationsRepository : AllConversationsRepository(FakeConversationApi()) {
         private val _conversations = MutableStateFlow<List<Conversation>>(emptyList())
         override val conversations: StateFlow<List<Conversation>> = _conversations.asStateFlow()
+        var fresh: Boolean = false
+        var didRefresh: Boolean = false
 
         fun setConversations(list: List<Conversation>) { _conversations.value = list }
-        override suspend fun refresh() {}
+        override suspend fun refresh() { didRefresh = true }
+        override suspend fun refreshIfStale(maxAgeMs: Long): Boolean {
+            if (fresh) return false
+            didRefresh = true
+            return true
+        }
         override fun handleOptimisticDelete(conversationId: String) {
             _conversations.value = _conversations.value.filter { it.id != conversationId }
         }
@@ -190,7 +212,14 @@ class ConversationsViewModelTest {
     private class FakeAgentRepository : AgentRepository(FakeAgentApi(), mockk(relaxed = true)) {
         private val _agents = MutableStateFlow(listOf(Agent(id = "a1", name = "Agent One")))
         override val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
-        override suspend fun refreshAgents() {}
+        var fresh: Boolean = false
+        var didRefresh: Boolean = false
+        override suspend fun refreshAgents() { didRefresh = true }
+        override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean {
+            if (fresh) return false
+            didRefresh = true
+            return true
+        }
         override fun getAgent(id: String) = flow { emit(_agents.value.first()) }
         override suspend fun createAgent(params: com.letta.mobile.data.model.AgentCreateParams) = _agents.value.first()
         override suspend fun updateAgent(id: String, params: com.letta.mobile.data.model.AgentUpdateParams) = _agents.value.first()

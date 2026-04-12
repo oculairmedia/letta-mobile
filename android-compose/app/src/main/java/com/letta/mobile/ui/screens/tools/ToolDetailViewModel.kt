@@ -26,6 +26,9 @@ class ToolDetailViewModel @Inject constructor(
     private val toolRepository: ToolRepository,
     private val agentRepository: AgentRepository,
 ) : ViewModel() {
+    companion object {
+        private const val AGENT_ATTACHMENT_CACHE_TTL_MS = 30_000L
+    }
 
     private val toolId: String = savedStateHandle.get<String>("toolId") ?: ""
 
@@ -108,7 +111,7 @@ class ToolDetailViewModel @Inject constructor(
     fun loadAgentAttachments() {
         viewModelScope.launch {
             try {
-                agentRepository.refreshAgents()
+                agentRepository.refreshAgentsIfStale(AGENT_ATTACHMENT_CACHE_TTL_MS)
                 val agents = agentRepository.agents.value
                 _agentState.value = ToolAgentAttachmentUiState(
                     attachedAgents = agents.filter { agent -> agent.tools.any { it.id == toolId } },
