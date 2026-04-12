@@ -19,10 +19,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import javax.inject.Inject
 
 @androidx.compose.runtime.Immutable
@@ -53,6 +55,9 @@ class ChatViewModel @Inject constructor(
     private val conversationRepository: ConversationRepository,
     private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
+    companion object {
+        private const val CONVERSATION_CACHE_TTL_MS = 30_000L
+    }
 
     val agentId: String = savedStateHandle.get<String>("agentId") ?: ""
     private var activeConversationId: String? = savedStateHandle.get<String>("conversationId")
@@ -89,8 +94,8 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             if (activeConversationId == null) {
                 try {
-                    conversationRepository.refreshConversations(agentId)
-                    val conversations = conversationRepository.getConversations(agentId).first()
+                    conversationRepository.refreshConversationsIfStale(agentId, CONVERSATION_CACHE_TTL_MS)
+                    val conversations = conversationRepository.getCachedConversations(agentId)
                     val mostRecent = conversations
                         .sortedByDescending { it.lastMessageAt ?: it.createdAt ?: "" }
                         .firstOrNull()
@@ -108,12 +113,25 @@ class ChatViewModel @Inject constructor(
 
     fun loadMessages() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoadingMessages = true)
+            val cachedAgent = agentRepository.getCachedAgent(agentId)
+            val cachedMessages = messageRepository.getCachedMessages(agentId, activeConversationId)
+            if (cachedAgent != null || cachedMessages.isNotEmpty()) {
+                _uiState.value = _uiState.value.copy(
+                    agentName = cachedAgent?.name ?: _uiState.value.agentName,
+                    messages = if (cachedMessages.isNotEmpty()) cachedMessages.toUiMessages() else _uiState.value.messages,
+                    isLoadingMessages = cachedMessages.isEmpty(),
+                    error = null,
+                )
+            } else {
+                _uiState.value = _uiState.value.copy(isLoadingMessages = true)
+            }
             try {
-                val agent = agentRepository.getAgent(agentId).first()
+                val (agent, appMessages) = supervisorScope {
+                    val agentDeferred = async { agentRepository.getAgent(agentId).first() }
+                    val messagesDeferred = async { messageRepository.fetchMessages(agentId, activeConversationId) }
+                    agentDeferred.await() to messagesDeferred.await()
+                }
                 _uiState.value = _uiState.value.copy(agentName = agent.name)
-
-                val appMessages = messageRepository.getMessages(agentId, activeConversationId).first()
                 val messages = appMessages.toUiMessages()
                 if (messages.isNotEmpty()) hasSummary = true
                 _uiState.value = _uiState.value.copy(

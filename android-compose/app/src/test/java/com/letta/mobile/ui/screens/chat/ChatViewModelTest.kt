@@ -19,6 +19,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -101,6 +102,15 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun `loadMessages uses cached conversation resolution without refresh when conversation exists`() = runTest {
+        messages = listOf(TestData.appMessage(id = "1", messageType = MessageType.USER, content = "Hello"))
+
+        createViewModel(conversationId = "conv-1")
+
+        io.mockk.coVerify(exactly = 0) { conversationRepository.refreshConversations(any()) }
+    }
+
+    @Test
     fun `loadMessages preserves repository order instead of resorting by date`() = runTest {
         messages = listOf(
             AppMessage(
@@ -130,6 +140,7 @@ class ChatViewModelTest {
         every { agentRepository.getAgent(any()) } returns flow { throw Exception("Failed to load agent") }
 
         val vm = createViewModel()
+        advanceUntilIdle()
         val state = vm.uiState.value
 
         assertTrue(state.error != null)

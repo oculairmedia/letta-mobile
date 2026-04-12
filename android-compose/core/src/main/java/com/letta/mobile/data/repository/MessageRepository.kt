@@ -115,6 +115,14 @@ open class MessageRepository @Inject constructor(
         emit(messages)
     }
 
+    fun getCachedMessages(agentId: String, conversationId: String? = null): List<AppMessage> {
+        return if (conversationId != null) {
+            _messagesByConversation.value[conversationId] ?: emptyList()
+        } else {
+            _messagesByAgent.value[agentId] ?: emptyList()
+        }
+    }
+
     suspend fun cancelMessage(agentId: String, runIds: List<String>? = null): Map<String, String> {
         return messageApi.cancelMessage(agentId = agentId, runIds = runIds)
     }
