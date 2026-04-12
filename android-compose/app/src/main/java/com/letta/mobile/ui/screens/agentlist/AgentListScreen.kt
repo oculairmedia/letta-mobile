@@ -40,7 +40,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import com.letta.mobile.ui.components.LettaSearchBar
+import com.letta.mobile.ui.components.ExpandableTitleSearch
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -116,7 +116,7 @@ fun AgentListScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showCreateDialog by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
-    var showSearch by remember { mutableStateOf(false) }
+    var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
     var showGrid by rememberSaveable { mutableStateOf(false) }
     var pendingImportName by remember { mutableStateOf<String?>(null) }
     var pendingImportOverrideTools by remember { mutableStateOf(true) }
@@ -172,7 +172,21 @@ fun AgentListScreen(
         topBar = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 LargeFlexibleTopAppBar(
-                    title = { Text(stringResource(R.string.common_agents)) },
+                    title = {
+                        ExpandableTitleSearch(
+                            query = uiState.searchQuery,
+                            onQueryChange = viewModel::updateSearchQuery,
+                            onClear = { viewModel.updateSearchQuery("") },
+                            expanded = isSearchExpanded,
+                            onExpandedChange = { isSearchExpanded = it },
+                            placeholder = stringResource(R.string.screen_agents_search_hint),
+                            openSearchContentDescription = stringResource(R.string.action_search),
+                            closeSearchContentDescription = stringResource(R.string.action_close),
+                            titleContent = {
+                                Text(stringResource(R.string.common_agents))
+                            },
+                        )
+                    },
                     scrollBehavior = scrollBehavior,
                     colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.largeTopAppBarColors(),
                     navigationIcon = {
@@ -187,28 +201,8 @@ fun AgentListScreen(
                                 contentDescription = stringResource(R.string.action_import_agent),
                             )
                         }
-                        IconButton(onClick = {
-                            showSearch = !showSearch
-                            if (!showSearch) viewModel.updateSearchQuery("")
-                        }) {
-                            Icon(
-                                if (showSearch) LettaIcons.Clear else LettaIcons.Search,
-                                contentDescription = stringResource(R.string.action_search),
-                            )
-                        }
                     }
                 )
-
-                if (showSearch) {
-                    LettaSearchBar(
-                        query = uiState.searchQuery,
-                        onQueryChange = { viewModel.updateSearchQuery(it) },
-                        onClear = { viewModel.updateSearchQuery("") },
-                        placeholder = stringResource(R.string.screen_agents_search_hint),
-                        compact = true,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
-                }
 
                 SingleChoiceSegmentedButtonRow(
                     modifier = Modifier

@@ -23,6 +23,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -30,7 +31,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import com.letta.mobile.ui.components.LettaSearchBar
+import com.letta.mobile.ui.components.ExpandableTitleSearch
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -65,7 +66,7 @@ fun AllToolsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showCreateDialog by remember { mutableStateOf(false) }
-    var showSearch by remember { mutableStateOf(false) }
+    var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
@@ -80,7 +81,21 @@ fun AllToolsScreen(
         topBar = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 LargeFlexibleTopAppBar(
-                    title = { Text(stringResource(R.string.common_tools)) },
+                    title = {
+                        ExpandableTitleSearch(
+                            query = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty(),
+                            onQueryChange = viewModel::updateSearchQuery,
+                            onClear = { viewModel.updateSearchQuery("") },
+                            expanded = isSearchExpanded,
+                            onExpandedChange = { isSearchExpanded = it },
+                            placeholder = stringResource(R.string.screen_tools_search_hint),
+                            openSearchContentDescription = stringResource(R.string.action_search),
+                            closeSearchContentDescription = stringResource(R.string.action_close),
+                            titleContent = {
+                                Text(stringResource(R.string.common_tools))
+                            },
+                        )
+                    },
                     scrollBehavior = scrollBehavior,
                     colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.largeTopAppBarColors(),
                     navigationIcon = {
@@ -88,30 +103,7 @@ fun AllToolsScreen(
                             Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
                         }
                     },
-                    actions = {
-                        IconButton(onClick = {
-                            showSearch = !showSearch
-                            if (!showSearch) viewModel.updateSearchQuery("")
-                        }) {
-                            Icon(
-                                if (showSearch) LettaIcons.Clear else LettaIcons.Search,
-                                contentDescription = stringResource(R.string.action_search),
-                            )
-                        }
-                    }
                 )
-
-                if (showSearch) {
-                    val searchQuery = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty()
-                    LettaSearchBar(
-                        query = searchQuery,
-                        onQueryChange = { viewModel.updateSearchQuery(it) },
-                        onClear = { viewModel.updateSearchQuery("") },
-                        placeholder = stringResource(R.string.screen_tools_search_hint),
-                        compact = true,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
-                }
 
                 val allToolTags = remember(uiState) {
                     viewModel.getAllTags()

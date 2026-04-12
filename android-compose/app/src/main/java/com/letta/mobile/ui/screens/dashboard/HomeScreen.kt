@@ -39,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,8 +64,8 @@ import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
+import com.letta.mobile.ui.components.ExpandableTitleSearch
 import com.letta.mobile.ui.components.LettaInputBar
-import com.letta.mobile.ui.components.LettaSearchBar
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.statValue
@@ -84,6 +85,7 @@ fun HomeScreen(
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
@@ -93,18 +95,28 @@ fun HomeScreen(
         topBar = {
             LargeFlexibleTopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Letta")
-                        if (uiState.isConnected) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Icon(
-                                LettaIcons.Circle,
-                                contentDescription = "Connected",
-                                tint = MaterialTheme.customColors.onlineColor,
-                                modifier = Modifier.size(8.dp),
-                            )
-                        }
-                    }
+                    ExpandableTitleSearch(
+                        query = uiState.searchQuery,
+                        onQueryChange = viewModel::updateSearchQuery,
+                        onClear = viewModel::clearSearch,
+                        expanded = isSearchExpanded,
+                        onExpandedChange = { isSearchExpanded = it },
+                        placeholder = stringResource(R.string.screen_home_search_placeholder),
+                        openSearchContentDescription = stringResource(R.string.action_search),
+                        closeSearchContentDescription = stringResource(R.string.action_close),
+                        titleContent = {
+                            Text("Letta")
+                            if (uiState.isConnected) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Icon(
+                                    LettaIcons.Circle,
+                                    contentDescription = "Connected",
+                                    tint = MaterialTheme.customColors.onlineColor,
+                                    modifier = Modifier.size(8.dp),
+                                )
+                            }
+                        },
+                    )
                 },
                 actions = {
                     IconButton(onClick = onNavigateToSettings) {
@@ -118,8 +130,6 @@ fun HomeScreen(
     ) { paddingValues ->
         HomeContent(
             state = uiState,
-            onSearchQueryChange = viewModel::updateSearchQuery,
-            onClearSearch = viewModel::clearSearch,
             onNavigateToAgents = onNavigateToAgents,
             onNavigateToConversations = onNavigateToConversations,
             onNavigateToTools = onNavigateToTools,
@@ -137,8 +147,6 @@ fun HomeScreen(
 @Composable
 private fun HomeContent(
     state: DashboardUiState,
-    onSearchQueryChange: (String) -> Unit,
-    onClearSearch: () -> Unit,
     onNavigateToAgents: () -> Unit,
     onNavigateToConversations: () -> Unit,
     onNavigateToTools: () -> Unit,
@@ -165,14 +173,6 @@ private fun HomeContent(
                 )
             }
         }
-
-        LettaSearchBar(
-            query = state.searchQuery,
-            onQueryChange = onSearchQueryChange,
-            onClear = onClearSearch,
-            placeholder = stringResource(R.string.screen_home_search_placeholder),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-        )
 
         Card(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),

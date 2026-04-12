@@ -24,7 +24,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import com.letta.mobile.ui.components.LettaSearchBar
+import com.letta.mobile.ui.components.ExpandableTitleSearch
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
@@ -34,6 +34,8 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -59,6 +61,7 @@ fun ModelBrowserScreen(
     viewModel: ModelBrowserViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isSearchExpanded = rememberSaveable { mutableStateOf(false) }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
@@ -67,7 +70,19 @@ fun ModelBrowserScreen(
         containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
         topBar = {
             LargeFlexibleTopAppBar(
-                title = { Text(stringResource(R.string.screen_models_title)) },
+                title = {
+                    ExpandableTitleSearch(
+                        query = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty(),
+                        onQueryChange = viewModel::updateSearchQuery,
+                        onClear = { viewModel.updateSearchQuery("") },
+                        expanded = isSearchExpanded.value,
+                        onExpandedChange = { isSearchExpanded.value = it },
+                        placeholder = stringResource(R.string.screen_models_search_hint),
+                        openSearchContentDescription = stringResource(R.string.action_search),
+                        closeSearchContentDescription = stringResource(R.string.action_close),
+                        titleContent = { Text(stringResource(R.string.screen_models_title)) },
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(LettaIcons.ArrowBack, contentDescription = "Back")
@@ -148,15 +163,6 @@ private fun ModelBrowserContent(
                 text = { Text(stringResource(R.string.screen_models_tab_embedding)) },
             )
         }
-
-        LettaSearchBar(
-            query = state.searchQuery,
-            onQueryChange = onSearchChange,
-            onClear = { onSearchChange("") },
-            placeholder = stringResource(R.string.screen_models_search_hint),
-            compact = true,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        )
 
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
