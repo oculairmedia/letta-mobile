@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
+import coil3.annotation.ExperimentalCoilApi
 import coil3.disk.DiskCache
 import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.crossfade
@@ -62,6 +63,7 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
     override fun newImageLoader(context: coil3.PlatformContext): ImageLoader {
         return ImageLoader.Builder(context)
             .components {
+                @OptIn(ExperimentalCoilApi::class)
                 add(KtorNetworkFetcherFactory(httpClient = imageHttpClient))
             }
             .crossfade(true)
