@@ -8,9 +8,9 @@ import android.net.NetworkRequest
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import com.letta.mobile.data.api.LettaApiClient
 import com.letta.mobile.data.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
-import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.statement.HttpResponse
 import kotlinx.coroutines.CoroutineScope
@@ -29,7 +29,7 @@ import javax.inject.Singleton
 class ConnectivityMonitor @Inject constructor(
     @ApplicationContext private val context: Context,
     private val settingsRepository: SettingsRepository,
-    private val httpClient: HttpClient,
+    private val apiClient: LettaApiClient,
 ) : DefaultLifecycleObserver {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -116,11 +116,11 @@ class ConnectivityMonitor @Inject constructor(
         scope.launch {
             delay(200)
             
-            val config = settingsRepository.activeConfig.value ?: return@launch
-            val url = "${config.serverUrl}/v1/agents?limit=1"
+            if (settingsRepository.activeConfig.value == null) return@launch
+            val url = "${apiClient.getBaseUrl().trimEnd('/')}/v1/agents?limit=1"
 
             try {
-                val response: HttpResponse = httpClient.get(url)
+                val response: HttpResponse = apiClient.getClient().get(url)
                 _isServerReachable.value = response.status.value in 200..299
             } catch (e: Exception) {
                 _isServerReachable.value = false
