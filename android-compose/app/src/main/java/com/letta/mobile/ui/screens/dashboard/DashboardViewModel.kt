@@ -10,13 +10,15 @@ import com.letta.mobile.data.model.toParsed
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.MessageRepository
+import com.letta.mobile.data.repository.RunRepository
 import com.letta.mobile.data.repository.SettingsRepository
-import com.letta.mobile.data.repository.StepRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -59,7 +61,7 @@ class DashboardViewModel @Inject constructor(
     private val blockRepository: IBlockRepository,
     private val settingsRepository: SettingsRepository,
     private val messageRepository: MessageRepository,
-    private val stepRepository: StepRepository,
+    private val runRepository: RunRepository,
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -251,15 +253,24 @@ class DashboardViewModel @Inject constructor(
             try {
                 val windowEnd = Instant.now()
                 val windowStart = windowEnd.minus(24, ChronoUnit.HOURS)
-                val steps = stepRepository.listSteps(
-                    com.letta.mobile.data.model.StepListParams(
-                        startDate = windowStart.toString(),
-                        endDate = windowEnd.toString(),
-                        limit = 200,
-                        order = "desc",
-                        orderBy = "created_at",
-                    )
-                )
+                val recentRuns = runRepository.getRecentRuns(limit = 100)
+                    .filter { run ->
+                        val createdAt = run.createdAt ?: return@filter false
+                        try {
+                            val createdInstant = Instant.parse(createdAt)
+                            !createdInstant.isBefore(windowStart) && !createdInstant.isAfter(windowEnd)
+                        } catch (_: Exception) {
+                            false
+                        }
+                    }
+                val steps = recentRuns
+                    .map { run ->
+                        async {
+                            runRepository.getRunSteps(run.id)
+                        }
+                    }
+                    .awaitAll()
+                    .flatten()
                 _uiState.value = _uiState.value.copy(
                     usageSummary = DashboardUsageCalculator.calculate(steps),
                     isUsageLoading = false,
