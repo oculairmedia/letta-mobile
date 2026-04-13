@@ -12,11 +12,13 @@ import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.BugReportRepository
 import com.letta.mobile.data.repository.ConversationRepository
+import com.letta.mobile.data.repository.FolderRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.domain.ClientToolRegistry
 import com.letta.mobile.domain.MessageProcessor
 import com.letta.mobile.testutil.FakeBlockApi
+import com.letta.mobile.testutil.FakeFolderApi
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -86,6 +88,7 @@ class ChatViewModelE2eTest {
             val agentRepo = mockk<AgentRepository>(relaxed = true)
             val blockRepository = BlockRepository(FakeBlockApi())
             val bugReportRepository = mockk<BugReportRepository>(relaxed = true)
+            val folderRepository = FolderRepository(FakeFolderApi())
             val conversations = listOf(Conversation(id = "conv-1", agentId = "agent-1", summary = "Existing"))
             every { conversationRepo.getConversations("agent-1") } returns flowOf(conversations)
             coEvery { conversationRepo.refreshConversations("agent-1") } returns Unit
@@ -93,6 +96,7 @@ class ChatViewModelE2eTest {
 
             val settingsRepo = mockk<SettingsRepository>(relaxed = true)
             every { settingsRepo.getChatBackgroundKey() } returns flowOf("default")
+            every { settingsRepo.getChatFontScale() } returns flowOf(1f)
             val botGateway = mockk<BotGateway>(relaxed = true)
             val botConfigStore = mockk<BotConfigStore>(relaxed = true)
             val internalBotClient = mockk<InternalBotClient>(relaxed = true)
@@ -103,6 +107,7 @@ class ChatViewModelE2eTest {
                 agentRepo,
                 blockRepository,
                 bugReportRepository,
+                folderRepository,
                 conversationRepo,
                 settingsRepo,
                 botGateway,
@@ -152,6 +157,7 @@ class ChatViewModelE2eTest {
             val agentRepo = mockk<AgentRepository>(relaxed = true)
             val blockRepository = BlockRepository(FakeBlockApi())
             val bugReportRepository = mockk<BugReportRepository>(relaxed = true)
+            val folderRepository = FolderRepository(FakeFolderApi())
             val conversations = mutableListOf<Conversation>()
             val createdSummaries = mutableListOf<String>()
             every { conversationRepo.getConversations("agent-1") } answers { flowOf(conversations.toList()) }
@@ -167,6 +173,7 @@ class ChatViewModelE2eTest {
 
             val settingsRepo = mockk<SettingsRepository>(relaxed = true)
             every { settingsRepo.getChatBackgroundKey() } returns flowOf("default")
+            every { settingsRepo.getChatFontScale() } returns flowOf(1f)
             val botGateway = mockk<BotGateway>(relaxed = true)
             val botConfigStore = mockk<BotConfigStore>(relaxed = true)
             val internalBotClient = mockk<InternalBotClient>(relaxed = true)
@@ -177,6 +184,7 @@ class ChatViewModelE2eTest {
                 agentRepo,
                 blockRepository,
                 bugReportRepository,
+                folderRepository,
                 conversationRepo,
                 settingsRepo,
                 botGateway,

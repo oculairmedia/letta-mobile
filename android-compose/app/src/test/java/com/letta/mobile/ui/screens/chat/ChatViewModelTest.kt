@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import com.letta.mobile.bot.config.BotConfigStore
 import com.letta.mobile.bot.core.BotSession
 import com.letta.mobile.bot.core.BotGateway
+import com.letta.mobile.bot.protocol.BotAgentInfo
 import com.letta.mobile.bot.protocol.BotChatResponse
 import com.letta.mobile.bot.protocol.InternalBotClient
 import com.letta.mobile.data.model.Agent
@@ -17,10 +18,12 @@ import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.BugReportRepository
 import com.letta.mobile.data.repository.ConversationRepository
+import com.letta.mobile.data.repository.FolderRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.repository.StreamState
 import com.letta.mobile.testutil.FakeBlockApi
+import com.letta.mobile.testutil.FakeFolderApi
 import com.letta.mobile.testutil.TestData
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -52,6 +55,7 @@ class ChatViewModelTest {
     private lateinit var agentRepository: AgentRepository
     private lateinit var blockRepository: BlockRepository
     private lateinit var bugReportRepository: BugReportRepository
+    private lateinit var folderRepository: FolderRepository
     private lateinit var conversationRepository: ConversationRepository
     private lateinit var settingsRepository: SettingsRepository
     private lateinit var botGateway: BotGateway
@@ -68,6 +72,7 @@ class ChatViewModelTest {
         agentRepository = mockk(relaxed = true)
         blockRepository = BlockRepository(FakeBlockApi())
         bugReportRepository = mockk(relaxed = true)
+        folderRepository = FolderRepository(FakeFolderApi())
         conversationRepository = mockk(relaxed = true)
         settingsRepository = mockk(relaxed = true)
         botGateway = mockk(relaxed = true)
@@ -116,6 +121,7 @@ class ChatViewModelTest {
             agentRepository,
             blockRepository,
             bugReportRepository,
+            folderRepository,
             conversationRepository,
             settingsRepository,
             botGateway,
@@ -302,6 +308,7 @@ class ChatViewModelTest {
             agentRepository,
             blockRepository,
             bugReportRepository,
+            folderRepository,
             conversationRepository,
             settingsRepository,
             botGateway,
@@ -367,6 +374,7 @@ class ChatViewModelTest {
             agentRepository,
             blockRepository,
             bugReportRepository,
+            folderRepository,
             conversationRepository,
             settingsRepository,
             botGateway,
@@ -407,6 +415,7 @@ class ChatViewModelTest {
             agentRepository,
             blockRepository,
             bugReportRepository,
+            folderRepository,
             conversationRepository,
             settingsRepository,
             botGateway,
@@ -444,6 +453,7 @@ class ChatViewModelTest {
             agentRepository,
             blockRepository,
             bugReportRepository,
+            folderRepository,
             conversationRepository,
             settingsRepository,
             botGateway,
@@ -481,6 +491,7 @@ class ChatViewModelTest {
             agentRepository,
             blockRepository,
             bugReportRepository,
+            folderRepository,
             conversationRepository,
             settingsRepository,
             botGateway,
@@ -518,6 +529,7 @@ class ChatViewModelTest {
             agentRepository,
             blockRepository,
             bugReportRepository,
+            folderRepository,
             conversationRepository,
             settingsRepository,
             botGateway,
@@ -536,6 +548,53 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun `project agents load from folder membership and live bot status`() = runTest {
+        folderRepository = FolderRepository(FakeFolderApi())
+        every { agentRepository.getCachedAgent("agent-1") } returns null
+        coEvery { internalBotClient.listAgents() } returns listOf(
+            BotAgentInfo(id = "agent-1", name = "Coder", status = "working")
+        )
+        every { agentRepository.getAgent("agent-1") } returns flowOf(
+            Agent(
+                id = "agent-1",
+                name = "Coder",
+                model = "gpt-4.1",
+                updatedAt = "2026-04-13T12:00:00Z",
+            )
+        )
+
+        val savedState = SavedStateHandle().apply {
+            set("agentId", "agent-1")
+            set("conversationId", "conv-1")
+            set("projectIdentifier", "letta-mobile")
+            set("projectName", "Letta Mobile")
+            set("projectLettaFolderId", "folder-1")
+        }
+
+        val vm = ChatViewModel(
+            savedState,
+            messageRepository,
+            agentRepository,
+            blockRepository,
+            bugReportRepository,
+            folderRepository,
+            conversationRepository,
+            settingsRepository,
+            botGateway,
+            botConfigStore,
+            internalBotClient,
+        )
+        advanceUntilIdle()
+
+        val state = vm.uiState.value.projectAgents
+        assertFalse(state.isLoading)
+        assertEquals(1, state.agents.size)
+        assertEquals("Coder", state.agents.first().name)
+        assertEquals("Working", state.agents.first().statusLabel)
+        assertEquals("gpt-4.1", state.agents.first().model)
+    }
+
+    @Test
     fun `tryHandleSlashCommand is true only for project bug command`() = runTest {
         val savedState = SavedStateHandle().apply {
             set("agentId", "agent-1")
@@ -550,6 +609,7 @@ class ChatViewModelTest {
             agentRepository,
             blockRepository,
             bugReportRepository,
+            folderRepository,
             conversationRepository,
             settingsRepository,
             botGateway,
@@ -585,6 +645,7 @@ class ChatViewModelTest {
             agentRepository,
             blockRepository,
             bugReportRepository,
+            folderRepository,
             conversationRepository,
             settingsRepository,
             botGateway,
