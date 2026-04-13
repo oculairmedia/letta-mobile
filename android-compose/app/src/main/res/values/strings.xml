@@ -219,6 +219,12 @@
     <string name="screen_project_brief_tech_stack_title">Tech stack</string>
     <string name="screen_project_brief_goals_title">Active goals</string>
     <string name="screen_project_brief_recent_changes_title">Recent changes</string>
+    <string name="screen_project_agents_title">Active agents</string>
+    <string name="screen_project_agents_subtitle">Live project-linked coding agent activity and embedded bot session status</string>
+    <string name="screen_project_agents_loading">Loading current agent activity…</string>
+    <string name="screen_project_agents_empty">No linked coding agents are currently visible for this project.</string>
+    <string name="screen_project_agents_model">Model: %1$s</string>
+    <string name="screen_project_agents_last_activity">Last activity %1$s</string>
     <string name="screen_project_bug_report_title">Structured bug reporting</string>
     <string name="screen_project_bug_report_subtitle">Capture issue details before routing them to the project manager agent</string>
     <string name="screen_project_bug_report_open">Report bug</string>

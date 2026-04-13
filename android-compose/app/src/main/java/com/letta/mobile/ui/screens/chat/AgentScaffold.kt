@@ -203,6 +203,10 @@ fun AgentScaffold(
             ) {
                 projectContext?.let { project ->
                     ProjectContextCard(project = project)
+                    ProjectAgentsCard(
+                        state = uiState.projectAgents,
+                        onRetry = viewModel::loadProjectAgents,
+                    )
                     ProjectBriefCard(
                         brief = uiState.projectBrief,
                         onRetry = viewModel::loadProjectBrief,
@@ -255,6 +259,150 @@ fun AgentScaffold(
             },
         )
     }
+}
+
+@Composable
+private fun ProjectAgentsCard(
+    state: ProjectAgentsUiState,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            FormItem(
+                label = {
+                    Text(
+                        text = stringResource(R.string.screen_project_agents_title),
+                        style = MaterialTheme.typography.listItemHeadline,
+                    )
+                },
+                description = {
+                    Text(stringResource(R.string.screen_project_agents_subtitle))
+                },
+                tail = {
+                    OutlinedButton(onClick = onRetry, enabled = !state.isLoading) {
+                        Text(stringResource(R.string.action_refresh))
+                    }
+                },
+            )
+
+            if (state.isLoading) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    Text(
+                        text = stringResource(R.string.screen_project_agents_loading),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            state.error?.let { error ->
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = error,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                        )
+                        OutlinedButton(onClick = onRetry) {
+                            Text(stringResource(R.string.action_retry))
+                        }
+                    }
+                }
+            }
+
+            if (!state.isLoading && state.agents.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.screen_project_agents_empty),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            state.agents.forEach { agent ->
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceBright)) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(agent.name, style = MaterialTheme.typography.titleSmall)
+                                agent.model?.let {
+                                    Text(
+                                        text = stringResource(R.string.screen_project_agents_model, it),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                            AssistChip(
+                                onClick = {},
+                                label = { Text(agent.statusLabel) },
+                                leadingIcon = {
+                                    Box(
+                                        modifier = Modifier.size(10.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Card(
+                                            modifier = Modifier.size(10.dp),
+                                            colors = CardDefaults.cardColors(containerColor = toneColor(agent.statusTone)),
+                                        ) {}
+                                    }
+                                },
+                            )
+                        }
+
+                        agent.detail?.let {
+                            Text(
+                                text = it,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                        agent.lastActivity?.let {
+                            Text(
+                                text = stringResource(
+                                    R.string.screen_project_agents_last_activity,
+                                    formatRelativeTime(it),
+                                ),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun toneColor(tone: ProjectAgentStatusTone) = when (tone) {
+    ProjectAgentStatusTone.Neutral -> MaterialTheme.colorScheme.onSurfaceVariant
+    ProjectAgentStatusTone.Good -> MaterialTheme.colorScheme.tertiary
+    ProjectAgentStatusTone.Busy -> MaterialTheme.colorScheme.primary
+    ProjectAgentStatusTone.Error -> MaterialTheme.colorScheme.error
 }
 
 @Composable

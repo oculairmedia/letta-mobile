@@ -5,10 +5,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.bot.config.BotConfigStore
 import com.letta.mobile.bot.core.BotGateway
+import com.letta.mobile.bot.protocol.BotAgentInfo
 import com.letta.mobile.bot.protocol.BotChatRequest
 import com.letta.mobile.bot.protocol.InternalBotClient
 import com.letta.mobile.data.mapper.toUiMessages
 import com.letta.mobile.data.model.AppMessage
+import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.model.ProjectBugReport
@@ -18,6 +20,7 @@ import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.BugReportRepository
 import com.letta.mobile.data.repository.ConversationRepository
+import com.letta.mobile.data.repository.FolderRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.repository.StreamState
@@ -43,6 +46,7 @@ import javax.inject.Inject
 data class ProjectChatContext(
     val identifier: String,
     val name: String,
+    val lettaFolderId: String? = null,
     val filesystemPath: String? = null,
     val gitUrl: String? = null,
     val lastSyncAt: String? = null,
@@ -104,6 +108,31 @@ data class ProjectBugReportUiState(
     val error: String? = null,
 )
 
+enum class ProjectAgentStatusTone {
+    Neutral,
+    Good,
+    Busy,
+    Error,
+}
+
+@androidx.compose.runtime.Immutable
+data class ProjectAgentActivity(
+    val id: String,
+    val name: String,
+    val statusLabel: String,
+    val statusTone: ProjectAgentStatusTone,
+    val detail: String? = null,
+    val model: String? = null,
+    val lastActivity: String? = null,
+)
+
+@androidx.compose.runtime.Immutable
+data class ProjectAgentsUiState(
+    val isLoading: Boolean = false,
+    val agents: List<ProjectAgentActivity> = emptyList(),
+    val error: String? = null,
+)
+
 data class ChatUiState(
     val messages: ImmutableList<UiMessage> = persistentListOf(),
     val isLoadingMessages: Boolean = true,
@@ -118,6 +147,7 @@ data class ChatUiState(
     val activeApprovalRequestId: String? = null,
     val projectBrief: ProjectBriefUiState = ProjectBriefUiState(),
     val bugReports: ProjectBugReportUiState = ProjectBugReportUiState(),
+    val projectAgents: ProjectAgentsUiState = ProjectAgentsUiState(),
 )
 
 @HiltViewModel
@@ -127,6 +157,7 @@ class ChatViewModel @Inject constructor(
     private val agentRepository: AgentRepository,
     private val blockRepository: BlockRepository,
     private val bugReportRepository: BugReportRepository,
+    private val folderRepository: FolderRepository,
     private val conversationRepository: ConversationRepository,
     private val settingsRepository: SettingsRepository,
     private val botGateway: BotGateway,
@@ -147,6 +178,7 @@ class ChatViewModel @Inject constructor(
         ProjectChatContext(
             identifier = identifier,
             name = name,
+            lettaFolderId = savedStateHandle.get<String>("projectLettaFolderId"),
             filesystemPath = savedStateHandle.get<String>("projectFilesystemPath"),
             gitUrl = savedStateHandle.get<String>("projectGitUrl"),
             lastSyncAt = savedStateHandle.get<String>("projectLastSyncAt"),
@@ -188,8 +220,34 @@ class ChatViewModel @Inject constructor(
         } else {
             resolveConversationAndLoad()
             if (projectContext != null) {
+                loadProjectAgents()
                 loadProjectBrief()
                 loadRecentBugReports()
+            }
+        }
+    }
+
+    fun loadProjectAgents() {
+        val project = projectContext ?: return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                projectAgents = _uiState.value.projectAgents.copy(isLoading = true, error = null)
+            )
+            try {
+                val activities = buildProjectAgentActivities(project)
+                _uiState.value = _uiState.value.copy(
+                    projectAgents = ProjectAgentsUiState(
+                        isLoading = false,
+                        agents = activities,
+                    )
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    projectAgents = _uiState.value.projectAgents.copy(
+                        isLoading = false,
+                        error = mapErrorToUserMessage(e, "Failed to load active agents"),
+                    )
+                )
             }
         }
     }
@@ -484,6 +542,7 @@ class ChatViewModel @Inject constructor(
                             )
                             reloadMessagesFromServer()
                             if (projectContext != null) {
+                                loadProjectAgents()
                                 loadProjectBrief()
                             }
                         }
@@ -529,6 +588,7 @@ class ChatViewModel @Inject constructor(
             content = response.response,
         )
         emit(StreamState.Complete(listOf(assistantMessage)))
+        loadProjectAgents()
         loadProjectBrief()
     }
 
@@ -629,6 +689,59 @@ class ChatViewModel @Inject constructor(
 
     fun updateInputText(text: String) {
         _inputText.value = text
+    }
+
+    private suspend fun buildProjectAgentActivities(
+        project: ProjectChatContext,
+    ): List<ProjectAgentActivity> {
+        val liveStatuses = runCatching { internalBotClient.listAgents() }
+            .getOrDefault(emptyList())
+            .associateBy { it.id }
+
+        val folderId = project.lettaFolderId
+        if (folderId.isNullOrBlank()) {
+            return liveStatuses[agentId]
+                ?.let { listOf(it.toProjectAgentActivity(agent = null)) }
+                ?: emptyList()
+        }
+
+        agentRepository.refreshAgentsIfStale(maxAgeMs = 60_000)
+        val folderAgentIds = folderRepository.listAgentsForFolder(folderId)
+        val agents = folderAgentIds.mapNotNull { id ->
+            agentRepository.getCachedAgent(id)
+                ?: runCatching { agentRepository.getAgent(id).first() }.getOrNull()
+        }
+
+        return agents.map { agent ->
+            liveStatuses[agent.id].toProjectAgentActivity(agent)
+        }.sortedWith(compareBy<ProjectAgentActivity> { it.statusLabel }.thenBy { it.name.lowercase() })
+    }
+
+    private fun BotAgentInfo?.toProjectAgentActivity(agent: Agent?): ProjectAgentActivity {
+        val rawStatus = this?.status?.lowercase()
+        val (statusLabel, statusTone) = when {
+            rawStatus == null && agent?.lastRunCompletion != null -> "Idle" to ProjectAgentStatusTone.Neutral
+            rawStatus == null -> "Disconnected" to ProjectAgentStatusTone.Neutral
+            rawStatus.contains("error") || rawStatus.contains("fail") -> "Error" to ProjectAgentStatusTone.Error
+            rawStatus.contains("working") || rawStatus.contains("running") || rawStatus.contains("busy") -> "Working" to ProjectAgentStatusTone.Busy
+            rawStatus.contains("connected") || rawStatus.contains("ready") || rawStatus.contains("idle") -> rawStatus.replaceFirstChar { it.uppercase() } to ProjectAgentStatusTone.Good
+            else -> rawStatus.replaceFirstChar { it.uppercase() } to ProjectAgentStatusTone.Neutral
+        }
+
+        val metadataWork = agent?.metadata?.get("current_work")?.toString()?.trim('"')
+        val detail = metadataWork
+            ?: agent?.lastRunCompletion
+            ?: if (this != null) "Embedded bot session available" else null
+
+        return ProjectAgentActivity(
+            id = agent?.id ?: this?.id.orEmpty(),
+            name = agent?.name ?: this?.name.orEmpty(),
+            statusLabel = statusLabel,
+            statusTone = statusTone,
+            detail = detail,
+            model = agent?.model,
+            lastActivity = agent?.updatedAt ?: agent?.createdAt,
+        )
     }
 
 }
