@@ -40,6 +40,7 @@ class BotToolRegistryTest : WordSpec({
                 "list_launchable_apps",
                 "render_summary_card",
                 "render_metric_card",
+                "render_suggestion_chips",
             )
         }
 
@@ -135,6 +136,26 @@ class BotToolRegistryTest : WordSpec({
             payload["type"]?.jsonPrimitive?.content shouldBe "generated_ui"
             payload["component"]?.jsonPrimitive?.content shouldBe "summary_card"
             payload["props"]?.jsonObject?.get("title")?.jsonPrimitive?.content shouldBe "Today"
+        }
+
+        "return generated ui envelope for suggestion chip tools" {
+            val registry = BotToolRegistry(
+                contextProviders = emptySet(),
+                androidExecutionBridge = FakeAndroidExecutionBridge(),
+            )
+
+            val result = runBlocking {
+                registry.execute(
+                    "render_suggestion_chips",
+                    """{"title":"Next steps","suggestions":[{"label":"Explain coroutines","message":"Explain Kotlin coroutines"}]}""",
+                )
+            }
+
+            (result is BotToolExecutionResult.Success) shouldBe true
+            val payload = Json.parseToJsonElement((result as BotToolExecutionResult.Success).payload).jsonObject
+            payload["type"]?.jsonPrimitive?.content shouldBe "generated_ui"
+            payload["component"]?.jsonPrimitive?.content shouldBe "suggestion_chips"
+            payload["props"]?.jsonObject?.get("suggestions")?.toString() shouldContain "Explain Kotlin coroutines"
         }
     }
 })

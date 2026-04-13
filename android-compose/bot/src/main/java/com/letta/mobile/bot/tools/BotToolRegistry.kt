@@ -106,6 +106,11 @@ class BotToolRegistry @Inject constructor(
             description = "Render a structured metric card in the Android client chat UI",
             tags = setOf("android", "ui", "generated-ui"),
         ),
+        "render_suggestion_chips" to BotToolDefinition(
+            name = "render_suggestion_chips",
+            description = "Render suggestion chips in the Android client chat UI that can send follow-up messages",
+            tags = setOf("android", "ui", "generated-ui", "interactive"),
+        ),
     )
 
     fun isSupported(toolName: String): Boolean = toolName in definitions
@@ -137,6 +142,7 @@ class BotToolRegistry @Inject constructor(
             "list_launchable_apps" -> executeAndroidBridge(definition) { androidExecutionBridge.listLaunchableApps() }
             "render_summary_card" -> executeGeneratedUi(definition, arguments)
             "render_metric_card" -> executeGeneratedUi(definition, arguments)
+            "render_suggestion_chips" -> executeGeneratedUi(definition, arguments)
             else -> BotToolExecutionResult.Unavailable(toolName, "Unsupported local bot tool")
         }
     }
@@ -239,6 +245,7 @@ class BotToolRegistry @Inject constructor(
         val componentName = when (definition.name) {
             "render_summary_card" -> "summary_card"
             "render_metric_card" -> "metric_card"
+            "render_suggestion_chips" -> "suggestion_chips"
             else -> return BotToolExecutionResult.Unavailable(definition.name, "Unsupported generated UI tool")
         }
 
