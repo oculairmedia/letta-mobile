@@ -96,6 +96,16 @@ class BotToolRegistry @Inject constructor(
             description = "List launchable apps installed on the Android device",
             tags = setOf("android", "apps"),
         ),
+        "render_summary_card" to BotToolDefinition(
+            name = "render_summary_card",
+            description = "Render a structured summary card in the Android client chat UI",
+            tags = setOf("android", "ui", "generated-ui"),
+        ),
+        "render_metric_card" to BotToolDefinition(
+            name = "render_metric_card",
+            description = "Render a structured metric card in the Android client chat UI",
+            tags = setOf("android", "ui", "generated-ui"),
+        ),
     )
 
     fun isSupported(toolName: String): Boolean = toolName in definitions
@@ -125,6 +135,8 @@ class BotToolRegistry @Inject constructor(
             "read_clipboard" -> executeAndroidBridge(definition) { androidExecutionBridge.readClipboard() }
             "notification_status" -> executeAndroidBridge(definition) { androidExecutionBridge.notificationStatus() }
             "list_launchable_apps" -> executeAndroidBridge(definition) { androidExecutionBridge.listLaunchableApps() }
+            "render_summary_card" -> executeGeneratedUi(definition, arguments)
+            "render_metric_card" -> executeGeneratedUi(definition, arguments)
             else -> BotToolExecutionResult.Unavailable(toolName, "Unsupported local bot tool")
         }
     }
@@ -210,6 +222,40 @@ class BotToolRegistry @Inject constructor(
         return runCatching {
             json.parseToJsonElement(arguments).jsonObject[key]?.jsonPrimitive?.contentOrNull
         }.getOrNull()
+    }
+
+    private fun executeGeneratedUi(
+        definition: BotToolDefinition,
+        arguments: String?,
+    ): BotToolExecutionResult {
+        if (arguments.isNullOrBlank()) {
+            return BotToolExecutionResult.Unavailable(definition.name, "Missing JSON arguments for generated UI")
+        }
+
+        val args = runCatching { json.parseToJsonElement(arguments).jsonObject }.getOrElse {
+            return BotToolExecutionResult.Failure(definition.name, "Invalid JSON arguments")
+        }
+
+        val componentName = when (definition.name) {
+            "render_summary_card" -> "summary_card"
+            "render_metric_card" -> "metric_card"
+            else -> return BotToolExecutionResult.Unavailable(definition.name, "Unsupported generated UI tool")
+        }
+
+        val fallbackText = args["text"]?.jsonPrimitive?.contentOrNull
+            ?: args["fallback_text"]?.jsonPrimitive?.contentOrNull
+
+        val payload = buildJsonObject {
+            put("type", "generated_ui")
+            put("component", componentName)
+            put("props", args)
+            fallbackText?.let { put("text", it) }
+        }
+
+        return BotToolExecutionResult.Success(
+            toolName = definition.name,
+            payload = payload.toString(),
+        )
     }
 
     private fun buildStubSource(definition: BotToolDefinition): String = """

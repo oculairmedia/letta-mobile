@@ -6,7 +6,10 @@ import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.coroutines.runBlocking
 
@@ -35,6 +38,8 @@ class BotToolRegistryTest : WordSpec({
                 "read_clipboard",
                 "notification_status",
                 "list_launchable_apps",
+                "render_summary_card",
+                "render_metric_card",
             )
         }
 
@@ -110,6 +115,26 @@ class BotToolRegistryTest : WordSpec({
 
             (result is BotToolExecutionResult.Unavailable) shouldBe true
             (result as BotToolExecutionResult.Unavailable).reason shouldContain "package_name"
+        }
+
+        "return generated ui envelope for summary card tools" {
+            val registry = BotToolRegistry(
+                contextProviders = emptySet(),
+                androidExecutionBridge = FakeAndroidExecutionBridge(),
+            )
+
+            val result = runBlocking {
+                registry.execute(
+                    "render_summary_card",
+                    """{"title":"Today","body":"3 tasks pending","items":["Review inbox","Check runs"]}""",
+                )
+            }
+
+            (result is BotToolExecutionResult.Success) shouldBe true
+            val payload = Json.parseToJsonElement((result as BotToolExecutionResult.Success).payload).jsonObject
+            payload["type"]?.jsonPrimitive?.content shouldBe "generated_ui"
+            payload["component"]?.jsonPrimitive?.content shouldBe "summary_card"
+            payload["props"]?.jsonObject?.get("title")?.jsonPrimitive?.content shouldBe "Today"
         }
     }
 })
