@@ -60,6 +60,12 @@ open class MessageRepository @Inject constructor(
     private val messageApi: MessageApi,
     private val messageProcessor: MessageProcessor,
 ) {
+    private companion object {
+        const val DEFAULT_FETCH_LIMIT = 100
+        const val TARGETED_FETCH_LIMIT = 100
+        const val MAX_TARGETED_FETCH_PAGES = 20
+    }
+
     private val json = Json { ignoreUnknownKeys = true }
 
     private val _messagesByAgent = MutableStateFlow<Map<String, List<AppMessage>>>(emptyMap())
@@ -76,19 +82,29 @@ open class MessageRepository @Inject constructor(
         ).flow
     }
 
-    suspend fun fetchMessages(agentId: String, conversationId: String? = null): List<AppMessage> {
+    suspend fun fetchMessages(
+        agentId: String,
+        conversationId: String? = null,
+        targetMessageId: String? = null,
+    ): List<AppMessage> {
         // Always use the agent messages endpoint — it returns tool_call_message types
         // which are needed for resolving tool names. The conversation_id parameter
         // filters to the specific conversation when provided.
         return try {
-            val lettaMessages = messageApi.listMessages(
-                agentId = agentId,
-                limit = 100,
-                order = "asc",
-                conversationId = conversationId,
-            )
-
-            val appMessages = lettaMessages.toAppMessages()
+            val appMessages = if (targetMessageId.isNullOrBlank()) {
+                messageApi.listMessages(
+                    agentId = agentId,
+                    limit = DEFAULT_FETCH_LIMIT,
+                    order = "asc",
+                    conversationId = conversationId,
+                ).toAppMessages()
+            } else {
+                fetchMessagesUntilTarget(
+                    agentId = agentId,
+                    conversationId = conversationId,
+                    targetMessageId = targetMessageId,
+                )
+            }
 
             // Update cache
             if (conversationId != null) {
@@ -115,6 +131,40 @@ open class MessageRepository @Inject constructor(
     fun getMessages(agentId: String, conversationId: String? = null): Flow<List<AppMessage>> = flow {
         val messages = fetchMessages(agentId, conversationId)
         emit(messages)
+    }
+
+    private suspend fun fetchMessagesUntilTarget(
+        agentId: String,
+        conversationId: String?,
+        targetMessageId: String,
+    ): List<AppMessage> {
+        var after: String? = null
+        var pagesFetched = 0
+        var mergedMessages: List<AppMessage> = emptyList()
+
+        while (pagesFetched < MAX_TARGETED_FETCH_PAGES) {
+            val page = messageApi.listMessages(
+                agentId = agentId,
+                limit = TARGETED_FETCH_LIMIT,
+                after = after,
+                order = "asc",
+                conversationId = conversationId,
+            )
+
+            if (page.isEmpty()) break
+
+            mergedMessages = mergeMessageLists(mergedMessages, page.toAppMessages())
+            if (mergedMessages.any { it.id == targetMessageId }) {
+                return mergedMessages
+            }
+
+            if (page.size < TARGETED_FETCH_LIMIT) break
+
+            after = page.lastOrNull()?.id ?: break
+            pagesFetched++
+        }
+
+        return mergedMessages
     }
 
     fun getCachedMessages(agentId: String, conversationId: String? = null): List<AppMessage> {

@@ -131,6 +131,64 @@ class MessageRepositoryE2eTest : com.letta.mobile.testutil.TrackedMockClientTest
     }
 
     @Test
+    fun `fetchMessages keeps paging until target message is loaded`() = runTest {
+        var requestedAfterValues = mutableListOf<String?>()
+        val jsonHeaders = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+        val client = trackClient(HttpClient(MockEngine { req ->
+            val url = req.url.toString()
+            when {
+                req.method == HttpMethod.Get && url.contains("/v1/agents/") && url.contains("/messages") && req.url.parameters["conversation_id"] == "conv-1" -> {
+                    val after = req.url.parameters["after"]
+                    requestedAfterValues.add(after)
+                    val body = if (after == null) {
+                        buildString {
+                            append("[")
+                            for (index in 1..100) {
+                                if (index > 1) append(',')
+                                append("{\"id\":\"msg-$index\",\"message_type\":\"assistant_message\",\"content\":\"Message $index\"}")
+                            }
+                            append("]")
+                        }
+                    } else {
+                        """
+                        [
+                          {"id":"msg-101","message_type":"assistant_message","content":"Message 101"},
+                          {"id":"msg-target","message_type":"assistant_message","content":"Target message"}
+                        ]
+                        """.trimIndent()
+                    }
+                    respond(body, HttpStatusCode.OK, jsonHeaders)
+                }
+                else -> respond("[]", HttpStatusCode.OK, jsonHeaders)
+            }
+        }) {
+            install(ContentNegotiation) {
+                json(Json { ignoreUnknownKeys = true; isLenient = true })
+            }
+        })
+
+        val apiClient = mockk<LettaApiClient> {
+            coEvery { getClient() } returns client
+            every { getBaseUrl() } returns "http://test"
+        }
+
+        val repository = MessageRepository(
+            MessageApi(apiClient),
+            MessageProcessor(ClientToolRegistry()),
+        )
+
+        val messages = repository.fetchMessages(
+            agentId = "agent-1",
+            conversationId = "conv-1",
+            targetMessageId = "msg-target",
+        )
+
+        assertEquals(listOf(null, "msg-100"), requestedAfterValues)
+        assertTrue(messages.any { it.id == "msg-target" })
+        assertEquals("msg-target", messages.last().id)
+    }
+
+    @Test
     fun `fetchConversationInspectorMessages keeps metadata for debugging`() = runTest {
         val repository = createRepository(
             streamConversationId = "conv-1",
