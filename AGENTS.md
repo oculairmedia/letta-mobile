@@ -126,7 +126,46 @@ Use these rules for all new UI work and UI refactors in this repo. The app alrea
 - If motion competes with readability, causes layout jumps, or depends on fragile anchors, simplify or remove it.
 - Reuse existing repo patterns before adding a new motion treatment. New reusable motion behavior belongs in `android-compose/designsystem` or shared navigation helpers, not inside a single screen.
 
-### 6. Surface and hierarchy rules
+### 6. Color role policy
+
+The app theme defines **primary**, **secondary**, **tertiary**, and **error** color roles across all 6 presets. Use each role for its intended semantic purpose.
+
+#### Role assignments
+
+| Color role | Semantic purpose | Typical components |
+|---|---|---|
+| `primary` / `primaryContainer` | Main brand action, default emphasis | Primary buttons, FABs on main screens, active nav items, progress indicators |
+| `secondary` / `secondaryContainer` | Supporting actions and less-prominent selections | Filter chips, secondary buttons, less-prominent toggles |
+| `tertiary` / `tertiaryContainer` | Contrasting accent that balances primary/secondary, draws differentiated attention | Accent FABs on secondary screens, "live/active" status indicators, third data-series color in charts, highlight badges, feature-differentiating accents |
+| `error` / `errorContainer` | Error and destructive states | Error text, destructive confirmations, failure indicators |
+| `surface*` variants | Container hierarchy and elevation | Cards, sheets, scaffolds, dialogs |
+
+#### Tertiary introduction targets
+
+Tertiary is currently underused. When touching these areas, prefer tertiary over inventing one-off accent colors:
+
+- **Status differentiation** — use `tertiaryContainer`/`onTertiaryContainer` for "running", "live", or "active" states that need to contrast with primary success and secondary idle states. `UsageScreen` running chips and `AgentListScreen` already do this — extend the pattern to other status surfaces.
+- **Chart accent colors** — use tertiary as the third data-series color alongside primary and secondary in Vico charts and any future data visualization.
+- **Accent FABs** — when a screen already has a primary-colored FAB or primary-colored main action, use `tertiaryContainer`/`onTertiaryContainer` for a secondary FAB or competing action to avoid color collision.
+- **Highlight badges** — "new", "beta", or feature-differentiating badges that need to stand out from both primary and secondary chip colors.
+
+#### Existing tertiary derivations in `CustomColors`
+
+`deriveCustomColors()` in `Theme.kt` already maps tertiary into:
+- `reasoningBubbleBgColor` → `tertiaryContainer` at 45% alpha (reasoning chat bubbles)
+- `warningContainerColor` → `tertiaryContainer` (warning state backgrounds)
+- `warningTextColor` → `onTertiaryContainer` (warning state text)
+
+Do not duplicate these — use `MaterialTheme.customColors.warningContainerColor` etc. for warning states rather than reaching for `tertiaryContainer` directly.
+
+#### Rules
+
+- Never use raw hex colors when a color role already expresses the intent. If primary, secondary, or tertiary fits, use the role.
+- When adding a new accent that does not fit primary or secondary, reach for `tertiary`/`tertiaryContainer` before inventing a custom color.
+- If a screen needs more than three accent colors beyond error, add a semantic slot to `CustomColors` and derive it from an existing role rather than hardcoding a hex value.
+- Keep `Color.kt` for named reusable constants. If a new tertiary-derived constant is needed app-wide, define it there.
+
+#### Surface and hierarchy
 
 - Follow the repo theme layer and `LettaTopBarDefaults` rather than inventing per-screen app-bar/surface colors.
 - Use consistent corner-radius and surface emphasis rules across similar cards and tiles.
@@ -151,6 +190,7 @@ Use these rules for all new UI work and UI refactors in this repo. The app alrea
 - `letta-mobile-iqwq` — Build reusable searchable list screen scaffold
 - `letta-mobile-pkzn` — Define motion and navigation transition policy
 - `letta-mobile-ns9n` — Standardize selection and emphasis components
+- `letta-mobile-k8x0` — Introduce tertiary color role across app UI
 
 ### 10. Current design-system migration checklist
 
