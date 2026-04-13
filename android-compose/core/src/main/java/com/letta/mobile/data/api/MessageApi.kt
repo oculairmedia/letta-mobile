@@ -37,7 +37,7 @@ open class MessageApi @Inject constructor(
 
         val response = client.post("$baseUrl/v1/conversations/$conversationId/messages") {
             contentType(ContentType.Application.Json)
-            setBody(request.copy(streaming = true))
+            setBody(request)
         }
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())
