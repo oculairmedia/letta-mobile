@@ -4,6 +4,8 @@ import com.letta.mobile.bot.context.BatteryContextProvider
 import com.letta.mobile.bot.context.ConnectivityContextProvider
 import com.letta.mobile.bot.context.DeviceContextProvider
 import com.letta.mobile.bot.context.TimeContextProvider
+import com.letta.mobile.bot.tools.AndroidExecutionBridge
+import com.letta.mobile.bot.tools.DefaultAndroidExecutionBridge
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -21,6 +23,9 @@ import dagger.multibindings.IntoSet
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class BotModule {
+
+    @Binds
+    abstract fun bindAndroidExecutionBridge(impl: DefaultAndroidExecutionBridge): AndroidExecutionBridge
 
     @Binds
     @IntoSet
