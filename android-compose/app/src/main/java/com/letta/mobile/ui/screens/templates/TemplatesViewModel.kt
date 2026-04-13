@@ -30,7 +30,7 @@ data class TemplatesUiState(
     val templates: ImmutableList<StarterAgentTemplate> = persistentListOf()
 )
 
-private val BUILTIN_TEMPLATES = persistentListOf(
+internal val BUILTIN_TEMPLATES = persistentListOf(
     StarterAgentTemplate(
         id = "default",
         name = "Default Agent",
