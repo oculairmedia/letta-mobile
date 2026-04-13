@@ -25,9 +25,14 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.content.ContextCompat
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
+import androidx.navigation.compose.rememberNavController
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.SnackbarDispatcher
+import com.letta.mobile.ui.navigation.AdaptiveScaffold
 import com.letta.mobile.ui.navigation.AppNavGraph
+import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.LettaTheme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -39,12 +44,14 @@ class MainActivity : ComponentActivity() {
 
     private var notificationTarget by mutableStateOf<NotificationNavigationTarget?>(null)
 
+    @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         notificationTarget = NotificationNavigationTarget.fromIntent(intent)
         enableEdgeToEdge()
         setContent {
+            val windowSizeClass = calculateWindowSizeClass(this@MainActivity)
             val snackbarDispatcher = remember { SnackbarDispatcher() }
             val snackbarHostState = remember { SnackbarHostState() }
             val appTheme = settingsRepository.getTheme().collectAsState(initial = AppTheme.SYSTEM)
@@ -80,14 +87,21 @@ class MainActivity : ComponentActivity() {
                 themePreset = themePreset.value,
                 dynamicColor = dynamicColor.value,
             ) {
-                CompositionLocalProvider(LocalSnackbarDispatcher provides snackbarDispatcher) {
+                CompositionLocalProvider(
+                    LocalSnackbarDispatcher provides snackbarDispatcher,
+                    LocalWindowSizeClass provides windowSizeClass,
+                ) {
                     Scaffold(
                         snackbarHost = { SnackbarHost(snackbarHostState) },
                     ) { _ ->
-                        AppNavGraph(
-                            notificationTarget = notificationTarget,
-                            onNotificationTargetConsumed = { notificationTarget = null },
-                        )
+                        val navController = rememberNavController()
+                        AdaptiveScaffold(navController = navController) {
+                            AppNavGraph(
+                                navController = navController,
+                                notificationTarget = notificationTarget,
+                                onNotificationTargetConsumed = { notificationTarget = null },
+                            )
+                        }
                     }
                 }
             }

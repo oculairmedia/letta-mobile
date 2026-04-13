@@ -58,6 +58,10 @@ android {
         compose = true
     }
 
+    lint {
+        disable += "NullSafeMutableLiveData"
+    }
+
     packaging {
         resources {
             excludes += setOf(
@@ -103,6 +107,7 @@ dependencies {
 
     // Compose
     implementation("androidx.compose.material3:material3:1.5.0-alpha15")
+    implementation("androidx.compose.material3:material3-window-size-class:1.5.0-alpha15")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material:material-icons-extended")

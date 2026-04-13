@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -34,6 +35,9 @@ import com.letta.mobile.ui.screens.chat.AgentScaffold
 import com.letta.mobile.ui.screens.config.ConfigListScreen
 import com.letta.mobile.ui.screens.config.ConfigScreen
 import com.letta.mobile.ui.screens.conversations.ConversationsScreen
+import com.letta.mobile.ui.screens.conversations.TwoPaneConversationsLayout
+import com.letta.mobile.ui.theme.LocalWindowSizeClass
+import com.letta.mobile.ui.theme.isExpandedWidth
 import com.letta.mobile.ui.screens.editagent.EditAgentScreen
 import com.letta.mobile.ui.screens.folders.FolderAdminScreen
 import com.letta.mobile.ui.screens.groups.GroupAdminScreen
@@ -101,6 +105,7 @@ class NavViewModel @Inject constructor(
 
 @Composable
 fun AppNavGraph(
+    navController: NavHostController = rememberNavController(),
     notificationTarget: NotificationNavigationTarget? = null,
     onNotificationTargetConsumed: () -> Unit = {},
 ) {
@@ -113,7 +118,6 @@ fun AppNavGraph(
         hasConfig -> HomeRoute
         else -> ConfigRoute
     }
-    val navController = rememberNavController()
 
     LaunchedEffect(notificationTarget) {
         val target = notificationTarget ?: return@LaunchedEffect
@@ -177,26 +181,48 @@ fun AppNavGraph(
             popExitTransition = drillInPopExit,
         ) {
             CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
-                ConversationsScreen(
-                    onNavigateToChat = { agentId, conversationId ->
-                        navController.navigate(AgentChatRoute(agentId = agentId, conversationId = conversationId))
-                    },
-                    onNavigateToSettings = { navController.navigate(ConfigRoute) },
-                    onNavigateToAgentList = { navController.navigate(AgentListRoute) },
-                    onNavigateToTemplates = { navController.navigate(TemplatesRoute) },
-                    onNavigateToArchives = { navController.navigate(ArchivesRoute) },
-                    onNavigateToFolders = { navController.navigate(FoldersRoute) },
-                    onNavigateToGroups = { navController.navigate(GroupsRoute) },
-                    onNavigateToProviders = { navController.navigate(ProvidersRoute) },
-                    onNavigateToBlocks = { navController.navigate(BlocksRoute) },
-                    onNavigateToIdentities = { navController.navigate(IdentitiesRoute) },
-                    onNavigateToSchedules = { navController.navigate(SchedulesRoute) },
-                    onNavigateToRuns = { navController.navigate(RunsRoute) },
-                    onNavigateToJobs = { navController.navigate(JobsRoute) },
-                    onNavigateToMessageBatches = { navController.navigate(MessageBatchesRoute) },
-                    onNavigateToMcp = { navController.navigate(McpRoute) },
-                    onNavigateToAbout = { navController.navigate(AboutRoute) },
-                )
+                val windowSizeClass = LocalWindowSizeClass.current
+                if (windowSizeClass.isExpandedWidth) {
+                    TwoPaneConversationsLayout(
+                        outerNavController = navController,
+                        onNavigateToSettings = { navController.navigate(ConfigRoute) },
+                        onNavigateToAgentList = { navController.navigate(AgentListRoute) },
+                        onNavigateToTemplates = { navController.navigate(TemplatesRoute) },
+                        onNavigateToArchives = { navController.navigate(ArchivesRoute) },
+                        onNavigateToFolders = { navController.navigate(FoldersRoute) },
+                        onNavigateToGroups = { navController.navigate(GroupsRoute) },
+                        onNavigateToProviders = { navController.navigate(ProvidersRoute) },
+                        onNavigateToBlocks = { navController.navigate(BlocksRoute) },
+                        onNavigateToIdentities = { navController.navigate(IdentitiesRoute) },
+                        onNavigateToSchedules = { navController.navigate(SchedulesRoute) },
+                        onNavigateToRuns = { navController.navigate(RunsRoute) },
+                        onNavigateToJobs = { navController.navigate(JobsRoute) },
+                        onNavigateToMessageBatches = { navController.navigate(MessageBatchesRoute) },
+                        onNavigateToMcp = { navController.navigate(McpRoute) },
+                        onNavigateToAbout = { navController.navigate(AboutRoute) },
+                    )
+                } else {
+                    ConversationsScreen(
+                        onNavigateToChat = { agentId, conversationId ->
+                            navController.navigate(AgentChatRoute(agentId = agentId, conversationId = conversationId))
+                        },
+                        onNavigateToSettings = { navController.navigate(ConfigRoute) },
+                        onNavigateToAgentList = { navController.navigate(AgentListRoute) },
+                        onNavigateToTemplates = { navController.navigate(TemplatesRoute) },
+                        onNavigateToArchives = { navController.navigate(ArchivesRoute) },
+                        onNavigateToFolders = { navController.navigate(FoldersRoute) },
+                        onNavigateToGroups = { navController.navigate(GroupsRoute) },
+                        onNavigateToProviders = { navController.navigate(ProvidersRoute) },
+                        onNavigateToBlocks = { navController.navigate(BlocksRoute) },
+                        onNavigateToIdentities = { navController.navigate(IdentitiesRoute) },
+                        onNavigateToSchedules = { navController.navigate(SchedulesRoute) },
+                        onNavigateToRuns = { navController.navigate(RunsRoute) },
+                        onNavigateToJobs = { navController.navigate(JobsRoute) },
+                        onNavigateToMessageBatches = { navController.navigate(MessageBatchesRoute) },
+                        onNavigateToMcp = { navController.navigate(McpRoute) },
+                        onNavigateToAbout = { navController.navigate(AboutRoute) },
+                    )
+                }
             }
         }
 

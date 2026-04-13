@@ -59,6 +59,27 @@
     <init>(...);
 }
 
+# Netty (pulled in by Ktor server engine)
+-dontwarn reactor.blockhound.**
+-dontwarn io.netty.internal.tcnative.**
+-dontwarn org.apache.log4j.**
+-dontwarn org.apache.logging.**
+-dontwarn org.slf4j.**
+-dontwarn com.google.errorprone.annotations.**
+-dontwarn com.aayushatharva.brotli4j.**
+-dontwarn com.jcraft.jzlib.**
+-dontwarn com.ning.compress.**
+-dontwarn com.oracle.svm.core.**
+-dontwarn lzma.sdk.**
+-dontwarn net.jpountz.**
+-dontwarn sun.security.ssl.**
+-dontwarn jdk.jfr.**
+-dontwarn java.lang.foreign.**
+
+# Ktor
+-keep class io.ktor.** { *; }
+-dontwarn io.ktor.**
+
 # Remove logging in release
 -assumenosideeffects class android.util.Log {
     public static int v(...);

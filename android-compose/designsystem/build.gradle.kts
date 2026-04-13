@@ -29,6 +29,13 @@ android {
         compose = true
     }
 
+    lint {
+        // Workaround: NonNullableMutableLiveDataDetector crashes with
+        // IncompatibleClassChangeError on newer Kotlin + AGP combinations.
+        // This module has no LiveData usage so the check is irrelevant.
+        disable += "NullSafeMutableLiveData"
+    }
+
     sourceSets {
         getByName("main") {
             manifest.srcFile("src/main/AndroidManifest.xml")
@@ -58,6 +65,7 @@ dependencies {
     implementation(project(":core"))
 
     implementation("androidx.compose.material3:material3:1.5.0-alpha15")
+    implementation("androidx.compose.material3:material3-window-size-class:1.5.0-alpha15")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.foundation:foundation")

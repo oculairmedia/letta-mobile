@@ -99,6 +99,7 @@ fun ConversationsScreen(
     onNavigateToMessageBatches: () -> Unit = {},
     onNavigateToMcp: () -> Unit = {},
     onNavigateToAbout: () -> Unit = {},
+    modifier: Modifier = Modifier,
     viewModel: ConversationsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -109,7 +110,7 @@ fun ConversationsScreen(
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
         topBar = {
             LargeFlexibleTopAppBar(

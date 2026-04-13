@@ -68,7 +68,9 @@ import com.letta.mobile.ui.components.ExpandableTitleSearch
 import com.letta.mobile.ui.components.LettaInputBar
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaSpacing
+import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.customColors
+import com.letta.mobile.ui.theme.isExpandedWidth
 import com.letta.mobile.ui.theme.statValue
 import java.util.Locale
 
@@ -267,31 +269,81 @@ private fun HomeContent(
                     )
                 }
 
-                UsageAnalyticsCard(
-                    usageSummary = state.usageSummary,
-                    isLoading = state.isUsageLoading,
-                    onClick = onNavigateToUsage,
-                    modifier = Modifier.padding(horizontal = LettaSpacing.screenHorizontal),
-                )
+                val isWide = LocalWindowSizeClass.current.isExpandedWidth
 
-                FavoriteAgentCard(
-                    favoriteAgentId = state.favoriteAgentId,
-                    favoriteAgentName = state.favoriteAgentName,
-                    onNavigateToChat = { onNavigateToChat(it, null) },
-                    onSetFavorite = onNavigateToAgents,
-                    onClearFavorite = onClearFavorite,
-                    onConfigure = { id -> onNavigateToEditAgent(id) },
-                )
+                if (isWide) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = LettaSpacing.screenHorizontal),
+                        horizontalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
+                    ) {
+                        UsageAnalyticsCard(
+                            usageSummary = state.usageSummary,
+                            isLoading = state.isUsageLoading,
+                            onClick = onNavigateToUsage,
+                            modifier = Modifier.weight(1f),
+                        )
+                        FavoriteAgentCard(
+                            favoriteAgentId = state.favoriteAgentId,
+                            favoriteAgentName = state.favoriteAgentName,
+                            onNavigateToChat = { onNavigateToChat(it, null) },
+                            onSetFavorite = onNavigateToAgents,
+                            onClearFavorite = onClearFavorite,
+                            onConfigure = { id -> onNavigateToEditAgent(id) },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                } else {
+                    UsageAnalyticsCard(
+                        usageSummary = state.usageSummary,
+                        isLoading = state.isUsageLoading,
+                        onClick = onNavigateToUsage,
+                        modifier = Modifier.padding(horizontal = LettaSpacing.screenHorizontal),
+                    )
+
+                    FavoriteAgentCard(
+                        favoriteAgentId = state.favoriteAgentId,
+                        favoriteAgentName = state.favoriteAgentName,
+                        onNavigateToChat = { onNavigateToChat(it, null) },
+                        onSetFavorite = onNavigateToAgents,
+                        onClearFavorite = onClearFavorite,
+                        onConfigure = { id -> onNavigateToEditAgent(id) },
+                    )
+                }
 
                 if (state.pinnedAgents.isNotEmpty()) {
-                    state.pinnedAgents.forEach { pinned ->
-                        PinnedAgentCard(
-                            name = pinned.name,
-                            onClick = { onNavigateToChat(pinned.id, null) },
-                            onUnpin = { onUnpinAgent(pinned.id) },
-                            onConfigure = { onNavigateToEditAgent(pinned.id) },
-                            modifier = Modifier.padding(horizontal = LettaSpacing.screenHorizontal),
-                        )
+                    if (isWide) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = LettaSpacing.screenHorizontal),
+                            horizontalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
+                        ) {
+                            state.pinnedAgents.forEachIndexed { index, pinned ->
+                                PinnedAgentCard(
+                                    name = pinned.name,
+                                    onClick = { onNavigateToChat(pinned.id, null) },
+                                    onUnpin = { onUnpinAgent(pinned.id) },
+                                    onConfigure = { onNavigateToEditAgent(pinned.id) },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                            // Fill remaining space if odd number of pinned agents
+                            if (state.pinnedAgents.size % 2 != 0) {
+                                Spacer(Modifier.weight(1f))
+                            }
+                        }
+                    } else {
+                        state.pinnedAgents.forEach { pinned ->
+                            PinnedAgentCard(
+                                name = pinned.name,
+                                onClick = { onNavigateToChat(pinned.id, null) },
+                                onUnpin = { onUnpinAgent(pinned.id) },
+                                onConfigure = { onNavigateToEditAgent(pinned.id) },
+                                modifier = Modifier.padding(horizontal = LettaSpacing.screenHorizontal),
+                            )
+                        }
                     }
                 }
             }
