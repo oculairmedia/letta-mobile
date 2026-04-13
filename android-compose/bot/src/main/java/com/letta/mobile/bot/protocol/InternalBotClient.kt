@@ -1,6 +1,7 @@
 package com.letta.mobile.bot.protocol
 
 import com.letta.mobile.bot.channel.ChannelMessage
+import com.letta.mobile.bot.config.BotConfigStore
 import com.letta.mobile.bot.core.BotGateway
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -10,6 +11,7 @@ import kotlinx.coroutines.flow.map
 @Singleton
 class InternalBotClient @Inject constructor(
     private val gateway: BotGateway,
+    private val configStore: BotConfigStore,
 ) : BotClient {
     override suspend fun sendMessage(request: BotChatRequest): BotChatResponse {
         val message = request.toChannelMessage()
@@ -33,10 +35,26 @@ class InternalBotClient @Inject constructor(
         }
     }
 
-    override suspend fun getStatus(): BotStatusResponse = BotStatusResponse(
-        status = gateway.status.value.name.lowercase(),
-        agents = gateway.sessions.value.keys.toList(),
-    )
+    override suspend fun getStatus(): BotStatusResponse {
+        val sessions = gateway.sessions.value
+        val enabledConfigs = configStore.getAll().filter { it.enabled }
+        val agentDetails = sessions.map { (id, session) ->
+            BotAgentInfo(
+                id = id,
+                name = session.displayName,
+                status = session.status.value.name.lowercase(),
+            )
+        }
+
+        return BotStatusResponse(
+            status = gateway.status.value.name.lowercase(),
+            agents = sessions.keys.toList(),
+            sessionCount = sessions.size,
+            agentDetails = agentDetails,
+            activeProfileIds = enabledConfigs.mapNotNull { it.serverProfileId }.distinct(),
+            activeModes = enabledConfigs.map { it.mode.name.lowercase() }.distinct(),
+        )
+    }
 
     override suspend fun listAgents(): List<BotAgentInfo> = gateway.sessions.value.map { (id, session) ->
         BotAgentInfo(

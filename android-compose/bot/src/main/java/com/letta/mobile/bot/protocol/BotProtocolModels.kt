@@ -25,6 +25,14 @@ data class BotChatResponse(
 data class BotStatusResponse(
     val status: String,
     val agents: List<String>,
+    @SerialName("session_count") val sessionCount: Int = 0,
+    @SerialName("agent_details") val agentDetails: List<BotAgentInfo> = emptyList(),
+    @SerialName("active_profile_ids") val activeProfileIds: List<String> = emptyList(),
+    @SerialName("active_modes") val activeModes: List<String> = emptyList(),
+    @SerialName("api_port") val apiPort: Int? = null,
+    @SerialName("auth_required") val authRequired: Boolean = false,
+    @SerialName("rate_limit_requests") val rateLimitRequests: Int = 0,
+    @SerialName("rate_limit_window_seconds") val rateLimitWindowSeconds: Long = 0,
 )
 
 @Serializable

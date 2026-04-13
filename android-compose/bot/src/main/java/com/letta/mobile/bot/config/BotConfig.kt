@@ -54,16 +54,47 @@ data class BotConfig(
     /** Whether the bot auto-starts when the app launches. */
     @SerialName("auto_start") val autoStart: Boolean = false,
 
+    @SerialName("heartbeat_enabled") val heartbeatEnabled: Boolean = false,
+
+    @SerialName("heartbeat_interval_minutes") val heartbeatIntervalMinutes: Long = 60,
+
+    @SerialName("heartbeat_message") val heartbeatMessage: String = DEFAULT_HEARTBEAT_MESSAGE,
+
+    @SerialName("heartbeat_requires_charging") val heartbeatRequiresCharging: Boolean = false,
+
+    @SerialName("heartbeat_requires_unmetered_network") val heartbeatRequiresUnmeteredNetwork: Boolean = false,
+
+    @SerialName("scheduled_jobs") val scheduledJobs: List<BotScheduledJob> = emptyList(),
+
     /** Whether this config is currently enabled. */
     val enabled: Boolean = true,
 
     @SerialName("api_server_enabled") val apiServerEnabled: Boolean = false,
 
     @SerialName("api_server_port") val apiServerPort: Int = 8080,
+
+    @SerialName("api_server_token") val apiServerToken: String? = null,
 ) {
     @Serializable
     enum class Mode {
         @SerialName("local") LOCAL,
         @SerialName("remote") REMOTE,
     }
+
+    companion object {
+        const val DEFAULT_HEARTBEAT_MESSAGE = "Check for anything important that needs attention and stay silent if there is nothing worth surfacing."
+        const val DEFAULT_SCHEDULE_STALE_GRACE_MINUTES = 120L
+    }
 }
+
+@Serializable
+data class BotScheduledJob(
+    val id: String,
+    @SerialName("display_name") val displayName: String = "",
+    val message: String,
+    @SerialName("cron_expression") val cronExpression: String,
+    val enabled: Boolean = true,
+    @SerialName("requires_charging") val requiresCharging: Boolean = false,
+    @SerialName("requires_unmetered_network") val requiresUnmeteredNetwork: Boolean = false,
+    @SerialName("stale_grace_minutes") val staleGraceMinutes: Long = BotConfig.DEFAULT_SCHEDULE_STALE_GRACE_MINUTES,
+)

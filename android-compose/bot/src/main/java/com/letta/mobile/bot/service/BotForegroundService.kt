@@ -42,6 +42,7 @@ class BotForegroundService : Service() {
     private var gatewayMonitorJob: kotlinx.coroutines.Job? = null
     private var startJob: kotlinx.coroutines.Job? = null
     private var currentApiPort: Int? = null
+    private var currentApiAuthRequired = false
 
     override fun onCreate() {
         super.onCreate()
@@ -87,11 +88,13 @@ class BotForegroundService : Service() {
 
                 val apiConfig = enabledConfigs.firstOrNull { it.apiServerEnabled }
                 if (apiConfig != null) {
-                    apiServer.start(apiConfig.apiServerPort)
+                    apiServer.start(apiConfig.apiServerPort, apiConfig.apiServerToken)
                     currentApiPort = apiConfig.apiServerPort
+                    currentApiAuthRequired = !apiConfig.apiServerToken.isNullOrBlank()
                 } else if (apiServer.isRunning) {
                     apiServer.stop()
                     currentApiPort = null
+                    currentApiAuthRequired = false
                 }
 
                 gateway.start(enabledConfigs)
@@ -103,7 +106,9 @@ class BotForegroundService : Service() {
                             GatewayStatus.STARTING -> "Starting bot sessions..."
                             GatewayStatus.RUNNING -> {
                                 val count = gateway.sessions.value.size
-                                val apiSuffix = currentApiPort?.let { " · API $it" } ?: ""
+                                val apiSuffix = currentApiPort?.let {
+                                    " · API $it${if (currentApiAuthRequired) " auth" else ""}"
+                                } ?: ""
                                 "$count bot${if (count != 1) "s" else ""} running$apiSuffix"
                             }
                             GatewayStatus.STOPPING -> "Stopping..."
@@ -129,6 +134,7 @@ class BotForegroundService : Service() {
             gatewayMonitorJob?.cancel()
             apiServer.stop()
             currentApiPort = null
+            currentApiAuthRequired = false
             gateway.stop()
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
