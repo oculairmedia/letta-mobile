@@ -1,6 +1,9 @@
 package com.letta.mobile.domain
 
 import com.letta.mobile.data.api.MessageApi
+import com.letta.mobile.data.model.ApprovalRequestMessage
+import com.letta.mobile.data.model.ApprovalResponseMessage
+import com.letta.mobile.data.model.ApprovalResult
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.ToolCallMessage
@@ -82,6 +85,52 @@ class MessageProcessorTest : WordSpec({
             messages[0].content shouldBe "Here is your summary"
             messages[0].generatedUi?.component shouldBe "summary_card"
             messages[0].generatedUi?.propsJson shouldBe "{\"title\":\"Today\",\"body\":\"3 tasks pending\"}"
+        }
+
+        "emit approval request and response messages during streaming" {
+            val processor = MessageProcessor(ClientToolRegistry())
+            val stream = flowOf(
+                ApprovalRequestMessage(
+                    id = "approval-request-1",
+                    toolCalls = listOf(
+                        ToolCall(
+                            toolCallId = "call-approval-1",
+                            name = "bash",
+                            arguments = "{\"command\":\"rm -rf /tmp/demo\"}",
+                        ),
+                    ),
+                ),
+                ApprovalResponseMessage(
+                    id = "approval-response-1",
+                    approvalRequestId = "approval-request-1",
+                    approve = false,
+                    reason = "Unsafe command",
+                    approvals = listOf(
+                        ApprovalResult(
+                            toolCallId = "call-approval-1",
+                            approve = false,
+                            status = "rejected",
+                            reason = "Unsafe command",
+                        ),
+                    ),
+                ),
+            )
+
+            val messages = runBlocking {
+                processor.processStream(
+                    stream = stream,
+                    agentId = "agent-1",
+                    conversationId = "conversation-1",
+                    messageApi = mockk<MessageApi>(relaxed = true),
+                ).toList()
+            }
+
+            messages shouldHaveSize 2
+            messages[0].approvalRequest?.requestId shouldBe "approval-request-1"
+            messages[0].approvalRequest?.toolCalls?.single()?.toolCallId shouldBe "call-approval-1"
+            messages[1].approvalResponse?.requestId shouldBe "approval-request-1"
+            messages[1].approvalResponse?.approved shouldBe false
+            messages[1].approvalResponse?.reason shouldBe "Unsafe command"
         }
     }
 })

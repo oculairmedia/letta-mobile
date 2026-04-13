@@ -6,6 +6,8 @@ import androidx.paging.PagingData
 import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.data.mapper.toAppMessages
 import com.letta.mobile.data.model.AppMessage
+import com.letta.mobile.data.model.ApprovalCreate
+import com.letta.mobile.data.model.ApprovalResult
 import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.AssistantMessage
@@ -419,6 +421,38 @@ open class MessageRepository @Inject constructor(
         } catch (e: Exception) {
             emit(StreamState.Error(e.message ?: "Unknown error"))
         }
+    }
+
+    suspend fun submitApproval(
+        conversationId: String,
+        approvalRequestId: String,
+        toolCallIds: List<String>,
+        approve: Boolean,
+        reason: String? = null,
+    ) {
+        val request = MessageCreateRequest(
+            messages = listOf(
+                json.encodeToJsonElement(
+                    ApprovalCreate.serializer(),
+                    ApprovalCreate(
+                        approvals = toolCallIds.map { toolCallId ->
+                            ApprovalResult(
+                                toolCallId = toolCallId,
+                                approve = approve,
+                                reason = reason?.takeIf { it.isNotBlank() },
+                                status = if (approve) "approved" else "rejected",
+                            )
+                        },
+                        approve = approve,
+                        approvalRequestId = approvalRequestId,
+                        reason = reason?.takeIf { it.isNotBlank() },
+                    )
+                )
+            ),
+            streaming = false,
+        )
+
+        messageApi.sendConversationMessage(conversationId, request)
     }
 
     suspend fun resetMessages(agentId: String) {

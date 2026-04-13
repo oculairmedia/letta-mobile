@@ -128,7 +128,9 @@ class MessageProcessor @Inject constructor(
                         }
 
                         is ApprovalResponseMessage -> {
-                            // Skip approval response messages for now
+                            val appMessage = lettaMessage.toAppMessage(mappingState) ?: return@collect
+                            messages.add(appMessage)
+                            onEmit(appMessage)
                         }
 
                         is EventMessage -> {
