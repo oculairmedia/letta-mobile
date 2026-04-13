@@ -11,6 +11,8 @@ local.properties
 .cxx/
 *.keystore
 !debug.keystore
+*.jks
+keystore.properties
 
 # OpenCode / IDE
 .vscode

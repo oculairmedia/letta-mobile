@@ -70,7 +70,16 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Decode signing keystore
+        if: matrix.variant == 'release'
+        run: echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > android-compose/app/letta-release.jks
+
       - name: Build ${{ matrix.variant }} APK
+        env:
+          SIGNING_STORE_FILE: ${{ matrix.variant == 'release' && 'letta-release.jks' || '' }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: ./gradlew ${{ matrix.gradle_task }} --no-daemon --build-cache
 
       - name: Upload ${{ matrix.variant }} APK
