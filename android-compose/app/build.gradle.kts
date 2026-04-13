@@ -58,6 +58,18 @@ android {
         compose = true
     }
 
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/INDEX.LIST",
+                "META-INF/io.netty.versions.properties",
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE.md",
+                "META-INF/NOTICE.md",
+            )
+        }
+    }
+
     sourceSets {
         getByName("test") {
             java.srcDir("${project(":core").projectDir}/src/testFixtures/java")
@@ -83,6 +95,7 @@ kotlin {
 dependencies {
     implementation(project(":core"))
     implementation(project(":designsystem"))
+    implementation(project(":bot"))
 
     val composeBom = platform("androidx.compose:compose-bom:2026.03.01")
     implementation(composeBom)
