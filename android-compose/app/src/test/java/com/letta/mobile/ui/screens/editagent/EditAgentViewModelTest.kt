@@ -12,6 +12,7 @@ import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.BlockRepository
+import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.ModelRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.testutil.FakeAgentApi
@@ -43,6 +44,7 @@ class EditAgentViewModelTest {
     private lateinit var fakeAgentRepo: FakeAgentRepo
     private lateinit var fakeBlockRepo: FakeBlockRepo
     private lateinit var fakeToolRepo: FakeToolRepo
+    private lateinit var mockMessageRepository: MessageRepository
     private lateinit var mockModelRepository: ModelRepository
     private lateinit var viewModel: EditAgentViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
@@ -53,9 +55,17 @@ class EditAgentViewModelTest {
         fakeAgentRepo = FakeAgentRepo()
         fakeBlockRepo = FakeBlockRepo()
         fakeToolRepo = FakeToolRepo()
+        mockMessageRepository = mockk(relaxed = true)
         mockModelRepository = mockk(relaxed = true)
         val savedState = SavedStateHandle(mapOf("agentId" to "a1"))
-        viewModel = EditAgentViewModel(savedState, fakeAgentRepo, fakeBlockRepo, mockModelRepository, fakeToolRepo)
+        viewModel = EditAgentViewModel(
+            savedState,
+            fakeAgentRepo,
+            fakeBlockRepo,
+            mockMessageRepository,
+            mockModelRepository,
+            fakeToolRepo,
+        )
     }
 
     @After
