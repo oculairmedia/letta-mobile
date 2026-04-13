@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.mapper.toUiMessages
 import com.letta.mobile.data.model.AppMessage
-
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.ConversationRepository
@@ -48,6 +47,7 @@ data class ChatUiState(
     val promptTokens: Int? = null,
     val completionTokens: Int? = null,
     val totalTokens: Int? = null,
+    val activeApprovalRequestId: String? = null,
 )
 
 @HiltViewModel
@@ -261,6 +261,50 @@ class ChatViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = e.message, isStreaming = false, isAgentTyping = false)
+            }
+        }
+    }
+
+    fun submitApproval(
+        requestId: String,
+        toolCallIds: List<String>,
+        approve: Boolean,
+        reason: String? = null,
+    ) {
+        viewModelScope.launch {
+            val convId = activeConversationId
+            if (convId == null) {
+                _uiState.value = _uiState.value.copy(error = "No active conversation available for approval")
+                return@launch
+            }
+
+            _uiState.value = _uiState.value.copy(
+                isStreaming = true,
+                isAgentTyping = true,
+                activeApprovalRequestId = requestId,
+            )
+
+            try {
+                messageRepository.submitApproval(
+                    conversationId = convId,
+                    approvalRequestId = requestId,
+                    toolCallIds = toolCallIds,
+                    approve = approve,
+                    reason = reason,
+                )
+                reloadMessagesFromServer()
+                _uiState.value = _uiState.value.copy(
+                    isStreaming = false,
+                    isAgentTyping = false,
+                    activeApprovalRequestId = null,
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "Failed to submit approval",
+                    isStreaming = false,
+                    isAgentTyping = false,
+                    activeApprovalRequestId = null,
+                )
             }
         }
     }

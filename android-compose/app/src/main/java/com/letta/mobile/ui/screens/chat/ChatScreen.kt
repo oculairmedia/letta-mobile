@@ -91,6 +91,9 @@ fun ChatScreen(
                 state = state,
                 scrollToMessageId = viewModel.scrollToMessageId,
                 onSendMessage = { viewModel.sendMessage(it) },
+                onSubmitApproval = { requestId, toolCallIds, approve, reason ->
+                    viewModel.submitApproval(requestId, toolCallIds, approve, reason)
+                },
                 onInputTextChange = { viewModel.updateInputText(it) },
                 fontScale = fontScale,
                 onFontScaleChange = { viewModel.setChatFontScale(it) },
@@ -121,6 +124,7 @@ private fun ChatContent(
     state: ChatUiState,
     scrollToMessageId: String? = null,
     onSendMessage: (String) -> Unit,
+    onSubmitApproval: (String, List<String>, Boolean, String?) -> Unit,
     onInputTextChange: (String) -> Unit,
     fontScale: Float = 1f,
     onFontScaleChange: (Float) -> Unit = {},
@@ -302,6 +306,11 @@ private fun ChatContent(
                                     message = message,
                                     groupPosition = position,
                                     isStreaming = state.isStreaming,
+                                    onGeneratedUiMessage = onSendMessage,
+                                    onApprovalDecision = { requestId, toolCallIds, approve, reason ->
+                                        onSubmitApproval(requestId, toolCallIds, approve, reason)
+                                    },
+                                    approvalInFlight = state.activeApprovalRequestId == message.approvalRequest?.requestId,
                                     modifier = highlightModifier.padding(top = spacingBelow, bottom = spacingAbove),
                                 )
                             }

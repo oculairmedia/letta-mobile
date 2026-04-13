@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.screens.chat
 
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
+import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.UiState
@@ -19,6 +20,17 @@ val sampleMessages = persistentListOf(
     UiMessage(
         id = "6", role = "tool", content = "", timestamp = "2024-03-15T10:02:05Z",
         toolCalls = listOf(UiToolCall(name = "web_search", arguments = "{\"query\": \"Kotlin\"}", result = "Found 10 results"))
+    ),
+    UiMessage(
+        id = "7",
+        role = "assistant",
+        content = "Try one of these follow-ups:",
+        timestamp = "2024-03-15T10:02:10Z",
+        generatedUi = UiGeneratedComponent(
+            name = "suggestion_chips",
+            propsJson = "{\"title\":\"Next steps\",\"suggestions\":[{\"label\":\"Explain coroutines\",\"message\":\"Explain Kotlin coroutines\"},{\"label\":\"Show Android example\",\"message\":\"Show an Android Kotlin example\"}]}",
+            fallbackText = "Choose a follow-up",
+        ),
     ),
 )
 

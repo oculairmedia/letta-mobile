@@ -12,6 +12,7 @@ import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.repository.StreamState
 import com.letta.mobile.testutil.TestData
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -59,6 +60,7 @@ class ChatViewModelTest {
                 streamStates.forEach { emit(it) }
             }
         }
+        coEvery { messageRepository.submitApproval(any(), any(), any(), any(), any()) } returns Unit
         every { agentRepository.getAgent(any()) } returns flowOf(TestData.agent(id = "agent-1", name = "Test Agent"))
         every { conversationRepository.getConversations(any()) } answers {
             flowOf(listOf(TestData.conversation(id = "conv-1", agentId = firstArg())))
@@ -243,5 +245,30 @@ class ChatViewModelTest {
     fun `blank agentId sets error`() = runTest {
         val vm = createViewModel(agentId = "")
         assertTrue(vm.uiState.value.error != null)
+    }
+
+    @Test
+    fun `submitApproval forwards approval decision to repository`() = runTest {
+        val vm = createViewModel()
+
+        vm.submitApproval(
+            requestId = "approval-1",
+            toolCallIds = listOf("tool-call-1", "tool-call-2"),
+            approve = false,
+            reason = "Needs confirmation",
+        )
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) {
+            messageRepository.submitApproval(
+                conversationId = "conv-1",
+                approvalRequestId = "approval-1",
+                toolCallIds = listOf("tool-call-1", "tool-call-2"),
+                approve = false,
+                reason = "Needs confirmation",
+            )
+        }
+        assertFalse(vm.uiState.value.isStreaming)
+        assertEquals(null, vm.uiState.value.activeApprovalRequestId)
     }
 }
