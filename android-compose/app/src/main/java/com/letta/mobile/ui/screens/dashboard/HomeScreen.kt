@@ -67,6 +67,7 @@ import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.ExpandableTitleSearch
 import com.letta.mobile.ui.components.LettaInputBar
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.statValue
 import java.util.Locale
@@ -165,7 +166,10 @@ private fun HomeContent(
         state.error?.let { error ->
             androidx.compose.material3.Surface(
                 color = MaterialTheme.colorScheme.errorContainer,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = LettaSpacing.screenHorizontal)
+                    .padding(bottom = LettaSpacing.cardGap),
                 shape = RoundedCornerShape(8.dp),
             ) {
                 Text(
@@ -178,7 +182,10 @@ private fun HomeContent(
         }
 
         Card(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = LettaSpacing.screenHorizontal)
+                .padding(bottom = LettaSpacing.cardGap),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             ),
@@ -224,11 +231,11 @@ private fun HomeContent(
         } else {
             Column(
                 modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = LettaSpacing.screenHorizontal),
+                    horizontalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
                 ) {
                     StatCard(
                         label = "Agents",
@@ -264,7 +271,7 @@ private fun HomeContent(
                     usageSummary = state.usageSummary,
                     isLoading = state.isUsageLoading,
                     onClick = onNavigateToUsage,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                    modifier = Modifier.padding(horizontal = LettaSpacing.screenHorizontal),
                 )
 
                 FavoriteAgentCard(
@@ -277,14 +284,13 @@ private fun HomeContent(
                 )
 
                 if (state.pinnedAgents.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
                     state.pinnedAgents.forEach { pinned ->
                         PinnedAgentCard(
                             name = pinned.name,
                             onClick = { onNavigateToChat(pinned.id, null) },
                             onUnpin = { onUnpinAgent(pinned.id) },
                             onConfigure = { onNavigateToEditAgent(pinned.id) },
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+                            modifier = Modifier.padding(horizontal = LettaSpacing.screenHorizontal),
                         )
                     }
                 }
@@ -497,7 +503,7 @@ private fun FavoriteAgentCard(
         Card(
             modifier = modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 4.dp)
+                .padding(horizontal = LettaSpacing.screenHorizontal)
                 .combinedClickable(
                     onClick = { onNavigateToChat(favoriteAgentId) },
                     onLongClick = {
@@ -553,7 +559,7 @@ private fun FavoriteAgentCard(
     } else {
         Card(
             onClick = onSetFavorite,
-            modifier = modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+            modifier = modifier.fillMaxWidth().padding(horizontal = LettaSpacing.screenHorizontal),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             ),
