@@ -2,6 +2,7 @@ package com.letta.mobile.di
 
 import android.content.Context
 import com.letta.mobile.data.local.AgentDao
+import com.letta.mobile.data.local.BugReportDao
 import com.letta.mobile.data.local.LettaDatabase
 import dagger.Module
 import dagger.Provides
@@ -22,5 +23,10 @@ object DatabaseModule {
     @Provides
     fun provideAgentDao(database: LettaDatabase): AgentDao {
         return database.agentDao()
+    }
+
+    @Provides
+    fun provideBugReportDao(database: LettaDatabase): BugReportDao {
+        return database.bugReportDao()
     }
 }
