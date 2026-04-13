@@ -67,6 +67,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 fun ChatScreen(
     modifier: Modifier = Modifier,
     chatBackground: ChatBackground = ChatBackground.Default,
+    onBugCommand: (() -> Unit)? = null,
     viewModel: ChatViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -112,12 +113,24 @@ fun ChatScreen(
             text = inputText,
             onTextChange = { newText ->
                 if (newText.endsWith("\n") && !state.isStreaming && inputText.isNotBlank()) {
-                    viewModel.sendMessage(inputText)
+                    if (viewModel.tryHandleSlashCommand(inputText)) {
+                        viewModel.updateInputText("")
+                        onBugCommand?.invoke()
+                    } else {
+                        viewModel.sendMessage(inputText)
+                    }
                 } else {
                     viewModel.updateInputText(newText)
                 }
             },
-            onSend = { viewModel.sendMessage(it) },
+            onSend = {
+                if (viewModel.tryHandleSlashCommand(it)) {
+                    viewModel.updateInputText("")
+                    onBugCommand?.invoke()
+                } else {
+                    viewModel.sendMessage(it)
+                }
+            },
             placeholder = stringResource(R.string.screen_chat_input_hint),
             sendContentDescription = stringResource(R.string.action_send_message),
             enabled = !state.isStreaming,

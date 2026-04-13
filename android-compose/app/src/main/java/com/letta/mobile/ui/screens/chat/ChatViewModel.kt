@@ -11,10 +11,12 @@ import com.letta.mobile.data.mapper.toUiMessages
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockUpdateParams
+import com.letta.mobile.data.model.ProjectBugReport
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.MessageType
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.BlockRepository
+import com.letta.mobile.data.repository.BugReportRepository
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.SettingsRepository
@@ -78,6 +80,30 @@ data class ProjectBriefUiState(
     val error: String? = null,
 )
 
+enum class BugSeverity(val wireValue: String) {
+    Critical("critical"),
+    High("high"),
+    Medium("medium"),
+    Low("low"),
+}
+
+@androidx.compose.runtime.Immutable
+data class ProjectBugReportDraft(
+    val title: String = "",
+    val description: String = "",
+    val severity: BugSeverity = BugSeverity.Medium,
+    val tags: List<String> = emptyList(),
+    val attachmentReferences: List<String> = emptyList(),
+)
+
+@androidx.compose.runtime.Immutable
+data class ProjectBugReportUiState(
+    val isSubmitting: Boolean = false,
+    val recentReports: List<ProjectBugReport> = emptyList(),
+    val lastSubmittedPrompt: String? = null,
+    val error: String? = null,
+)
+
 data class ChatUiState(
     val messages: ImmutableList<UiMessage> = persistentListOf(),
     val isLoadingMessages: Boolean = true,
@@ -91,6 +117,7 @@ data class ChatUiState(
     val totalTokens: Int? = null,
     val activeApprovalRequestId: String? = null,
     val projectBrief: ProjectBriefUiState = ProjectBriefUiState(),
+    val bugReports: ProjectBugReportUiState = ProjectBugReportUiState(),
 )
 
 @HiltViewModel
@@ -99,6 +126,7 @@ class ChatViewModel @Inject constructor(
     private val messageRepository: MessageRepository,
     private val agentRepository: AgentRepository,
     private val blockRepository: BlockRepository,
+    private val bugReportRepository: BugReportRepository,
     private val conversationRepository: ConversationRepository,
     private val settingsRepository: SettingsRepository,
     private val botGateway: BotGateway,
@@ -161,7 +189,75 @@ class ChatViewModel @Inject constructor(
             resolveConversationAndLoad()
             if (projectContext != null) {
                 loadProjectBrief()
+                loadRecentBugReports()
             }
+        }
+    }
+
+    fun loadRecentBugReports() {
+        val projectIdentifier = projectContext?.identifier ?: return
+        viewModelScope.launch {
+            try {
+                val recent = bugReportRepository.getRecentBugReports(projectIdentifier)
+                _uiState.value = _uiState.value.copy(
+                    bugReports = _uiState.value.bugReports.copy(recentReports = recent, error = null)
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    bugReports = _uiState.value.bugReports.copy(
+                        error = mapErrorToUserMessage(e, "Failed to load recent bug reports"),
+                    )
+                )
+            }
+        }
+    }
+
+    fun submitStructuredBugReport(draft: ProjectBugReportDraft) {
+        val project = projectContext ?: return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                bugReports = _uiState.value.bugReports.copy(isSubmitting = true, error = null)
+            )
+            try {
+                val prompt = buildBugReportPrompt(draft)
+                val logged = bugReportRepository.logBugReport(
+                    ProjectBugReport(
+                        projectIdentifier = project.identifier,
+                        title = draft.title.trim(),
+                        description = draft.description.trim(),
+                        severity = draft.severity.wireValue,
+                        tags = draft.tags,
+                        attachmentReferences = draft.attachmentReferences,
+                        structuredPrompt = prompt,
+                        createdAt = java.time.Instant.now().toString(),
+                    )
+                )
+                _uiState.value = _uiState.value.copy(
+                    bugReports = _uiState.value.bugReports.copy(
+                        isSubmitting = false,
+                        lastSubmittedPrompt = prompt,
+                        recentReports = listOf(logged) + _uiState.value.bugReports.recentReports
+                            .filterNot { it.id == logged.id }
+                            .take(4),
+                    )
+                )
+                sendMessage(prompt)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    bugReports = _uiState.value.bugReports.copy(
+                        isSubmitting = false,
+                        error = mapErrorToUserMessage(e, "Failed to submit bug report"),
+                    )
+                )
+            }
+        }
+    }
+
+    fun tryHandleSlashCommand(text: String): Boolean {
+        if (projectContext == null) return false
+        return when (text.trim()) {
+            "/bug" -> true
+            else -> false
         }
     }
 
@@ -595,3 +691,24 @@ private fun buildProjectBriefSections(blocks: List<Block>): Map<ProjectBriefSect
 
 private fun String.canonicalBriefLabel(): String =
     lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+
+private fun buildBugReportPrompt(draft: ProjectBugReportDraft): String {
+    val title = draft.title.trim()
+    val description = draft.description.trim()
+    val tags = draft.tags.joinToString(", ").ifBlank { "none" }
+    val attachments = draft.attachmentReferences.joinToString("\n") { "- $it" }
+        .ifBlank { "- none" }
+
+    return buildString {
+        appendLine("Bug Report: $title")
+        appendLine("Severity: ${draft.severity.wireValue}")
+        appendLine("Tags: $tags")
+        appendLine("Description:")
+        appendLine(description)
+        appendLine()
+        appendLine("Attached media references:")
+        appendLine(attachments)
+        appendLine()
+        append("Please triage this issue, decide whether to create/update beads, and route it to the appropriate coding agent if needed.")
+    }.trim()
+}

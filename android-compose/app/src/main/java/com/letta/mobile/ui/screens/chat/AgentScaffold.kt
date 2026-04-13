@@ -41,6 +41,13 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
@@ -78,6 +85,8 @@ import com.letta.mobile.ui.components.ConnectionState
 import com.letta.mobile.ui.components.ConnectionStatusBanner
 import com.letta.mobile.ui.components.MarkdownText
 import com.letta.mobile.ui.components.Accordions
+import com.letta.mobile.ui.components.ActionSheet
+import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.theme.ChatBackground
 
@@ -108,6 +117,7 @@ fun AgentScaffold(
     val scope = rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showConversationPicker by remember { mutableStateOf(false) }
+    var showBugReportSheet by remember { mutableStateOf(false) }
     val chatBackground by viewModel.chatBackground.collectAsStateWithLifecycle()
 
     val agentName = uiState.agentName
@@ -178,6 +188,13 @@ fun AgentScaffold(
                     }
                 )
             },
+            floatingActionButton = {
+                if (projectContext != null) {
+                    FloatingActionButton(onClick = { showBugReportSheet = true }) {
+                        Icon(LettaIcons.Error, contentDescription = stringResource(R.string.screen_project_bug_report_open))
+                    }
+                }
+            },
         ) { paddingValues ->
             Column(
                 modifier = Modifier
@@ -191,6 +208,10 @@ fun AgentScaffold(
                         onRetry = viewModel::loadProjectBrief,
                         onSaveSection = viewModel::saveProjectBriefSection,
                     )
+                    ProjectBugReportSummaryCard(
+                        state = uiState.bugReports,
+                        onCreateReport = { showBugReportSheet = true },
+                    )
                 }
                 AgentConversationHeader(
                     agentId = agentId,
@@ -202,6 +223,7 @@ fun AgentScaffold(
                 ChatScreen(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     chatBackground = chatBackground,
+                    onBugCommand = { showBugReportSheet = true },
                 )
             }
         }
@@ -219,6 +241,247 @@ fun AgentScaffold(
             onNewConversation = {
                 showConversationPicker = false
                 onSwitchConversation?.invoke(agentId, "")
+            },
+        )
+    }
+
+    if (showBugReportSheet && projectContext != null) {
+        ProjectBugReportSheet(
+            state = uiState.bugReports,
+            onDismiss = { showBugReportSheet = false },
+            onSubmit = {
+                viewModel.submitStructuredBugReport(it)
+                showBugReportSheet = false
+            },
+        )
+    }
+}
+
+@Composable
+private fun ProjectBugReportSummaryCard(
+    state: ProjectBugReportUiState,
+    onCreateReport: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            FormItem(
+                label = { Text(stringResource(R.string.screen_project_bug_report_title), style = MaterialTheme.typography.listItemHeadline) },
+                description = {
+                    Text(stringResource(R.string.screen_project_bug_report_subtitle))
+                },
+                tail = {
+                    OutlinedButton(onClick = onCreateReport) {
+                        Text(stringResource(R.string.screen_project_bug_report_open))
+                    }
+                },
+            )
+
+            state.error?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+
+            state.recentReports.take(3).forEach { report ->
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceBright)) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(report.title, style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            text = stringResource(
+                                R.string.screen_project_bug_report_recent_meta,
+                                report.severity,
+                                formatRelativeTime(report.createdAt),
+                            ),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProjectBugReportSheet(
+    state: ProjectBugReportUiState,
+    onDismiss: () -> Unit,
+    onSubmit: (ProjectBugReportDraft) -> Unit,
+) {
+    var title by rememberSaveable { mutableStateOf("") }
+    var description by rememberSaveable { mutableStateOf("") }
+    var severity by rememberSaveable { mutableStateOf(BugSeverity.Medium) }
+    var severityExpanded by remember { mutableStateOf(false) }
+    var selectedTags by remember { mutableStateOf(setOf("ui", "backend", "sync")) }
+    var attachments by remember { mutableStateOf(listOf<String>()) }
+    var showAttachmentSheet by remember { mutableStateOf(false) }
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.screen_project_bug_report_title),
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Text(
+                text = stringResource(R.string.screen_project_bug_report_sheet_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            OutlinedTextField(
+                value = title,
+                onValueChange = { title = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.screen_project_bug_report_field_title)) },
+            )
+
+            OutlinedTextField(
+                value = description,
+                onValueChange = { description = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.screen_project_bug_report_field_description)) },
+                minLines = 5,
+            )
+
+            ExposedDropdownMenuBox(
+                expanded = severityExpanded,
+                onExpandedChange = { severityExpanded = it },
+            ) {
+                OutlinedTextField(
+                    value = severity.wireValue.replaceFirstChar { it.uppercase() },
+                    onValueChange = {},
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(MenuAnchorType.PrimaryEditable),
+                    readOnly = true,
+                    label = { Text(stringResource(R.string.screen_project_bug_report_field_severity)) },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = severityExpanded) },
+                )
+                DropdownMenu(
+                    expanded = severityExpanded,
+                    onDismissRequest = { severityExpanded = false },
+                ) {
+                    BugSeverity.entries.forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(option.wireValue.replaceFirstChar { it.uppercase() }) },
+                            onClick = {
+                                severity = option
+                                severityExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = stringResource(R.string.screen_project_bug_report_field_tags),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("ui", "backend", "sync", "crash").forEach { tag ->
+                        FilterChip(
+                            selected = tag in selectedTags,
+                            onClick = {
+                                selectedTags = if (tag in selectedTags) selectedTags - tag else selectedTags + tag
+                            },
+                            label = { Text(tag) },
+                        )
+                    }
+                }
+            }
+
+            FormItem(
+                label = { Text(stringResource(R.string.screen_project_bug_report_field_attachments)) },
+                description = {
+                    Text(
+                        if (attachments.isEmpty()) {
+                            stringResource(R.string.screen_project_bug_report_attachments_empty)
+                        } else {
+                            attachments.joinToString("\n")
+                        }
+                    )
+                },
+                tail = {
+                    OutlinedButton(onClick = { showAttachmentSheet = true }) {
+                        Text(stringResource(R.string.screen_project_bug_report_add_attachment))
+                    }
+                },
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        onSubmit(
+                            ProjectBugReportDraft(
+                                title = title,
+                                description = description,
+                                severity = severity,
+                                tags = selectedTags.toList().sorted(),
+                                attachmentReferences = attachments,
+                            )
+                        )
+                    },
+                    enabled = title.isNotBlank() && description.isNotBlank() && !state.isSubmitting,
+                ) {
+                    Text(stringResource(R.string.screen_project_bug_report_submit))
+                }
+            }
+        }
+    }
+
+    ActionSheet(
+        show = showAttachmentSheet,
+        onDismiss = { showAttachmentSheet = false },
+        title = stringResource(R.string.screen_project_bug_report_attachment_title),
+    ) {
+        ActionSheetItem(
+            text = stringResource(R.string.screen_project_bug_report_attachment_camera),
+            icon = LettaIcons.Error,
+            onClick = {
+                attachments = attachments + "camera://capture-${System.currentTimeMillis()}"
+                showAttachmentSheet = false
+            },
+        )
+        ActionSheetItem(
+            text = stringResource(R.string.screen_project_bug_report_attachment_gallery),
+            icon = LettaIcons.FileOpen,
+            onClick = {
+                attachments = attachments + "gallery://selection-${System.currentTimeMillis()}"
+                showAttachmentSheet = false
+            },
+        )
+        ActionSheetItem(
+            text = stringResource(R.string.screen_project_bug_report_attachment_recording),
+            icon = LettaIcons.Play,
+            onClick = {
+                attachments = attachments + "recording://screen-${System.currentTimeMillis()}"
+                showAttachmentSheet = false
             },
         )
     }
