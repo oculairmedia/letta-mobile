@@ -374,11 +374,12 @@ private fun UsageAnalyticsCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val accentColors = MaterialTheme.customColors
     Card(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            containerColor = accentColors.freshAccentContainer,
         ),
     ) {
         Column(
@@ -404,7 +405,7 @@ private fun UsageAnalyticsCard(
                 Icon(
                     imageVector = LettaIcons.Sparkles,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = accentColors.freshAccent,
                 )
                 Icon(
                     imageVector = LettaIcons.ChevronRight,
@@ -479,10 +480,11 @@ private fun UsageMetricCard(
     icon: ImageVector,
     modifier: Modifier = Modifier,
 ) {
+    val accentColors = MaterialTheme.customColors
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = accentColors.freshAccentContainer,
         ),
     ) {
         Column(
@@ -492,7 +494,7 @@ private fun UsageMetricCard(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = accentColors.freshAccent,
                 modifier = Modifier.size(18.dp),
             )
             Spacer(modifier = Modifier.height(6.dp))
@@ -990,9 +992,13 @@ private fun StatCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val accentColors = MaterialTheme.customColors
     Card(
         onClick = onClick,
         modifier = modifier,
+        colors = CardDefaults.cardColors(
+            containerColor = accentColors.freshAccentContainer,
+        ),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(12.dp),
@@ -1001,7 +1007,7 @@ private fun StatCard(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = accentColors.freshAccent,
                 modifier = Modifier.size(20.dp),
             )
             Spacer(modifier = Modifier.height(4.dp))

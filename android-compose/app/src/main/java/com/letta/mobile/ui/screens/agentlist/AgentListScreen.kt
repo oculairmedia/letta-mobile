@@ -104,6 +104,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.ui.theme.listItemMetadata
 import com.letta.mobile.ui.theme.listItemSupporting
+import com.letta.mobile.ui.theme.customColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -524,6 +525,7 @@ private fun AgentCard(
     onTogglePinned: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val accentColors = MaterialTheme.customColors
     var showContextMenu by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
@@ -550,7 +552,7 @@ private fun AgentCard(
         color = if (isFavorite) {
             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
         } else {
-            MaterialTheme.colorScheme.surfaceBright
+            accentColors.freshAccentContainer
         },
         tonalElevation = 0.dp,
     ) {
@@ -698,6 +700,7 @@ private fun CompactAgentCard(
     onTogglePinned: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val accentColors = MaterialTheme.customColors
     var showContextMenu by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
@@ -723,7 +726,7 @@ private fun CompactAgentCard(
         color = if (isFavorite) {
             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
         } else {
-            MaterialTheme.colorScheme.surfaceBright
+            accentColors.freshAccentContainer
         },
         tonalElevation = 0.dp,
     ) {
@@ -808,9 +811,10 @@ private fun CompactAgentCard(
 
 @Composable
 private fun AgentMetaChip(text: String) {
+    val accentColors = MaterialTheme.customColors
     Surface(
         shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        color = accentColors.freshAccentContainer,
     ) {
         Text(
             text = text,

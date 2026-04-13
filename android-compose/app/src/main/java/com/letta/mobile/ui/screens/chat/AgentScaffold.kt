@@ -206,13 +206,14 @@ private fun AgentConversationHeader(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val accentColors = MaterialTheme.customColors
     Card(
         onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            containerColor = accentColors.freshAccentContainer,
         ),
     ) {
         Row(

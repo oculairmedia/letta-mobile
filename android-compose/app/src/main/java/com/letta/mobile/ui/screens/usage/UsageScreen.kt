@@ -53,6 +53,7 @@ import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
+import com.letta.mobile.ui.theme.customColors
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.axis.rememberBottom
 import com.patrykandpatrick.vico.compose.cartesian.axis.rememberStart
@@ -278,10 +279,11 @@ private fun StatMiniCard(
     modifier: Modifier = Modifier,
     isError: Boolean = false,
 ) {
+    val accentColors = MaterialTheme.customColors
     val containerColor = if (isError) {
         MaterialTheme.colorScheme.errorContainer
     } else {
-        MaterialTheme.colorScheme.surfaceContainerHigh
+        accentColors.freshAccentContainer
     }
     val contentColor = if (isError) {
         MaterialTheme.colorScheme.onErrorContainer
@@ -322,9 +324,10 @@ private fun StatMiniCard(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TokenBreakdownRow(analytics: UsageAnalytics) {
+    val accentColors = MaterialTheme.customColors
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            containerColor = accentColors.freshAccentContainer,
         ),
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -369,11 +372,12 @@ private fun ChartCard(
     labels: List<String>,
 ) {
     val hasData = values.any { it > 0 }
-    val primaryColor = MaterialTheme.colorScheme.primary
+    val accentColors = MaterialTheme.customColors
+    val primaryColor = accentColors.freshAccent
 
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            containerColor = accentColors.freshAccentContainer,
         ),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -434,10 +438,11 @@ private fun ChartCard(
 
 @Composable
 private fun RunSummaryCard(run: RunSummary) {
+    val accentColors = MaterialTheme.customColors
     val containerColor = if (run.hasError) {
         MaterialTheme.colorScheme.errorContainer
     } else {
-        MaterialTheme.colorScheme.surfaceContainerHigh
+        accentColors.freshAccentContainer
     }
 
     Card(
