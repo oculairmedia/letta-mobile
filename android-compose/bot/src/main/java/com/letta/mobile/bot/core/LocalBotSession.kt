@@ -9,15 +9,18 @@ import com.letta.mobile.bot.context.DeviceContextProvider
 import com.letta.mobile.bot.message.DirectiveParser
 import com.letta.mobile.bot.message.MessageEnvelopeFormatter
 import com.letta.mobile.bot.message.MessageQueue
-import com.letta.mobile.data.api.ConversationApi
-import com.letta.mobile.data.api.MessageApi
+import com.letta.mobile.bot.runtime.LettaRuntimeClient
+import com.letta.mobile.bot.runtime.LettaRuntimeEvent
+import com.letta.mobile.bot.runtime.memory.RuntimeMemoryManager
+import com.letta.mobile.bot.tools.BotToolExecutionResult
+import com.letta.mobile.bot.tools.BotToolRegistry
+import com.letta.mobile.bot.tools.BotToolSync
 import com.letta.mobile.data.model.AssistantMessage
-import com.letta.mobile.data.model.ConversationCreateParams
-import com.letta.mobile.data.model.MessageCreateRequest
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -25,6 +28,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -46,9 +50,11 @@ import kotlinx.coroutines.sync.withLock
  */
 class LocalBotSession @AssistedInject constructor(
     @Assisted private val config: BotConfig,
-    private val messageApi: MessageApi,
-    private val conversationApi: ConversationApi,
+    private val runtimeClient: LettaRuntimeClient,
     private val envelopeFormatter: MessageEnvelopeFormatter,
+    private val memoryManager: RuntimeMemoryManager,
+    private val toolRegistry: BotToolRegistry,
+    private val toolSync: BotToolSync,
     private val contextProviders: @JvmSuppressWildcards Set<DeviceContextProvider>,
 ) : BotSession {
 
@@ -74,6 +80,8 @@ class LocalBotSession @AssistedInject constructor(
 
     override suspend fun start() {
         _status.value = BotStatus.STARTING
+
+        toolSync.syncTools(agentId)
 
         // Start the message processing loop
         scope.launch {
@@ -105,16 +113,71 @@ class LocalBotSession @AssistedInject constructor(
         val resolvedConversationId = conversationId ?: resolveConversation(message)
 
         // Use the message queue for serial processing
-        val result = kotlinx.coroutines.CompletableDeferred<Result<BotResponse>>()
+        val result = CompletableDeferred<Result<BotResponse>>()
         messageQueue.enqueue(QueuedMessage(message, resolvedConversationId) { result.complete(it) })
         return result.await().getOrThrow()
     }
 
     override fun streamToAgent(message: ChannelMessage, conversationId: String?): Flow<BotResponseChunk> = flow {
-        // TODO: Implement true streaming using sendConversationMessage + SSE parsing
-        // For now, fall back to non-streaming
-        val response = sendToAgent(message, conversationId)
-        emit(BotResponseChunk(text = response.text, isComplete = true))
+        _status.value = BotStatus.PROCESSING
+        try {
+            val memorySnapshot = memoryManager.loadSnapshot(agentId)
+            val resolvedConversationId = conversationId ?: resolveConversation(message)
+            val formattedText = envelopeFormatter.format(
+                message = message,
+                contextProviders = activeProviders,
+                memorySnapshot = memorySnapshot,
+                customTemplate = config.envelopeTemplate,
+            )
+
+            runtimeClient.streamConversationMessage(
+                agentId = agentId,
+                conversationId = resolvedConversationId,
+                input = formattedText,
+            ).collect { event ->
+                when (event) {
+                    is LettaRuntimeEvent.AssistantDelta -> emit(
+                        BotResponseChunk(
+                            text = event.textDelta,
+                            conversationId = event.conversationId,
+                        )
+                    )
+
+                    is LettaRuntimeEvent.ReasoningDelta -> emit(
+                        BotResponseChunk(
+                            text = event.textDelta,
+                            conversationId = event.conversationId,
+                        )
+                    )
+
+                    is LettaRuntimeEvent.ToolCallRequested -> {
+                        val toolSummary = handleToolCalls(event)
+                        emit(
+                            BotResponseChunk(
+                                text = toolSummary,
+                                conversationId = event.conversationId,
+                            )
+                        )
+                    }
+
+                    is LettaRuntimeEvent.RawMessage -> Unit
+
+                    is LettaRuntimeEvent.Completed -> {
+                        _status.value = BotStatus.RUNNING
+                        emit(
+                            BotResponseChunk(
+                                conversationId = event.conversationId,
+                                isComplete = true,
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            _status.value = BotStatus.RUNNING
+            Log.e(TAG, "Error streaming message for agent $agentId", e)
+            throw e
+        }
     }
 
     override suspend fun deliverToChannel(response: BotResponse, sourceMessage: ChannelMessage): DeliveryResult {
@@ -144,27 +207,40 @@ class LocalBotSession @AssistedInject constructor(
         _status.value = BotStatus.PROCESSING
 
         try {
-            // 1. Format with device context envelope
+            val memorySnapshot = memoryManager.loadSnapshot(agentId)
             val formattedText = envelopeFormatter.format(
                 message = message,
                 contextProviders = activeProviders,
+                memorySnapshot = memorySnapshot,
                 customTemplate = config.envelopeTemplate,
             )
 
-            // 2. Send to the Letta agent via conversation API
-            val request = MessageCreateRequest(input = formattedText)
-            val lettaResponse = messageApi.sendMessage(agentId, request)
+            var finalText = ""
+            var usage: UsageInfo? = null
 
-            // 3. Extract the assistant's text response
-            val assistantText = lettaResponse.messages
-                .filterIsInstance<AssistantMessage>()
-                .lastOrNull()?.content ?: ""
+            runtimeClient.streamConversationMessage(
+                agentId = agentId,
+                conversationId = conversationId,
+                input = formattedText,
+            ).collect { event ->
+                when (event) {
+                    is LettaRuntimeEvent.ToolCallRequested -> {
+                        handleToolCalls(event)
+                    }
 
-            // 4. Parse directives from the response
+                    is LettaRuntimeEvent.Completed -> {
+                        finalText = event.finalText
+                        usage = event.usage
+                    }
+
+                    else -> Unit
+                }
+            }
+
             val parseResult = if (config.directivesEnabled) {
-                DirectiveParser.parse(assistantText)
+                DirectiveParser.parse(finalText)
             } else {
-                DirectiveParser.ParseResult(assistantText, emptyList())
+                DirectiveParser.ParseResult(finalText, emptyList())
             }
 
             _status.value = BotStatus.RUNNING
@@ -173,11 +249,7 @@ class LocalBotSession @AssistedInject constructor(
                 conversationId = conversationId,
                 text = parseResult.cleanText,
                 directives = parseResult.directives,
-                usage = UsageInfo(
-                    promptTokens = lettaResponse.usage.promptTokens ?: 0,
-                    completionTokens = lettaResponse.usage.completionTokens ?: 0,
-                    totalTokens = lettaResponse.usage.totalTokens ?: 0,
-                ),
+                usage = usage,
             )
         } catch (e: Exception) {
             _status.value = BotStatus.RUNNING
@@ -188,10 +260,52 @@ class LocalBotSession @AssistedInject constructor(
 
     /** Create a new conversation for this agent. */
     private suspend fun createConversation(): String {
-        val conversation = conversationApi.createConversation(
-            ConversationCreateParams(agentId = agentId)
-        )
-        return conversation.id
+        return runtimeClient.createConversation(agentId = agentId)
+    }
+
+    private suspend fun handleToolCalls(event: LettaRuntimeEvent.ToolCallRequested): String {
+        val results = event.toolCalls.map { toolCall ->
+            val toolName = toolCall.name ?: return@map "Skipped unnamed tool call"
+            when (val result = toolRegistry.execute(toolName, toolCall.arguments)) {
+                is BotToolExecutionResult.Success -> {
+                    val toolCallId = toolCall.effectiveId
+                    if (toolCallId.isNotBlank()) {
+                        runtimeClient.submitToolResult(
+                            conversationId = event.conversationId,
+                            toolCallId = toolCallId,
+                            toolReturn = result.payload,
+                        )
+                    }
+                    "Executed $toolName"
+                }
+
+                is BotToolExecutionResult.Unavailable -> {
+                    val toolCallId = toolCall.effectiveId
+                    if (toolCallId.isNotBlank()) {
+                        runtimeClient.submitToolResult(
+                            conversationId = event.conversationId,
+                            toolCallId = toolCallId,
+                            toolReturn = result.reason,
+                        )
+                    }
+                    "Unavailable: $toolName"
+                }
+
+                is BotToolExecutionResult.Failure -> {
+                    val toolCallId = toolCall.effectiveId
+                    if (toolCallId.isNotBlank()) {
+                        runtimeClient.submitToolResult(
+                            conversationId = event.conversationId,
+                            toolCallId = toolCallId,
+                            toolReturn = result.error,
+                        )
+                    }
+                    "Failed: $toolName"
+                }
+            }
+        }
+
+        return results.joinToString(separator = "\n")
     }
 
     @AssistedFactory

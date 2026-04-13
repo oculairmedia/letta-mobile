@@ -2,6 +2,7 @@ package com.letta.mobile.bot.message
 
 import com.letta.mobile.bot.channel.ChannelMessage
 import com.letta.mobile.bot.context.DeviceContextProvider
+import com.letta.mobile.bot.runtime.memory.RuntimeMemorySnapshot
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -38,14 +39,17 @@ class MessageEnvelopeFormatter @Inject constructor() {
     suspend fun format(
         message: ChannelMessage,
         contextProviders: List<DeviceContextProvider> = emptyList(),
+        memorySnapshot: RuntimeMemorySnapshot? = null,
         customTemplate: String? = null,
     ): String {
         if (customTemplate != null) {
-            return applyTemplate(customTemplate, message, contextProviders)
+            return applyTemplate(customTemplate, message, contextProviders, memorySnapshot)
         }
 
         val contextLines = buildList {
             add("Channel: ${message.channelId} | Sender: ${message.senderId}${message.senderName?.let { " ($it)" } ?: ""}")
+
+            memorySnapshot?.renderLines()?.forEach { add(it) }
 
             for (provider in contextProviders) {
                 if (provider.hasPermission()) {
@@ -73,6 +77,7 @@ class MessageEnvelopeFormatter @Inject constructor() {
         template: String,
         message: ChannelMessage,
         contextProviders: List<DeviceContextProvider>,
+        memorySnapshot: RuntimeMemorySnapshot?,
     ): String {
         var result = template
         result = result.replace("{{channel}}", message.channelId)
@@ -87,6 +92,7 @@ class MessageEnvelopeFormatter @Inject constructor() {
             if (provider.hasPermission()) provider.gatherContext() else null
         }.joinToString("\n")
         result = result.replace("{{context}}", contextBlock)
+        result = result.replace("{{memory}}", memorySnapshot?.renderLines()?.joinToString("\n") ?: "")
 
         return result
     }
