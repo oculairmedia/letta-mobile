@@ -12,8 +12,10 @@ import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.MessageType
+import com.letta.mobile.data.model.ProjectBugReport
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.BlockRepository
+import com.letta.mobile.data.repository.BugReportRepository
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.SettingsRepository
@@ -49,6 +51,7 @@ class ChatViewModelTest {
     private lateinit var messageRepository: MessageRepository
     private lateinit var agentRepository: AgentRepository
     private lateinit var blockRepository: BlockRepository
+    private lateinit var bugReportRepository: BugReportRepository
     private lateinit var conversationRepository: ConversationRepository
     private lateinit var settingsRepository: SettingsRepository
     private lateinit var botGateway: BotGateway
@@ -64,6 +67,7 @@ class ChatViewModelTest {
         messageRepository = mockk(relaxed = true)
         agentRepository = mockk(relaxed = true)
         blockRepository = BlockRepository(FakeBlockApi())
+        bugReportRepository = mockk(relaxed = true)
         conversationRepository = mockk(relaxed = true)
         settingsRepository = mockk(relaxed = true)
         botGateway = mockk(relaxed = true)
@@ -80,6 +84,8 @@ class ChatViewModelTest {
             }
         }
         coEvery { messageRepository.submitApproval(any(), any(), any(), any(), any()) } returns Unit
+        coEvery { bugReportRepository.getRecentBugReports(any(), any()) } returns emptyList()
+        coEvery { bugReportRepository.logBugReport(any()) } answers { firstArg<ProjectBugReport>().copy(id = 1L) }
         every { agentRepository.getAgent(any()) } returns flowOf(TestData.agent(id = "agent-1", name = "Test Agent"))
         every { conversationRepository.getConversations(any()) } answers {
             flowOf(listOf(TestData.conversation(id = "conv-1", agentId = firstArg())))
@@ -109,6 +115,7 @@ class ChatViewModelTest {
             messageRepository,
             agentRepository,
             blockRepository,
+            bugReportRepository,
             conversationRepository,
             settingsRepository,
             botGateway,
@@ -294,6 +301,7 @@ class ChatViewModelTest {
             messageRepository,
             agentRepository,
             blockRepository,
+            bugReportRepository,
             conversationRepository,
             settingsRepository,
             botGateway,
@@ -358,6 +366,7 @@ class ChatViewModelTest {
             messageRepository,
             agentRepository,
             blockRepository,
+            bugReportRepository,
             conversationRepository,
             settingsRepository,
             botGateway,
@@ -397,6 +406,7 @@ class ChatViewModelTest {
             messageRepository,
             agentRepository,
             blockRepository,
+            bugReportRepository,
             conversationRepository,
             settingsRepository,
             botGateway,
@@ -433,6 +443,7 @@ class ChatViewModelTest {
             messageRepository,
             agentRepository,
             blockRepository,
+            bugReportRepository,
             conversationRepository,
             settingsRepository,
             botGateway,
@@ -469,6 +480,7 @@ class ChatViewModelTest {
             messageRepository,
             agentRepository,
             blockRepository,
+            bugReportRepository,
             conversationRepository,
             settingsRepository,
             botGateway,
@@ -505,6 +517,7 @@ class ChatViewModelTest {
             messageRepository,
             agentRepository,
             blockRepository,
+            bugReportRepository,
             conversationRepository,
             settingsRepository,
             botGateway,
@@ -520,5 +533,83 @@ class ChatViewModelTest {
         assertEquals(BlockUpdateParams(value = "Updated brief"), fakeBlockApi.lastUpdateParams)
         assertEquals("Updated brief", vm.uiState.value.projectBrief.sections[ProjectBriefSectionKey.Description]?.content)
         assertFalse(vm.uiState.value.projectBrief.isSaving)
+    }
+
+    @Test
+    fun `tryHandleSlashCommand is true only for project bug command`() = runTest {
+        val savedState = SavedStateHandle().apply {
+            set("agentId", "agent-1")
+            set("conversationId", "conv-1")
+            set("projectIdentifier", "letta-mobile")
+            set("projectName", "Letta Mobile")
+        }
+
+        val vm = ChatViewModel(
+            savedState,
+            messageRepository,
+            agentRepository,
+            blockRepository,
+            bugReportRepository,
+            conversationRepository,
+            settingsRepository,
+            botGateway,
+            botConfigStore,
+            internalBotClient,
+        )
+
+        assertTrue(vm.tryHandleSlashCommand("/bug"))
+        assertFalse(vm.tryHandleSlashCommand("hello"))
+    }
+
+    @Test
+    fun `submitStructuredBugReport sends formatted prompt through project gateway`() = runTest {
+        val session = mockk<BotSession>()
+        val requestSlot = slot<com.letta.mobile.bot.protocol.BotChatRequest>()
+        every { botGateway.getSession("agent-1") } returns session
+        coEvery { internalBotClient.sendMessage(capture(requestSlot)) } returns BotChatResponse(
+            response = "Triaged bug report",
+            conversationId = "conv-1",
+            agentId = "agent-1",
+        )
+
+        val savedState = SavedStateHandle().apply {
+            set("agentId", "agent-1")
+            set("conversationId", "conv-1")
+            set("projectIdentifier", "letta-mobile")
+            set("projectName", "Letta Mobile")
+        }
+
+        val vm = ChatViewModel(
+            savedState,
+            messageRepository,
+            agentRepository,
+            blockRepository,
+            bugReportRepository,
+            conversationRepository,
+            settingsRepository,
+            botGateway,
+            botConfigStore,
+            internalBotClient,
+        )
+        advanceUntilIdle()
+
+        vm.submitStructuredBugReport(
+            ProjectBugReportDraft(
+                title = "Crash on sync",
+                description = "App crashes after project sync finishes.",
+                severity = BugSeverity.High,
+                tags = listOf("sync", "crash"),
+                attachmentReferences = listOf("recording://screen-1"),
+            )
+        )
+        advanceUntilIdle()
+
+        val sentMessage = requestSlot.captured.message
+        assertTrue(sentMessage.contains("Bug Report: Crash on sync"))
+        assertTrue(sentMessage.contains("Severity: high"))
+        assertTrue(sentMessage.contains("Tags: sync, crash"))
+        assertTrue(sentMessage.contains("recording://screen-1"))
+        assertEquals(sentMessage, vm.uiState.value.bugReports.lastSubmittedPrompt)
+        assertTrue(vm.uiState.value.bugReports.recentReports.any { it.title == "Crash on sync" })
     }
 }

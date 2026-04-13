@@ -10,6 +10,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.BlockRepository
+import com.letta.mobile.data.repository.BugReportRepository
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.SettingsRepository
@@ -84,6 +85,7 @@ class ChatViewModelE2eTest {
             val conversationRepo = mockk<ConversationRepository>(relaxed = true)
             val agentRepo = mockk<AgentRepository>(relaxed = true)
             val blockRepository = BlockRepository(FakeBlockApi())
+            val bugReportRepository = mockk<BugReportRepository>(relaxed = true)
             val conversations = listOf(Conversation(id = "conv-1", agentId = "agent-1", summary = "Existing"))
             every { conversationRepo.getConversations("agent-1") } returns flowOf(conversations)
             coEvery { conversationRepo.refreshConversations("agent-1") } returns Unit
@@ -100,6 +102,7 @@ class ChatViewModelE2eTest {
                 messageRepository,
                 agentRepo,
                 blockRepository,
+                bugReportRepository,
                 conversationRepo,
                 settingsRepo,
                 botGateway,
@@ -148,6 +151,7 @@ class ChatViewModelE2eTest {
             val conversationRepo = mockk<ConversationRepository>(relaxed = true)
             val agentRepo = mockk<AgentRepository>(relaxed = true)
             val blockRepository = BlockRepository(FakeBlockApi())
+            val bugReportRepository = mockk<BugReportRepository>(relaxed = true)
             val conversations = mutableListOf<Conversation>()
             val createdSummaries = mutableListOf<String>()
             every { conversationRepo.getConversations("agent-1") } answers { flowOf(conversations.toList()) }
@@ -172,6 +176,7 @@ class ChatViewModelE2eTest {
                 messageRepository,
                 agentRepo,
                 blockRepository,
+                bugReportRepository,
                 conversationRepo,
                 settingsRepo,
                 botGateway,
