@@ -72,7 +72,7 @@ jobs:
 
       - name: Decode signing keystore
         if: matrix.variant == 'release'
-        run: echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > android-compose/app/letta-release.jks
+        run: echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > app/letta-release.jks
 
       - name: Build ${{ matrix.variant }} APK
         env:
