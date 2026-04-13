@@ -56,8 +56,12 @@ import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.components.TagDrillInDialog
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.tags.TagDrillInEntityType
+import com.letta.mobile.ui.tags.TagDrillInSource
+import com.letta.mobile.ui.tags.TagDrillInViewModel
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 
 private const val CUSTOM_TOOL_TYPE = "custom"
@@ -71,6 +75,8 @@ fun ToolDetailScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val agentState by viewModel.agentState.collectAsStateWithLifecycle()
     val deleteState by viewModel.deleteState.collectAsStateWithLifecycle()
+    val tagDrillInViewModel: TagDrillInViewModel = hiltViewModel()
+    val tagDrillInState by tagDrillInViewModel.uiState.collectAsStateWithLifecycle()
     var showActionSheet by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -126,6 +132,12 @@ fun ToolDetailScreen(
                 tool = state.data,
                 attachedAgents = agentState.attachedAgents,
                 onDetachAgent = viewModel::detachFromAgent,
+                onTagClick = { tag ->
+                    tagDrillInViewModel.showTag(
+                        tag,
+                        TagDrillInSource(TagDrillInEntityType.TOOL, state.data.id),
+                    )
+                },
                 modifier = Modifier.padding(paddingValues),
             )
         }
@@ -201,6 +213,11 @@ fun ToolDetailScreen(
         )
     }
 
+    TagDrillInDialog(
+        state = tagDrillInState,
+        onDismiss = tagDrillInViewModel::dismiss,
+    )
+
     val deleteError = (deleteState as? UiState.Error)?.message
     if (deleteError != null) {
         AlertDialog(
@@ -222,6 +239,7 @@ private fun ToolDetailContent(
     tool: Tool,
     attachedAgents: List<com.letta.mobile.data.model.Agent>,
     onDetachAgent: (String) -> Unit,
+    onTagClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -293,7 +311,10 @@ private fun ToolDetailContent(
                         headlineContent = {
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 tool.tags.forEach { tag ->
-                                    AssistChip(onClick = {}, label = { Text(tag, style = MaterialTheme.typography.labelSmall) })
+                                    AssistChip(
+                                        onClick = { onTagClick(tag) },
+                                        label = { Text(tag, style = MaterialTheme.typography.labelSmall) },
+                                    )
                                 }
                             }
                         },

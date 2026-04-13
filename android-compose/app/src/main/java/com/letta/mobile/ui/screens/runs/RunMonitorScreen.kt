@@ -2,6 +2,7 @@ package com.letta.mobile.ui.screens.runs
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -54,10 +55,14 @@ import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.components.TagDrillInDialog
 import com.letta.mobile.ui.theme.dialogSectionHeading
 import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.ui.theme.listItemMetadata
 import com.letta.mobile.ui.theme.listItemSupporting
+import com.letta.mobile.ui.tags.TagDrillInEntityType
+import com.letta.mobile.ui.tags.TagDrillInSource
+import com.letta.mobile.ui.tags.TagDrillInViewModel
 import com.letta.mobile.util.formatRelativeTime
 import kotlinx.serialization.json.JsonElement
 import com.letta.mobile.ui.icons.LettaIcons
@@ -69,6 +74,8 @@ fun RunMonitorScreen(
     viewModel: RunMonitorViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val tagDrillInViewModel: TagDrillInViewModel = hiltViewModel()
+    val tagDrillInState by tagDrillInViewModel.uiState.collectAsStateWithLifecycle()
     var cancelTarget by remember { mutableStateOf<Run?>(null) }
     var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<Run?>(null) }
@@ -173,6 +180,9 @@ fun RunMonitorScreen(
             steps = state?.selectedRunSteps.orEmpty(),
             onInspectStep = viewModel::inspectStep,
             onDismiss = { viewModel.clearSelectedRun() },
+            onTagClick = { stepId, tag ->
+                tagDrillInViewModel.showTag(tag, TagDrillInSource(TagDrillInEntityType.STEP, stepId))
+            },
             onCancel = if (run.isTerminalStatus()) null else {
                 {
                     viewModel.clearSelectedRun()
@@ -197,11 +207,19 @@ fun RunMonitorScreen(
             metrics = state?.selectedStepMetrics,
             trace = state?.selectedStepTrace,
             onDismiss = { viewModel.clearSelectedStep() },
+            onTagClick = { tag ->
+                tagDrillInViewModel.showTag(tag, TagDrillInSource(TagDrillInEntityType.STEP, step.id))
+            },
             onSetPositiveFeedback = { viewModel.updateStepFeedback(step.id, "positive") },
             onSetNegativeFeedback = { viewModel.updateStepFeedback(step.id, "negative") },
             onClearFeedback = { viewModel.updateStepFeedback(step.id, null) },
         )
     }
+
+    TagDrillInDialog(
+        state = tagDrillInState,
+        onDismiss = tagDrillInViewModel::dismiss,
+    )
 
     cancelTarget?.let { run ->
         ConfirmDialog(
@@ -317,6 +335,7 @@ private fun RunDetailDialog(
     steps: List<Step>,
     onInspectStep: (String) -> Unit,
     onDismiss: () -> Unit,
+    onTagClick: (String, String) -> Unit,
     onCancel: (() -> Unit)?,
     onDelete: (() -> Unit)?,
 ) {
@@ -429,9 +448,7 @@ private fun RunDetailDialog(
                             step.traceId?.let { Text(stringResource(R.string.screen_runs_step_trace_id_label, it), style = MaterialTheme.typography.listItemMetadata) }
                             step.tid?.let { Text(stringResource(R.string.screen_runs_step_tid_label, it), style = MaterialTheme.typography.listItemMetadata) }
                             step.feedback?.let { Text(stringResource(R.string.screen_runs_step_feedback_label, it), style = MaterialTheme.typography.listItemMetadata) }
-                            if (step.tags.isNotEmpty()) {
-                                Text(stringResource(R.string.screen_runs_step_tags_label, step.tags.joinToString(", ")), style = MaterialTheme.typography.listItemSupporting)
-                            }
+                            StepTagRow(tags = step.tags) { tag -> onTagClick(step.id, tag) }
                             step.errorType?.let { Text(stringResource(R.string.screen_runs_step_error_type_label, it), style = MaterialTheme.typography.listItemSupporting) }
                             if (step.messages.isNotEmpty()) {
                                 Text(stringResource(R.string.screen_runs_step_messages_count_label, step.messages.size), style = MaterialTheme.typography.listItemMetadata)
@@ -508,6 +525,7 @@ private fun StepDetailDialog(
     metrics: StepMetrics?,
     trace: ProviderTrace?,
     onDismiss: () -> Unit,
+    onTagClick: (String) -> Unit,
     onSetPositiveFeedback: () -> Unit,
     onSetNegativeFeedback: () -> Unit,
     onClearFeedback: () -> Unit,
@@ -534,9 +552,7 @@ private fun StepDetailDialog(
                 step.traceId?.let { Text(stringResource(R.string.screen_runs_step_trace_id_label, it)) }
                 step.tid?.let { Text(stringResource(R.string.screen_runs_step_tid_label, it)) }
                 step.stopReason?.let { Text(stringResource(R.string.screen_runs_stop_reason_label, it)) }
-                if (step.tags.isNotEmpty()) {
-                    Text(stringResource(R.string.screen_runs_step_tags_label, step.tags.joinToString(", ")))
-                }
+                StepTagRow(tags = step.tags, onTagClick = onTagClick)
                 step.errorType?.let { Text(stringResource(R.string.screen_runs_step_error_type_label, it)) }
                 if (step.completionTokensDetails.isNotEmpty()) {
                     Text(stringResource(R.string.screen_runs_step_completion_details_label, step.completionTokensDetails.toSortedDisplayString()))
@@ -603,6 +619,31 @@ private fun StepDetailDialog(
             }
         },
     )
+}
+
+@Composable
+private fun StepTagRow(
+    tags: List<String>,
+    onTagClick: (String) -> Unit,
+) {
+    if (tags.isEmpty()) return
+
+    Text(
+        text = stringResource(R.string.common_tags),
+        style = MaterialTheme.typography.listItemMetadata,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        tags.forEach { tag ->
+            AssistChip(
+                onClick = { onTagClick(tag) },
+                label = { Text(tag) },
+            )
+        }
+    }
 }
 
 private fun Map<String, JsonElement>.toSortedDisplayString(): String {

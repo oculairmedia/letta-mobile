@@ -21,7 +21,11 @@ import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.components.TagDrillInDialog
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.tags.TagDrillInEntityType
+import com.letta.mobile.ui.tags.TagDrillInSource
+import com.letta.mobile.ui.tags.TagDrillInViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,6 +36,8 @@ fun TemplatesScreen(
     viewModel: TemplatesViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val tagDrillInViewModel: TagDrillInViewModel = hiltViewModel()
+    val tagDrillInState by tagDrillInViewModel.uiState.collectAsStateWithLifecycle()
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
@@ -65,17 +71,29 @@ fun TemplatesScreen(
                         onNavigateToAgent(agentId)
                     }
                 },
+                onTagClick = { template, tag ->
+                    tagDrillInViewModel.showTag(
+                        tag,
+                        TagDrillInSource(TagDrillInEntityType.TEMPLATE, template.id),
+                    )
+                },
                 onNavigateToAgentList = onNavigateToAgentList,
                 modifier = Modifier.padding(paddingValues)
             )
         }
     }
+
+    TagDrillInDialog(
+        state = tagDrillInState,
+        onDismiss = tagDrillInViewModel::dismiss,
+    )
 }
 
 @Composable
 private fun TemplatesContent(
     state: TemplatesUiState,
     onTemplateClick: (StarterAgentTemplate) -> Unit,
+    onTagClick: (StarterAgentTemplate, String) -> Unit,
     onNavigateToAgentList: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -109,7 +127,8 @@ private fun TemplatesContent(
                 ) { template ->
                     TemplateCard(
                         template = template,
-                        onClick = { onTemplateClick(template) }
+                        onClick = { onTemplateClick(template) },
+                        onTagClick = { tag -> onTagClick(template, tag) },
                     )
                 }
             }
@@ -163,6 +182,7 @@ private fun StarterAgentsInfoCard(
 private fun TemplateCard(
     template: StarterAgentTemplate,
     onClick: () -> Unit,
+    onTagClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -207,10 +227,17 @@ private fun TemplateCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            AssistChip(
-                onClick = onClick,
-                label = { Text(template.tags.last()) },
-            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                template.tags.forEach { tag ->
+                    AssistChip(
+                        onClick = { onTagClick(tag) },
+                        label = { Text(tag) },
+                    )
+                }
+            }
         }
     }
 }

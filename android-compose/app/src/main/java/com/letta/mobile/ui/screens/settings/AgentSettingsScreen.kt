@@ -22,7 +22,11 @@ import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.components.TagDrillInDialog
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.tags.TagDrillInEntityType
+import com.letta.mobile.ui.tags.TagDrillInSource
+import com.letta.mobile.ui.tags.TagDrillInViewModel
 import com.letta.mobile.ui.theme.listItemMetadata
 import com.letta.mobile.ui.theme.listItemSupporting
 
@@ -34,6 +38,8 @@ fun AgentSettingsScreen(
     viewModel: AgentSettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val tagDrillInViewModel: TagDrillInViewModel = hiltViewModel()
+    val tagDrillInState by tagDrillInViewModel.uiState.collectAsStateWithLifecycle()
     val snackbar = LocalSnackbarDispatcher.current
     val context = LocalContext.current
 
@@ -83,9 +89,15 @@ fun AgentSettingsScreen(
                 }
             },
             onDelete = { viewModel.deleteAgent(onNavigateBack) },
+            onTagClick = { tag, source -> tagDrillInViewModel.showTag(tag, source) },
             modifier = modifier
         )
     }
+
+    TagDrillInDialog(
+        state = tagDrillInState,
+        onDismiss = tagDrillInViewModel::dismiss,
+    )
 }
 
 @Composable
@@ -103,6 +115,7 @@ private fun SettingsContent(
     onClone: (cloneName: String?, overrideExistingTools: Boolean, stripMessages: Boolean) -> Unit,
     onResetMessages: () -> Unit,
     onDelete: () -> Unit,
+    onTagClick: (String, TagDrillInSource) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -261,11 +274,15 @@ private fun SettingsContent(
                 ToolDetailDialog(
                     tool = tool,
                     onDismiss = { selectedTool = null },
+                    onTagClick = { tag ->
+                        onTagClick(tag, TagDrillInSource(TagDrillInEntityType.TOOL, tool.id))
+                    },
                 )
             }
         }
 
-        if (!state.agent?.tags.isNullOrEmpty()) {
+        val agent = state.agent
+        if (!agent?.tags.isNullOrEmpty()) {
             CardGroup(title = { Text(stringResource(R.string.common_tags)) }) {
                 item(
                     headlineContent = {
@@ -274,9 +291,14 @@ private fun SettingsContent(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
-                            state.agent?.tags?.forEach { tag ->
+                            agent.tags.forEach { tag ->
                                 AssistChip(
-                                    onClick = {},
+                                    onClick = {
+                                        onTagClick(
+                                            tag,
+                                            TagDrillInSource(TagDrillInEntityType.AGENT, agent.id),
+                                        )
+                                    },
                                     label = { Text(tag) },
                                 )
                             }
@@ -379,6 +401,7 @@ private fun SettingsContent(
 private fun ToolDetailDialog(
     tool: com.letta.mobile.data.model.Tool,
     onDismiss: () -> Unit,
+    onTagClick: (String) -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -425,7 +448,7 @@ private fun ToolDetailDialog(
                         ) {
                             tool.tags.forEach { tag ->
                                 AssistChip(
-                                    onClick = {},
+                                    onClick = { onTagClick(tag) },
                                     label = { Text(tag, style = MaterialTheme.typography.labelSmall) },
                                 )
                             }

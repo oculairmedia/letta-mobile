@@ -2,6 +2,7 @@ package com.letta.mobile.ui.screens.agentlist
 
 import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -95,12 +96,16 @@ import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.components.ShimmerGrid
+import com.letta.mobile.ui.components.TagDrillInDialog
 import com.letta.mobile.ui.navigation.agentAvatarSharedElementKey
 import com.letta.mobile.ui.navigation.optionalSharedElement
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.screens.tools.ToolPickerDialog
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.tags.TagDrillInEntityType
+import com.letta.mobile.ui.tags.TagDrillInSource
+import com.letta.mobile.ui.tags.TagDrillInViewModel
 import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.ui.theme.listItemMetadata
 import com.letta.mobile.ui.theme.listItemSupporting
@@ -115,6 +120,8 @@ fun AgentListScreen(
     viewModel: AgentListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val tagDrillInViewModel: TagDrillInViewModel = hiltViewModel()
+    val tagDrillInState by tagDrillInViewModel.uiState.collectAsStateWithLifecycle()
     var showCreateDialog by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
     var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
@@ -296,6 +303,12 @@ fun AgentListScreen(
                                             onClick = { onNavigateToAgent(favoriteAgent.id) },
                                             onEdit = { onNavigateToEditAgent(favoriteAgent.id) },
                                             onUnfavorite = { viewModel.toggleFavorite(favoriteAgent.id) },
+                                            onTagClick = { tag ->
+                                                tagDrillInViewModel.showTag(
+                                                    tag,
+                                                    TagDrillInSource(TagDrillInEntityType.AGENT, favoriteAgent.id),
+                                                )
+                                            },
                                         )
                                     }
                                 }
@@ -310,6 +323,12 @@ fun AgentListScreen(
                                         onDelete = { viewModel.deleteAgent(agent.id) },
                                         onToggleFavorite = { viewModel.toggleFavorite(agent.id) },
                                         onTogglePinned = { viewModel.togglePinned(agent.id) },
+                                        onTagClick = { tag ->
+                                            tagDrillInViewModel.showTag(
+                                                tag,
+                                                TagDrillInSource(TagDrillInEntityType.AGENT, agent.id),
+                                            )
+                                        },
                                     )
                                 }
                             }
@@ -326,6 +345,12 @@ fun AgentListScreen(
                                             onClick = { onNavigateToAgent(favoriteAgent.id) },
                                             onEdit = { onNavigateToEditAgent(favoriteAgent.id) },
                                             onUnfavorite = { viewModel.toggleFavorite(favoriteAgent.id) },
+                                            onTagClick = { tag ->
+                                                tagDrillInViewModel.showTag(
+                                                    tag,
+                                                    TagDrillInSource(TagDrillInEntityType.AGENT, favoriteAgent.id),
+                                                )
+                                            },
                                         )
                                     }
                                 }
@@ -340,6 +365,12 @@ fun AgentListScreen(
                                         onDelete = { viewModel.deleteAgent(agent.id) },
                                         onToggleFavorite = { viewModel.toggleFavorite(agent.id) },
                                         onTogglePinned = { viewModel.togglePinned(agent.id) },
+                                        onTagClick = { tag ->
+                                            tagDrillInViewModel.showTag(
+                                                tag,
+                                                TagDrillInSource(TagDrillInEntityType.AGENT, agent.id),
+                                            )
+                                        },
                                     )
                                 }
                             }
@@ -379,6 +410,11 @@ fun AgentListScreen(
             },
         )
     }
+
+    TagDrillInDialog(
+        state = tagDrillInState,
+        onDismiss = tagDrillInViewModel::dismiss,
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -388,6 +424,7 @@ private fun FavoriteAgentCard(
     onClick: () -> Unit,
     onEdit: () -> Unit,
     onUnfavorite: () -> Unit,
+    onTagClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val contentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -467,7 +504,7 @@ private fun FavoriteAgentCard(
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     tags.take(4).forEach { tag ->
                         SuggestionChip(
-                            onClick = {},
+                            onClick = { onTagClick(tag) },
                             label = { Text(tag, style = MaterialTheme.typography.labelSmall) },
                         )
                     }
@@ -523,6 +560,7 @@ private fun AgentCard(
     onDelete: () -> Unit,
     onToggleFavorite: () -> Unit,
     onTogglePinned: () -> Unit = {},
+    onTagClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val accentColors = MaterialTheme.customColors
@@ -629,7 +667,7 @@ private fun AgentCard(
                         AgentMetaChip(text = "Sleep")
                     }
                     agent.tags.take(3).forEach { tag ->
-                        AgentTagChip(tag = tag)
+                        AgentTagChip(tag = tag, onClick = { onTagClick(tag) })
                     }
                     if (agent.tags.size > 3) {
                         AgentMetaChip(text = "+${agent.tags.size - 3}")
@@ -698,6 +736,7 @@ private fun CompactAgentCard(
     onDelete: () -> Unit,
     onToggleFavorite: () -> Unit,
     onTogglePinned: () -> Unit = {},
+    onTagClick: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val accentColors = MaterialTheme.customColors
@@ -828,8 +867,9 @@ private fun AgentMetaChip(text: String) {
 }
 
 @Composable
-private fun AgentTagChip(tag: String) {
+private fun AgentTagChip(tag: String, onClick: () -> Unit) {
     Surface(
+        modifier = Modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(50),
         color = MaterialTheme.colorScheme.tertiaryContainer,
     ) {
