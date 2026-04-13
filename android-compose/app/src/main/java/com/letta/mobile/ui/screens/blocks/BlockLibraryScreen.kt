@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.screens.blocks
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -10,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,6 +21,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -26,11 +31,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import com.letta.mobile.ui.components.ExpandableTitleSearch
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.runtime.Composable
@@ -41,7 +44,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
@@ -56,7 +61,9 @@ import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.customColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,13 +72,15 @@ fun BlockLibraryScreen(
     viewModel: BlockLibraryViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var selectedBlock by remember { mutableStateOf<Block?>(null) }
+    val selectedIds by viewModel.selectedIds.collectAsStateWithLifecycle()
+    val isSelectionMode = selectedIds.isNotEmpty()
+
+    var inspectTarget by remember { mutableStateOf<Block?>(null) }
     var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf<Block?>(null) }
-    var deleteTarget by remember { mutableStateOf<Block?>(null) }
     var showCreateDialog by remember { mutableStateOf(false) }
-    var attachTarget by remember { mutableStateOf<Block?>(null) }
-    var detachTarget by remember { mutableStateOf<Pair<Block, Agent>?>(null) }
+    var manageAgentsTarget by remember { mutableStateOf<Block?>(null) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
@@ -81,30 +90,52 @@ fun BlockLibraryScreen(
         topBar = {
             LargeFlexibleTopAppBar(
                 title = {
-                    ExpandableTitleSearch(
-                        query = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty(),
-                        onQueryChange = viewModel::updateSearchQuery,
-                        onClear = { viewModel.updateSearchQuery("") },
-                        expanded = isSearchExpanded,
-                        onExpandedChange = { isSearchExpanded = it },
-                        placeholder = stringResource(R.string.screen_blocks_search_hint),
-                        openSearchContentDescription = stringResource(R.string.action_search),
-                        closeSearchContentDescription = stringResource(R.string.action_close),
-                        titleContent = { Text(stringResource(R.string.screen_blocks_title)) },
-                    )
+                    if (isSelectionMode) {
+                        Text(stringResource(R.string.screen_blocks_selected_count, selectedIds.size))
+                    } else {
+                        ExpandableTitleSearch(
+                            query = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty(),
+                            onQueryChange = viewModel::updateSearchQuery,
+                            onClear = { viewModel.updateSearchQuery("") },
+                            expanded = isSearchExpanded,
+                            onExpandedChange = { isSearchExpanded = it },
+                            placeholder = stringResource(R.string.screen_blocks_search_hint),
+                            openSearchContentDescription = stringResource(R.string.action_search),
+                            closeSearchContentDescription = stringResource(R.string.action_close),
+                            titleContent = { Text(stringResource(R.string.screen_blocks_title)) },
+                        )
+                    }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
+                    IconButton(onClick = {
+                        if (isSelectionMode) viewModel.clearSelection() else onNavigateBack()
+                    }) {
+                        Icon(
+                            if (isSelectionMode) LettaIcons.Close else LettaIcons.ArrowBack,
+                            stringResource(R.string.action_back),
+                        )
                     }
                 },
                 colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.largeTopAppBarColors(),
                 scrollBehavior = scrollBehavior,
+                actions = {
+                    if (isSelectionMode) {
+                        IconButton(onClick = { showDeleteConfirm = true }) {
+                            Icon(
+                                LettaIcons.Delete,
+                                contentDescription = stringResource(R.string.action_delete),
+                                tint = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
+                },
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showCreateDialog = true }) {
-                Icon(LettaIcons.Add, stringResource(R.string.screen_blocks_create_title))
+            if (!isSelectionMode) {
+                FloatingActionButton(onClick = { showCreateDialog = true }) {
+                    Icon(LettaIcons.Add, stringResource(R.string.screen_blocks_create_title))
+                }
             }
         },
     ) { paddingValues ->
@@ -157,11 +188,16 @@ fun BlockLibraryScreen(
                                 BlockLibraryCard(
                                     block = block,
                                     agents = state.data.agentsByBlock[block.id] ?: emptyList(),
-                                    onInspect = { selectedBlock = block },
-                                    onEdit = { if (block.readOnly != true) editTarget = block },
-                                    onDelete = { if (block.readOnly != true) deleteTarget = block },
-                                    onDetachAgent = { agent -> detachTarget = block to agent },
-                                    onAttach = { attachTarget = block },
+                                    isSelected = block.id in selectedIds,
+                                    isSelectionMode = isSelectionMode,
+                                    onTap = {
+                                        if (isSelectionMode) {
+                                            viewModel.toggleSelection(block.id)
+                                        } else {
+                                            inspectTarget = block
+                                        }
+                                    },
+                                    onLongPress = { viewModel.toggleSelection(block.id) },
                                 )
                             }
                         }
@@ -171,16 +207,38 @@ fun BlockLibraryScreen(
         }
     }
 
-    selectedBlock?.let { block ->
+    // Bulk delete confirmation
+    ConfirmDialog(
+        show = showDeleteConfirm,
+        title = stringResource(R.string.screen_blocks_delete_title),
+        message = stringResource(R.string.screen_blocks_delete_selected_confirm, selectedIds.size),
+        confirmText = stringResource(R.string.action_delete),
+        dismissText = stringResource(R.string.action_cancel),
+        onConfirm = {
+            showDeleteConfirm = false
+            viewModel.deleteSelected {}
+        },
+        onDismiss = { showDeleteConfirm = false },
+        destructive = true,
+    )
+
+    inspectTarget?.let { block ->
+        val successData = (uiState as? UiState.Success)?.data
+        val agents = successData?.agentsByBlock?.get(block.id) ?: emptyList()
         BlockDetailDialog(
             block = block,
+            agents = agents,
             onEdit = if (block.readOnly == true) null else {
                 {
-                    selectedBlock = null
+                    inspectTarget = null
                     editTarget = block
                 }
             },
-            onDismiss = { selectedBlock = null },
+            onManageAgents = {
+                inspectTarget = null
+                manageAgentsTarget = block
+            },
+            onDismiss = { inspectTarget = null },
         )
     }
 
@@ -210,88 +268,65 @@ fun BlockLibraryScreen(
             onConfirm = { _, value, description, limit ->
                 viewModel.updateGlobalBlock(block.id, value, description, limit) {
                     editTarget = null
-                    selectedBlock = null
+                    inspectTarget = null
                 }
             },
         )
     }
 
-    deleteTarget?.let { block ->
-        ConfirmDialog(
-            show = true,
-            title = stringResource(R.string.screen_blocks_delete_title),
-            message = stringResource(R.string.screen_blocks_delete_confirm, block.label ?: stringResource(R.string.common_unknown)),
-            confirmText = stringResource(R.string.action_delete),
-            dismissText = stringResource(R.string.action_cancel),
-            onConfirm = {
-                viewModel.deleteBlock(block.id) {
-                    deleteTarget = null
-                    if (selectedBlock?.id == block.id) selectedBlock = null
-                }
-            },
-            onDismiss = { deleteTarget = null },
-            destructive = true,
-        )
-    }
-
-    detachTarget?.let { (block, agent) ->
-        ConfirmDialog(
-            show = true,
-            title = stringResource(R.string.screen_blocks_detach_title),
-            message = stringResource(
-                R.string.screen_blocks_detach_confirm,
-                block.label ?: stringResource(R.string.common_unknown),
-                agent.name,
-            ),
-            confirmText = stringResource(R.string.action_remove),
-            dismissText = stringResource(R.string.action_cancel),
-            onConfirm = {
-                viewModel.detachBlockFromAgent(block.id, agent.id) {
-                    detachTarget = null
-                }
-            },
-            onDismiss = { detachTarget = null },
-            destructive = true,
-        )
-    }
-
-    attachTarget?.let { block ->
+    manageAgentsTarget?.let { block ->
         val successData = (uiState as? UiState.Success)?.data
         val attachedAgentIds = successData?.agentsByBlock?.get(block.id)?.map { it.id }?.toSet() ?: emptySet()
-        val availableAgents = successData?.allAgents?.filter { it.id !in attachedAgentIds } ?: emptyList()
+        val allAgents = successData?.allAgents ?: emptyList()
 
-        AgentPickerDialog(
-            agents = availableAgents,
-            onDismiss = { attachTarget = null },
-            onSelect = { agent ->
-                viewModel.attachBlockToAgent(block.id, agent.id) {
-                    attachTarget = null
+        AgentMultiSelectDialog(
+            agents = allAgents,
+            selectedAgentIds = attachedAgentIds,
+            onDismiss = { manageAgentsTarget = null },
+            onConfirm = { newSelection ->
+                viewModel.updateBlockAgents(block.id, newSelection) {
+                    manageAgentsTarget = null
                 }
             },
         )
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 private fun BlockLibraryCard(
     block: Block,
     agents: List<Agent>,
-    onInspect: () -> Unit,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit,
-    onDetachAgent: (Agent) -> Unit,
-    onAttach: () -> Unit,
+    isSelected: Boolean,
+    isSelectionMode: Boolean,
+    onTap: () -> Unit,
+    onLongPress: () -> Unit,
 ) {
+    val haptic = LocalHapticFeedback.current
+    val selectionColors = MaterialTheme.customColors
+    val containerColor = if (isSelected) {
+        selectionColors.selectionContainer
+    } else {
+        CardDefaults.cardColors().containerColor
+    }
+
     Card(
-        onClick = onInspect,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = onTap,
+                onLongClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onLongPress()
+                },
+            ),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -309,15 +344,13 @@ private fun BlockLibraryCard(
                         )
                     }
                 }
-                if (block.readOnly != true) {
-                    Row {
-                        IconButton(onClick = onEdit) {
-                            Icon(LettaIcons.Edit, stringResource(R.string.action_edit))
-                        }
-                        IconButton(onClick = onDelete) {
-                            Icon(LettaIcons.Delete, stringResource(R.string.action_delete))
-                        }
-                    }
+                if (isSelected) {
+                    Icon(
+                        LettaIcons.CheckCircle,
+                        contentDescription = "Selected",
+                        modifier = Modifier.size(LettaIconSizing.Toolbar),
+                        tint = selectionColors.selectionIndicator,
+                    )
                 }
             }
 
@@ -337,22 +370,15 @@ private fun BlockLibraryCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                if (agents.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.screen_blocks_no_agents),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(vertical = 4.dp),
-                    )
-                } else {
+            if (agents.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
                     agents.forEach { agent ->
                         AssistChip(
-                            onClick = { onDetachAgent(agent) },
+                            onClick = {},
                             label = { Text(agent.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             leadingIcon = {
                                 Icon(
@@ -361,27 +387,9 @@ private fun BlockLibraryCard(
                                     modifier = Modifier.size(AssistChipDefaults.IconSize),
                                 )
                             },
-                            trailingIcon = {
-                                Icon(
-                                    LettaIcons.LinkOff,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(AssistChipDefaults.IconSize),
-                                )
-                            },
                         )
                     }
                 }
-                AssistChip(
-                    onClick = onAttach,
-                    label = { Text(stringResource(R.string.action_attach)) },
-                    leadingIcon = {
-                        Icon(
-                            LettaIcons.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(AssistChipDefaults.IconSize),
-                        )
-                    },
-                )
             }
         }
     }
@@ -390,7 +398,9 @@ private fun BlockLibraryCard(
 @Composable
 private fun BlockDetailDialog(
     block: Block,
+    agents: List<Agent>,
     onEdit: (() -> Unit)?,
+    onManageAgents: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
@@ -425,6 +435,20 @@ private fun BlockDetailDialog(
                     text = block.value,
                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                 )
+                if (agents.isNotEmpty()) {
+                    HorizontalDivider()
+                    Text(
+                        text = stringResource(R.string.common_agents),
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                    agents.forEach { agent ->
+                        Text(
+                            text = agent.name,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
@@ -433,6 +457,9 @@ private fun BlockDetailDialog(
                     TextButton(onClick = it) {
                         Text(stringResource(R.string.action_edit))
                     }
+                }
+                TextButton(onClick = onManageAgents) {
+                    Text(stringResource(R.string.screen_blocks_manage_agents))
                 }
                 TextButton(onClick = onDismiss) {
                     Text(stringResource(R.string.action_close))
@@ -523,16 +550,17 @@ private fun BlockEditorDialog(
 }
 
 @Composable
-private fun AgentPickerDialog(
+private fun AgentMultiSelectDialog(
     agents: List<Agent>,
+    selectedAgentIds: Set<String>,
     onDismiss: () -> Unit,
-    onSelect: (Agent) -> Unit,
+    onConfirm: (Set<String>) -> Unit,
 ) {
-    var selected by remember { mutableStateOf<Agent?>(null) }
+    var selection by remember(selectedAgentIds) { mutableStateOf(selectedAgentIds) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.screen_blocks_attach_title)) },
+        title = { Text(stringResource(R.string.screen_blocks_manage_agents)) },
         text = {
             if (agents.isEmpty()) {
                 Text(
@@ -540,33 +568,42 @@ private fun AgentPickerDialog(
                     style = MaterialTheme.typography.bodyMedium,
                 )
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.heightIn(max = 360.dp),
+                ) {
                     items(agents, key = { it.id }) { agent ->
-                        Row(
+                        val isChecked = agent.id in selection
+                        TextButton(
+                            onClick = {
+                                selection = if (isChecked) selection - agent.id else selection + agent.id
+                            },
                             modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            RadioButton(
-                                selected = selected?.id == agent.id,
-                                onClick = { selected = agent },
-                            )
-                            Text(
-                                text = agent.name,
-                                style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Checkbox(
+                                    checked = isChecked,
+                                    onCheckedChange = null,
+                                )
+                                Spacer(modifier = Modifier.size(8.dp))
+                                Text(
+                                    text = agent.name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                     }
                 }
             }
         },
         confirmButton = {
-            TextButton(
-                onClick = { selected?.let(onSelect) },
-                enabled = selected != null,
-            ) {
-                Text(stringResource(R.string.action_attach))
+            TextButton(onClick = { onConfirm(selection) }) {
+                Text(stringResource(R.string.action_save))
             }
         },
         dismissButton = {

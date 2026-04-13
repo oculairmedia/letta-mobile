@@ -332,6 +332,9 @@
     <string name="screen_blocks_no_agents">Not attached to any agents</string>
     <string name="screen_blocks_attach_hint">Select an agent</string>
     <string name="screen_blocks_no_available_agents">No available agents to attach</string>
+    <string name="screen_blocks_selected_count">%1$d selected</string>
+    <string name="screen_blocks_delete_selected_confirm">Delete %1$d selected blocks? This action cannot be undone.</string>
+    <string name="screen_blocks_manage_agents">Manage Agents</string>
     <string name="screen_models_title">Models</string>
     <string name="screen_models_search_hint">Search models…</string>
     <string name="screen_models_filter_all">All</string>

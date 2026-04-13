@@ -41,6 +41,9 @@ class BlockLibraryViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<UiState<BlockLibraryUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<BlockLibraryUiState>> = _uiState.asStateFlow()
 
+    private val _selectedIds = MutableStateFlow<Set<String>>(emptySet())
+    val selectedIds: StateFlow<Set<String>> = _selectedIds.asStateFlow()
+
     private var filterLabel: String? = null
     private var filterTemplate: Boolean? = null
     private var searchQuery: String = ""
@@ -213,6 +216,46 @@ class BlockLibraryViewModel @Inject constructor(
                 onSuccess()
             } catch (e: Exception) {
                 reportOperationError(mapErrorToUserMessage(e, "Failed to attach block"))
+            }
+        }
+    }
+
+    fun toggleSelection(id: String) {
+        _selectedIds.value = _selectedIds.value.let { current ->
+            if (id in current) current - id else current + id
+        }
+    }
+
+    fun clearSelection() {
+        _selectedIds.value = emptySet()
+    }
+
+    fun deleteSelected(onComplete: () -> Unit) {
+        val ids = _selectedIds.value.toList()
+        if (ids.isEmpty()) return
+        _selectedIds.value = emptySet()
+        viewModelScope.launch {
+            for (id in ids) {
+                try { blockRepository.deleteBlock(id) } catch (_: Exception) {}
+            }
+            loadBlocks()
+            onComplete()
+        }
+    }
+
+    fun updateBlockAgents(blockId: String, newAgentIds: Set<String>, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            val currentAgentIds = (_uiState.value as? UiState.Success)?.data
+                ?.agentsByBlock?.get(blockId)?.map { it.id }?.toSet() ?: emptySet()
+            val toAttach = newAgentIds - currentAgentIds
+            val toDetach = currentAgentIds - newAgentIds
+            try {
+                toAttach.forEach { blockRepository.attachBlock(it, blockId) }
+                toDetach.forEach { blockRepository.detachBlock(it, blockId) }
+                loadBlocks()
+                onSuccess()
+            } catch (e: Exception) {
+                reportOperationError(mapErrorToUserMessage(e, "Failed to update agents"))
             }
         }
     }
