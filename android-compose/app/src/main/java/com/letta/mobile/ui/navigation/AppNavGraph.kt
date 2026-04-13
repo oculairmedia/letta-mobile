@@ -25,10 +25,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.letta.mobile.NotificationNavigationTarget
 import com.letta.mobile.data.repository.SettingsRepository
+import com.letta.mobile.ui.screens.projects.ProjectHomeScreen
 import com.letta.mobile.ui.screens.about.AboutScreen
 import com.letta.mobile.ui.screens.agentlist.AgentListScreen
 import com.letta.mobile.ui.screens.archives.ArchiveAdminScreen
-import com.letta.mobile.ui.screens.dashboard.HomeScreen
 import com.letta.mobile.ui.screens.archival.ArchivalScreen
 import com.letta.mobile.ui.screens.blocks.BlockLibraryScreen
 import com.letta.mobile.ui.screens.chat.AgentScaffold
@@ -137,28 +137,21 @@ fun AppNavGraph(
                 startDestination = startDestination
             ) {
         composable<HomeRoute> {
-            HomeScreen(
-                onNavigateToAgents = { navController.navigate(AgentListRoute) },
-                onNavigateToConversations = { navController.navigate(ConversationsRoute) },
-                onNavigateToTools = { navController.navigate(AllToolsRoute) },
-                onNavigateToBlocks = { navController.navigate(BlocksRoute) },
-                onNavigateToSettings = { navController.navigate(ConfigRoute) },
-                onNavigateToChat = { agentId, initialMessage ->
-                    navController.navigate(AgentChatRoute(agentId = agentId, initialMessage = initialMessage))
-                },
-                onNavigateToChatMessage = { agentId, conversationId, messageId ->
+            ProjectHomeScreen(
+                onNavigateToProjectChat = { project ->
                     navController.navigate(
                         AgentChatRoute(
-                            agentId = agentId,
-                            conversationId = conversationId,
-                            scrollToMessageId = messageId,
+                            agentId = project.lettaAgentId.orEmpty(),
+                            projectIdentifier = project.identifier,
+                            projectName = project.name,
+                            projectFilesystemPath = project.filesystemPath,
+                            projectGitUrl = project.gitUrl,
+                            projectLastSyncAt = project.lastSyncAt,
+                            projectActiveCodingAgents = project.techStack,
                         )
                     )
                 },
-                onNavigateToEditAgent = { agentId ->
-                    navController.navigate(EditAgentRoute(agentId))
-                },
-                onNavigateToUsage = { navController.navigate(UsageRoute) },
+                onNavigateToSettings = { navController.navigate(ConfigRoute) },
             )
         }
 
