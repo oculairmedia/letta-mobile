@@ -4,6 +4,7 @@ import android.util.Log
 import com.letta.mobile.bot.channel.ChannelMessage
 import com.letta.mobile.bot.channel.DeliveryResult
 import com.letta.mobile.bot.config.BotConfig
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -80,12 +81,20 @@ class BotGateway @Inject constructor(
      * Route an incoming message to the appropriate agent.
      * Uses the message's agentId if present, otherwise falls back to default.
      */
-    suspend fun routeMessage(message: ChannelMessage): BotResponse {
+    suspend fun routeMessage(message: ChannelMessage, conversationId: String? = null): BotResponse {
         val session = message.targetAgentId?.let { getSession(it) }
             ?: getDefaultSession()
             ?: throw IllegalStateException("No active bot sessions")
 
-        return session.sendToAgent(message)
+        return session.sendToAgent(message, conversationId)
+    }
+
+    fun streamMessage(message: ChannelMessage, conversationId: String? = null): Flow<BotResponseChunk> {
+        val session = message.targetAgentId?.let { getSession(it) }
+            ?: getDefaultSession()
+            ?: throw IllegalStateException("No active bot sessions")
+
+        return session.streamToAgent(message, conversationId)
     }
 
     /**

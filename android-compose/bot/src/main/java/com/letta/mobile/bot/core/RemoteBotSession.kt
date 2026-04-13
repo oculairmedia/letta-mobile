@@ -6,31 +6,15 @@ import com.letta.mobile.bot.channel.ChannelMessage
 import com.letta.mobile.bot.channel.DeliveryResult
 import com.letta.mobile.bot.config.BotConfig
 import com.letta.mobile.bot.message.DirectiveParser
+import com.letta.mobile.bot.protocol.BotChatRequest
+import com.letta.mobile.bot.protocol.ExternalBotClient
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.engine.okhttp.OkHttp
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.plugins.auth.Auth
-import io.ktor.client.plugins.auth.providers.BearerTokens
-import io.ktor.client.plugins.auth.providers.bearer
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.request.get
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
-import io.ktor.http.contentType
-import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 
 /**
  * Remote bot session — proxies requests to an external lettabot HTTP server.
@@ -54,39 +38,16 @@ class RemoteBotSession @AssistedInject constructor(
     private val _status = MutableStateFlow(BotStatus.IDLE)
     override val status = _status.asStateFlow()
 
-    private var client: HttpClient? = null
-
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        encodeDefaults = true
-        explicitNulls = false
-    }
+    private var client: ExternalBotClient? = null
 
     override suspend fun start() {
         _status.value = BotStatus.STARTING
         val baseUrl = config.remoteUrl ?: throw IllegalStateException("Remote URL not configured")
 
-        client = HttpClient(OkHttp) {
-            install(ContentNegotiation) { json(json) }
-            install(HttpTimeout) {
-                requestTimeoutMillis = 120_000
-                connectTimeoutMillis = 15_000
-                socketTimeoutMillis = 120_000
-            }
-            config.remoteToken?.let { token ->
-                install(Auth) {
-                    bearer { loadTokens { BearerTokens(token, token) } }
-                }
-            }
-        }
+        client = ExternalBotClient(baseUrl = baseUrl, token = config.remoteToken)
 
-        // Verify connection
         try {
-            val response = client!!.get("$baseUrl/api/v1/status")
-            if (response.status.value !in 200..299) {
-                throw IllegalStateException("Bot server returned ${response.status.value}")
-            }
+            client!!.getStatus()
             _status.value = BotStatus.RUNNING
             Log.i(TAG, "Connected to remote bot at $baseUrl")
         } catch (e: Exception) {
@@ -104,12 +65,11 @@ class RemoteBotSession @AssistedInject constructor(
     }
 
     override suspend fun sendToAgent(message: ChannelMessage, conversationId: String?): BotResponse {
-        val httpClient = client ?: throw IllegalStateException("Session not started")
-        val baseUrl = config.remoteUrl!!
+        val remoteClient = client ?: throw IllegalStateException("Session not started")
 
         _status.value = BotStatus.PROCESSING
         try {
-            val request = RemoteChatRequest(
+            val request = BotChatRequest(
                 message = message.text,
                 channelId = message.channelId,
                 chatId = message.chatId,
@@ -118,16 +78,7 @@ class RemoteBotSession @AssistedInject constructor(
                 conversationId = conversationId,
             )
 
-            val response = httpClient.post("$baseUrl/api/v1/chat") {
-                contentType(ContentType.Application.Json)
-                setBody(request)
-            }
-
-            if (response.status.value !in 200..299) {
-                throw RuntimeException("Bot server error: ${response.status.value} ${response.bodyAsText()}")
-            }
-
-            val chatResponse: RemoteChatResponse = response.body()
+            val chatResponse = remoteClient.sendMessage(request)
             val parseResult = if (config.directivesEnabled) {
                 DirectiveParser.parse(chatResponse.response)
             } else {
@@ -151,7 +102,13 @@ class RemoteBotSession @AssistedInject constructor(
         // For remote mode, fall back to non-streaming and emit the full response.
         // Streaming support can be added later with SSE.
         val response = sendToAgent(message, conversationId)
-        emit(BotResponseChunk(text = response.text, isComplete = true))
+        emit(
+            BotResponseChunk(
+                text = response.text,
+                conversationId = response.conversationId,
+                isComplete = true,
+            )
+        )
     }
 
     override suspend fun deliverToChannel(response: BotResponse, sourceMessage: ChannelMessage): DeliveryResult {
@@ -180,22 +137,3 @@ class RemoteBotSession @AssistedInject constructor(
         private const val TAG = "RemoteBotSession"
     }
 }
-
-/** Request payload for the remote bot's /api/v1/chat endpoint. */
-@Serializable
-internal data class RemoteChatRequest(
-    val message: String,
-    @SerialName("channel_id") val channelId: String? = null,
-    @SerialName("chat_id") val chatId: String? = null,
-    @SerialName("sender_id") val senderId: String? = null,
-    @SerialName("sender_name") val senderName: String? = null,
-    @SerialName("conversation_id") val conversationId: String? = null,
-)
-
-/** Response from the remote bot's /api/v1/chat endpoint. */
-@Serializable
-internal data class RemoteChatResponse(
-    val response: String,
-    @SerialName("conversation_id") val conversationId: String? = null,
-    @SerialName("agent_id") val agentId: String? = null,
-)

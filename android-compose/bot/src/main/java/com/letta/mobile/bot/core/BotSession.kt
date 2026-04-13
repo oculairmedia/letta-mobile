@@ -98,6 +98,7 @@ data class BotResponse(
 /** A streaming chunk from the agent. */
 data class BotResponseChunk(
     val text: String? = null,
+    val conversationId: String? = null,
     val isComplete: Boolean = false,
     val directive: Directive? = null,
 )

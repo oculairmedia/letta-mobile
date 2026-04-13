@@ -1,9 +1,14 @@
 package com.letta.mobile.bot.api
 
 import android.util.Log
-import com.letta.mobile.bot.channel.ChannelMessage
-import com.letta.mobile.bot.core.BotGateway
-import com.letta.mobile.bot.core.BotResponse
+import com.letta.mobile.bot.protocol.BotAgentInfo
+import com.letta.mobile.bot.protocol.BotChatRequest
+import com.letta.mobile.bot.protocol.BotChatResponse
+import com.letta.mobile.bot.protocol.BotErrorResponse
+import com.letta.mobile.bot.protocol.BotStatusResponse
+import com.letta.mobile.bot.protocol.BotStreamChunk
+import com.letta.mobile.bot.protocol.InternalBotClient
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
@@ -13,14 +18,14 @@ import io.ktor.server.netty.Netty
 import io.ktor.server.netty.NettyApplicationEngine
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.request.receive
+import io.ktor.server.response.respondTextWriter
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import kotlinx.coroutines.flow.collect
 import kotlinx.serialization.json.Json
-import java.util.UUID
+import kotlinx.serialization.encodeToString
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -39,15 +44,22 @@ import javax.inject.Singleton
  */
 @Singleton
 class BotApiServer @Inject constructor(
-    private val gateway: BotGateway,
+    private val internalBotClient: InternalBotClient,
 ) {
     private var server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
     private var running = false
 
     val isRunning: Boolean get() = running
 
+    val activePort: Int? get() = if (running) currentPort else null
+
+    private var currentPort: Int? = null
+
     fun start(port: Int = DEFAULT_PORT) {
-        if (running) return
+        if (running && currentPort == port) return
+        if (running) {
+            stop()
+        }
 
         server = embeddedServer(Netty, port = port) {
             install(ContentNegotiation) {
@@ -61,43 +73,40 @@ class BotApiServer @Inject constructor(
             routing {
                 // Health check
                 get("/api/v1/status") {
-                    call.respond(StatusResponse(
-                        status = gateway.status.value.name.lowercase(),
-                        agents = gateway.sessions.value.keys.toList(),
-                    ))
+                    call.respond(internalBotClient.getStatus())
                 }
 
                 // List active agents
                 get("/api/v1/agents") {
-                    val agents = gateway.sessions.value.map { (id, session) ->
-                        AgentInfo(id = id, name = session.displayName, status = session.status.value.name.lowercase())
-                    }
-                    call.respond(agents)
+                    call.respond(internalBotClient.listAgents())
                 }
 
-                // Chat endpoint
                 post("/api/v1/chat") {
                     try {
-                        val request = call.receive<ChatRequest>()
-                        val message = ChannelMessage(
-                            messageId = UUID.randomUUID().toString(),
-                            channelId = request.channelId ?: "api",
-                            chatId = request.chatId ?: "api",
-                            senderId = request.senderId ?: "api_user",
-                            senderName = request.senderName,
-                            text = request.message,
-                            targetAgentId = request.agentId,
-                        )
-
-                        val response: BotResponse = gateway.routeMessage(message)
-                        call.respond(ChatResponse(
-                            response = response.text,
-                            conversationId = response.conversationId,
-                            agentId = response.agentId,
-                        ))
+                        val request = call.receive<BotChatRequest>()
+                        call.respond(internalBotClient.sendMessage(request))
                     } catch (e: Exception) {
                         Log.e(TAG, "Chat API error", e)
-                        call.respond(HttpStatusCode.InternalServerError, ErrorResponse(e.message ?: "Unknown error"))
+                        call.respond(HttpStatusCode.InternalServerError, BotErrorResponse(e.message ?: "Unknown error"))
+                    }
+                }
+
+                post("/api/v1/chat/stream") {
+                    try {
+                        val request = call.receive<BotChatRequest>()
+                        call.respondTextWriter(contentType = ContentType.Text.EventStream) {
+                            internalBotClient.streamMessage(request).collect { chunk ->
+                                write("data: ${Json.encodeToString(chunk)}\n\n")
+                                flush()
+                                if (chunk.done) {
+                                    write("data: [DONE]\n\n")
+                                    flush()
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Chat stream API error", e)
+                        call.respond(HttpStatusCode.InternalServerError, BotErrorResponse(e.message ?: "Unknown error"))
                     }
                 }
             }
@@ -105,6 +114,7 @@ class BotApiServer @Inject constructor(
 
         server?.start(wait = false)
         running = true
+        currentPort = port
         Log.i(TAG, "Bot API server started on port $port")
     }
 
@@ -112,6 +122,7 @@ class BotApiServer @Inject constructor(
         server?.stop(gracePeriodMillis = 1000, timeoutMillis = 5000)
         server = null
         running = false
+        currentPort = null
         Log.i(TAG, "Bot API server stopped")
     }
 
@@ -120,39 +131,3 @@ class BotApiServer @Inject constructor(
         const val DEFAULT_PORT = 8080
     }
 }
-
-@Serializable
-data class StatusResponse(
-    val status: String,
-    val agents: List<String>,
-)
-
-@Serializable
-data class AgentInfo(
-    val id: String,
-    val name: String,
-    val status: String,
-)
-
-@Serializable
-data class ChatRequest(
-    val message: String,
-    @SerialName("channel_id") val channelId: String? = null,
-    @SerialName("chat_id") val chatId: String? = null,
-    @SerialName("sender_id") val senderId: String? = null,
-    @SerialName("sender_name") val senderName: String? = null,
-    @SerialName("agent_id") val agentId: String? = null,
-    @SerialName("conversation_id") val conversationId: String? = null,
-)
-
-@Serializable
-data class ChatResponse(
-    val response: String,
-    @SerialName("conversation_id") val conversationId: String? = null,
-    @SerialName("agent_id") val agentId: String? = null,
-)
-
-@Serializable
-data class ErrorResponse(
-    val error: String,
-)
