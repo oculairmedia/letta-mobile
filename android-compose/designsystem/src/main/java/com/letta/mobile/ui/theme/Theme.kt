@@ -14,6 +14,8 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
@@ -188,6 +190,20 @@ private fun buildDarkScheme(
 
 private fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
     val complementary = colorScheme.primary.complementary()
+    val complementaryHsl = complementary.toHslColor()
+    val isLightTheme = colorScheme.background.luminance() > 0.5f
+    val freshAccent = Color.hsl(
+        complementaryHsl.hue,
+        complementaryHsl.saturation.coerceAtLeast(0.45f),
+        if (isLightTheme) {
+            complementaryHsl.lightness.coerceIn(0.48f, 0.62f)
+        } else {
+            complementaryHsl.lightness.coerceIn(0.62f, 0.74f)
+        },
+    )
+    val freshAccentContainer = freshAccent.copy(
+        alpha = if (isLightTheme) 0.18f else 0.28f,
+    ).compositeOver(colorScheme.surfaceContainerHigh)
     return CustomColors(
     userBubbleBgColor = colorScheme.primaryContainer,
     agentBubbleBgColor = colorScheme.surfaceContainerLow,
@@ -212,6 +228,10 @@ private fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
     iconPrimary = colorScheme.onSurface,
     iconSecondary = colorScheme.onSurfaceVariant,
     iconAccent = colorScheme.primary,
+    freshAccent = freshAccent,
+    onFreshAccent = if (isLightTheme) Color.White else colorScheme.background,
+    freshAccentContainer = freshAccentContainer,
+    onFreshAccentContainer = colorScheme.onSurface,
     listItemContainerColor = colorScheme.surfaceBright,
     selectionContainer = complementary.copy(alpha = 0.15f),
     onSelectionContainer = colorScheme.onSurface,
@@ -219,7 +239,7 @@ private fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
     borderDefault = colorScheme.outlineVariant,
     borderFocused = colorScheme.primary,
     borderCritical = colorScheme.error,
-)
+    )
 }
 
 private val SakuraThemeColors = PresetThemeColors(

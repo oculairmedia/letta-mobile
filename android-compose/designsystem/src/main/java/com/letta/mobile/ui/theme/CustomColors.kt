@@ -44,6 +44,11 @@ data class CustomColors(
     val iconSecondary: Color = Color.Unspecified,
     val iconAccent: Color = Color.Unspecified,
 
+    val freshAccent: Color = Color.Unspecified,
+    val onFreshAccent: Color = Color.Unspecified,
+    val freshAccentContainer: Color = Color.Unspecified,
+    val onFreshAccentContainer: Color = Color.Unspecified,
+
     val listItemContainerColor: Color = Color.Unspecified,
 
     // Selection (complementary to primary — warm↔cool inversion)
