@@ -44,31 +44,38 @@ class ProjectHomeViewModel @Inject constructor(
                 _uiState.value = UiState.Success(current.copy(isRefreshing = true))
             }
 
-            try {
+            // The /api/registry/projects endpoint may not be available on all
+            // server deployments; degrade gracefully to an empty list so the
+            // home screen remains usable and navigation stays accessible.
+            val refreshed = runCatching {
                 if (forceRefresh) {
                     projectRepository.refreshProjects()
                 } else {
                     projectRepository.refreshProjectsIfStale(maxAgeMs = 60_000)
                 }
+            }
 
-                val projects = projectRepository.projects.value
-                    .sortedWith(
-                        compareByDescending<ProjectSummary> { projectLastActivity(it) }
-                            .thenBy { it.name.lowercase() }
-                    )
-
-                _uiState.value = UiState.Success(
-                    ProjectHomeUiState(
-                        projects = projects.toImmutableList(),
-                        selectedProjectId = current?.selectedProjectId,
-                        isRefreshing = false,
-                    )
-                )
-            } catch (e: Exception) {
-                _uiState.value = UiState.Error(
-                    mapErrorToUserMessage(e, "Failed to load projects")
+            if (refreshed.isFailure) {
+                android.util.Log.w(
+                    "ProjectHomeVM",
+                    "Failed to load projects",
+                    refreshed.exceptionOrNull(),
                 )
             }
+
+            val projects = projectRepository.projects.value
+                .sortedWith(
+                    compareByDescending<ProjectSummary> { projectLastActivity(it) }
+                        .thenBy { it.name.lowercase() }
+                )
+
+            _uiState.value = UiState.Success(
+                ProjectHomeUiState(
+                    projects = projects.toImmutableList(),
+                    selectedProjectId = current?.selectedProjectId,
+                    isRefreshing = false,
+                )
+            )
         }
     }
 

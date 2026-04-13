@@ -28,13 +28,18 @@ data class ConfigUiState(
     val theme: AppTheme = AppTheme.SYSTEM,
     val themePreset: ThemePreset = ThemePreset.DEFAULT,
     val dynamicColor: Boolean = false,
+    val enableProjects: Boolean = false,
 )
 
 @HiltViewModel
 class ConfigViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
-    
+
+    companion object {
+        const val DEFAULT_CLOUD_URL = "https://api.letta.com"
+    }
+
     private val _uiState = MutableStateFlow<UiState<ConfigUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<ConfigUiState>> = _uiState.asStateFlow()
 
@@ -50,6 +55,7 @@ class ConfigViewModel @Inject constructor(
                 val appTheme = settingsRepository.getTheme().first()
                 val themePreset = settingsRepository.getThemePreset().first()
                 val dynamicColor = settingsRepository.getDynamicColor().first()
+                val enableProjects = settingsRepository.getEnableProjects().first()
                 val configUiState = if (config != null) {
                     ConfigUiState(
                         mode = if (config.mode == LettaConfig.Mode.CLOUD) ServerMode.CLOUD else ServerMode.SELF_HOSTED,
@@ -58,12 +64,14 @@ class ConfigViewModel @Inject constructor(
                         theme = appTheme,
                         themePreset = themePreset,
                         dynamicColor = dynamicColor,
+                        enableProjects = enableProjects,
                     )
                 } else {
                     ConfigUiState(
                         theme = appTheme,
                         themePreset = themePreset,
                         dynamicColor = dynamicColor,
+                        enableProjects = enableProjects,
                     )
                 }
                 _uiState.value = UiState.Success(configUiState)
@@ -74,10 +82,15 @@ class ConfigViewModel @Inject constructor(
     }
 
     fun updateMode(mode: ServerMode) {
-        val currentState = (_uiState.value as? UiState.Success)?.data
-        if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(mode = mode))
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        val updatedUrl = when (mode) {
+            ServerMode.CLOUD -> DEFAULT_CLOUD_URL
+            ServerMode.SELF_HOSTED ->
+                if (currentState.serverUrl == DEFAULT_CLOUD_URL) "" else currentState.serverUrl
         }
+        _uiState.value = UiState.Success(
+            currentState.copy(mode = mode, serverUrl = updatedUrl)
+        )
     }
 
     fun updateServerUrl(url: String) {
@@ -120,18 +133,30 @@ class ConfigViewModel @Inject constructor(
         }
     }
 
+    fun updateEnableProjects(enabled: Boolean) {
+        val currentState = (_uiState.value as? UiState.Success)?.data
+        if (currentState != null) {
+            _uiState.value = UiState.Success(currentState.copy(enableProjects = enabled))
+        }
+    }
+
     fun saveConfig(onSuccess: () -> Unit, onError: ((String) -> Unit)? = null) {
         viewModelScope.launch {
             try {
                 val state = (_uiState.value as? UiState.Success)?.data ?: return@launch
-                val url = state.serverUrl.trim()
-                if (url.isBlank()) {
-                    onError?.invoke("Server URL is required")
-                    return@launch
-                }
-                if (!url.startsWith("http://") && !url.startsWith("https://")) {
-                    onError?.invoke("Server URL must start with http:// or https://")
-                    return@launch
+                val url = if (state.mode == ServerMode.CLOUD) {
+                    DEFAULT_CLOUD_URL
+                } else {
+                    val raw = state.serverUrl.trim()
+                    if (raw.isBlank()) {
+                        onError?.invoke("Server URL is required")
+                        return@launch
+                    }
+                    if (!raw.startsWith("http://") && !raw.startsWith("https://")) {
+                        onError?.invoke("Server URL must start with http:// or https://")
+                        return@launch
+                    }
+                    raw
                 }
                 val existingConfig = settingsRepository.activeConfig.value
                 val config = LettaConfig(
@@ -144,6 +169,7 @@ class ConfigViewModel @Inject constructor(
                 settingsRepository.setTheme(state.theme)
                 settingsRepository.setThemePreset(state.themePreset)
                 settingsRepository.setDynamicColor(state.dynamicColor)
+                settingsRepository.setEnableProjects(state.enableProjects)
                 onSuccess()
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(e.message ?: "Failed to save config")

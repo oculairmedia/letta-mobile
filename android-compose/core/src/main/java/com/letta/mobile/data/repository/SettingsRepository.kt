@@ -63,6 +63,7 @@ class SettingsRepository @Inject constructor(
         val PINNED_CONVERSATION_IDS = stringSetPreferencesKey("pinned_conversation_ids")
         val PINNED_AGENT_IDS = stringSetPreferencesKey("pinned_agent_ids")
         val CHAT_FONT_SCALE = floatPreferencesKey("chat_font_scale")
+        val ENABLE_PROJECTS = booleanPreferencesKey("enable_projects")
     }
 
     init {
@@ -262,6 +263,16 @@ class SettingsRepository @Inject constructor(
         val clamped = scale.coerceIn(0.7f, 1.6f)
         dataStore.edit { prefs ->
             prefs[Keys.CHAT_FONT_SCALE] = clamped
+        }
+    }
+
+    fun getEnableProjects(): Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[Keys.ENABLE_PROJECTS] ?: false
+    }
+
+    suspend fun setEnableProjects(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[Keys.ENABLE_PROJECTS] = enabled
         }
     }
 

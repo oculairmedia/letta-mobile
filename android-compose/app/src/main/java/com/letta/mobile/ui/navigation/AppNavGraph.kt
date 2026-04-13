@@ -139,22 +139,11 @@ fun AppNavGraph(
                 startDestination = startDestination
             ) {
         composable<HomeRoute> {
-            ProjectHomeScreen(
-                onNavigateToProjectChat = { project ->
-                    navController.navigate(
-                        AgentChatRoute(
-                            agentId = project.lettaAgentId.orEmpty(),
-                            projectIdentifier = project.identifier,
-                            projectName = project.name,
-                            projectFilesystemPath = project.filesystemPath,
-                            projectGitUrl = project.gitUrl,
-                            projectLastSyncAt = project.lastSyncAt,
-                            projectActiveCodingAgents = project.techStack,
-                        )
-                    )
-                },
-                onNavigateToSettings = { navController.navigate(ConfigRoute) },
-            )
+            LaunchedEffect(Unit) {
+                navController.navigate(ConversationsRoute) {
+                    popUpTo<HomeRoute> { inclusive = true }
+                }
+            }
         }
 
         composable<UsageRoute>(
@@ -196,6 +185,7 @@ fun AppNavGraph(
                         onNavigateToMcp = { navController.navigate(McpRoute) },
                         onNavigateToAbout = { navController.navigate(AboutRoute) },
                         onNavigateToBotSettings = { navController.navigate(BotSettingsRoute) },
+                        onNavigateToProjects = { navController.navigate(ProjectsRoute) },
                     )
                 } else {
                     ConversationsScreen(
@@ -218,6 +208,7 @@ fun AppNavGraph(
                         onNavigateToMcp = { navController.navigate(McpRoute) },
                         onNavigateToAbout = { navController.navigate(AboutRoute) },
                         onNavigateToBotSettings = { navController.navigate(BotSettingsRoute) },
+                        onNavigateToProjects = { navController.navigate(ProjectsRoute) },
                     )
                 }
             }
@@ -379,6 +370,30 @@ fun AppNavGraph(
         ) {
             BotConfigEditScreen(
                 onNavigateBack = { navController.popBackStack() },
+            )
+        }
+
+        composable<ProjectsRoute>(
+            enterTransition = drillInEnter,
+            exitTransition = drillInExit,
+            popEnterTransition = drillInPopEnter,
+            popExitTransition = drillInPopExit,
+        ) {
+            ProjectHomeScreen(
+                onNavigateToProjectChat = { project ->
+                    navController.navigate(
+                        AgentChatRoute(
+                            agentId = project.lettaAgentId.orEmpty(),
+                            projectIdentifier = project.identifier,
+                            projectName = project.name,
+                            projectFilesystemPath = project.filesystemPath,
+                            projectGitUrl = project.gitUrl,
+                            projectLastSyncAt = project.lastSyncAt,
+                            projectActiveCodingAgents = project.techStack,
+                        )
+                    )
+                },
+                onNavigateToSettings = { navController.navigate(ConfigRoute) },
             )
         }
 

@@ -147,6 +147,9 @@
     <string name="screen_config_dynamic_color_supported">Use Material You colors on Android 12 and newer. This overrides the selected preset.</string>
     <string name="screen_config_dynamic_color_unsupported">Material You dynamic color requires Android 12 or newer.</string>
     <string name="screen_config_theme_mode_system">System</string>
+    <string name="screen_config_features_section">Features</string>
+    <string name="screen_config_enable_projects">Projects home</string>
+    <string name="screen_config_enable_projects_description">Show the Projects dashboard as the home screen. Requires a project registry endpoint on your server.</string>
     <string name="screen_agent_edit_title">Edit Agent</string>
     <string name="common_name">Name</string>
     <string name="common_id">ID</string>

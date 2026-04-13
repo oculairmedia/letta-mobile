@@ -67,6 +67,7 @@ fun ConfigScreen(
                 onThemeChange = { viewModel.updateTheme(it) },
                 onThemePresetChange = { viewModel.updateThemePreset(it) },
                 onDynamicColorChange = { viewModel.updateDynamicColor(it) },
+                onEnableProjectsChange = { viewModel.updateEnableProjects(it) },
                 onSave = {
                     viewModel.saveConfig(
                         onSuccess = { snackbar.dispatch("Configuration saved"); onNavigateBack() },
@@ -88,6 +89,7 @@ private fun ConfigContent(
     onThemeChange: (AppTheme) -> Unit,
     onThemePresetChange: (ThemePreset) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
+    onEnableProjectsChange: (Boolean) -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -119,7 +121,13 @@ private fun ConfigContent(
                     }
                 },
             )
-            if (state.mode == ServerMode.SELF_HOSTED) {
+            if (state.mode == ServerMode.CLOUD) {
+                item(
+                    headlineContent = { Text(stringResource(R.string.common_server_url)) },
+                    supportingContent = { Text(ConfigViewModel.DEFAULT_CLOUD_URL) },
+                    leadingContent = { Icon(LettaIcons.Link, null) },
+                )
+            } else {
                 item(
                     headlineContent = {
                         OutlinedTextField(
@@ -221,6 +229,19 @@ private fun ConfigContent(
                                 R.string.screen_config_theme_preset
                             }
                         )
+                    )
+                },
+            )
+        }
+
+        CardGroup(title = { Text(stringResource(R.string.screen_config_features_section)) }) {
+            item(
+                headlineContent = { Text(stringResource(R.string.screen_config_enable_projects)) },
+                supportingContent = { Text(stringResource(R.string.screen_config_enable_projects_description)) },
+                trailingContent = {
+                    Switch(
+                        checked = state.enableProjects,
+                        onCheckedChange = onEnableProjectsChange,
                     )
                 },
             )
