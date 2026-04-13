@@ -16,7 +16,12 @@ object GeneratedUiRenderer : MessageContentRenderer {
     override fun canRender(message: UiMessage): Boolean = message.generatedUi != null
 
     @Composable
-    override fun Render(message: UiMessage, textColor: Color, modifier: Modifier) {
+    override fun Render(
+        message: UiMessage,
+        textColor: Color,
+        modifier: Modifier,
+        onGeneratedUiMessage: ((String) -> Unit)?,
+    ) {
         val generatedUi = message.generatedUi ?: return
         Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (message.content.isNotBlank()) {
@@ -25,7 +30,10 @@ object GeneratedUiRenderer : MessageContentRenderer {
 
             val renderer = GeneratedUiRegistry.resolve(generatedUi.name)
             if (renderer != null) {
-                renderer.Render(component = generatedUi)
+                renderer.Render(
+                    component = generatedUi,
+                    onGeneratedUiMessage = onGeneratedUiMessage,
+                )
             } else {
                 GeneratedUiFallbackCard(component = generatedUi)
             }
@@ -37,7 +45,12 @@ interface MessageContentRenderer {
     fun canRender(message: UiMessage): Boolean
 
     @Composable
-    fun Render(message: UiMessage, textColor: Color, modifier: Modifier)
+    fun Render(
+        message: UiMessage,
+        textColor: Color,
+        modifier: Modifier,
+        onGeneratedUiMessage: ((String) -> Unit)? = null,
+    )
 }
 
 object TextMessageRenderer : MessageContentRenderer {
@@ -45,7 +58,12 @@ object TextMessageRenderer : MessageContentRenderer {
         message.role == "user" || (message.role == "assistant" && message.toolCalls.isNullOrEmpty())
 
     @Composable
-    override fun Render(message: UiMessage, textColor: Color, modifier: Modifier) {
+    override fun Render(
+        message: UiMessage,
+        textColor: Color,
+        modifier: Modifier,
+        onGeneratedUiMessage: ((String) -> Unit)?,
+    ) {
         if (message.role == "user") {
             Text(
                 text = message.content,
@@ -68,7 +86,12 @@ object ToolCallRenderer : MessageContentRenderer {
         !message.toolCalls.isNullOrEmpty()
 
     @Composable
-    override fun Render(message: UiMessage, textColor: Color, modifier: Modifier) {
+    override fun Render(
+        message: UiMessage,
+        textColor: Color,
+        modifier: Modifier,
+        onGeneratedUiMessage: ((String) -> Unit)?,
+    ) {
         Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (message.content.isNotBlank()) {
                 MarkdownText(text = message.content, textColor = textColor)

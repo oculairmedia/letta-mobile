@@ -2,11 +2,13 @@ package com.letta.mobile.ui.screens.chat
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -18,27 +20,36 @@ import kotlinx.serialization.json.Json
 
 private val generatedUiJson = Json { ignoreUnknownKeys = true }
 
-interface GeneratedUiRenderer {
+interface GeneratedUiComponentRenderer {
     val componentName: String
 
     @Composable
-    fun Render(component: UiGeneratedComponent, modifier: Modifier = Modifier)
+    fun Render(
+        component: UiGeneratedComponent,
+        modifier: Modifier = Modifier,
+        onGeneratedUiMessage: ((String) -> Unit)? = null,
+    )
 }
 
 object GeneratedUiRegistry {
-    private val renderers: Map<String, GeneratedUiRenderer> = listOf(
+    private val renderers: Map<String, GeneratedUiComponentRenderer> = listOf(
         SummaryCardRenderer,
         MetricCardRenderer,
+        SuggestionChipsRenderer,
     ).associateBy { it.componentName }
 
-    fun resolve(componentName: String): GeneratedUiRenderer? = renderers[componentName]
+    fun resolve(componentName: String): GeneratedUiComponentRenderer? = renderers[componentName]
 }
 
-object SummaryCardRenderer : GeneratedUiRenderer {
+object SummaryCardRenderer : GeneratedUiComponentRenderer {
     override val componentName: String = "summary_card"
 
     @Composable
-    override fun Render(component: UiGeneratedComponent, modifier: Modifier) {
+    override fun Render(
+        component: UiGeneratedComponent,
+        modifier: Modifier,
+        onGeneratedUiMessage: ((String) -> Unit)?,
+    ) {
         val model = runCatching {
             generatedUiJson.decodeFromString<SummaryCardProps>(component.propsJson)
         }.getOrNull()
@@ -64,11 +75,15 @@ object SummaryCardRenderer : GeneratedUiRenderer {
     }
 }
 
-object MetricCardRenderer : GeneratedUiRenderer {
+object MetricCardRenderer : GeneratedUiComponentRenderer {
     override val componentName: String = "metric_card"
 
     @Composable
-    override fun Render(component: UiGeneratedComponent, modifier: Modifier) {
+    override fun Render(
+        component: UiGeneratedComponent,
+        modifier: Modifier,
+        onGeneratedUiMessage: ((String) -> Unit)?,
+    ) {
         val model = runCatching {
             generatedUiJson.decodeFromString<MetricCardProps>(component.propsJson)
         }.getOrNull()
@@ -90,6 +105,55 @@ object MetricCardRenderer : GeneratedUiRenderer {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            if (model == null) {
+                GeneratedUiFallback(component = component)
+            }
+        }
+    }
+}
+
+object SuggestionChipsRenderer : GeneratedUiComponentRenderer {
+    override val componentName: String = "suggestion_chips"
+
+    @Composable
+    override fun Render(
+        component: UiGeneratedComponent,
+        modifier: Modifier,
+        onGeneratedUiMessage: ((String) -> Unit)?,
+    ) {
+        val model = runCatching {
+            generatedUiJson.decodeFromString<SuggestionChipsProps>(component.propsJson)
+        }.getOrNull()
+
+        GeneratedUiCard(
+            title = model?.title ?: "Suggestions",
+            modifier = modifier,
+        ) {
+            model?.body?.takeIf { it.isNotBlank() }?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            model?.suggestions?.takeIf { it.isNotEmpty() }?.let { suggestions ->
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    suggestions.forEach { suggestion ->
+                        SuggestionChip(
+                            onClick = {
+                                suggestion.message?.takeIf { it.isNotBlank() }?.let { message ->
+                                    onGeneratedUiMessage?.invoke(message)
+                                }
+                            },
+                            enabled = !suggestion.message.isNullOrBlank() && onGeneratedUiMessage != null,
+                            label = { Text(suggestion.label) },
+                        )
+                    }
+                }
             }
             if (model == null) {
                 GeneratedUiFallback(component = component)
@@ -148,4 +212,17 @@ data class MetricCardProps(
     val label: String,
     val value: String,
     @SerialName("supporting_text") val supportingText: String? = null,
+)
+
+@Serializable
+data class SuggestionChipsProps(
+    val title: String? = null,
+    val body: String? = null,
+    val suggestions: List<SuggestionChipAction> = emptyList(),
+)
+
+@Serializable
+data class SuggestionChipAction(
+    val label: String,
+    val message: String? = null,
 )

@@ -179,6 +179,16 @@
     <string name="screen_chat_input_hint">Type a message…</string>
     <string name="screen_chat_empty">Start a conversation</string>
     <string name="screen_chat_title">Agent Chat</string>
+    <string name="screen_chat_approval_request_title">Approval required</string>
+    <string name="screen_chat_approval_request_body">Review the requested tool actions before continuing.</string>
+    <string name="screen_chat_approval_approve_action">Approve</string>
+    <string name="screen_chat_approval_reject_action">Reject</string>
+    <string name="screen_chat_approval_reject_title">Reject approval request</string>
+    <string name="screen_chat_approval_reason_label">Reason</string>
+    <string name="screen_chat_approval_reason_placeholder">Optional context for the agent</string>
+    <string name="screen_chat_approval_submitting">Submitting…</string>
+    <string name="screen_chat_approval_approved_title">Approved</string>
+    <string name="screen_chat_approval_rejected_title">Rejected</string>
     <string name="channel_notifications_name">Agent updates</string>
     <string name="channel_notifications_description">Background delivery for new Letta messages</string>
     <string name="channel_notifications_fallback_title">Letta update</string>

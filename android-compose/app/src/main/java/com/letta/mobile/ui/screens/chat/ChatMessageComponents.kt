@@ -30,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,10 +47,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.R
+import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.MessageBubbleShape
+import com.letta.mobile.ui.components.TextInputDialog
 import com.letta.mobile.ui.components.ThinkingSection
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
@@ -84,6 +87,9 @@ internal fun ChatMessageItem(
     message: UiMessage,
     groupPosition: GroupPosition,
     isStreaming: Boolean,
+    onGeneratedUiMessage: ((String) -> Unit)? = null,
+    onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)? = null,
+    approvalInFlight: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val isUser = message.role == "user"
@@ -135,13 +141,16 @@ internal fun ChatMessageItem(
             horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
             modifier = Modifier.fillMaxWidth(MaterialTheme.chatDimens.bubbleMaxWidthFraction),
         ) {
-            MessageBubbleSurface(
-                message = message,
-                groupPosition = groupPosition,
-                isStreaming = isStreaming,
-                onLongClick = onLongClick,
-            )
-        }
+                MessageBubbleSurface(
+                    message = message,
+                    groupPosition = groupPosition,
+                    isStreaming = isStreaming,
+                    onGeneratedUiMessage = onGeneratedUiMessage,
+                    onApprovalDecision = onApprovalDecision,
+                    approvalInFlight = approvalInFlight,
+                    onLongClick = onLongClick,
+                )
+            }
 
         if (isUser) {
             Spacer(modifier = Modifier.width(8.dp))
@@ -160,6 +169,9 @@ private fun MessageBubbleSurface(
     message: UiMessage,
     groupPosition: GroupPosition,
     isStreaming: Boolean,
+    onGeneratedUiMessage: ((String) -> Unit)? = null,
+    onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)? = null,
+    approvalInFlight: Boolean = false,
     onLongClick: (() -> Unit)? = null,
 ) {
     val isUser = message.role == "user"
@@ -168,7 +180,7 @@ private fun MessageBubbleSurface(
     val colors = MaterialTheme.chatColors
     val dimens = MaterialTheme.chatDimens
     val typo = MaterialTheme.chatTypography
-    val renderer = remember(message.role, message.toolCalls) { resolveRenderer(message) }
+    val renderer = remember(message.role, message.toolCalls, message.generatedUi) { resolveRenderer(message) }
     val bubbleShape = MessageBubbleShape(radius = 12.dp, isFromUser = isUser, groupPosition = groupPosition)
 
     Surface(
@@ -199,8 +211,117 @@ private fun MessageBubbleSurface(
                 )
             }
 
+            val approvalRequest = message.approvalRequest
+            if (approvalRequest != null) {
+                ApprovalRequestCard(
+                    approval = approvalRequest,
+                    isSubmitting = approvalInFlight,
+                    onDecision = onApprovalDecision,
+                )
+                return@Column
+            }
+
+            if (message.approvalResponse != null) {
+                ApprovalResponseCard(message = message)
+                return@Column
+            }
+
             val textColor = if (isUser) colors.userText else colors.agentText
-            renderer.Render(message = message, textColor = textColor, modifier = Modifier)
+            renderer.Render(
+                message = message,
+                textColor = textColor,
+                modifier = Modifier,
+                onGeneratedUiMessage = onGeneratedUiMessage,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ApprovalRequestCard(
+    approval: UiApprovalRequest,
+    isSubmitting: Boolean,
+    onDecision: ((String, List<String>, Boolean, String?) -> Unit)?,
+) {
+    var showRejectDialog by remember { mutableStateOf(false) }
+    val toolCallIds = remember(approval) { approval.toolCalls.map { it.toolCallId } }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = stringResource(R.string.screen_chat_approval_request_title),
+            style = MaterialTheme.typography.titleSmall,
+        )
+        Text(
+            text = stringResource(R.string.screen_chat_approval_request_body),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        approval.toolCalls.forEach { toolCall ->
+            ToolCallCard(
+                toolCall = UiToolCall(
+                    name = toolCall.name,
+                    arguments = toolCall.arguments,
+                    result = null,
+                )
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = { showRejectDialog = true },
+                enabled = !isSubmitting && onDecision != null,
+            ) {
+                Text(stringResource(R.string.screen_chat_approval_reject_action))
+            }
+            androidx.compose.material3.Button(
+                onClick = {
+                    onDecision?.invoke(approval.requestId, toolCallIds, true, null)
+                },
+                enabled = !isSubmitting && onDecision != null,
+            ) {
+                Text(
+                    if (isSubmitting) stringResource(R.string.screen_chat_approval_submitting)
+                    else stringResource(R.string.screen_chat_approval_approve_action)
+                )
+            }
+        }
+    }
+
+    TextInputDialog(
+        show = showRejectDialog,
+        title = stringResource(R.string.screen_chat_approval_reject_title),
+        label = stringResource(R.string.screen_chat_approval_reason_label),
+        confirmText = stringResource(R.string.screen_chat_approval_reject_action),
+        dismissText = stringResource(R.string.action_cancel),
+        onConfirm = { reason ->
+            showRejectDialog = false
+            onDecision?.invoke(approval.requestId, toolCallIds, false, reason)
+        },
+        onDismiss = { showRejectDialog = false },
+        placeholder = stringResource(R.string.screen_chat_approval_reason_placeholder),
+        singleLine = false,
+        minLines = 3,
+        validate = { true },
+    )
+}
+
+@Composable
+private fun ApprovalResponseCard(message: UiMessage) {
+    val approval = message.approvalResponse ?: return
+    val approved = approval.approved == true || approval.approvals.any { it.approved == true }
+    val title = if (approved) {
+        stringResource(R.string.screen_chat_approval_approved_title)
+    } else {
+        stringResource(R.string.screen_chat_approval_rejected_title)
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(text = title, style = MaterialTheme.typography.titleSmall)
+        approval.reason?.takeIf { it.isNotBlank() }?.let { reason ->
+            Text(
+                text = reason,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
