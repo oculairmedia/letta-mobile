@@ -44,8 +44,6 @@
     <string name="screen_projects_new_project_name_label">Project name</string>
     <string name="screen_projects_new_project_path_label">Filesystem path</string>
     <string name="screen_projects_new_project_git_url_label">Git URL (optional)</string>
-    <string name="screen_projects_new_project_tech_stack_label">Tech stack</string>
-    <string name="screen_projects_new_project_tech_stack_helper">Comma-separated tags, for example: Kotlin, Android, Ktor</string>
     <string name="screen_projects_missing_agent">%1$s doesn’t have a linked Letta agent yet.</string>
     <string name="screen_projects_open_chat_action">Open project chat</string>
     <string name="screen_projects_archive_action">Archive project</string>
