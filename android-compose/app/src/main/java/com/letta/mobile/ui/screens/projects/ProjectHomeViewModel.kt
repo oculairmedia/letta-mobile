@@ -36,6 +36,52 @@ data class NewProjectDraft(
 }
 
 @androidx.compose.runtime.Immutable
+data class ConversationalProjectDraft(
+    val goal: String = "",
+    val name: String = "",
+    val filesystemPath: String = "",
+    val gitUrl: String = "",
+) {
+    enum class FilesystemPathValidation {
+        Missing,
+        MustBeAbsolute,
+        Valid,
+    }
+
+    fun normalized(): ConversationalProjectDraft = copy(
+        goal = goal.trim(),
+        name = name.trim(),
+        filesystemPath = filesystemPath.trim(),
+        gitUrl = gitUrl.trim(),
+    )
+
+    fun filesystemPathValidation(): FilesystemPathValidation = when {
+        filesystemPath.trim().isBlank() -> FilesystemPathValidation.Missing
+        !filesystemPath.trim().startsWith("/") -> FilesystemPathValidation.MustBeAbsolute
+        else -> FilesystemPathValidation.Valid
+    }
+
+    fun isReadyFor(step: ConversationalProjectStep): Boolean = when (step) {
+        ConversationalProjectStep.Goal -> goal.trim().isNotBlank()
+        ConversationalProjectStep.Name -> name.trim().isNotBlank()
+        ConversationalProjectStep.FilesystemPath -> filesystemPathValidation() == FilesystemPathValidation.Valid
+        ConversationalProjectStep.GitUrl -> true
+        ConversationalProjectStep.Review -> isReadyToCreate()
+    }
+
+    fun isReadyToCreate(): Boolean =
+        name.trim().isNotBlank() && filesystemPathValidation() == FilesystemPathValidation.Valid
+}
+
+enum class ConversationalProjectStep {
+    Goal,
+    Name,
+    FilesystemPath,
+    GitUrl,
+    Review,
+}
+
+@androidx.compose.runtime.Immutable
 data class ProjectSettingsDraft(
     val identifier: String = "",
     val projectName: String = "",
@@ -75,11 +121,15 @@ data class ProjectHomeUiState(
     val showCreateOptions: Boolean = false,
     val showManualCreateDialog: Boolean = false,
     val newProjectDraft: NewProjectDraft = NewProjectDraft(),
+    val showConversationalCreateDialog: Boolean = false,
+    val conversationalProjectDraft: ConversationalProjectDraft = ConversationalProjectDraft(),
+    val conversationalProjectStep: ConversationalProjectStep = ConversationalProjectStep.Goal,
     val showProjectSettingsDialog: Boolean = false,
     val projectSettingsDraft: ProjectSettingsDraft = ProjectSettingsDraft(),
     val showArchiveProjectDialog: Boolean = false,
     val showDeleteProjectDialog: Boolean = false,
     val isSubmittingManualCreate: Boolean = false,
+    val isSubmittingConversationalCreate: Boolean = false,
     val isSubmittingProjectSettings: Boolean = false,
 )
 
@@ -139,11 +189,15 @@ class ProjectHomeViewModel @Inject constructor(
                     showCreateOptions = current?.showCreateOptions ?: false,
                     showManualCreateDialog = current?.showManualCreateDialog ?: false,
                     newProjectDraft = current?.newProjectDraft ?: NewProjectDraft(),
+                    showConversationalCreateDialog = current?.showConversationalCreateDialog ?: false,
+                    conversationalProjectDraft = current?.conversationalProjectDraft ?: ConversationalProjectDraft(),
+                    conversationalProjectStep = current?.conversationalProjectStep ?: ConversationalProjectStep.Goal,
                     showProjectSettingsDialog = current?.showProjectSettingsDialog ?: false,
                     projectSettingsDraft = current?.projectSettingsDraft ?: ProjectSettingsDraft(),
                     showArchiveProjectDialog = current?.showArchiveProjectDialog ?: false,
                     showDeleteProjectDialog = current?.showDeleteProjectDialog ?: false,
                     isSubmittingManualCreate = false,
+                    isSubmittingConversationalCreate = false,
                     isSubmittingProjectSettings = false,
                     isRefreshing = false,
                 )
@@ -167,6 +221,9 @@ class ProjectHomeViewModel @Inject constructor(
                 selectedProjectId = projectId,
                 showManualCreateDialog = if (projectId == null) current.showManualCreateDialog else false,
                 newProjectDraft = if (projectId == null) current.newProjectDraft else NewProjectDraft(),
+                showConversationalCreateDialog = if (projectId == null) current.showConversationalCreateDialog else false,
+                conversationalProjectDraft = if (projectId == null) current.conversationalProjectDraft else ConversationalProjectDraft(),
+                conversationalProjectStep = if (projectId == null) current.conversationalProjectStep else ConversationalProjectStep.Goal,
                 showProjectSettingsDialog = if (projectId == null) current.showProjectSettingsDialog else false,
                 projectSettingsDraft = if (projectId == null) current.projectSettingsDraft else ProjectSettingsDraft(),
                 showArchiveProjectDialog = if (projectId == null) current.showArchiveProjectDialog else false,
@@ -217,8 +274,104 @@ class ProjectHomeViewModel @Inject constructor(
 
     fun startConversationalProjectCreation() {
         val current = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(current.resetTransientProjectActions().copy(selectedProjectId = null))
-        _events.trySend(ProjectHomeUiEvent.ShowMessage("Conversational project setup isn't wired to the registry API yet."))
+        _uiState.value = UiState.Success(
+            current.resetTransientProjectActions().copy(
+                selectedProjectId = null,
+                showConversationalCreateDialog = true,
+                conversationalProjectStep = ConversationalProjectStep.Goal,
+            )
+        )
+    }
+
+    fun dismissConversationalProjectCreation() {
+        val current = (_uiState.value as? UiState.Success)?.data ?: return
+        if (!current.showConversationalCreateDialog) return
+        if (current.conversationalProjectStep == ConversationalProjectStep.Goal) {
+            _uiState.value = UiState.Success(
+                current.copy(
+                    showConversationalCreateDialog = false,
+                    conversationalProjectDraft = ConversationalProjectDraft(),
+                    conversationalProjectStep = ConversationalProjectStep.Goal,
+                    isSubmittingConversationalCreate = false,
+                )
+            )
+        } else {
+            _uiState.value = UiState.Success(
+                current.copy(
+                    conversationalProjectStep = current.conversationalProjectStep.previous(),
+                    isSubmittingConversationalCreate = false,
+                )
+            )
+        }
+    }
+
+    fun updateConversationalProjectDraft(draft: ConversationalProjectDraft) {
+        val current = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(current.copy(conversationalProjectDraft = draft))
+    }
+
+    fun submitConversationalProjectCreation() {
+        val current = (_uiState.value as? UiState.Success)?.data ?: return
+        val draft = current.conversationalProjectDraft.normalized()
+        val step = current.conversationalProjectStep
+        if (step != ConversationalProjectStep.Review) {
+            if (!draft.isReadyFor(step)) {
+                _uiState.value = UiState.Success(current.copy(conversationalProjectDraft = draft))
+                return
+            }
+            _uiState.value = UiState.Success(
+                current.copy(
+                    conversationalProjectDraft = draft,
+                    conversationalProjectStep = step.next(),
+                )
+            )
+            return
+        }
+        if (!draft.isReadyToCreate()) {
+            _uiState.value = UiState.Success(current.copy(conversationalProjectDraft = draft))
+            return
+        }
+        _uiState.value = UiState.Success(
+            current.copy(
+                conversationalProjectDraft = draft,
+                isSubmittingConversationalCreate = true,
+            )
+        )
+        viewModelScope.launch {
+            runCatching {
+                projectRepository.createProject(
+                    name = draft.name.takeIf { it.isNotBlank() },
+                    filesystemPath = draft.filesystemPath,
+                    gitUrl = draft.gitUrl.takeIf { it.isNotBlank() },
+                )
+            }.onSuccess { created ->
+                loadProjects(forceRefresh = true)
+                val refreshed = (_uiState.value as? UiState.Success)?.data ?: return@onSuccess
+                _uiState.value = UiState.Success(
+                    refreshed.copy(
+                        showConversationalCreateDialog = false,
+                        conversationalProjectDraft = ConversationalProjectDraft(),
+                        conversationalProjectStep = ConversationalProjectStep.Goal,
+                        isSubmittingConversationalCreate = false,
+                    )
+                )
+                val detail = if (draft.goal.isNotBlank()) {
+                    " Project brief handoff isn't wired yet, so your setup notes stayed local."
+                } else {
+                    ""
+                }
+                _events.trySend(ProjectHomeUiEvent.ShowMessage("Created ${created.name}.$detail"))
+            }.onFailure { error ->
+                val refreshed = (_uiState.value as? UiState.Success)?.data ?: return@onFailure
+                _uiState.value = UiState.Success(
+                    refreshed.copy(
+                        conversationalProjectDraft = draft,
+                        isSubmittingConversationalCreate = false,
+                    )
+                )
+                _events.trySend(ProjectHomeUiEvent.ShowMessage(error.message ?: "Failed to create project"))
+            }
+        }
     }
 
     fun submitManualProjectCreation() {
@@ -434,11 +587,31 @@ class ProjectHomeViewModel @Inject constructor(
         showCreateOptions = false,
         showManualCreateDialog = false,
         newProjectDraft = NewProjectDraft(),
+        showConversationalCreateDialog = false,
+        conversationalProjectDraft = ConversationalProjectDraft(),
+        conversationalProjectStep = ConversationalProjectStep.Goal,
         showProjectSettingsDialog = false,
         projectSettingsDraft = ProjectSettingsDraft(),
         showArchiveProjectDialog = false,
         showDeleteProjectDialog = false,
         isSubmittingManualCreate = false,
+        isSubmittingConversationalCreate = false,
         isSubmittingProjectSettings = false,
     )
+
+    private fun ConversationalProjectStep.next(): ConversationalProjectStep = when (this) {
+        ConversationalProjectStep.Goal -> ConversationalProjectStep.Name
+        ConversationalProjectStep.Name -> ConversationalProjectStep.FilesystemPath
+        ConversationalProjectStep.FilesystemPath -> ConversationalProjectStep.GitUrl
+        ConversationalProjectStep.GitUrl -> ConversationalProjectStep.Review
+        ConversationalProjectStep.Review -> ConversationalProjectStep.Review
+    }
+
+    private fun ConversationalProjectStep.previous(): ConversationalProjectStep = when (this) {
+        ConversationalProjectStep.Goal -> ConversationalProjectStep.Goal
+        ConversationalProjectStep.Name -> ConversationalProjectStep.Goal
+        ConversationalProjectStep.FilesystemPath -> ConversationalProjectStep.Name
+        ConversationalProjectStep.GitUrl -> ConversationalProjectStep.FilesystemPath
+        ConversationalProjectStep.Review -> ConversationalProjectStep.GitUrl
+    }
 }

@@ -468,23 +468,19 @@ class ProjectHomeViewModelTest {
     @Test
     fun `startConversationalProjectCreation exposes pending message`() = runTest {
         val viewModel = ProjectHomeViewModel(repository)
-        val event = async { viewModel.events.first() }
 
         viewModel.showCreateProjectOptions()
         viewModel.startConversationalProjectCreation()
 
         val state = viewModel.uiState.value as UiState.Success
         assertEquals(false, state.data.showCreateOptions)
-        assertEquals(
-            ProjectHomeUiEvent.ShowMessage("Conversational project setup isn't wired to the registry API yet."),
-            event.await(),
-        )
+        assertEquals(true, state.data.showConversationalCreateDialog)
+        assertEquals(ConversationalProjectStep.Goal, state.data.conversationalProjectStep)
     }
 
     @Test
     fun `startConversationalProjectCreation dismisses manual create dialog`() = runTest {
         val viewModel = ProjectHomeViewModel(repository)
-        val event = async { viewModel.events.first() }
 
         viewModel.startManualProjectCreation()
         viewModel.updateNewProjectDraft(
@@ -498,10 +494,170 @@ class ProjectHomeViewModelTest {
         val state = viewModel.uiState.value as UiState.Success
         assertEquals(false, state.data.showManualCreateDialog)
         assertEquals("", state.data.newProjectDraft.name)
+        assertEquals(true, state.data.showConversationalCreateDialog)
+        assertEquals(ConversationalProjectStep.Goal, state.data.conversationalProjectStep)
+    }
+
+    @Test
+    fun `submitConversationalProjectCreation advances through guided steps`() = runTest {
+        val viewModel = ProjectHomeViewModel(repository)
+
+        viewModel.startConversationalProjectCreation()
+        viewModel.updateConversationalProjectDraft(
+            ConversationalProjectDraft(goal = "Ship a mobile PM surface")
+        )
+        viewModel.submitConversationalProjectCreation()
+
+        var state = viewModel.uiState.value as UiState.Success
+        assertEquals(ConversationalProjectStep.Name, state.data.conversationalProjectStep)
+
+        viewModel.updateConversationalProjectDraft(
+            state.data.conversationalProjectDraft.copy(name = "Letta Mobile")
+        )
+        viewModel.submitConversationalProjectCreation()
+
+        state = viewModel.uiState.value as UiState.Success
+        assertEquals(ConversationalProjectStep.FilesystemPath, state.data.conversationalProjectStep)
+
+        viewModel.updateConversationalProjectDraft(
+            state.data.conversationalProjectDraft.copy(filesystemPath = "/opt/stacks/letta-mobile")
+        )
+        viewModel.submitConversationalProjectCreation()
+
+        state = viewModel.uiState.value as UiState.Success
+        assertEquals(ConversationalProjectStep.GitUrl, state.data.conversationalProjectStep)
+
+        viewModel.submitConversationalProjectCreation()
+
+        state = viewModel.uiState.value as UiState.Success
+        assertEquals(ConversationalProjectStep.Review, state.data.conversationalProjectStep)
+    }
+
+    @Test
+    fun `dismissConversationalProjectCreation steps backward before closing`() = runTest {
+        val viewModel = ProjectHomeViewModel(repository)
+
+        viewModel.startConversationalProjectCreation()
+        viewModel.updateConversationalProjectDraft(
+            ConversationalProjectDraft(goal = "Ship a mobile PM surface")
+        )
+        viewModel.submitConversationalProjectCreation()
+
+        viewModel.dismissConversationalProjectCreation()
+
+        var state = viewModel.uiState.value as UiState.Success
+        assertEquals(true, state.data.showConversationalCreateDialog)
+        assertEquals(ConversationalProjectStep.Goal, state.data.conversationalProjectStep)
+
+        viewModel.dismissConversationalProjectCreation()
+
+        state = viewModel.uiState.value as UiState.Success
+        assertEquals(false, state.data.showConversationalCreateDialog)
+        assertEquals("", state.data.conversationalProjectDraft.goal)
+    }
+
+    @Test
+    fun `submitConversationalProjectCreation blocks invalid path and stays on path step`() = runTest {
+        val viewModel = ProjectHomeViewModel(repository)
+
+        viewModel.startConversationalProjectCreation()
+        viewModel.updateConversationalProjectDraft(
+            ConversationalProjectDraft(goal = "Goal")
+        )
+        viewModel.submitConversationalProjectCreation()
+        viewModel.updateConversationalProjectDraft(
+            (viewModel.uiState.value as UiState.Success).data.conversationalProjectDraft.copy(name = "Graphiti")
+        )
+        viewModel.submitConversationalProjectCreation()
+        viewModel.updateConversationalProjectDraft(
+            (viewModel.uiState.value as UiState.Success).data.conversationalProjectDraft.copy(filesystemPath = "relative/path")
+        )
+
+        viewModel.submitConversationalProjectCreation()
+
+        val state = viewModel.uiState.value as UiState.Success
+        assertEquals(ConversationalProjectStep.FilesystemPath, state.data.conversationalProjectStep)
+        assertEquals("relative/path", state.data.conversationalProjectDraft.filesystemPath)
+    }
+
+    @Test
+    fun `submitConversationalProjectCreation creates project and explains local-only brief handoff`() = runTest {
+        val viewModel = ProjectHomeViewModel(repository)
+        val event = async { viewModel.events.first() }
+
+        viewModel.startConversationalProjectCreation()
+        viewModel.updateConversationalProjectDraft(
+            ConversationalProjectDraft(
+                goal = "  Ship project workflow on mobile  ",
+            )
+        )
+        viewModel.submitConversationalProjectCreation()
+        viewModel.updateConversationalProjectDraft(
+            (viewModel.uiState.value as UiState.Success).data.conversationalProjectDraft.copy(name = "  Letta Mobile  ")
+        )
+        viewModel.submitConversationalProjectCreation()
+        viewModel.updateConversationalProjectDraft(
+            (viewModel.uiState.value as UiState.Success).data.conversationalProjectDraft.copy(
+                filesystemPath = "  /opt/stacks/letta-mobile  "
+            )
+        )
+        viewModel.submitConversationalProjectCreation()
+        viewModel.updateConversationalProjectDraft(
+            (viewModel.uiState.value as UiState.Success).data.conversationalProjectDraft.copy(
+                gitUrl = "  https://github.com/example/letta-mobile.git  "
+            )
+        )
+        viewModel.submitConversationalProjectCreation()
+
+        val reviewState = viewModel.uiState.value as UiState.Success
+        assertEquals(ConversationalProjectStep.Review, reviewState.data.conversationalProjectStep)
+
+        viewModel.submitConversationalProjectCreation()
+
+        val state = viewModel.uiState.value as UiState.Success
+        assertEquals(false, state.data.showConversationalCreateDialog)
+        assertEquals("", state.data.conversationalProjectDraft.goal)
+        assertTrue(
+            fakeApi.calls.contains(
+                "createProject:Letta Mobile:/opt/stacks/letta-mobile:https://github.com/example/letta-mobile.git"
+            )
+        )
         assertEquals(
-            ProjectHomeUiEvent.ShowMessage("Conversational project setup isn't wired to the registry API yet."),
+            ProjectHomeUiEvent.ShowMessage(
+                "Created Letta Mobile. Project brief handoff isn't wired yet, so your setup notes stayed local."
+            ),
             event.await(),
         )
+    }
+
+    @Test
+    fun `submitConversationalProjectCreation exposes action error when create fails`() = runTest {
+        fakeApi.createShouldFail = true
+        val viewModel = ProjectHomeViewModel(repository)
+        val event = async { viewModel.events.first() }
+
+        viewModel.startConversationalProjectCreation()
+        viewModel.updateConversationalProjectDraft(
+            ConversationalProjectDraft(goal = "Ship project workflow on mobile")
+        )
+        viewModel.submitConversationalProjectCreation()
+        viewModel.updateConversationalProjectDraft(
+            (viewModel.uiState.value as UiState.Success).data.conversationalProjectDraft.copy(name = "Letta Mobile")
+        )
+        viewModel.submitConversationalProjectCreation()
+        viewModel.updateConversationalProjectDraft(
+            (viewModel.uiState.value as UiState.Success).data.conversationalProjectDraft.copy(
+                filesystemPath = "/opt/stacks/letta-mobile"
+            )
+        )
+        viewModel.submitConversationalProjectCreation()
+        viewModel.submitConversationalProjectCreation()
+        viewModel.submitConversationalProjectCreation()
+
+        val state = viewModel.uiState.value as UiState.Success
+        assertEquals(true, state.data.showConversationalCreateDialog)
+        assertEquals(ConversationalProjectStep.Review, state.data.conversationalProjectStep)
+        assertEquals(ProjectHomeUiEvent.ShowMessage("Create failed"), event.await())
     }
 
     @Test
