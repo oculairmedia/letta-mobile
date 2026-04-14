@@ -70,7 +70,9 @@
     <string name="screen_projects_archive_action">Archive project</string>
     <string name="screen_projects_edit_pending">Editing %1$s isn’t wired yet.</string>
     <string name="screen_projects_archive_pending">Archiving %1$s isn’t wired yet.</string>
+    <string name="screen_projects_archive_confirm_message">Archive %1$s? This action isn’t wired to the registry API yet, but the flow will be confirmed before it runs.</string>
     <string name="screen_projects_delete_pending">Deleting %1$s isn’t wired yet.</string>
+    <string name="screen_projects_delete_confirm_message">Delete %1$s? This action isn’t wired to the registry API yet, but delete is destructive and should always require confirmation.</string>
     <string name="screen_projects_settings_title">Project settings</string>
     <string name="screen_projects_settings_path_label">Project folder path</string>
     <string name="screen_projects_settings_git_url_label">Git URL</string>
