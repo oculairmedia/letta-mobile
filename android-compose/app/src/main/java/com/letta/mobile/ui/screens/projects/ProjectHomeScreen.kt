@@ -37,7 +37,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -53,7 +52,6 @@ import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
-import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaSpacing
@@ -69,7 +67,6 @@ fun ProjectHomeScreen(
     viewModel: ProjectHomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
     val snackbar = LocalSnackbarDispatcher.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val missingAgentMessage = stringResource(R.string.screen_projects_missing_agent, "%s")
@@ -127,36 +124,11 @@ fun ProjectHomeScreen(
             }
 
             is UiState.Success -> {
-                LaunchedEffect(state.data.pendingNotice) {
-                    state.data.pendingNotice?.let { notice ->
-                        val message = when (notice.type) {
-                            PendingProjectNotice.Type.ConversationalNotWired -> {
-                                context.getString(R.string.screen_projects_new_project_conversational_pending)
-                            }
-                            PendingProjectNotice.Type.ManualProvisioningSucceeded -> {
-                                context.getString(
-                                    R.string.screen_projects_new_project_manual_success,
-                                    notice.projectName
-                                        ?: context.getString(R.string.screen_projects_new_project)
-                                )
-                            }
-                            PendingProjectNotice.Type.ProjectSettingsUpdateSucceeded -> {
-                                context.getString(
-                                    R.string.screen_projects_settings_update_success,
-                                    notice.projectName
-                                        ?: context.getString(R.string.screen_projects_title)
-                                )
-                            }
+                LaunchedEffect(viewModel) {
+                    viewModel.events.collect { event ->
+                        when (event) {
+                            is ProjectHomeUiEvent.ShowMessage -> snackbar.dispatch(event.message)
                         }
-                        snackbar.dispatch(message)
-                        viewModel.consumePendingNotice()
-                    }
-                }
-
-                LaunchedEffect(state.data.actionErrorMessage) {
-                    state.data.actionErrorMessage?.let {
-                        snackbar.dispatch(it)
-                        viewModel.consumeActionErrorMessage()
                     }
                 }
 
@@ -253,19 +225,6 @@ fun ProjectHomeScreen(
                             value = state.data.newProjectDraft.gitUrl,
                             onValueChange = { viewModel.updateNewProjectDraft(state.data.newProjectDraft.copy(gitUrl = it)) },
                             label = { Text(stringResource(R.string.screen_projects_new_project_git_url_label)) },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                        )
-                        FormItem(
-                            label = { Text(stringResource(R.string.screen_projects_new_project_tech_stack_label)) },
-                            description = {
-                                Text(stringResource(R.string.screen_projects_new_project_tech_stack_helper))
-                            },
-                        )
-                        OutlinedTextField(
-                            value = state.data.newProjectDraft.techStackInput,
-                            onValueChange = { viewModel.updateNewProjectDraft(state.data.newProjectDraft.copy(techStackInput = it)) },
-                            label = { Text(stringResource(R.string.common_tags)) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                         )

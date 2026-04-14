@@ -9,9 +9,11 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -21,7 +23,6 @@ data class NewProjectDraft(
     val description: String = "",
     val filesystemPath: String = "",
     val gitUrl: String = "",
-    val techStackInput: String = "",
 ) {
     fun isReadyToSubmit(): Boolean =
         name.trim().isNotBlank() && filesystemPath.trim().isNotBlank()
@@ -31,7 +32,6 @@ data class NewProjectDraft(
         description = description.trim(),
         filesystemPath = filesystemPath.trim(),
         gitUrl = gitUrl.trim(),
-        techStackInput = techStackInput.trim(),
     )
 }
 
@@ -62,16 +62,8 @@ data class ProjectSettingsDraft(
     fun isReadyToSubmit(): Boolean = filesystemPathValidation() == FilesystemPathValidation.Valid
 }
 
-@androidx.compose.runtime.Immutable
-data class PendingProjectNotice(
-    val type: Type,
-    val projectName: String? = null,
-) {
-    enum class Type {
-        ConversationalNotWired,
-        ManualProvisioningSucceeded,
-        ProjectSettingsUpdateSucceeded,
-    }
+sealed interface ProjectHomeUiEvent {
+    data class ShowMessage(val message: String) : ProjectHomeUiEvent
 }
 
 @androidx.compose.runtime.Immutable
@@ -84,8 +76,6 @@ data class ProjectHomeUiState(
     val newProjectDraft: NewProjectDraft = NewProjectDraft(),
     val showProjectSettingsDialog: Boolean = false,
     val projectSettingsDraft: ProjectSettingsDraft = ProjectSettingsDraft(),
-    val pendingNotice: PendingProjectNotice? = null,
-    val actionErrorMessage: String? = null,
     val isSubmittingManualCreate: Boolean = false,
     val isSubmittingProjectSettings: Boolean = false,
 )
@@ -97,6 +87,8 @@ class ProjectHomeViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow<UiState<ProjectHomeUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<ProjectHomeUiState>> = _uiState.asStateFlow()
+    private val _events = Channel<ProjectHomeUiEvent>(Channel.BUFFERED)
+    val events = _events.receiveAsFlow()
 
     init {
         loadProjects()
@@ -145,8 +137,6 @@ class ProjectHomeViewModel @Inject constructor(
                     newProjectDraft = current?.newProjectDraft ?: NewProjectDraft(),
                     showProjectSettingsDialog = current?.showProjectSettingsDialog ?: false,
                     projectSettingsDraft = current?.projectSettingsDraft ?: ProjectSettingsDraft(),
-                    pendingNotice = current?.pendingNotice,
-                    actionErrorMessage = current?.actionErrorMessage,
                     isSubmittingManualCreate = false,
                     isSubmittingProjectSettings = false,
                     isRefreshing = false,
@@ -162,14 +152,12 @@ class ProjectHomeViewModel @Inject constructor(
     fun selectProject(projectId: String?) {
         val current = (_uiState.value as? UiState.Success)?.data ?: return
         _uiState.value = UiState.Success(
-            current.copy(
+            current.resetTransientProjectActions().copy(
                 selectedProjectId = projectId,
-                showCreateOptions = false,
                 showManualCreateDialog = if (projectId == null) current.showManualCreateDialog else false,
                 newProjectDraft = if (projectId == null) current.newProjectDraft else NewProjectDraft(),
                 showProjectSettingsDialog = if (projectId == null) current.showProjectSettingsDialog else false,
                 projectSettingsDraft = if (projectId == null) current.projectSettingsDraft else ProjectSettingsDraft(),
-                actionErrorMessage = null,
             )
         )
     }
@@ -177,33 +165,24 @@ class ProjectHomeViewModel @Inject constructor(
     fun showCreateProjectOptions() {
         val current = (_uiState.value as? UiState.Success)?.data ?: return
         _uiState.value = UiState.Success(
-            current.copy(
+            current.resetTransientProjectActions().copy(
                 selectedProjectId = null,
                 showCreateOptions = true,
-                showManualCreateDialog = false,
-                newProjectDraft = NewProjectDraft(),
-                showProjectSettingsDialog = false,
-                projectSettingsDraft = ProjectSettingsDraft(),
-                actionErrorMessage = null,
             )
         )
     }
 
     fun dismissCreateProjectOptions() {
         val current = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(current.copy(showCreateOptions = false, actionErrorMessage = null))
+        _uiState.value = UiState.Success(current.copy(showCreateOptions = false))
     }
 
     fun startManualProjectCreation() {
         val current = (_uiState.value as? UiState.Success)?.data ?: return
         _uiState.value = UiState.Success(
-            current.copy(
+            current.resetTransientProjectActions().copy(
                 selectedProjectId = null,
-                showCreateOptions = false,
                 showManualCreateDialog = true,
-                showProjectSettingsDialog = false,
-                projectSettingsDraft = ProjectSettingsDraft(),
-                actionErrorMessage = null,
             )
         )
     }
@@ -214,7 +193,6 @@ class ProjectHomeViewModel @Inject constructor(
             current.copy(
                 showManualCreateDialog = false,
                 newProjectDraft = NewProjectDraft(),
-                actionErrorMessage = null,
             )
         )
     }
@@ -226,33 +204,20 @@ class ProjectHomeViewModel @Inject constructor(
 
     fun startConversationalProjectCreation() {
         val current = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(
-            current.copy(
-                selectedProjectId = null,
-                showCreateOptions = false,
-                showManualCreateDialog = false,
-                newProjectDraft = NewProjectDraft(),
-                showProjectSettingsDialog = false,
-                projectSettingsDraft = ProjectSettingsDraft(),
-                actionErrorMessage = null,
-                pendingNotice = PendingProjectNotice(
-                    type = PendingProjectNotice.Type.ConversationalNotWired,
-                ),
-            )
-        )
+        _uiState.value = UiState.Success(current.resetTransientProjectActions().copy(selectedProjectId = null))
+        _events.trySend(ProjectHomeUiEvent.ShowMessage("Conversational project setup isn't wired to the registry API yet."))
     }
 
     fun submitManualProjectCreation() {
         val current = (_uiState.value as? UiState.Success)?.data ?: return
         val draft = current.newProjectDraft.normalized()
         if (!draft.isReadyToSubmit()) {
-            _uiState.value = UiState.Success(current.copy(newProjectDraft = draft, actionErrorMessage = null))
+            _uiState.value = UiState.Success(current.copy(newProjectDraft = draft))
             return
         }
         _uiState.value = UiState.Success(
             current.copy(
                 newProjectDraft = draft,
-                actionErrorMessage = null,
                 isSubmittingManualCreate = true,
             )
         )
@@ -270,23 +235,19 @@ class ProjectHomeViewModel @Inject constructor(
                     refreshed.copy(
                         showManualCreateDialog = false,
                         newProjectDraft = NewProjectDraft(),
-                        pendingNotice = PendingProjectNotice(
-                            type = PendingProjectNotice.Type.ManualProvisioningSucceeded,
-                            projectName = created.name,
-                        ),
-                        actionErrorMessage = null,
                         isSubmittingManualCreate = false,
                     )
                 )
+                _events.trySend(ProjectHomeUiEvent.ShowMessage("Created ${created.name}."))
             }.onFailure { error ->
                 val refreshed = (_uiState.value as? UiState.Success)?.data ?: return@onFailure
                 _uiState.value = UiState.Success(
                     refreshed.copy(
                         newProjectDraft = draft,
-                        actionErrorMessage = error.message ?: "Failed to create project",
                         isSubmittingManualCreate = false,
                     )
                 )
+                _events.trySend(ProjectHomeUiEvent.ShowMessage(error.message ?: "Failed to create project"))
             }
         }
     }
@@ -295,13 +256,9 @@ class ProjectHomeViewModel @Inject constructor(
         val current = (_uiState.value as? UiState.Success)?.data ?: return
         val project = current.projects.firstOrNull { it.identifier == current.selectedProjectId } ?: return
         _uiState.value = UiState.Success(
-            current.copy(
+            current.resetTransientProjectActions().copy(
                 selectedProjectId = null,
-                showCreateOptions = false,
-                showManualCreateDialog = false,
-                newProjectDraft = NewProjectDraft(),
                 showProjectSettingsDialog = true,
-                actionErrorMessage = null,
                 projectSettingsDraft = ProjectSettingsDraft(
                     identifier = project.identifier,
                     projectName = project.name,
@@ -318,7 +275,6 @@ class ProjectHomeViewModel @Inject constructor(
             current.copy(
                 showProjectSettingsDialog = false,
                 projectSettingsDraft = ProjectSettingsDraft(),
-                actionErrorMessage = null,
             )
         )
     }
@@ -332,13 +288,12 @@ class ProjectHomeViewModel @Inject constructor(
         val current = (_uiState.value as? UiState.Success)?.data ?: return
         val draft = current.projectSettingsDraft.normalized()
         if (!draft.isReadyToSubmit()) {
-            _uiState.value = UiState.Success(current.copy(projectSettingsDraft = draft, actionErrorMessage = null))
+            _uiState.value = UiState.Success(current.copy(projectSettingsDraft = draft))
             return
         }
         _uiState.value = UiState.Success(
             current.copy(
                 projectSettingsDraft = draft,
-                actionErrorMessage = null,
                 isSubmittingProjectSettings = true,
             )
         )
@@ -356,37 +311,21 @@ class ProjectHomeViewModel @Inject constructor(
                     refreshed.copy(
                         showProjectSettingsDialog = false,
                         projectSettingsDraft = ProjectSettingsDraft(),
-                        pendingNotice = PendingProjectNotice(
-                            type = PendingProjectNotice.Type.ProjectSettingsUpdateSucceeded,
-                            projectName = updated.name,
-                        ),
-                        actionErrorMessage = null,
                         isSubmittingProjectSettings = false,
                     )
                 )
+                _events.trySend(ProjectHomeUiEvent.ShowMessage("Saved project settings for ${updated.name}."))
             }.onFailure { error ->
                 val refreshed = (_uiState.value as? UiState.Success)?.data ?: return@onFailure
                 _uiState.value = UiState.Success(
                     refreshed.copy(
                         projectSettingsDraft = draft,
-                        actionErrorMessage = error.message ?: "Failed to update project settings",
                         isSubmittingProjectSettings = false,
                     )
                 )
+                _events.trySend(ProjectHomeUiEvent.ShowMessage(error.message ?: "Failed to update project settings"))
             }
         }
-    }
-
-    fun consumePendingNotice() {
-        val current = (_uiState.value as? UiState.Success)?.data ?: return
-        if (current.pendingNotice == null) return
-        _uiState.value = UiState.Success(current.copy(pendingNotice = null))
-    }
-
-    fun consumeActionErrorMessage() {
-        val current = (_uiState.value as? UiState.Success)?.data ?: return
-        if (current.actionErrorMessage == null) return
-        _uiState.value = UiState.Success(current.copy(actionErrorMessage = null))
     }
 
     fun currentProject(): ProjectSummary? {
@@ -401,4 +340,14 @@ class ProjectHomeViewModel @Inject constructor(
             ?: project.lastScanAt
             ?: ""
     }
+
+    private fun ProjectHomeUiState.resetTransientProjectActions(): ProjectHomeUiState = copy(
+        showCreateOptions = false,
+        showManualCreateDialog = false,
+        newProjectDraft = NewProjectDraft(),
+        showProjectSettingsDialog = false,
+        projectSettingsDraft = ProjectSettingsDraft(),
+        isSubmittingManualCreate = false,
+        isSubmittingProjectSettings = false,
+    )
 }

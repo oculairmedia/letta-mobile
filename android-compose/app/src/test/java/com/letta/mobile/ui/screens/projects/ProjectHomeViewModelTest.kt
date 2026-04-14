@@ -9,6 +9,8 @@ import com.letta.mobile.ui.common.UiState
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -185,13 +187,13 @@ class ProjectHomeViewModelTest {
     @Test
     fun `submitManualProjectCreation resets draft and exposes pending message`() = runTest {
         val viewModel = ProjectHomeViewModel(repository)
+        val event = async { viewModel.events.first() }
 
         viewModel.startManualProjectCreation()
         viewModel.updateNewProjectDraft(
             NewProjectDraft(
                 name = "Graphiti",
                 filesystemPath = "/opt/stacks/graphiti",
-                techStackInput = "TypeScript, Letta",
             )
         )
 
@@ -200,11 +202,7 @@ class ProjectHomeViewModelTest {
         val state = viewModel.uiState.value as UiState.Success
         assertEquals(false, state.data.showManualCreateDialog)
         assertEquals("", state.data.newProjectDraft.name)
-        assertEquals(
-            PendingProjectNotice.Type.ManualProvisioningSucceeded,
-            state.data.pendingNotice?.type,
-        )
-        assertEquals("Graphiti", state.data.pendingNotice?.projectName)
+        assertEquals(ProjectHomeUiEvent.ShowMessage("Created Graphiti."), event.await())
         assertTrue(fakeApi.calls.contains("createProject:Graphiti:/opt/stacks/graphiti:null"))
     }
 
@@ -240,7 +238,6 @@ class ProjectHomeViewModelTest {
 
         val state = viewModel.uiState.value as UiState.Success
         assertEquals(true, state.data.showProjectSettingsDialog)
-        assertEquals(null, state.data.pendingNotice)
         assertEquals("relative/path", state.data.projectSettingsDraft.filesystemPath)
     }
 
@@ -248,6 +245,7 @@ class ProjectHomeViewModelTest {
     fun `submitProjectSettingsEdit closes dialog and exposes pending notice`() = runTest {
         fakeApi.projects += project(identifier = "alpha", name = "Alpha")
         val viewModel = ProjectHomeViewModel(repository)
+        val event = async { viewModel.events.first() }
 
         viewModel.selectProject("alpha")
         viewModel.startProjectSettingsEdit()
@@ -265,17 +263,14 @@ class ProjectHomeViewModelTest {
         val state = viewModel.uiState.value as UiState.Success
         assertEquals(false, state.data.showProjectSettingsDialog)
         assertEquals("", state.data.projectSettingsDraft.filesystemPath)
-        assertEquals(
-            PendingProjectNotice.Type.ProjectSettingsUpdateSucceeded,
-            state.data.pendingNotice?.type,
-        )
-        assertEquals("Alpha", state.data.pendingNotice?.projectName)
+        assertEquals(ProjectHomeUiEvent.ShowMessage("Saved project settings for Alpha."), event.await())
         assertTrue(fakeApi.calls.contains("updateProject:alpha:/opt/stacks/alpha:https://github.com/example/alpha.git"))
     }
 
     @Test
     fun `submitManualProjectCreation trims draft values before exposing pending notice`() = runTest {
         val viewModel = ProjectHomeViewModel(repository)
+        val event = async { viewModel.events.first() }
 
         viewModel.startManualProjectCreation()
         viewModel.updateNewProjectDraft(
@@ -284,24 +279,20 @@ class ProjectHomeViewModelTest {
                 description = "  Project memory graph  ",
                 filesystemPath = "  /opt/stacks/graphiti  ",
                 gitUrl = "  https://github.com/example/graphiti.git  ",
-                techStackInput = "  TypeScript, Letta  ",
             )
         )
 
         viewModel.submitManualProjectCreation()
 
         val state = viewModel.uiState.value as UiState.Success
-        assertEquals(
-            PendingProjectNotice.Type.ManualProvisioningSucceeded,
-            state.data.pendingNotice?.type,
-        )
-        assertEquals("Graphiti", state.data.pendingNotice?.projectName)
+        assertEquals(ProjectHomeUiEvent.ShowMessage("Created Graphiti."), event.await())
     }
 
     @Test
     fun `submitManualProjectCreation exposes action error when create fails`() = runTest {
         fakeApi.createShouldFail = true
         val viewModel = ProjectHomeViewModel(repository)
+        val event = async { viewModel.events.first() }
 
         viewModel.startManualProjectCreation()
         viewModel.updateNewProjectDraft(
@@ -315,8 +306,7 @@ class ProjectHomeViewModelTest {
 
         val state = viewModel.uiState.value as UiState.Success
         assertEquals(true, state.data.showManualCreateDialog)
-        assertEquals("Create failed", state.data.actionErrorMessage)
-        assertEquals(null, state.data.pendingNotice)
+        assertEquals(ProjectHomeUiEvent.ShowMessage("Create failed"), event.await())
     }
 
     @Test
@@ -324,6 +314,7 @@ class ProjectHomeViewModelTest {
         fakeApi.projects += project(identifier = "alpha", name = "Alpha")
         fakeApi.updateShouldFail = true
         val viewModel = ProjectHomeViewModel(repository)
+        val event = async { viewModel.events.first() }
 
         viewModel.selectProject("alpha")
         viewModel.startProjectSettingsEdit()
@@ -339,8 +330,7 @@ class ProjectHomeViewModelTest {
 
         val state = viewModel.uiState.value as UiState.Success
         assertEquals(true, state.data.showProjectSettingsDialog)
-        assertEquals("Update failed", state.data.actionErrorMessage)
-        assertEquals(null, state.data.pendingNotice)
+        assertEquals(ProjectHomeUiEvent.ShowMessage("Update failed"), event.await())
     }
 
     @Test
@@ -369,7 +359,6 @@ class ProjectHomeViewModelTest {
 
         val state = viewModel.uiState.value as UiState.Success
         assertEquals(true, state.data.showManualCreateDialog)
-        assertEquals(null, state.data.pendingNotice)
         assertEquals("", state.data.newProjectDraft.name)
         assertEquals("", state.data.newProjectDraft.filesystemPath)
     }
@@ -377,6 +366,7 @@ class ProjectHomeViewModelTest {
     @Test
     fun `startConversationalProjectCreation exposes pending message`() = runTest {
         val viewModel = ProjectHomeViewModel(repository)
+        val event = async { viewModel.events.first() }
 
         viewModel.showCreateProjectOptions()
         viewModel.startConversationalProjectCreation()
@@ -384,15 +374,15 @@ class ProjectHomeViewModelTest {
         val state = viewModel.uiState.value as UiState.Success
         assertEquals(false, state.data.showCreateOptions)
         assertEquals(
-            PendingProjectNotice.Type.ConversationalNotWired,
-            state.data.pendingNotice?.type,
+            ProjectHomeUiEvent.ShowMessage("Conversational project setup isn't wired to the registry API yet."),
+            event.await(),
         )
-        assertEquals(null, state.data.pendingNotice?.projectName)
     }
 
     @Test
     fun `startConversationalProjectCreation dismisses manual create dialog`() = runTest {
         val viewModel = ProjectHomeViewModel(repository)
+        val event = async { viewModel.events.first() }
 
         viewModel.startManualProjectCreation()
         viewModel.updateNewProjectDraft(
@@ -407,21 +397,9 @@ class ProjectHomeViewModelTest {
         assertEquals(false, state.data.showManualCreateDialog)
         assertEquals("", state.data.newProjectDraft.name)
         assertEquals(
-            PendingProjectNotice.Type.ConversationalNotWired,
-            state.data.pendingNotice?.type,
+            ProjectHomeUiEvent.ShowMessage("Conversational project setup isn't wired to the registry API yet."),
+            event.await(),
         )
-    }
-
-    @Test
-    fun `consumePendingNotice clears the pending notice after dispatch`() = runTest {
-        val viewModel = ProjectHomeViewModel(repository)
-
-        viewModel.showCreateProjectOptions()
-        viewModel.startConversationalProjectCreation()
-        viewModel.consumePendingNotice()
-
-        val state = viewModel.uiState.value as UiState.Success
-        assertEquals(null, state.data.pendingNotice)
     }
 
     @Test
