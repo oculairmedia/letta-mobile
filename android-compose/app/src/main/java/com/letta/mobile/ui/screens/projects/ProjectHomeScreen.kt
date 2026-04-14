@@ -8,15 +8,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -58,6 +61,7 @@ import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ExpandableTitleSearch
+import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaSpacing
@@ -84,6 +88,16 @@ fun ProjectHomeScreen(
     val projectSettingsPathHelper = stringResource(R.string.screen_projects_settings_path_helper)
     val projectSettingsPathMissing = stringResource(R.string.screen_projects_settings_path_missing)
     val projectSettingsPathAbsolute = stringResource(R.string.screen_projects_settings_path_must_be_absolute)
+    val conversationalGoalLabel = stringResource(R.string.screen_projects_new_project_goal_label)
+    val conversationalGoalHelper = stringResource(R.string.screen_projects_new_project_goal_helper)
+    val conversationalNameLabel = stringResource(R.string.screen_projects_new_project_name_label)
+    val conversationalNameHelper = stringResource(R.string.screen_projects_new_project_name_helper)
+    val conversationalPathLabel = stringResource(R.string.screen_projects_new_project_path_label)
+    val conversationalPathHelper = stringResource(R.string.screen_projects_new_project_path_helper)
+    val conversationalPathMissing = stringResource(R.string.screen_projects_settings_path_missing)
+    val conversationalPathAbsolute = stringResource(R.string.screen_projects_settings_path_must_be_absolute)
+    val conversationalGitUrlLabel = stringResource(R.string.screen_projects_new_project_git_url_label)
+    val conversationalGitUrlHelper = stringResource(R.string.screen_projects_new_project_git_url_helper)
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -272,6 +286,188 @@ fun ProjectHomeScreen(
                 }
 
                 MultiFieldInputDialog(
+                    show = state.data.showConversationalCreateDialog,
+                    title = stringResource(
+                        when (state.data.conversationalProjectStep) {
+                            ConversationalProjectStep.Goal -> R.string.screen_projects_new_project_conversational_goal_title
+                            ConversationalProjectStep.Name -> R.string.screen_projects_new_project_conversational_name_title
+                            ConversationalProjectStep.FilesystemPath -> R.string.screen_projects_new_project_conversational_path_title
+                            ConversationalProjectStep.GitUrl -> R.string.screen_projects_new_project_conversational_git_url_title
+                            ConversationalProjectStep.Review -> R.string.screen_projects_new_project_conversational_review_title
+                        }
+                    ),
+                    confirmText = stringResource(
+                        when (state.data.conversationalProjectStep) {
+                            ConversationalProjectStep.Review -> R.string.action_create
+                            else -> R.string.screen_projects_new_project_conversational_continue
+                        }
+                    ),
+                    dismissText = stringResource(
+                        when (state.data.conversationalProjectStep) {
+                            ConversationalProjectStep.Goal -> R.string.action_cancel
+                            else -> R.string.action_back
+                        }
+                    ),
+                    onDismiss = viewModel::dismissConversationalProjectCreation,
+                    confirmEnabled = state.data.conversationalProjectDraft.isReadyFor(state.data.conversationalProjectStep) && !state.data.isSubmittingConversationalCreate,
+                    onConfirm = viewModel::submitConversationalProjectCreation,
+                ) {
+                    val draft = state.data.conversationalProjectDraft
+                    val scrollState = rememberScrollState()
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight()
+                            .verticalScroll(scrollState),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        Text(
+                            text = stringResource(
+                                when (state.data.conversationalProjectStep) {
+                                    ConversationalProjectStep.Goal -> R.string.screen_projects_new_project_conversational_goal_prompt
+                                    ConversationalProjectStep.Name -> R.string.screen_projects_new_project_conversational_name_prompt
+                                    ConversationalProjectStep.FilesystemPath -> R.string.screen_projects_new_project_conversational_path_prompt
+                                    ConversationalProjectStep.GitUrl -> R.string.screen_projects_new_project_conversational_git_url_prompt
+                                    ConversationalProjectStep.Review -> R.string.screen_projects_new_project_conversational_review_prompt
+                                }
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+
+                        when (state.data.conversationalProjectStep) {
+                            ConversationalProjectStep.Goal -> {
+                                FormItem(
+                                    label = { Text(conversationalGoalLabel) },
+                                    description = { Text(conversationalGoalHelper) },
+                                ) {
+                                    OutlinedTextField(
+                                        value = draft.goal,
+                                        onValueChange = {
+                                            viewModel.updateConversationalProjectDraft(draft.copy(goal = it))
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        minLines = 4,
+                                    )
+                                }
+                            }
+
+                            ConversationalProjectStep.Name -> {
+                                if (draft.goal.isNotBlank()) {
+                                    ProjectConversationSummaryChip(
+                                        label = stringResource(R.string.common_description),
+                                        value = draft.goal,
+                                    )
+                                }
+                                FormItem(
+                                    label = { Text(conversationalNameLabel) },
+                                    description = { Text(conversationalNameHelper) },
+                                ) {
+                                    OutlinedTextField(
+                                        value = draft.name,
+                                        onValueChange = {
+                                            viewModel.updateConversationalProjectDraft(draft.copy(name = it))
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                    )
+                                }
+                            }
+
+                            ConversationalProjectStep.FilesystemPath -> {
+                                val pathValidation = draft.filesystemPathValidation()
+                                if (draft.goal.isNotBlank()) {
+                                    ProjectConversationSummaryChip(
+                                        label = stringResource(R.string.common_description),
+                                        value = draft.goal,
+                                    )
+                                }
+                                if (draft.name.isNotBlank()) {
+                                    ProjectConversationSummaryChip(
+                                        label = conversationalNameLabel,
+                                        value = draft.name,
+                                    )
+                                }
+                                FormItem(
+                                    label = { Text(conversationalPathLabel) },
+                                    description = {
+                                        Text(
+                                            when (pathValidation) {
+                                                ConversationalProjectDraft.FilesystemPathValidation.Missing -> conversationalPathMissing
+                                                ConversationalProjectDraft.FilesystemPathValidation.MustBeAbsolute -> conversationalPathAbsolute
+                                                ConversationalProjectDraft.FilesystemPathValidation.Valid -> conversationalPathHelper
+                                            }
+                                        )
+                                    },
+                                ) {
+                                    OutlinedTextField(
+                                        value = draft.filesystemPath,
+                                        onValueChange = {
+                                            viewModel.updateConversationalProjectDraft(draft.copy(filesystemPath = it))
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        isError = pathValidation != ConversationalProjectDraft.FilesystemPathValidation.Valid,
+                                        singleLine = true,
+                                    )
+                                }
+                            }
+
+                            ConversationalProjectStep.GitUrl -> {
+                                ProjectConversationSummaryChip(
+                                    label = conversationalNameLabel,
+                                    value = draft.name,
+                                )
+                                ProjectConversationSummaryChip(
+                                    label = conversationalPathLabel,
+                                    value = draft.filesystemPath,
+                                )
+                                FormItem(
+                                    label = { Text(conversationalGitUrlLabel) },
+                                    description = { Text(conversationalGitUrlHelper) },
+                                ) {
+                                    OutlinedTextField(
+                                        value = draft.gitUrl,
+                                        onValueChange = {
+                                            viewModel.updateConversationalProjectDraft(draft.copy(gitUrl = it))
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                    )
+                                }
+                            }
+
+                            ConversationalProjectStep.Review -> {
+                                if (draft.goal.isNotBlank()) {
+                                    ProjectConversationSummaryChip(
+                                        label = conversationalGoalLabel,
+                                        value = draft.goal,
+                                    )
+                                }
+                                ProjectConversationSummaryChip(
+                                    label = conversationalNameLabel,
+                                    value = draft.name,
+                                )
+                                ProjectConversationSummaryChip(
+                                    label = conversationalPathLabel,
+                                    value = draft.filesystemPath,
+                                )
+                                ProjectConversationSummaryChip(
+                                    label = conversationalGitUrlLabel,
+                                    value = draft.gitUrl.ifBlank {
+                                        stringResource(R.string.screen_projects_new_project_git_url_none)
+                                    },
+                                )
+                                Text(
+                                    text = stringResource(R.string.screen_projects_new_project_conversational_review_helper),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+
+                MultiFieldInputDialog(
                     show = state.data.showProjectSettingsDialog,
                     title = projectSettingsTitle,
                     confirmText = stringResource(R.string.action_save),
@@ -385,6 +581,35 @@ fun ProjectHomeScreen(
                     destructive = true,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun ProjectConversationSummaryChip(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
         }
     }
 }
