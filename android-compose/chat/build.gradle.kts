@@ -16,7 +16,7 @@ detekt {
 
 android {
     namespace = "com.letta.mobile.chat"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 26

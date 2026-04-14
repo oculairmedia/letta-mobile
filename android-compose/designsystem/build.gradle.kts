@@ -14,7 +14,7 @@ detekt {
 
 android {
     namespace = "com.letta.mobile.designsystem"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 26

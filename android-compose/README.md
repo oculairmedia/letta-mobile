@@ -13,7 +13,7 @@ This directory contains the production Letta Mobile Android app.
 
 ## Prerequisites
 
-- Android Studio with Android SDK Platform 35 and Build-Tools 34 installed
+- Android Studio with Android SDK Platform 36 and Build-Tools 36 installed
 - A full JDK/JBR via Android Studio or Java 17
 - `local.properties` pointing at your Android SDK
 
@@ -65,7 +65,7 @@ Run those commands sequentially. KSP state can become unreliable if you try to o
 
 ## Troubleshooting
 
-- If Gradle reports missing Android SDK components, install Platform 35 and Build-Tools 34 in Android Studio.
+- If Gradle reports missing Android SDK components, install Platform 36 and Build-Tools 36 in Android Studio.
 - If Gradle reports missing `JAVA_COMPILER`, make sure `JAVA_HOME` points to a full JDK/JBR, not a JRE.
 - If Gradle cannot find the SDK, verify `local.properties` contains the correct `sdk.dir` for your machine.
 - If Kotlin or KSP behaves inconsistently after dependency or generated-code changes, rerun with `clean` before compiling again.

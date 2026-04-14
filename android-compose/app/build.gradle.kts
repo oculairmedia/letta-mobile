@@ -25,12 +25,12 @@ val keystorePropsFile = rootProject.file("keystore.properties")
 
 android {
     namespace = "com.letta.mobile"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.letta.mobile"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 3
         versionName = "1.1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
