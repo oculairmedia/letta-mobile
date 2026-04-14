@@ -55,6 +55,7 @@ import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.components.StatusChip
 import com.letta.mobile.ui.components.TagDrillInDialog
 import com.letta.mobile.ui.theme.dialogSectionHeading
 import com.letta.mobile.ui.theme.listItemHeadline
@@ -285,7 +286,7 @@ private fun RunCard(
             Spacer(modifier = Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 run.status?.let { status ->
-                    AssistChip(onClick = {}, label = { Text(status) })
+                    StatusChip(status = status)
                 }
                 if (run.background == true) {
                     AssistChip(onClick = {}, label = { Text(stringResource(R.string.screen_runs_background_chip)) })

@@ -49,6 +49,7 @@ import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.components.StatusChip
 import com.letta.mobile.ui.theme.dialogSectionHeading
 import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.ui.theme.listItemMetadata
@@ -229,7 +230,7 @@ private fun MessageBatchCard(
             Spacer(modifier = Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 batch.status?.let { status ->
-                    AssistChip(onClick = {}, label = { Text(status) })
+                    StatusChip(status = status)
                 }
                 batch.jobType?.let { type ->
                     AssistChip(onClick = {}, label = { Text(type) })
