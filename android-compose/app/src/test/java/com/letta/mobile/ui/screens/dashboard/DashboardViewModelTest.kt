@@ -29,6 +29,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -210,6 +211,53 @@ class DashboardViewModelTest {
         assertFalse(state.isUsageLoading)
         assertNull(state.usageSummary)
         assertTrue(state.agentCount != null)
+    }
+
+    @Test
+    fun `updateSearchQuery filters homepage results across loaded sources`() = runTest {
+        val viewModel = DashboardViewModel(
+            agentRepository = agentRepository,
+            allConversationsRepository = conversationsRepository,
+            toolRepository = toolRepository,
+            blockRepository = blockRepository,
+            settingsRepository = settingsRepository,
+            messageRepository = messageRepository,
+            runRepository = runRepository,
+        )
+
+        viewModel.updateSearchQuery("human")
+        advanceTimeBy(350)
+
+        val state = viewModel.uiState.value
+        assertTrue(state.isSearchActive)
+        assertEquals(emptyList<String>(), state.agentResults.map { it.name })
+        assertEquals(emptyList<String>(), state.toolResults.map { it.name })
+        assertEquals(listOf("human"), state.blockResults.mapNotNull { it.label })
+    }
+
+    @Test
+    fun `clearSearch resets homepage search results`() = runTest {
+        val viewModel = DashboardViewModel(
+            agentRepository = agentRepository,
+            allConversationsRepository = conversationsRepository,
+            toolRepository = toolRepository,
+            blockRepository = blockRepository,
+            settingsRepository = settingsRepository,
+            messageRepository = messageRepository,
+            runRepository = runRepository,
+        )
+
+        viewModel.updateSearchQuery("agent")
+        advanceTimeBy(350)
+        viewModel.clearSearch()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isSearchActive)
+        assertEquals("", state.searchQuery)
+        assertTrue(state.agentResults.isEmpty())
+        assertTrue(state.toolResults.isEmpty())
+        assertTrue(state.blockResults.isEmpty())
+        assertTrue(state.messageResults.isEmpty())
     }
 
     private fun sampleStep(id: String, model: String, totalTokens: Int) = Step(

@@ -72,9 +72,15 @@ class DashboardViewModel @Inject constructor(
     private val messageRepository: MessageRepository,
     private val runRepository: RunRepository,
 ) : ViewModel() {
+    private data class SearchSnapshot(
+        val query: String,
+        val agents: List<Agent>,
+        val tools: List<Tool>,
+        val blocks: List<Block>,
+    )
 
     private val _searchQuery = MutableStateFlow("")
-    private var cachedBlocks: List<Block> = emptyList()
+    private val _cachedBlocks = MutableStateFlow<List<Block>>(emptyList())
 
     private val _uiState = MutableStateFlow(
         DashboardUiState(
@@ -148,11 +154,18 @@ class DashboardViewModel @Inject constructor(
 
     private fun setupSearch() {
         viewModelScope.launch {
-            _searchQuery
+            combine(
+                _searchQuery,
+                agentRepository.agents,
+                toolRepository.getTools(),
+                _cachedBlocks,
+            ) { query, agents, tools, blocks ->
+                SearchSnapshot(query = query, agents = agents, tools = tools, blocks = blocks)
+            }
                 .debounce(300L)
                 .distinctUntilChanged()
-                .collect { query ->
-                    if (query.isBlank()) {
+                .collect { snapshot ->
+                    if (snapshot.query.isBlank()) {
                         _uiState.value = _uiState.value.copy(
                             agentResults = persistentListOf(),
                             messageResults = persistentListOf(),
@@ -163,16 +176,16 @@ class DashboardViewModel @Inject constructor(
                         return@collect
                     }
 
-                    val q = query.trim().lowercase()
-                    val agents = agentRepository.agents.value.filter { agent ->
+                    val q = snapshot.query.trim().lowercase()
+                    val agents = snapshot.agents.filter { agent ->
                         agent.name.lowercase().contains(q) ||
                             (agent.description?.lowercase()?.contains(q) == true)
                     }
-                    val tools = toolRepository.getTools().value.filter { tool ->
+                    val tools = snapshot.tools.filter { tool ->
                         tool.name.lowercase().contains(q) ||
                             (tool.description?.lowercase()?.contains(q) == true)
                     }
-                    val blocks = cachedBlocks.filter { block ->
+                    val blocks = snapshot.blocks.filter { block ->
                         (block.label?.lowercase()?.contains(q) == true) ||
                             (block.description?.lowercase()?.contains(q) == true) ||
                             block.value.lowercase().contains(q)
@@ -187,7 +200,7 @@ class DashboardViewModel @Inject constructor(
                     try {
                         val results = messageRepository.searchMessages(
                             MessageSearchRequest(
-                                query = query,
+                                query = snapshot.query,
                                 roles = listOf("user", "assistant"),
                                 limit = 20,
                             )
@@ -288,7 +301,7 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val blocks = blockRepository.listAllBlocks()
-                cachedBlocks = blocks
+                _cachedBlocks.value = blocks
                 _uiState.value = _uiState.value.copy(
                     blockCount = blocks.size,
                 )
