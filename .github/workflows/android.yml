@@ -36,8 +36,17 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Compile app and run unit tests
-        run: ./gradlew :app:compileDebugKotlin :core:testDebugUnitTest :app:testDebugUnitTest --no-daemon --build-cache
+      - name: Compile core sequentially
+        run: ./gradlew --no-daemon :core:compileDebugKotlin
+
+      - name: Compile app sequentially
+        run: ./gradlew --no-daemon :app:compileDebugKotlin
+
+      - name: Run core unit tests
+        run: ./gradlew --no-daemon :core:testDebugUnitTest
+
+      - name: Run app unit tests
+        run: ./gradlew --no-daemon :app:testDebugUnitTest
 
   build-apk:
     runs-on: ubuntu-latest
