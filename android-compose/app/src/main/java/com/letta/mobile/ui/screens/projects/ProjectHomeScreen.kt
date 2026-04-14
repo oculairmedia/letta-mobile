@@ -25,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -32,9 +33,11 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -50,6 +53,8 @@ import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
+import com.letta.mobile.ui.components.FormItem
+import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
@@ -64,13 +69,18 @@ fun ProjectHomeScreen(
     viewModel: ProjectHomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val snackbar = LocalSnackbarDispatcher.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-    val newProjectPendingMessage = stringResource(R.string.screen_projects_new_project_pending)
     val missingAgentMessage = stringResource(R.string.screen_projects_missing_agent, "%s")
-    val editPendingMessage = stringResource(R.string.screen_projects_edit_pending, "%s")
     val archivePendingMessage = stringResource(R.string.screen_projects_archive_pending, "%s")
     val deletePendingMessage = stringResource(R.string.screen_projects_delete_pending, "%s")
+    val projectSettingsTitle = stringResource(R.string.screen_projects_settings_title)
+    val projectSettingsPathLabel = stringResource(R.string.screen_projects_settings_path_label)
+    val projectSettingsGitUrlLabel = stringResource(R.string.screen_projects_settings_git_url_label)
+    val projectSettingsPathHelper = stringResource(R.string.screen_projects_settings_path_helper)
+    val projectSettingsPathMissing = stringResource(R.string.screen_projects_settings_path_missing)
+    val projectSettingsPathAbsolute = stringResource(R.string.screen_projects_settings_path_must_be_absolute)
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -90,7 +100,7 @@ fun ProjectHomeScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
-                    snackbar.dispatch(newProjectPendingMessage)
+                    viewModel.showCreateProjectOptions()
                 }
             ) {
                 Icon(LettaIcons.Add, contentDescription = stringResource(R.string.screen_projects_new_project))
@@ -117,6 +127,39 @@ fun ProjectHomeScreen(
             }
 
             is UiState.Success -> {
+                LaunchedEffect(state.data.pendingNotice) {
+                    state.data.pendingNotice?.let { notice ->
+                        val message = when (notice.type) {
+                            PendingProjectNotice.Type.ConversationalNotWired -> {
+                                context.getString(R.string.screen_projects_new_project_conversational_pending)
+                            }
+                            PendingProjectNotice.Type.ManualProvisioningSucceeded -> {
+                                context.getString(
+                                    R.string.screen_projects_new_project_manual_success,
+                                    notice.projectName
+                                        ?: context.getString(R.string.screen_projects_new_project)
+                                )
+                            }
+                            PendingProjectNotice.Type.ProjectSettingsUpdateSucceeded -> {
+                                context.getString(
+                                    R.string.screen_projects_settings_update_success,
+                                    notice.projectName
+                                        ?: context.getString(R.string.screen_projects_title)
+                                )
+                            }
+                        }
+                        snackbar.dispatch(message)
+                        viewModel.consumePendingNotice()
+                    }
+                }
+
+                LaunchedEffect(state.data.actionErrorMessage) {
+                    state.data.actionErrorMessage?.let {
+                        snackbar.dispatch(it)
+                        viewModel.consumeActionErrorMessage()
+                    }
+                }
+
                 PullToRefreshBox(
                     isRefreshing = state.data.isRefreshing,
                     onRefresh = viewModel::refresh,
@@ -159,6 +202,127 @@ fun ProjectHomeScreen(
 
                 val selectedProject = viewModel.currentProject()
                 ActionSheet(
+                    show = state.data.showCreateOptions,
+                    onDismiss = viewModel::dismissCreateProjectOptions,
+                    title = stringResource(R.string.screen_projects_new_project),
+                ) {
+                    ActionSheetItem(
+                        text = stringResource(R.string.screen_projects_new_project_manual_action),
+                        icon = LettaIcons.Edit,
+                        onClick = viewModel::startManualProjectCreation,
+                    )
+                    ActionSheetItem(
+                        text = stringResource(R.string.screen_projects_new_project_conversational_action),
+                        icon = LettaIcons.Chat,
+                        onClick = viewModel::startConversationalProjectCreation,
+                    )
+                }
+
+                MultiFieldInputDialog(
+                    show = state.data.showManualCreateDialog,
+                    title = stringResource(R.string.screen_projects_new_project_manual_title),
+                    confirmText = stringResource(R.string.action_create),
+                    dismissText = stringResource(R.string.action_cancel),
+                    onDismiss = viewModel::dismissManualProjectCreation,
+                    confirmEnabled = state.data.newProjectDraft.isReadyToSubmit() && !state.data.isSubmittingManualCreate,
+                    onConfirm = viewModel::submitManualProjectCreation,
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedTextField(
+                            value = state.data.newProjectDraft.name,
+                            onValueChange = { viewModel.updateNewProjectDraft(state.data.newProjectDraft.copy(name = it)) },
+                            label = { Text(stringResource(R.string.screen_projects_new_project_name_label)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                        )
+                        OutlinedTextField(
+                            value = state.data.newProjectDraft.description,
+                            onValueChange = { viewModel.updateNewProjectDraft(state.data.newProjectDraft.copy(description = it)) },
+                            label = { Text(stringResource(R.string.common_description)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 3,
+                        )
+                        OutlinedTextField(
+                            value = state.data.newProjectDraft.filesystemPath,
+                            onValueChange = { viewModel.updateNewProjectDraft(state.data.newProjectDraft.copy(filesystemPath = it)) },
+                            label = { Text(stringResource(R.string.screen_projects_new_project_path_label)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                        )
+                        OutlinedTextField(
+                            value = state.data.newProjectDraft.gitUrl,
+                            onValueChange = { viewModel.updateNewProjectDraft(state.data.newProjectDraft.copy(gitUrl = it)) },
+                            label = { Text(stringResource(R.string.screen_projects_new_project_git_url_label)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                        )
+                        FormItem(
+                            label = { Text(stringResource(R.string.screen_projects_new_project_tech_stack_label)) },
+                            description = {
+                                Text(stringResource(R.string.screen_projects_new_project_tech_stack_helper))
+                            },
+                        )
+                        OutlinedTextField(
+                            value = state.data.newProjectDraft.techStackInput,
+                            onValueChange = { viewModel.updateNewProjectDraft(state.data.newProjectDraft.copy(techStackInput = it)) },
+                            label = { Text(stringResource(R.string.common_tags)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                        )
+                    }
+                }
+
+                MultiFieldInputDialog(
+                    show = state.data.showProjectSettingsDialog,
+                    title = projectSettingsTitle,
+                    confirmText = stringResource(R.string.action_save),
+                    dismissText = stringResource(R.string.action_cancel),
+                    onDismiss = viewModel::dismissProjectSettingsEdit,
+                    confirmEnabled = state.data.projectSettingsDraft.isReadyToSubmit() && !state.data.isSubmittingProjectSettings,
+                    onConfirm = viewModel::submitProjectSettingsEdit,
+                ) {
+                    val pathValidation = state.data.projectSettingsDraft.filesystemPathValidation()
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            text = state.data.projectSettingsDraft.projectName,
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        OutlinedTextField(
+                            value = state.data.projectSettingsDraft.filesystemPath,
+                            onValueChange = {
+                                viewModel.updateProjectSettingsDraft(
+                                    state.data.projectSettingsDraft.copy(filesystemPath = it)
+                                )
+                            },
+                            label = { Text(projectSettingsPathLabel) },
+                            supportingText = {
+                                Text(
+                                    when (pathValidation) {
+                                        ProjectSettingsDraft.FilesystemPathValidation.Missing -> projectSettingsPathMissing
+                                        ProjectSettingsDraft.FilesystemPathValidation.MustBeAbsolute -> projectSettingsPathAbsolute
+                                        ProjectSettingsDraft.FilesystemPathValidation.Valid -> projectSettingsPathHelper
+                                    }
+                                )
+                            },
+                            isError = pathValidation != ProjectSettingsDraft.FilesystemPathValidation.Valid,
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                        )
+                        OutlinedTextField(
+                            value = state.data.projectSettingsDraft.gitUrl,
+                            onValueChange = {
+                                viewModel.updateProjectSettingsDraft(
+                                    state.data.projectSettingsDraft.copy(gitUrl = it)
+                                )
+                            },
+                            label = { Text(projectSettingsGitUrlLabel) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                        )
+                    }
+                }
+
+                ActionSheet(
                     show = selectedProject != null,
                     onDismiss = { viewModel.selectProject(null) },
                     title = selectedProject?.name,
@@ -180,10 +344,7 @@ fun ProjectHomeScreen(
                     ActionSheetItem(
                         text = stringResource(R.string.action_edit),
                         icon = LettaIcons.Edit,
-                        onClick = {
-                            viewModel.selectProject(null)
-                            snackbar.dispatch(editPendingMessage.format(project.name))
-                        },
+                        onClick = viewModel::startProjectSettingsEdit,
                     )
                     ActionSheetItem(
                         text = stringResource(R.string.screen_projects_archive_action),

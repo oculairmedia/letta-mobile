@@ -92,30 +92,371 @@ class ProjectHomeViewModelTest {
     }
 
     @Test
-    fun `loadProjects maps repository failures into ui error state`() = runTest {
+    fun `startProjectSettingsEdit seeds draft from selected project`() = runTest {
+        fakeApi.projects += project(
+            identifier = "alpha",
+            name = "Alpha",
+            filesystemPath = "/opt/stacks/alpha",
+            gitUrl = "https://github.com/example/alpha.git",
+        )
+        val viewModel = ProjectHomeViewModel(repository)
+
+        viewModel.selectProject("alpha")
+        viewModel.startProjectSettingsEdit()
+
+        val state = viewModel.uiState.value as UiState.Success
+        assertEquals(true, state.data.showProjectSettingsDialog)
+        assertEquals(null, state.data.selectedProjectId)
+        assertEquals("alpha", state.data.projectSettingsDraft.identifier)
+        assertEquals("Alpha", state.data.projectSettingsDraft.projectName)
+        assertEquals("/opt/stacks/alpha", state.data.projectSettingsDraft.filesystemPath)
+        assertEquals("https://github.com/example/alpha.git", state.data.projectSettingsDraft.gitUrl)
+    }
+
+    @Test
+    fun `startManualProjectCreation opens manual dialog and hides create options`() = runTest {
+        val viewModel = ProjectHomeViewModel(repository)
+
+        viewModel.showCreateProjectOptions()
+        viewModel.startManualProjectCreation()
+
+        val state = viewModel.uiState.value as UiState.Success
+        assertEquals(false, state.data.showCreateOptions)
+        assertEquals(true, state.data.showManualCreateDialog)
+    }
+
+    @Test
+    fun `showCreateProjectOptions clears selected project`() = runTest {
+        fakeApi.projects += listOf(
+            project(identifier = "alpha", name = "Alpha"),
+            project(identifier = "beta", name = "Beta"),
+        )
+        val viewModel = ProjectHomeViewModel(repository)
+
+        viewModel.selectProject("beta")
+        viewModel.showCreateProjectOptions()
+
+        val state = viewModel.uiState.value as UiState.Success
+        assertEquals(null, state.data.selectedProjectId)
+        assertEquals(true, state.data.showCreateOptions)
+    }
+
+    @Test
+    fun `showCreateProjectOptions dismisses manual create dialog`() = runTest {
+        val viewModel = ProjectHomeViewModel(repository)
+
+        viewModel.startManualProjectCreation()
+        viewModel.updateNewProjectDraft(
+            NewProjectDraft(
+                name = "Graphiti",
+                filesystemPath = "/opt/stacks/graphiti",
+            )
+        )
+        viewModel.showCreateProjectOptions()
+
+        val state = viewModel.uiState.value as UiState.Success
+        assertEquals(true, state.data.showCreateOptions)
+        assertEquals(false, state.data.showManualCreateDialog)
+        assertEquals("", state.data.newProjectDraft.name)
+    }
+
+    @Test
+    fun `selectProject dismisses create surfaces`() = runTest {
+        fakeApi.projects += project(identifier = "alpha", name = "Alpha")
+        val viewModel = ProjectHomeViewModel(repository)
+
+        viewModel.showCreateProjectOptions()
+        viewModel.startManualProjectCreation()
+        viewModel.updateNewProjectDraft(
+            NewProjectDraft(
+                name = "Graphiti",
+                filesystemPath = "/opt/stacks/graphiti",
+            )
+        )
+        viewModel.selectProject("alpha")
+
+        val state = viewModel.uiState.value as UiState.Success
+        assertEquals("alpha", state.data.selectedProjectId)
+        assertEquals(false, state.data.showCreateOptions)
+        assertEquals(false, state.data.showManualCreateDialog)
+        assertEquals("", state.data.newProjectDraft.name)
+    }
+
+    @Test
+    fun `submitManualProjectCreation resets draft and exposes pending message`() = runTest {
+        val viewModel = ProjectHomeViewModel(repository)
+
+        viewModel.startManualProjectCreation()
+        viewModel.updateNewProjectDraft(
+            NewProjectDraft(
+                name = "Graphiti",
+                filesystemPath = "/opt/stacks/graphiti",
+                techStackInput = "TypeScript, Letta",
+            )
+        )
+
+        viewModel.submitManualProjectCreation()
+
+        val state = viewModel.uiState.value as UiState.Success
+        assertEquals(false, state.data.showManualCreateDialog)
+        assertEquals("", state.data.newProjectDraft.name)
+        assertEquals(
+            PendingProjectNotice.Type.ManualProvisioningSucceeded,
+            state.data.pendingNotice?.type,
+        )
+        assertEquals("Graphiti", state.data.pendingNotice?.projectName)
+        assertTrue(fakeApi.calls.contains("createProject:Graphiti:/opt/stacks/graphiti:null"))
+    }
+
+    @Test
+    fun `project settings draft requires absolute path`() {
+        val draft = ProjectSettingsDraft(
+            filesystemPath = "relative/path",
+        )
+
+        assertEquals(
+            ProjectSettingsDraft.FilesystemPathValidation.MustBeAbsolute,
+            draft.filesystemPathValidation(),
+        )
+        assertEquals(false, draft.isReadyToSubmit())
+    }
+
+    @Test
+    fun `submitProjectSettingsEdit ignores invalid path draft`() = runTest {
+        fakeApi.projects += project(identifier = "alpha", name = "Alpha")
+        val viewModel = ProjectHomeViewModel(repository)
+
+        viewModel.selectProject("alpha")
+        viewModel.startProjectSettingsEdit()
+        viewModel.updateProjectSettingsDraft(
+            ProjectSettingsDraft(
+                identifier = "alpha",
+                projectName = "Alpha",
+                filesystemPath = "relative/path",
+            )
+        )
+
+        viewModel.submitProjectSettingsEdit()
+
+        val state = viewModel.uiState.value as UiState.Success
+        assertEquals(true, state.data.showProjectSettingsDialog)
+        assertEquals(null, state.data.pendingNotice)
+        assertEquals("relative/path", state.data.projectSettingsDraft.filesystemPath)
+    }
+
+    @Test
+    fun `submitProjectSettingsEdit closes dialog and exposes pending notice`() = runTest {
+        fakeApi.projects += project(identifier = "alpha", name = "Alpha")
+        val viewModel = ProjectHomeViewModel(repository)
+
+        viewModel.selectProject("alpha")
+        viewModel.startProjectSettingsEdit()
+        viewModel.updateProjectSettingsDraft(
+            ProjectSettingsDraft(
+                identifier = "alpha",
+                projectName = "Alpha",
+                filesystemPath = "  /opt/stacks/alpha  ",
+                gitUrl = "  https://github.com/example/alpha.git  ",
+            )
+        )
+
+        viewModel.submitProjectSettingsEdit()
+
+        val state = viewModel.uiState.value as UiState.Success
+        assertEquals(false, state.data.showProjectSettingsDialog)
+        assertEquals("", state.data.projectSettingsDraft.filesystemPath)
+        assertEquals(
+            PendingProjectNotice.Type.ProjectSettingsUpdateSucceeded,
+            state.data.pendingNotice?.type,
+        )
+        assertEquals("Alpha", state.data.pendingNotice?.projectName)
+        assertTrue(fakeApi.calls.contains("updateProject:alpha:/opt/stacks/alpha:https://github.com/example/alpha.git"))
+    }
+
+    @Test
+    fun `submitManualProjectCreation trims draft values before exposing pending notice`() = runTest {
+        val viewModel = ProjectHomeViewModel(repository)
+
+        viewModel.startManualProjectCreation()
+        viewModel.updateNewProjectDraft(
+            NewProjectDraft(
+                name = "  Graphiti  ",
+                description = "  Project memory graph  ",
+                filesystemPath = "  /opt/stacks/graphiti  ",
+                gitUrl = "  https://github.com/example/graphiti.git  ",
+                techStackInput = "  TypeScript, Letta  ",
+            )
+        )
+
+        viewModel.submitManualProjectCreation()
+
+        val state = viewModel.uiState.value as UiState.Success
+        assertEquals(
+            PendingProjectNotice.Type.ManualProvisioningSucceeded,
+            state.data.pendingNotice?.type,
+        )
+        assertEquals("Graphiti", state.data.pendingNotice?.projectName)
+    }
+
+    @Test
+    fun `submitManualProjectCreation exposes action error when create fails`() = runTest {
+        fakeApi.createShouldFail = true
+        val viewModel = ProjectHomeViewModel(repository)
+
+        viewModel.startManualProjectCreation()
+        viewModel.updateNewProjectDraft(
+            NewProjectDraft(
+                name = "Graphiti",
+                filesystemPath = "/opt/stacks/graphiti",
+            )
+        )
+
+        viewModel.submitManualProjectCreation()
+
+        val state = viewModel.uiState.value as UiState.Success
+        assertEquals(true, state.data.showManualCreateDialog)
+        assertEquals("Create failed", state.data.actionErrorMessage)
+        assertEquals(null, state.data.pendingNotice)
+    }
+
+    @Test
+    fun `submitProjectSettingsEdit exposes action error when update fails`() = runTest {
+        fakeApi.projects += project(identifier = "alpha", name = "Alpha")
+        fakeApi.updateShouldFail = true
+        val viewModel = ProjectHomeViewModel(repository)
+
+        viewModel.selectProject("alpha")
+        viewModel.startProjectSettingsEdit()
+        viewModel.updateProjectSettingsDraft(
+            ProjectSettingsDraft(
+                identifier = "alpha",
+                projectName = "Alpha",
+                filesystemPath = "/opt/stacks/alpha",
+            )
+        )
+
+        viewModel.submitProjectSettingsEdit()
+
+        val state = viewModel.uiState.value as UiState.Success
+        assertEquals(true, state.data.showProjectSettingsDialog)
+        assertEquals("Update failed", state.data.actionErrorMessage)
+        assertEquals(null, state.data.pendingNotice)
+    }
+
+    @Test
+    fun `new project draft is not ready when required fields are whitespace only`() {
+        val draft = NewProjectDraft(
+            name = "   ",
+            filesystemPath = "   ",
+        )
+
+        assertEquals(false, draft.isReadyToSubmit())
+    }
+
+    @Test
+    fun `submitManualProjectCreation ignores invalid whitespace-only draft`() = runTest {
+        val viewModel = ProjectHomeViewModel(repository)
+
+        viewModel.startManualProjectCreation()
+        viewModel.updateNewProjectDraft(
+            NewProjectDraft(
+                name = "   ",
+                filesystemPath = "   ",
+            )
+        )
+
+        viewModel.submitManualProjectCreation()
+
+        val state = viewModel.uiState.value as UiState.Success
+        assertEquals(true, state.data.showManualCreateDialog)
+        assertEquals(null, state.data.pendingNotice)
+        assertEquals("", state.data.newProjectDraft.name)
+        assertEquals("", state.data.newProjectDraft.filesystemPath)
+    }
+
+    @Test
+    fun `startConversationalProjectCreation exposes pending message`() = runTest {
+        val viewModel = ProjectHomeViewModel(repository)
+
+        viewModel.showCreateProjectOptions()
+        viewModel.startConversationalProjectCreation()
+
+        val state = viewModel.uiState.value as UiState.Success
+        assertEquals(false, state.data.showCreateOptions)
+        assertEquals(
+            PendingProjectNotice.Type.ConversationalNotWired,
+            state.data.pendingNotice?.type,
+        )
+        assertEquals(null, state.data.pendingNotice?.projectName)
+    }
+
+    @Test
+    fun `startConversationalProjectCreation dismisses manual create dialog`() = runTest {
+        val viewModel = ProjectHomeViewModel(repository)
+
+        viewModel.startManualProjectCreation()
+        viewModel.updateNewProjectDraft(
+            NewProjectDraft(
+                name = "Graphiti",
+                filesystemPath = "/opt/stacks/graphiti",
+            )
+        )
+        viewModel.startConversationalProjectCreation()
+
+        val state = viewModel.uiState.value as UiState.Success
+        assertEquals(false, state.data.showManualCreateDialog)
+        assertEquals("", state.data.newProjectDraft.name)
+        assertEquals(
+            PendingProjectNotice.Type.ConversationalNotWired,
+            state.data.pendingNotice?.type,
+        )
+    }
+
+    @Test
+    fun `consumePendingNotice clears the pending notice after dispatch`() = runTest {
+        val viewModel = ProjectHomeViewModel(repository)
+
+        viewModel.showCreateProjectOptions()
+        viewModel.startConversationalProjectCreation()
+        viewModel.consumePendingNotice()
+
+        val state = viewModel.uiState.value as UiState.Success
+        assertEquals(null, state.data.pendingNotice)
+    }
+
+    @Test
+    fun `loadProjects degrades to empty success state on repository failure`() = runTest {
         fakeApi.shouldFail = true
 
         val viewModel = ProjectHomeViewModel(repository)
 
         val state = viewModel.uiState.value
-        assertTrue(state is UiState.Error)
-        assertEquals("Server error. Try again later.", (state as UiState.Error).message)
+        assertTrue(state is UiState.Success)
+        val success = state as UiState.Success
+        assertTrue(success.data.projects.isEmpty())
+        assertEquals(false, success.data.isRefreshing)
     }
 
     private fun project(
         identifier: String,
         name: String,
         updatedAt: String? = null,
+        filesystemPath: String? = null,
+        gitUrl: String? = null,
     ) = ProjectSummary(
         identifier = identifier,
         name = name,
         updatedAt = updatedAt,
+        filesystemPath = filesystemPath,
+        gitUrl = gitUrl,
         lettaAgentId = "agent-$identifier",
     )
 
     private class FakeProjectApi : ProjectApi(mockk(relaxed = true)) {
         var projects = mutableListOf<ProjectSummary>()
         var shouldFail = false
+        var createShouldFail = false
+        var updateShouldFail = false
         val calls = mutableListOf<String>()
 
         override suspend fun listProjects(): ProjectCatalog {
@@ -129,6 +470,36 @@ class ProjectHomeViewModelTest {
             if (shouldFail) throw ApiException(500, "Server error")
             return projects.firstOrNull { it.identifier == identifier }
                 ?: throw ApiException(404, "Not found")
+        }
+
+        override suspend fun createProject(request: com.letta.mobile.data.api.ProjectCreateRequest): ProjectSummary {
+            calls.add("createProject:${request.name}:${request.filesystemPath}:${request.gitUrl}")
+            if (createShouldFail) throw ApiException(400, "Create failed")
+            val created = ProjectSummary(
+                identifier = (request.name ?: "Project").uppercase(),
+                name = request.name ?: "Project",
+                filesystemPath = request.filesystemPath,
+                gitUrl = request.gitUrl,
+                lettaAgentId = null,
+            )
+            projects += created
+            return created
+        }
+
+        override suspend fun updateProject(
+            identifier: String,
+            request: com.letta.mobile.data.api.ProjectUpdateRequest,
+        ): ProjectSummary {
+            calls.add("updateProject:$identifier:${request.filesystemPath}:${request.gitUrl}")
+            if (updateShouldFail) throw ApiException(400, "Update failed")
+            val index = projects.indexOfFirst { it.identifier == identifier }
+            val existing = projects[index]
+            val updated = existing.copy(
+                filesystemPath = request.filesystemPath ?: existing.filesystemPath,
+                gitUrl = request.gitUrl ?: existing.gitUrl,
+            )
+            projects[index] = updated
+            return updated
         }
     }
 }
