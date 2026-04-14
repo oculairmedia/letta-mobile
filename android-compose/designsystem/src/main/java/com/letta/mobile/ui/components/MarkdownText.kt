@@ -65,7 +65,7 @@ fun MarkdownText(
                 MarkdownHighlightedCodeBlock(
                     content = it.content,
                     node = it.node,
-                    highlights = highlightsBuilder,
+                    highlightsBuilder = highlightsBuilder,
                 )
             },
             codeFence = {
@@ -113,10 +113,8 @@ fun MarkdownText(
             extendedSpans = extendedSpans,
             colors = markdownColor(
                 text = textColor,
-                codeText = MaterialTheme.colorScheme.onSurfaceVariant,
                 codeBackground = MaterialTheme.colorScheme.surfaceVariant,
                 dividerColor = MaterialTheme.colorScheme.outlineVariant,
-                linkText = MaterialTheme.colorScheme.primary,
             ),
             typography = markdownTypography(
                 text = MaterialTheme.typography.bodyMedium.copy(color = textColor),
@@ -201,7 +199,7 @@ private fun CodeFenceWithHeader(
                 MarkdownHighlightedCodeFence(
                     content = content,
                     node = node,
-                    highlights = highlights,
+                    highlightsBuilder = highlights,
                 )
             }
         }
