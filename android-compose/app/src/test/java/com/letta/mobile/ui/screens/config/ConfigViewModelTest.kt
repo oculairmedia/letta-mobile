@@ -200,7 +200,7 @@ class ConfigViewModelTest {
 
         val savedConfig = fakeRepository.getSavedConfig()
         assertEquals("existing-id-123", savedConfig?.id)
-        assertEquals("https://new.letta.ai", savedConfig?.serverUrl)
+        assertEquals(ConfigViewModel.DEFAULT_CLOUD_URL, savedConfig?.serverUrl)
     }
 
     @Test
@@ -231,6 +231,29 @@ class ConfigViewModelTest {
             val successState = (state as UiState.Success).data
             assertEquals(ServerMode.SELF_HOSTED, successState.mode)
         }
+    }
+
+    @Test
+    fun updateMode_roundTripsCloudAndSelfHostedUrlsCorrectly() = runTest {
+        fakeRepository.setActiveConfig(null)
+        viewModel.loadConfig()
+
+        viewModel.updateMode(ServerMode.CLOUD)
+        var successState = (viewModel.uiState.value as UiState.Success).data
+        assertEquals(ConfigViewModel.DEFAULT_CLOUD_URL, successState.serverUrl)
+
+        viewModel.updateMode(ServerMode.SELF_HOSTED)
+        successState = (viewModel.uiState.value as UiState.Success).data
+        assertEquals("", successState.serverUrl)
+
+        viewModel.updateServerUrl("http://localhost:8080")
+        viewModel.updateMode(ServerMode.CLOUD)
+        successState = (viewModel.uiState.value as UiState.Success).data
+        assertEquals(ConfigViewModel.DEFAULT_CLOUD_URL, successState.serverUrl)
+
+        viewModel.updateMode(ServerMode.SELF_HOSTED)
+        successState = (viewModel.uiState.value as UiState.Success).data
+        assertEquals("", successState.serverUrl)
     }
 
     @Test
@@ -324,6 +347,22 @@ class ConfigViewModelTest {
         assertEquals(ThemePreset.AMOLED_BLACK, fakeRepository.getThemePreset().first())
         assertEquals(false, fakeRepository.getDynamicColor().first())
         assertEquals("default", fakeRepository.getChatBackgroundKey().first())
+    }
+
+    @Test
+    fun saveConfig_trimsSelfHostedUrlAndToken() = runTest {
+        fakeRepository.setActiveConfig(null)
+        viewModel.loadConfig()
+
+        viewModel.updateMode(ServerMode.SELF_HOSTED)
+        viewModel.updateServerUrl("  https://self-hosted.letta.dev  ")
+        viewModel.updateApiToken("  token-with-spaces  ")
+
+        viewModel.saveConfig(onSuccess = {})
+
+        val savedConfig = fakeRepository.getSavedConfig()
+        assertEquals("https://self-hosted.letta.dev", savedConfig?.serverUrl)
+        assertEquals("token-with-spaces", savedConfig?.accessToken)
     }
 
     private class FakeSettingsRepository(context: Context) : SettingsRepository(context) {
