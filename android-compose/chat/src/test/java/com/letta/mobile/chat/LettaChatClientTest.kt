@@ -6,6 +6,7 @@ import com.letta.mobile.chat.model.StreamEvent
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.MessageType
+import com.letta.mobile.data.repository.ConversationManager
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.StreamState
@@ -52,12 +53,19 @@ class LettaChatClientTest : WordSpec({
         val conversationRepo = object : ConversationRepository(mockk(relaxed = true)) {
             override fun getConversations(agentId: String): Flow<List<Conversation>> = flowOf(conversations)
             override suspend fun refreshConversations(agentId: String) {}
+            override fun getCachedConversations(agentId: String): List<Conversation> =
+                conversations.filter { it.agentId == agentId }
+
+            override suspend fun getConversation(id: String): Conversation =
+                conversations.first { it.id == id }
+
             override suspend fun createConversation(agentId: String, summary: String?): Conversation = fakeConversation("new-conv", agentId)
             override suspend fun updateConversation(id: String, agentId: String, summary: String) {}
             override suspend fun deleteConversation(id: String, agentId: String) {}
             override suspend fun forkConversation(id: String, agentId: String): Conversation = fakeConversation("fork-$id", agentId)
         }
-        return LettaChatClient(messageRepo, conversationRepo, agentId, conversationId)
+        val conversationManager = ConversationManager(conversationRepo)
+        return LettaChatClient(messageRepo, conversationManager, conversationRepo, agentId, conversationId)
     }
 
     "connect" should {

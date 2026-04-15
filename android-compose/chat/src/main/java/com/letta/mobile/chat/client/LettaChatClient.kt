@@ -8,7 +8,9 @@ import com.letta.mobile.chat.model.MessageRole
 import com.letta.mobile.chat.model.MessageStatus
 import com.letta.mobile.chat.model.StreamEvent
 import com.letta.mobile.data.model.AppMessage
+import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.MessageType
+import com.letta.mobile.data.repository.ConversationManager
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.StreamState
@@ -24,6 +26,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 class LettaChatClient(
     private val messageRepository: MessageRepository,
+    private val conversationManager: ConversationManager,
     private val conversationRepository: ConversationRepository,
     private val agentId: String,
     initialConversationId: String? = null,
@@ -45,18 +48,26 @@ class LettaChatClient(
 
     private val pendingTools = ConcurrentHashMap<String, ChatToolCall>()
     private val seenMessageIds = ConcurrentHashMap.newKeySet<String>()
-    private var activeConversationId: String? = initialConversationId
+    private val activeConversationId: String?
+        get() = conversationManager.getActiveConversationId(agentId)
     private var hasSummary = false
+
+    init {
+        initialConversationId
+            ?.takeIf { it.isNotBlank() }
+            ?.let { conversationManager.setActiveConversation(agentId, it) }
+    }
 
     suspend fun connect() {
         _isLoading.update { true }
         try {
             if (activeConversationId == null) {
-                activeConversationId = resolveConversation()
+                conversationManager.resolveAndSetActiveConversation(agentId)
             }
+            syncConversation()
             loadMessages()
         } catch (e: Exception) {
-            Log.w(TAG, "Connect failed", e)
+            logWarning("Connect failed", e)
             _error.update { e.message }
         } finally {
             _isLoading.update { false }
@@ -126,32 +137,6 @@ class LettaChatClient(
         _error.update { null }
     }
 
-    private suspend fun resolveConversation(): String? {
-        try {
-            conversationRepository.refreshConversations(agentId)
-            val conversations = conversationRepository.getConversations(agentId).first()
-            val mostRecent = conversations
-                .sortedByDescending { it.lastMessageAt ?: it.createdAt ?: "" }
-                .firstOrNull()
-            if (mostRecent != null) {
-                _conversation.update {
-                    ChatConversation(
-                        id = mostRecent.id,
-                        agentId = mostRecent.agentId,
-                        summary = mostRecent.summary,
-                        lastMessageAt = mostRecent.lastMessageAt,
-                        createdAt = mostRecent.createdAt,
-                    )
-                }
-                Log.d(TAG, "Resolved to conversation: ${mostRecent.id}")
-                return mostRecent.id
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to resolve conversation", e)
-        }
-        return null
-    }
-
     private suspend fun loadMessages() {
         try {
             val appMessages = messageRepository.fetchMessages(agentId, activeConversationId)
@@ -161,7 +146,24 @@ class LettaChatClient(
             chatMessages.forEach { seenMessageIds.add(it.id) }
             hasSummary = chatMessages.isNotEmpty()
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to load messages", e)
+            logWarning("Failed to load messages", e)
+        }
+    }
+
+    private suspend fun syncConversation() {
+        val conversationId = activeConversationId
+        if (conversationId == null) {
+            _conversation.update { null }
+            return
+        }
+
+        val conversation = conversationRepository.getCachedConversations(agentId)
+            .firstOrNull { it.id == conversationId }
+            ?: runCatching { conversationRepository.getConversation(conversationId) }.getOrNull()
+
+        _conversation.update { conversation?.toChatConversation() }
+        if (conversation != null) {
+            logDebug("Resolved to conversation: ${conversation.id}")
         }
     }
 
@@ -187,7 +189,7 @@ class LettaChatClient(
                 conversationRepository.updateConversation(activeConversationId!!, agentId, summary)
                 hasSummary = true
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to set summary", e)
+                logWarning("Failed to set summary", e)
             }
         }
     }
@@ -202,8 +204,16 @@ class LettaChatClient(
                 chatMessages.forEach { seenMessageIds.add(it.id) }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Silent reload failed", e)
+            logWarning("Silent reload failed", e)
         }
+    }
+
+    private fun logDebug(message: String) {
+        runCatching { Log.d(TAG, message) }
+    }
+
+    private fun logWarning(message: String, throwable: Throwable) {
+        runCatching { Log.w(TAG, message, throwable) }
     }
 
     private fun AppMessage.toChatMessage(): ChatMessage {
@@ -239,6 +249,16 @@ class LettaChatClient(
             timestamp = date.toString(),
             isReasoning = messageType == MessageType.REASONING,
             toolCalls = toolCalls,
+        )
+    }
+
+    private fun Conversation.toChatConversation(): ChatConversation {
+        return ChatConversation(
+            id = id,
+            agentId = agentId,
+            summary = summary,
+            lastMessageAt = lastMessageAt,
+            createdAt = createdAt,
         )
     }
 
