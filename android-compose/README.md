@@ -43,6 +43,119 @@ Run Gradle commands from this directory.
 ./gradlew --no-daemon detekt
 ```
 
+## Release process
+
+Use this flow when building and publishing an Android APK release.
+
+### 1. Pick the release version
+
+- The public GitHub release line currently uses `v0.1.x` tags.
+- Check existing releases before picking a new tag:
+
+```bash
+gh release list --limit 20
+git tag --list "v0.1.*"
+```
+
+- Create a new tag instead of overwriting an existing release.
+- Keep the Android app's internal `versionName` / `versionCode` in `app/build.gradle.kts` aligned intentionally; the public GitHub tag and internal Android version do not have to match automatically.
+
+### 2. Prepare signing inputs
+
+Release builds use the `release` signing config in `app/build.gradle.kts`.
+
+Provide signing credentials in one of two ways:
+
+1. `android-compose/keystore.properties` (preferred for local release work)
+2. Environment variables (`SIGNING_STORE_FILE`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD`)
+
+Expected `keystore.properties` shape:
+
+```properties
+storeFile=../letta-release.jks
+storePassword=...
+keyAlias=...
+keyPassword=...
+```
+
+Notes:
+
+- `storeFile` is resolved from the `app` module, so paths should be relative to `android-compose/app/`.
+- `keystore.properties` and `*.jks` are gitignored; keep them local.
+- If you create a temporary keystore for a one-off build, treat that APK as non-production-signing output.
+
+### 3. Build the release APK locally
+
+Run all commands from `android-compose/`.
+
+Recommended sequential flow:
+
+```bash
+./gradlew --stop
+pkill -f kotlin-daemon 2>/dev/null || true
+./gradlew cleanKotlinIC
+./gradlew --no-daemon :app:assembleRelease
+```
+
+Expected output:
+
+```text
+app/build/outputs/apk/release/app-release.apk
+```
+
+Useful checks after the build:
+
+```bash
+ls app/build/outputs/apk/release
+stat app/build/outputs/apk/release/app-release.apk
+```
+
+### 4. CI release build behavior
+
+GitHub Actions already knows how to build a release APK in `.github/workflows/android.yml`:
+
+- decodes `SIGNING_KEYSTORE_BASE64`
+- sets `SIGNING_*` env vars
+- runs `./gradlew :app:assembleRelease --no-daemon --build-cache`
+- uploads `android-compose/app/build/outputs/apk/release/*.apk` as an artifact
+
+If local release builds fail, compare your setup with the workflow first.
+
+### 5. Publish the GitHub release
+
+After the APK is built and you have chosen a new tag:
+
+```bash
+gh release create v0.1.2 \
+  "android-compose/app/build/outputs/apk/release/app-release.apk#letta-mobile-v0.1.2-release.apk" \
+  --target main \
+  --title "v0.1.2" \
+  --notes "## Summary
+- short release summary
+
+## Artifact
+- letta-mobile-v0.1.2-release.apk"
+```
+
+Verify the published release:
+
+```bash
+gh release view v0.1.2 --json tagName,name,url,assets
+```
+
+### 6. Release checklist
+
+Use this checklist every time:
+
+1. Confirm `main` is clean and up to date.
+2. Pick a new GitHub release tag; do not reuse an existing one.
+3. Confirm signing inputs are present.
+4. Run the sequential release build flow.
+5. Verify `app/build/outputs/apk/release/app-release.apk` exists.
+6. Publish the GitHub release and upload the APK.
+7. Verify the release URL and asset.
+8. Document whether the APK was signed with the production key or a temporary local key.
+
 ## Recommended verification flow
 
 For normal application changes:
