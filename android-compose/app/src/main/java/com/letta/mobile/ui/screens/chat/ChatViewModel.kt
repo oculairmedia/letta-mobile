@@ -39,6 +39,9 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import javax.inject.Inject
@@ -183,6 +186,7 @@ class ChatViewModel @Inject constructor(
 ) : ViewModel() {
     companion object {
         private const val CONVERSATION_CACHE_TTL_MS = 30_000L
+        private const val MESSAGE_SYNC_INTERVAL_MS = 5_000L
     }
 
     val agentId: String = savedStateHandle.get<String>("agentId")!!
@@ -229,8 +233,63 @@ class ChatViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Start polling for new messages from server.
+     * This handles messages added by other clients (web UI, CLI, etc.).
+     */
+    private fun startMessageSync(conversationId: String) {
+        stopMessageSync()
+
+        // Don't sync for project chat (uses different server)
+        if (projectContext != null) return
+
+        messageSyncJob = viewModelScope.launch {
+            while (isActive) {
+                delay(MESSAGE_SYNC_INTERVAL_MS)
+
+                // Stop if conversation changed
+                if (conversationId != activeConversationId) break
+
+                // Skip if currently streaming
+                if (_uiState.value.isStreaming) continue
+
+                val newMessages = messageRepository.checkForNewMessages(
+                    agentId = agentId,
+                    conversationId = conversationId,
+                )
+
+                if (newMessages.isNotEmpty()) {
+                    val uiMessages = newMessages.toUiMessages()
+                    _uiState.value = _uiState.value.copy(
+                        messages = mergeNewSyncedMessages(_uiState.value.messages, uiMessages)
+                    )
+                }
+            }
+        }
+    }
+
+    private fun stopMessageSync() {
+        messageSyncJob?.cancel()
+        messageSyncJob = null
+    }
+
+    private fun mergeNewSyncedMessages(
+        existing: ImmutableList<UiMessage>,
+        incoming: List<UiMessage>,
+    ): ImmutableList<UiMessage> {
+        val existingIds = existing.map { it.id }.toSet()
+        val newOnly = incoming.filter { it.id !in existingIds }
+        return (existing + newOnly).toImmutableList()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopMessageSync()
+    }
+
     private val pendingToolsMap = java.util.concurrent.ConcurrentHashMap<String, PendingToolCall>()
     private var hasSummary = false
+    private var messageSyncJob: Job? = null
 
     init {
         savedStateHandle.get<String>("conversationId")
@@ -511,6 +570,9 @@ class ChatViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 messages = messages.toImmutableList(), isLoadingMessages = false
             )
+
+            // Start background sync for messages from other clients
+            startMessageSync(requestedConversationId)
         } catch (e: Exception) {
             if (requestedConversationId != activeConversationId) {
                 return

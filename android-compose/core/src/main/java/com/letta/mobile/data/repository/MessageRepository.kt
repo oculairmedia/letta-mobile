@@ -71,6 +71,16 @@ open class MessageRepository @Inject constructor(
 
     private val _messagesByConversation = MutableStateFlow<Map<String, List<AppMessage>>>(emptyMap())
 
+    // Track last synced message ID per conversation for incremental fetches
+    private val _lastSyncedMessageId = MutableStateFlow<Map<String, String>>(emptyMap())
+
+    fun getLastSyncedMessageId(conversationId: String): String? =
+        _lastSyncedMessageId.value[conversationId]
+
+    private fun setLastSyncedMessageId(conversationId: String, messageId: String) {
+        _lastSyncedMessageId.update { it + (conversationId to messageId) }
+    }
+
     fun getMessagesPaged(agentId: String?, conversationId: String?): Flow<PagingData<AppMessage>> {
         return Pager(
             config = PagingConfig(
@@ -114,6 +124,11 @@ open class MessageRepository @Inject constructor(
                 }
             }
 
+            // Track last message ID for incremental sync
+            appMessages.lastOrNull()?.id?.let { lastId ->
+                setLastSyncedMessageId(conversationId, lastId)
+            }
+
             appMessages
         } catch (e: Exception) {
             // Return cached or empty list on error
@@ -124,6 +139,42 @@ open class MessageRepository @Inject constructor(
     fun getMessages(agentId: String, conversationId: String): Flow<List<AppMessage>> = flow {
         val messages = fetchMessages(agentId, conversationId)
         emit(messages)
+    }
+
+    /**
+     * Check for new messages from server that we don't have locally.
+     * Uses cursor-based pagination to only fetch messages after our last known message.
+     * Returns the new messages found (empty if none or on error).
+     */
+    suspend fun checkForNewMessages(
+        agentId: String,
+        conversationId: String,
+    ): List<AppMessage> {
+        val lastKnownId = getLastSyncedMessageId(conversationId)
+
+        return try {
+            val newMessages = messageApi.listMessages(
+                agentId = agentId,
+                conversationId = conversationId,
+                after = lastKnownId,
+                limit = 50,
+                order = "asc",
+            ).toAppMessages()
+
+            if (newMessages.isNotEmpty()) {
+                // Merge into cache
+                mergeMessagesIntoCache(conversationId, newMessages)
+                // Update sync marker
+                newMessages.lastOrNull()?.id?.let { lastId ->
+                    setLastSyncedMessageId(conversationId, lastId)
+                }
+            }
+
+            newMessages
+        } catch (e: Exception) {
+            // Silent fail for background sync
+            emptyList()
+        }
     }
 
     private suspend fun fetchMessagesUntilTarget(
