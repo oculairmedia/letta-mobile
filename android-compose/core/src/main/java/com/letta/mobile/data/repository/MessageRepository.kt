@@ -68,7 +68,6 @@ open class MessageRepository @Inject constructor(
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    private val _messagesByAgent = MutableStateFlow<Map<String, List<AppMessage>>>(emptyMap())
     private val _messagesByConversation = MutableStateFlow<Map<String, List<AppMessage>>>(emptyMap())
 
     fun getMessagesPaged(agentId: String?, conversationId: String?): Flow<PagingData<AppMessage>> {
@@ -84,7 +83,7 @@ open class MessageRepository @Inject constructor(
 
     suspend fun fetchMessages(
         agentId: String,
-        conversationId: String? = null,
+        conversationId: String,
         targetMessageId: String? = null,
     ): List<AppMessage> {
         // Always use the agent messages endpoint — it returns tool_call_message types
@@ -108,35 +107,27 @@ open class MessageRepository @Inject constructor(
             }
 
             // Update cache
-            if (conversationId != null) {
-                _messagesByConversation.update { current -> current.toMutableMap().apply {
-                            put(conversationId, appMessages)
-                        } }
-            } else {
-                _messagesByAgent.update { current -> current.toMutableMap().apply {
-                            put(agentId, appMessages)
-                        } }
+            _messagesByConversation.update { current ->
+                current.toMutableMap().apply {
+                    put(conversationId, appMessages)
+                }
             }
 
             appMessages
         } catch (e: Exception) {
             // Return cached or empty list on error
-            if (conversationId != null) {
-                _messagesByConversation.value[conversationId] ?: emptyList()
-            } else {
-                _messagesByAgent.value[agentId] ?: emptyList()
-            }
+            _messagesByConversation.value[conversationId] ?: emptyList()
         }
     }
 
-    fun getMessages(agentId: String, conversationId: String? = null): Flow<List<AppMessage>> = flow {
+    fun getMessages(agentId: String, conversationId: String): Flow<List<AppMessage>> = flow {
         val messages = fetchMessages(agentId, conversationId)
         emit(messages)
     }
 
     private suspend fun fetchMessagesUntilTarget(
         agentId: String,
-        conversationId: String?,
+        conversationId: String,
         targetMessageId: String,
     ): List<AppMessage> {
         var after: String? = null
@@ -168,12 +159,8 @@ open class MessageRepository @Inject constructor(
         return mergedMessages
     }
 
-    fun getCachedMessages(agentId: String, conversationId: String? = null): List<AppMessage> {
-        return if (conversationId != null) {
-            _messagesByConversation.value[conversationId] ?: emptyList()
-        } else {
-            _messagesByAgent.value[agentId] ?: emptyList()
-        }
+    fun getCachedMessages(conversationId: String): List<AppMessage> {
+        return _messagesByConversation.value[conversationId] ?: emptyList()
     }
 
     suspend fun cancelMessage(agentId: String, runIds: List<String>? = null): Map<String, String> {
@@ -396,7 +383,7 @@ open class MessageRepository @Inject constructor(
     fun sendMessage(
         agentId: String,
         text: String,
-        conversationId: String? = null
+        conversationId: String,
     ): Flow<StreamState> = flow {
         emit(StreamState.Sending)
 
@@ -407,7 +394,7 @@ open class MessageRepository @Inject constructor(
             content = text
         )
 
-        addMessageToCache(agentId, conversationId, optimisticMessage)
+        addMessageToCache(conversationId, optimisticMessage)
 
         try {
             val request = MessageCreateRequest(
@@ -422,11 +409,6 @@ open class MessageRepository @Inject constructor(
                 ),
                 streaming = true
             )
-
-            if (conversationId == null) {
-                emit(StreamState.Error("Please select or create a conversation first"))
-                return@flow
-            }
 
             val streamChannel = messageApi.sendConversationMessage(conversationId, request)
             val lineReader = Utf8LineReader(streamChannel)
@@ -467,7 +449,7 @@ open class MessageRepository @Inject constructor(
 
             emit(StreamState.Complete(messages))
 
-            mergeMessagesIntoCache(agentId, conversationId, messages)
+            mergeMessagesIntoCache(conversationId, messages)
 
         } catch (e: Exception) {
             emit(StreamState.Error(e.message ?: "Unknown error"))
@@ -508,36 +490,31 @@ open class MessageRepository @Inject constructor(
 
     suspend fun resetMessages(agentId: String) {
         messageApi.resetMessages(agentId)
-        _messagesByAgent.update { current -> current.toMutableMap().apply {
-                    remove(agentId)
-                } }
+        _messagesByConversation.update { emptyMap() }
     }
 
-    private fun addMessageToCache(agentId: String, conversationId: String?, message: AppMessage) {
-        if (conversationId != null) {
-            _messagesByConversation.update { current -> current.toMutableMap().apply {
-                        val existing = get(conversationId) ?: emptyList()
-                        put(conversationId, existing + message)
-                    } }
-        } else {
-            _messagesByAgent.update { current -> current.toMutableMap().apply {
-                        val existing = get(agentId) ?: emptyList()
-                        put(agentId, existing + message)
-                    } }
+    suspend fun resetMessages(agentId: String, conversationId: String) {
+        messageApi.resetMessages(agentId)
+        _messagesByConversation.update { current ->
+            current.toMutableMap().apply { remove(conversationId) }
         }
     }
 
-    private fun mergeMessagesIntoCache(agentId: String, conversationId: String?, messages: List<AppMessage>) {
-        if (conversationId != null) {
-            _messagesByConversation.update { current -> current.toMutableMap().apply {
-                        val existing = get(conversationId) ?: emptyList()
-                        put(conversationId, mergeMessageLists(existing, messages))
-                    } }
-        } else {
-            _messagesByAgent.update { current -> current.toMutableMap().apply {
-                        val existing = get(agentId) ?: emptyList()
-                        put(agentId, mergeMessageLists(existing, messages))
-                    } }
+    private fun addMessageToCache(conversationId: String, message: AppMessage) {
+        _messagesByConversation.update { current ->
+            current.toMutableMap().apply {
+                val existing = get(conversationId) ?: emptyList()
+                put(conversationId, existing + message)
+            }
+        }
+    }
+
+    private fun mergeMessagesIntoCache(conversationId: String, messages: List<AppMessage>) {
+        _messagesByConversation.update { current ->
+            current.toMutableMap().apply {
+                val existing = get(conversationId) ?: emptyList()
+                put(conversationId, mergeMessageLists(existing, messages))
+            }
         }
     }
 
