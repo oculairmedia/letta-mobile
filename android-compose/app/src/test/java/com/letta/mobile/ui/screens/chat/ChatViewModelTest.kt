@@ -26,6 +26,7 @@ import com.letta.mobile.data.repository.StreamState
 import com.letta.mobile.testutil.FakeBlockApi
 import com.letta.mobile.testutil.FakeFolderApi
 import com.letta.mobile.testutil.TestData
+import io.mockk.clearMocks
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -444,6 +445,7 @@ class ChatViewModelTest {
             internalBotClient,
         )
         advanceUntilIdle()
+        clearMocks(messageRepository, answers = false, recordedCalls = true)
 
         vm.sendMessage("Ship it")
         advanceUntilIdle()
@@ -457,6 +459,53 @@ class ChatViewModelTest {
         assertTrue(vm.uiState.value.messages.any { it.content == "Gateway reply" && it.role == "assistant" })
         assertFalse(vm.uiState.value.isStreaming)
         assertFalse(vm.uiState.value.isAgentTyping)
+    }
+
+    @Test
+    fun `project chat does not reload messages from local repository after gateway send`() = runTest {
+        val session = mockk<BotSession>()
+        every { botGateway.getSession("agent-1") } returns session
+        coEvery { internalBotClient.sendMessage(any()) } returns BotChatResponse(
+            response = "Gateway reply",
+            conversationId = "conv-1",
+            agentId = "agent-1",
+        )
+
+        val savedState = SavedStateHandle().apply {
+            set("agentId", "agent-1")
+            set("conversationId", "conv-1")
+            set("projectIdentifier", "letta-mobile")
+            set("projectName", "Letta Mobile")
+        }
+
+        val vm = ChatViewModel(
+            savedState,
+            messageRepository,
+            agentRepository,
+            blockRepository,
+            bugReportRepository,
+            folderRepository,
+            conversationManager,
+            conversationRepository,
+            settingsRepository,
+            botGateway,
+            botConfigStore,
+            internalBotClient,
+        )
+        advanceUntilIdle()
+        clearMocks(messageRepository, answers = false, recordedCalls = true)
+
+        vm.sendMessage("Ship it")
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) {
+            messageRepository.fetchMessages(
+                agentId = "agent-1",
+                conversationId = "conv-1",
+                targetMessageId = null,
+            )
+        }
+        assertTrue(vm.uiState.value.messages.any { it.content == "Gateway reply" })
     }
 
     @Test

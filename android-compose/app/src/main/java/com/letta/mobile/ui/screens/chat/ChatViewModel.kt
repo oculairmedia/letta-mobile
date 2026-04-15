@@ -552,7 +552,9 @@ class ChatViewModel @Inject constructor(
                                 isAgentTyping = false,
                                 pendingTools = persistentListOf(),
                             )
-                            reloadMessagesFromServer(convId)
+                            if (projectContext == null) {
+                                reloadMessagesFromServer(convId)
+                            }
                             if (projectContext != null) {
                                 loadProjectAgents()
                                 loadProjectBrief()
