@@ -92,12 +92,13 @@ open class MessageRepository @Inject constructor(
         // filters to the specific conversation when provided.
         return try {
             val appMessages = if (targetMessageId.isNullOrBlank()) {
+                // Fetch newest messages first (desc), then reverse for chronological display
                 messageApi.listMessages(
                     agentId = agentId,
                     limit = DEFAULT_FETCH_LIMIT,
-                    order = "asc",
+                    order = "desc",
                     conversationId = conversationId,
-                ).toAppMessages()
+                ).reversed().toAppMessages()
             } else {
                 fetchMessagesUntilTarget(
                     agentId = agentId,

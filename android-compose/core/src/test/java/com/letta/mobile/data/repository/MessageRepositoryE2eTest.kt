@@ -59,10 +59,11 @@ class MessageRepositoryE2eTest : com.letta.mobile.testutil.TrackedMockClientTest
     @Test
     fun `sendMessage keeps existing cached history after streaming completes`() = runTest {
         // After streaming, the server will have the new messages on reload
+        // API returns newest first (desc order), repo reverses for chronological display
         val reloadJson = """
             [
-              {"id":"user-1","message_type":"user_message","content":"Hello"},
-              {"id":"assistant-1","message_type":"assistant_message","content":"Done"}
+              {"id":"assistant-1","message_type":"assistant_message","content":"Done"},
+              {"id":"user-1","message_type":"user_message","content":"Hello"}
             ]
         """.trimIndent()
         var getCallCount = 0
@@ -93,10 +94,11 @@ class MessageRepositoryE2eTest : com.letta.mobile.testutil.TrackedMockClientTest
     fun `fetchMessages maps conversation messages from API`() = runTest {
         val repository = createRepository(
             streamConversationId = "conv-1",
+            // API returns newest first (desc order), repo reverses for chronological display
             conversationMessagesJson = """
                 [
-                  {"id":"user-1","message_type":"user_message","content":"Hello"},
-                  {"id":"assistant-1","message_type":"assistant_message","content":"Hi"}
+                  {"id":"assistant-1","message_type":"assistant_message","content":"Hi"},
+                  {"id":"user-1","message_type":"user_message","content":"Hello"}
                 ]
             """.trimIndent(),
             ssePayload = "data: [DONE]\n\n",
@@ -110,14 +112,15 @@ class MessageRepositoryE2eTest : com.letta.mobile.testutil.TrackedMockClientTest
     }
 
     @Test
-    fun `fetchMessages requests ascending order and preserves API sequence`() = runTest {
+    fun `fetchMessages requests descending order and reverses for chronological display`() = runTest {
         var requestedOrder: String? = null
         val repository = createRepository(
             streamConversationId = "conv-1",
+            // API returns newest first (desc order)
             conversationMessagesJson = """
                 [
-                  {"id":"user-1","message_type":"user_message","content":"Hello"},
-                  {"id":"assistant-1","message_type":"assistant_message","content":"Hi"}
+                  {"id":"assistant-1","message_type":"assistant_message","content":"Hi"},
+                  {"id":"user-1","message_type":"user_message","content":"Hello"}
                 ]
             """.trimIndent(),
             ssePayload = "data: [DONE]\n\n",
@@ -126,7 +129,8 @@ class MessageRepositoryE2eTest : com.letta.mobile.testutil.TrackedMockClientTest
 
         val messages = repository.fetchMessages("agent-1", "conv-1")
 
-        assertEquals("asc", requestedOrder)
+        assertEquals("desc", requestedOrder)
+        // Result should be reversed for chronological order (oldest first)
         assertEquals(listOf("user-1", "assistant-1"), messages.map { it.id })
     }
 
