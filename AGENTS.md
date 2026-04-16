@@ -38,6 +38,13 @@ cp -rf source dest          # NOT: cp -r source dest
 - `apt-get` - use `-y` flag
 - `brew` - use `HOMEBREW_NO_AUTO_UPDATE=1` env var
 
+## Project Reporting
+
+- For this project, the PM agent is **Huly Letta Mobile**.
+- Report completed work to **Huly Letta Mobile** via Matrix.
+- Do **not** report letta-mobile work to Meridian.
+- If a project-specific Letta settings file is missing, still use **Huly Letta Mobile** as the fallback reporting target for this repo.
+
 ## Material Design System Rules
 
 Use these rules for all new UI work and UI refactors in this repo. The app already uses Material 3 broadly; the goal is to use it **systematically**.
