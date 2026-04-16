@@ -330,11 +330,15 @@ class DashboardViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
+                // Use the dedicated count endpoint for accurate count
+                // listAllBlocks uses limit=1000 which gives incorrect counts
+                val count = blockRepository.countBlocks()
+                _uiState.value = _uiState.value.copy(
+                    blockCount = count,
+                )
+                // Also load blocks for search functionality
                 val blocks = blockRepository.listAllBlocks()
                 _cachedBlocks.value = blocks
-                _uiState.value = _uiState.value.copy(
-                    blockCount = blocks.size,
-                )
             } catch (e: Exception) {
                 Log.w("DashboardVM", "Block count failed", e)
             }
