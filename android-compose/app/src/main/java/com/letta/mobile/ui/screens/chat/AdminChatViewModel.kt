@@ -547,6 +547,21 @@ class AdminChatViewModel @Inject constructor(
         viewModelScope.launch { loadMessagesInternal() }
     }
 
+    /**
+     * Silent refresh from cache - called on resume.
+     * Reads cached messages without loading indicators.
+     * If cache has more messages than current UI, updates silently.
+     */
+    fun refreshFromCache() {
+        val conversationId = activeConversationId ?: return
+        val cachedMessages = messageRepository.getCachedMessages(conversationId).toUiMessages()
+        if (cachedMessages.isNotEmpty() && cachedMessages.size >= _uiState.value.messages.size) {
+            _uiState.value = _uiState.value.copy(
+                messages = cachedMessages.toImmutableList()
+            )
+        }
+    }
+
     fun retryConversationLoad() {
         resolveConversationAndLoad()
     }
