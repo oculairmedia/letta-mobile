@@ -878,13 +878,10 @@ class AdminChatViewModel @Inject constructor(
             if (conversationId != activeConversationId) {
                 return
             }
+            // Server state is truth — just display it
             val serverMessages = messageRepository.getCachedMessages(conversationId).toUiMessages()
             if (serverMessages.isNotEmpty()) {
-                val merged = mergeReloadedMessages(
-                    existingMessages = _uiState.value.messages,
-                    serverMessages = serverMessages,
-                )
-                _uiState.value = _uiState.value.copy(messages = merged.toImmutableList())
+                _uiState.value = _uiState.value.copy(messages = serverMessages.toImmutableList())
             }
         } catch (e: Exception) {
             android.util.Log.w("AdminChatViewModel", "Silent reload failed", e)

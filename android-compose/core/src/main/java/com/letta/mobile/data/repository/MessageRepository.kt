@@ -120,24 +120,20 @@ open class MessageRepository @Inject constructor(
                 )
             }
 
-            val mergedMessages = mergeFetchedMessages(
-                existing = _messagesByConversation.value[conversationId].orEmpty(),
-                fetched = appMessages,
-            )
-
-            // Update cache
+            // Server state is truth — just use what server returned
+            // Update cache directly with server messages
             _messagesByConversation.update { current ->
                 current.toMutableMap().apply {
-                    put(conversationId, mergedMessages)
+                    put(conversationId, appMessages)
                 }
             }
 
             // Track last message ID for incremental sync
-            _messagesByConversation.value[conversationId]?.lastOrNull()?.id?.let { lastId ->
+            appMessages.lastOrNull()?.id?.let { lastId ->
                 setLastSyncedMessageId(conversationId, lastId)
             }
 
-            mergedMessages
+            appMessages
         } catch (e: Exception) {
             // Return cached or empty list on error
             _messagesByConversation.value[conversationId] ?: emptyList()
@@ -171,8 +167,15 @@ open class MessageRepository @Inject constructor(
             ).toAppMessages()
 
             if (newMessages.isNotEmpty()) {
-                // Merge into cache
-                mergeMessagesIntoCache(conversationId, newMessages)
+                // Append new messages to cache (they come after lastKnownId)
+                _messagesByConversation.update { current ->
+                    current.toMutableMap().apply {
+                        val existing = get(conversationId) ?: emptyList()
+                        val existingIds = existing.mapTo(mutableSetOf()) { it.id }
+                        val actuallyNew = newMessages.filterNot { it.id in existingIds }
+                        put(conversationId, existing + actuallyNew)
+                    }
+                }
                 // Update sync marker
                 newMessages.lastOrNull()?.id?.let { lastId ->
                     setLastSyncedMessageId(conversationId, lastId)
