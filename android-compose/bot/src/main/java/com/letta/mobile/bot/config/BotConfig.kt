@@ -51,6 +51,8 @@ data class BotConfig(
     /** Device context providers to activate in LOCAL mode. */
     @SerialName("context_providers") val contextProviders: List<String> = emptyList(),
 
+    @SerialName("enabled_skills") val enabledSkills: List<String> = emptyList(),
+
     /** Whether the bot auto-starts when the app launches. */
     @SerialName("auto_start") val autoStart: Boolean = false,
 

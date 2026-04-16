@@ -115,9 +115,12 @@ class BotToolRegistry @Inject constructor(
 
     fun isSupported(toolName: String): Boolean = toolName in definitions
 
-    fun listDefinitions(): List<BotToolDefinition> = definitions.values.toList()
+    fun listDefinitions(toolNames: Set<String>? = null): List<BotToolDefinition> {
+        return definitions.values.filterByRequestedNames(toolNames)
+    }
 
-    fun listToolCreateParams(): List<ToolCreateParams> = definitions.values.map { definition ->
+    fun listToolCreateParams(toolNames: Set<String>? = null): List<ToolCreateParams> =
+        listDefinitions(toolNames).map { definition ->
         ToolCreateParams(
             sourceCode = buildStubSource(definition),
             description = definition.description,
@@ -269,4 +272,10 @@ class BotToolRegistry @Inject constructor(
         def ${definition.name}():
             pass
     """.trimIndent()
+
+    private fun Collection<BotToolDefinition>.filterByRequestedNames(toolNames: Set<String>?): List<BotToolDefinition> {
+        if (toolNames == null) return toList()
+        if (toolNames.isEmpty()) return emptyList()
+        return filter { it.name in toolNames }
+    }
 }

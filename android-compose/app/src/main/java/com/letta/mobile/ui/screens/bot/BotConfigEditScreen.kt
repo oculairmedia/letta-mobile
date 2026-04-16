@@ -820,6 +820,33 @@ private fun AdvancedSection(vm: BotConfigEditViewModel) {
             item(
                 headlineContent = {
                     OutlinedTextField(
+                        value = vm.enabledSkills,
+                        onValueChange = { vm.enabledSkills = it },
+                        label = { Text("Enabled Skills") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                    )
+                },
+                supportingContent = {
+                    Text(
+                        text = if (vm.availableSkillIds.isBlank()) {
+                            "Comma-separated skill IDs. No bundled skills are available."
+                        } else {
+                            "Comma-separated skill IDs. Bundled skills: ${vm.availableSkillIds}"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                },
+                trailingContent = {
+                    HelpIcon(
+                        title = "Enabled Skills",
+                        description = "Optional comma-separated skill IDs to load for this bot session. Skills add prompt guidance and limit synced local tools to the capabilities required by the enabled bundles.",
+                    )
+                },
+            )
+            item(
+                headlineContent = {
+                    OutlinedTextField(
                         value = vm.contextProviders,
                         onValueChange = { vm.contextProviders = it },
                         label = { Text("Context Providers") },

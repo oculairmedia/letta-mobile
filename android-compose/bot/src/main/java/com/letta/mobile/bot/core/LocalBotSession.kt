@@ -11,6 +11,7 @@ import com.letta.mobile.bot.message.MessageEnvelopeFormatter
 import com.letta.mobile.bot.message.MessageQueue
 import com.letta.mobile.bot.runtime.LettaRuntimeClient
 import com.letta.mobile.bot.runtime.LettaRuntimeEvent
+import com.letta.mobile.bot.skills.BotSkillRegistry
 import com.letta.mobile.bot.tools.BotToolExecutionResult
 import com.letta.mobile.bot.tools.BotToolRegistry
 import com.letta.mobile.bot.tools.BotToolSync
@@ -53,6 +54,7 @@ class LocalBotSession @AssistedInject constructor(
     private val envelopeFormatter: MessageEnvelopeFormatter,
     private val toolRegistry: BotToolRegistry,
     private val toolSync: BotToolSync,
+    private val skillRegistry: BotSkillRegistry,
     private val contextProviders: @JvmSuppressWildcards Set<DeviceContextProvider>,
 ) : BotSession {
 
@@ -66,6 +68,11 @@ class LocalBotSession @AssistedInject constructor(
     private val messageQueue = MessageQueue<QueuedMessage>()
     private val conversationCache = mutableMapOf<String, String>() // routeKey -> conversationId
     private val conversationMutex = Mutex()
+    private val activeSkills by lazy { skillRegistry.resolveEnabledSkills(config.enabledSkills) }
+    private val activeSkillPromptFragments by lazy {
+        activeSkills.map { skill -> "[${skill.displayName}]\n${skill.promptFragment}" }
+            .filter { it.isNotBlank() }
+    }
 
     /** The active context providers for this session (filtered by config). */
     private val activeProviders: List<DeviceContextProvider> by lazy {
@@ -79,7 +86,11 @@ class LocalBotSession @AssistedInject constructor(
     override suspend fun start() {
         _status.value = BotStatus.STARTING
 
-        toolSync.syncTools(agentId)
+        val requestedToolNames = when {
+            config.enabledSkills.isEmpty() -> null
+            else -> activeSkills.flatMap { it.localToolNames }.toSet()
+        }
+        toolSync.syncTools(agentId, requestedToolNames)
 
         // Start the message processing loop
         scope.launch {
@@ -124,6 +135,7 @@ class LocalBotSession @AssistedInject constructor(
                 message = message,
                 contextProviders = activeProviders,
                 customTemplate = config.envelopeTemplate,
+                skillPromptFragments = activeSkillPromptFragments,
             )
 
             runtimeClient.streamConversationMessage(
@@ -207,6 +219,7 @@ class LocalBotSession @AssistedInject constructor(
                 message = message,
                 contextProviders = activeProviders,
                 customTemplate = config.envelopeTemplate,
+                skillPromptFragments = activeSkillPromptFragments,
             )
 
             var finalText = ""

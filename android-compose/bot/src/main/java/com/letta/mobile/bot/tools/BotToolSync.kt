@@ -9,8 +9,11 @@ class BotToolSync @Inject constructor(
     private val runtimeClient: LettaRuntimeClient,
     private val toolRegistry: BotToolRegistry,
 ) {
-    suspend fun syncTools(agentId: String) {
-        toolRegistry.listToolCreateParams().forEach { params ->
+    suspend fun syncTools(
+        agentId: String,
+        toolNames: Set<String>? = null,
+    ) {
+        toolRegistry.listToolCreateParams(toolNames).forEach { params ->
             val tool = runtimeClient.upsertTool(params)
             runtimeClient.attachTool(agentId, tool.id)
         }

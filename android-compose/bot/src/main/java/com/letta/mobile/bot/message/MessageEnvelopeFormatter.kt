@@ -39,9 +39,10 @@ class MessageEnvelopeFormatter @Inject constructor() {
         message: ChannelMessage,
         contextProviders: List<DeviceContextProvider> = emptyList(),
         customTemplate: String? = null,
+        skillPromptFragments: List<String> = emptyList(),
     ): String {
         if (customTemplate != null) {
-            return applyTemplate(customTemplate, message, contextProviders)
+            return applyTemplate(customTemplate, message, contextProviders, skillPromptFragments)
         }
 
         val contextLines = buildList {
@@ -61,9 +62,17 @@ class MessageEnvelopeFormatter @Inject constructor() {
             }
         }
 
-        return if (contextLines.isNotEmpty()) {
-            val reminder = contextLines.joinToString("\n")
-            "<system-reminder>\n$reminder\n</system-reminder>\n${message.text}"
+        val sections = buildList {
+            if (contextLines.isNotEmpty()) {
+                add("<system-reminder>\n${contextLines.joinToString("\n")}\n</system-reminder>")
+            }
+            if (skillPromptFragments.isNotEmpty()) {
+                add("<skill-reminder>\n${skillPromptFragments.joinToString("\n\n")}\n</skill-reminder>")
+            }
+        }
+
+        return if (sections.isNotEmpty()) {
+            sections.joinToString(separator = "\n") + "\n${message.text}"
         } else {
             message.text
         }
@@ -73,6 +82,7 @@ class MessageEnvelopeFormatter @Inject constructor() {
         template: String,
         message: ChannelMessage,
         contextProviders: List<DeviceContextProvider>,
+        skillPromptFragments: List<String>,
     ): String {
         var result = template
         result = result.replace("{{channel}}", message.channelId)
@@ -86,7 +96,9 @@ class MessageEnvelopeFormatter @Inject constructor() {
         val contextBlock = contextProviders.mapNotNull { provider ->
             if (provider.hasPermission()) provider.gatherContext() else null
         }.joinToString("\n")
+        val skillsBlock = skillPromptFragments.joinToString("\n\n")
         result = result.replace("{{context}}", contextBlock)
+        result = result.replace("{{skills}}", skillsBlock)
         result = result.replace("{{memory}}", "")
 
         return result

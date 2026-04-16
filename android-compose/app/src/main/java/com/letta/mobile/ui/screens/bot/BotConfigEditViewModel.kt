@@ -14,6 +14,7 @@ import com.letta.mobile.bot.config.BotConfig
 import com.letta.mobile.bot.config.BotConfigStore
 import com.letta.mobile.bot.config.BotScheduledJob
 import com.letta.mobile.bot.core.ConversationMode
+import com.letta.mobile.bot.skills.BotSkillRegistry
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.domain.AgentSearch
@@ -33,6 +34,7 @@ class BotConfigEditViewModel @Inject constructor(
     private val configStore: BotConfigStore,
     private val agentRepository: AgentRepository,
     private val agentSearch: AgentSearch,
+    private val skillRegistry: BotSkillRegistry,
 ) : ViewModel() {
 
     private val route = savedStateHandle.toRoute<BotConfigEditRoute>()
@@ -70,8 +72,10 @@ class BotConfigEditViewModel @Inject constructor(
     var directivesEnabled by mutableStateOf(true)
     var envelopeTemplate by mutableStateOf("")
     var contextProviders by mutableStateOf("")
+    var enabledSkills by mutableStateOf("")
 
     val scheduledJobs = mutableStateListOf<BotScheduledJob>()
+    val availableSkillIds: String = skillRegistry.listAvailableSkills().joinToString(", ") { it.id }
 
     private var configId: String = route.configId ?: UUID.randomUUID().toString()
 
@@ -125,6 +129,7 @@ class BotConfigEditViewModel @Inject constructor(
         directivesEnabled = config.directivesEnabled
         envelopeTemplate = config.envelopeTemplate ?: ""
         contextProviders = config.contextProviders.joinToString(", ")
+        enabledSkills = config.enabledSkills.joinToString(", ")
         scheduledJobs.clear()
         scheduledJobs.addAll(config.scheduledJobs)
 
@@ -171,6 +176,7 @@ class BotConfigEditViewModel @Inject constructor(
             envelopeTemplate = envelopeTemplate.trim().ifBlank { null },
             directivesEnabled = directivesEnabled,
             contextProviders = contextProviders.split(",").map { it.trim() }.filter { it.isNotEmpty() },
+            enabledSkills = enabledSkills.split(",").map { it.trim() }.filter { it.isNotEmpty() },
             autoStart = autoStart,
             heartbeatEnabled = heartbeatEnabled,
             heartbeatIntervalMinutes = heartbeatIntervalMinutes,

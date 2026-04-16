@@ -44,6 +44,19 @@ class BotToolRegistryTest : WordSpec({
             )
         }
 
+        "filter tool create params to requested tool names" {
+            val registry = BotToolRegistry(
+                contextProviders = emptySet(),
+                androidExecutionBridge = FakeAndroidExecutionBridge(),
+            )
+
+            val params = registry.listToolCreateParams(setOf("get_current_time", "render_summary_card"))
+            val derivedNames = params.mapNotNull { Regex("def\\s+([A-Za-z_][A-Za-z0-9_]*)").find(it.sourceCode)?.groupValues?.get(1) }
+
+            derivedNames shouldContainAll listOf("get_current_time", "render_summary_card")
+            derivedNames.size shouldBe 2
+        }
+
         "execute provider-backed tools successfully" {
             val registry = BotToolRegistry(
                 contextProviders = setOf(
