@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -101,6 +102,8 @@ fun ConversationsScreen(
     onNavigateToAbout: () -> Unit = {},
     onNavigateToBotSettings: () -> Unit = {},
     onNavigateToProjects: () -> Unit = {},
+    activeBackendLabel: String? = null,
+    onNavigateToBackendSwitcher: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     viewModel: ConversationsViewModel = hiltViewModel()
 ) {
@@ -125,7 +128,15 @@ fun ConversationsScreen(
                         onExpandedChange = { isSearchExpanded = it },
                         placeholder = stringResource(R.string.screen_conversations_search_hint),
                         titleContent = {
-                            Text(stringResource(R.string.common_conversations))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(stringResource(R.string.common_conversations))
+                                if (activeBackendLabel != null && onNavigateToBackendSwitcher != null) {
+                                    AssistChip(
+                                        onClick = onNavigateToBackendSwitcher,
+                                        label = { Text(activeBackendLabel, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                    )
+                                }
+                            }
                         },
                     )
                 },

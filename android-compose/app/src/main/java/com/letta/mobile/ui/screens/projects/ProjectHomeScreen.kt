@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -74,9 +75,11 @@ import com.letta.mobile.util.formatRelativeTime
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProjectHomeScreen(
-    onNavigateBack: () -> Unit,
+    onNavigateBack: (() -> Unit)?,
     onNavigateToProjectChat: (project: ProjectSummary) -> Unit,
     onNavigateToSettings: () -> Unit,
+    activeBackendLabel: String? = null,
+    onNavigateToBackendSwitcher: (() -> Unit)? = null,
     viewModel: ProjectHomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -120,15 +123,25 @@ fun ProjectHomeScreen(
                         openSearchContentDescription = stringResource(R.string.action_search),
                         closeSearchContentDescription = stringResource(R.string.action_close),
                         titleContent = {
-                            Text(stringResource(R.string.screen_projects_title))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(stringResource(R.string.screen_projects_title))
+                                if (activeBackendLabel != null && onNavigateToBackendSwitcher != null) {
+                                    AssistChip(
+                                        onClick = onNavigateToBackendSwitcher,
+                                        label = { Text(activeBackendLabel, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                    )
+                                }
+                            }
                         },
                     )
                 },
                 scrollBehavior = scrollBehavior,
                 colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.largeTopAppBarColors(),
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
+                    onNavigateBack?.let { navigateBack ->
+                        IconButton(onClick = navigateBack) {
+                            Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
+                        }
                     }
                 },
                 actions = {

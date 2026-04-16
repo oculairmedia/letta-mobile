@@ -3,6 +3,7 @@ package com.letta.mobile.ui.navigation
 import kotlinx.serialization.Serializable
 
 @Serializable data object HomeRoute
+@Serializable data object AdminRoute
 @Serializable data object ConversationsRoute
 @Serializable data object AgentListRoute
 @Serializable data object ConfigRoute

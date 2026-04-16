@@ -9,28 +9,18 @@ enum class TopLevelDestination(
     val route: Any,
 ) {
     HOME(
-        icon = LettaIcons.Dashboard,
+        icon = LettaIcons.Apps,
         label = "Home",
         route = HomeRoute,
     ),
-    CONVERSATIONS(
+    CHAT(
         icon = LettaIcons.Chat,
-        label = "Chats",
+        label = "Chat",
         route = ConversationsRoute,
     ),
-    AGENTS(
-        icon = LettaIcons.Agent,
-        label = "Agents",
-        route = AgentListRoute,
-    ),
-    TOOLS(
-        icon = LettaIcons.Tool,
-        label = "Tools",
-        route = AllToolsRoute,
-    ),
-    SETTINGS(
-        icon = LettaIcons.Settings,
-        label = "Settings",
-        route = ConfigRoute,
+    ADMIN(
+        icon = LettaIcons.Dashboard,
+        label = "Admin",
+        route = AdminRoute,
     ),
 }

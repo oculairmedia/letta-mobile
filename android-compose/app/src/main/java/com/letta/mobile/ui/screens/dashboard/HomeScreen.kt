@@ -26,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -126,6 +127,9 @@ fun HomeScreen(
     onNavigateToBotSettings: () -> Unit = {},
     onNavigateToProjects: () -> Unit = {},
     onNavigateToModels: () -> Unit = {},
+    activeBackendLabel: String? = null,
+    onNavigateToBackendSwitcher: (() -> Unit)? = null,
+    title: String = "Letta",
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -256,15 +260,22 @@ fun HomeScreen(
                         openSearchContentDescription = stringResource(R.string.action_search),
                         closeSearchContentDescription = stringResource(R.string.action_close),
                         titleContent = {
-                            Text("Letta")
-                            if (uiState.isConnected) {
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Icon(
-                                    LettaIcons.Circle,
-                                    contentDescription = "Connected",
-                                    tint = MaterialTheme.customColors.onlineColor,
-                                    modifier = Modifier.size(8.dp),
-                                )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(title)
+                                if (uiState.isConnected) {
+                                    Icon(
+                                        LettaIcons.Circle,
+                                        contentDescription = "Connected",
+                                        tint = MaterialTheme.customColors.onlineColor,
+                                        modifier = Modifier.size(8.dp),
+                                    )
+                                }
+                                if (activeBackendLabel != null && onNavigateToBackendSwitcher != null) {
+                                    AssistChip(
+                                        onClick = onNavigateToBackendSwitcher,
+                                        label = { Text(activeBackendLabel, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                    )
+                                }
                             }
                         },
                     )
@@ -1153,4 +1164,3 @@ private fun highlightMatches(
 }
 
 private fun formatNumber(value: Int): String = String.format(Locale.US, "%,d", value)
-

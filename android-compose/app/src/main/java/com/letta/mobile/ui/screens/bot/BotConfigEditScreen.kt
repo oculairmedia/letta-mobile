@@ -833,8 +833,9 @@ private fun AdvancedSection(vm: BotConfigEditViewModel) {
                         text = when {
                             unknownSkillIds.isNotEmpty() -> "Unknown skill IDs: ${unknownSkillIds.joinToString(", ")}"
                             vm.availableSkillIds.isBlank() -> "No bundled skills are available."
-                        } else {
+                            else -> {
                             "Bundled skills: ${vm.availableSkillIds}"
+                            }
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = if (unknownSkillIds.isNotEmpty()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,

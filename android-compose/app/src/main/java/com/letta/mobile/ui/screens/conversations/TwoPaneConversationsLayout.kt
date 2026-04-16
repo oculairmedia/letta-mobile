@@ -44,6 +44,8 @@ fun TwoPaneConversationsLayout(
     onNavigateToAbout: () -> Unit,
     onNavigateToBotSettings: () -> Unit = {},
     onNavigateToProjects: () -> Unit = {},
+    activeBackendLabel: String? = null,
+    onNavigateToBackendSwitcher: (() -> Unit)? = null,
 ) {
     val windowSizeClass = LocalWindowSizeClass.current
     val listPaneWidth = if (windowSizeClass.isWideWidth) 400.dp else 340.dp
@@ -77,6 +79,8 @@ fun TwoPaneConversationsLayout(
             onNavigateToAbout = onNavigateToAbout,
             onNavigateToBotSettings = onNavigateToBotSettings,
             onNavigateToProjects = onNavigateToProjects,
+            activeBackendLabel = activeBackendLabel,
+            onNavigateToBackendSwitcher = onNavigateToBackendSwitcher,
             modifier = Modifier
                 .width(listPaneWidth)
                 .fillMaxHeight(),

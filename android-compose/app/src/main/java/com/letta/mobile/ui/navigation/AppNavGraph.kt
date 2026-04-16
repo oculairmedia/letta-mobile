@@ -24,6 +24,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.letta.mobile.NotificationNavigationTarget
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.ui.screens.projects.ProjectHomeScreen
 import com.letta.mobile.ui.screens.dashboard.HomeScreen
@@ -100,9 +101,14 @@ class NavViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
     val hasConfig = settingsRepository.activeConfig.map { it != null }
+    val activeConfig = settingsRepository.activeConfig
 
     fun clearAllData() {
         viewModelScope.launch { settingsRepository.clearAllData() }
+    }
+
+    fun setActiveConfig(configId: String) {
+        viewModelScope.launch { settingsRepository.setActiveConfigId(configId) }
     }
 }
 
@@ -114,6 +120,8 @@ fun AppNavGraph(
 ) {
     val navViewModel: NavViewModel = hiltViewModel()
     val hasConfig by navViewModel.hasConfig.collectAsState(initial = true)
+    val activeConfig by navViewModel.activeConfig.collectAsState(initial = null)
+    val activeBackendLabel = activeConfig.toBackendLabel()
 
     val initialNotificationTarget = remember { notificationTarget }
     val startDestination: Any = when {
@@ -140,6 +148,29 @@ fun AppNavGraph(
                 startDestination = startDestination
             ) {
         composable<HomeRoute> {
+            ProjectHomeScreen(
+                onNavigateBack = null,
+                onNavigateToProjectChat = { project ->
+                    navController.navigate(
+                        AgentChatRoute(
+                            agentId = project.lettaAgentId.orEmpty(),
+                            projectIdentifier = project.identifier,
+                            projectName = project.name,
+                            projectLettaFolderId = project.lettaFolderId,
+                            projectFilesystemPath = project.filesystemPath,
+                            projectGitUrl = project.gitUrl,
+                            projectLastSyncAt = project.lastSyncAt,
+                            projectActiveCodingAgents = project.techStack,
+                        )
+                    )
+                },
+                onNavigateToSettings = { navController.navigate(ConfigRoute) },
+                activeBackendLabel = activeBackendLabel,
+                onNavigateToBackendSwitcher = { navController.navigate(ConfigListRoute) },
+            )
+        }
+
+        composable<AdminRoute> {
             HomeScreen(
                 onNavigateToAgents = { navController.navigate(AgentListRoute) },
                 onNavigateToConversations = { navController.navigate(ConversationsRoute) },
@@ -169,8 +200,11 @@ fun AppNavGraph(
                 onNavigateToMcp = { navController.navigate(McpRoute) },
                 onNavigateToAbout = { navController.navigate(AboutRoute) },
                 onNavigateToBotSettings = { navController.navigate(BotSettingsRoute) },
-                onNavigateToProjects = { navController.navigate(ProjectsRoute) },
+                onNavigateToProjects = { navController.navigate(HomeRoute) },
                 onNavigateToModels = { navController.navigate(ModelsRoute) },
+                activeBackendLabel = activeBackendLabel,
+                onNavigateToBackendSwitcher = { navController.navigate(ConfigListRoute) },
+                title = "Admin",
             )
         }
 
@@ -213,7 +247,9 @@ fun AppNavGraph(
                         onNavigateToMcp = { navController.navigate(McpRoute) },
                         onNavigateToAbout = { navController.navigate(AboutRoute) },
                         onNavigateToBotSettings = { navController.navigate(BotSettingsRoute) },
-                        onNavigateToProjects = { navController.navigate(ProjectsRoute) },
+                        onNavigateToProjects = { navController.navigate(HomeRoute) },
+                        activeBackendLabel = activeBackendLabel,
+                        onNavigateToBackendSwitcher = { navController.navigate(ConfigListRoute) },
                     )
                 } else {
                     ConversationsScreen(
@@ -236,7 +272,9 @@ fun AppNavGraph(
                         onNavigateToMcp = { navController.navigate(McpRoute) },
                         onNavigateToAbout = { navController.navigate(AboutRoute) },
                         onNavigateToBotSettings = { navController.navigate(BotSettingsRoute) },
-                        onNavigateToProjects = { navController.navigate(ProjectsRoute) },
+                        onNavigateToProjects = { navController.navigate(HomeRoute) },
+                        activeBackendLabel = activeBackendLabel,
+                        onNavigateToBackendSwitcher = { navController.navigate(ConfigListRoute) },
                     )
                 }
             }
@@ -267,7 +305,7 @@ fun AppNavGraph(
                     if (navController.previousBackStackEntry != null) {
                         navController.popBackStack()
                     } else {
-                        navController.navigate(HomeRoute) {
+                        navController.navigate(AdminRoute) {
                             popUpTo<ConfigRoute> { inclusive = true }
                         }
                     }
@@ -518,5 +556,17 @@ fun AppNavGraph(
         }
     }
         }
+    }
+}
+
+private fun LettaConfig?.toBackendLabel(): String? {
+    val config = this ?: return null
+    return when (config.mode) {
+        LettaConfig.Mode.CLOUD -> "Cloud"
+        LettaConfig.Mode.SELF_HOSTED -> config.serverUrl
+            .removePrefix("https://")
+            .removePrefix("http://")
+            .substringBefore('/')
+            .ifBlank { "Server" }
     }
 }

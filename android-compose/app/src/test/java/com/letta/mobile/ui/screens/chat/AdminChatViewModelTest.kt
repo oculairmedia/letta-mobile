@@ -96,7 +96,8 @@ class AdminChatViewModelTest {
         }
 
         every { messageRepository.getMessages(any(), any()) } answers { flowOf(messages) }
-        coEvery { messageRepository.fetchMessages(any(), any()) } answers { messages }
+        coEvery { messageRepository.fetchMessages(any(), any(), any()) } answers { messages }
+        every { messageRepository.getCachedMessages(any()) } answers { messages }
         coEvery { messageRepository.fetchOlderMessages(any(), any(), any()) } returns emptyList()
         every { messageRepository.sendMessage(any(), any(), any()) } answers {
             flow {
@@ -906,5 +907,105 @@ class AdminChatViewModelTest {
         assertTrue(sentMessage.contains("recording://screen-1"))
         assertEquals(sentMessage, vm.uiState.value.bugReports.lastSubmittedPrompt)
         assertTrue(vm.uiState.value.bugReports.recentReports.any { it.title == "Crash on sync" })
+    }
+
+    // ==================== refreshFromCache Tests ====================
+
+    @Test
+    fun `refreshFromCache shows cached messages immediately`() = runTest {
+        val cachedMessages = listOf(
+            TestData.appMessage(id = "1", messageType = MessageType.USER, content = "Hello"),
+            TestData.appMessage(id = "2", messageType = MessageType.ASSISTANT, content = "Hi there"),
+        )
+        messages = cachedMessages
+        coEvery { messageRepository.getCachedMessages(any()) } returns cachedMessages
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        // Clear the messages to simulate UI state being empty
+        // (simulating what happens if ViewModel state was somehow cleared)
+        val emptyState = vm.uiState.value.copy(messages = kotlinx.collections.immutable.persistentListOf())
+        
+        // Call refreshFromCache
+        vm.refreshFromCache()
+        advanceUntilIdle()
+
+        // Should have messages from cache
+        assertEquals(2, vm.uiState.value.messages.size)
+        assertEquals("Hello", vm.uiState.value.messages[0].content)
+    }
+
+    @Test
+    fun `refreshFromCache fetches from server after showing cached`() = runTest {
+        val cachedMessages = listOf(
+            TestData.appMessage(id = "1", messageType = MessageType.USER, content = "Hello"),
+        )
+        val serverMessages = listOf(
+            TestData.appMessage(id = "1", messageType = MessageType.USER, content = "Hello"),
+            TestData.appMessage(id = "2", messageType = MessageType.ASSISTANT, content = "Server response"),
+        )
+        
+        messages = cachedMessages
+        coEvery { messageRepository.getCachedMessages(any()) } returnsMany listOf(cachedMessages, serverMessages)
+        coEvery { messageRepository.fetchMessages(any(), any(), any()) } returns serverMessages
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        // Now call refreshFromCache
+        vm.refreshFromCache()
+        advanceUntilIdle()
+
+        // Should have fetched from server
+        coVerify { messageRepository.fetchMessages(any(), "conv-1", any()) }
+        
+        // Should have both messages now
+        assertEquals(2, vm.uiState.value.messages.size)
+    }
+
+    @Test
+    fun `refreshFromCache does nothing when no active conversation`() = runTest {
+        coEvery { conversationManager.getActiveConversationId(any()) } returns null
+        
+        val vm = createViewModel(conversationId = null)
+        advanceUntilIdle()
+
+        // Force conversation state to be unresolved
+        vm.refreshFromCache()
+        advanceUntilIdle()
+
+        // Should not crash, should not fetch
+        coVerify(exactly = 0) { messageRepository.fetchMessages(any(), any(), any()) }
+    }
+
+    @Test
+    fun `messages persist in cache across simulated navigation`() = runTest {
+        // First load
+        val initialMessages = listOf(
+            TestData.appMessage(id = "1", messageType = MessageType.USER, content = "Hello"),
+        )
+        messages = initialMessages
+        coEvery { messageRepository.getCachedMessages("conv-1") } returns initialMessages
+
+        val vm1 = createViewModel()
+        advanceUntilIdle()
+        assertEquals(1, vm1.uiState.value.messages.size)
+
+        // Simulate streaming adds a message to cache
+        val afterStreamMessages = listOf(
+            TestData.appMessage(id = "1", messageType = MessageType.USER, content = "Hello"),
+            TestData.appMessage(id = "2", messageType = MessageType.ASSISTANT, content = "Response"),
+        )
+        coEvery { messageRepository.getCachedMessages("conv-1") } returns afterStreamMessages
+        coEvery { messageRepository.fetchMessages(any(), any(), any()) } returns afterStreamMessages
+
+        // Simulate navigation back - call refreshFromCache
+        vm1.refreshFromCache()
+        advanceUntilIdle()
+
+        // Should now have both messages
+        assertEquals(2, vm1.uiState.value.messages.size)
+        assertEquals("Response", vm1.uiState.value.messages[1].content)
     }
 }
