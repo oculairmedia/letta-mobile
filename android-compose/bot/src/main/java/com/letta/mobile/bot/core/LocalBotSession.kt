@@ -86,6 +86,21 @@ class LocalBotSession @AssistedInject constructor(
     override suspend fun start() {
         _status.value = BotStatus.STARTING
 
+        val unknownSkillIds = skillRegistry.findUnknownSkillIds(config.enabledSkills)
+        require(unknownSkillIds.isEmpty()) {
+            buildString {
+                append("Unknown skill IDs in bot config for agent ")
+                append(agentId)
+                append(": ")
+                append(unknownSkillIds.joinToString(", "))
+                val availableSkills = skillRegistry.listAvailableSkills().map { it.id }
+                if (availableSkills.isNotEmpty()) {
+                    append(". Available skills: ")
+                    append(availableSkills.joinToString(", "))
+                }
+            }
+        }
+
         val requestedToolNames = when {
             config.enabledSkills.isEmpty() -> null
             else -> activeSkills.flatMap { it.localToolNames }.toSet()

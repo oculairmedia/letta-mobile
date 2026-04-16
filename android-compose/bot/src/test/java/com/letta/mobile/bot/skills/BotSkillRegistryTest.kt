@@ -63,5 +63,22 @@ class BotSkillRegistryTest : WordSpec({
             ids shouldContain "alpha"
             ids.first() shouldBe "alpha"
         }
+
+        "report unknown configured skill ids" {
+            val registry = BotSkillRegistry(
+                skillLoader = {
+                    listOf(
+                        BotSkill("morning-briefing", "Morning Briefing", "", "", emptySet()),
+                        BotSkill("commute-assistant", "Commute Assistant", "", "", emptySet()),
+                    )
+                }
+            )
+
+            val unknownIds = registry.findUnknownSkillIds(
+                listOf("morning-briefing", " missing-skill ", "", "missing-skill", "other-skill")
+            )
+
+            unknownIds shouldBe listOf("missing-skill", "other-skill")
+        }
     }
 })

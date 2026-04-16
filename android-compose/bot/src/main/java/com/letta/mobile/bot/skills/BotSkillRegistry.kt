@@ -51,6 +51,14 @@ class BotSkillRegistry internal constructor(
 
     fun listAvailableSkills(): List<BotSkill> = skills.values.sortedBy { it.id }
 
+    fun getSkill(skillId: String): BotSkill? = skills[skillId]
+
+    fun findUnknownSkillIds(skillIds: List<String>): List<String> = skillIds
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .distinct()
+        .filterNot { it in skills }
+
     fun resolveEnabledSkills(
         skillIds: List<String>,
         date: LocalDate = LocalDate.now(),
