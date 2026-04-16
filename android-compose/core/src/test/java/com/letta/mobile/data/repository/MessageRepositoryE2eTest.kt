@@ -115,6 +115,7 @@ class MessageRepositoryE2eTest : com.letta.mobile.testutil.TrackedMockClientTest
     @Test
     fun `fetchMessages requests descending order and reverses for chronological display`() = runTest {
         var requestedOrder: String? = null
+        var requestedLimit: String? = null
         val repository = createRepository(
             streamConversationId = "conv-1",
             // API returns newest first (desc order)
@@ -125,14 +126,64 @@ class MessageRepositoryE2eTest : com.letta.mobile.testutil.TrackedMockClientTest
                 ]
             """.trimIndent(),
             ssePayload = "data: [DONE]\n\n",
-            onConversationMessagesRequest = { requestedOrder = it },
+            onConversationMessagesRequest = { order, limit, _ ->
+                requestedOrder = order
+                requestedLimit = limit
+            },
         )
 
         val messages = repository.fetchMessages("agent-1", "conv-1")
 
         assertEquals("desc", requestedOrder)
+        assertEquals(MessageRepository.INITIAL_FETCH_LIMIT.toString(), requestedLimit)
         // Result should be reversed for chronological order (oldest first)
         assertEquals(listOf("user-1", "assistant-1"), messages.map { it.id })
+    }
+
+    @Test
+    fun `fetchOlderMessages requests before cursor and prepends older cache entries`() = runTest {
+        val requestedBeforeValues = mutableListOf<String?>()
+        val repository = createRepository(
+            streamConversationId = "conv-1",
+            conversationMessagesJson = """
+                [
+                  {"id":"assistant-11","message_type":"assistant_message","content":"Latest reply"},
+                  {"id":"user-11","message_type":"user_message","content":"Latest question"}
+                ]
+            """.trimIndent(),
+            ssePayload = "data: [DONE]\n\n",
+            onConversationMessagesRequest = { _, _, before ->
+                requestedBeforeValues += before
+            },
+            overrideGetResponse = { before ->
+                if (before == "user-11") {
+                    """
+                    [
+                      {"id":"assistant-10","message_type":"assistant_message","content":"Older answer"},
+                      {"id":"user-10","message_type":"user_message","content":"Older question"}
+                    ]
+                    """.trimIndent()
+                } else {
+                    """
+                    [
+                      {"id":"assistant-11","message_type":"assistant_message","content":"Latest reply"},
+                      {"id":"user-11","message_type":"user_message","content":"Latest question"}
+                    ]
+                    """.trimIndent()
+                }
+            },
+        )
+
+        repository.fetchMessages("agent-1", "conv-1")
+        val olderMessages = repository.fetchOlderMessages("agent-1", "conv-1", "user-11")
+        val cachedMessages = repository.getCachedMessages("conv-1")
+
+        assertEquals(listOf(null, "user-11"), requestedBeforeValues)
+        assertEquals(listOf("user-10", "assistant-10"), olderMessages.map { it.id })
+        assertEquals(
+            listOf("user-10", "assistant-10", "user-11", "assistant-11"),
+            cachedMessages.map { it.id },
+        )
     }
 
     @Test
@@ -274,8 +325,8 @@ class MessageRepositoryE2eTest : com.letta.mobile.testutil.TrackedMockClientTest
         streamConversationId: String,
         conversationMessagesJson: String,
         ssePayload: String,
-        onConversationMessagesRequest: ((String?) -> Unit)? = null,
-        overrideGetResponse: (() -> String)? = null,
+        onConversationMessagesRequest: ((String?, String?, String?) -> Unit)? = null,
+        overrideGetResponse: ((String?) -> String)? = null,
     ): MessageRepository {
         val jsonHeaders = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
         val sseHeaders = headersOf(HttpHeaders.ContentType, "text/event-stream")
@@ -286,13 +337,21 @@ class MessageRepositoryE2eTest : com.letta.mobile.testutil.TrackedMockClientTest
                     respond(ByteReadChannel(ssePayload.toByteArray()), HttpStatusCode.OK, sseHeaders)
                 }
                 req.method == HttpMethod.Get && url.contains("/v1/agents/") && url.contains("/messages") && req.url.parameters["conversation_id"] == streamConversationId -> {
-                    onConversationMessagesRequest?.invoke(req.url.parameters["order"])
-                    val body = overrideGetResponse?.invoke() ?: conversationMessagesJson
+                    onConversationMessagesRequest?.invoke(
+                        req.url.parameters["order"],
+                        req.url.parameters["limit"],
+                        req.url.parameters["before"],
+                    )
+                    val body = overrideGetResponse?.invoke(req.url.parameters["before"]) ?: conversationMessagesJson
                     respond(body, HttpStatusCode.OK, jsonHeaders)
                 }
                 req.method == HttpMethod.Get && url.contains("/v1/conversations/$streamConversationId/messages") -> {
-                    onConversationMessagesRequest?.invoke(req.url.parameters["order"])
-                    val body = overrideGetResponse?.invoke() ?: conversationMessagesJson
+                    onConversationMessagesRequest?.invoke(
+                        req.url.parameters["order"],
+                        req.url.parameters["limit"],
+                        req.url.parameters["before"],
+                    )
+                    val body = overrideGetResponse?.invoke(req.url.parameters["before"]) ?: conversationMessagesJson
                     respond(body, HttpStatusCode.OK, jsonHeaders)
                 }
                 else -> respond("[]", HttpStatusCode.OK, jsonHeaders)

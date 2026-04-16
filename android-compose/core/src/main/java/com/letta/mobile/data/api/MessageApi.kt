@@ -48,6 +48,7 @@ open class MessageApi @Inject constructor(
     open suspend fun listMessages(
         agentId: String,
         limit: Int? = null,
+        before: String? = null,
         after: String? = null,
         order: String? = null,
         conversationId: String? = null,
@@ -57,6 +58,7 @@ open class MessageApi @Inject constructor(
 
         val response = client.get("$baseUrl/v1/agents/$agentId/messages") {
             parameter("limit", limit)
+            parameter("before", before)
             parameter("after", after)
             parameter("order", order)
             conversationId?.let { parameter("conversation_id", it) }

@@ -26,6 +26,7 @@ class MessagePagingSource(
                 messageApi.listMessages(
                     agentId = agentId,
                     limit = params.loadSize,
+                    before = null,
                     after = afterCursor,
                     conversationId = conversationId,
                 )

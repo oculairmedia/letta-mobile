@@ -61,8 +61,10 @@ open class MessageRepository @Inject constructor(
     private val messageApi: MessageApi,
     private val messageProcessor: MessageProcessor,
 ) {
-    private companion object {
-        const val DEFAULT_FETCH_LIMIT = 100
+    companion object {
+        const val INITIAL_FETCH_LIMIT = 10
+        const val OLDER_MESSAGES_PAGE_SIZE = 10
+        const val DEFAULT_FETCH_LIMIT = INITIAL_FETCH_LIMIT
         const val TARGETED_FETCH_LIMIT = 100
         const val MAX_TARGETED_FETCH_PAGES = 20
     }
@@ -106,6 +108,7 @@ open class MessageRepository @Inject constructor(
                 messageApi.listMessages(
                     agentId = agentId,
                     limit = DEFAULT_FETCH_LIMIT,
+                    before = null,
                     order = "desc",
                     conversationId = conversationId,
                 ).reversed().toAppMessages()
@@ -117,19 +120,24 @@ open class MessageRepository @Inject constructor(
                 )
             }
 
+            val mergedMessages = mergeFetchedMessages(
+                existing = _messagesByConversation.value[conversationId].orEmpty(),
+                fetched = appMessages,
+            )
+
             // Update cache
             _messagesByConversation.update { current ->
                 current.toMutableMap().apply {
-                    put(conversationId, appMessages)
+                    put(conversationId, mergedMessages)
                 }
             }
 
             // Track last message ID for incremental sync
-            appMessages.lastOrNull()?.id?.let { lastId ->
+            _messagesByConversation.value[conversationId]?.lastOrNull()?.id?.let { lastId ->
                 setLastSyncedMessageId(conversationId, lastId)
             }
 
-            appMessages
+            mergedMessages
         } catch (e: Exception) {
             // Return cached or empty list on error
             _messagesByConversation.value[conversationId] ?: emptyList()
@@ -156,6 +164,7 @@ open class MessageRepository @Inject constructor(
             val newMessages = messageApi.listMessages(
                 agentId = agentId,
                 conversationId = conversationId,
+                before = null,
                 after = lastKnownId,
                 limit = 50,
                 order = "asc",
@@ -190,6 +199,7 @@ open class MessageRepository @Inject constructor(
             val page = messageApi.listMessages(
                 agentId = agentId,
                 limit = TARGETED_FETCH_LIMIT,
+                before = null,
                 after = after,
                 order = "asc",
                 conversationId = conversationId,
@@ -209,6 +219,29 @@ open class MessageRepository @Inject constructor(
         }
 
         return mergedMessages
+    }
+
+    suspend fun fetchOlderMessages(
+        agentId: String,
+        conversationId: String,
+        beforeMessageId: String,
+    ): List<AppMessage> {
+        if (beforeMessageId.isBlank()) return emptyList()
+
+        val olderMessages = messageApi.listMessages(
+            agentId = agentId,
+            limit = OLDER_MESSAGES_PAGE_SIZE,
+            before = beforeMessageId,
+            after = null,
+            order = "desc",
+            conversationId = conversationId,
+        ).reversed().toAppMessages()
+
+        if (olderMessages.isNotEmpty()) {
+            prependMessagesIntoCache(conversationId, olderMessages)
+        }
+
+        return olderMessages
     }
 
     fun getCachedMessages(conversationId: String): List<AppMessage> {
@@ -573,6 +606,17 @@ open class MessageRepository @Inject constructor(
         }
     }
 
+    private fun prependMessagesIntoCache(conversationId: String, messages: List<AppMessage>) {
+        _messagesByConversation.update { current ->
+            current.toMutableMap().apply {
+                val existing = get(conversationId) ?: emptyList()
+                val existingIds = existing.mapTo(mutableSetOf()) { it.id }
+                val olderMessages = messages.filterNot { it.id in existingIds }
+                put(conversationId, olderMessages + existing)
+            }
+        }
+    }
+
     private fun mergeMessageLists(existing: List<AppMessage>, incoming: List<AppMessage>): List<AppMessage> {
         val merged = LinkedHashMap<String, AppMessage>()
         existing.filterNot { it.isPending }.forEach { merged[it.id] = it }
@@ -581,6 +625,22 @@ open class MessageRepository @Inject constructor(
         val incomingHashes = incoming.mapTo(mutableSetOf()) { it.contentHash() }
         existing.filter { it.isPending }.forEach { pendingMessage ->
             if (pendingMessage.contentHash() !in incomingHashes) {
+                merged[pendingMessage.id] = pendingMessage
+            }
+        }
+
+        return merged.values.toList()
+    }
+
+    private fun mergeFetchedMessages(existing: List<AppMessage>, fetched: List<AppMessage>): List<AppMessage> {
+        if (fetched.isEmpty()) return existing
+
+        val merged = LinkedHashMap<String, AppMessage>()
+        fetched.forEach { merged[it.id] = it }
+
+        val fetchedHashes = fetched.mapTo(mutableSetOf()) { it.contentHash() }
+        existing.filter { it.isPending }.forEach { pendingMessage ->
+            if (pendingMessage.contentHash() !in fetchedHashes) {
                 merged[pendingMessage.id] = pendingMessage
             }
         }

@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -120,6 +121,7 @@ fun ChatScreen(
                         state = state,
                         scrollToMessageId = viewModel.scrollToMessageId,
                         onSendMessage = { viewModel.sendMessage(it) },
+                        onLoadOlderMessages = { viewModel.loadOlderMessages() },
                         onSubmitApproval = { requestId, toolCallIds, approve, reason ->
                             viewModel.submitApproval(requestId, toolCallIds, approve, reason)
                         },
@@ -168,6 +170,7 @@ private fun ChatContent(
     state: ChatUiState,
     scrollToMessageId: String? = null,
     onSendMessage: (String) -> Unit,
+    onLoadOlderMessages: () -> Unit,
     onSubmitApproval: (String, List<String>, Boolean, String?) -> Unit,
     onInputTextChange: (String) -> Unit,
     activeFontScale: Float = 1f,
@@ -207,12 +210,34 @@ private fun ChatContent(
         }
     }
 
+    val shouldLoadOlderMessages by remember {
+        derivedStateOf {
+            if (!state.hasMoreOlderMessages || state.isLoadingOlderMessages || state.messages.isEmpty()) {
+                return@derivedStateOf false
+            }
+
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.maxOfOrNull { it.index } ?: 0
+            val totalItems = listState.layoutInfo.totalItemsCount
+            totalItems > 0 && lastVisible >= totalItems - 3
+        }
+    }
+
     LaunchedEffect(Unit) {
         snapshotFlow { messageCount }
             .distinctUntilChanged()
             .collect {
                 if (it > 0 && isAtBottom && scrollToMessageId == null) {
                     listState.animateScrollToItem(0)
+                }
+            }
+    }
+
+    LaunchedEffect(listState, state.hasMoreOlderMessages, state.isLoadingOlderMessages, state.messages.size) {
+        snapshotFlow { shouldLoadOlderMessages }
+            .distinctUntilChanged()
+            .collect { shouldLoad ->
+                if (shouldLoad) {
+                    onLoadOlderMessages()
                 }
             }
     }
@@ -382,6 +407,19 @@ private fun ChatContent(
                                 if (date != null) {
                                     DateSeparator(date = date)
                                 }
+                            }
+                        }
+                    }
+
+                    if (state.isLoadingOlderMessages) {
+                        item(key = "older-loading") {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                CircularProgressIndicator()
                             }
                         }
                     }

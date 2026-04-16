@@ -20,6 +20,7 @@ class FakeMessageApi : MessageApi(mockk(relaxed = true)) {
     override suspend fun listMessages(
         agentId: String,
         limit: Int?,
+        before: String?,
         after: String?,
         order: String?,
         conversationId: String?,

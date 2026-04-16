@@ -155,6 +155,8 @@ data class ChatUiState(
     val conversationState: ConversationState = ConversationState.Loading,
     val messages: ImmutableList<UiMessage> = persistentListOf(),
     val isLoadingMessages: Boolean = true,
+    val isLoadingOlderMessages: Boolean = false,
+    val hasMoreOlderMessages: Boolean = false,
     val isStreaming: Boolean = false,
     val isAgentTyping: Boolean = false,
     val pendingTools: ImmutableList<PendingToolCall> = persistentListOf(),
@@ -485,6 +487,8 @@ class AdminChatViewModel @Inject constructor(
                         conversationState = ConversationState.NoConversation,
                         messages = persistentListOf(),
                         isLoadingMessages = false,
+                        isLoadingOlderMessages = false,
+                        hasMoreOlderMessages = false,
                         error = null,
                     )
                 } else {
@@ -508,6 +512,8 @@ class AdminChatViewModel @Inject constructor(
                     ),
                     messages = persistentListOf(),
                     isLoadingMessages = false,
+                    isLoadingOlderMessages = false,
+                    hasMoreOlderMessages = false,
                     isStreaming = false,
                     isAgentTyping = false,
                     error = null,
@@ -524,6 +530,8 @@ class AdminChatViewModel @Inject constructor(
                     conversationState = ConversationState.NoConversation,
                     messages = persistentListOf(),
                     isLoadingMessages = false,
+                    isLoadingOlderMessages = false,
+                    hasMoreOlderMessages = false,
                     error = null,
                 )
             }
@@ -565,11 +573,13 @@ class AdminChatViewModel @Inject constructor(
                 agentName = agent.name,
                 conversationState = ConversationState.Ready(requestedConversationId),
             )
-            val messages = fetchedMessages.toUiMessages()
+            val messages = messageRepository.getCachedMessages(requestedConversationId).toUiMessages()
             if (messages.isNotEmpty()) hasSummary = true
             _uiState.value = _uiState.value.copy(
                 messages = messages.toImmutableList(),
                 isLoadingMessages = false,
+                isLoadingOlderMessages = false,
+                hasMoreOlderMessages = targetMessageId != null || fetchedMessages.size >= MessageRepository.INITIAL_FETCH_LIMIT,
             )
 
             // Start background sync for messages from other clients
@@ -581,6 +591,7 @@ class AdminChatViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 conversationState = ConversationState.Ready(requestedConversationId),
                 isLoadingMessages = false,
+                isLoadingOlderMessages = false,
                 error = e.message ?: "Failed to load messages",
             )
         }
@@ -596,6 +607,53 @@ class AdminChatViewModel @Inject constructor(
 
     fun retryConversationLoad() {
         resolveConversationAndLoad()
+    }
+
+    fun loadOlderMessages() {
+        val conversationId = activeConversationId ?: return
+        val currentState = _uiState.value
+        if (
+            currentState.isLoadingMessages ||
+            currentState.isLoadingOlderMessages ||
+            !currentState.hasMoreOlderMessages ||
+            currentState.isStreaming
+        ) {
+            return
+        }
+
+        val oldestLoadedMessageId = currentState.messages
+            .firstOrNull { !it.isPending }
+            ?.id
+            ?: return
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoadingOlderMessages = true)
+            try {
+                val olderMessages = messageRepository.fetchOlderMessages(
+                    agentId = agentId,
+                    conversationId = conversationId,
+                    beforeMessageId = oldestLoadedMessageId,
+                )
+                if (conversationId != activeConversationId) {
+                    return@launch
+                }
+
+                val mergedMessages = mergeOlderMessages(
+                    olderMessages = olderMessages.toUiMessages(),
+                    existingMessages = _uiState.value.messages,
+                )
+                _uiState.value = _uiState.value.copy(
+                    messages = mergedMessages.toImmutableList(),
+                    isLoadingOlderMessages = false,
+                    hasMoreOlderMessages = olderMessages.size >= MessageRepository.OLDER_MESSAGES_PAGE_SIZE,
+                )
+            } catch (e: Exception) {
+                android.util.Log.w("AdminChatViewModel", "Failed to load older messages", e)
+                if (conversationId == activeConversationId) {
+                    _uiState.value = _uiState.value.copy(isLoadingOlderMessages = false)
+                }
+            }
+        }
     }
 
     fun sendMessage(text: String) {
@@ -859,6 +917,16 @@ class AdminChatViewModel @Inject constructor(
         }
 
         return merged.values.toList()
+    }
+
+    private fun mergeOlderMessages(
+        olderMessages: List<UiMessage>,
+        existingMessages: List<UiMessage>,
+    ): List<UiMessage> {
+        if (olderMessages.isEmpty()) return existingMessages
+
+        val existingIds = existingMessages.mapTo(mutableSetOf()) { it.id }
+        return olderMessages.filterNot { it.id in existingIds } + existingMessages
     }
 
     fun resetMessages() {
