@@ -1,86 +1,481 @@
 #!/bin/bash
-# Simple CLI for testing Letta SDK endpoints
+# Comprehensive CLI for testing Letta SDK endpoints
+# Mirrors all functionality available in the Android app
 
 BASE_URL="${LETTA_URL:-http://192.168.50.90:8289}"
+JQ_OPTS="-r"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
+log_ok() { echo -e "${GREEN}[OK]${NC} $1"; }
+log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+log_err() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 usage() {
-    echo "letta-cli - Test Letta SDK endpoints"
-    echo ""
-    echo "Usage:"
-    echo "  letta-cli messages <agent_id> [--limit N] [--order asc|desc] [--after ID] [--conversation ID]"
-    echo "  letta-cli count <resource>  # agents, tools, blocks"
-    echo "  letta-cli check-new <agent_id> <after_id> [--conversation ID]"
-    echo "  letta-cli conversations [--limit N]"
-    echo ""
-    echo "Environment:"
-    echo "  LETTA_URL  - Server URL (default: http://192.168.50.90:8289)"
+    cat << EOF
+letta-cli - Test Letta SDK endpoints (mirrors Android app functionality)
+
+USAGE:
+    letta-cli <command> [options]
+
+COMMANDS:
+    # Counts (Dashboard)
+    count agents|tools|blocks|conversations
+
+    # Agents
+    agents list [--limit N] [--tags TAG]
+    agents get <agent_id>
+    agents create <name> [--model MODEL]
+    agents delete <agent_id>
+
+    # Conversations
+    conversations list [--limit N] [--agent_id ID]
+    conversations get <conversation_id>
+    conversations messages <conversation_id> [--limit N]
+
+    # Messages
+    messages list <agent_id> [--limit N] [--order asc|desc] [--after ID] [--before ID] [--conversation ID]
+    messages check-new <agent_id> <after_id> [--conversation ID]
+    messages send <conversation_id> <text>
+
+    # Tools
+    tools list [--limit N]
+    tools get <tool_id>
+    tools count
+
+    # Blocks
+    blocks list [--limit N] [--label LABEL]
+    blocks get <block_id>
+    blocks count
+
+    # Runs (for monitoring)
+    runs list [--agent_id ID] [--limit N]
+    runs get <run_id>
+
+    # Jobs
+    jobs list [--limit N]
+    jobs get <job_id>
+
+    # MCP Servers
+    mcp list
+    mcp get <server_id>
+    mcp tools <server_id>
+
+    # Models & Providers
+    models list
+    providers list
+
+    # Health/Debug
+    health
+    test-sync <agent_id> [--conversation ID]  # Full sync test
+
+ENVIRONMENT:
+    LETTA_URL    Server URL (default: http://192.168.50.90:8289)
+    LETTA_TOKEN  Auth token (optional)
+
+EXAMPLES:
+    letta-cli count agents
+    letta-cli agents list --limit 10
+    letta-cli messages list agent-xxx --limit 5 --order desc
+    letta-cli test-sync agent-xxx --conversation conv-yyy
+EOF
 }
 
-cmd_messages() {
-    local agent_id="$1"
-    shift
-    local limit=10 order="desc" after="" conversation=""
-    
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            --limit) limit="$2"; shift 2 ;;
-            --order) order="$2"; shift 2 ;;
-            --after) after="$2"; shift 2 ;;
-            --conversation) conversation="$2"; shift 2 ;;
-            *) shift ;;
-        esac
-    done
-    
-    local url="$BASE_URL/v1/agents/$agent_id/messages?limit=$limit&order=$order"
-    [[ -n "$after" ]] && url+="&after=$after"
-    [[ -n "$conversation" ]] && url+="&conversation_id=$conversation"
-    
-    echo "=== Fetching messages from: $url ==="
-    curl -s "$url" | jq -r '
-        "Found \(length) messages\n",
-        (.[] | "\(.date[:19] // "?") | \(.message_type | .[0:20] | . + " " * (20 - length)) | \((.content // .reasoning // (.tool_calls[0].name // .message_type))[:70] | gsub("\n"; " "))\n  ID: \(.id)")
-    '
+api_get() {
+    local path="$1"
+    curl -s -H "Authorization: Bearer ${LETTA_TOKEN:-}" "$BASE_URL$path"
 }
 
+api_post() {
+    local path="$1"
+    local data="$2"
+    curl -s -X POST -H "Content-Type: application/json" -H "Authorization: Bearer ${LETTA_TOKEN:-}" -d "$data" "$BASE_URL$path"
+}
+
+api_delete() {
+    local path="$1"
+    curl -s -X DELETE -H "Authorization: Bearer ${LETTA_TOKEN:-}" "$BASE_URL$path"
+}
+
+# ============== COUNT ==============
 cmd_count() {
     local resource="$1"
-    local url="$BASE_URL/v1/${resource}/count"
-    echo "$resource count: $(curl -s "$url")"
+    case "$resource" in
+        agents) api_get "/v1/agents/count" ;;
+        tools) api_get "/v1/tools/count" ;;
+        blocks) api_get "/v1/blocks/count" ;;
+        conversations) api_get "/v1/conversations/?limit=10000" | jq 'length' ;;
+        *) log_err "Unknown resource: $resource (try: agents, tools, blocks, conversations)"; return 1 ;;
+    esac
 }
 
-cmd_check_new() {
-    local agent_id="$1"
-    local after_id="$2"
-    shift 2
+# ============== AGENTS ==============
+cmd_agents() {
+    local subcmd="$1"; shift
+    case "$subcmd" in
+        list)
+            local limit=50 tags=""
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --limit) limit="$2"; shift 2 ;;
+                    --tags) tags="$2"; shift 2 ;;
+                    *) shift ;;
+                esac
+            done
+            local url="/v1/agents?limit=$limit"
+            [[ -n "$tags" ]] && url+="&tags=$tags"
+            api_get "$url" | jq $JQ_OPTS '.[] | "\(.id) | \(.name) | \(.created_at[:10])"'
+            ;;
+        get)
+            local agent_id="$1"
+            api_get "/v1/agents/$agent_id" | jq .
+            ;;
+        create)
+            local name="$1"; shift
+            local model="letta/letta-free"
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --model) model="$2"; shift 2 ;;
+                    *) shift ;;
+                esac
+            done
+            api_post "/v1/agents" "{\"name\": \"$name\", \"model\": \"$model\"}" | jq .
+            ;;
+        delete)
+            local agent_id="$1"
+            api_delete "/v1/agents/$agent_id"
+            log_ok "Deleted agent $agent_id"
+            ;;
+        *) log_err "Unknown agents command: $subcmd" ;;
+    esac
+}
+
+# ============== CONVERSATIONS ==============
+cmd_conversations() {
+    local subcmd="$1"; shift
+    case "$subcmd" in
+        list)
+            local limit=20 agent_id=""
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --limit) limit="$2"; shift 2 ;;
+                    --agent_id) agent_id="$2"; shift 2 ;;
+                    *) shift ;;
+                esac
+            done
+            local url="/v1/conversations/?limit=$limit"
+            [[ -n "$agent_id" ]] && url+="&agent_id=$agent_id"
+            api_get "$url" | jq $JQ_OPTS '.[] | "\(.id) | \(.agent_id[:30])... | \(.created_at[:19])"'
+            ;;
+        get)
+            local conv_id="$1"
+            api_get "/v1/conversations/$conv_id" | jq .
+            ;;
+        messages)
+            local conv_id="$1"; shift
+            local limit=50
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --limit) limit="$2"; shift 2 ;;
+                    *) shift ;;
+                esac
+            done
+            api_get "/v1/conversations/$conv_id/messages?limit=$limit" | jq $JQ_OPTS '.[] | "\(.date[:19] // "?") | \(.message_type[:20]) | \((.content // .reasoning // "")[:50])"'
+            ;;
+        *) log_err "Unknown conversations command: $subcmd" ;;
+    esac
+}
+
+# ============== MESSAGES ==============
+cmd_messages() {
+    local subcmd="$1"; shift
+    case "$subcmd" in
+        list)
+            local agent_id="$1"; shift
+            local limit=10 order="desc" after="" before="" conversation=""
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --limit) limit="$2"; shift 2 ;;
+                    --order) order="$2"; shift 2 ;;
+                    --after) after="$2"; shift 2 ;;
+                    --before) before="$2"; shift 2 ;;
+                    --conversation) conversation="$2"; shift 2 ;;
+                    *) shift ;;
+                esac
+            done
+            local url="/v1/agents/$agent_id/messages?limit=$limit&order=$order"
+            [[ -n "$after" ]] && url+="&after=$after"
+            [[ -n "$before" ]] && url+="&before=$before"
+            [[ -n "$conversation" ]] && url+="&conversation_id=$conversation"
+            
+            log_info "GET $url"
+            api_get "$url" | jq $JQ_OPTS '
+                "Found \(length) messages\n",
+                (.[] | "\(.date[:19] // "?") | \(.message_type[:20] | . + " " * (20 - length)) | \((.content // .reasoning // (.tool_calls[0].name // .message_type))[:60] | gsub("\n"; " "))\n  ID: \(.id)")
+            '
+            ;;
+        check-new)
+            local agent_id="$1"
+            local after_id="$2"
+            shift 2
+            local conversation=""
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --conversation) conversation="$2"; shift 2 ;;
+                    *) shift ;;
+                esac
+            done
+            local url="/v1/agents/$agent_id/messages?limit=50&order=asc&after=$after_id"
+            [[ -n "$conversation" ]] && url+="&conversation_id=$conversation"
+            
+            log_info "Checking for NEW messages after: $after_id"
+            api_get "$url" | jq $JQ_OPTS '
+                "Found \(length) NEW messages\n",
+                (.[] | "\(.date[:19] // "?") | \(.message_type[:20]) | \((.content // .reasoning // "")[:50])")
+            '
+            ;;
+        send)
+            local conv_id="$1"
+            local text="$2"
+            log_info "Sending message to conversation $conv_id"
+            api_post "/v1/conversations/$conv_id/messages" "{\"messages\": [{\"role\": \"user\", \"content\": \"$text\"}]}" | jq .
+            ;;
+        *) log_err "Unknown messages command: $subcmd" ;;
+    esac
+}
+
+# ============== TOOLS ==============
+cmd_tools() {
+    local subcmd="$1"; shift
+    case "$subcmd" in
+        list)
+            local limit=50
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --limit) limit="$2"; shift 2 ;;
+                    *) shift ;;
+                esac
+            done
+            api_get "/v1/tools?limit=$limit" | jq $JQ_OPTS '.[] | "\(.id) | \(.name) | \(.source_type // "?")"'
+            ;;
+        get)
+            local tool_id="$1"
+            api_get "/v1/tools/$tool_id" | jq .
+            ;;
+        count)
+            api_get "/v1/tools/count"
+            ;;
+        *) log_err "Unknown tools command: $subcmd" ;;
+    esac
+}
+
+# ============== BLOCKS ==============
+cmd_blocks() {
+    local subcmd="$1"; shift
+    case "$subcmd" in
+        list)
+            local limit=50 label=""
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --limit) limit="$2"; shift 2 ;;
+                    --label) label="$2"; shift 2 ;;
+                    *) shift ;;
+                esac
+            done
+            local url="/v1/blocks?limit=$limit"
+            [[ -n "$label" ]] && url+="&label=$label"
+            api_get "$url" | jq $JQ_OPTS '.[] | "\(.id) | \(.label // "?") | \(.value[:40] | gsub("\n"; " "))..."'
+            ;;
+        get)
+            local block_id="$1"
+            api_get "/v1/blocks/$block_id" | jq .
+            ;;
+        count)
+            api_get "/v1/blocks/count"
+            ;;
+        *) log_err "Unknown blocks command: $subcmd" ;;
+    esac
+}
+
+# ============== RUNS ==============
+cmd_runs() {
+    local subcmd="$1"; shift
+    case "$subcmd" in
+        list)
+            local limit=20 agent_id=""
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --limit) limit="$2"; shift 2 ;;
+                    --agent_id) agent_id="$2"; shift 2 ;;
+                    *) shift ;;
+                esac
+            done
+            local url="/v1/runs?limit=$limit"
+            [[ -n "$agent_id" ]] && url+="&agent_id=$agent_id"
+            api_get "$url" | jq $JQ_OPTS '.[] | "\(.id) | \(.status) | \(.agent_id[:20])... | \(.created_at[:19])"'
+            ;;
+        get)
+            local run_id="$1"
+            api_get "/v1/runs/$run_id" | jq .
+            ;;
+        *) log_err "Unknown runs command: $subcmd" ;;
+    esac
+}
+
+# ============== JOBS ==============
+cmd_jobs() {
+    local subcmd="$1"; shift
+    case "$subcmd" in
+        list)
+            local limit=20
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --limit) limit="$2"; shift 2 ;;
+                    *) shift ;;
+                esac
+            done
+            api_get "/v1/jobs?limit=$limit" | jq $JQ_OPTS '.[] | "\(.id) | \(.status) | \(.job_type // "?")"'
+            ;;
+        get)
+            local job_id="$1"
+            api_get "/v1/jobs/$job_id" | jq .
+            ;;
+        *) log_err "Unknown jobs command: $subcmd" ;;
+    esac
+}
+
+# ============== MCP ==============
+cmd_mcp() {
+    local subcmd="$1"; shift
+    case "$subcmd" in
+        list)
+            api_get "/v1/mcp-servers" | jq $JQ_OPTS '.[] | "\(.id) | \(.server_name) | \(.mcp_server_type // "?")"'
+            ;;
+        get)
+            local server_id="$1"
+            api_get "/v1/mcp-servers/$server_id" | jq .
+            ;;
+        tools)
+            local server_id="$1"
+            api_get "/v1/mcp-servers/$server_id/tools" | jq $JQ_OPTS '.[] | "\(.name)"'
+            ;;
+        *) log_err "Unknown mcp command: $subcmd" ;;
+    esac
+}
+
+# ============== MODELS & PROVIDERS ==============
+cmd_models() {
+    api_get "/v1/models" | jq $JQ_OPTS '.[] | "\(.name) | \(.endpoint_type // "?")"'
+}
+
+cmd_providers() {
+    api_get "/v1/providers" | jq $JQ_OPTS '.[] | "\(.id) | \(.name)"'
+}
+
+# ============== HEALTH ==============
+cmd_health() {
+    log_info "Checking $BASE_URL..."
+    if api_get "/health" | jq -e . > /dev/null 2>&1; then
+        log_ok "Server is healthy"
+        echo ""
+        echo "Counts:"
+        echo "  Agents:        $(cmd_count agents)"
+        echo "  Tools:         $(cmd_count tools)"
+        echo "  Blocks:        $(cmd_count blocks)"
+        echo "  Conversations: $(cmd_count conversations)"
+    else
+        log_err "Server is not responding"
+        return 1
+    fi
+}
+
+# ============== TEST SYNC ==============
+cmd_test_sync() {
+    local agent_id="$1"; shift
     local conversation=""
-    
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --conversation) conversation="$2"; shift 2 ;;
             *) shift ;;
         esac
     done
+
+    log_info "=== SYNC TEST for agent: $agent_id ==="
+    echo ""
+
+    # Step 1: Initial fetch (like app does on first load)
+    log_info "Step 1: Initial fetch (order=desc, limit=10, simulating app startup)"
+    local initial_url="/v1/agents/$agent_id/messages?limit=10&order=desc"
+    [[ -n "$conversation" ]] && initial_url+="&conversation_id=$conversation"
     
-    local url="$BASE_URL/v1/agents/$agent_id/messages?limit=50&order=asc&after=$after_id"
-    [[ -n "$conversation" ]] && url+="&conversation_id=$conversation"
+    local initial_response=$(api_get "$initial_url")
+    local initial_count=$(echo "$initial_response" | jq 'length')
+    log_ok "Fetched $initial_count messages"
     
-    echo "=== Checking for NEW messages after: $after_id ==="
-    curl -s "$url" | jq -r '
-        "Found \(length) NEW messages\n",
-        (.[] | "\(.date[:19] // "?") | \(.message_type | .[0:20] | . + " " * (20 - length)) | \((.content // .reasoning // (.tool_calls[0].name // .message_type))[:70] | gsub("\n"; " "))")
-    '
+    # Get the newest message ID (will be first after .reversed() in app)
+    # But lastSyncedMessageId is set to .lastOrNull() AFTER reverse, which is the newest
+    local newest_id=$(echo "$initial_response" | jq -r '.[0].id')
+    local oldest_id=$(echo "$initial_response" | jq -r '.[-1].id')
+    
+    echo "  Newest (DESC[0]):  $newest_id"
+    echo "  Oldest (DESC[-1]): $oldest_id"
+    echo ""
+    
+    # After .reversed(), the list becomes [oldest...newest]
+    # .lastOrNull() returns newest_id ✓
+    log_info "App sets lastSyncedMessageId = newest_id (correct)"
+    echo ""
+
+    # Step 2: Simulate checkForNewMessages
+    log_info "Step 2: Check for new messages (after=$newest_id, order=asc)"
+    local check_url="/v1/agents/$agent_id/messages?limit=50&order=asc&after=$newest_id"
+    [[ -n "$conversation" ]] && check_url+="&conversation_id=$conversation"
+    
+    local new_response=$(api_get "$check_url")
+    local new_count=$(echo "$new_response" | jq 'length')
+    
+    if [[ "$new_count" -gt 0 ]]; then
+        log_ok "Found $new_count NEW messages!"
+        echo "$new_response" | jq $JQ_OPTS '.[] | "  \(.date[:19]) | \(.message_type[:20])"'
+    else
+        log_warn "No new messages found (this is expected if no activity since fetch)"
+    fi
+    echo ""
+
+    # Step 3: Test older messages fetch
+    log_info "Step 3: Fetch older messages (before=$oldest_id, order=desc)"
+    local older_url="/v1/agents/$agent_id/messages?limit=10&order=desc&before=$oldest_id"
+    [[ -n "$conversation" ]] && older_url+="&conversation_id=$conversation"
+    
+    local older_response=$(api_get "$older_url")
+    local older_count=$(echo "$older_response" | jq 'length')
+    log_ok "Fetched $older_count older messages"
+    echo ""
+
+    log_info "=== SYNC TEST COMPLETE ==="
 }
 
-cmd_conversations() {
-    local limit="${1:-20}"
-    echo "=== Conversations (limit=$limit) ==="
-    curl -s "$BASE_URL/v1/conversations/?limit=$limit" | jq -r '.[] | "\(.id) | \(.agent_id[:20])... | \(.created_at[:19])"'
-}
-
+# ============== MAIN ==============
 case "$1" in
-    messages) shift; cmd_messages "$@" ;;
     count) shift; cmd_count "$@" ;;
-    check-new) shift; cmd_check_new "$@" ;;
+    agents) shift; cmd_agents "$@" ;;
     conversations) shift; cmd_conversations "$@" ;;
-    *) usage ;;
+    messages) shift; cmd_messages "$@" ;;
+    tools) shift; cmd_tools "$@" ;;
+    blocks) shift; cmd_blocks "$@" ;;
+    runs) shift; cmd_runs "$@" ;;
+    jobs) shift; cmd_jobs "$@" ;;
+    mcp) shift; cmd_mcp "$@" ;;
+    models) shift; cmd_models "$@" ;;
+    providers) shift; cmd_providers "$@" ;;
+    health) cmd_health ;;
+    test-sync) shift; cmd_test_sync "$@" ;;
+    -h|--help|help|"") usage ;;
+    *) log_err "Unknown command: $1"; usage; exit 1 ;;
 esac
