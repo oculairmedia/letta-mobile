@@ -548,9 +548,8 @@ class AdminChatViewModel @Inject constructor(
     }
 
     /**
-     * Silent refresh on resume.
-     * First shows cached messages immediately (no flash).
-     * Then fetches from server to ensure we have latest.
+     * Refresh on resume - always fetches from server for admin monitoring.
+     * Shows cached messages immediately to avoid flash, then updates with server data.
      */
     fun refreshFromCache() {
         val conversationId = activeConversationId
@@ -567,23 +566,69 @@ class AdminChatViewModel @Inject constructor(
             )
         }
         
-        // Then silently fetch from server to ensure we have latest
+        // Always fetch fresh from server - this is an admin surface that needs real-time data
         viewModelScope.launch {
             try {
-                messageRepository.fetchMessages(
+                // Check for new messages since last sync (incremental)
+                val newMessages = messageRepository.checkForNewMessages(
                     agentId = agentId,
                     conversationId = conversationId,
                 )
-                val serverMessages = messageRepository.getCachedMessages(conversationId).toUiMessages()
-                if (serverMessages.isNotEmpty() && conversationId == activeConversationId) {
+                
+                // Update UI with all messages from cache (which now includes new ones)
+                val allMessages = messageRepository.getCachedMessages(conversationId).toUiMessages()
+                if (allMessages.isNotEmpty() && conversationId == activeConversationId) {
                     _uiState.value = _uiState.value.copy(
-                        messages = serverMessages.toImmutableList()
+                        messages = allMessages.toImmutableList()
                     )
                 }
             } catch (e: Exception) {
                 // Silent fail - we already showed cached
             }
         }
+    }
+    
+    /**
+     * Start polling for new messages. Call when entering the chat screen.
+     * Polls every 3 seconds for new messages from the server.
+     */
+    private var pollingJob: kotlinx.coroutines.Job? = null
+    
+    fun startMessagePolling() {
+        val conversationId = activeConversationId ?: return
+        
+        // Don't start if already polling
+        if (pollingJob?.isActive == true) return
+        
+        pollingJob = viewModelScope.launch {
+            while (true) {
+                delay(3000) // Poll every 3 seconds
+                
+                // Skip polling while streaming (we get real-time updates via SSE)
+                if (_uiState.value.isStreaming) continue
+                
+                try {
+                    val newMessages = messageRepository.checkForNewMessages(
+                        agentId = agentId,
+                        conversationId = conversationId,
+                    )
+                    
+                    if (newMessages.isNotEmpty() && conversationId == activeConversationId) {
+                        val allMessages = messageRepository.getCachedMessages(conversationId).toUiMessages()
+                        _uiState.value = _uiState.value.copy(
+                            messages = allMessages.toImmutableList()
+                        )
+                    }
+                } catch (e: Exception) {
+                    // Silent fail for background polling
+                }
+            }
+        }
+    }
+    
+    fun stopMessagePolling() {
+        pollingJob?.cancel()
+        pollingJob = null
     }
 
     fun retryConversationLoad() {

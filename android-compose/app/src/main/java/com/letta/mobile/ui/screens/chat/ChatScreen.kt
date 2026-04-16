@@ -80,9 +80,15 @@ fun ChatScreen(
     var activeFontScale by remember { mutableFloatStateOf(fontScale) }
     LaunchedEffect(fontScale) { activeFontScale = fontScale }
 
-    // Silent refresh on resume - reads from cache without loading indicators
+    // Refresh on resume and start polling for new messages (admin monitoring)
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         viewModel.refreshFromCache()
+        viewModel.startMessagePolling()
+    }
+    
+    // Stop polling when leaving the screen
+    LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) {
+        viewModel.stopMessagePolling()
     }
 
     val backgroundModifier = when (chatBackground) {
