@@ -74,6 +74,7 @@ COMMANDS:
     # Health/Debug
     health
     test-sync <agent_id> [--conversation ID]  # Full sync test
+    classify-approvals <conversation_id> [--json]  # First-line UI-mislabel diagnostic (letta-mobile-3nqa)
 
 ENVIRONMENT:
     LETTA_URL    Server URL (default: http://192.168.50.90:8289)
@@ -461,6 +462,235 @@ cmd_test_sync() {
     log_info "=== SYNC TEST COMPLETE ==="
 }
 
+# ============== CLASSIFY APPROVALS ==============
+# First-line diagnostic for "the chat UI is mislabeling tool results" bugs
+# (letta-mobile-3nqa). USE THIS BEFORE SPECULATING FROM SOURCE.
+#
+# Original purpose (letta-mobile-o9ce): regression detector that catches
+# bypassPermissions auto-approval echoes which the pre-fix Android client
+# rendered as "Rejected" cards (ChatMessageComponents.kt:328 treated
+# approve=null as approved=false).
+#
+# Reports:
+#   - tool_return_message.status                  (success / error / other)
+#   - approval_response_message.approve           (true / false / null / missing)
+#   - approval_response_message.approvals[].approve (same buckets)
+#   - Android-mapper classification:
+#       * "auto-approved (suppressed)" -> approve=null, all approvals[].approve=null  ⚠ bypass fingerprint
+#       * "explicit approved"          -> any decision == true
+#       * "explicit rejected"          -> all explicit decisions == false
+#
+# WARNs explicitly when ANY response has all-null decisions (the
+# bypassPermissions fingerprint). The Android UI must NOT render those as
+# Rejected — see ChatMessageComponents.kt:326-355 (explicitDecisions guard).
+#
+# Flags:
+#   --json    Emit a single machine-readable JSON object (no human prose).
+#
+# Exit code: non-zero if any auto-approval echo is detected (so CI / smoke
+# tests can fail the build if a regression slips back in).
+cmd_classify_approvals() {
+    local conv_id=""
+    local as_json=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --json) as_json=1; shift ;;
+            -h|--help)
+                cat <<EOF
+letta-cli classify-approvals <conversation_id> [--json]
+
+First-line UI-mislabel diagnostic. Buckets approval/tool_return messages
+and warns on the bypassPermissions fingerprint that previously caused
+every auto-approved Bash call to render as Rejected.
+EOF
+                return 0
+                ;;
+            *) conv_id="$1"; shift ;;
+        esac
+    done
+    if [[ -z "$conv_id" ]]; then
+        log_err "Usage: letta-cli classify-approvals <conversation_id> [--json]"
+        return 1
+    fi
+
+    local payload
+    payload=$(api_get "/v1/conversations/$conv_id/messages?limit=1000")
+
+    # ---- Compute the full report once via jq, JSON-shaped. ----
+    local report
+    report=$(echo "$payload" | jq --arg conv "$conv_id" '
+      def bucket_top(m): if m | has("approve") | not then "missing"
+                        elif m.approve == null then "null"
+                        elif m.approve == true then "true"
+                        elif m.approve == false then "false"
+                        else (m.approve | tostring) end;
+      def bucket_nested(a): if a | has("approve") | not then "missing"
+                            elif a.approve == null then "null"
+                            elif a.approve == true then "true"
+                            elif a.approve == false then "false"
+                            else (a.approve | tostring) end;
+
+      [.[] | select(.message_type == "approval_response_message")] as $resps
+      | [.[] | select(.message_type == "tool_return_message")] as $rets
+      | {
+          conversation: $conv,
+          total_messages: length,
+          tool_return_status: (
+            $rets
+            | group_by(.status // "missing")
+            | map({key: (.[0].status // "missing"), value: length})
+            | from_entries
+          ),
+          top_level_approve: (
+            $resps
+            | map(bucket_top(.))
+            | group_by(.) | map({key: .[0], value: length}) | from_entries
+          ),
+          nested_approve: (
+            [$resps[] | (.approvals // [])[] | bucket_nested(.)]
+            | group_by(.) | map({key: .[0], value: length}) | from_entries
+          ),
+          all_null_decision_responses: (
+            $resps
+            | map(select(
+                (.approve == null) and
+                ((.approvals // []) | all(.approve == null))
+              ))
+            | length
+          ),
+          android_mapper_classification: {
+            auto_approved_suppressed: (
+              $resps
+              | map(select(
+                  (.approve == null) and
+                  ((.approvals // []) | all(.approve == null))
+                ))
+              | length
+            ),
+            explicit_approved: (
+              $resps
+              | map(select(
+                  (.approve == true) or
+                  ((.approvals // []) | any(.approve == true))
+                ))
+              | length
+            ),
+            explicit_rejected: (
+              $resps
+              | map(select(
+                  ((.approve == false) or
+                   ((.approvals // []) | any(.approve == false))) and
+                  ((.approve == true) | not) and
+                  ((.approvals // []) | any(.approve == true) | not)
+                ))
+              | length
+            ),
+          },
+        }
+        | .bypass_permissions_fingerprint = (.all_null_decision_responses > 0)
+    ')
+
+    if [[ "$as_json" -eq 1 ]]; then
+        echo "$report" | jq -c .
+        local mis
+        mis=$(echo "$report" | jq '.all_null_decision_responses')
+        [[ "${mis:-0}" -gt 0 ]] && return 2 || return 0
+    fi
+
+    # ---- Human report ----
+    log_info "Pulling messages for $conv_id"
+    local total
+    total=$(echo "$report" | jq '.total_messages')
+    log_ok "Loaded $total messages"
+
+    echo ""
+    log_info "tool_return_message.status:"
+    echo "$report" | jq -r '.tool_return_status | if length == 0 then "  (none)" else (to_entries[] | "  \(.key): \(.value)") end'
+
+    echo ""
+    log_info "approval_response_message.approve (top-level):"
+    echo "$report" | jq -r '.top_level_approve | if length == 0 then "  (none)" else (to_entries[] | "  \(.key): \(.value)") end'
+
+    echo ""
+    log_info "approval_response_message.approvals[].approve (nested):"
+    echo "$report" | jq -r '.nested_approve | if length == 0 then "  (none)" else (to_entries[] | "  \(.key): \(.value)") end'
+
+    echo ""
+    log_info "Android mapper classification:"
+    echo "$report" | jq -r '.android_mapper_classification | to_entries[] | "  \(.key): \(.value)"'
+
+    echo ""
+    log_info "First 3 approval_response_message samples (raw):"
+    echo "$payload" | jq -r '
+      [.[] | select(.message_type == "approval_response_message")] | .[0:3]
+      | .[] | {
+          id, approve, reason,
+          approvals: ((.approvals // []) | map({type, tool_call_id, approve, status, reason}))
+        }'
+
+    echo ""
+    local mislabeled
+    mislabeled=$(echo "$report" | jq '.all_null_decision_responses')
+    if [[ "${mislabeled:-0}" -gt 0 ]]; then
+        log_warn "$mislabeled approval_response_message(s) have NO explicit decision."
+        log_warn "  This is the bypassPermissions fingerprint. The Android UI must NOT"
+        log_warn "  render these as 'Rejected' (see ChatMessageComponents.kt:326-355)."
+        log_warn "  If you see Rejected cards in the app for this conversation, the fix did not ship."
+        return 2
+    else
+        log_ok "Every approval_response_message has at least one explicit approve=true|false."
+    fi
+}
+
+# ---- Self-test for cmd_classify_approvals (jq-only, no live server). ----
+# Run with: letta-cli classify-approvals --self-test
+# Covers the three buckets called out in letta-mobile-3nqa acceptance criteria.
+_classify_approvals_self_test() {
+    local fail=0
+    local fixture_null='[
+      {"message_type":"approval_response_message","approve":null,"approvals":[{"type":"tool","status":"success"}]},
+      {"message_type":"approval_response_message","approve":null,"approvals":[{"type":"tool","status":"success"}]},
+      {"message_type":"tool_return_message","status":"success"}
+    ]'
+    local fixture_true='[
+      {"message_type":"approval_response_message","approve":true,"approvals":[{"type":"tool","approve":true,"status":"success"}]},
+      {"message_type":"tool_return_message","status":"success"}
+    ]'
+    local fixture_false='[
+      {"message_type":"approval_response_message","approve":false,"approvals":[{"type":"tool","approve":false,"status":"error"}]},
+      {"message_type":"tool_return_message","status":"error"}
+    ]'
+
+    _check_classify() {
+        local fixture="$1" expect_null="$2" expect_fingerprint="$3" label="$4"
+        local got
+        got=$(echo "$fixture" | jq '
+          [.[] | select(.message_type == "approval_response_message")
+                | select((.approve == null) and ((.approvals // []) | all(.approve == null)))
+          ] | length
+        ')
+        if [[ "$got" != "$expect_null" ]]; then
+            log_err "[self-test] $label: expected all_null=$expect_null, got $got"
+            fail=1
+        fi
+        local got_fp="false"
+        [[ "$got" -gt 0 ]] && got_fp="true"
+        if [[ "$got_fp" != "$expect_fingerprint" ]]; then
+            log_err "[self-test] $label: expected fingerprint=$expect_fingerprint, got $got_fp"
+            fail=1
+        fi
+    }
+    _check_classify "$fixture_null"  2 true  "all-null bucket"
+    _check_classify "$fixture_true"  0 false "explicit-true bucket"
+    _check_classify "$fixture_false" 0 false "explicit-false bucket"
+
+    if [[ "$fail" -eq 0 ]]; then
+        log_ok "[self-test] all 3 buckets pass (all-null, explicit-true, explicit-false)"
+        return 0
+    fi
+    return 1
+}
+
 # ============== MAIN ==============
 case "$1" in
     count) shift; cmd_count "$@" ;;
@@ -476,6 +706,14 @@ case "$1" in
     providers) shift; cmd_providers "$@" ;;
     health) cmd_health ;;
     test-sync) shift; cmd_test_sync "$@" ;;
+    classify-approvals)
+        shift
+        if [[ "$1" == "--self-test" ]]; then
+            _classify_approvals_self_test
+        else
+            cmd_classify_approvals "$@"
+        fi
+        ;;
     -h|--help|help|"") usage ;;
     *) log_err "Unknown command: $1"; usage; exit 1 ;;
 esac
