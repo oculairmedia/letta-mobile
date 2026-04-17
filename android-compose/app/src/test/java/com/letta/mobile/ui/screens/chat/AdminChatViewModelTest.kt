@@ -692,6 +692,45 @@ class AdminChatViewModelTest {
     }
 
     @Test
+    fun `loadOlderMessages never produces duplicate message ids (LazyColumn key safety)`() = runTest {
+        // Regression for letta-mobile-o2v7: scrolling up crashed ChatScreen because
+        // LazyColumn got duplicate keys when a paginated page overlapped the loaded
+        // window. Guarantee merge-dedup keeps ids unique so Compose keys stay stable.
+        val startIndex = 31
+        val endIndex = startIndex + MessageRepository.INITIAL_FETCH_LIMIT - 1
+        messages = (startIndex..endIndex).map { index ->
+            TestData.appMessage(
+                id = "msg-$index",
+                messageType = if (index % 2 == 0) MessageType.ASSISTANT else MessageType.USER,
+                content = "Loaded message $index",
+            )
+        }
+        // Server returns a page that overlaps (msg-31 is already loaded) plus two
+        // genuinely older rows. The overlap must be dropped, not duplicated.
+        coEvery {
+            messageRepository.fetchOlderMessages("agent-1", "conv-1", "msg-$startIndex")
+        } returns listOf(
+            TestData.appMessage(id = "msg-29", messageType = MessageType.USER, content = "Older question"),
+            TestData.appMessage(id = "msg-30", messageType = MessageType.ASSISTANT, content = "Older answer"),
+            TestData.appMessage(id = "msg-$startIndex", messageType = MessageType.USER, content = "Duplicate of newest-loaded"),
+        )
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.loadOlderMessages()
+        advanceUntilIdle()
+
+        val ids = vm.uiState.value.messages.map { it.id }
+        assertEquals(
+            "Merged message list must not contain duplicate ids (LazyColumn key collision)",
+            ids.size,
+            ids.toSet().size,
+        )
+        assertEquals("msg-29", ids.first())
+    }
+
+    @Test
     fun `loadOlderMessages skips fetch when initial page proves there is no older history`() = runTest {
         messages = listOf(
             TestData.appMessage(id = "msg-1", messageType = MessageType.USER, content = "Only message"),

@@ -296,7 +296,13 @@ private fun ChatContent(
                 modifier = Modifier.weight(1f),
             )
         } else {
-            val reversed = remember(groupedMessages) { groupedMessages.asReversed() }
+            val reversed = remember(groupedMessages) {
+                // Defensive: LazyColumn crashes on duplicate item keys. mergeOlderMessages
+                // already dedupes by id, but a late streaming tick or reasoning-collapse
+                // edge case could still leak duplicates — so we guard here too.
+                val seen = HashSet<String>(groupedMessages.size)
+                groupedMessages.filter { (msg, _) -> seen.add(msg.id) }.asReversed()
+            }
 
             // Scroll to a specific message when navigating from search results
             LaunchedEffect(scrollToMessageId, reversed.size) {
@@ -365,7 +371,7 @@ private fun ChatContent(
                         val currentDate = message.timestamp.take(10)
                         val showDate = prevDate != null && prevDate != currentDate
 
-                        item(key = "${message.id}-$index") {
+                        item(key = "msg-${message.id}") {
                             // reverseLayout = true: top = space below (toward newer),
                             // bottom = space above (toward older)
                             val spacingBelow = when {
@@ -404,7 +410,10 @@ private fun ChatContent(
                         }
 
                         if (showDate) {
-                            item(key = "date-$currentDate") {
+                            // Tie the separator key to the boundary message id so
+                            // the same date can legitimately appear multiple times
+                            // (e.g. after older-page merges) without colliding.
+                            item(key = "date-${message.id}") {
                                 val date = try {
                                     LocalDate.parse(currentDate)
                                 } catch (_: Exception) {
