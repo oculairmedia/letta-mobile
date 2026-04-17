@@ -137,8 +137,11 @@ class TimelineSyncLoop(
     /** Background worker: processes one send at a time from the queue. */
     private suspend fun processSendQueue() {
         for (pending in sendQueue) {
+            val t0 = System.currentTimeMillis()
+            Log.d(logTag, "processSendQueue: starting otid=${pending.otid}")
             try {
                 streamAndReconcile(pending.content, pending.otid)
+                Log.d(logTag, "processSendQueue: otid=${pending.otid} done in ${System.currentTimeMillis() - t0}ms")
             } catch (t: Throwable) {
                 Log.e(logTag, "Send failed for otid=${pending.otid}", t)
                 writeMutex.withLock {
@@ -169,9 +172,17 @@ class TimelineSyncLoop(
             streaming = true,
             includeReturnMessageTypes = DEFAULT_INCLUDE_TYPES,
         )
+        val tPost = System.currentTimeMillis()
         val channel = messageApi.sendConversationMessage(conversationId, request)
+        Log.d(logTag, "POST returned in ${System.currentTimeMillis() - tPost}ms; parsing stream…")
+        var eventCount = 0
+        val tStream = System.currentTimeMillis()
 
         SseParser.parse(channel).collect { message ->
+            eventCount++
+            if (eventCount == 1) {
+                Log.d(logTag, "first SSE event in ${System.currentTimeMillis() - tStream}ms")
+            }
             writeMutex.withLock {
                 val confirmed = message.toTimelineEvent(position = _state.value.nextLocalPosition())
                     ?: return@withLock
@@ -180,6 +191,8 @@ class TimelineSyncLoop(
             }
             _events.emit(TimelineSyncEvent.ServerEvent(message))
         }
+
+        Log.d(logTag, "stream complete: $eventCount events in ${System.currentTimeMillis() - tStream}ms")
 
         // Stream completed successfully → mark our local send as SENT
         writeMutex.withLock {

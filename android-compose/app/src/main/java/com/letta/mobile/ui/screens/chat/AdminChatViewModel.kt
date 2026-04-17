@@ -494,8 +494,12 @@ class AdminChatViewModel @Inject constructor(
             }
             return
         }
+        // Read the flag directly from DataStore — the cached StateFlow starts
+        // at `false` and only flips on first emission, which races against
+        // this init-time call. .first() blocks until we have the real value.
+        val timelineModeInitial = settingsRepository.getUseTimelineSync().first()
         val cachedAgent = agentRepository.getCachedAgent(agentId)
-        val cachedMessages = if (useTimelineSync.value) emptyList()
+        val cachedMessages = if (timelineModeInitial) emptyList()
                              else messageRepository.getCachedMessages(requestedConversationId)
         if (cachedAgent != null || cachedMessages.isNotEmpty()) {
             if (requestedConversationId == activeConversationId) {
@@ -513,7 +517,7 @@ class AdminChatViewModel @Inject constructor(
         }
         try {
             val targetMessageId = scrollToMessageId
-            val timelineMode = useTimelineSync.value
+            val timelineMode = timelineModeInitial
 
             // In timeline mode, skip the redundant legacy message fetch.
             // The TimelineRepository.hydrate() (called by startTimelineObserver)
@@ -763,9 +767,11 @@ class AdminChatViewModel @Inject constructor(
         }
 
         if (useTimelineSync.value) {
+            Log.d("AdminChatVM", "sendMessage: routing via TIMELINE")
             sendMessageViaTimeline(text)
             return
         }
+        Log.d("AdminChatVM", "sendMessage: routing via LEGACY (timeline flag off)")
 
         viewModelScope.launch {
             val userMessage = UiMessage(
@@ -879,6 +885,8 @@ class AdminChatViewModel @Inject constructor(
      */
     private fun sendMessageViaTimeline(text: String) {
         viewModelScope.launch {
+            val sendStart = System.currentTimeMillis()
+            Log.d("AdminChatVM", "sendMessageViaTimeline: start (${text.length} chars)")
             _inputText.value = ""
             _uiState.value = _uiState.value.copy(isStreaming = true, isAgentTyping = true)
             try {
@@ -901,7 +909,9 @@ class AdminChatViewModel @Inject constructor(
                 startTimelineObserver(convId)
                 // Enqueue via the Timeline sync loop — returns immediately after
                 // appending the Local event and queuing the HTTP request.
-                timelineRepository.sendMessage(convId, text)
+                val otid = timelineRepository.sendMessage(convId, text)
+                val enqueueMs = System.currentTimeMillis() - sendStart
+                Log.d("AdminChatVM", "sendMessageViaTimeline: enqueued otid=$otid in ${enqueueMs}ms")
                 // isStreaming / isAgentTyping will be cleared when we see a Confirmed
                 // assistant event land in the timeline (see startTimelineObserver).
             } catch (e: Exception) {
