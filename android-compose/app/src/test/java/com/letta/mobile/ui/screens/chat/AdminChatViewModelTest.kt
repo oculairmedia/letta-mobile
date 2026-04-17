@@ -54,6 +54,7 @@ import java.time.Instant
 class AdminChatViewModelTest {
 
     private lateinit var messageRepository: MessageRepository
+    private lateinit var timelineRepository: com.letta.mobile.data.timeline.TimelineRepository
     private lateinit var agentRepository: AgentRepository
     private lateinit var blockRepository: BlockRepository
     private lateinit var bugReportRepository: BugReportRepository
@@ -73,6 +74,7 @@ class AdminChatViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         messageRepository = mockk(relaxed = true)
+        timelineRepository = mockk(relaxed = true)
         agentRepository = mockk(relaxed = true)
         blockRepository = BlockRepository(FakeBlockApi())
         bugReportRepository = mockk(relaxed = true)
@@ -87,6 +89,7 @@ class AdminChatViewModelTest {
 
         every { settingsRepository.getChatBackgroundKey() } returns flowOf("default")
         every { settingsRepository.getChatFontScale() } returns flowOf(1f)
+        every { settingsRepository.getUseTimelineSync() } returns flowOf(false)
         every { conversationManager.getActiveConversationId(any()) } answers {
             activeConversationIds[firstArg()]
         }
@@ -147,6 +150,7 @@ class AdminChatViewModelTest {
         return AdminChatViewModel(
             savedState,
             messageRepository,
+            timelineRepository,
             agentRepository,
             blockRepository,
             bugReportRepository,
@@ -437,6 +441,7 @@ class AdminChatViewModelTest {
         val vm = AdminChatViewModel(
             savedState,
             messageRepository,
+            timelineRepository,
             agentRepository,
             blockRepository,
             bugReportRepository,
@@ -504,6 +509,7 @@ class AdminChatViewModelTest {
         val vm = AdminChatViewModel(
             savedState,
             messageRepository,
+            timelineRepository,
             agentRepository,
             blockRepository,
             bugReportRepository,
@@ -552,6 +558,7 @@ class AdminChatViewModelTest {
         val vm = AdminChatViewModel(
             savedState,
             messageRepository,
+            timelineRepository,
             agentRepository,
             blockRepository,
             bugReportRepository,
@@ -594,6 +601,7 @@ class AdminChatViewModelTest {
         val vm = AdminChatViewModel(
             savedState,
             messageRepository,
+            timelineRepository,
             agentRepository,
             blockRepository,
             bugReportRepository,
@@ -633,6 +641,7 @@ class AdminChatViewModelTest {
         AdminChatViewModel(
             savedState,
             messageRepository,
+            timelineRepository,
             agentRepository,
             blockRepository,
             bugReportRepository,
@@ -651,7 +660,10 @@ class AdminChatViewModelTest {
 
     @Test
     fun `loadOlderMessages prepends older history and keeps existing newer messages`() = runTest {
-        messages = (11..20).map { index ->
+        // Generate enough messages to trigger hasMoreOlderMessages (needs >= INITIAL_FETCH_LIMIT)
+        val startIndex = 31
+        val endIndex = startIndex + MessageRepository.INITIAL_FETCH_LIMIT - 1
+        messages = (startIndex..endIndex).map { index ->
             TestData.appMessage(
                 id = "msg-$index",
                 messageType = if (index % 2 == 0) MessageType.ASSISTANT else MessageType.USER,
@@ -659,10 +671,10 @@ class AdminChatViewModelTest {
             )
         }
         coEvery {
-            messageRepository.fetchOlderMessages("agent-1", "conv-1", "msg-11")
+            messageRepository.fetchOlderMessages("agent-1", "conv-1", "msg-$startIndex")
         } returns listOf(
-            TestData.appMessage(id = "msg-9", messageType = MessageType.USER, content = "Older question"),
-            TestData.appMessage(id = "msg-10", messageType = MessageType.ASSISTANT, content = "Older answer"),
+            TestData.appMessage(id = "msg-29", messageType = MessageType.USER, content = "Older question"),
+            TestData.appMessage(id = "msg-30", messageType = MessageType.ASSISTANT, content = "Older answer"),
         )
 
         val vm = createViewModel()
@@ -672,7 +684,7 @@ class AdminChatViewModelTest {
         advanceUntilIdle()
 
         assertEquals(
-            listOf("msg-9", "msg-10") + (11..20).map { "msg-$it" },
+            listOf("msg-29", "msg-30") + (startIndex..endIndex).map { "msg-$it" },
             vm.uiState.value.messages.map { it.id },
         )
         assertFalse(vm.uiState.value.isLoadingOlderMessages)
@@ -718,6 +730,7 @@ class AdminChatViewModelTest {
         val vm = AdminChatViewModel(
             savedState,
             messageRepository,
+            timelineRepository,
             agentRepository,
             blockRepository,
             bugReportRepository,
@@ -757,6 +770,7 @@ class AdminChatViewModelTest {
         val vm = AdminChatViewModel(
             savedState,
             messageRepository,
+            timelineRepository,
             agentRepository,
             blockRepository,
             bugReportRepository,
@@ -806,6 +820,7 @@ class AdminChatViewModelTest {
         val vm = AdminChatViewModel(
             savedState,
             messageRepository,
+            timelineRepository,
             agentRepository,
             blockRepository,
             bugReportRepository,
@@ -839,6 +854,7 @@ class AdminChatViewModelTest {
         val vm = AdminChatViewModel(
             savedState,
             messageRepository,
+            timelineRepository,
             agentRepository,
             blockRepository,
             bugReportRepository,
@@ -876,6 +892,7 @@ class AdminChatViewModelTest {
         val vm = AdminChatViewModel(
             savedState,
             messageRepository,
+            timelineRepository,
             agentRepository,
             blockRepository,
             bugReportRepository,

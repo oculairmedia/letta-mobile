@@ -99,13 +99,16 @@ class AdminChatViewModelE2eTest {
             val settingsRepo = mockk<SettingsRepository>(relaxed = true)
             every { settingsRepo.getChatBackgroundKey() } returns flowOf("default")
             every { settingsRepo.getChatFontScale() } returns flowOf(1f)
+            every { settingsRepo.getUseTimelineSync() } returns flowOf(false)
             val botGateway = mockk<BotGateway>(relaxed = true)
             val botConfigStore = mockk<BotConfigStore>(relaxed = true)
             val internalBotClient = mockk<InternalBotClient>(relaxed = true)
+            val timelineRepository = mockk<com.letta.mobile.data.timeline.TimelineRepository>(relaxed = true)
 
             val vm = AdminChatViewModel(
                 SavedStateHandle(mapOf("agentId" to "agent-1", "conversationId" to "conv-1")),
                 messageRepository,
+                timelineRepository,
                 agentRepo,
                 blockRepository,
                 bugReportRepository,
@@ -184,13 +187,16 @@ class AdminChatViewModelE2eTest {
             val settingsRepo = mockk<SettingsRepository>(relaxed = true)
             every { settingsRepo.getChatBackgroundKey() } returns flowOf("default")
             every { settingsRepo.getChatFontScale() } returns flowOf(1f)
+            every { settingsRepo.getUseTimelineSync() } returns flowOf(false)
             val botGateway = mockk<BotGateway>(relaxed = true)
             val botConfigStore = mockk<BotConfigStore>(relaxed = true)
             val internalBotClient = mockk<InternalBotClient>(relaxed = true)
+            val timelineRepository = mockk<com.letta.mobile.data.timeline.TimelineRepository>(relaxed = true)
 
             val vm = AdminChatViewModel(
                 SavedStateHandle(mapOf("agentId" to "agent-1")),
                 messageRepository,
+                timelineRepository,
                 agentRepo,
                 blockRepository,
                 bugReportRepository,

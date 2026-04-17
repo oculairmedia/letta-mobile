@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.chat
 
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -173,6 +174,7 @@ data class ChatUiState(
 class AdminChatViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val messageRepository: MessageRepository,
+    private val timelineRepository: com.letta.mobile.data.timeline.TimelineRepository,
     private val agentRepository: AgentRepository,
     private val blockRepository: BlockRepository,
     private val bugReportRepository: BugReportRepository,
@@ -235,6 +237,18 @@ class AdminChatViewModel @Inject constructor(
 
     private val pendingToolsMap = java.util.concurrent.ConcurrentHashMap<String, PendingToolCall>()
     private var hasSummary = false
+
+    /**
+     * Feature flag for the Timeline-sync migration (see
+     * docs/architecture/message-sync-migration.md). When true, [sendMessage]
+     * delegates to [timelineRepository] and a separate coroutine mirrors the
+     * unified Timeline into [_uiState.messages]. When false, the legacy
+     * [messageRepository] path is used unchanged.
+     */
+    private val useTimelineSync: StateFlow<Boolean> = settingsRepository.getUseTimelineSync()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    private var timelineObserverJob: kotlinx.coroutines.Job? = null
 
     init {
         savedStateHandle.get<String>("conversationId")
@@ -525,6 +539,12 @@ class AdminChatViewModel @Inject constructor(
                 hasMoreOlderMessages = targetMessageId != null || fetchedMessages.size >= MessageRepository.INITIAL_FETCH_LIMIT,
             )
 
+            // Phase 3: if the Timeline-sync flag is on, attach observer so the
+            // unified Timeline takes over _uiState.messages on next send.
+            if (useTimelineSync.value) {
+                startTimelineObserver(requestedConversationId)
+            }
+
             // Background sync disabled - was causing UI flashes
         } catch (e: Exception) {
             if (requestedConversationId != activeConversationId) {
@@ -710,6 +730,11 @@ class AdminChatViewModel @Inject constructor(
             -> Unit
         }
 
+        if (useTimelineSync.value) {
+            sendMessageViaTimeline(text)
+            return
+        }
+
         viewModelScope.launch {
             val userMessage = UiMessage(
                 id = "pending-${System.currentTimeMillis()}",
@@ -782,15 +807,19 @@ class AdminChatViewModel @Inject constructor(
                         }
                         is StreamState.Complete -> {
                             pendingToolsMap.clear()
-                            val newMessages = state.messages.toUiMessages()
+                            // Reload from repository - it has the authoritative merged state
+                            // (server messages + pending + streaming, properly ordered).
+                            // This replaces the local pending UI message with the server-confirmed version.
+                            val authoritativeMessages = messageRepository
+                                .getCachedMessages(convId)
+                                .toUiMessages()
+                                .toImmutableList()
                             _uiState.value = _uiState.value.copy(
-                                messages = (existingMessages + newMessages).toImmutableList(),
+                                messages = authoritativeMessages,
                                 isStreaming = false,
                                 isAgentTyping = false,
                                 pendingTools = persistentListOf(),
                             )
-                            // Don't reload after streaming - streamed messages are already displayed
-                            // Reload was causing flash by replacing UI state
                             if (projectContext != null) {
                                 loadProjectAgents()
                                 loadProjectBrief()
@@ -803,6 +832,118 @@ class AdminChatViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(error = e.message, isStreaming = false, isAgentTyping = false)
+            }
+        }
+    }
+
+    /**
+     * Timeline-sync send path. Handles optimistic append, streaming, and
+     * reconciliation via [timelineRepository]. The timeline observer ([startTimelineObserver])
+     * mirrors state changes into [_uiState.messages] automatically.
+     *
+     * Unlike the legacy path, this function returns immediately after
+     * enqueueing the send — all visible state transitions flow through the
+     * single sync loop.
+     */
+    private fun sendMessageViaTimeline(text: String) {
+        viewModelScope.launch {
+            _inputText.value = ""
+            _uiState.value = _uiState.value.copy(isStreaming = true, isAgentTyping = true)
+            try {
+                var convId = activeConversationId
+                if (convId == null) {
+                    val summary = text.take(80).let { if (text.length > 80) "$it\u2026" else it }
+                    convId = conversationManager.createAndSetActiveConversation(agentId, summary)
+                    hasSummary = true
+                    _uiState.value = _uiState.value.copy(
+                        conversationState = ConversationState.Ready(convId),
+                    )
+                } else if (!hasSummary) {
+                    runCatching {
+                        val summary = text.take(80).let { if (text.length > 80) "$it\u2026" else it }
+                        conversationRepository.updateConversation(convId, agentId, summary)
+                        hasSummary = true
+                    }
+                }
+                // Ensure observer is attached for this conversation
+                startTimelineObserver(convId)
+                // Enqueue via the Timeline sync loop — returns immediately after
+                // appending the Local event and queuing the HTTP request.
+                timelineRepository.sendMessage(convId, text)
+                // isStreaming / isAgentTyping will be cleared when we see a Confirmed
+                // assistant event land in the timeline (see startTimelineObserver).
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    error = e.message,
+                    isStreaming = false,
+                    isAgentTyping = false,
+                )
+            }
+        }
+    }
+
+    /**
+     * Subscribe to the [TimelineRepository]'s StateFlow for the given
+     * conversation and mirror its events into [_uiState.messages].
+     *
+     * Idempotent — calling repeatedly for the same conversation is a no-op.
+     */
+    private fun startTimelineObserver(conversationId: String) {
+        if (timelineObserverJob?.isActive == true) return
+        timelineObserverJob = viewModelScope.launch {
+            val flow = timelineRepository.observe(conversationId)
+            flow.collect { timeline ->
+                val ui = timeline.events.mapNotNull { it.toUiMessageOrNull() }.toImmutableList()
+                // Clear streaming state if the tail is a Confirmed assistant event
+                val tailIsAssistant = timeline.events.lastOrNull().let {
+                    it is com.letta.mobile.data.timeline.TimelineEvent.Confirmed &&
+                        it.messageType == com.letta.mobile.data.timeline.TimelineMessageType.ASSISTANT
+                }
+                val anyLocalPending = timeline.events.any {
+                    it is com.letta.mobile.data.timeline.TimelineEvent.Local &&
+                        it.deliveryState == com.letta.mobile.data.timeline.DeliveryState.SENDING
+                }
+                _uiState.value = _uiState.value.copy(
+                    messages = ui,
+                    isStreaming = anyLocalPending,
+                    isAgentTyping = anyLocalPending && !tailIsAssistant,
+                )
+            }
+        }
+    }
+
+    /** Convert a [TimelineEvent] to a [UiMessage] for display. */
+    private fun com.letta.mobile.data.timeline.TimelineEvent.toUiMessageOrNull(): UiMessage? {
+        return when (val ev = this) {
+            is com.letta.mobile.data.timeline.TimelineEvent.Local -> UiMessage(
+                id = ev.otid,
+                role = when (ev.role) {
+                    com.letta.mobile.data.timeline.Role.USER -> "user"
+                    com.letta.mobile.data.timeline.Role.ASSISTANT -> "assistant"
+                    com.letta.mobile.data.timeline.Role.SYSTEM -> "system"
+                },
+                content = ev.content,
+                timestamp = ev.sentAt.toString(),
+                isPending = ev.deliveryState == com.letta.mobile.data.timeline.DeliveryState.SENDING,
+            )
+            is com.letta.mobile.data.timeline.TimelineEvent.Confirmed -> {
+                val role = when (ev.messageType) {
+                    com.letta.mobile.data.timeline.TimelineMessageType.USER -> "user"
+                    com.letta.mobile.data.timeline.TimelineMessageType.ASSISTANT -> "assistant"
+                    com.letta.mobile.data.timeline.TimelineMessageType.REASONING -> "assistant"
+                    com.letta.mobile.data.timeline.TimelineMessageType.SYSTEM -> "system"
+                    com.letta.mobile.data.timeline.TimelineMessageType.TOOL_CALL,
+                    com.letta.mobile.data.timeline.TimelineMessageType.TOOL_RETURN,
+                    com.letta.mobile.data.timeline.TimelineMessageType.OTHER -> return null
+                }
+                UiMessage(
+                    id = ev.serverId,
+                    role = role,
+                    content = ev.content,
+                    timestamp = ev.date.toString(),
+                    isPending = false,
+                    isReasoning = ev.messageType == com.letta.mobile.data.timeline.TimelineMessageType.REASONING,
+                )
             }
         }
     }

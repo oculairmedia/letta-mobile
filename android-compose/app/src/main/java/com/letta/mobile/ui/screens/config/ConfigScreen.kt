@@ -72,6 +72,7 @@ fun ConfigScreen(
                 onThemePresetChange = { viewModel.updateThemePreset(it) },
                 onDynamicColorChange = { viewModel.updateDynamicColor(it) },
                 onEnableProjectsChange = { viewModel.updateEnableProjects(it) },
+                onUseTimelineSyncChange = { viewModel.updateUseTimelineSync(it) },
                 onSave = {
                     viewModel.saveConfig(
                         onSuccess = { snackbar.dispatch("Configuration saved"); onNavigateBack() },
@@ -94,6 +95,7 @@ private fun ConfigContent(
     onThemePresetChange: (ThemePreset) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
     onEnableProjectsChange: (Boolean) -> Unit,
+    onUseTimelineSyncChange: (Boolean) -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -250,6 +252,21 @@ private fun ConfigContent(
                     Switch(
                         checked = state.enableProjects,
                         onCheckedChange = onEnableProjectsChange,
+                    )
+                },
+            )
+            item(
+                headlineContent = { Text("Use Timeline Sync (experimental)") },
+                supportingContent = {
+                    Text(
+                        "Enables the new otid-based message sync architecture. " +
+                            "Improves reliability of optimistic sends and reconciliation.",
+                    )
+                },
+                trailingContent = {
+                    Switch(
+                        checked = state.useTimelineSync,
+                        onCheckedChange = onUseTimelineSyncChange,
                     )
                 },
             )

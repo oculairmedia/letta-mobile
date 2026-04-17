@@ -115,7 +115,7 @@ class MessageRepositoryE2eTest : com.letta.mobile.testutil.TrackedMockClientTest
     @Test
     fun `fetchMessages requests descending order and reverses for chronological display`() = runTest {
         var requestedOrder: String? = null
-        var requestedLimit: String? = null
+        var requestedLimit: Int? = null
         val repository = createRepository(
             streamConversationId = "conv-1",
             // API returns newest first (desc order)
@@ -128,14 +128,15 @@ class MessageRepositoryE2eTest : com.letta.mobile.testutil.TrackedMockClientTest
             ssePayload = "data: [DONE]\n\n",
             onConversationMessagesRequest = { order, limit, _ ->
                 requestedOrder = order
-                requestedLimit = limit
+                requestedLimit = limit?.toIntOrNull()
             },
         )
 
         val messages = repository.fetchMessages("agent-1", "conv-1")
 
         assertEquals("desc", requestedOrder)
-        assertEquals(MessageRepository.INITIAL_FETCH_LIMIT.toString(), requestedLimit)
+        // SDK over-fetches to handle Letta API's run-based limit semantics
+        assertTrue("Limit should be >= INITIAL_FETCH_LIMIT", requestedLimit != null && requestedLimit!! >= MessageRepository.INITIAL_FETCH_LIMIT)
         // Result should be reversed for chronological order (oldest first)
         assertEquals(listOf("user-1", "assistant-1"), messages.map { it.id })
     }

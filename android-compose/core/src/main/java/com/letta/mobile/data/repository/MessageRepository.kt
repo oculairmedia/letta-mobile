@@ -62,8 +62,10 @@ open class MessageRepository @Inject constructor(
     private val messageProcessor: MessageProcessor,
 ) {
     companion object {
-        const val INITIAL_FETCH_LIMIT = 10
-        const val OLDER_MESSAGES_PAGE_SIZE = 10
+        /** Number of messages to display on initial chat load */
+        const val INITIAL_FETCH_LIMIT = 30
+        /** Number of messages to load when scrolling up for history */
+        const val OLDER_MESSAGES_PAGE_SIZE = 20
         const val DEFAULT_FETCH_LIMIT = INITIAL_FETCH_LIMIT
         const val TARGETED_FETCH_LIMIT = 100
         const val MAX_TARGETED_FETCH_PAGES = 20
@@ -71,7 +73,48 @@ open class MessageRepository @Inject constructor(
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    private val _messagesByConversation = MutableStateFlow<Map<String, List<AppMessage>>>(emptyMap())
+    // ========== SINGLE SOURCE OF TRUTH ARCHITECTURE ==========
+    // Server state: immutable snapshots from API (replace entirely on fetch)
+    private val _serverMessages = MutableStateFlow<Map<String, List<AppMessage>>>(emptyMap())
+    
+    // Pending state: local optimistic messages waiting for server confirmation
+    private val _pendingMessages = MutableStateFlow<Map<String, List<AppMessage>>>(emptyMap())
+    
+    // Streaming state: messages being received via SSE (cleared when stream completes)
+    private val _streamingMessages = MutableStateFlow<Map<String, List<AppMessage>>>(emptyMap())
+
+    /**
+     * Get display messages for a conversation.
+     * Merges server + pending + streaming states and sorts chronologically.
+     * This is the ONLY place where messages are combined and sorted.
+     */
+    fun getDisplayMessages(conversationId: String): List<AppMessage> {
+        val server = _serverMessages.value[conversationId] ?: emptyList()
+        val pending = _pendingMessages.value[conversationId] ?: emptyList()
+        val streaming = _streamingMessages.value[conversationId] ?: emptyList()
+        
+        // Server messages are already in correct chronological order from API
+        // (sorted by date with otid as tiebreaker for same-date messages within a run)
+        
+        val serverIds = server.mapTo(mutableSetOf()) { it.id }
+        val serverHashes = server.mapTo(mutableSetOf()) { it.contentHash() }
+        
+        // Pending messages that haven't been confirmed by server (by content match)
+        val unconfirmedPending = pending.filter { pendingMsg ->
+            pendingMsg.contentHash() !in serverHashes
+        }
+        
+        // Streaming messages that aren't already in server state
+        val newStreaming = streaming.filter { it.id !in serverIds }
+        
+        // Merge: server (in order) + pending (newest user actions) + streaming (incoming)
+        return server + unconfirmedPending + newStreaming
+    }
+
+    // Legacy accessor - redirects to new architecture
+    @Deprecated("Use getDisplayMessages() instead", ReplaceWith("getDisplayMessages(conversationId)"))
+    private val _messagesByConversation: MutableStateFlow<Map<String, List<AppMessage>>>
+        get() = _serverMessages  // Backwards compatibility during migration
 
     // Track last synced message ID per conversation for incremental fetches
     private val _lastSyncedMessageId = MutableStateFlow<Map<String, String>>(emptyMap())
@@ -99,19 +142,16 @@ open class MessageRepository @Inject constructor(
         conversationId: String,
         targetMessageId: String? = null,
     ): List<AppMessage> {
-        // Always use the agent messages endpoint — it returns tool_call_message types
-        // which are needed for resolving tool names. The conversation_id parameter
-        // filters to the specific conversation when provided.
+        // Use the SDK's fetchRecentMessages which handles the Letta API's run-based
+        // limit semantics and provides actual message-count limiting.
         return try {
             val appMessages = if (targetMessageId.isNullOrBlank()) {
-                // Fetch newest messages first (desc), then reverse for chronological display
-                messageApi.listMessages(
-                    agentId = agentId,
-                    limit = DEFAULT_FETCH_LIMIT,
-                    before = null,
-                    order = "desc",
+                // Fetch recent messages using the SDK method that handles over-fetching
+                messageApi.fetchRecentMessages(
                     conversationId = conversationId,
-                ).reversed().toAppMessages()
+                    messageLimit = DEFAULT_FETCH_LIMIT,
+                    beforeMessageId = null,
+                ).toAppMessages()
             } else {
                 fetchMessagesUntilTarget(
                     agentId = agentId,
@@ -120,12 +160,19 @@ open class MessageRepository @Inject constructor(
                 )
             }
 
-            // Server state is truth — just use what server returned
-            // Update cache directly with server messages
-            _messagesByConversation.update { current ->
+            // Replace server state entirely (immutable snapshot)
+            _serverMessages.update { current ->
                 current.toMutableMap().apply {
                     put(conversationId, appMessages)
                 }
+            }
+            
+            // Clear pending messages that are now confirmed by server
+            clearConfirmedPendingMessages(conversationId, appMessages)
+            
+            // Clear streaming state (fetch means stream is done)
+            _streamingMessages.update { current ->
+                current.toMutableMap().apply { remove(conversationId) }
             }
 
             // Track last message ID for incremental sync
@@ -134,10 +181,28 @@ open class MessageRepository @Inject constructor(
                 setLastSyncedMessageId(conversationId, lastId)
             }
 
-            appMessages
+            getDisplayMessages(conversationId)
         } catch (e: Exception) {
-            // Return cached or empty list on error
-            _messagesByConversation.value[conversationId] ?: emptyList()
+            // Return display messages on error
+            getDisplayMessages(conversationId)
+        }
+    }
+    
+    /**
+     * Clear pending messages that have been confirmed by server (matched by content hash).
+     */
+    private fun clearConfirmedPendingMessages(conversationId: String, serverMessages: List<AppMessage>) {
+        val serverHashes = serverMessages.mapTo(mutableSetOf()) { it.contentHash() }
+        _pendingMessages.update { current ->
+            current.toMutableMap().apply {
+                val pending = get(conversationId) ?: return@apply
+                val stillPending = pending.filter { it.contentHash() !in serverHashes }
+                if (stillPending.isEmpty()) {
+                    remove(conversationId)
+                } else {
+                    put(conversationId, stillPending)
+                }
+            }
         }
     }
 
@@ -159,20 +224,18 @@ open class MessageRepository @Inject constructor(
         android.util.Log.d("MessageRepository", "checkForNewMessages: conv=$conversationId, lastKnownId=$lastKnownId")
 
         return try {
-            val newMessages = messageApi.listMessages(
-                agentId = agentId,
+            // Use SDK method that handles run-based limit semantics
+            val newMessages = messageApi.fetchMessagesAfter(
                 conversationId = conversationId,
-                before = null,
-                after = lastKnownId,
-                limit = 50,
-                order = "asc",
+                afterMessageId = lastKnownId,
+                messageLimit = 50,
             ).toAppMessages()
 
             android.util.Log.d("MessageRepository", "checkForNewMessages: fetched ${newMessages.size} from API")
 
             if (newMessages.isNotEmpty()) {
-                // Append new messages to cache (they come after lastKnownId)
-                _messagesByConversation.update { current ->
+                // Append to server state (no sorting needed - getDisplayMessages handles it)
+                _serverMessages.update { current ->
                     current.toMutableMap().apply {
                         val existing = get(conversationId) ?: emptyList()
                         val existingIds = existing.mapTo(mutableSetOf()) { it.id }
@@ -181,6 +244,10 @@ open class MessageRepository @Inject constructor(
                         put(conversationId, existing + actuallyNew)
                     }
                 }
+                
+                // Clear any pending messages now confirmed
+                clearConfirmedPendingMessages(conversationId, newMessages)
+                
                 // Update sync marker
                 newMessages.lastOrNull()?.id?.let { lastId ->
                     android.util.Log.d("MessageRepository", "checkForNewMessages: updating lastSyncedMessageId to $lastId")
@@ -216,7 +283,8 @@ open class MessageRepository @Inject constructor(
 
             if (page.isEmpty()) break
 
-            mergedMessages = mergeMessageLists(mergedMessages, page.toAppMessages())
+            // Simple append - pages come in asc order
+            mergedMessages = mergedMessages + page.toAppMessages()
             if (mergedMessages.any { it.id == targetMessageId }) {
                 return mergedMessages
             }
@@ -237,24 +305,34 @@ open class MessageRepository @Inject constructor(
     ): List<AppMessage> {
         if (beforeMessageId.isBlank()) return emptyList()
 
-        val olderMessages = messageApi.listMessages(
-            agentId = agentId,
-            limit = OLDER_MESSAGES_PAGE_SIZE,
-            before = beforeMessageId,
-            after = null,
-            order = "desc",
+        // Use SDK method that handles run-based limit semantics
+        val olderMessages = messageApi.fetchRecentMessages(
             conversationId = conversationId,
-        ).reversed().toAppMessages()
+            messageLimit = OLDER_MESSAGES_PAGE_SIZE,
+            beforeMessageId = beforeMessageId,
+        ).toAppMessages()
 
         if (olderMessages.isNotEmpty()) {
-            prependMessagesIntoCache(conversationId, olderMessages)
+            // PREPEND older messages to server state (they come before existing)
+            _serverMessages.update { current ->
+                current.toMutableMap().apply {
+                    val existing = get(conversationId) ?: emptyList()
+                    val existingIds = existing.mapTo(mutableSetOf()) { it.id }
+                    val newOlder = olderMessages.filterNot { it.id in existingIds }
+                    put(conversationId, newOlder + existing)  // Older messages go FIRST
+                }
+            }
         }
 
         return olderMessages
     }
 
+    /**
+     * Get display messages (merged server + pending + streaming, sorted).
+     * This is the primary accessor for UI consumption.
+     */
     fun getCachedMessages(conversationId: String): List<AppMessage> {
-        return _messagesByConversation.value[conversationId] ?: emptyList()
+        return getDisplayMessages(conversationId)
     }
 
     suspend fun cancelMessage(agentId: String, runIds: List<String>? = null): Map<String, String> {
@@ -491,7 +569,8 @@ open class MessageRepository @Inject constructor(
             localId = localId,
         )
 
-        addMessageToCache(conversationId, optimisticMessage)
+        // Add to PENDING state (not server state)
+        addPendingMessage(conversationId, optimisticMessage)
 
         try {
             val request = MessageCreateRequest(
@@ -544,9 +623,57 @@ open class MessageRepository @Inject constructor(
                     }
                 }
 
+            // Add streamed messages to streaming state BEFORE emitting Complete
+            // so consumers reading getCachedMessages() will see them immediately.
+            _streamingMessages.update { current ->
+                current.toMutableMap().apply {
+                    put(conversationId, messages)
+                }
+            }
+
             emit(StreamState.Complete(messages))
 
-            mergeMessagesIntoCache(conversationId, messages)
+            // Background fetch happens later - don't block stream completion.
+            // The pending user message + streaming response remain in the merged display
+            // until the next poll cycle picks up the server-confirmed versions.
+            // This avoids race conditions where the server fetch returns stale data
+            // and overwrites the pending+streaming we just emitted.
+            try {
+                val serverMessages = messageApi.fetchRecentMessages(
+                    conversationId = conversationId,
+                    messageLimit = DEFAULT_FETCH_LIMIT,
+                    beforeMessageId = null,
+                ).toAppMessages()
+                
+                // Only update server state if the fetch actually contains our streamed message IDs
+                // (i.e., the server has actually persisted them). Otherwise keep streaming state.
+                val streamedIds = messages.mapTo(mutableSetOf()) { it.id }
+                val serverIds = serverMessages.mapTo(mutableSetOf()) { it.id }
+                val serverHasStreamedMessages = streamedIds.isEmpty() || streamedIds.any { it in serverIds }
+                
+                if (serverHasStreamedMessages) {
+                    // Server has the messages - safe to update server state and clear streaming/pending
+                    _serverMessages.update { current ->
+                        current.toMutableMap().apply {
+                            put(conversationId, serverMessages)
+                        }
+                    }
+                    
+                    _pendingMessages.update { current ->
+                        current.toMutableMap().apply { remove(conversationId) }
+                    }
+                    
+                    _streamingMessages.update { current ->
+                        current.toMutableMap().apply { remove(conversationId) }
+                    }
+                    
+                    serverMessages.lastOrNull()?.id?.let { setLastSyncedMessageId(conversationId, it) }
+                } else {
+                    android.util.Log.d("MessageRepository", "Server doesn't have streamed messages yet, keeping streaming state")
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("MessageRepository", "Background sync after stream failed", e)
+            }
 
         } catch (e: Exception) {
             emit(StreamState.Error(e.message ?: "Unknown error"))
@@ -587,18 +714,31 @@ open class MessageRepository @Inject constructor(
 
     suspend fun resetMessages(agentId: String) {
         messageApi.resetMessages(agentId)
-        _messagesByConversation.update { emptyMap() }
+        // Clear all states
+        _serverMessages.update { emptyMap() }
+        _pendingMessages.update { emptyMap() }
+        _streamingMessages.update { emptyMap() }
     }
 
     suspend fun resetMessages(agentId: String, conversationId: String) {
         messageApi.resetMessages(agentId)
-        _messagesByConversation.update { current ->
+        // Clear all states for this conversation
+        _serverMessages.update { current ->
+            current.toMutableMap().apply { remove(conversationId) }
+        }
+        _pendingMessages.update { current ->
+            current.toMutableMap().apply { remove(conversationId) }
+        }
+        _streamingMessages.update { current ->
             current.toMutableMap().apply { remove(conversationId) }
         }
     }
 
-    private fun addMessageToCache(conversationId: String, message: AppMessage) {
-        _messagesByConversation.update { current ->
+    /**
+     * Add a message to the PENDING state (optimistic local message).
+     */
+    private fun addPendingMessage(conversationId: String, message: AppMessage) {
+        _pendingMessages.update { current ->
             current.toMutableMap().apply {
                 val existing = get(conversationId) ?: emptyList()
                 put(conversationId, existing + message)
@@ -606,38 +746,22 @@ open class MessageRepository @Inject constructor(
         }
     }
 
+    // ========== LEGACY METHODS (kept for backwards compat, will be removed) ==========
+    
+    @Deprecated("Use getDisplayMessages() - server state is now immutable")
+    private fun addMessageToCache(conversationId: String, message: AppMessage) {
+        // Redirect to pending state
+        addPendingMessage(conversationId, message)
+    }
+
+    @Deprecated("Use streaming state instead")
     private fun mergeMessagesIntoCache(conversationId: String, messages: List<AppMessage>) {
-        _messagesByConversation.update { current ->
-            current.toMutableMap().apply {
-                val existing = get(conversationId) ?: emptyList()
-                put(conversationId, mergeMessageLists(existing, messages))
-            }
-        }
+        // No-op - streaming messages are now handled via _streamingMessages
     }
 
+    @Deprecated("Server state is now append-only via fetchOlderMessages")
     private fun prependMessagesIntoCache(conversationId: String, messages: List<AppMessage>) {
-        _messagesByConversation.update { current ->
-            current.toMutableMap().apply {
-                val existing = get(conversationId) ?: emptyList()
-                val existingIds = existing.mapTo(mutableSetOf()) { it.id }
-                val olderMessages = messages.filterNot { it.id in existingIds }
-                put(conversationId, olderMessages + existing)
-            }
-        }
+        // No-op - older messages are added directly to _serverMessages in fetchOlderMessages
     }
 
-    private fun mergeMessageLists(existing: List<AppMessage>, incoming: List<AppMessage>): List<AppMessage> {
-        val merged = LinkedHashMap<String, AppMessage>()
-        existing.filterNot { it.isPending }.forEach { merged[it.id] = it }
-        incoming.forEach { merged[it.id] = it }
-
-        val incomingHashes = incoming.mapTo(mutableSetOf()) { it.contentHash() }
-        existing.filter { it.isPending }.forEach { pendingMessage ->
-            if (pendingMessage.contentHash() !in incomingHashes) {
-                merged[pendingMessage.id] = pendingMessage
-            }
-        }
-
-        return merged.values.toList()
-    }
 }

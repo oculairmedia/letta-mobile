@@ -65,6 +65,7 @@ class SettingsRepository @Inject constructor(
         val CHAT_FONT_SCALE = floatPreferencesKey("chat_font_scale")
         val ENABLE_PROJECTS = booleanPreferencesKey("enable_projects")
         val PINNED_SHORTCUT_ORDER = stringPreferencesKey("pinned_shortcut_order")
+        val USE_TIMELINE_SYNC = booleanPreferencesKey("use_timeline_sync")
     }
 
     init {
@@ -274,6 +275,24 @@ class SettingsRepository @Inject constructor(
     suspend fun setEnableProjects(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[Keys.ENABLE_PROJECTS] = enabled
+        }
+    }
+
+    /**
+     * Feature flag for the new otid-based Timeline sync architecture.
+     * See docs/architecture/message-sync-migration.md.
+     *
+     * Defaults to false — legacy MessageRepository path used unless explicitly
+     * enabled. Per Phase 4 of the migration plan, this will flip to true after
+     * a 1-week dogfood period, and Phase 5 removes the legacy path entirely.
+     */
+    fun getUseTimelineSync(): Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[Keys.USE_TIMELINE_SYNC] ?: false
+    }
+
+    suspend fun setUseTimelineSync(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[Keys.USE_TIMELINE_SYNC] = enabled
         }
     }
 

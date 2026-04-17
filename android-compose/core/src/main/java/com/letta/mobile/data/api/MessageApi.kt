@@ -14,6 +14,110 @@ import javax.inject.Singleton
 open class MessageApi @Inject constructor(
     private val apiClient: LettaApiClient
 ) {
+    companion object {
+        /**
+         * The Letta API's `limit` parameter counts runs/steps, not individual messages.
+         * Each run can contain multiple messages (user, reasoning, assistant, tool calls, etc.).
+         * We over-fetch by this multiplier to ensure we get enough messages, then slice client-side.
+         */
+        private const val RUN_TO_MESSAGE_MULTIPLIER = 5
+        private const val MAX_OVER_FETCH_LIMIT = 200
+    }
+
+    /**
+     * Fetch recent messages with a true message-count limit.
+     *
+     * The Letta API's `limit` counts runs/steps, not messages. This method over-fetches
+     * and slices to provide the expected behavior where `messageLimit` is the actual
+     * number of messages returned.
+     *
+     * @param conversationId The conversation to fetch messages from
+     * @param messageLimit Exact number of messages to return (default 20)
+     * @param beforeMessageId Fetch messages before this message ID (for pagination)
+     * @return List of messages in chronological order (oldest first), limited to messageLimit
+     */
+    open suspend fun fetchRecentMessages(
+        conversationId: String,
+        messageLimit: Int = 20,
+        beforeMessageId: String? = null,
+    ): List<LettaMessage> {
+        val client = apiClient.getClient()
+        val baseUrl = apiClient.getBaseUrl()
+
+        // Over-fetch to account for runs containing multiple messages
+        val runLimit = ((messageLimit * RUN_TO_MESSAGE_MULTIPLIER) / 4).coerceIn(messageLimit, MAX_OVER_FETCH_LIMIT)
+
+        // Strategy: Use desc order to fetch the most recent messages,
+        // then sort the results in chronological order using a stable sort.
+        // 
+        // The problem with desc + reverse: within a single run, desc returns
+        // [reasoning, assistant] but chronologically it should be [reasoning, assistant]
+        // (reasoning happens before assistant). Reversing gives [assistant, reasoning]
+        // which is WRONG.
+        //
+        // Instead: fetch desc (to get recent messages), then sort by (date, otid)
+        // where otid is a string that increments monotonically within a run.
+        val response = client.get("$baseUrl/v1/conversations/$conversationId/messages") {
+            parameter("limit", runLimit)
+            parameter("before", beforeMessageId)
+            parameter("order", "desc")
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+
+        val allMessages: List<LettaMessage> = response.body()
+
+        // Take the most recent N messages (first N in desc order)
+        // Then sort chronologically by date, using otid as tiebreaker for same-date messages
+        return allMessages.take(messageLimit).sortedWith(
+            compareBy<LettaMessage>(
+                { it.date ?: "" },       // Primary: chronological date
+                { it.otid ?: it.id }      // Tiebreaker: otid (increments within a run) or id
+            )
+        )
+    }
+
+    /**
+     * Fetch messages after a specific message ID (for incremental sync).
+     *
+     * @param conversationId The conversation to fetch messages from
+     * @param afterMessageId Fetch messages after this message ID
+     * @param messageLimit Max number of messages to return
+     * @return List of new messages in chronological order (oldest first)
+     */
+    open suspend fun fetchMessagesAfter(
+        conversationId: String,
+        afterMessageId: String?,
+        messageLimit: Int = 50,
+    ): List<LettaMessage> {
+        val client = apiClient.getClient()
+        val baseUrl = apiClient.getBaseUrl()
+
+        // Over-fetch to account for runs containing multiple messages
+        val runLimit = ((messageLimit * RUN_TO_MESSAGE_MULTIPLIER) / 4).coerceIn(messageLimit, MAX_OVER_FETCH_LIMIT)
+
+        val response = client.get("$baseUrl/v1/conversations/$conversationId/messages") {
+            parameter("limit", runLimit)
+            parameter("after", afterMessageId)
+            parameter("order", "asc")
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+
+        val allMessages: List<LettaMessage> = response.body()
+
+        // Messages are in asc order (oldest first), take the limit
+        // Apply same stable sort as fetchRecentMessages for consistent ordering
+        return allMessages.take(messageLimit).sortedWith(
+            compareBy<LettaMessage>(
+                { it.date ?: "" },
+                { it.otid ?: it.id }
+            )
+        )
+    }
+
     open suspend fun sendMessage(agentId: String, request: MessageCreateRequest): LettaResponse {
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
