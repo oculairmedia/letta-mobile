@@ -67,12 +67,17 @@ fun MarkdownText(
                 )
             },
             codeFence = {
-                CodeFenceWithHeader(
-                    content = it.content,
-                    node = it.node,
-                    style = it.typography.code,
-                    highlights = highlightsBuilder,
-                )
+                val (language, codeText) = extractCodeFenceInfo(it.content, it.node)
+                if (language.equals("mermaid", ignoreCase = true) && codeText.isNotBlank()) {
+                    MermaidDiagram(source = codeText)
+                } else {
+                    CodeFenceWithHeader(
+                        content = it.content,
+                        node = it.node,
+                        style = it.typography.code,
+                        highlights = highlightsBuilder,
+                    )
+                }
             },
         )
     }
