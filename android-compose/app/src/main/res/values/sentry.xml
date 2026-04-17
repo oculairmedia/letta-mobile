@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sentry SDK reads its traces/profiles sample rates as typed Float resources
+  (see io.sentry.android.core.ManifestMetadataReader#readDouble which calls
+  Bundle.getFloat under the hood). Android doesn't have a native <float>
+  resource type, so the convention is a <item type="string" name="..."> with
+  a raw decimal value referenced via @string/... in the manifest. The SDK
+  parses the string with Double.parseDouble().
+-->
+<resources>
+    <string name="sentry_traces_sample_rate" translatable="false">0.2</string>
+</resources>

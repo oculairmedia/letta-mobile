@@ -24,7 +24,7 @@
             android:value="${SENTRY_ENV}" />
         <meta-data
             android:name="io.sentry.traces.sample-rate"
-            android:value="0.2" />
+            android:value="@string/sentry_traces_sample_rate" />
         <meta-data
             android:name="io.sentry.auto-session-tracking.enable"
             android:value="true" />

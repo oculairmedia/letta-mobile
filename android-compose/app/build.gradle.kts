@@ -47,8 +47,8 @@ android {
         applicationId = "com.letta.mobile"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.2.0"
+        versionCode = 5
+        versionName = "1.2.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         manifestPlaceholders["SENTRY_DSN"] = localProps.getProperty("sentry.dsn", "")
