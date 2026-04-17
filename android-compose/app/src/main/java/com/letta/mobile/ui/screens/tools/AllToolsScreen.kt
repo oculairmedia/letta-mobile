@@ -112,7 +112,6 @@ fun AllToolsScreen(
                     val selectedToolTags = (uiState as? UiState.Success)?.data?.selectedTags.orEmpty()
                     LazyRow(
                         modifier = Modifier
-                            .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {

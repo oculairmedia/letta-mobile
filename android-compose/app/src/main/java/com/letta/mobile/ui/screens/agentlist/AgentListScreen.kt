@@ -235,7 +235,6 @@ fun AgentListScreen(
                 if (allTags.isNotEmpty()) {
                     LazyRow(
                         modifier = Modifier
-                            .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {

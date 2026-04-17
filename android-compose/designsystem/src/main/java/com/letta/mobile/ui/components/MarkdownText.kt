@@ -192,7 +192,6 @@ private fun CodeFenceWithHeader(
 
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
                     .horizontalScroll(rememberScrollState())
                     .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
             ) {
