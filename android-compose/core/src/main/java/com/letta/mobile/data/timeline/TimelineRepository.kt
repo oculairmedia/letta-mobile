@@ -55,6 +55,9 @@ open class TimelineRepository @Inject constructor(
                     "Hydrate failed for $conversationId — proceeding with empty timeline",
                     t,
                 )
+                // Notify observers so they can clear loading state instead of
+                // spinning forever waiting for a Hydrated event that never comes.
+                runCatching { loop.emitHydrateFailed(t.message ?: "unknown") }
             }
             return loop
         }

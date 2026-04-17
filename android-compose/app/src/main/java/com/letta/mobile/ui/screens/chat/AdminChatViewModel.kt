@@ -547,9 +547,11 @@ class AdminChatViewModel @Inject constructor(
 
             if (timelineMode) {
                 // Hand control of _uiState.messages to the timeline observer.
-                // It calls TimelineRepository.hydrate() and emits as messages arrive.
+                // It calls TimelineRepository.hydrate() and emits as messages
+                // arrive. Keep isLoadingMessages=true until the observer sees
+                // the first emission (see startTimelineObserver).
                 _uiState.value = _uiState.value.copy(
-                    isLoadingMessages = false,
+                    isLoadingMessages = true,
                     isLoadingOlderMessages = false,
                     hasMoreOlderMessages = false,
                 )
@@ -940,22 +942,44 @@ class AdminChatViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(error = "Timeline init failed: ${e.message}")
                 return@launch
             }
-            flow.collect { timeline ->
-                val ui = timeline.events.mapNotNull { it.toUiMessageOrNull() }.toImmutableList()
-                // Clear streaming state if the tail is a Confirmed assistant event
-                val tailIsAssistant = timeline.events.lastOrNull().let {
-                    it is com.letta.mobile.data.timeline.TimelineEvent.Confirmed &&
-                        it.messageType == com.letta.mobile.data.timeline.TimelineMessageType.ASSISTANT
+            // Also subscribe to the loop's sync events so we can definitively
+            // clear the loading spinner on Hydrated (even for empty convs).
+            val loop = timelineRepository.getOrCreate(conversationId)
+            val hydrateSignal = viewModelScope.launch {
+                loop.events.collect { ev ->
+                    when (ev) {
+                        is com.letta.mobile.data.timeline.TimelineSyncEvent.Hydrated,
+                        is com.letta.mobile.data.timeline.TimelineSyncEvent.HydrateFailed -> {
+                            _uiState.value = _uiState.value.copy(isLoadingMessages = false)
+                        }
+                        else -> Unit
+                    }
                 }
-                val anyLocalPending = timeline.events.any {
-                    it is com.letta.mobile.data.timeline.TimelineEvent.Local &&
-                        it.deliveryState == com.letta.mobile.data.timeline.DeliveryState.SENDING
+            }
+
+            try {
+                flow.collect { timeline ->
+                    val ui = timeline.events.mapNotNull { it.toUiMessageOrNull() }.toImmutableList()
+                    val tailIsAssistant = timeline.events.lastOrNull().let {
+                        it is com.letta.mobile.data.timeline.TimelineEvent.Confirmed &&
+                            it.messageType == com.letta.mobile.data.timeline.TimelineMessageType.ASSISTANT
+                    }
+                    val anyLocalPending = timeline.events.any {
+                        it is com.letta.mobile.data.timeline.TimelineEvent.Local &&
+                            it.deliveryState == com.letta.mobile.data.timeline.DeliveryState.SENDING
+                    }
+                    // Any non-empty emission also implies hydrate succeeded.
+                    val clearLoading = ui.isNotEmpty()
+                    _uiState.value = _uiState.value.copy(
+                        messages = ui,
+                        isLoadingMessages = if (clearLoading) false
+                                           else _uiState.value.isLoadingMessages,
+                        isStreaming = anyLocalPending,
+                        isAgentTyping = anyLocalPending && !tailIsAssistant,
+                    )
                 }
-                _uiState.value = _uiState.value.copy(
-                    messages = ui,
-                    isStreaming = anyLocalPending,
-                    isAgentTyping = anyLocalPending && !tailIsAssistant,
-                )
+            } finally {
+                hydrateSignal.cancel()
             }
         }
     }

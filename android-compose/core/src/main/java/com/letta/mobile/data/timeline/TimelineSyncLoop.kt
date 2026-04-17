@@ -62,7 +62,15 @@ class TimelineSyncLoop(
     // requests on the same conversation, so we must serialize client-side.
     private val sendQueue = Channel<PendingSend>(Channel.UNLIMITED)
 
-    private val _events = MutableSharedFlow<TimelineSyncEvent>(extraBufferCapacity = 64)
+    // replay=1 so late subscribers (e.g. AdminChatViewModel subscribing after
+    // hydrate has already fired during getOrCreate) still receive Hydrated
+    // and can clear their loading state.
+    private val _events = MutableSharedFlow<TimelineSyncEvent>(replay = 1, extraBufferCapacity = 64)
+
+    /** Signal that hydrate failed — emitted by [TimelineRepository]. */
+    internal suspend fun emitHydrateFailed(message: String) {
+        _events.emit(TimelineSyncEvent.HydrateFailed(message))
+    }
     val events: SharedFlow<TimelineSyncEvent> = _events.asSharedFlow()
 
     init {
@@ -270,6 +278,7 @@ sealed class TimelineSyncEvent {
     data class ServerEvent(val message: LettaMessage) : TimelineSyncEvent()
     data class StreamError(val type: String, val message: String) : TimelineSyncEvent()
     data class ReconcileError(val message: String) : TimelineSyncEvent()
+    data class HydrateFailed(val message: String) : TimelineSyncEvent()
 }
 
 /**
