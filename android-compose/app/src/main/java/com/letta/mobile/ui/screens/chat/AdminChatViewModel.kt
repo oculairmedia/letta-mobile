@@ -891,7 +891,13 @@ class AdminChatViewModel @Inject constructor(
     private fun startTimelineObserver(conversationId: String) {
         if (timelineObserverJob?.isActive == true) return
         timelineObserverJob = viewModelScope.launch {
-            val flow = timelineRepository.observe(conversationId)
+            val flow = try {
+                timelineRepository.observe(conversationId)
+            } catch (e: Exception) {
+                android.util.Log.e("AdminChatViewModel", "Timeline observe failed", e)
+                _uiState.value = _uiState.value.copy(error = "Timeline init failed: ${e.message}")
+                return@launch
+            }
             flow.collect { timeline ->
                 val ui = timeline.events.mapNotNull { it.toUiMessageOrNull() }.toImmutableList()
                 // Clear streaming state if the tail is a Confirmed assistant event

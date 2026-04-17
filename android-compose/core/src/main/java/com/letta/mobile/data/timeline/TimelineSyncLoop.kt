@@ -78,8 +78,7 @@ class TimelineSyncLoop(
      * conversation is opened.
      */
     suspend fun hydrate(limit: Int = 50) = writeMutex.withLock {
-        val response = messageApi.listMessages(
-            agentId = "",                     // unused for conversation endpoint
+        val response = messageApi.listConversationMessages(
             conversationId = conversationId,
             limit = limit,
             order = "asc",
@@ -197,8 +196,7 @@ class TimelineSyncLoop(
      */
     private suspend fun reconcileAfterSend(otid: String) = writeMutex.withLock {
         try {
-            val serverMessages = messageApi.listMessages(
-                agentId = "",
+            val serverMessages = messageApi.listConversationMessages(
                 conversationId = conversationId,
                 limit = RECONCILE_LIMIT,
                 order = "desc",

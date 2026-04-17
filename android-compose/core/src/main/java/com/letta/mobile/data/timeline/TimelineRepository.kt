@@ -46,10 +46,16 @@ open class TimelineRepository @Inject constructor(
                 scope = scope,
             )
             loops[conversationId] = loop
-            // Hydrate outside the mutex-held scope to avoid blocking other callers
-            // — but we don't want two callers to both wait on the same hydrate.
-            // Hydrate is idempotent enough that a single call is safe here.
-            loop.hydrate()
+            // Hydrate may fail (e.g. 404 on a brand-new conversation) — never
+            // let that propagate up and kill the chat screen. The user can
+            // still send messages; reconcile will fill in history afterwards.
+            runCatching { loop.hydrate() }.onFailure { t ->
+                android.util.Log.w(
+                    "TimelineRepository",
+                    "Hydrate failed for $conversationId — proceeding with empty timeline",
+                    t,
+                )
+            }
             return loop
         }
     }
