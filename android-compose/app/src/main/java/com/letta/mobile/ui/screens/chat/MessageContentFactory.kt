@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -13,6 +14,7 @@ import com.letta.mobile.ui.components.MarkdownText
 import com.letta.mobile.ui.theme.LocalChatFontScale
 import com.letta.mobile.ui.theme.chatTypography
 import com.letta.mobile.ui.theme.scaledBy
+import kotlinx.collections.immutable.toImmutableList
 
 object GeneratedUiRenderer : MessageContentRenderer {
     override fun canRender(message: UiMessage): Boolean = message.generatedUi != null
@@ -99,7 +101,13 @@ object ToolCallRenderer : MessageContentRenderer {
                 MarkdownText(text = message.content, textColor = textColor)
             }
             message.toolCalls?.takeIf { it.isNotEmpty() }?.let { toolCalls ->
-                MessageToolCalls(toolCalls = toolCalls)
+                // Wrap at the call-site so MessageToolCalls receives a stable
+                // ImmutableList param (o7ob.2.6). UiMessage still uses raw List
+                // to avoid rippling the migration through MessageMapper.
+                val stableToolCalls = remember(toolCalls) {
+                    toolCalls.toImmutableList()
+                }
+                MessageToolCalls(toolCalls = stableToolCalls)
             }
         }
     }

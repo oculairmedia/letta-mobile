@@ -1,5 +1,6 @@
 package com.letta.mobile.data.model
 
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -21,7 +22,9 @@ import kotlinx.serialization.json.JsonPrimitive
  * Text-only messages continue to go through the legacy string path to minimize
  * server-side compatibility surface.
  */
+@Immutable
 sealed class MessageContentPart {
+    @Immutable
     data class Text(val text: String) : MessageContentPart()
 
     /**
@@ -31,6 +34,7 @@ sealed class MessageContentPart {
      * @param base64 the base64-encoded image bytes (no data: prefix)
      * @param mediaType MIME type, e.g. "image/jpeg" or "image/png"
      */
+    @Immutable
     data class Image(val base64: String, val mediaType: String) : MessageContentPart() {
         fun toDataUrl(): String = "data:$mediaType;base64,$base64"
     }

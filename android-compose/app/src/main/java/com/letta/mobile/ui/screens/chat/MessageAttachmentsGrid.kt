@@ -27,7 +27,7 @@ import com.letta.mobile.data.model.UiImageAttachment
  */
 @Composable
 fun MessageAttachmentsGrid(
-    attachments: List<UiImageAttachment>,
+    attachments: kotlinx.collections.immutable.ImmutableList<UiImageAttachment>,
     modifier: Modifier = Modifier,
 ) {
     if (attachments.isEmpty()) return

@@ -33,6 +33,7 @@ import com.letta.mobile.R
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.ui.components.LettaInputBar
 import com.letta.mobile.ui.icons.LettaIcons
+import kotlinx.collections.immutable.ImmutableList
 
 /**
  * The chat input composer: text bar + staged attachment thumbnails + attach
@@ -42,7 +43,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 @Composable
 fun ChatComposer(
     inputText: String,
-    pendingAttachments: List<MessageContentPart.Image>,
+    pendingAttachments: ImmutableList<MessageContentPart.Image>,
     isStreaming: Boolean,
     canSendMessages: Boolean,
     onTextChange: (String) -> Unit,
@@ -92,7 +93,7 @@ fun ChatComposer(
 
 @Composable
 private fun AttachmentStrip(
-    attachments: List<MessageContentPart.Image>,
+    attachments: ImmutableList<MessageContentPart.Image>,
     onRemove: (Int) -> Unit,
 ) {
     LazyRow(

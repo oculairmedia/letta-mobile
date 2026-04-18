@@ -42,6 +42,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import kotlinx.collections.immutable.persistentListOf
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -608,8 +609,8 @@ class AdminChatViewModelTest {
                 title = "Crash on sync",
                 description = "App crashes after project sync finishes.",
                 severity = BugSeverity.High,
-                tags = listOf("sync", "crash"),
-                attachmentReferences = listOf("recording://screen-1"),
+                tags = persistentListOf("sync", "crash"),
+                attachmentReferences = persistentListOf("recording://screen-1"),
             )
         )
         advanceUntilIdle()

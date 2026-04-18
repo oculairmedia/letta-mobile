@@ -70,6 +70,7 @@ import com.letta.mobile.ui.theme.listItemMetadata
 import com.letta.mobile.ui.theme.listItemSupporting
 import com.letta.mobile.ui.theme.scaledBy
 import com.letta.mobile.ui.theme.sectionTitle
+import kotlinx.collections.immutable.toImmutableList
 
 private fun UiMessage.displayRoleLabel(defaultLabel: String): String {
     val toolCall = toolCalls?.singleOrNull()
@@ -273,7 +274,14 @@ private fun MessageBubbleSurface(
             }
 
             if (message.attachments.isNotEmpty()) {
-                MessageAttachmentsGrid(attachments = message.attachments)
+                // UiMessage still exposes `attachments` as raw List to avoid
+                // rippling an ImmutableList migration through MessageMapper
+                // and every sync code-path; wrap at the call-site so the
+                // composable sees a stable param type (o7ob.2.6).
+                val stableAttachments = remember(message.attachments) {
+                    message.attachments.toImmutableList()
+                }
+                MessageAttachmentsGrid(attachments = stableAttachments)
             }
 
             val textColor = if (bubbleLess) {
@@ -513,7 +521,7 @@ internal fun MessageReasoning(
 
 @Composable
 internal fun MessageToolCalls(
-    toolCalls: List<UiToolCall>,
+    toolCalls: kotlinx.collections.immutable.ImmutableList<UiToolCall>,
     modifier: Modifier = Modifier,
 ) {
     Column(

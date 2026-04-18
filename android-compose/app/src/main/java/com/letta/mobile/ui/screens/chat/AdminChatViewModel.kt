@@ -30,6 +30,7 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.collections.immutable.toImmutableMap
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -81,7 +82,11 @@ data class ProjectBriefSection(
 data class ProjectBriefUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
-    val sections: Map<ProjectBriefSectionKey, ProjectBriefSection> = emptyMap(),
+    // ImmutableMap so Compose treats this whole state as stable — raw
+    // kotlin.collections.Map is an unstable interface type to the
+    // compiler (it could be a MutableMap at runtime). See o7ob.2.6.
+    val sections: kotlinx.collections.immutable.ImmutableMap<ProjectBriefSectionKey, ProjectBriefSection> =
+        kotlinx.collections.immutable.persistentMapOf(),
     val error: String? = null,
 )
 
@@ -97,14 +102,14 @@ data class ProjectBugReportDraft(
     val title: String = "",
     val description: String = "",
     val severity: BugSeverity = BugSeverity.Medium,
-    val tags: List<String> = emptyList(),
-    val attachmentReferences: List<String> = emptyList(),
+    val tags: ImmutableList<String> = persistentListOf(),
+    val attachmentReferences: ImmutableList<String> = persistentListOf(),
 )
 
 @androidx.compose.runtime.Immutable
 data class ProjectBugReportUiState(
     val isSubmitting: Boolean = false,
-    val recentReports: List<ProjectBugReport> = emptyList(),
+    val recentReports: ImmutableList<ProjectBugReport> = persistentListOf(),
     val lastSubmittedPrompt: String? = null,
     val error: String? = null,
 )
@@ -130,7 +135,7 @@ data class ProjectAgentActivity(
 @androidx.compose.runtime.Immutable
 data class ProjectAgentsUiState(
     val isLoading: Boolean = false,
-    val agents: List<ProjectAgentActivity> = emptyList(),
+    val agents: ImmutableList<ProjectAgentActivity> = persistentListOf(),
     val error: String? = null,
 )
 
@@ -148,6 +153,7 @@ sealed interface ConversationState {
     data class Error(val message: String) : ConversationState
 }
 
+@androidx.compose.runtime.Immutable
 data class ChatUiState(
     val conversationState: ConversationState = ConversationState.Loading,
     val messages: ImmutableList<UiMessage> = persistentListOf(),
@@ -276,7 +282,7 @@ class AdminChatViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     projectAgents = ProjectAgentsUiState(
                         isLoading = false,
-                        agents = activities,
+                        agents = activities.toImmutableList(),
                     )
                 )
             } catch (e: Exception) {
@@ -296,7 +302,10 @@ class AdminChatViewModel @Inject constructor(
             try {
                 val recent = bugReportRepository.getRecentBugReports(projectIdentifier)
                 _uiState.value = _uiState.value.copy(
-                    bugReports = _uiState.value.bugReports.copy(recentReports = recent, error = null)
+                    bugReports = _uiState.value.bugReports.copy(
+                        recentReports = recent.toImmutableList(),
+                        error = null,
+                    )
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
@@ -332,9 +341,9 @@ class AdminChatViewModel @Inject constructor(
                     bugReports = _uiState.value.bugReports.copy(
                         isSubmitting = false,
                         lastSubmittedPrompt = prompt,
-                        recentReports = listOf(logged) + _uiState.value.bugReports.recentReports
+                        recentReports = (listOf(logged) + _uiState.value.bugReports.recentReports
                             .filterNot { it.id == logged.id }
-                            .take(4),
+                            .take(4)).toImmutableList(),
                     )
                 )
                 sendMessage(prompt)
@@ -368,7 +377,7 @@ class AdminChatViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     projectBrief = ProjectBriefUiState(
                         isLoading = false,
-                        sections = buildProjectBriefSections(blocks),
+                        sections = buildProjectBriefSections(blocks).toImmutableMap(),
                     )
                 )
             } catch (e: Exception) {
@@ -404,7 +413,8 @@ class AdminChatViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     projectBrief = _uiState.value.projectBrief.copy(
                         isSaving = false,
-                        sections = _uiState.value.projectBrief.sections + (key to updatedSection),
+                        sections = (_uiState.value.projectBrief.sections + (key to updatedSection))
+                            .toImmutableMap(),
                     )
                 )
             } catch (e: Exception) {

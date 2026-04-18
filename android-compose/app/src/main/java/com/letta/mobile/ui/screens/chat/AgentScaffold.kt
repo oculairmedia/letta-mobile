@@ -102,6 +102,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.listItemHeadline
+import kotlinx.collections.immutable.toImmutableList
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -594,8 +595,8 @@ private fun ProjectBugReportSheet(
                                 title = title,
                                 description = description,
                                 severity = severity,
-                                tags = selectedTags.toList().sorted(),
-                                attachmentReferences = attachments,
+                                tags = selectedTags.toList().sorted().toImmutableList(),
+                                attachmentReferences = attachments.toImmutableList(),
                             )
                         )
                     },
