@@ -48,8 +48,8 @@ android {
         applicationId = "com.letta.mobile"
         minSdk = 26
         targetSdk = 36
-        versionCode = 6
-        versionName = "1.2.2"
+        versionCode = 7
+        versionName = "1.2.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // Sentry config is read at runtime by [SentryInitializer] from
