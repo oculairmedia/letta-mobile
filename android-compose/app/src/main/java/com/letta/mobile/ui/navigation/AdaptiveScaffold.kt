@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
@@ -70,10 +71,21 @@ fun AdaptiveScaffold(
         Scaffold(
             modifier = modifier.fillMaxSize(),
             bottomBar = {
+                // Anchor the expand/shrink to the Bottom edge so the bar
+                // reveals by growing UPWARD from the bottom of the screen
+                // (its final resting edge) rather than appearing above
+                // its final slot and dropping down into place. On exit it
+                // shrinks back into the bottom edge.
                 AnimatedVisibility(
                     visible = !isImeVisible,
-                    enter = expandVertically(animationSpec = tween(durationMillis = 150)),
-                    exit = shrinkVertically(animationSpec = tween(durationMillis = 150)),
+                    enter = expandVertically(
+                        expandFrom = Alignment.Bottom,
+                        animationSpec = tween(durationMillis = 150),
+                    ),
+                    exit = shrinkVertically(
+                        shrinkTowards = Alignment.Bottom,
+                        animationSpec = tween(durationMillis = 150),
+                    ),
                 ) {
                     LettaBottomBar(navController = navController)
                 }
