@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
 import com.mikepenz.markdown.compose.components.markdownComponents
 import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCodeBlock
 import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCodeFence
@@ -50,6 +51,65 @@ fun MarkdownText(
 ) {
     if (text.isBlank()) return
 
+    // Pre-pass: if the text contains display-math fences ($$…$$), split into
+    // alternating Markdown / MathBlock segments. Cheap fast-path otherwise.
+    if (text.contains("$$")) {
+        val segments = remember(text) { splitDisplayMathSegments(text) }
+        if (segments.size > 1) {
+            androidx.compose.foundation.layout.Column(modifier = modifier) {
+                segments.forEach { seg ->
+                    when (seg) {
+                        is MathSegment.Text ->
+                            MarkdownTextRaw(text = seg.content, modifier = Modifier, textColor = textColor)
+                        is MathSegment.Math ->
+                            MathBlock(source = seg.content, displayMode = true)
+                    }
+                }
+            }
+            return
+        }
+    }
+
+    MarkdownTextRaw(text = text, modifier = modifier, textColor = textColor)
+}
+
+/** Sealed segments produced by [splitDisplayMathSegments]. */
+internal sealed class MathSegment {
+    data class Text(val content: String) : MathSegment()
+    data class Math(val content: String) : MathSegment()
+}
+
+/**
+ * Split [text] into alternating Markdown text and `$$…$$` math segments. Empty
+ * text segments (between adjacent math blocks) are dropped.
+ */
+internal fun splitDisplayMathSegments(text: String): List<MathSegment> {
+    val regex = Regex("\\$\\$([\\s\\S]+?)\\$\\$")
+    val out = mutableListOf<MathSegment>()
+    var last = 0
+    for (match in regex.findAll(text)) {
+        if (match.range.first > last) {
+            val before = text.substring(last, match.range.first)
+            if (before.isNotBlank()) out.add(MathSegment.Text(before))
+        }
+        val src = match.groupValues[1].trim()
+        if (src.isNotEmpty()) out.add(MathSegment.Math(src))
+        last = match.range.last + 1
+    }
+    if (last < text.length) {
+        val tail = text.substring(last)
+        if (tail.isNotBlank()) out.add(MathSegment.Text(tail))
+    }
+    return out
+}
+
+/** Internal renderer that handles a single non-math chunk via the Markdown lib. */
+@Composable
+private fun MarkdownTextRaw(
+    text: String,
+    modifier: Modifier = Modifier,
+    textColor: Color = MaterialTheme.colorScheme.onSurface,
+) {
     val fontScale = LocalChatFontScale.current
     val isDarkTheme = isSystemInDarkTheme()
 
@@ -68,15 +128,23 @@ fun MarkdownText(
             },
             codeFence = {
                 val (language, codeText) = extractCodeFenceInfo(it.content, it.node)
-                if (language.equals("mermaid", ignoreCase = true) && codeText.isNotBlank()) {
-                    MermaidDiagram(source = codeText)
-                } else {
-                    CodeFenceWithHeader(
-                        content = it.content,
-                        node = it.node,
-                        style = it.typography.code,
-                        highlights = highlightsBuilder,
-                    )
+                when {
+                    language.equals("mermaid", ignoreCase = true) && codeText.isNotBlank() -> {
+                        MermaidDiagram(source = codeText)
+                    }
+                    (language.equals("latex", ignoreCase = true) ||
+                        language.equals("math", ignoreCase = true) ||
+                        language.equals("tex", ignoreCase = true)) && codeText.isNotBlank() -> {
+                        MathBlock(source = codeText, displayMode = true)
+                    }
+                    else -> {
+                        CodeFenceWithHeader(
+                            content = it.content,
+                            node = it.node,
+                            style = it.typography.code,
+                            highlights = highlightsBuilder,
+                        )
+                    }
                 }
             },
         )
@@ -114,6 +182,7 @@ fun MarkdownText(
             modifier = modifier.fillMaxWidth(),
             components = components,
             extendedSpans = extendedSpans,
+            imageTransformer = Coil3ImageTransformerImpl,
             colors = markdownColor(
                 text = textColor,
                 codeBackground = MaterialTheme.colorScheme.surfaceVariant,
