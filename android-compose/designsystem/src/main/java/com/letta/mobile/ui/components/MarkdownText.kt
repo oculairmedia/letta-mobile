@@ -51,16 +51,35 @@ fun MarkdownText(
 ) {
     if (text.isBlank()) return
 
-    // Pre-pass: if the text contains display-math fences ($$…$$), split into
-    // alternating Markdown / MathBlock segments. Cheap fast-path otherwise.
-    if (text.contains("$$")) {
-        val segments = remember(text) { splitDisplayMathSegments(text) }
-        if (segments.size > 1) {
+    // Pre-pass: if the text contains display-math fences ($$…$$) OR a
+    // plausible inline-math span ($…$), split into alternating Markdown /
+    // MathBlock segments. Display-math is block-level (stacked column);
+    // inline-math is interleaved with prose (wrapping row). Cheap fast-path
+    // when neither marker is present.
+    val hasDisplay = text.contains("$$")
+    val hasInline = !hasDisplay && text.contains('$') && containsLikelyInlineMath(text)
+    if (hasDisplay || hasInline) {
+        val blockSegments = remember(text) { splitDisplayMathSegments(text) }
+        val hasBlockSplit = blockSegments.any { it is MathSegment.Math } && blockSegments.size > 1
+        val hasAnyInline = blockSegments
+            .filterIsInstance<MathSegment.Text>()
+            .any { containsLikelyInlineMath(it.content) }
+
+        if (hasBlockSplit || hasAnyInline) {
             androidx.compose.foundation.layout.Column(modifier = modifier) {
-                segments.forEach { seg ->
+                blockSegments.forEach { seg ->
                     when (seg) {
-                        is MathSegment.Text ->
-                            MarkdownTextRaw(text = seg.content, modifier = Modifier, textColor = textColor)
+                        is MathSegment.Text -> {
+                            if (containsLikelyInlineMath(seg.content)) {
+                                InlineMathParagraph(text = seg.content, textColor = textColor)
+                            } else {
+                                MarkdownTextRaw(
+                                    text = seg.content,
+                                    modifier = Modifier,
+                                    textColor = textColor,
+                                )
+                            }
+                        }
                         is MathSegment.Math ->
                             MathBlock(source = seg.content, displayMode = true)
                     }
@@ -73,7 +92,32 @@ fun MarkdownText(
     MarkdownTextRaw(text = text, modifier = modifier, textColor = textColor)
 }
 
-/** Sealed segments produced by [splitDisplayMathSegments]. */
+/**
+ * Renders a single paragraph that contains one or more inline `$…$` math
+ * spans. Prose pieces go through [MarkdownTextRaw] (preserving markdown
+ * formatting within each piece); math pieces go through [MathBlock] with
+ * `displayMode=false`. The pieces are laid out in a [FlowRow] so long runs
+ * still wrap across lines naturally.
+ */
+@Composable
+private fun InlineMathParagraph(text: String, textColor: Color) {
+    val pieces = remember(text) { splitInlineMathSegments(text) }
+    androidx.compose.foundation.layout.FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+    ) {
+        pieces.forEach { piece ->
+            when (piece) {
+                is MathSegment.Text ->
+                    MarkdownTextRaw(text = piece.content, textColor = textColor)
+                is MathSegment.Math ->
+                    MathBlock(source = piece.content, displayMode = false)
+            }
+        }
+    }
+}
+
+/** Sealed segments produced by [splitDisplayMathSegments] and [splitInlineMathSegments]. */
 internal sealed class MathSegment {
     data class Text(val content: String) : MathSegment()
     data class Math(val content: String) : MathSegment()
@@ -102,6 +146,72 @@ internal fun splitDisplayMathSegments(text: String): List<MathSegment> {
     }
     return out
 }
+
+/**
+ * Split a paragraph [text] into inline `$…$` math pieces interleaved with
+ * Markdown text pieces.
+ *
+ * We intentionally use a narrower match than display-math to avoid false
+ * positives on currency and shell variables:
+ *  - The opening `$` must be at start-of-string or preceded by a non-word,
+ *    non-`$` character — so `A$100` and `$$` won't anchor a match.
+ *  - The opening `$` must NOT be followed by whitespace or a digit (`$ x$`
+ *    and `$100` are skipped). KaTeX convention: real inline math starts
+ *    with a non-space, non-digit character.
+ *  - The closing `$` must NOT be preceded by whitespace.
+ *  - The body must not contain another `$` or newline (inline math is
+ *    single-line by convention; multi-line math belongs in `$$…$$`).
+ *  - Empty bodies are rejected.
+ *
+ * Empty surrounding text segments are dropped, matching the display-math
+ * splitter's contract. `$$` escapes are left for the display-math pass.
+ */
+internal fun splitInlineMathSegments(text: String): List<MathSegment> {
+    val regex = Regex(INLINE_MATH_PATTERN)
+    val out = mutableListOf<MathSegment>()
+    var last = 0
+    for (match in regex.findAll(text)) {
+        val body = match.groupValues[1]
+        if (body.isBlank()) continue
+        // groupValues[1] is the math body, but match.range covers the full
+        // `$body$` span including the fences.
+        if (match.range.first > last) {
+            val before = text.substring(last, match.range.first)
+            if (before.isNotEmpty()) out.add(MathSegment.Text(before))
+        }
+        out.add(MathSegment.Math(body.trim()))
+        last = match.range.last + 1
+    }
+    if (last < text.length) {
+        val tail = text.substring(last)
+        if (tail.isNotEmpty()) out.add(MathSegment.Text(tail))
+    }
+    // If no inline-math was found, return a single-element list so callers
+    // can treat "no split" as "render as a single chunk" without branching.
+    if (out.isEmpty()) out.add(MathSegment.Text(text))
+    return out
+}
+
+/**
+ * Cheap precheck used by [MarkdownText] to decide whether to invoke the
+ * inline-math splitter at all. Mirrors [INLINE_MATH_PATTERN] but is an
+ * anchored scan over `text`, so a false-positive here just costs one regex
+ * match inside [splitInlineMathSegments].
+ */
+internal fun containsLikelyInlineMath(text: String): Boolean {
+    if (!text.contains('$')) return false
+    return Regex(INLINE_MATH_PATTERN).containsMatchIn(text)
+}
+
+// (?<=^|[^\w$]) — opening must follow a non-word, non-$ boundary
+// \$           — literal $
+// (?![\s\d])   — not followed by whitespace or digit (rules out $100, $ x$)
+// ([^$\n]+?)   — body: no $ or newline, non-greedy
+// (?<!\s)      — closing $ not preceded by whitespace
+// \$           — literal closing $
+// (?!\w)       — closing not followed by a word char (rules out `$x$abc`-style runs bleeding into identifiers)
+private const val INLINE_MATH_PATTERN =
+    "(?<=^|[^\\w$])\\$(?![\\s\\d])([^$\\n]+?)(?<!\\s)\\$(?!\\w)"
 
 /** Internal renderer that handles a single non-math chunk via the Markdown lib. */
 @Composable

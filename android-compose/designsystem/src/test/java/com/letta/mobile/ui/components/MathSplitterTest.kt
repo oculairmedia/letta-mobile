@@ -101,4 +101,85 @@ class MathSplitterTest {
         assertTrue(html.contains("displayMode: false"))
         assertTrue(html.contains("color-scheme: dark"))
     }
+
+    // ---------- Inline math ($...$) tests ----------
+
+    @Test
+    fun `inline math is extracted from surrounding prose`() {
+        val segs = splitInlineMathSegments("the formula \$a^2+b^2=c^2\$ works")
+        val maths = segs.filterIsInstance<MathSegment.Math>().map { it.content }
+        assertEquals(listOf("a^2+b^2=c^2"), maths)
+        val texts = segs.filterIsInstance<MathSegment.Text>().map { it.content }
+        assertEquals(listOf("the formula ", " works"), texts)
+    }
+
+    @Test
+    fun `multiple inline math expressions are each extracted`() {
+        val segs = splitInlineMathSegments("let \$x\$ and \$y\$ be vars")
+        val maths = segs.filterIsInstance<MathSegment.Math>().map { it.content }
+        assertEquals(listOf("x", "y"), maths)
+    }
+
+    @Test
+    fun `currency is not mistaken for inline math`() {
+        val segs = splitInlineMathSegments("it costs \$100 and \$200 dollars")
+        // No math span should be extracted — `$100` and `$200` start with a
+        // digit, which the pattern rejects.
+        assertTrue(
+            "expected no math segments, got: " +
+                segs.filterIsInstance<MathSegment.Math>().map { it.content },
+            segs.none { it is MathSegment.Math },
+        )
+    }
+
+    @Test
+    fun `shell-like tokens are not matched when preceded by a word`() {
+        // `A$100` — the opening `$` is preceded by a word character, so the
+        // lookbehind prevents a match.
+        val segs = splitInlineMathSegments("see table A\$100 now")
+        assertTrue(segs.none { it is MathSegment.Math })
+    }
+
+    @Test
+    fun `whitespace-anchored fences are rejected`() {
+        // Real LaTeX never opens with whitespace after `\$` or closes with
+        // whitespace before `\$`. Reject both forms.
+        val segs1 = splitInlineMathSegments("leading \$ x \$ trail")
+        assertTrue(segs1.none { it is MathSegment.Math })
+        val segs2 = splitInlineMathSegments("trailing \$x \$ trail")
+        assertTrue(segs2.none { it is MathSegment.Math })
+    }
+
+    @Test
+    fun `empty inline math is skipped`() {
+        val segs = splitInlineMathSegments("foo \$\$ bar")
+        assertTrue(segs.none { it is MathSegment.Math })
+    }
+
+    @Test
+    fun `multiline inline math is not matched`() {
+        // Multi-line math must go through `\$\$…\$\$`, not inline — the pattern
+        // forbids newlines inside the body.
+        val segs = splitInlineMathSegments("ab \$c\nd\$ ef")
+        assertTrue(segs.none { it is MathSegment.Math })
+    }
+
+    @Test
+    fun `plain prose round-trips through the splitter`() {
+        val segs = splitInlineMathSegments("nothing mathy here")
+        assertEquals(1, segs.size)
+        assertTrue(segs.first() is MathSegment.Text)
+        assertEquals("nothing mathy here", (segs.first() as MathSegment.Text).content)
+    }
+
+    @Test
+    fun `containsLikelyInlineMath precheck mirrors the regex`() {
+        assertTrue(containsLikelyInlineMath("hello \$x+y\$ world"))
+        // No `\$` at all → fast false.
+        assertEquals(false, containsLikelyInlineMath("hello world"))
+        // Currency → no match.
+        assertEquals(false, containsLikelyInlineMath("\$100 and \$200"))
+        // Whitespace-anchored fence → no match.
+        assertEquals(false, containsLikelyInlineMath("leading \$ x \$ trail"))
+    }
 }
