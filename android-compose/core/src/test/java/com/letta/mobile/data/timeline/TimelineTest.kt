@@ -1,6 +1,8 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.util.Telemetry
 import java.time.Instant
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -14,6 +16,11 @@ import org.junit.Test
  * to ensure the mobile port preserves the validated invariants.
  */
 class TimelineTest {
+
+    @After
+    fun tearDown() {
+        Telemetry.clear()
+    }
 
     private fun local(otid: String, pos: Double, content: String = "msg"): TimelineEvent.Local =
         TimelineEvent.Local(
@@ -56,17 +63,10 @@ class TimelineTest {
         assertEquals("b", t.events[1].otid)
     }
 
-    @Test(expected = IllegalArgumentException::class)
-    fun `append rejects out-of-order`() {
-        val t = Timeline("c1").append(local("a", 5.0))
-        t.append(local("b", 3.0))
-    }
-
-    @Test(expected = IllegalArgumentException::class)
-    fun `append rejects duplicate otid`() {
-        val t = Timeline("c1").append(local("dup", 1.0))
-        t.append(confirmed("dup", 2.0))
-    }
+    // NOTE: Previous tests asserted that append() throws IllegalArgumentException
+    // on out-of-order position or duplicate otid. As of letta-mobile-4jmg we tolerate
+    // both cases (log telemetry, bump position, drop duplicate) to avoid crashing the
+    // chat screen on transient races. See defensive-behavior tests at the bottom.
 
     @Test
     fun `replaceLocal swaps in place preserving position`() {
@@ -199,5 +199,84 @@ class TimelineTest {
             .append(confirmed("recent-2", 101.0))
         t = t.insertOrdered(confirmed("old-1", 50.0))
         assertEquals(listOf("old-1", "recent-1", "recent-2"), t.events.map { it.otid })
+    }
+
+    // === Defensive behavior tests (letta-mobile-4jmg) ===
+
+    @Test
+    fun `init logs telemetry for position collision`() {
+        Telemetry.clear()
+        val events = listOf(
+            local("a", 1.0, "first"),
+            confirmed("b", 1.0),  // position collision
+        )
+        
+        val t = Timeline("c1", events = events)
+        
+        // The events should still be present (no crash in production)
+        assertEquals(2, t.events.size)
+        
+        // Verify telemetry error was logged
+        val telemetryEvents = Telemetry.snapshot()
+        val positionViolation = telemetryEvents.any {
+            it.tag == "Timeline" && it.name == "init.positionViolation" && it.level == Telemetry.Level.ERROR
+        }
+        assertTrue("Expected positionViolation telemetry event", positionViolation)
+    }
+
+    @Test
+    fun `init logs telemetry for duplicate otid`() {
+        Telemetry.clear()
+        val events = listOf(
+            local("dup", 1.0, "first"),
+            confirmed("dup", 2.0),  // otid duplicate
+        )
+        
+        val t = Timeline("c1", events = events)
+        
+        // Should not crash (defensive behavior)
+        assertEquals(2, t.events.size)
+        
+        // Verify telemetry error was logged
+        val telemetryEvents = Telemetry.snapshot()
+        val otidDuplicate = telemetryEvents.any {
+            it.tag == "Timeline" && it.name == "init.otidDuplicates" && it.level == Telemetry.Level.ERROR
+        }
+        assertTrue("Expected otidDuplicates telemetry event", otidDuplicate)
+    }
+
+    @Test
+    fun `append drops duplicate otid and logs warning instead of crashing`() {
+        Telemetry.clear()
+        val t = Timeline("c1").append(local("dup", 1.0))
+        val afterDup = t.append(local("dup", 2.0))
+        // Duplicate is dropped — timeline keeps the original event.
+        assertEquals(1, afterDup.events.size)
+        assertEquals("dup", afterDup.events.single().otid)
+        assertTrue(
+            "Expected append.duplicateOtid telemetry",
+            Telemetry.snapshot().any {
+                it.tag == "Timeline" && it.name == "append.duplicateOtid" && it.level == Telemetry.Level.WARN
+            },
+        )
+    }
+
+    @Test
+    fun `append bumps colliding position instead of crashing`() {
+        Telemetry.clear()
+        val t = Timeline("c1").append(local("a", 5.0))
+        // Attempt to append at a position that would break strict-monotonic.
+        val bumped = t.append(confirmed("b", 3.0))
+        // Event accepted — position bumped to last+1.0.
+        assertEquals(2, bumped.events.size)
+        assertEquals(5.0, bumped.events[0].position, 0.0001)
+        assertEquals(6.0, bumped.events[1].position, 0.0001)
+        assertEquals("b", bumped.events[1].otid)
+        assertTrue(
+            "Expected append.positionBumped telemetry",
+            Telemetry.snapshot().any {
+                it.tag == "Timeline" && it.name == "append.positionBumped" && it.level == Telemetry.Level.WARN
+            },
+        )
     }
 }

@@ -1,5 +1,8 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.core.BuildConfig
+import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.util.Telemetry
 import java.time.Instant
 import java.util.UUID
 
@@ -26,6 +29,13 @@ sealed class TimelineEvent {
     /** Display content (plain text for user/assistant, formatted for tool/reasoning). */
     abstract val content: String
 
+    /**
+     * Optional attached images. Rendered as thumbnails alongside the text body.
+     * The same objects are serialized into the outbound MessageCreate.content
+     * array for the server.
+     */
+    abstract val attachments: List<MessageContentPart.Image>
+
     /** Optimistic, not yet confirmed by server. Only ever role=USER in practice. */
     data class Local(
         override val position: Double,
@@ -34,6 +44,7 @@ sealed class TimelineEvent {
         val role: Role = Role.USER,
         val sentAt: Instant,
         val deliveryState: DeliveryState,
+        override val attachments: List<MessageContentPart.Image> = emptyList(),
     ) : TimelineEvent()
 
     /** Confirmed via server. */
@@ -46,6 +57,7 @@ sealed class TimelineEvent {
         val date: Instant,
         val runId: String?,
         val stepId: String?,
+        override val attachments: List<MessageContentPart.Image> = emptyList(),
     ) : TimelineEvent()
 }
 
@@ -85,11 +97,29 @@ data class Timeline(
     val backfillCursor: String? = null,
 ) {
     init {
-        require(events.zipWithNext().all { (a, b) -> a.position < b.position }) {
-            "Timeline events must be strictly ordered by position"
+        // Defensive telemetry: log invariant violations but don't crash in production.
+        // In concurrent scenarios (e.g., reconcileAfterSend racing with stream events),
+        // position collisions or otid duplicates can occur transiently. Log them for
+        // diagnosis but allow the timeline to be constructed.
+        val positionViolation = events.zipWithNext().any { (a, b) -> a.position >= b.position }
+        val otidDupes = events.size != events.map { it.otid }.toSet().size
+        
+        if (positionViolation) {
+            Telemetry.event(
+                "Timeline", "init.positionViolation",
+                "conversationId" to conversationId,
+                "eventCount" to events.size,
+                level = Telemetry.Level.ERROR
+            )
         }
-        require(events.map { it.otid }.toSet().size == events.size) {
-            "otids must be unique within a timeline"
+        if (otidDupes) {
+            Telemetry.event(
+                "Timeline", "init.otidDuplicates",
+                "conversationId" to conversationId,
+                "eventCount" to events.size,
+                "uniqueOtids" to events.map { it.otid }.toSet().size,
+                level = Telemetry.Level.ERROR
+            )
         }
     }
 
@@ -102,17 +132,43 @@ data class Timeline(
     fun findByOtid(otid: String): TimelineEvent? = events.firstOrNull { it.otid == otid }
 
     /**
-     * Append a new event at the end. Its position must be strictly greater than
-     * the current last event's position (or the timeline must be empty).
+     * Append a new event at the end.
+     *
+     * In production this tolerates invariant violations (duplicate otid or
+     * non-monotonic position) rather than crashing — logs telemetry and either
+     * drops the duplicate or bumps the position to preserve ordering. The
+     * [init] block logs the same violations at construction time; this is the
+     * matching defence at mutation time so a transient race doesn't take down
+     * the chat screen.
      */
     fun append(event: TimelineEvent): Timeline {
-        require(events.lastOrNull()?.let { it.position < event.position } ?: true) {
-            "Appended event position ${event.position} must be > last ${events.lastOrNull()?.position}"
+        if (findByOtid(event.otid) != null) {
+            Telemetry.event(
+                "Timeline", "append.duplicateOtid",
+                "conversationId" to conversationId,
+                "otid" to event.otid,
+                level = Telemetry.Level.WARN,
+            )
+            return this
         }
-        require(findByOtid(event.otid) == null) {
-            "otid ${event.otid} already in timeline"
+        val lastPos = events.lastOrNull()?.position
+        val safeEvent: TimelineEvent = if (lastPos != null && lastPos >= event.position) {
+            Telemetry.event(
+                "Timeline", "append.positionBumped",
+                "conversationId" to conversationId,
+                "otid" to event.otid,
+                "requested" to event.position,
+                "bumpedTo" to (lastPos + 1.0),
+                level = Telemetry.Level.WARN,
+            )
+            when (event) {
+                is TimelineEvent.Local -> event.copy(position = lastPos + 1.0)
+                is TimelineEvent.Confirmed -> event.copy(position = lastPos + 1.0)
+            }
+        } else {
+            event
         }
-        return copy(events = events + event)
+        return copy(events = events + safeEvent)
     }
 
     /**
