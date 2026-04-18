@@ -28,6 +28,7 @@ import com.letta.mobile.util.mapErrorToUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -158,6 +159,7 @@ data class ChatUiState(
     val pendingTools: ImmutableList<PendingToolCall> = persistentListOf(),
     val agentName: String = "",
     val error: String? = null,
+    val composerError: String? = null,
     val promptTokens: Int? = null,
     val completionTokens: Int? = null,
     val totalTokens: Int? = null,
@@ -165,7 +167,19 @@ data class ChatUiState(
     val projectBrief: ProjectBriefUiState = ProjectBriefUiState(),
     val bugReports: ProjectBugReportUiState = ProjectBugReportUiState(),
     val projectAgents: ProjectAgentsUiState = ProjectAgentsUiState(),
+    /**
+     * Pending image attachments staged in the composer. Reset on successful send.
+     * Cap enforced by [MAX_COMPOSER_ATTACHMENTS].
+     */
+    val pendingAttachments: ImmutableList<com.letta.mobile.data.model.MessageContentPart.Image> =
+        persistentListOf(),
 )
+
+/** Upper bound on composer image attachments per message. */
+const val MAX_COMPOSER_ATTACHMENTS = 4
+
+/** Upper bound on per-message total base64 payload (approximate — ~8 MB). */
+const val MAX_COMPOSER_TOTAL_BYTES = 8 * 1024 * 1024
 
 @HiltViewModel
 class AdminChatViewModel @Inject constructor(
@@ -611,8 +625,84 @@ class AdminChatViewModel @Inject constructor(
             -> Unit
         }
 
-        Telemetry.event("AdminChatVM", "sendMessage.route", "via" to "timeline", "length" to text.length)
-        sendMessageViaTimeline(text)
+        val attachments = _uiState.value.pendingAttachments.toList()
+        if (text.isBlank() && attachments.isEmpty()) return
+
+        Telemetry.event(
+            "AdminChatVM", "sendMessage.route",
+            "via" to "timeline",
+            "length" to text.length,
+            "attachments" to attachments.size,
+        )
+        sendMessageViaTimeline(text, attachments)
+    }
+
+    fun reportComposerError(message: String) {
+        _uiState.value = _uiState.value.copy(composerError = message)
+    }
+
+    fun clearComposerError() {
+        if (_uiState.value.composerError == null) return
+        _uiState.value = _uiState.value.copy(composerError = null)
+    }
+
+    /**
+     * Stage a new image attachment in the composer. Enforces [MAX_COMPOSER_ATTACHMENTS]
+     * count cap and [MAX_COMPOSER_TOTAL_BYTES] cumulative base64 size cap. Returns
+     * true on success; false if a cap was hit (caller should surface the error).
+     */
+    fun addAttachment(image: com.letta.mobile.data.model.MessageContentPart.Image): Boolean {
+        val current = _uiState.value.pendingAttachments
+        if (current.size >= MAX_COMPOSER_ATTACHMENTS) {
+            Telemetry.event(
+                "AdminChatVM",
+                "attachment.rejected",
+                "reason" to "count_cap",
+                "current" to current.size,
+                "max" to MAX_COMPOSER_ATTACHMENTS,
+            )
+            reportComposerError("Attachment limit reached ($MAX_COMPOSER_ATTACHMENTS max).")
+            return false
+        }
+        val newTotal = current.sumOf { it.base64.length } + image.base64.length
+        if (newTotal > MAX_COMPOSER_TOTAL_BYTES) {
+            Telemetry.event(
+                "AdminChatVM",
+                "attachment.rejected",
+                "reason" to "size_cap",
+                "newTotal" to newTotal,
+                "max" to MAX_COMPOSER_TOTAL_BYTES,
+            )
+            reportComposerError("Attachments too large — downscale or remove some before sending.")
+            return false
+        }
+        _uiState.value = _uiState.value.copy(
+            pendingAttachments = (current + image).toPersistentList(),
+            composerError = null,
+        )
+        Telemetry.event(
+            "AdminChatVM",
+            "attachment.added",
+            "size" to image.base64.length,
+            "mediaType" to image.mediaType,
+            "totalCount" to (current.size + 1),
+        )
+        return true
+    }
+
+    /** Remove a staged attachment by index. */
+    fun removeAttachment(index: Int) {
+        val current = _uiState.value.pendingAttachments
+        if (index !in current.indices) return
+        _uiState.value = _uiState.value.copy(
+            pendingAttachments = (current.toMutableList().also { it.removeAt(index) })
+                .toPersistentList(),
+        )
+        Telemetry.event(
+            "AdminChatVM",
+            "attachment.removed",
+            "index" to index,
+        )
     }
 
     /**
@@ -622,11 +712,21 @@ class AdminChatViewModel @Inject constructor(
      * automatically. Returns immediately after enqueueing the send — all
      * visible state transitions flow through the single sync loop.
      */
-    private fun sendMessageViaTimeline(text: String) {
+    private fun sendMessageViaTimeline(
+        text: String,
+        attachments: List<com.letta.mobile.data.model.MessageContentPart.Image> = emptyList(),
+    ) {
         viewModelScope.launch {
             val enqueueTimer = Telemetry.startTimer("AdminChatVM", "send.enqueue")
             _inputText.value = ""
-            _uiState.value = _uiState.value.copy(isStreaming = true, isAgentTyping = true)
+            _uiState.value = _uiState.value.copy(
+                isStreaming = true,
+                isAgentTyping = true,
+                composerError = null,
+                // Clear composer attachments optimistically; they're carried on the
+                // Local event now so the user bubble still shows them.
+                pendingAttachments = persistentListOf(),
+            )
             try {
                 var convId = activeConversationId
                 if (convId == null) {
@@ -647,7 +747,11 @@ class AdminChatViewModel @Inject constructor(
                 startTimelineObserver(convId)
                 // Enqueue via the Timeline sync loop — returns immediately after
                 // appending the Local event and queuing the HTTP request.
-                val otid = timelineRepository.sendMessage(convId, text)
+                val otid = if (attachments.isEmpty()) {
+                    timelineRepository.sendMessage(convId, text)
+                } else {
+                    timelineRepository.sendMessage(convId, text, attachments)
+                }
                 enqueueTimer.stop("otid" to otid, "conversationId" to convId)
                 // isStreaming / isAgentTyping will be cleared when we see a Confirmed
                 // assistant event land in the timeline (see startTimelineObserver).
@@ -733,6 +837,12 @@ class AdminChatViewModel @Inject constructor(
                 content = ev.content,
                 timestamp = ev.sentAt.toString(),
                 isPending = ev.deliveryState == com.letta.mobile.data.timeline.DeliveryState.SENDING,
+                attachments = ev.attachments.map {
+                    com.letta.mobile.data.model.UiImageAttachment(
+                        base64 = it.base64,
+                        mediaType = it.mediaType,
+                    )
+                },
             )
             is com.letta.mobile.data.timeline.TimelineEvent.Confirmed -> {
                 val role = when (ev.messageType) {
@@ -751,6 +861,12 @@ class AdminChatViewModel @Inject constructor(
                     timestamp = ev.date.toString(),
                     isPending = false,
                     isReasoning = ev.messageType == com.letta.mobile.data.timeline.TimelineMessageType.REASONING,
+                    attachments = ev.attachments.map {
+                        com.letta.mobile.data.model.UiImageAttachment(
+                            base64 = it.base64,
+                            mediaType = it.mediaType,
+                        )
+                    },
                 )
             }
         }

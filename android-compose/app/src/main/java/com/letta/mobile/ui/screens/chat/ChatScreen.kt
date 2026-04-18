@@ -24,6 +24,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -87,76 +89,101 @@ fun ChatScreen(
     }
 
     LettaChatTheme(fontScale = activeFontScale) {
-    Column(modifier = modifier.fillMaxSize().then(backgroundModifier).imePadding()) {
-        when (val conversationState = state.conversationState) {
-            ConversationState.Loading -> {
-                MessageSkeletonList(modifier = Modifier.weight(1f))
-            }
-            is ConversationState.Error -> {
-                ErrorContent(
-                    message = conversationState.message,
-                    onRetry = { viewModel.retryConversationLoad() },
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            ConversationState.NoConversation -> {
-                NoConversationContent(modifier = Modifier.weight(1f))
-            }
-            is ConversationState.Ready -> {
-                if (state.isLoadingMessages && state.messages.isEmpty()) {
-                    MessageSkeletonList(modifier = Modifier.weight(1f))
-                } else if (state.error != null && state.messages.isEmpty()) {
-                    ErrorContent(
-                        message = state.error!!,
-                        onRetry = { viewModel.loadMessages() },
-                        modifier = Modifier.weight(1f),
-                    )
-                } else {
-                    ChatContent(
-                        state = state,
-                        scrollToMessageId = viewModel.scrollToMessageId,
-                        onSendMessage = { viewModel.sendMessage(it) },
-                        onLoadOlderMessages = { viewModel.loadOlderMessages() },
-                        onSubmitApproval = { requestId, toolCallIds, approve, reason ->
-                            viewModel.submitApproval(requestId, toolCallIds, approve, reason)
-                        },
-                        onInputTextChange = { viewModel.updateInputText(it) },
-                        activeFontScale = activeFontScale,
-                        onActiveFontScaleChange = { activeFontScale = it },
-                        onFontScaleChange = { viewModel.setChatFontScale(it) },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
+        val snackbarHostState = remember { SnackbarHostState() }
+
+        LaunchedEffect(state.composerError) {
+            val message = state.composerError ?: return@LaunchedEffect
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearComposerError()
         }
 
-        LettaInputBar(
-            text = inputText,
-            onTextChange = { newText ->
-                if (newText.endsWith("\n") && !state.isStreaming && inputText.isNotBlank()) {
-                    if (viewModel.tryHandleSlashCommand(inputText)) {
-                        viewModel.updateInputText("")
-                        onBugCommand?.invoke()
-                    } else {
-                        viewModel.sendMessage(inputText)
+        Box(modifier = modifier.fillMaxSize().then(backgroundModifier).imePadding()) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                when (val conversationState = state.conversationState) {
+                    ConversationState.Loading -> {
+                        MessageSkeletonList(modifier = Modifier.weight(1f))
                     }
-                } else {
-                    viewModel.updateInputText(newText)
+                    is ConversationState.Error -> {
+                        ErrorContent(
+                            message = conversationState.message,
+                            onRetry = { viewModel.retryConversationLoad() },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    ConversationState.NoConversation -> {
+                        NoConversationContent(modifier = Modifier.weight(1f))
+                    }
+                    is ConversationState.Ready -> {
+                        if (state.isLoadingMessages && state.messages.isEmpty()) {
+                            MessageSkeletonList(modifier = Modifier.weight(1f))
+                        } else if (state.error != null && state.messages.isEmpty()) {
+                            ErrorContent(
+                                message = state.error!!,
+                                onRetry = { viewModel.loadMessages() },
+                                modifier = Modifier.weight(1f),
+                            )
+                        } else {
+                            ChatContent(
+                                state = state,
+                                scrollToMessageId = viewModel.scrollToMessageId,
+                                onSendMessage = { viewModel.sendMessage(it) },
+                                onLoadOlderMessages = { viewModel.loadOlderMessages() },
+                                onSubmitApproval = { requestId, toolCallIds, approve, reason ->
+                                    viewModel.submitApproval(requestId, toolCallIds, approve, reason)
+                                },
+                                onInputTextChange = { viewModel.updateInputText(it) },
+                                activeFontScale = activeFontScale,
+                                onActiveFontScaleChange = { activeFontScale = it },
+                                onFontScaleChange = { viewModel.setChatFontScale(it) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
                 }
-            },
-            onSend = {
-                if (viewModel.tryHandleSlashCommand(it)) {
-                    viewModel.updateInputText("")
-                    onBugCommand?.invoke()
-                } else {
-                    viewModel.sendMessage(it)
-                }
-            },
-            placeholder = stringResource(R.string.screen_chat_input_hint),
-            sendContentDescription = stringResource(R.string.action_send_message),
-            enabled = !state.isStreaming && viewModel.canSendMessages,
-        )
-    }
+
+                val launchPicker = rememberImageAttachmentPicker(
+                    onPicked = { viewModel.addAttachment(it) },
+                    onError = { viewModel.reportComposerError(it) },
+                )
+                ChatComposer(
+                    inputText = inputText,
+                    pendingAttachments = state.pendingAttachments,
+                    isStreaming = state.isStreaming,
+                    canSendMessages = viewModel.canSendMessages,
+                    onTextChange = { newText ->
+                        if (newText.endsWith("\n") && !state.isStreaming &&
+                            (inputText.isNotBlank() || state.pendingAttachments.isNotEmpty())
+                        ) {
+                            if (viewModel.tryHandleSlashCommand(inputText)) {
+                                viewModel.updateInputText("")
+                                onBugCommand?.invoke()
+                            } else {
+                                viewModel.sendMessage(inputText)
+                            }
+                        } else {
+                            viewModel.updateInputText(newText)
+                        }
+                    },
+                    onSend = {
+                        if (viewModel.tryHandleSlashCommand(it)) {
+                            viewModel.updateInputText("")
+                            onBugCommand?.invoke()
+                        } else {
+                            viewModel.sendMessage(it)
+                        }
+                    },
+                    onRemoveAttachment = { viewModel.removeAttachment(it) },
+                    onAttachImage = launchPicker,
+                )
+            }
+
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp),
+            )
+        }
     }
 }
 

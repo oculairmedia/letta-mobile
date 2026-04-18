@@ -165,6 +165,8 @@
     <string name="screen_tools_create_action">Create Tool</string>
     
     <string name="action_send_message">Send message</string>
+    <string name="action_attach_image">Attach image</string>
+    <string name="action_remove_attachment">Remove attachment</string>
     <string name="screen_chat_input_placeholder">Type a message...</string>
     
     <string name="screen_agents_dialog_name_label">Agent Name</string>

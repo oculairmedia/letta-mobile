@@ -14,6 +14,18 @@ data class UiMessage(
     val generatedUi: UiGeneratedComponent? = null,
     val approvalRequest: UiApprovalRequest? = null,
     val approvalResponse: UiApprovalResponse? = null,
+    /**
+     * Image attachments rendered as thumbnails in the bubble. Populated for
+     * outgoing user messages that carried attachments through the Timeline
+     * send path.
+     */
+    val attachments: List<UiImageAttachment> = emptyList(),
+)
+
+@Immutable
+data class UiImageAttachment(
+    val base64: String,
+    val mediaType: String,
 )
 
 @Immutable

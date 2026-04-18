@@ -35,6 +35,11 @@ import com.letta.mobile.ui.icons.LettaIcons
  * @param sendContentDescription Accessibility label for the send button.
  * @param enabled Whether the send button is enabled (beyond the default non-blank check).
  * @param maxLines Maximum visible lines for the text field.
+ * @param canSendOverride Optional override for the send enablement check —
+ *   useful when the bar has non-text content staged (e.g. image attachments)
+ *   so Send is enabled with an empty text field.
+ * @param leadingContent Optional slot rendered to the left of the text field,
+ *   typically an attach button.
  */
 @Composable
 fun LettaInputBar(
@@ -46,9 +51,11 @@ fun LettaInputBar(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     maxLines: Int = 4,
+    canSendOverride: Boolean? = null,
+    leadingContent: (@Composable () -> Unit)? = null,
 ) {
     val colorScheme = MaterialTheme.colorScheme
-    val canSend = text.isNotBlank() && enabled
+    val canSend = (canSendOverride ?: text.isNotBlank()) && enabled
 
     Row(
         modifier = modifier
@@ -57,6 +64,7 @@ fun LettaInputBar(
         verticalAlignment = Alignment.Bottom,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        leadingContent?.invoke()
         TextField(
             value = text,
             onValueChange = onTextChange,

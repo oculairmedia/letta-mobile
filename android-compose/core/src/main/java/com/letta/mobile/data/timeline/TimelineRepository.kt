@@ -82,6 +82,16 @@ open class TimelineRepository @Inject constructor(
     suspend fun sendMessage(conversationId: String, content: String): String =
         getOrCreate(conversationId).send(content)
 
+    /**
+     * Send a user message with attached images. The text body may be blank if
+     * the user sends images only.
+     */
+    suspend fun sendMessage(
+        conversationId: String,
+        content: String,
+        attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>,
+    ): String = getOrCreate(conversationId).send(content, attachments)
+
     /** Retry a failed send. */
     suspend fun retry(conversationId: String, otid: String) {
         getOrCreate(conversationId).retry(otid)
