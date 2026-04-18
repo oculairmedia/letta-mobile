@@ -25,8 +25,27 @@ detekt {
 
 sentry {
     autoInstallation.enabled.set(true)
-    includeProguardMapping.set(true)
-    includeSourceContext.set(true)
+
+    // Gate ProGuard mapping + source-context upload on the auth token being
+    // present. sentry-cli needs SENTRY_AUTH_TOKEN + SENTRY_ORG + SENTRY_PROJECT
+    // (and SENTRY_URL for our self-hosted instance at sentry.oculair.ca) to
+    // push symbols. Without them, the upload tasks abort with
+    // "An organization ID or slug is required" and fail the build. Gating
+    // lets local builds (no secrets) and fork PRs succeed, while main-branch
+    // CI on the oculairmedia/letta-mobile repo (which has the secrets) still
+    // ships mapping files so stack traces stay deobfuscated.
+    val hasSentryAuth = !System.getenv("SENTRY_AUTH_TOKEN").isNullOrBlank()
+    includeProguardMapping.set(hasSentryAuth)
+    includeSourceContext.set(hasSentryAuth)
+
+    // Org / project / URL come from the environment (populated by CI from
+    // repo secrets — see .github/workflows/android.yml). Hard-defaulting
+    // here would lock us to a single Sentry instance; env-driven keeps the
+    // build portable.
+    System.getenv("SENTRY_ORG")?.takeIf { it.isNotBlank() }?.let { org.set(it) }
+    System.getenv("SENTRY_PROJECT")?.takeIf { it.isNotBlank() }?.let { projectName.set(it) }
+    System.getenv("SENTRY_URL")?.takeIf { it.isNotBlank() }?.let { url.set(it) }
+
     tracingInstrumentation {
         enabled.set(true)
     }

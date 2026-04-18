@@ -89,6 +89,15 @@ jobs:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          # Self-hosted Sentry config. The Sentry Gradle plugin's upload
+          # tasks (uploadSentryProguardMappingsRelease, sentryBundleSources*)
+          # read these from the environment. We gate the upload on the
+          # auth token being present via build.gradle.kts so forks / local
+          # builds without secrets continue to succeed.
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          SENTRY_URL: ${{ secrets.SENTRY_URL }}
         run: ./gradlew ${{ matrix.gradle_task }} --no-daemon --build-cache
 
       - name: Upload ${{ matrix.variant }} APK
