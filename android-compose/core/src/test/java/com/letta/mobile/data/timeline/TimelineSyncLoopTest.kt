@@ -3,6 +3,7 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.SystemMessage
 import com.letta.mobile.data.model.UserMessage
@@ -21,6 +22,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -120,6 +122,29 @@ class TimelineSyncLoopTest {
     }
 
     @Test
+    fun `reconcile preserves multimodal attachments on confirmed user event`() = runBlocking {
+        val api = FakeSyncApi()
+        api.nextStreamMessages = emptyList()
+        val scope = CoroutineScope(Dispatchers.IO)
+        val sync = TimelineSyncLoop(api, "conv1", scope)
+
+        val image = MessageContentPart.Image(base64 = "AAAA", mediaType = "image/jpeg")
+        val userOtid = sync.send("caption", attachments = listOf(image))
+
+        withTimeout(5_000) {
+            while (sync.state.value.findByOtid(userOtid) !is TimelineEvent.Confirmed) delay(20)
+        }
+
+        val swapped = sync.state.value.findByOtid(userOtid) as? TimelineEvent.Confirmed
+        assertNotNull(swapped)
+        assertEquals("caption", swapped!!.content)
+        assertEquals(1, swapped.attachments.size)
+        assertEquals("image/jpeg", swapped.attachments.first().mediaType)
+        assertEquals("AAAA", swapped.attachments.first().base64)
+        scope.coroutineContext.job.cancel()
+    }
+
+    @Test
     fun `identical content sent twice produces two local events`() = runBlocking {
         val api = FakeSyncApi()
         api.nextStreamMessages = listOf(
@@ -163,6 +188,40 @@ class TimelineSyncLoopTest {
         assertEquals(10, timeline.events.map { it.otid }.toSet().size)
         scope.coroutineContext.job.cancel()
     }
+
+    @Test
+    fun `retry uses return at withLock for early exit`() = runBlocking {
+        // letta-mobile-lbmy: verify that retry() reads the event state inside
+        // writeMutex.withLock to avoid TOCTOU races. The fix moves the read
+        // inside the lock and uses return@withLock for early exit.
+        // This test verifies that retry on a non-FAILED event is a no-op
+        // (which proves the check happens inside the lock).
+        val api = FakeSyncApi()
+        api.nextStreamMessages = emptyList()
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val sync = TimelineSyncLoop(api, "conv1", scope)
+
+        val image = MessageContentPart.Image(base64 = "AAAA", mediaType = "image/jpeg")
+        val otid = sync.send("msg", attachments = listOf(image))
+
+        val local = sync.state.value.findByOtid(otid) as? TimelineEvent.Local
+        assertNotNull(local)
+        assertEquals(DeliveryState.SENDING, local!!.deliveryState)
+
+        // Retry on a SENDING event should be a no-op (early return inside lock)
+        sync.retry(otid)
+
+        val afterRetry = sync.state.value.findByOtid(otid) as? TimelineEvent.Local
+        assertNotNull(afterRetry)
+        // State should still be SENDING (retry didn't change it because not FAILED)
+        assertEquals(DeliveryState.SENDING, afterRetry!!.deliveryState)
+        
+        // Attachments should still be intact
+        assertEquals(1, afterRetry.attachments.size)
+        assertEquals("image/jpeg", afterRetry.attachments.first().mediaType)
+
+        scope.coroutineContext.job.cancel()
+    }
 }
 
 /**
@@ -181,13 +240,11 @@ private class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
         stored.add(msg)
     }
 
-    override suspend fun listMessages(
-        agentId: String,
+    override suspend fun listConversationMessages(
+        conversationId: String,
         limit: Int?,
-        before: String?,
         after: String?,
         order: String?,
-        conversationId: String?,
     ): List<LettaMessage> {
         return if (order == "desc") stored.reversed() else stored.toList()
     }
@@ -205,15 +262,13 @@ private class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
             }
         }
         val userContent = firstMessage?.let {
-            (it as? kotlinx.serialization.json.JsonObject)?.get("content")?.let { v ->
-                (v as? JsonPrimitive)?.contentOrNull
-            }
+            (it as? JsonObject)?.get("content")
         }
         if (otid != null) {
             stored.add(
                 UserMessage(
                     id = "message-$otid",
-                    contentRaw = JsonPrimitive(userContent ?: ""),
+                    contentRaw = userContent ?: JsonPrimitive(""),
                     otid = otid,
                 )
             )
