@@ -52,8 +52,15 @@ android {
         versionName = "1.2.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        manifestPlaceholders["SENTRY_DSN"] = localProps.getProperty("sentry.dsn", "")
-        manifestPlaceholders["SENTRY_ENV"] = localProps.getProperty("sentry.environment", "development")
+        // Sentry config is read at runtime by [SentryInitializer] from
+        // generated string resources. See letta-mobile-o7ob.7 — manifest
+        // meta-data can't express a float like traces.sample-rate.
+        val sentryDsn = localProps.getProperty("sentry.dsn", "")
+        val sentryEnv = localProps.getProperty("sentry.environment", "development")
+        resValue("string", "sentry_dsn", sentryDsn)
+        resValue("string", "sentry_env", sentryEnv)
+        manifestPlaceholders["SENTRY_DSN"] = sentryDsn
+        manifestPlaceholders["SENTRY_ENV"] = sentryEnv
     }
 
     signingConfigs {
@@ -248,13 +255,15 @@ dependencies {
     // Background sync
     implementation("androidx.work:work-runtime-ktx:2.10.5")
 
-    // Sentry error tracking
+    // Sentry error tracking — initialized programmatically via
+    // androidx.startup in SentryInitializer. See letta-mobile-o7ob.7.
     implementation("io.sentry:sentry-android:7.19.1")
+    implementation("androidx.startup:startup-runtime:1.2.0")
 
     // Baseline Profile installer — reads the bundled profile and warms
     // AOT compilation on first launch. See letta-mobile-o7ob.2.1 and
     // letta-mobile-o7ob.2.4.
-    implementation("androidx.profileinstaller:profileinstaller:1.4.2")
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
     "baselineProfile"(project(":baselineprofile"))
 
     // Testing

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -15,19 +16,30 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.LettaMobile">
 
-        <!-- Sentry configuration -->
+        <!--
+          Sentry configuration.
+
+          The SDK is initialized programmatically in `SentryInitializer`
+          (via AndroidX Startup). We disable auto-init because
+          `io.sentry.traces.sample-rate` cannot be expressed as a
+          numeric manifest value — `ManifestMetadataReader.readDouble`
+          only reads `Bundle.getFloat`/`getInt`, so a `@string/...`
+          reference falls through to the -1 default and sampling is
+          silently disabled (see letta-mobile-o7ob.7).
+        -->
         <meta-data
-            android:name="io.sentry.dsn"
-            android:value="${SENTRY_DSN}" />
-        <meta-data
-            android:name="io.sentry.environment"
-            android:value="${SENTRY_ENV}" />
-        <meta-data
-            android:name="io.sentry.traces.sample-rate"
-            android:value="@string/sentry_traces_sample_rate" />
-        <meta-data
-            android:name="io.sentry.auto-session-tracking.enable"
-            android:value="true" />
+            android:name="io.sentry.auto-init"
+            android:value="false" />
+
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="com.letta.mobile.crash.SentryInitializer"
+                android:value="androidx.startup" />
+        </provider>
 
         <activity
             android:name=".MainActivity"
