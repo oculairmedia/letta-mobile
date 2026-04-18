@@ -80,6 +80,11 @@ class DashboardViewModelTest {
                 TestData.agent(id = "agent-2", name = "Agent Two"),
             )
         )
+        // Dashboard uses the dedicated count endpoint (commit 37421c7 —
+        // "use count endpoints instead of page size for stats"), not
+        // `agents.value.size`. The relaxed mock default for Int is 0,
+        // which made this test flake as "expected 2, was 0" (o7ob.6).
+        coEvery { agentRepository.countAgents() } returns 2
         coEvery { agentRepository.refreshAgents() } returns Unit
         every { agentRepository.getCachedAgent(any()) } answers {
             agentRepository.agents.value.firstOrNull { it.id == firstArg() }
@@ -92,6 +97,7 @@ class DashboardViewModelTest {
         every {
             conversationsRepository.conversations
         } returns MutableStateFlow(listOf(TestData.conversation(id = "conv-1", agentId = "agent-1")))
+        coEvery { conversationsRepository.countConversations() } returns 1
         coEvery { conversationsRepository.refresh() } returns Unit
 
         toolRepository = mockk(relaxed = true)
@@ -102,9 +108,11 @@ class DashboardViewModelTest {
                 TestData.tool(id = "tool-3"),
             )
         )
+        coEvery { toolRepository.countTools() } returns 3
         coEvery { toolRepository.refreshTools() } returns Unit
 
         blockRepository = mockk(relaxed = true)
+        coEvery { blockRepository.countBlocks() } returns 2
         coEvery { blockRepository.listAllBlocks() } returns listOf(
             TestData.block(id = "block-1"),
             TestData.block(id = "block-2", label = "human"),
