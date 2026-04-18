@@ -50,8 +50,8 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -125,7 +125,11 @@ fun AgentScaffold(
     val conversationId = viewModel.conversationId
     val projectContext = viewModel.projectContext
     val screenTitle = projectContext?.name ?: agentName.ifBlank { stringResource(R.string.screen_chat_title) }
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    // Compact top bar — was LargeFlexibleTopAppBar (~152dp expanded), now a
+    // standard TopAppBar at ~64dp. The chat surface is content-dense and
+    // doesn't benefit from a big collapsing hero header; the agent name fits
+    // fine in a single compact title row.
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     BackHandler(enabled = drawerState.isOpen) {
         scope.launch { drawerState.close() }
@@ -166,7 +170,7 @@ fun AgentScaffold(
             modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
             containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
             topBar = {
-                LargeFlexibleTopAppBar(
+                TopAppBar(
                     title = {
                         Text(
                             text = screenTitle,
@@ -174,7 +178,7 @@ fun AgentScaffold(
                             overflow = TextOverflow.Ellipsis,
                         )
                     },
-                    colors = LettaTopBarDefaults.largeTopAppBarColors(),
+                    colors = LettaTopBarDefaults.topAppBarColors(),
                     scrollBehavior = scrollBehavior,
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {
