@@ -1,0 +1,30 @@
+{
+  "$schema": "./baselines.schema.json",
+  "comment": [
+    "Performance baselines used by the macrobenchmark CI gate.",
+    "Every metric has a baseline (median of last known-good run) and a",
+    "tolerance (percentage above which a build is failed). Re-baselining",
+    "is an explicit commit to this file — see letta-mobile-o7ob.4.1."
+  ],
+  "metrics": {
+    "startup.cold.p95_ms": {
+      "baseline": null,
+      "tolerance_pct": 15,
+      "source": "StartupBenchmark.coldStartupCompilationPartial",
+      "metric": "timeToInitialDisplayMs"
+    },
+    "startup.warm.p95_ms": {
+      "baseline": null,
+      "tolerance_pct": 15,
+      "source": "StartupBenchmark.warmStartup",
+      "metric": "timeToInitialDisplayMs"
+    },
+    "scroll.jank.pct": {
+      "baseline": null,
+      "tolerance_pct": 20,
+      "source": "ScrollJankBenchmark.scrollChatListCompilationPartial",
+      "metric": "frameDurationCpuMs",
+      "aggregation": "jankCountPercent"
+    }
+  }
+}

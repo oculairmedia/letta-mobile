@@ -10,6 +10,7 @@ plugins {
     id("com.google.devtools.ksp")
     id("io.gitlab.arturbosch.detekt")
     id("io.sentry.android.gradle")
+    id("androidx.baselineprofile")
 }
 
 allOpen {
@@ -79,6 +80,22 @@ android {
             signingConfig = signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
+        // `benchmark` mirrors release (minified + shrunk) but is
+        // debuggable+profileable so Macrobenchmark can hook into it.
+        // Signed with the debug cert so `installRelease` keystores aren't
+        // needed on dev machines running benchmarks.
+        create("benchmark") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+            // `profileable` is what macrobench uses to read perf counters
+            // without pulling the debugger in.
+            isDebuggable = false
+            isProfileable = true
+            // Keep the app id suffix distinct so dev builds can coexist.
+            applicationIdSuffix = ".benchmark"
+            versionNameSuffix = "-benchmark"
+        }
     }
 
     compileOptions {
@@ -120,12 +137,32 @@ android {
         getByName("test") {
             java.srcDir("${project(":core").projectDir}/src/testFixtures/java")
         }
+        // The `benchmark` buildType (macrobenchmark target) uses the same
+        // no-op DebugPerformanceMonitor as release so benchmarks measure
+        // the production code path, not the debug instrumentation stack.
+        getByName("benchmark") {
+            java.srcDir("src/release/java")
+        }
     }
 }
 
 composeCompiler {
     reportsDestination = layout.buildDirectory.dir("compose_compiler")
     metricsDestination = layout.buildDirectory.dir("compose_compiler")
+}
+
+// Consumes the baseline profile produced by the :baselineprofile
+// module. The plugin automatically wires generated profiles into
+// release APKs so install-time AOT compilation warms the hot path.
+// See letta-mobile-o7ob.2.1.
+baselineProfile {
+    // Don't regenerate on every release build — generation requires a
+    // connected device. CI runs `:app:generateBenchmarkBaselineProfile`
+    // in a dedicated job.
+    automaticGenerationDuringBuild = false
+    // Check the generated profile into source control so local release
+    // builds (without a device) still ship with a profile.
+    saveInSrc = true
 }
 
 kotlin {
@@ -213,6 +250,12 @@ dependencies {
 
     // Sentry error tracking
     implementation("io.sentry:sentry-android:7.19.1")
+
+    // Baseline Profile installer — reads the bundled profile and warms
+    // AOT compilation on first launch. See letta-mobile-o7ob.2.1 and
+    // letta-mobile-o7ob.2.4.
+    implementation("androidx.profileinstaller:profileinstaller:1.4.2")
+    "baselineProfile"(project(":baselineprofile"))
 
     // Testing
     testImplementation("junit:junit:4.13.2")

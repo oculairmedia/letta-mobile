@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Macrobenchmark's self-instrumenting runner requires these. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
+    <application
+        android:largeHeap="true"
+        android:requestLegacyExternalStorage="true" />
+
+    <queries>
+        <package android:name="com.letta.mobile" />
+    </queries>
+
+</manifest>

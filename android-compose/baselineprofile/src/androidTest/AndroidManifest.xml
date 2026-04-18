@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Baseline profile generator needs access to the target app. -->
+    <queries>
+        <package android:name="com.letta.mobile.benchmark" />
+    </queries>
+</manifest>
