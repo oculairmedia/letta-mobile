@@ -326,10 +326,16 @@
     <string name="screen_chat_approval_submitting">Submitting…</string>
     <string name="screen_chat_approval_approved_title">Approved</string>
     <string name="screen_chat_approval_rejected_title">Rejected</string>
+    <string name="screen_chat_tool_approval_chip_approved">approved</string>
+    <string name="screen_chat_tool_approval_chip_rejected">rejected</string>
     <string name="channel_notifications_name">Agent updates</string>
     <string name="channel_notifications_description">Background delivery for new Letta messages</string>
     <string name="channel_notifications_fallback_title">Letta update</string>
     <string name="channel_notifications_fallback_text">Open the conversation to see the latest update.</string>
+    <string name="push_service_channel_name">Live chat sync</string>
+    <string name="push_service_channel_description">Keeps the app connected to the Letta server so incoming messages arrive in real time.</string>
+    <string name="push_service_notification_title">Letta chat sync active</string>
+    <string name="push_service_notification_text">Listening for new messages.</string>
     <string name="screen_chat_config_section">Agent Configuration</string>
     <string name="screen_chat_model_config_section">Model Config</string>
     <string name="common_context_window">Context Window</string>

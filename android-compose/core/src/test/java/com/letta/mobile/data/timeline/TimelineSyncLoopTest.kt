@@ -357,6 +357,267 @@ class TimelineSyncLoopTest {
 
         scope.coroutineContext.job.cancel()
     }
+
+    // --- letta-mobile-mge5.20: tool call / approval / return wiring --------
+
+    @Test
+    fun `hydrate attaches tool_return to its invoking ApprovalRequest`() = runBlocking {
+        val api = FakeSyncApi()
+        val reqId = "req-1"
+        val tcid = "toolu_abc"
+        val toolCall = com.letta.mobile.data.model.ToolCall(
+            id = tcid, name = "Bash", arguments = "{\"command\":\"echo hi\"}",
+        )
+        api.addStoredMessage(
+            com.letta.mobile.data.model.ApprovalRequestMessage(
+                id = reqId, toolCalls = listOf(toolCall),
+            )
+        )
+        api.addStoredMessage(
+            com.letta.mobile.data.model.ToolReturnMessage(
+                id = "ret-1",
+                toolCallId = tcid,
+                toolReturnRaw = JsonPrimitive("hi\n"),
+            )
+        )
+
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val sync = TimelineSyncLoop(api, "conv1", scope)
+        sync.hydrate()
+
+        val events = sync.state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
+        // The tool_return should NOT appear as a standalone event.
+        assertEquals(
+            "Expected exactly one bubble (the TOOL_CALL), not a separate TOOL_RETURN",
+            1, events.size,
+        )
+        val bubble = events.single()
+        assertEquals(TimelineMessageType.TOOL_CALL, bubble.messageType)
+        assertEquals("hi\n", bubble.toolReturnContent)
+        assertTrue("approvalDecided must be true once return observed", bubble.approvalDecided)
+
+        scope.coroutineContext.job.cancel()
+    }
+
+    @Test
+    fun `streamed tool_return attaches to tool_call event and flips approvalDecided`() = runBlocking {
+        val api = FakeSyncApi()
+        val reqId = "req-2"
+        val tcid = "toolu_xyz"
+        val toolCall = com.letta.mobile.data.model.ToolCall(
+            id = tcid, name = "Bash", arguments = "{\"command\":\"ls\"}",
+        )
+        // Seed the store with a user message so send has something to build from.
+        api.nextStreamMessages = listOf(
+            com.letta.mobile.data.model.ApprovalRequestMessage(
+                id = reqId, toolCalls = listOf(toolCall),
+            ),
+            com.letta.mobile.data.model.ToolReturnMessage(
+                id = "ret-2",
+                toolCallId = tcid,
+                toolReturnRaw = JsonPrimitive("file_a\nfile_b\n"),
+            ),
+        )
+        val scope = CoroutineScope(Dispatchers.IO)
+        val sync = TimelineSyncLoop(api, "conv1", scope)
+
+        sync.send("list files")
+
+        // Wait for the stream to drain and ingest.
+        withTimeout(2000) {
+            while (true) {
+                val confirmed = sync.state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
+                val tc = confirmed.firstOrNull { it.messageType == TimelineMessageType.TOOL_CALL }
+                if (tc != null && tc.toolReturnContent != null) break
+                delay(20)
+            }
+        }
+
+        val confirmed = sync.state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
+        val bubbleByType = confirmed.groupBy { it.messageType }
+        assertFalse(
+            "Standalone TOOL_RETURN event leaked through into the timeline",
+            bubbleByType.containsKey(TimelineMessageType.TOOL_RETURN),
+        )
+        val toolCallEvent = bubbleByType[TimelineMessageType.TOOL_CALL]?.single()
+        assertNotNull(toolCallEvent)
+        assertEquals("file_a\nfile_b\n", toolCallEvent!!.toolReturnContent)
+        assertTrue(toolCallEvent.approvalDecided)
+
+        scope.coroutineContext.job.cancel()
+    }
+
+    @Test
+    fun `tool_return with short discriminator is still dispatched via SseParser`() = runBlocking {
+        // letta-mobile-mge5.18 regression guard: SSE uses message_type="tool_return"
+        // (without _message). LettaMessageSerializer must accept both forms.
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; encodeDefaults = true }
+        val short = """{"message_type":"tool_return","id":"r1","tool_call_id":"tc1","tool_return":"done"}"""
+        val parsed = json.decodeFromString(
+            com.letta.mobile.data.model.LettaMessage.serializer(), short,
+        )
+        assertTrue(
+            "short-form discriminator must decode to ToolReturnMessage; got ${parsed::class.simpleName}",
+            parsed is com.letta.mobile.data.model.ToolReturnMessage,
+        )
+        val long = """{"message_type":"tool_return_message","id":"r2","tool_call_id":"tc2","tool_return":"ok"}"""
+        val parsedLong = json.decodeFromString(
+            com.letta.mobile.data.model.LettaMessage.serializer(), long,
+        )
+        assertTrue(parsedLong is com.letta.mobile.data.model.ToolReturnMessage)
+    }
+
+    @Test
+    fun `approval_response with short discriminator is dispatched via SseParser`() = runBlocking {
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; encodeDefaults = true }
+        val short = """{"message_type":"approval_response","id":"x","approval_request_id":"req-1","approve":true}"""
+        val parsed = json.decodeFromString(
+            com.letta.mobile.data.model.LettaMessage.serializer(), short,
+        )
+        assertTrue(
+            "short form must decode to ApprovalResponseMessage; got ${parsed::class.simpleName}",
+            parsed is com.letta.mobile.data.model.ApprovalResponseMessage,
+        )
+    }
+
+    @Test
+    fun `reasoning short and long discriminators both decode to ReasoningMessage`() = runBlocking {
+        // letta-mobile-mge5.22: SSE emits "reasoning"; REST emits
+        // "reasoning_message". Both must land in ReasoningMessage or inner
+        // thoughts disappear from the timeline.
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; encodeDefaults = true }
+        val short = """{"message_type":"reasoning","id":"r1","reasoning":"thinking..."}"""
+        val long = """{"message_type":"reasoning_message","id":"r2","reasoning":"thinking again"}"""
+        listOf(short, long).forEach { frame ->
+            val parsed = json.decodeFromString(
+                com.letta.mobile.data.model.LettaMessage.serializer(), frame,
+            )
+            assertTrue(
+                "Frame $frame decoded to ${parsed::class.simpleName} — expected ReasoningMessage",
+                parsed is com.letta.mobile.data.model.ReasoningMessage,
+            )
+        }
+    }
+
+    @Test
+    fun `all known discriminator pairs decode as expected`() = runBlocking {
+        // Regression guard for mge5.16/18/22 — whenever the server adds a
+        // new short discriminator we should catch it here first before the
+        // UI silently drops messages.
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; encodeDefaults = true }
+        data class Case(val frame: String, val expected: Class<*>)
+        val cases = listOf(
+            Case("""{"message_type":"user_message","id":"u","content":"hi"}""",
+                com.letta.mobile.data.model.UserMessage::class.java),
+            Case("""{"message_type":"assistant_message","id":"a","content":"ok"}""",
+                com.letta.mobile.data.model.AssistantMessage::class.java),
+            Case("""{"message_type":"system_message","id":"s","content":"sys"}""",
+                com.letta.mobile.data.model.SystemMessage::class.java),
+            Case("""{"message_type":"reasoning","id":"r","reasoning":"t"}""",
+                com.letta.mobile.data.model.ReasoningMessage::class.java),
+            Case("""{"message_type":"reasoning_message","id":"r","reasoning":"t"}""",
+                com.letta.mobile.data.model.ReasoningMessage::class.java),
+            Case("""{"message_type":"hidden_reasoning","id":"h","state":"redacted"}""",
+                com.letta.mobile.data.model.HiddenReasoningMessage::class.java),
+            Case("""{"message_type":"hidden_reasoning_message","id":"h","state":"redacted"}""",
+                com.letta.mobile.data.model.HiddenReasoningMessage::class.java),
+            Case("""{"message_type":"tool_call","id":"tc"}""",
+                com.letta.mobile.data.model.ToolCallMessage::class.java),
+            Case("""{"message_type":"tool_call_message","id":"tc"}""",
+                com.letta.mobile.data.model.ToolCallMessage::class.java),
+            Case("""{"message_type":"tool_return","id":"tr","tool_call_id":"x","tool_return":"r"}""",
+                com.letta.mobile.data.model.ToolReturnMessage::class.java),
+            Case("""{"message_type":"tool_return_message","id":"tr","tool_call_id":"x","tool_return":"r"}""",
+                com.letta.mobile.data.model.ToolReturnMessage::class.java),
+            Case("""{"message_type":"approval_request","id":"ar"}""",
+                com.letta.mobile.data.model.ApprovalRequestMessage::class.java),
+            Case("""{"message_type":"approval_request_message","id":"ar"}""",
+                com.letta.mobile.data.model.ApprovalRequestMessage::class.java),
+            Case("""{"message_type":"approval_response","id":"ap","approval_request_id":"r","approve":true}""",
+                com.letta.mobile.data.model.ApprovalResponseMessage::class.java),
+            Case("""{"message_type":"approval_response_message","id":"ap","approval_request_id":"r","approve":true}""",
+                com.letta.mobile.data.model.ApprovalResponseMessage::class.java),
+            Case("""{"message_type":"stop_reason","stop_reason":"end_turn"}""",
+                com.letta.mobile.data.model.StopReason::class.java),
+        )
+        cases.forEach { (frame, expected) ->
+            val parsed = json.decodeFromString(
+                com.letta.mobile.data.model.LettaMessage.serializer(), frame,
+            )
+            assertTrue(
+                "Frame $frame decoded to ${parsed::class.simpleName}; expected ${expected.simpleName}",
+                expected.isInstance(parsed),
+            )
+        }
+    }
+
+    @Test
+    fun `streamed approval_request followed by tool_return preserves output on later delta frame`() = runBlocking {
+        // letta-mobile-mge5.23: repro of the "approve/reject still visible
+        // + no output" symptom. Sequence of SSE frames observed in practice:
+        //   1. approval_request (streaming delta 1) with empty args
+        //   2. approval_request (streaming delta 2) with populated args
+        //   3. tool_return_message with the output
+        //   4. approval_request (final settling delta) with the same
+        //      server id but potentially empty fields — if this overwrites
+        //      the already-attached toolReturnContent, the UI regresses to
+        //      empty-output / approve-reject-visible state.
+        // The merge path in ingestStreamEvent must preserve existing
+        // toolReturnContent/approvalDecided/toolCalls on such deltas.
+        val api = FakeSyncApi()
+        val job = kotlinx.coroutines.Job()
+        val loop = TimelineSyncLoop(
+            conversationId = "conv-x",
+            messageApi = api,
+            scope = CoroutineScope(Dispatchers.Unconfined + job),
+        )
+        try {
+        loop.hydrate(limit = 50)
+
+        val approvalBase = com.letta.mobile.data.model.ApprovalRequestMessage(
+            id = "msg-ar-1",
+            runId = "run-1",
+            otid = "otid-ar-1",
+            toolCall = com.letta.mobile.data.model.ToolCall(
+                id = "toolu_xyz", name = "Bash", arguments = "{\"command\":\"echo ok\"}",
+            ),
+        )
+        // Frame 1: populated call
+        loop.ingestStreamEvent(approvalBase)
+        // Frame 2: tool_return for the call
+        val toolReturn = com.letta.mobile.data.model.ToolReturnMessage(
+            id = "msg-tr-1",
+            toolCallId = "toolu_xyz",
+            toolReturnRaw = kotlinx.serialization.json.JsonPrimitive("ok\n"),
+            status = "success",
+            runId = "run-1",
+        )
+        loop.ingestStreamEvent(toolReturn)
+        // Frame 3: settling delta with the same server id but blank args
+        val stale = com.letta.mobile.data.model.ApprovalRequestMessage(
+            id = "msg-ar-1",
+            runId = "run-1",
+            otid = "otid-ar-1",
+            toolCall = com.letta.mobile.data.model.ToolCall(
+                id = "toolu_xyz", name = "Bash", arguments = null,
+            ),
+        )
+        loop.ingestStreamEvent(stale)
+
+        val final = loop.state.value.events
+            .filterIsInstance<TimelineEvent.Confirmed>()
+            .firstOrNull { it.serverId == "msg-ar-1" }
+        assertNotNull("call event must still exist after settling delta", final)
+        assertTrue("approvalDecided must survive the settling delta", final!!.approvalDecided)
+        assertEquals("toolReturnContent must survive the settling delta", "ok\n", final.toolReturnContent)
+        // args should have been preserved from the populated earlier frame
+        val firstCall = final.toolCalls.firstOrNull()
+        assertNotNull(firstCall)
+        assertEquals("{\"command\":\"echo ok\"}", firstCall!!.arguments)
+        } finally {
+            job.cancel()
+        }
+    }
 }
 
 /**
@@ -448,3 +709,107 @@ private class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
 
 private val kotlinx.serialization.json.JsonPrimitive.contentOrNull: String?
     get() = if (isString) content else content.takeIf { it != "null" }
+
+/**
+ * mge5.24: image attachments must survive a process restart even when the
+ * server (correctly observed in production) drops user_message records that
+ * carry non-text content.
+ */
+class TimelineSyncLoopImageRestoreTest {
+
+    private class FakeStore : PendingLocalStore {
+        val rows = mutableMapOf<String, PendingLocalRecord>()
+        override suspend fun save(record: PendingLocalRecord) { rows[record.otid] = record }
+        override suspend fun delete(otid: String) { rows.remove(otid) }
+        override suspend fun load(conversationId: String): List<PendingLocalRecord> =
+            rows.values.filter { it.conversationId == conversationId }.sortedBy { it.sentAt }
+    }
+
+    @Test
+    fun `send with attachments writes to disk store synchronously`() = runBlocking {
+        val api = FakeSyncApi()
+        val store = FakeStore()
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val sync = TimelineSyncLoop(api, "conv-img", scope, pendingLocalStore = store)
+
+        val image = MessageContentPart.Image(base64 = "AAAA", mediaType = "image/png")
+        val otid = sync.send(content = "look at this", attachments = listOf(image))
+
+        // save() is invoked inline within send(); no scheduler advancement needed.
+        assertEquals(1, store.rows.size)
+        val saved = store.rows[otid]!!
+        assertEquals("conv-img", saved.conversationId)
+        assertEquals("look at this", saved.content)
+        assertEquals(1, saved.attachments.size)
+        assertEquals("AAAA", saved.attachments.first().base64)
+        scope.coroutineContext.job.cancel()
+    }
+
+    @Test
+    fun `hydrate restores disk-persisted Local when server has no matching otid`() = runBlocking {
+        // Mirrors the observed Letta behavior (mge5.24): the server stored
+        // an assistant reply but no user_message for the image send.
+        val api = FakeSyncApi()
+        api.addStoredMessage(AssistantMessage(id = "asst-1", contentRaw = JsonPrimitive("got it")))
+        val store = FakeStore()
+        val image = MessageContentPart.Image(base64 = "BBBB", mediaType = "image/png")
+        store.rows["otid-orphan"] = PendingLocalRecord(
+            otid = "otid-orphan",
+            conversationId = "conv-restore",
+            content = "from a previous session",
+            attachments = listOf(image),
+            sentAt = java.time.Instant.parse("2026-04-19T13:00:00Z"),
+        )
+
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val sync = TimelineSyncLoop(api, "conv-restore", scope, pendingLocalStore = store)
+        sync.hydrate()
+
+        val restored = sync.state.value.events.filterIsInstance<TimelineEvent.Local>()
+            .firstOrNull { it.otid == "otid-orphan" }
+        assertNotNull("Expected disk-persisted Local to be restored", restored)
+        assertEquals("from a previous session", restored!!.content)
+        assertEquals(1, restored.attachments.size)
+        assertEquals(DeliveryState.SENT, restored.deliveryState)
+        scope.coroutineContext.job.cancel()
+    }
+
+    @Test
+    fun `hydrate skips disk-persisted Local when server already has the otid`() = runBlocking {
+        // If the server eventually does start persisting image messages (or
+        // we left a stale row around for a text send), reconcile/hydrate must
+        // NOT double-render the bubble.
+        val api = FakeSyncApi()
+        api.addStoredMessage(UserMessage(id = "msg-1", contentRaw = JsonPrimitive("here"), otid = "otid-dup"))
+        val store = FakeStore()
+        store.rows["otid-dup"] = PendingLocalRecord(
+            otid = "otid-dup",
+            conversationId = "conv-dedup",
+            content = "here",
+            attachments = emptyList(),
+            sentAt = java.time.Instant.parse("2026-04-19T13:00:00Z"),
+        )
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val sync = TimelineSyncLoop(api, "conv-dedup", scope, pendingLocalStore = store)
+        sync.hydrate()
+
+        val withOtid = sync.state.value.events.filter { it.otid == "otid-dup" }
+        assertEquals("Expected exactly one event for otid-dup, not a duplicate", 1, withOtid.size)
+        assertTrue("Server-confirmed event should win over disk Local", withOtid.first() is TimelineEvent.Confirmed)
+        scope.coroutineContext.job.cancel()
+    }
+
+    @Test
+    fun `text-only send does not write to store`() = runBlocking {
+        val api = FakeSyncApi()
+        val store = FakeStore()
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val sync = TimelineSyncLoop(api, "conv-text", scope, pendingLocalStore = store)
+
+        sync.send(content = "just words")
+        kotlinx.coroutines.delay(50)
+        scope.coroutineContext.job.cancel()
+
+        assertEquals("Text-only sends must not be persisted", 0, store.rows.size)
+    }
+}

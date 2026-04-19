@@ -31,7 +31,12 @@ object ToolDisplayRegistry {
         val known = registry[toolName]
         if (known != null) {
             val detail = extractDetail(toolName, args)
-            return known.copy(detailLine = detail ?: known.detailLine)
+            // letta-mobile-mge5.19: prefer the extracted detail (e.g. the
+            // actual Bash command, file path, search query) as the PRIMARY
+            // header label — it's what the user wants to see at a glance.
+            // Fall back to the canned verb if we couldn't extract.
+            val label = detail ?: known.label
+            return known.copy(label = label, detailLine = null)
         }
         // Unknown tool — show first 60 chars of args as detail
         val detail = args?.take(60)?.let { if ((args.length) > 60) "$it…" else it }

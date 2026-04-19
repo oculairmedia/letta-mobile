@@ -51,8 +51,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.R
+import com.letta.mobile.data.model.ToolReturnStatus
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.MessageBubbleShape
@@ -534,6 +536,44 @@ internal fun MessageToolCalls(
     }
 }
 
+/**
+ * Compact, inline approval chip shown in the `ToolCallCard` header when a
+ * pre-tool approval decision was folded onto the call (letta-mobile-23h5).
+ *
+ * Keeps the visual footprint tiny (one word + a translucent pill) so it
+ * doesn't fight with the tool label or the expand chevron.
+ */
+@Composable
+private fun ApprovalChip(decision: UiToolApprovalDecision) {
+    val approved = decision == UiToolApprovalDecision.Approved
+    val container = if (approved) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+    } else {
+        MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
+    }
+    val text = if (approved) {
+        stringResource(R.string.screen_chat_tool_approval_chip_approved)
+    } else {
+        stringResource(R.string.screen_chat_tool_approval_chip_rejected)
+    }
+    val tint = if (approved) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.error
+    }
+    Surface(
+        shape = MaterialTheme.shapes.small,
+        color = container,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = tint,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+        )
+    }
+}
+
 @Composable
 private fun ToolCallCard(toolCall: UiToolCall) {
     val fontScale = LocalChatFontScale.current
@@ -541,7 +581,12 @@ private fun ToolCallCard(toolCall: UiToolCall) {
     val display = remember(toolCall.name, toolCall.arguments) {
         ToolDisplayRegistry.resolve(toolCall.name, toolCall.arguments)
     }
-    val isError = toolCall.status != null && toolCall.status != "success"
+    // Explicit-error-whitelist: only paint the Error icon / red color when
+    // the server actually said "error". Treating `null`, "completed", or any
+    // unrecognized value as error caused the long-running mis-labeling bug
+    // tracked in `letta-mobile-o9ce`. See ToolReturnStatus for the full
+    // empirical justification.
+    val isError = ToolReturnStatus.isError(toolCall.status)
     val codeStyle = MaterialTheme.chatTypography.codeBlock
 
     Card(
@@ -568,6 +613,13 @@ private fun ToolCallCard(toolCall: UiToolCall) {
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                // letta-mobile-23h5: folded-in approval decision. Rendered as
+                // a compact chip so the user can see "approved" / "rejected"
+                // without the old stack of redundant standalone pill bubbles.
+                toolCall.approvalDecision?.let { decision ->
+                    ApprovalChip(decision = decision)
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
                 if (isError) {
                     Icon(
                         imageVector = LettaIcons.Error,
@@ -632,18 +684,46 @@ private fun ToolCallCard(toolCall: UiToolCall) {
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    // Result
+                    // Result — inner collapsible (letta-mobile-mge5.19).
+                    // Default collapsed: show the result-label row with a
+                    // chevron + first-line preview. Tap expands to full.
                     toolCall.result?.let { result ->
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = if (isError) "Error" else "Result",
-                            style = MaterialTheme.typography.sectionTitle.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                            color = if (isError) {
-                                MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                            },
-                        )
+                        var resultExpanded by remember(toolCall.result) { mutableStateOf(false) }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { resultExpanded = !resultExpanded },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = if (isError) "Error" else "Output",
+                                style = MaterialTheme.typography.sectionTitle.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                                color = if (isError) {
+                                    MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                },
+                                modifier = Modifier.weight(1f),
+                            )
+                            val lineCount = result.count { it == '\n' } + 1
+                            if (lineCount > 1 || result.length > 80) {
+                                Text(
+                                    text = if (resultExpanded) "collapse" else "${lineCount} line${if (lineCount == 1) "" else "s"}",
+                                    style = MaterialTheme.typography.labelSmall.scaledBy(fontScale),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                            }
+                            Icon(
+                                imageVector = LettaIcons.ExpandMore,
+                                contentDescription = if (resultExpanded) "Collapse output" else "Expand output",
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .rotate(if (resultExpanded) 180f else 0f),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            )
+                        }
                         Text(
                             text = result,
                             style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
@@ -652,8 +732,9 @@ private fun ToolCallCard(toolCall: UiToolCall) {
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
                             },
-                            maxLines = 10,
+                            maxLines = if (resultExpanded) Int.MAX_VALUE else 2,
                             overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.animateContentSize(),
                         )
                     }
                 }

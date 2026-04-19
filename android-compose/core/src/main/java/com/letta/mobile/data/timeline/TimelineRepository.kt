@@ -26,6 +26,7 @@ import kotlinx.coroutines.sync.withLock
 @Singleton
 open class TimelineRepository @Inject constructor(
     private val messageApi: MessageApi,
+    private val pendingLocalStore: PendingLocalStore,
 ) {
     // Dedicated supervisor scope — child jobs fail in isolation.
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -34,44 +35,63 @@ open class TimelineRepository @Inject constructor(
     private val loopsMutex = Mutex()
 
     /**
+     * Listener the :app module can install to receive inbound-message events
+     * from every TimelineSyncLoop we manage. Used to post system notifications
+     * when messages arrive while the relevant chat isn't foregrounded.
+     * See letta-mobile-mge5. Set once at application startup.
+     */
+    @Volatile
+    var ingestedListener: IngestedMessageListener? = null
+
+    /**
      * Get or create the sync loop for the given conversation.
      *
      * The first call creates the loop and hydrates it from the server.
      * Subsequent calls return the cached loop without re-hydrating.
      */
     suspend fun getOrCreate(conversationId: String): TimelineSyncLoop {
-        loopsMutex.withLock {
-            loops[conversationId]?.let {
-                Telemetry.event(
-                    "TimelineRepo", "getOrCreate.cacheHit",
-                    "conversationId" to conversationId,
-                )
-                return it
-            }
+        // Fast path for already-cached loops.
+        loops[conversationId]?.let {
+            Telemetry.event(
+                "TimelineRepo", "getOrCreate.cacheHit",
+                "conversationId" to conversationId,
+            )
+            return it
+        }
+        // Mutex protects the map-insert critical section only (not hydrate).
+        // Hydrate used to run inside the mutex which serialized all concurrent
+        // warmup calls — an observed cause of "oldish state": conv-1598043a
+        // wasn't hydrated until ~15s after app start because earlier slots in
+        // the warmup list each held the lock for ~500ms. letta-mobile-mge5.
+        val loop = loopsMutex.withLock {
+            loops[conversationId]?.let { return@withLock it }
             Telemetry.event(
                 "TimelineRepo", "getOrCreate.cacheMiss",
                 "conversationId" to conversationId,
             )
-            val loop = TimelineSyncLoop(
+            val created = TimelineSyncLoop(
                 messageApi = messageApi,
                 conversationId = conversationId,
                 scope = scope,
+                ingestedListener = ingestedListener,
+                pendingLocalStore = pendingLocalStore,
             )
-            loops[conversationId] = loop
-            // Hydrate may fail (e.g. 404 on a brand-new conversation) — never
-            // let that propagate up and kill the chat screen. The user can
-            // still send messages; reconcile will fill in history afterwards.
-            runCatching { loop.hydrate() }.onFailure { t ->
-                Telemetry.error(
-                    "TimelineRepo", "hydrate.failed", t,
-                    "conversationId" to conversationId,
-                )
-                // Notify observers so they can clear loading state instead of
-                // spinning forever waiting for a Hydrated event that never comes.
-                runCatching { loop.emitHydrateFailed(t.message ?: "unknown") }
-            }
-            return loop
+            loops[conversationId] = created
+            created
         }
+        // Hydrate OUTSIDE the mutex so parallel callers don't block each other.
+        // If two callers race on the same conversationId, the second will find
+        // the loop in the map and short-circuit at the fast path — hydrate
+        // still only runs once per conv (first caller wins). The TimelineSync
+        // writeMutex inside hydrate() prevents concurrent state mutation.
+        runCatching { loop.hydrate() }.onFailure { t ->
+            Telemetry.error(
+                "TimelineRepo", "hydrate.failed", t,
+                "conversationId" to conversationId,
+            )
+            runCatching { loop.emitHydrateFailed(t.message ?: "unknown") }
+        }
+        return loop
     }
 
     /** Observe a conversation's timeline state. */

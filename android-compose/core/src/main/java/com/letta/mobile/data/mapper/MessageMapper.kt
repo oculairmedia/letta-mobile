@@ -12,6 +12,8 @@ import com.letta.mobile.data.model.GeneratedUiPayload
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageType
 import com.letta.mobile.data.model.ReasoningMessage
+import com.letta.mobile.data.model.SystemMessage
+import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.model.UserMessage
@@ -21,6 +23,7 @@ import com.letta.mobile.data.model.UiApprovalResponse
 import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.data.model.UiToolCall
 import java.time.Instant
 import kotlinx.serialization.json.Json
@@ -62,7 +65,11 @@ fun LettaMessage.toAppMessage(state: MessageMappingState): AppMessage? {
             id = id,
             date = date?.toInstant() ?: Instant.now(),
             messageType = MessageType.USER,
-            content = content
+            content = content,
+            // letta-mobile-mge5.24: carry any inline image parts through so
+            // re-hydrating history from /messages shows the original image
+            // bubble instead of a text-only placeholder.
+            attachments = attachments,
         )
         is AssistantMessage -> {
             val generatedUi = extractGeneratedUi(contentRaw)
@@ -74,6 +81,7 @@ fun LettaMessage.toAppMessage(state: MessageMappingState): AppMessage? {
                     if (generatedUi != null) "" else content
                 },
                 generatedUi = generatedUi,
+                attachments = attachments,
             )
         }
         is ReasoningMessage -> AppMessage(
@@ -159,11 +167,110 @@ fun LettaMessage.toAppMessage(state: MessageMappingState): AppMessage? {
     }
 }
 
+/**
+ * Folded approval decision resolved from an `APPROVAL_RESPONSE` payload that
+ * targets a specific tool call. Emitted by [buildFoldedApprovalIndex] and
+ * consumed by [toUiMessages] when attaching a chip to the tool-call card.
+ *
+ * `carriedReason` is true when the underlying response also supplied a reason
+ * string — in that case we still keep the standalone approval card around so
+ * the note is visible (letta-mobile-23h5).
+ */
+private data class FoldedToolApproval(
+    val decision: UiToolApprovalDecision,
+    val carriedReason: Boolean,
+    val sourceMessageId: String,
+)
+
+/**
+ * Pre-scan the flat message list for `APPROVAL_RESPONSE` events and index any
+ * per-call decisions by `toolCallId`. Only top-level-explicit or per-call
+ * decisions are returned — bare `approve=null` bookkeeping echoes are left
+ * alone (those are dropped entirely by the existing APPROVAL_RESPONSE branch).
+ */
+private fun List<AppMessage>.buildFoldedApprovalIndex(): Map<String, FoldedToolApproval> {
+    val index = mutableMapOf<String, FoldedToolApproval>()
+    for (msg in this) {
+        if (msg.messageType != MessageType.APPROVAL_RESPONSE) continue
+        val response = msg.approvalResponse ?: continue
+        val topLevelReason = response.reason?.takeIf { it.isNotBlank() }
+        // When the response only carries a top-level approve=true/false (no
+        // per-call breakdown), fold it onto whatever tool calls the matching
+        // request was about. We don't have that linkage here without walking
+        // the APPROVAL_REQUEST, so leave those as standalone cards for now —
+        // the common Letta Code case populates per-call `approvals[]`.
+        for (decision in response.approvals) {
+            val toolCallId = decision.toolCallId.takeIf { it.isNotBlank() } ?: continue
+            val decided = decision.approved ?: continue
+            val reasonBlank = decision.reason.isNullOrBlank() && topLevelReason == null
+            index[toolCallId] = FoldedToolApproval(
+                decision = if (decided) UiToolApprovalDecision.Approved else UiToolApprovalDecision.Rejected,
+                carriedReason = !reasonBlank,
+                sourceMessageId = msg.id,
+            )
+        }
+    }
+    return index
+}
+
 fun List<AppMessage>.toUiMessages(): List<UiMessage> {
     val returnsByCallId = mutableMapOf<String, AppMessage>()
     for (msg in this) {
         if (msg.messageType == MessageType.TOOL_RETURN && !msg.toolCallId.isNullOrBlank()) {
             returnsByCallId[msg.toolCallId] = msg
+        }
+    }
+
+    // The set of tool-call ids that will actually produce a visible bubble in
+    // this render. A folded approval decision can only silently replace its
+    // standalone card if the target tool call is going to be present — if it
+    // never arrived (e.g. a rogue approval_response with no matching
+    // tool_call_message) the decision would be invisible, which would regress
+    // the legacy behaviour.
+    val renderedToolCallIds = buildSet {
+        for (msg in this@toUiMessages) {
+            if (msg.messageType == MessageType.TOOL_CALL || msg.messageType == MessageType.TOOL_RETURN) {
+                msg.toolCallId?.takeIf { it.isNotBlank() }?.let { add(it) }
+            }
+        }
+    }
+
+    val foldedApprovals = buildFoldedApprovalIndex()
+        .filterKeys { it in renderedToolCallIds }
+    // APPROVAL_RESPONSE source messages whose per-call decisions were ALL
+    // absorbed (and which carried no user-written reason) can be suppressed
+    // entirely. Anything else — a reason, a rejection, or decisions that
+    // didn't match any tool call — falls through to the standalone card.
+    val fullyAbsorbedResponseIds = mutableSetOf<String>()
+    run {
+        val responsesToDecisions = mutableMapOf<String, MutableList<FoldedToolApproval>>()
+        for ((_, folded) in foldedApprovals) {
+            responsesToDecisions.getOrPut(folded.sourceMessageId) { mutableListOf() }.add(folded)
+        }
+        for (msg in this) {
+            if (msg.messageType != MessageType.APPROVAL_RESPONSE) continue
+            val response = msg.approvalResponse ?: continue
+            val folded = responsesToDecisions[msg.id].orEmpty()
+            if (folded.isEmpty()) continue
+            // Every per-call decision in the response must be (a) explicit
+            // (approve != null), (b) target a tool call that will actually
+            // render, and (c) be the Approved kind with no reason. Anything
+            // else falls through to the standalone card so the user can still
+            // see the outcome.
+            val explicitPerCall = response.approvals.filter {
+                !it.toolCallId.isNullOrBlank() && it.approved != null
+            }
+            if (explicitPerCall.isEmpty()) continue
+            if (explicitPerCall.any { it.toolCallId !in renderedToolCallIds }) continue
+            if (folded.size != explicitPerCall.size) continue
+            if (folded.any { it.carriedReason }) continue
+            if (!response.reason.isNullOrBlank()) continue
+            // Only absorb Approved decisions silently. A Rejected outcome is
+            // consequential enough on its own that we keep the standalone
+            // card even without a reason — users should always see a
+            // rejection spelled out.
+            if (folded.any { it.decision == UiToolApprovalDecision.Rejected }) continue
+            fullyAbsorbedResponseIds.add(msg.id)
         }
     }
 
@@ -221,6 +328,7 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                     arguments = arguments,
                     result = returnContent,
                     status = returnStatus,
+                    approvalDecision = msg.toolCallId?.let { foldedApprovals[it]?.decision },
                 )
                 result.add(UiMessage(
                     id = msg.id,
@@ -270,6 +378,7 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                     arguments = "",
                     result = msg.content.ifBlank { null },
                     status = msg.toolReturnStatus,
+                    approvalDecision = msg.toolCallId?.let { foldedApprovals[it]?.decision },
                 )
                 result.add(UiMessage(
                     id = msg.id,
@@ -300,6 +409,14 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                     response.approved != null ||
                     response.approvals.any { it.approved != null }
                 )
+                // letta-mobile-23h5: if every per-call decision was silently
+                // absorbed onto its tool-call card (approve=true, no reason),
+                // skip the standalone "Approved" bubble altogether — the chip
+                // on the tool card carries the same info without polluting
+                // the timeline with redundant pills.
+                if (msg.id in fullyAbsorbedResponseIds) {
+                    continue
+                }
                 if (hasExplicitDecision) {
                     result.add(msg.toUiMessage())
                 }
@@ -413,6 +530,12 @@ fun AppMessage.toUiMessage(): UiMessage {
                     )
                 },
             )
+        },
+        // letta-mobile-mge5.24: surface inline image parts extracted during
+        // AppMessage mapping. USER/ASSISTANT bubbles will render a
+        // MessageAttachmentsGrid alongside the text content.
+        attachments = attachments.map {
+            UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
         },
     )
 }

@@ -107,6 +107,66 @@ class MessageMapperTest : WordSpec({
             uiMsg.toolCalls!!.first().name shouldBe "tool"
             uiMsg.toolCalls!!.first().result shouldBe "result data"
         }
+
+        "propagate inline image attachments on user messages (letta-mobile-mge5.24)" {
+            val img = com.letta.mobile.data.model.MessageContentPart.Image(
+                base64 = "AAAA",
+                mediaType = "image/png",
+            )
+            val appMsg = com.letta.mobile.data.model.AppMessage(
+                id = "u1",
+                date = java.time.Instant.parse("2024-03-15T10:00:00Z"),
+                messageType = MessageType.USER,
+                content = "caption",
+                attachments = listOf(img),
+            )
+            val uiMsg = appMsg.toUiMessage()
+            uiMsg.attachments shouldHaveSize 1
+            uiMsg.attachments.first().base64 shouldBe "AAAA"
+            uiMsg.attachments.first().mediaType shouldBe "image/png"
+        }
+
+        "hydrate UserMessage.contentRaw image parts end-to-end through toAppMessages" {
+            // Simulates what history-hydration actually sees on the wire:
+            // a user_message with a multimodal content array whose image
+            // part uses source.type=letta with inline data (the real shape
+            // the Letta server returns for persisted image uploads).
+            val contentRaw = kotlinx.serialization.json.buildJsonArray {
+                add(kotlinx.serialization.json.buildJsonObject {
+                    put("type", kotlinx.serialization.json.JsonPrimitive("text"))
+                    put("text", kotlinx.serialization.json.JsonPrimitive("look"))
+                })
+                add(kotlinx.serialization.json.buildJsonObject {
+                    put("type", kotlinx.serialization.json.JsonPrimitive("image"))
+                    put("source", kotlinx.serialization.json.buildJsonObject {
+                        put("type", kotlinx.serialization.json.JsonPrimitive("letta"))
+                        put("file_id", kotlinx.serialization.json.JsonPrimitive("file-xyz"))
+                        put("media_type", kotlinx.serialization.json.JsonPrimitive("image/jpeg"))
+                        put("data", kotlinx.serialization.json.JsonPrimitive("HYDRATED+/=="))
+                    })
+                })
+            }
+            val userMessage = com.letta.mobile.data.model.UserMessage(
+                id = "user-history-1",
+                contentRaw = contentRaw,
+            )
+
+            val appMessages = listOf<com.letta.mobile.data.model.LettaMessage>(userMessage).toAppMessages()
+            appMessages shouldHaveSize 1
+            val app = appMessages.first()
+            app.messageType shouldBe MessageType.USER
+            app.content shouldBe "look"
+            app.attachments shouldHaveSize 1
+            app.attachments.first().base64 shouldBe "HYDRATED+/=="
+            app.attachments.first().mediaType shouldBe "image/jpeg"
+
+            val uiMessages = appMessages.toUiMessages()
+            uiMessages shouldHaveSize 1
+            val ui = uiMessages.first()
+            ui.role shouldBe "user"
+            ui.attachments shouldHaveSize 1
+            ui.attachments.first().base64 shouldBe "HYDRATED+/=="
+        }
     }
 
     "List<AppMessage>.toUiMessages" should {
@@ -449,6 +509,127 @@ class MessageMapperTest : WordSpec({
 
             ui shouldHaveSize 1
             ui[0].approvalResponse!!.approved shouldBe true
+        }
+
+        // letta-mobile-23h5: Bash/Edit/etc. tool calls in bypassPermissions
+        // sessions used to emit THREE UI items for every approved call: the
+        // tool-call card, the tool-return, and a standalone "Approved" pill
+        // bubble from the matching approval_response_message. The pill had
+        // no context (no tool name, no command, no output), just the word
+        // "Approved". We now fold the approve=true decision onto the
+        // originating tool-call card as a chip and drop the pill bubble.
+        "fold approve=true decision onto the owning tool-call card" {
+            val messages = listOf(
+                TestData.appMessage(
+                    id = "tool-call-1",
+                    messageType = MessageType.TOOL_CALL,
+                    content = "{\"command\":\"ls\"}",
+                    toolName = "Bash",
+                    toolCallId = "tc-1",
+                ),
+                ApprovalResponseMessage(
+                    id = "approval-response-fold-1",
+                    approvalRequestId = "approval-1",
+                    approve = null,
+                    reason = null,
+                    approvals = listOf(
+                        ApprovalResult(
+                            toolCallId = "tc-1",
+                            approve = true,
+                            status = "approved",
+                            reason = null,
+                        )
+                    ),
+                ).toAppMessage()!!,
+            )
+
+            val ui = messages.toUiMessages()
+
+            // Only the tool-call card survives — no redundant "Approved" pill.
+            ui shouldHaveSize 1
+            ui[0].role shouldBe "tool"
+            val toolCall = ui[0].toolCalls!!.single()
+            toolCall.name shouldBe "Bash"
+            toolCall.approvalDecision shouldBe
+                com.letta.mobile.data.model.UiToolApprovalDecision.Approved
+        }
+
+        // Rejections are consequential — the user should always see them
+        // spelled out. Keep the standalone approval card AND fold the
+        // decision onto the tool call so the card's chip shows Rejected too.
+        "keep standalone card but still fold decision when approve=false" {
+            val messages = listOf(
+                TestData.appMessage(
+                    id = "tool-call-rej",
+                    messageType = MessageType.TOOL_CALL,
+                    content = "{\"command\":\"rm -rf /\"}",
+                    toolName = "Bash",
+                    toolCallId = "tc-rej",
+                ),
+                ApprovalResponseMessage(
+                    id = "approval-response-rej-1",
+                    approvalRequestId = "approval-rej",
+                    approve = false,
+                    reason = "Unsafe command",
+                    approvals = listOf(
+                        ApprovalResult(
+                            toolCallId = "tc-rej",
+                            approve = false,
+                            status = "rejected",
+                            reason = "Unsafe command",
+                        )
+                    ),
+                ).toAppMessage()!!,
+            )
+
+            val ui = messages.toUiMessages()
+
+            ui shouldHaveSize 2
+            val toolUi = ui.single { it.role == "tool" }
+            toolUi.toolCalls!!.single().approvalDecision shouldBe
+                com.letta.mobile.data.model.UiToolApprovalDecision.Rejected
+            val approvalUi = ui.single { it.approvalResponse != null }
+            approvalUi.approvalResponse!!.approved shouldBe false
+            approvalUi.approvalResponse!!.reason shouldBe "Unsafe command"
+        }
+
+        // When the operator attached a reason to an approve=true (rare but
+        // meaningful) we must keep the standalone card so the note is
+        // visible. The tool-card chip still shows Approved.
+        "keep standalone card when approve=true carried a reason" {
+            val messages = listOf(
+                TestData.appMessage(
+                    id = "tool-call-note",
+                    messageType = MessageType.TOOL_CALL,
+                    content = "{}",
+                    toolName = "Edit",
+                    toolCallId = "tc-note",
+                ),
+                ApprovalResponseMessage(
+                    id = "approval-response-note-1",
+                    approvalRequestId = "approval-note",
+                    approve = true,
+                    reason = "Approved because this path is known-safe",
+                    approvals = listOf(
+                        ApprovalResult(
+                            toolCallId = "tc-note",
+                            approve = true,
+                            status = "approved",
+                            reason = null,
+                        )
+                    ),
+                ).toAppMessage()!!,
+            )
+
+            val ui = messages.toUiMessages()
+
+            ui shouldHaveSize 2
+            val toolUi = ui.single { it.role == "tool" }
+            toolUi.toolCalls!!.single().approvalDecision shouldBe
+                com.letta.mobile.data.model.UiToolApprovalDecision.Approved
+            val approvalUi = ui.single { it.approvalResponse != null }
+            approvalUi.approvalResponse!!.reason shouldBe
+                "Approved because this path is known-safe"
         }
     }
 

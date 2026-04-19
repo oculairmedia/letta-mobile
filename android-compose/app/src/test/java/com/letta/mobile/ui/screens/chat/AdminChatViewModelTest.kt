@@ -158,6 +158,7 @@ class AdminChatViewModelTest {
             conversationRepository,
             settingsRepository,
             internalBotClient,
+            com.letta.mobile.channel.CurrentConversationTracker(),
         )
     }
 
@@ -356,6 +357,7 @@ class AdminChatViewModelTest {
             conversationRepository,
             settingsRepository,
             internalBotClient,
+            com.letta.mobile.channel.CurrentConversationTracker(),
         )
 
         val project = vm.projectContext
@@ -456,6 +458,7 @@ class AdminChatViewModelTest {
             conversationRepository,
             settingsRepository,
             internalBotClient,
+            com.letta.mobile.channel.CurrentConversationTracker(),
         )
         advanceUntilIdle()
 
@@ -494,6 +497,7 @@ class AdminChatViewModelTest {
             conversationRepository,
             settingsRepository,
             internalBotClient,
+            com.letta.mobile.channel.CurrentConversationTracker(),
         )
         advanceUntilIdle()
 
@@ -542,6 +546,7 @@ class AdminChatViewModelTest {
             conversationRepository,
             settingsRepository,
             internalBotClient,
+            com.letta.mobile.channel.CurrentConversationTracker(),
         )
         advanceUntilIdle()
 
@@ -574,6 +579,7 @@ class AdminChatViewModelTest {
             conversationRepository,
             settingsRepository,
             internalBotClient,
+            com.letta.mobile.channel.CurrentConversationTracker(),
         )
 
         assertTrue(vm.tryHandleSlashCommand("/bug"))
@@ -601,6 +607,7 @@ class AdminChatViewModelTest {
             conversationRepository,
             settingsRepository,
             internalBotClient,
+            com.letta.mobile.channel.CurrentConversationTracker(),
         )
         advanceUntilIdle()
 
@@ -626,4 +633,74 @@ class AdminChatViewModelTest {
         assertTrue(vm.uiState.value.bugReports.recentReports.any { it.title == "Crash on sync" })
     }
 
+    /**
+     * Regression for letta-mobile-nw2e.
+     *
+     * The prior `startTimelineObserver` used `if (timelineObserverJob?.isActive == true) return`,
+     * which silently ignored conversation switches: once the observer was
+     * bound to conv-A, selecting conv-B would NOT rebind. The user then sat
+     * on conv-B's screen watching it never update because no TimelineSync
+     * loop was ever started for conv-B.
+     *
+     * Acceptance: when the viewmodel is asked to resolve a different
+     * conversation after the first one, `timelineRepository.observe(convB)`
+     * AND `getOrCreate(convB)` must both be invoked at least once. Using
+     * atLeast=1 so we're resilient to internal retries or repeated binds.
+     */
+    @Test
+    fun `switching conversations triggers fresh timeline observer bind`() = runTest {
+        // Seed the conversation manager to resolve to "conv-A" first.
+        activeConversationIds["agent-1"] = "conv-A"
+
+        val vm = createViewModel(agentId = "agent-1", conversationId = "conv-A")
+        advanceUntilIdle()
+
+        // Capture arguments of every observe() + getOrCreate() call the VM
+        // has made so far. Baseline MUST include conv-A.
+        coVerify(atLeast = 1) { timelineRepository.observe("conv-A") }
+        coVerify(atLeast = 1) { timelineRepository.getOrCreate("conv-A") }
+
+        // Simulate user picking conv-B in the conversation picker. The
+        // production flow invokes conversationManager.setActiveConversation()
+        // and then retryConversationLoad() (== resolveConversationAndLoad()).
+        activeConversationIds["agent-1"] = "conv-B"
+        vm.retryConversationLoad()
+        advanceUntilIdle()
+
+        // The fix: observer must rebind to conv-B. If nw2e regresses,
+        // these verifications fail because the old `isActive == true`
+        // guard short-circuits and conv-B is never observed.
+        coVerify(atLeast = 1) { timelineRepository.observe("conv-B") }
+        coVerify(atLeast = 1) { timelineRepository.getOrCreate("conv-B") }
+    }
+
+    /**
+     * Regression for letta-mobile-nw2e (companion): staying on the SAME
+     * conversation must remain idempotent. We don't want the fix to cause
+     * a storm of rebinds if some caller invokes `startTimelineObserver`
+     * repeatedly for the same id (e.g. send → start observer defensively).
+     *
+     * We check observe() is called at most a small bounded number of times
+     * when the conversation id doesn't change. The exact count depends on
+     * how many internal paths hit startTimelineObserver, but it must be
+     * well under 10× the nominal single bind.
+     */
+    @Test
+    fun `same-conversation repeat calls do not storm rebinds`() = runTest {
+        activeConversationIds["agent-1"] = "conv-A"
+        val vm = createViewModel(agentId = "agent-1", conversationId = "conv-A")
+        advanceUntilIdle()
+
+        // Simulate several calls in quick succession (same conv id). In
+        // production these can happen when the user spam-taps a retry, or
+        // the send path + the resolver both wire up the observer.
+        repeat(5) {
+            vm.retryConversationLoad()
+            advanceUntilIdle()
+        }
+
+        // Hard upper bound: something is badly wrong if we've rebound more
+        // than 10× for a single conversation.
+        coVerify(atMost = 10) { timelineRepository.observe("conv-A") }
+    }
 }

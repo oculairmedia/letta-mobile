@@ -58,6 +58,27 @@ sealed class TimelineEvent {
         val runId: String?,
         val stepId: String?,
         override val attachments: List<MessageContentPart.Image> = emptyList(),
+        // Populated for TOOL_CALL events (ToolCallMessage + ApprovalRequestMessage).
+        // letta-mobile-mge5.14: without these the UI dropped tool calls entirely
+        // because the VM->UiMessage mapper couldn't reconstruct structured args.
+        val toolCalls: List<com.letta.mobile.data.model.ToolCall> = emptyList(),
+        // Populated for ApprovalRequestMessage so the UI can surface an
+        // approve/reject affordance tied to the original request.
+        val approvalRequestId: String? = null,
+        // True once an ApprovalResponseMessage for this request has been seen
+        // (either from the stream, the send echo, or reconcile). The UI hides
+        // the approve/reject buttons once decided. letta-mobile-mge5.15: before
+        // this, every tool call still showed approve/reject buttons even after
+        // the server had already auto-approved them.
+        val approvalDecided: Boolean = false,
+        // Attached ToolReturnMessage output body, if one has been observed for
+        // any of this event's tool calls. letta-mobile-mge5.19: previously
+        // tool_return_messages rendered as their own separate bubble, making
+        // the command/output relationship hard to read. Now attached directly
+        // to the invoking TOOL_CALL event so the UI can show command +
+        // collapsible output in a single card.
+        val toolReturnContent: String? = null,
+        val toolReturnIsError: Boolean = false,
     ) : TimelineEvent()
 }
 
@@ -132,6 +153,15 @@ data class Timeline(
     fun findByOtid(otid: String): TimelineEvent? = events.firstOrNull { it.otid == otid }
 
     /**
+     * Find an event by its server message id. Used by the resume-stream
+     * subscriber to dedupe events that may arrive via both the stream and
+     * a concurrent reconcile. See letta-mobile-mge5.
+     */
+    fun findByServerId(serverId: String): TimelineEvent.Confirmed? =
+        events.firstOrNull { it is TimelineEvent.Confirmed && it.serverId == serverId } as? TimelineEvent.Confirmed
+
+
+    /**
      * Append a new event at the end.
      *
      * In production this tolerates invariant violations (duplicate otid or
@@ -201,6 +231,30 @@ data class Timeline(
         val newEvents = if (insertIdx == -1) events + event
                        else events.toMutableList().also { it.add(insertIdx, event) }
         return copy(events = newEvents)
+    }
+
+    /**
+     * Replace an existing Confirmed event with an updated one that carries the
+     * same server id. Used by the resume-stream subscriber to apply token
+     * deltas — each delta frame carries the message's server id but has a
+     * growing `content`/`arguments` payload. Without in-place replacement,
+     * deltas would be dropped by server-id dedupe and the UI would appear
+     * choppy — it would only update once per terminal envelope.
+     *
+     * Preserves the original event's [position] so visual ordering doesn't
+     * jitter across deltas. Returns this timeline unchanged if no event with
+     * the given serverId exists (caller should append instead).
+     *
+     * Added for letta-mobile-mge5.
+     */
+    fun replaceByServerId(confirmed: TimelineEvent.Confirmed): Timeline {
+        val idx = events.indexOfFirst {
+            it is TimelineEvent.Confirmed && it.serverId == confirmed.serverId
+        }
+        if (idx == -1) return this
+        val existing = events[idx] as TimelineEvent.Confirmed
+        val stabilized = confirmed.copy(position = existing.position)
+        return copy(events = events.toMutableList().also { it[idx] = stabilized })
     }
 
     /** Mark a Local event as [DeliveryState.SENT]. No-op for Confirmed events. */

@@ -17,7 +17,9 @@ data class UiMessage(
     /**
      * Image attachments rendered as thumbnails in the bubble. Populated for
      * outgoing user messages that carried attachments through the Timeline
-     * send path.
+     * send path, and — since letta-mobile-mge5.24 — for USER/ASSISTANT
+     * messages hydrated from server history whose `content` is a multimodal
+     * JSON array containing inline image parts.
      */
     val attachments: List<UiImageAttachment> = emptyList(),
 )
@@ -34,7 +36,29 @@ data class UiToolCall(
     val arguments: String,
     val result: String?,
     val status: String? = null,
+    /**
+     * Folded-in approval outcome for this specific tool call, when the mapper
+     * absorbed a bare `approve=true` / `approve=false` `APPROVAL_RESPONSE`
+     * into the owning tool-call bubble instead of emitting a standalone
+     * "Approved" / "Rejected" card (letta-mobile-23h5).
+     *
+     * `null` means no decision is attached — either because the call didn't
+     * need approval, because the response carried a reason (in which case the
+     * standalone card is retained so the note is visible), or because the
+     * decision hasn't arrived yet.
+     */
+    val approvalDecision: UiToolApprovalDecision? = null,
 )
+
+/**
+ * Compact, inline representation of an approval decision for display on the
+ * tool-call card header (see `ChatMessageComponents.ToolCallCard`).
+ */
+@Immutable
+enum class UiToolApprovalDecision {
+    Approved,
+    Rejected,
+}
 
 @Immutable
 data class UiGeneratedComponent(

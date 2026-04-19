@@ -12,6 +12,15 @@ sealed interface ApiResult<out T> {
 
 class ApiException(val code: Int, message: String) : Exception(message)
 
+/**
+ * Thrown by [MessageApi.streamConversation] when the conversation has no active run
+ * to subscribe to. The caller (e.g. TimelineSyncLoop's subscriber coroutine) is
+ * expected to back off and retry — a run will eventually start when any client
+ * posts into the conversation. See letta-mobile-mge5.
+ */
+class NoActiveRunException(val conversationId: String) :
+    Exception("No active runs for conversation $conversationId")
+
 suspend inline fun <reified T> safeApiCall(crossinline call: suspend () -> HttpResponse): ApiResult<T> {
     return try {
         val response = call()
