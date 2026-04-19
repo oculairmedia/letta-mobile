@@ -19,6 +19,11 @@ data class AppMessage(
     val generatedUi: GeneratedUiPayload? = null,
     val approvalRequest: ApprovalRequestPayload? = null,
     val approvalResponse: ApprovalResponsePayload? = null,
+    // Inline image parts carried on USER/ASSISTANT/SYSTEM messages whose
+    // server-side `content` is a multimodal JSON array. Extracted by the
+    // mapper from LettaMessage.attachments so the UI can re-render images
+    // after hydration from history. See bead letta-mobile-mge5.24.
+    val attachments: List<MessageContentPart.Image> = emptyList(),
 )
 
 enum class MessageType {

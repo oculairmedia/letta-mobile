@@ -12,6 +12,15 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.nullable
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonEncoder
 
 /**
  * Sealed interface for all Letta message types.
@@ -114,15 +123,51 @@ private fun extractAttachments(raw: JsonElement?): List<MessageContentPart.Image
     if (raw !is JsonArray) return emptyList()
     return raw.mapNotNull { element ->
         val obj = element as? JsonObject ?: return@mapNotNull null
-        val type = obj["type"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-        if (type != "image_url") return@mapNotNull null
-        val url = obj["image_url"]
-            ?.jsonObject
-            ?.get("url")
-            ?.jsonPrimitive
-            ?.contentOrNull
-            ?: return@mapNotNull null
-        parseImageDataUrl(url)
+        when (obj["type"]?.jsonPrimitive?.contentOrNull) {
+            // Letta's native shape: { type:"image", source:{ type:"base64", media_type, data } | { type:"url", url } }
+            "image" -> parseLettaImagePart(obj)
+            // Legacy / OpenAI-style shape kept for backward compatibility with
+            // anything previously persisted or echoed by older server builds.
+            "image_url" -> {
+                val url = obj["image_url"]
+                    ?.jsonObject
+                    ?.get("url")
+                    ?.jsonPrimitive
+                    ?.contentOrNull
+                    ?: return@mapNotNull null
+                parseImageDataUrl(url)
+            }
+            else -> null
+        }
+    }
+}
+
+private fun parseLettaImagePart(obj: JsonObject): MessageContentPart.Image? {
+    val source = obj["source"] as? JsonObject ?: return null
+    return when (source["type"]?.jsonPrimitive?.contentOrNull) {
+        "base64" -> {
+            val mediaType = source["media_type"]?.jsonPrimitive?.contentOrNull
+            val data = source["data"]?.jsonPrimitive?.contentOrNull
+            if (mediaType.isNullOrBlank() || data.isNullOrBlank()) null
+            else MessageContentPart.Image(base64 = data, mediaType = mediaType)
+        }
+        "url" -> {
+            // Remote URL: only retain if it's an inline data: URL we can decode.
+            val url = source["url"]?.jsonPrimitive?.contentOrNull ?: return null
+            parseImageDataUrl(url)
+        }
+        // "letta" — server-managed file reference. Empirically the server
+        // inlines the raw base64 under `data` alongside a `file_id` that
+        // would let us fetch via /v1/files if needed. Since the payload is
+        // already present, decode it directly and render inline (no extra
+        // network roundtrip). See bead letta-mobile-mge5.24.
+        "letta" -> {
+            val mediaType = source["media_type"]?.jsonPrimitive?.contentOrNull
+            val data = source["data"]?.jsonPrimitive?.contentOrNull
+            if (mediaType.isNullOrBlank() || data.isNullOrBlank()) null
+            else MessageContentPart.Image(base64 = data, mediaType = mediaType)
+        }
+        else -> null
     }
 }
 
@@ -159,7 +204,16 @@ data class ReasoningMessage(
 data class ToolCallMessage(
     override val id: String,
     @SerialName("tool_call") val toolCall: ToolCall? = null,
-    @SerialName("tool_calls") val toolCalls: List<ToolCall>? = null,
+    // The Letta server streams `tool_calls` as EITHER a JSON array (final
+    // envelope) or a single object (streaming delta frame, where only one
+    // tool-call is being accumulated). The ToolCallListSerializer below
+    // tolerates both — letta-mobile-mge5: previously this caused every
+    // tool-call streaming frame to fail deserialization with
+    // `Expected JsonArray, but had JsonObject`, producing the "choppy and
+    // discontinuous" UI updates Emmanuel reported 2026-04-18.
+    @SerialName("tool_calls")
+    @Serializable(with = ToolCallListSerializer::class)
+    val toolCalls: List<ToolCall>? = null,
     override val date: String? = null,
     val name: String? = null,
     @SerialName("run_id") override val runId: String? = null,
@@ -226,7 +280,11 @@ data class ToolReturnMessage(
 data class ApprovalRequestMessage(
     override val id: String,
     @SerialName("tool_call") val toolCall: ToolCall? = null,
-    @SerialName("tool_calls") val toolCalls: List<ToolCall>? = null,
+    // Same single-object-or-array quirk as ToolCallMessage — see
+    // ToolCallListSerializer. letta-mobile-mge5.
+    @SerialName("tool_calls")
+    @Serializable(with = ToolCallListSerializer::class)
+    val toolCalls: List<ToolCall>? = null,
     override val date: String? = null,
     val name: String? = null,
     @SerialName("run_id") override val runId: String? = null,
@@ -421,7 +479,9 @@ data class UsageStatistics(
     @SerialName("cache_write_tokens") val cacheWriteTokens: Int? = null,
     @SerialName("reasoning_tokens") val reasoningTokens: Int? = null,
     @SerialName("context_tokens") val contextTokens: Int? = null,
-    @SerialName("run_ids") val runIds: List<String> = emptyList(),
+    // The Letta server sometimes sends `run_ids: null` — tolerate that as an
+    // empty list. letta-mobile-mge5.
+    @SerialName("run_ids") val runIds: List<String>? = null,
     override val date: String? = null,
     override val runId: String? = null,
     override val stepId: String? = null,
@@ -450,16 +510,68 @@ object LettaMessageSerializer : JsonContentPolymorphicSerializer<LettaMessage>(L
         "system_message" -> SystemMessage.serializer()
         "user_message" -> UserMessage.serializer()
         "assistant_message" -> AssistantMessage.serializer()
-        "reasoning_message" -> ReasoningMessage.serializer()
-        "tool_call_message" -> ToolCallMessage.serializer()
-        "tool_return_message" -> ToolReturnMessage.serializer()
-        "approval_request_message" -> ApprovalRequestMessage.serializer()
-        "approval_response_message" -> ApprovalResponseMessage.serializer()
-        "hidden_reasoning_message" -> HiddenReasoningMessage.serializer()
+        // letta-mobile-mge5.22: SSE uses short form "reasoning"; REST uses
+        // "reasoning_message". Accept both. Same class of drift as .16/.18.
+        "reasoning_message",
+        "reasoning" -> ReasoningMessage.serializer()
+        // SSE abbreviates some types (letta-mobile-mge5.18): accept both
+        // long and short discriminator forms used by the server.
+        "tool_call_message",
+        "tool_call" -> ToolCallMessage.serializer()
+        "tool_return_message",
+        "tool_return" -> ToolReturnMessage.serializer()
+        "approval_request_message",
+        "approval_request" -> ApprovalRequestMessage.serializer()
+        // Server inconsistency: the REST messages endpoint uses
+        // "approval_response_message" while the SSE /stream endpoint uses
+        // the shorter "approval_response" for the same payload shape. Accept
+        // both so ApprovalResponseMessage fires in both code paths —
+        // otherwise auto-approved tool calls keep their approve/reject UI
+        // because the response frame is silently dropped into
+        // UnknownMessage. letta-mobile-mge5.16.
+        "approval_response_message",
+        "approval_response" -> ApprovalResponseMessage.serializer()
+        "hidden_reasoning_message",
+        "hidden_reasoning" -> HiddenReasoningMessage.serializer()
         "event_message" -> EventMessage.serializer()
         "ping" -> PingMessage.serializer()
         "stop_reason" -> StopReason.serializer()
         "usage_statistics" -> UsageStatistics.serializer()
         else -> UnknownMessage.serializer() // fallback for unknown types
+    }
+}
+
+/**
+ * Accepts either a JSON array of [ToolCall] or a single [ToolCall] object.
+ *
+ * The Letta server emits `tool_calls` as a single object during streaming
+ * (mid-run delta frames where exactly one tool-call is being accumulated)
+ * and as an array in terminal envelopes. Without this, every streaming
+ * delta fails to deserialize (`Expected JsonArray, but had JsonObject`)
+ * which produced the "choppy / discontinuous" updates pattern —
+ * letta-mobile-mge5 (diagnosed 2026-04-18).
+ */
+object ToolCallListSerializer : KSerializer<List<ToolCall>?> {
+    private val listDelegate = ListSerializer(ToolCall.serializer()).nullable
+    private val objectDelegate = ToolCall.serializer()
+
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("ToolCallList")
+
+    override fun deserialize(decoder: Decoder): List<ToolCall>? {
+        val jd = decoder as? JsonDecoder
+            ?: error("ToolCallListSerializer only supports JSON")
+        val element = jd.decodeJsonElement()
+        return when (element) {
+            is JsonArray -> jd.json.decodeFromJsonElement(listDelegate, element)
+            is JsonObject -> listOf(jd.json.decodeFromJsonElement(objectDelegate, element))
+            else -> null
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: List<ToolCall>?) {
+        val je = encoder as? JsonEncoder
+            ?: error("ToolCallListSerializer only supports JSON")
+        je.encodeSerializableValue(listDelegate, value)
     }
 }
