@@ -589,13 +589,21 @@ private fun ToolCallCard(toolCall: UiToolCall) {
     val isError = ToolReturnStatus.isError(toolCall.status)
     val codeStyle = MaterialTheme.chatTypography.codeBlock
 
+    // letta-mobile-23h5 (polish 2026-04-19): give the tool card a touch
+    // more presence — slightly stronger surface tint and a 1.dp outline
+    // so it reads as a distinct artifact in a stack of bubbles, without
+    // shouting like a colored pill would.
     Card(
         modifier = Modifier.animateContentSize(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+        ),
+        border = androidx.compose.foundation.BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
         ),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
             // Single-line header — tap to expand/collapse
             Row(
                 modifier = Modifier

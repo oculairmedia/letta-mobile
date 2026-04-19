@@ -392,7 +392,9 @@ private fun ChatContent(
             ) {
                 LazyColumn(
                     state = listState,
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    // letta-mobile-23h5 (polish 2026-04-19): wider side
+                    // gutters so bubbles don't kiss the screen edge.
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
                     reverseLayout = true
                 ) {
                     if (state.isStreaming) {
