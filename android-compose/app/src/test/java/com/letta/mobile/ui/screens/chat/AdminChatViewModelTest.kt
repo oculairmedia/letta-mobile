@@ -410,21 +410,21 @@ class AdminChatViewModelTest {
     // (letta-mobile-page-hasMore). Removed here in Phase 5 to unblock the
     // legacy-state cleanup; re-add once Timeline exposes a pagination cursor.
 
-    @Test
-    fun `loadOlderMessages skips fetch when initial page proves there is no older history`() = runTest {
-        messages = listOf(
-            TestData.appMessage(id = "msg-1", messageType = MessageType.USER, content = "Only message"),
-        )
-
-        val vm = createViewModel()
-        advanceUntilIdle()
-
-        vm.loadOlderMessages()
-        advanceUntilIdle()
-
-        coVerify(exactly = 0) { messageRepository.fetchOlderMessages(any(), any(), any()) }
-        assertFalse(vm.uiState.value.hasMoreOlderMessages)
-    }
+    // `loadOlderMessages skips fetch when initial page proves there is no
+    // older history` was removed in letta-mobile-b1di. The 23h5 regression
+    // fix (see AdminChatViewModel.kt lines 952-967) intentionally inverted
+    // the contract: hasMoreOlderMessages is now optimistically flipped to
+    // true any time the timeline has at least one confirmed message, and
+    // the actual fetchOlderMessages call settles the truth (sets it back
+    // to false when fewer than PAGE_SIZE rows come back, see line 688).
+    // The deleted test asserted the pre-23h5 behavior — that single-message
+    // initial pages skip the fetch entirely — which contradicts the fix.
+    // Page-size pagination semantics are covered in MessageRepositoryE2eTest
+    // (`fetchOlderMessages returns page ordered chronologically`), and the
+    // optimistic-flip path is implicitly exercised by every other VM test
+    // that loads messages. Re-add a positive-coverage test here once
+    // TimelineRepository exposes an explicit pagination cursor (the same
+    // follow-up referenced above as letta-mobile-page-hasMore).
 
     @Test
     fun `project brief loads mapped sections from core memory blocks`() = runTest {
