@@ -74,6 +74,8 @@ COMMANDS:
     # Health/Debug
     health
     test-sync <agent_id> [--conversation ID]  # Full sync test
+    sync-drift --agent ID --conversation ID [--watch] [--interval SEC] [--iterations N]  # Measure client/server sync drift via adb (letta-mobile-nw2e)
+    stream-watch --conversation ID [--backoff-start SEC] [--backoff-max SEC]  # Subscribe to live SSE stream for a conversation (resume-stream pattern)
     classify-approvals <conversation_id> [--json]  # First-line UI-mislabel diagnostic (letta-mobile-3nqa)
 
 ENVIRONMENT:
@@ -462,6 +464,376 @@ cmd_test_sync() {
     log_info "=== SYNC TEST COMPLETE ==="
 }
 
+# ============== SYNC DRIFT ==============
+# Programmatic regression detector for "chat screen not updating" bugs
+# like letta-mobile-nw2e. Instead of eyeballing the phone, we read the
+# client's persisted "processed" cursor from the device via `adb run-as`,
+# query the server for messages newer than that cursor, and report:
+#
+#   - Wall-clock drift (server-latest - client-processed) in seconds
+#   - Number of messages the client has NOT processed yet
+#   - A verdict: HEALTHY (< 30s, 0 unprocessed), STALE (30-120s), BROKEN (> 120s or > 5 unprocessed)
+#
+# Bonus: --watch runs it every N seconds and reports whether drift is
+# growing (sync loop stuck), shrinking (catching up), or flat.
+#
+# Prereq: adb must be connected to the device (`adb devices`), and the
+# debug build of com.letta.mobile is installed (run-as works only on
+# debuggable apks).
+cmd_sync_drift() {
+    local agent_id=""
+    local conversation=""
+    local watch=false
+    local interval=5
+    local iterations=0
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --agent) agent_id="$2"; shift 2 ;;
+            --conversation) conversation="$2"; shift 2 ;;
+            --watch) watch=true; shift ;;
+            --interval) interval="$2"; shift 2 ;;
+            --iterations) iterations="$2"; shift 2 ;;
+            -h|--help)
+                cat <<EOF
+sync-drift - Measure client/server sync drift via adb + server query.
+
+USAGE:
+    letta-cli sync-drift --agent <agent_id> --conversation <conv_id> [--watch] [--interval SEC] [--iterations N]
+
+OPTIONS:
+    --agent AGENT_ID          Required. Agent owning the conversation.
+    --conversation CONV_ID    Required. Conversation to measure drift on.
+    --watch                   Poll continuously.
+    --interval SECONDS        Poll interval when --watch (default: 5).
+    --iterations N            Stop after N polls (default: 0 = forever).
+
+EXAMPLES:
+    # One-shot drift check
+    letta-cli sync-drift --agent agent-xxx --conversation conv-yyy
+
+    # Watch drift for 60s (12 polls at 5s interval) to see if it grows
+    letta-cli sync-drift --agent agent-xxx --conversation conv-yyy --watch --iterations 12
+EOF
+                return 0
+                ;;
+            *) shift ;;
+        esac
+    done
+
+    if [[ -z "$agent_id" || -z "$conversation" ]]; then
+        log_err "sync-drift requires --agent and --conversation"
+        return 1
+    fi
+
+    if ! command -v adb >/dev/null 2>&1; then
+        log_err "adb not on PATH; sync-drift needs adb to read client state"
+        return 1
+    fi
+
+    _sync_drift_once() {
+        # --- Read client cursor from device ---
+        local client_processed
+        client_processed=$(adb shell "run-as com.letta.mobile cat /data/user/0/com.letta.mobile/shared_prefs/channel_sync_state.xml 2>/dev/null" 2>/dev/null \
+            | grep "processed::$conversation" \
+            | sed -E 's/.*>([^<]+)<.*/\1/' \
+            | head -1 \
+            | tr -d '\r\n')
+        if [[ -z "$client_processed" ]]; then
+            echo "CLIENT_CURSOR=MISSING (conversation never processed by client)"
+            client_processed="1970-01-01T00:00:00Z"
+        fi
+
+        # --- Query server for latest message timestamp ---
+        local server_resp
+        server_resp=$(api_get "/v1/agents/$agent_id/messages?limit=10&order=desc&conversation_id=$conversation" 2>/dev/null)
+        local server_latest
+        server_latest=$(echo "$server_resp" | jq -r '.[0].date // empty' 2>/dev/null)
+        if [[ -z "$server_latest" ]]; then
+            echo "SERVER_LATEST=MISSING (empty response or bad auth)"
+            return 2
+        fi
+
+        # --- Count unprocessed messages (server entries newer than cursor) ---
+        local unprocessed
+        unprocessed=$(echo "$server_resp" | jq -r --arg cursor "$client_processed" '[.[] | select(.date > $cursor)] | length' 2>/dev/null)
+        [[ -z "$unprocessed" ]] && unprocessed=0
+
+        # --- Compute drift in seconds ---
+        local drift_sec
+        drift_sec=$(python3 -c "
+from datetime import datetime, timezone
+def parse(s):
+    s = s.rstrip('Z').split('.')[0]
+    return datetime.fromisoformat(s).replace(tzinfo=timezone.utc)
+try:
+    c = parse('$client_processed')
+    s = parse('$server_latest')
+    print(int((s - c).total_seconds()))
+except Exception as e:
+    print('ERR')
+" 2>/dev/null)
+
+        # --- Verdict ---
+        local verdict color
+        if [[ "$drift_sec" == "ERR" ]]; then
+            verdict="UNKNOWN"; color="$YELLOW"
+        elif [[ "$drift_sec" -lt 30 && "$unprocessed" -eq 0 ]]; then
+            verdict="HEALTHY"; color="$GREEN"
+        elif [[ "$drift_sec" -lt 120 && "$unprocessed" -lt 5 ]]; then
+            verdict="STALE"; color="$YELLOW"
+        else
+            verdict="BROKEN"; color="$RED"
+        fi
+
+        local ts
+        ts=$(date +%H:%M:%S)
+        echo -e "[$ts] client=$client_processed  server=$server_latest  drift=${drift_sec}s  unprocessed=$unprocessed  ${color}${verdict}${NC}"
+
+        # Return non-zero on BROKEN so --watch loops can honor exit codes downstream
+        [[ "$verdict" == "BROKEN" ]] && return 1
+        return 0
+    }
+
+    log_info "=== SYNC DRIFT for agent=$agent_id conv=$conversation ==="
+    echo ""
+
+    if [[ "$watch" == "true" ]]; then
+        local count=0
+        local prev_drift=""
+        while :; do
+            local output
+            output=$(_sync_drift_once)
+            echo "$output"
+            # Trend analysis — extract drift value, compare to previous
+            local this_drift
+            this_drift=$(echo "$output" | grep -oE "drift=[0-9]+s" | grep -oE "[0-9]+")
+            if [[ -n "$prev_drift" && -n "$this_drift" ]]; then
+                if [[ "$this_drift" -gt "$prev_drift" ]]; then
+                    echo "    trend: ⬆ drift growing by $((this_drift - prev_drift))s"
+                elif [[ "$this_drift" -lt "$prev_drift" ]]; then
+                    echo "    trend: ⬇ drift shrinking by $((prev_drift - this_drift))s"
+                else
+                    echo "    trend: → flat"
+                fi
+            fi
+            prev_drift="$this_drift"
+            count=$((count + 1))
+            if [[ "$iterations" -gt 0 && "$count" -ge "$iterations" ]]; then
+                break
+            fi
+            sleep "$interval"
+        done
+    else
+        _sync_drift_once
+    fi
+}
+
+# ============== STREAM WATCH ==============
+# Resume-stream pattern validator for letta-mobile-qkg9 replacement plan.
+#
+# Self-hosted Letta servers expose POST /v1/conversations/{id}/stream, which
+# "resumes the stream of the most recent active run." If no run is active,
+# returns 404 with "No active runs found for this conversation." If one IS
+# active, returns an SSE stream multiplexing events from that run to every
+# subscribed client — including clients that didn't initiate the run.
+#
+# This subcommand uses that endpoint as a long-lived, bandwidth-efficient
+# subscription. Loop:
+#   1. POST /stream.
+#   2. If 200 with event-stream: print events until close.
+#   3. If 404 "no active run": sleep backoff, retry.
+#   4. Backoff is exponential from --backoff-start to --backoff-max.
+#   5. Backoff resets to start on every successful connect.
+#
+# This is the pattern TimelineSyncLoop will use to get realtime incoming-
+# message delivery without polling.
+cmd_stream_watch() {
+    local conversation=""
+    local backoff_start=2
+    local backoff_max=30
+    local json_out=false
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --conversation) conversation="$2"; shift 2 ;;
+            --backoff-start) backoff_start="$2"; shift 2 ;;
+            --backoff-max) backoff_max="$2"; shift 2 ;;
+            --json) json_out=true; shift ;;
+            -h|--help)
+                cat <<EOF
+stream-watch — subscribe to live SSE events for a conversation using the
+resume-stream pattern. Exits only on Ctrl-C.
+
+USAGE:
+    letta-cli stream-watch --conversation CONV_ID [--backoff-start SEC] [--backoff-max SEC] [--json]
+
+OPTIONS:
+    --conversation CONV_ID   Required.
+    --backoff-start SEC      Initial backoff when no active run (default: 2).
+    --backoff-max SEC        Cap on exponential backoff (default: 30).
+    --json                   Emit raw JSON lines instead of formatted output.
+
+SEMANTICS:
+    - HTTP 200 + event-stream: we are subscribed. Events print live.
+    - HTTP 404 "No active runs found": sleep backoff, retry. Doubles each
+      consecutive 404 up to backoff_max.
+    - Any other error: print and retry at backoff_max interval.
+    - Successful connect resets backoff to start.
+
+EXAMPLES:
+    letta-cli stream-watch --conversation conv-1598043a-d864-4a5c-a59d-8622f0b4eb5d
+    letta-cli stream-watch --conversation conv-xxx --backoff-start 5 --backoff-max 60
+EOF
+                return 0
+                ;;
+            *) shift ;;
+        esac
+    done
+
+    if [[ -z "$conversation" ]]; then
+        log_err "stream-watch requires --conversation"
+        return 1
+    fi
+
+    local url="${BASE_URL}/v1/conversations/${conversation}/stream"
+    local headers=(-H "Content-Type: application/json" -H "Accept: text/event-stream")
+    if [[ -n "$LETTA_TOKEN" ]]; then
+        headers+=(-H "Authorization: Bearer $LETTA_TOKEN")
+    fi
+
+    local backoff="$backoff_start"
+    local connects=0
+    local idle_polls=0
+    local events_received=0
+    local start_ts
+    start_ts=$(date +%s)
+
+    [[ "$json_out" != "true" ]] && log_info "=== STREAM-WATCH conv=$conversation start=$(date +%H:%M:%S) ==="
+
+    # Trap to print a summary on exit.
+    trap '_stream_watch_summary' EXIT
+
+    _stream_watch_summary() {
+        local now
+        now=$(date +%s)
+        local dur=$((now - start_ts))
+        [[ "$json_out" != "true" ]] && {
+            echo ""
+            log_info "=== STREAM-WATCH SUMMARY ==="
+            echo "  Duration:        ${dur}s"
+            echo "  Successful connects: $connects"
+            echo "  Idle 404 polls:  $idle_polls"
+            echo "  Events received: $events_received"
+        }
+    }
+
+    while :; do
+        # Attempt connect. -D - writes headers to stdout, we parse status then content.
+        local tmp
+        tmp=$(mktemp)
+        local status
+        # Use --no-buffer so SSE frames flush as they arrive.
+        # -D /dev/stderr lets us see HTTP status before body.
+        # We POST with empty JSON body.
+        status=$(curl -sN --no-buffer -X POST "$url" "${headers[@]}" \
+            -w "HTTP_STATUS:%{http_code}\n" \
+            -d '{}' 2>/dev/null | {
+                # Read line-by-line; detect status line we appended via -w at EOF.
+                # -w trailer only fires when request completes (not during stream),
+                # so we rely on first-line shape to distinguish 200 vs 4xx.
+                local first_line_read=false
+                local found_status="unknown"
+                while IFS= read -r line; do
+                    if [[ "$line" =~ ^HTTP_STATUS:([0-9]+)$ ]]; then
+                        found_status="${BASH_REMATCH[1]}"
+                        continue
+                    fi
+                    if [[ "$first_line_read" == "false" ]]; then
+                        first_line_read=true
+                        # JSON error body signals 4xx/5xx.
+                        if [[ "$line" == "{\"detail\":"* ]]; then
+                            # 404/409 JSON response. Capture message.
+                            echo "__STATUS__:4xx"
+                            echo "__DETAIL__:$line"
+                            continue
+                        fi
+                    fi
+                    # SSE frame or continuation.
+                    if [[ -n "$line" ]]; then
+                        echo "__EVENT__:$line"
+                    fi
+                done
+                echo "__FINAL_STATUS__:$found_status"
+            } > "$tmp")
+
+        # Parse the collected output.
+        local had_events=false
+        local had_error=false
+        local error_detail=""
+        while IFS= read -r line; do
+            case "$line" in
+                __STATUS__:4xx)
+                    had_error=true
+                    ;;
+                __DETAIL__:*)
+                    error_detail="${line#__DETAIL__:}"
+                    ;;
+                __EVENT__:*)
+                    had_events=true
+                    local evt="${line#__EVENT__:}"
+                    events_received=$((events_received + 1))
+                    if [[ "$json_out" == "true" ]]; then
+                        echo "$evt"
+                    else
+                        local ts
+                        ts=$(date +%H:%M:%S.%3N)
+                        # Pretty-print data: lines with type extraction.
+                        if [[ "$evt" =~ ^data:\ (.*)$ ]]; then
+                            local payload="${BASH_REMATCH[1]}"
+                            local mtype
+                            mtype=$(echo "$payload" | jq -r '.message_type // empty' 2>/dev/null)
+                            if [[ -n "$mtype" ]]; then
+                                echo "[$ts] event  type=$mtype  $(echo "$payload" | jq -r '{run_id,id,seq_id}|to_entries|map("\(.key)=\(.value)")|join(" ")' 2>/dev/null)"
+                            else
+                                echo "[$ts] data   $payload" | head -c 200; echo
+                            fi
+                        else
+                            echo "[$ts] $evt"
+                        fi
+                    fi
+                    ;;
+                __FINAL_STATUS__:*) ;;
+            esac
+        done < "$tmp"
+        rm -f "$tmp"
+
+        if [[ "$had_events" == "true" ]]; then
+            connects=$((connects + 1))
+            backoff="$backoff_start"
+            [[ "$json_out" != "true" ]] && echo "[$(date +%H:%M:%S)] stream closed cleanly (run finished). reset backoff=${backoff}s"
+        elif [[ "$had_error" == "true" ]]; then
+            idle_polls=$((idle_polls + 1))
+            if [[ "$json_out" != "true" ]]; then
+                # Classify common detail strings.
+                if [[ "$error_detail" == *"No active runs"* ]]; then
+                    echo "[$(date +%H:%M:%S)] idle — no active run. sleep=${backoff}s"
+                else
+                    echo "[$(date +%H:%M:%S)] other error: $error_detail. sleep=${backoff}s"
+                fi
+            fi
+        else
+            idle_polls=$((idle_polls + 1))
+            [[ "$json_out" != "true" ]] && echo "[$(date +%H:%M:%S)] no data received (connection error?). sleep=${backoff}s"
+        fi
+
+        sleep "$backoff"
+        # Exponential backoff with cap.
+        backoff=$((backoff * 2))
+        [[ "$backoff" -gt "$backoff_max" ]] && backoff="$backoff_max"
+    done
+}
+
 # ============== CLASSIFY APPROVALS ==============
 # First-line diagnostic for "the chat UI is mislabeling tool results" bugs
 # (letta-mobile-3nqa). USE THIS BEFORE SPECULATING FROM SOURCE.
@@ -706,6 +1078,8 @@ case "$1" in
     providers) shift; cmd_providers "$@" ;;
     health) cmd_health ;;
     test-sync) shift; cmd_test_sync "$@" ;;
+    sync-drift) shift; cmd_sync_drift "$@" ;;
+    stream-watch) shift; cmd_stream_watch "$@" ;;
     classify-approvals)
         shift
         if [[ "$1" == "--self-test" ]]; then
