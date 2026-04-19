@@ -32,14 +32,14 @@ export JAVA_HOME="/path/to/android-studio/jbr"
 Run these from `android-compose/` before pushing:
 
 ```bash
-JAVA_HOME="/path/to/Android Studio/jbr" ./gradlew --no-daemon :app:compileDebugKotlin
-JAVA_HOME="/path/to/Android Studio/jbr" ./gradlew --no-daemon :app:testDebugUnitTest
+JAVA_HOME="/path/to/Android Studio/jbr" ./gradlew :app:compileDebugKotlin
+JAVA_HOME="/path/to/Android Studio/jbr" ./gradlew :app:testDebugUnitTest
 ```
 
 If you want a device build:
 
 ```bash
-JAVA_HOME="/path/to/Android Studio/jbr" ./gradlew --no-daemon installDebug
+JAVA_HOME="/path/to/Android Studio/jbr" ./gradlew installDebug
 ```
 
 ## Optional pre-push hook
@@ -52,4 +52,4 @@ Install it manually if you want local push protection:
 ./scripts/install-hooks.sh
 ```
 
-The hook runs `:app:compileDebugKotlin` from `android-compose/` with `--no-daemon` and fails the push if Kotlin compilation breaks.
+The hook runs `:app:compileDebugKotlin` from `android-compose/` and fails the push if Kotlin compilation breaks.

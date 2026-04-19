@@ -31,7 +31,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor setup. The short
 cd android-compose
 cp local.properties.example local.properties
 export JAVA_HOME="/path/to/Android Studio/jbr"
-./gradlew --no-daemon :app:assembleDebug
+./gradlew :app:assembleDebug
 ```
 
 ## Recommended checks
@@ -39,8 +39,8 @@ export JAVA_HOME="/path/to/Android Studio/jbr"
 Run these from `android-compose/` before pushing changes:
 
 ```bash
-./gradlew --no-daemon :app:compileDebugKotlin
-./gradlew --no-daemon :app:testDebugUnitTest
+./gradlew :app:compileDebugKotlin
+./gradlew :app:testDebugUnitTest
 ```
 
 ## CI
