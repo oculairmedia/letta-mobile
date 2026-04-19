@@ -200,6 +200,7 @@ class AdminChatViewModel @Inject constructor(
     private val conversationRepository: ConversationRepository,
     private val settingsRepository: SettingsRepository,
     private val internalBotClient: InternalBotClient,
+    private val currentConversationTracker: com.letta.mobile.channel.CurrentConversationTracker,
 ) : ViewModel() {
     companion object {
         private const val CONVERSATION_CACHE_TTL_MS = 30_000L
@@ -228,6 +229,19 @@ class AdminChatViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
+    /**
+     * letta-mobile-23h5 (regression fix 2026-04-19): older messages fetched via
+     * pagination need to survive the next timeline observer emission (which
+     * overwrites `_uiState.messages` with the live timeline contents). Hold
+     * a per-conversation prefix here, scoped to a (conversationId → list)
+     * pair so a conversation switch resets the prefix automatically.
+     *
+     * The timeline observer concatenates `olderMessagesPrefix` ahead of its
+     * mapped events on every emission; the loader replaces this list when a
+     * new page arrives.
+     */
+    private var olderMessagesPrefix: Pair<String, List<UiMessage>> = "" to emptyList()
+
     private val _inputText = MutableStateFlow("")
     val inputText: StateFlow<String> = _inputText.asStateFlow()
 
@@ -254,6 +268,12 @@ class AdminChatViewModel @Inject constructor(
     private var hasSummary = false
 
     private var timelineObserverJob: kotlinx.coroutines.Job? = null
+    private var timelineHydrateSignalJob: kotlinx.coroutines.Job? = null
+    // Conversation id the current observer job is bound to. Needed so we can
+    // detect "same conversation, already observing" vs "user switched convs
+    // and we must rebind" — fixing letta-mobile-nw2e, where the previous
+    // `isActive == true` guard silently ignored conversation switches.
+    private var timelineObserverConversationId: String? = null
 
     init {
         savedStateHandle.get<String>("conversationId")
@@ -602,8 +622,23 @@ class AdminChatViewModel @Inject constructor(
                     return@launch
                 }
 
+                // letta-mobile-23h5 (regression fix 2026-04-19): merge older
+                // messages into the per-conversation backfill prefix instead
+                // of writing them straight into _uiState.messages — the
+                // timeline observer would otherwise overwrite them on its
+                // very next emission. Concatenate previously-backfilled
+                // pages with this new page so consecutive scroll-ups grow
+                // the prefix monotonically.
+                val olderUi = olderMessages.toUiMessages()
+                val (prevConv, prevPrefix) = olderMessagesPrefix
+                val basePrefix = if (prevConv == conversationId) prevPrefix else emptyList()
+                val seenIds = HashSet<String>(basePrefix.size + olderUi.size)
+                val grown = ArrayList<UiMessage>(basePrefix.size + olderUi.size)
+                for (m in olderUi) if (seenIds.add(m.id)) grown.add(m)
+                for (m in basePrefix) if (seenIds.add(m.id)) grown.add(m)
+                olderMessagesPrefix = conversationId to grown
                 val mergedMessages = mergeOlderMessages(
-                    olderMessages = olderMessages.toUiMessages(),
+                    olderMessages = olderUi,
                     existingMessages = _uiState.value.messages,
                 )
                 _uiState.value = _uiState.value.copy(
@@ -780,10 +815,33 @@ class AdminChatViewModel @Inject constructor(
      * Subscribe to the [TimelineRepository]'s StateFlow for the given
      * conversation and mirror its events into [_uiState.messages].
      *
-     * Idempotent — calling repeatedly for the same conversation is a no-op.
+     * Idempotent for the SAME conversation — calling repeatedly with the same
+     * id while a job is active is a no-op. When the id differs, the previous
+     * observer + hydrate-signal job are cancelled and fresh ones are spun up
+     * bound to the new conversation.
+     *
+     * This two-condition guard fixes `letta-mobile-nw2e`: the prior impl only
+     * checked `isActive == true` regardless of which conversation the job
+     * was bound to, which made switching conversations a silent no-op and
+     * left the UI locked onto the first-selected conversation's timeline.
      */
     private fun startTimelineObserver(conversationId: String) {
-        if (timelineObserverJob?.isActive == true) return
+        if (timelineObserverConversationId == conversationId &&
+            timelineObserverJob?.isActive == true
+        ) {
+            return
+        }
+        // Conversation switch (or first bind): tear down any in-flight
+        // subscriptions from the previous conversation before starting new
+        // ones. Without this the hydrate-signal job would leak on every
+        // switch (it was a local `val` in the old impl, never cancellable).
+        timelineObserverJob?.cancel()
+        timelineHydrateSignalJob?.cancel()
+        // letta-mobile-23h5 (regression fix 2026-04-19): drop any backfill
+        // prefix from the previous conversation so it cannot bleed into the
+        // new conversation's history.
+        olderMessagesPrefix = "" to emptyList()
+        timelineObserverConversationId = conversationId
         timelineObserverJob = viewModelScope.launch {
             val flow = try {
                 timelineRepository.observe(conversationId)
@@ -795,7 +853,8 @@ class AdminChatViewModel @Inject constructor(
             // Also subscribe to the loop's sync events so we can definitively
             // clear the loading spinner on Hydrated (even for empty convs).
             val loop = timelineRepository.getOrCreate(conversationId)
-            val hydrateSignal = viewModelScope.launch {
+            currentConversationTracker.setCurrent(conversationId)
+            timelineHydrateSignalJob = viewModelScope.launch {
                 loop.events.collect { ev ->
                     when (ev) {
                         is com.letta.mobile.data.timeline.TimelineSyncEvent.Hydrated,
@@ -830,7 +889,15 @@ class AdminChatViewModel @Inject constructor(
 
             try {
                 flow.collect { timeline ->
-                    val ui = timeline.events.mapNotNull { it.toUiMessageOrNull() }.toImmutableList()
+                    val live = timeline.events.mapNotNull { it.toUiMessageOrNull() }
+                    // Prepend any backfilled older pages for THIS conversation.
+                    val (prefixConv, prefixList) = olderMessagesPrefix
+                    val prefix = if (prefixConv == conversationId) prefixList else emptyList()
+                    val seenIds = HashSet<String>(live.size + prefix.size)
+                    val combined = ArrayList<UiMessage>(live.size + prefix.size)
+                    for (m in prefix) if (seenIds.add(m.id)) combined.add(m)
+                    for (m in live) if (seenIds.add(m.id)) combined.add(m)
+                    val ui = combined.toImmutableList()
                     val tailIsAssistant = timeline.events.lastOrNull().let {
                         it is com.letta.mobile.data.timeline.TimelineEvent.Confirmed &&
                             it.messageType == com.letta.mobile.data.timeline.TimelineMessageType.ASSISTANT
@@ -841,67 +908,45 @@ class AdminChatViewModel @Inject constructor(
                     }
                     // Any non-empty emission also implies hydrate succeeded.
                     val clearLoading = ui.isNotEmpty()
+                    // letta-mobile-23h5 (regression fix 2026-04-19): the
+                    // timeline source-of-truth path was never flipping
+                    // hasMoreOlderMessages to true, so ChatScreen's scroll
+                    // detector (`!state.hasMoreOlderMessages → return false`)
+                    // never fired loadOlderMessages. Optimistically assume
+                    // there's history to fetch any time we have at least one
+                    // confirmed message; the first page fetch corrects this
+                    // (sets it back to false when fewer than PAGE_SIZE rows
+                    // come back).
+                    val anyConfirmed = ui.any { !it.isPending }
+                    // Optimistically allow the scroll detector to call
+                    // loadOlderMessages once we have any confirmed history
+                    // — the loader settles the truth (sets back to false
+                    // when fewer than PAGE_SIZE rows come back).
+                    val newHasMoreOlder = if (anyConfirmed) true
+                                          else _uiState.value.hasMoreOlderMessages
                     _uiState.value = _uiState.value.copy(
                         messages = ui,
                         isLoadingMessages = if (clearLoading) false
                                            else _uiState.value.isLoadingMessages,
                         isStreaming = anyLocalPending,
                         isAgentTyping = anyLocalPending && !tailIsAssistant,
+                        hasMoreOlderMessages = newHasMoreOlder,
                     )
                 }
             } finally {
-                hydrateSignal.cancel()
+                // Tear down the sibling hydrate-signal collector when the
+                // main observer terminates (conv switch, scope cancel, etc.).
+                // Field-based reference replaces the prior local `val hydrateSignal`
+                // so the job is also cancellable from `startTimelineObserver`
+                // on conversation switch — see letta-mobile-nw2e.
+                timelineHydrateSignalJob?.cancel()
             }
         }
     }
 
     /** Convert a [TimelineEvent] to a [UiMessage] for display. */
-    private fun com.letta.mobile.data.timeline.TimelineEvent.toUiMessageOrNull(): UiMessage? {
-        return when (val ev = this) {
-            is com.letta.mobile.data.timeline.TimelineEvent.Local -> UiMessage(
-                id = ev.otid,
-                role = when (ev.role) {
-                    com.letta.mobile.data.timeline.Role.USER -> "user"
-                    com.letta.mobile.data.timeline.Role.ASSISTANT -> "assistant"
-                    com.letta.mobile.data.timeline.Role.SYSTEM -> "system"
-                },
-                content = ev.content,
-                timestamp = ev.sentAt.toString(),
-                isPending = ev.deliveryState == com.letta.mobile.data.timeline.DeliveryState.SENDING,
-                attachments = ev.attachments.map {
-                    com.letta.mobile.data.model.UiImageAttachment(
-                        base64 = it.base64,
-                        mediaType = it.mediaType,
-                    )
-                },
-            )
-            is com.letta.mobile.data.timeline.TimelineEvent.Confirmed -> {
-                val role = when (ev.messageType) {
-                    com.letta.mobile.data.timeline.TimelineMessageType.USER -> "user"
-                    com.letta.mobile.data.timeline.TimelineMessageType.ASSISTANT -> "assistant"
-                    com.letta.mobile.data.timeline.TimelineMessageType.REASONING -> "assistant"
-                    com.letta.mobile.data.timeline.TimelineMessageType.SYSTEM -> "system"
-                    com.letta.mobile.data.timeline.TimelineMessageType.TOOL_CALL,
-                    com.letta.mobile.data.timeline.TimelineMessageType.TOOL_RETURN,
-                    com.letta.mobile.data.timeline.TimelineMessageType.OTHER -> return null
-                }
-                UiMessage(
-                    id = ev.serverId,
-                    role = role,
-                    content = ev.content,
-                    timestamp = ev.date.toString(),
-                    isPending = false,
-                    isReasoning = ev.messageType == com.letta.mobile.data.timeline.TimelineMessageType.REASONING,
-                    attachments = ev.attachments.map {
-                        com.letta.mobile.data.model.UiImageAttachment(
-                            base64 = it.base64,
-                            mediaType = it.mediaType,
-                        )
-                    },
-                )
-            }
-        }
-    }
+    internal fun com.letta.mobile.data.timeline.TimelineEvent.toUiMessageOrNull(): UiMessage? =
+        timelineEventToUiMessage(this)
 
     fun submitApproval(
         requestId: String,
@@ -1038,6 +1083,11 @@ class AdminChatViewModel @Inject constructor(
         )
     }
 
+    override fun onCleared() {
+        currentConversationTracker.setCurrent(null)
+        super.onCleared()
+    }
+
 }
 
 private val projectBriefLabelAliases = mapOf(
@@ -1118,4 +1168,5 @@ private fun buildBugReportPrompt(draft: ProjectBugReportDraft): String {
         appendLine()
         append("Please triage this issue, decide whether to create/update beads, and route it to the appropriate coding agent if needed.")
     }.trim()
+
 }
