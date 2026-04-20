@@ -28,9 +28,11 @@ import com.letta.mobile.util.mapErrorToUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableMap
+import kotlinx.collections.immutable.toImmutableSet
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -170,6 +172,8 @@ data class ChatUiState(
     val completionTokens: Int? = null,
     val totalTokens: Int? = null,
     val activeApprovalRequestId: String? = null,
+    val collapsedRunIds: kotlinx.collections.immutable.ImmutableSet<String> = persistentSetOf(),
+    val expandedReasoningMessageIds: kotlinx.collections.immutable.ImmutableSet<String> = persistentSetOf(),
     val projectBrief: ProjectBriefUiState = ProjectBriefUiState(),
     val bugReports: ProjectBugReportUiState = ProjectBugReportUiState(),
     val projectAgents: ProjectAgentsUiState = ProjectAgentsUiState(),
@@ -189,7 +193,7 @@ const val MAX_COMPOSER_TOTAL_BYTES = 8 * 1024 * 1024
 
 @HiltViewModel
 class AdminChatViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
+    private val savedStateHandle: SavedStateHandle,
     private val messageRepository: MessageRepository,
     private val timelineRepository: com.letta.mobile.data.timeline.TimelineRepository,
     private val agentRepository: AgentRepository,
@@ -205,6 +209,8 @@ class AdminChatViewModel @Inject constructor(
     companion object {
         private const val CONVERSATION_CACHE_TTL_MS = 30_000L
         private const val MESSAGE_SYNC_INTERVAL_MS = 5_000L
+        private const val COLLAPSED_RUN_IDS_KEY = "collapsedRunIds"
+        private const val EXPANDED_REASONING_MESSAGE_IDS_KEY = "expandedReasoningMessageIds"
     }
 
     val agentId: String = savedStateHandle.get<String>("agentId")!!
@@ -267,6 +273,36 @@ class AdminChatViewModel @Inject constructor(
     private val pendingToolsMap = java.util.concurrent.ConcurrentHashMap<String, PendingToolCall>()
     private var hasSummary = false
 
+    private fun collapsedRunIds(): Set<String> =
+        savedStateHandle.get<ArrayList<String>>(COLLAPSED_RUN_IDS_KEY)?.toSet().orEmpty()
+
+    private fun expandedReasoningMessageIds(): Set<String> =
+        savedStateHandle.get<ArrayList<String>>(EXPANDED_REASONING_MESSAGE_IDS_KEY)?.toSet().orEmpty()
+
+    private fun persistCollapsedRunIds(ids: Set<String>) {
+        savedStateHandle[COLLAPSED_RUN_IDS_KEY] = ArrayList(ids)
+        _uiState.value = _uiState.value.copy(collapsedRunIds = ids.toImmutableSet())
+    }
+
+    private fun persistExpandedReasoningMessageIds(ids: Set<String>) {
+        savedStateHandle[EXPANDED_REASONING_MESSAGE_IDS_KEY] = ArrayList(ids)
+        _uiState.value = _uiState.value.copy(expandedReasoningMessageIds = ids.toImmutableSet())
+    }
+
+    fun toggleRunCollapsed(runId: String) {
+        val next = collapsedRunIds().toMutableSet().apply {
+            if (!add(runId)) remove(runId)
+        }
+        persistCollapsedRunIds(next)
+    }
+
+    fun toggleReasoningExpanded(messageId: String) {
+        val next = expandedReasoningMessageIds().toMutableSet().apply {
+            if (!add(messageId)) remove(messageId)
+        }
+        persistExpandedReasoningMessageIds(next)
+    }
+
     private var timelineObserverJob: kotlinx.coroutines.Job? = null
     private var timelineHydrateSignalJob: kotlinx.coroutines.Job? = null
     // Conversation id the current observer job is bound to. Needed so we can
@@ -282,6 +318,10 @@ class AdminChatViewModel @Inject constructor(
         if (agentId.isBlank()) {
             _uiState.value = _uiState.value.copy(error = "No agent selected")
         } else {
+            _uiState.value = _uiState.value.copy(
+                collapsedRunIds = collapsedRunIds().toImmutableSet(),
+                expandedReasoningMessageIds = expandedReasoningMessageIds().toImmutableSet(),
+            )
             resolveConversationAndLoad()
             if (projectContext != null) {
                 loadProjectAgents()
