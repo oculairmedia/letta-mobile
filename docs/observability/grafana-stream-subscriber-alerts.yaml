@@ -1,0 +1,96 @@
+# Grafana/Prometheus-style alert rules for the letta-mobile StreamSubscriber.
+#
+# These are written as Grafana Alerting-compatible rule groups that query
+# the Loki datasource. If your stack uses pure Prometheus/loki-stack or a
+# different alerting layer, translate the LogQL `expr:` values — the event
+# names are the stable contract.
+#
+# Tracking: letta-mobile-mge5.6.
+
+groups:
+  - name: letta-mobile-stream-subscriber
+    interval: 1m
+    rules:
+
+      - alert: SubscriberSilence
+        # No evidence of subscriber activity for > 10 minutes on a
+        # conversation where the chat screen is known-open. Either the
+        # subscriber coroutine died, the server stopped responding, or
+        # the Telemetry pipeline broke.
+        #
+        # We proxy "chat screen open" by the presence of any recent
+        # TimelineSync activity — if nothing at all has been emitted, the
+        # app is probably not foregrounded and the alert should not fire.
+        # This uses a pair of queries: the main signal must be zero while a
+        # liveness signal must be non-zero.
+        expr: |
+          sum by (conversationId) (
+            rate({app="com.letta.mobile"} | json
+                 | tag="TimelineSync"
+                 | name=~"streamSubscriber\\.(eventReceived|opened|idle404)"
+                 [10m])
+          ) == 0
+          and on() sum(rate({app="com.letta.mobile"} | json | tag="TimelineSync" [10m])) > 0
+        for: 10m
+        labels:
+          severity: warning
+          component: timeline-sync
+        annotations:
+          summary: "StreamSubscriber silent for 10m on {{ $labels.conversationId }}"
+          description: "No eventReceived / opened / idle404 events in the last 10 minutes for this conversation while other TimelineSync activity is present. Subscriber likely dead."
+
+      - alert: RunFinishedWithZeroEvents
+        # A run completed but we saw zero SSE frames from it. Indicates
+        # the resume-stream mechanism multiplexed us into the wrong run
+        # or dropped frames. Guarded on durationMs > 1000 — sub-1s runs
+        # can legitimately finish before we attach, that's expected.
+        expr: |
+          sum by (conversationId) (
+            count_over_time({app="com.letta.mobile"} | json
+                            | tag="TimelineSync"
+                            | name="streamSubscriber.closed"
+                            | eventsReceived="0"
+                            | durationMs > 1000
+                            [5m])
+          ) > 0
+        for: 0m
+        labels:
+          severity: warning
+          component: timeline-sync
+        annotations:
+          summary: "Resume-stream run closed with zero events on {{ $labels.conversationId }}"
+          description: "A run >1s long produced no SSE frames through the subscriber. Likely a server-side resume-stream regression — check server logs and consider the mge5 fallback posture."
+
+      - alert: SubscriberNetworkErrorsSustained
+        # The subscriber is hitting non-idle errors repeatedly. Baseline
+        # is near zero; sustained activity indicates a real connectivity
+        # or server problem.
+        expr: |
+          sum(rate({app="com.letta.mobile"} | json
+                   | tag="TimelineSync"
+                   | name="streamSubscriber.networkError"
+                   [5m])) > 0.066   # ~20 events per 5 minutes
+        for: 5m
+        labels:
+          severity: warning
+          component: timeline-sync
+        annotations:
+          summary: "StreamSubscriber network errors sustained (> 20/5min)"
+          description: "The subscriber is repeatedly failing to connect. Check the Letta server health and any intermediate proxies."
+
+      - alert: SubscriberDedupeSpike
+        # Background dedupe rate is usually small. A spike means hydrate
+        # and stream are both delivering the same frames — a race, not
+        # a correctness bug, but worth surfacing.
+        expr: |
+          sum(rate({app="com.letta.mobile"} | json
+                   | tag="TimelineSync"
+                   | name="streamSubscriber.eventDeduped"
+                   [1m])) > 1.0
+        for: 5m
+        labels:
+          severity: info
+          component: timeline-sync
+        annotations:
+          summary: "StreamSubscriber dedupe rate unusually high"
+          description: "More than 60 redundant frames/minute. Investigate whether hydrate + stream are both firing concurrently for the same run."
