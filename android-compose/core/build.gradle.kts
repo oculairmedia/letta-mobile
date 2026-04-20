@@ -45,6 +45,14 @@ android {
             isReturnDefaultValues = true
             all {
                 it.useJUnitPlatform()
+                // Memory caps for unit-test JVM workers. Robolectric + Hilt
+                // generated code + Ktor clients accumulate across tests in a
+                // single JVM, so we cap heap + metaspace and recycle workers
+                // every 100 tests to keep long suites inside the cap.
+                // See: letta-mobile OOM in ConnectivityMonitorTest (Apr 2026).
+                it.maxHeapSize = "1536m"
+                it.jvmArgs("-XX:+UseG1GC", "-XX:MaxMetaspaceSize=384m")
+                it.setForkEvery(100L)
             }
         }
     }

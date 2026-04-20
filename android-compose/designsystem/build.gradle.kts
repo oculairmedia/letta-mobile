@@ -41,6 +41,10 @@ android {
             isReturnDefaultValues = true
             all {
                 it.useJUnitPlatform()
+                // Memory caps — see core/build.gradle.kts for rationale.
+                it.maxHeapSize = "1024m"
+                it.jvmArgs("-XX:+UseG1GC", "-XX:MaxMetaspaceSize=256m")
+                it.setForkEvery(100L)
             }
         }
     }

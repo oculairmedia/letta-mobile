@@ -66,20 +66,22 @@ class ConnectivityMonitorTest {
                 every { getBaseUrl() } returns "https://example.com/"
             }
 
+            var monitor: ConnectivityMonitor? = null
             try {
-                val monitor = ConnectivityMonitor(context, settingsRepository, apiClient)
+                monitor = ConnectivityMonitor(context, settingsRepository, apiClient)
 
                 val checkMethod = ConnectivityMonitor::class.java.getDeclaredMethod("checkServerReachability")
                 checkMethod.isAccessible = true
                 checkMethod.invoke(monitor)
 
                 assertTrue(requestLatch.await(2, TimeUnit.SECONDS))
-                assertTrue(waitForCondition(timeoutMillis = 2_000) { monitor.isServerReachable.value })
+                assertTrue(waitForCondition(timeoutMillis = 2_000) { monitor!!.isServerReachable.value })
 
                 assertTrue(requestedUrl == "https://example.com/v1/agents?limit=1")
                 io.mockk.verify(exactly = 1) { apiClient.getBaseUrl() }
                 coVerify(exactly = 1) { apiClient.getClient() }
             } finally {
+                monitor?.release()
                 httpClient.close()
             }
         } finally {

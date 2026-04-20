@@ -16,6 +16,7 @@ import io.ktor.client.statement.HttpResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -106,6 +107,21 @@ class ConnectivityMonitor @Inject constructor(
         if (!isMonitoring) return
         isMonitoring = false
         connectivityManager.unregisterNetworkCallback(networkCallback)
+    }
+
+    /**
+     * Fully releases this monitor: cancels the internal coroutine scope,
+     * unregisters the network callback, and detaches the process-lifecycle
+     * observer. Safe to call multiple times. Intended for tests and any
+     * long-running code path that needs deterministic teardown (preventing
+     * retained `collectLatest` coroutines + Ktor clients + Contexts).
+     */
+    fun release() {
+        stopMonitoring()
+        runCatching {
+            ProcessLifecycleOwner.get().lifecycle.removeObserver(this)
+        }
+        scope.cancel()
     }
 
     private fun checkServerReachability() {

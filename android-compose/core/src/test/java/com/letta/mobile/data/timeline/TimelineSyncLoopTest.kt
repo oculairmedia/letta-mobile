@@ -9,7 +9,6 @@ import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.SystemMessage
 import com.letta.mobile.data.model.UserMessage
 import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.writeStringUtf8
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -700,12 +699,10 @@ private class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
         // Also add stream messages to the store so subsequent listMessages reflects them
         stored.addAll(nextStreamMessages)
 
-        return io.ktor.utils.io.ByteChannel(autoFlush = true).also { channel ->
-            kotlinx.coroutines.GlobalScope.launch {
-                channel.writeStringUtf8(sseBody)
-                channel.close()
-            }
-        }
+        // Pre-filled ByteReadChannel — no background writer coroutine. The
+        // previous GlobalScope.launch pattern leaked coroutines across tests
+        // in the same JVM worker, eventually OOMing CI (letta-mobile-o8pr).
+        return ByteReadChannel(sseBody.toByteArray())
     }
 }
 
