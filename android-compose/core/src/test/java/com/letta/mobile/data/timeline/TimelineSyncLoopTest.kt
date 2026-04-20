@@ -645,6 +645,16 @@ private class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
         stored.add(msg)
     }
 
+    // The default `MessageApi.streamConversation` calls into a relaxed-mockk
+    // HttpClient and returns an ApiException on every invocation, which sends
+    // `runStreamSubscriber` into a 5s-delay retry loop that accumulates
+    // timers for the full duration of each test (observed: 91s for one test
+    // that never exercises the subscriber). Idle here instead so the loop
+    // suspends until the test's scope is cancelled. letta-mobile-o8pr.
+    override suspend fun streamConversation(conversationId: String): ByteReadChannel {
+        kotlinx.coroutines.awaitCancellation()
+    }
+
     override suspend fun listConversationMessages(
         conversationId: String,
         limit: Int?,
