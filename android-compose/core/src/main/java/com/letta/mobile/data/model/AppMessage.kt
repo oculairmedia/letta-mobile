@@ -11,6 +11,8 @@ data class AppMessage(
     val date: Instant,
     val messageType: MessageType,
     val content: String,
+    val runId: String? = null,
+    val stepId: String? = null,
     val isPending: Boolean = false,
     val localId: String? = null,
     val toolName: String? = null,

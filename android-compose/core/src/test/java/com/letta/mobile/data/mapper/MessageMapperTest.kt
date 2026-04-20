@@ -3,6 +3,7 @@ package com.letta.mobile.data.mapper
 import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.ApprovalResult
+import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.MessageType
 import com.letta.mobile.data.model.ToolCall
 import kotlinx.serialization.json.buildJsonObject
@@ -83,6 +84,18 @@ class MessageMapperTest : WordSpec({
             ).toUiMessage()
 
             uiMsg.isPending shouldBe true
+        }
+
+        "thread run id and step id onto ui message" {
+            val uiMsg = TestData.appMessage(
+                messageType = MessageType.ASSISTANT,
+                content = "Hi there",
+                runId = "run-123",
+                stepId = "step-456",
+            ).toUiMessage()
+
+            uiMsg.runId shouldBe "run-123"
+            uiMsg.stepId shouldBe "step-456"
         }
 
         "always produce toolCalls for TOOL_CALL even without name" {
@@ -269,6 +282,34 @@ class MessageMapperTest : WordSpec({
             tc.name shouldBe "core_memory_append"
             tc.arguments shouldBe "{\"key\": \"val\"}"
             tc.result.shouldBeNull()
+        }
+
+        "preserve run and step ids across merged tool call rendering" {
+            val messages = listOf(
+                TestData.appMessage(
+                    id = "m1",
+                    messageType = MessageType.TOOL_CALL,
+                    content = "{}",
+                    toolName = "archival_memory_search",
+                    toolCallId = "tc-1",
+                    runId = "run-1",
+                    stepId = "step-1",
+                ),
+                TestData.appMessage(
+                    id = "m2",
+                    messageType = MessageType.TOOL_RETURN,
+                    content = "results",
+                    toolName = "archival_memory_search",
+                    toolCallId = "tc-1",
+                    runId = "run-1",
+                    stepId = "step-1",
+                ),
+            )
+
+            val ui = messages.toUiMessages()
+            ui shouldHaveSize 1
+            ui.first().runId shouldBe "run-1"
+            ui.first().stepId shouldBe "step-1"
         }
 
         "pass through user, assistant, reasoning unchanged" {
@@ -680,6 +721,24 @@ class MessageMapperTest : WordSpec({
             appMessage.content shouldBe ""
             appMessage.generatedUi.shouldNotBeNull()
             appMessage.generatedUi!!.component shouldBe "metric_card"
+        }
+
+        "carry run and step ids from LettaMessage into AppMessage" {
+            val message = AssistantMessage(
+                id = "assistant-run-1",
+                contentRaw = buildJsonObject {
+                    put("text", "Grouped assistant message")
+                },
+                date = "2024-03-15T10:00:00Z",
+                runId = "run-hydrated",
+                stepId = "step-hydrated",
+            )
+
+            val appMessage = message.toAppMessage()
+
+            appMessage.shouldNotBeNull()
+            appMessage.runId shouldBe "run-hydrated"
+            appMessage.stepId shouldBe "step-hydrated"
         }
     }
 

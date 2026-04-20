@@ -105,6 +105,8 @@ internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                 role = role,
                 content = ev.content,
                 timestamp = ev.date.toString(),
+                runId = ev.runId,
+                stepId = ev.stepId,
                 isPending = false,
                 isReasoning = ev.messageType == TimelineMessageType.REASONING,
                 toolCalls = uiToolCalls,

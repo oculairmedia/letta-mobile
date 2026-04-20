@@ -184,6 +184,29 @@ class TimelineEventToUiMessageTest {
     }
 
     @Test
+    fun `confirmed events thread run id and step id onto ui message`() {
+        val ev = TimelineEvent.Confirmed(
+            position = 1.0,
+            otid = "server-msg-1",
+            content = "thinking",
+            serverId = "msg-1",
+            messageType = TimelineMessageType.REASONING,
+            runId = "run-live",
+            stepId = "step-live",
+            date = Instant.parse("2026-04-19T06:00:00Z"),
+            toolCalls = emptyList(),
+            approvalRequestId = null,
+            approvalDecided = false,
+            toolReturnContent = null,
+            toolReturnIsError = false,
+        )
+
+        val ui = timelineEventToUiMessage(ev)!!
+        assertEquals("run-live", ui.runId)
+        assertEquals("step-live", ui.stepId)
+    }
+
+    @Test
     fun `OTHER message type is dropped`() {
         val ev = confirmed(TimelineMessageType.OTHER, content = "something")
         assertNull(timelineEventToUiMessage(ev))

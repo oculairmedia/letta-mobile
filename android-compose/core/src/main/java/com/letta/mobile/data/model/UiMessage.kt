@@ -8,6 +8,17 @@ data class UiMessage(
     val role: String,
     val content: String,
     val timestamp: String,
+    /**
+     * Server run id for assistant-side messages that belong to a run.
+     * Null for user messages, which trigger runs rather than belonging to one,
+     * and for older hydrated history that predates run tracking.
+     */
+    val runId: String? = null,
+    /**
+     * Server step id for assistant-side messages that belong to a run step.
+     * Null for user messages and older history that predates step tracking.
+     */
+    val stepId: String? = null,
     val isPending: Boolean = false,
     val isReasoning: Boolean = false,
     val toolCalls: List<UiToolCall>? = null,

@@ -66,6 +66,8 @@ fun LettaMessage.toAppMessage(state: MessageMappingState): AppMessage? {
             date = date?.toInstant() ?: Instant.now(),
             messageType = MessageType.USER,
             content = content,
+            runId = runId,
+            stepId = stepId,
             // letta-mobile-mge5.24: carry any inline image parts through so
             // re-hydrating history from /messages shows the original image
             // bubble instead of a text-only placeholder.
@@ -80,6 +82,8 @@ fun LettaMessage.toAppMessage(state: MessageMappingState): AppMessage? {
                 content = generatedUi?.fallbackText.orEmpty().ifBlank {
                     if (generatedUi != null) "" else content
                 },
+                runId = runId,
+                stepId = stepId,
                 generatedUi = generatedUi,
                 attachments = attachments,
             )
@@ -88,7 +92,9 @@ fun LettaMessage.toAppMessage(state: MessageMappingState): AppMessage? {
             id = id,
             date = date?.toInstant() ?: Instant.now(),
             messageType = MessageType.REASONING,
-            content = reasoning
+            content = reasoning,
+            runId = runId,
+            stepId = stepId,
         )
         is ToolCallMessage -> {
             val toolCall = effectiveToolCalls.firstOrNull()
@@ -103,6 +109,8 @@ fun LettaMessage.toAppMessage(state: MessageMappingState): AppMessage? {
                 date = date?.toInstant() ?: Instant.now(),
                 messageType = MessageType.TOOL_CALL,
                 content = arguments,
+                runId = runId,
+                stepId = stepId,
                 toolName = toolName,
                 toolCallId = toolCallId,
             )
@@ -124,6 +132,8 @@ fun LettaMessage.toAppMessage(state: MessageMappingState): AppMessage? {
                 date = date?.toInstant() ?: Instant.now(),
                 messageType = MessageType.APPROVAL_REQUEST,
                 content = "",
+                runId = runId,
+                stepId = stepId,
                 approvalRequest = ApprovalRequestPayload(
                     requestId = id,
                     toolCalls = toolCalls,
@@ -138,6 +148,8 @@ fun LettaMessage.toAppMessage(state: MessageMappingState): AppMessage? {
                 date = date?.toInstant() ?: Instant.now(),
                 messageType = MessageType.TOOL_RETURN,
                 content = toolReturn.funcResponse ?: "",
+                runId = runId,
+                stepId = stepId,
                 toolName = context?.name ?: name,
                 toolCallId = toolCallId,
                 toolReturnStatus = toolReturn.status,
@@ -148,6 +160,8 @@ fun LettaMessage.toAppMessage(state: MessageMappingState): AppMessage? {
             date = date?.toInstant() ?: Instant.now(),
             messageType = MessageType.APPROVAL_RESPONSE,
             content = "",
+            runId = runId,
+            stepId = stepId,
             approvalResponse = ApprovalResponsePayload(
                 requestId = approvalRequestId,
                 approved = approve,
@@ -298,6 +312,8 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                                 role = "assistant",
                                 content = generatedUi.fallbackText.orEmpty(),
                                 timestamp = msg.date.toString(),
+                                runId = msg.runId,
+                                stepId = msg.stepId,
                                 generatedUi = UiGeneratedComponent(
                                     name = generatedUi.component,
                                     propsJson = generatedUi.propsJson,
@@ -318,6 +334,8 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                             role = "assistant",
                             content = visibleText,
                             timestamp = msg.date.toString(),
+                            runId = msg.runId,
+                            stepId = msg.stepId,
                         ))
                         continue
                     }
@@ -335,6 +353,8 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                     role = "tool",
                     content = "",
                     timestamp = msg.date.toString(),
+                    runId = msg.runId,
+                    stepId = msg.stepId,
                     toolCalls = listOf(toolCall),
                 ))
             }
@@ -352,6 +372,8 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                                 role = "assistant",
                                 content = generatedUi.fallbackText.orEmpty(),
                                 timestamp = msg.date.toString(),
+                                runId = msg.runId,
+                                stepId = msg.stepId,
                                 generatedUi = UiGeneratedComponent(
                                     name = generatedUi.component,
                                     propsJson = generatedUi.propsJson,
@@ -369,6 +391,8 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                         role = "assistant",
                         content = msg.content,
                         timestamp = msg.date.toString(),
+                        runId = msg.runId,
+                        stepId = msg.stepId,
                     ))
                     continue
                 }
@@ -385,6 +409,8 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                     role = "tool",
                     content = "",
                     timestamp = msg.date.toString(),
+                    runId = msg.runId,
+                    stepId = msg.stepId,
                     toolCalls = listOf(toolCall),
                 ))
             }
@@ -494,6 +520,8 @@ fun AppMessage.toUiMessage(): UiMessage {
         role = role,
         content = displayContent,
         timestamp = date.toString(),
+        runId = runId,
+        stepId = stepId,
         isPending = isPending,
         isReasoning = messageType == MessageType.REASONING,
         toolCalls = toolCalls,
