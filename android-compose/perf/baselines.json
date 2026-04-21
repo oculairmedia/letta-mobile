@@ -2,33 +2,48 @@
   "$schema": "./baselines.schema.json",
   "comment": [
     "Performance baselines used by the macrobenchmark CI gate.",
-    "Every metric has a baseline (median of last known-good run) and a",
-    "tolerance (percentage above which a build is failed). Re-baselining",
-    "is an explicit commit to this file — see letta-mobile-o7ob.4.1."
+    "The canonical benchmark device is the GitHub Actions API 33 emulator",
+    "(google_apis, pixel_6 profile). Baselines must be seeded from that",
+    "device class via perf/check_baselines.py --rebaseline or the dedicated",
+    "workflow_dispatch path before PR verification can pass.",
+    "Re-baselining is an explicit commit to this file \u2014 see",
+    "docs/performance/perf-gate.md and letta-mobile-o7ob.4.1."
   ],
+  "benchmark_environment": {
+    "canonical_device": "GitHub Actions Android Emulator",
+    "api_level": 33,
+    "target": "google_apis",
+    "profile": "pixel_6",
+    "notes": [
+      "API 33 sidesteps the Android 11 / API 30 profileinstaller handshake bug tracked in letta-mobile-ce2c.",
+      "A physical-device slow-floor tier can be added later without changing this gate's source of truth."
+    ]
+  },
   "metrics": {
     "startup.cold.p95_ms": {
       "baseline": null,
-      "tolerance_pct": 15,
+      "tolerance_pct": 10,
       "source": "StartupBenchmark.coldStartupCompilationPartial",
       "metric": "timeToInitialDisplayMs"
     },
     "startup.warm.p95_ms": {
       "baseline": null,
-      "tolerance_pct": 15,
+      "tolerance_pct": 10,
       "source": "StartupBenchmark.warmStartup",
       "metric": "timeToInitialDisplayMs"
     },
     "scroll.jank.pct": {
       "baseline": null,
-      "tolerance_pct": 20,
+      "tolerance_pct": 15,
+      "tolerance_abs": 1.0,
       "source": "ScrollJankBenchmark.scrollChatListCompilationPartial",
       "metric": "frameDurationCpuMs",
       "aggregation": "jankCountPercent"
     },
     "composer.typing.jank.pct": {
       "baseline": null,
-      "tolerance_pct": 20,
+      "tolerance_pct": 15,
+      "tolerance_abs": 1.0,
       "source": "ComposerTypingBenchmark.typeComposerCompilationPartial",
       "metric": "frameDurationCpuMs",
       "aggregation": "jankCountPercent"
