@@ -14,6 +14,7 @@ import com.letta.mobile.bot.heartbeat.BotHeartbeatScheduler
 import com.letta.mobile.bot.service.BotServiceAutoStarter
 import com.letta.mobile.crash.CrashReporter
 import com.letta.mobile.performance.DebugPerformanceMonitor
+import com.letta.mobile.util.Telemetry
 import dagger.hilt.android.HiltAndroidApp
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -21,7 +22,9 @@ import io.ktor.client.plugins.HttpTimeout
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import okio.Path.Companion.toOkioPath
 import javax.inject.Inject
 
@@ -67,63 +70,120 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
+        runStartupHooks()
+    }
+
+    internal fun runStartupHooks(
+        isRobolectricRuntime: Boolean = isRobolectricRuntime(),
+        runAsyncInline: Boolean = false,
+    ) {
+        val startMs = System.currentTimeMillis()
+        Telemetry.event(APP_TAG, "onCreate.start")
         // CrashReporter chains itself on top of Sentry's handler so
         // unhandled exceptions are both uploaded to Sentry and persisted
         // to app-private storage for surfacing on the next launch.
         crashReporter.install()
         setupGlobalExceptionHandler()
         channelNotificationPublisher.ensureChannel()
-        if (isRobolectricRuntime()) {
+        if (isRobolectricRuntime) {
+            emitOnCreateEnd(startMs)
             return
         }
-        applicationScope.launch {
-            runCatching {
-                DebugPerformanceMonitor.install(this@LettaApplication)
-            }.onFailure { error ->
-                Log.w("LettaApp", "Skipping debug performance monitor", error)
-            }
-        }
-        runCatching {
+
+        runStartupComponent("channelHeartbeat") {
             channelHeartbeatScheduler.schedule()
-        }.onFailure { error ->
-            Log.w("LettaApp", "Skipping heartbeat scheduling", error)
         }
-        applicationScope.launch {
-            runCatching {
-                botServiceAutoStarter.restoreIfConfigured()
-            }.onFailure { error ->
-                Log.w("LettaApp", "Skipping bot auto-start restore", error)
+
+        val asyncStartup: suspend () -> Unit = {
+            coroutineScope {
+                launch {
+                    runStartupComponentAsync("perfMonitor") {
+                        DebugPerformanceMonitor.install(this@LettaApplication)
+                    }
+                }
+                launch {
+                    runStartupComponentAsync("botAutostart") {
+                        botServiceAutoStarter.restoreIfConfigured()
+                    }
+                }
+                launch {
+                    runStartupComponentAsync("botHeartbeat") {
+                        botHeartbeatScheduler.schedule()
+                    }
+                }
             }
         }
-        applicationScope.launch {
-            runCatching {
-                botHeartbeatScheduler.schedule()
-            }.onFailure { error ->
-                Log.w("LettaApp", "Skipping bot heartbeat scheduling", error)
+
+        if (runAsyncInline) {
+            runBlocking { asyncStartup() }
+            emitOnCreateEnd(startMs)
+        } else {
+            applicationScope.launch {
+                try {
+                    asyncStartup()
+                } finally {
+                    emitOnCreateEnd(startMs)
+                }
             }
         }
     }
 
+    override fun onTerminate() {
+        Telemetry.event(APP_TAG, "onTerminate")
+        super.onTerminate()
+    }
+
     override fun newImageLoader(context: coil3.PlatformContext): ImageLoader {
-        return ImageLoader.Builder(context)
-            .components {
-                @OptIn(ExperimentalCoilApi::class)
-                add(KtorNetworkFetcherFactory(httpClient = imageHttpClient))
-            }
-            .crossfade(true)
-            .diskCache {
-                DiskCache.Builder()
-                    .directory(java.io.File(cacheDir, "image_cache").toOkioPath())
-                    .maxSizeBytes(50L * 1024 * 1024)
-                    .build()
-            }
-            .build()
+        return try {
+            ImageLoader.Builder(context)
+                .components {
+                    @OptIn(ExperimentalCoilApi::class)
+                    add(KtorNetworkFetcherFactory(httpClient = imageHttpClient))
+                }
+                .crossfade(true)
+                .diskCache {
+                    DiskCache.Builder()
+                        .directory(java.io.File(cacheDir, "image_cache").toOkioPath())
+                        .maxSizeBytes(50L * 1024 * 1024)
+                        .build()
+                }
+                .build()
+        } catch (t: Throwable) {
+            Telemetry.error(APP_TAG, "init.failed", t, "component" to "imageLoader")
+            throw t
+        }
+    }
+
+    private fun runStartupComponent(component: String, block: () -> Unit) {
+        runCatching {
+            block()
+        }.onFailure { error ->
+            Telemetry.error(APP_TAG, "init.failed", error, "component" to component)
+            Log.w(LOG_TAG, "Skipping $component initialization", error)
+        }
+    }
+
+    private suspend fun runStartupComponentAsync(component: String, block: suspend () -> Unit) {
+        runCatching {
+            block()
+        }.onFailure { error ->
+            Telemetry.error(APP_TAG, "init.failed", error, "component" to component)
+            Log.w(LOG_TAG, "Skipping $component initialization", error)
+        }
+    }
+
+    private fun emitOnCreateEnd(startMs: Long) {
+        Telemetry.event(
+            APP_TAG,
+            "onCreate.end",
+            durationMs = System.currentTimeMillis() - startMs,
+        )
     }
 
     private fun setupGlobalExceptionHandler() {
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            Log.e("LettaApp", "Uncaught exception on ${thread.name}", throwable)
+            Log.e(LOG_TAG, "Uncaught exception on ${thread.name}", throwable)
             defaultHandler?.uncaughtException(thread, throwable)
         }
     }
@@ -132,5 +192,10 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
         return runCatching {
             Class.forName("org.robolectric.RuntimeEnvironment")
         }.isSuccess
+    }
+
+    private companion object {
+        const val APP_TAG = "App"
+        const val LOG_TAG = "LettaApp"
     }
 }
