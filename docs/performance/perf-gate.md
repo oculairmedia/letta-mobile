@@ -124,3 +124,21 @@ If the job fails unexpectedly:
 that verifies the parser exits non-zero when a benchmark value exceeds the
 allowed ceiling. Keep that test passing so the CI gate itself does not
 silently rot.
+
+## Known quirks
+
+### `reactivecircus/android-emulator-runner` `script:` line continuations
+
+The emulator-runner action's `script:` input does **not** honor YAML
+line-continuation backslashes the way standard `run:` steps do. The action
+passes the block through an intermediate shell invocation that consumes the
+`\` literally, which then shows up as a malformed Gradle task name (e.g.
+`Task '\' not found in root project`).
+
+Keep each `./gradlew` invocation on a single line inside `script:`, or
+split it across multiple `- uses: ... with: { script: ... }` steps if
+readability demands it. Normal multiline `run: |` blocks elsewhere in the
+workflow are unaffected and can continue using `\` line continuations.
+
+This bit us once during the initial perf-gate bring-up (2026-04-21); the
+fix was commit `021e832`.
