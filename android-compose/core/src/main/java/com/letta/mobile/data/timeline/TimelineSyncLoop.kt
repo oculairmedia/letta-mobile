@@ -855,11 +855,21 @@ class TimelineSyncLoop(
             } catch (e: ApiException) {
                 // The Letta server returns 400 INVALID_ARGUMENT with body
                 // `{"detail":"... No active runs found ..."}` as an alternative
-                // form of "no active run". Classify these the same as
-                // NoActiveRunException and back off. Everything else is an
-                // actual error.
+                // form of "no active run". It may ALSO return
+                // `{"detail":"EXPIRED: Run was created more than 3 hours ago,
+                // and is now expired."}` once a previously-active run ages out
+                // without finishing. Both of these are the "idle" state from
+                // the subscriber's point of view — back off and retry; the
+                // next live run (or a subsequent probe) will open a fresh
+                // stream. Everything else is an actual error.
+                // letta-mobile-gqz3: before this fix, EXPIRED was mis-classified
+                // as a generic error and the subscriber wedged at the backoff
+                // cap, repeatedly re-attaching to the dead run forever.
                 val msg = e.message ?: ""
-                if (msg.contains("No active runs", ignoreCase = true)) {
+                val isIdlePattern = msg.contains("No active runs", ignoreCase = true) ||
+                    msg.contains("EXPIRED:", ignoreCase = true) ||
+                    msg.contains("is now expired", ignoreCase = true)
+                if (isIdlePattern) {
                     Telemetry.event(
                         "TimelineSync", "streamSubscriber.idle404",
                         "conversationId" to conversationId,
