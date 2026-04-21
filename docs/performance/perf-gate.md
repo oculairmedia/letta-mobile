@@ -24,14 +24,20 @@ Why this device is the source of truth:
 Physical-device slow-floor runs are still valuable, but they belong in a
 separate tier and do **not** define the baseline for this gate.
 
-## What the gate measures
+## What the gate measures today
 
 The CI workflow runs the benchmark methods that back `perf/baselines.json`:
 
 - `StartupBenchmark#coldStartupCompilationPartial`
 - `StartupBenchmark#warmStartup`
-- `ScrollJankBenchmark#scrollChatListCompilationPartial`
-- `ComposerTypingBenchmark#typeComposerCompilationPartial`
+
+The repo still contains `ScrollJankBenchmark` and `ComposerTypingBenchmark`,
+but they are **not gating in CI yet**. On a fresh API 33 emulator the app
+currently launches into a nondeterministic empty-state surface, which means the
+frame-timing benchmarks can produce zero `frameDurationCpuMs` samples even when
+the emulator and benchmark harness are healthy. They move back into the gate
+only after the app exposes a deterministic benchmark launch route. Track that
+follow-up under `letta-mobile-4ccv`.
 
 The parser reads AndroidX benchmark JSON output from:
 
@@ -46,11 +52,6 @@ Current policy:
 
 - `startup.cold.p95_ms`: `+10%`
 - `startup.warm.p95_ms`: `+10%`
-- `scroll.jank.pct`: `max(+15%, +1.0 absolute)`
-- `composer.typing.jank.pct`: `max(+15%, +1.0 absolute)`
-
-The absolute `+1.0` floor prevents tiny jank percentages from flaking on
-measurement noise alone.
 
 ## Re-baselining
 
@@ -66,9 +67,7 @@ cd android-compose
 ./gradlew :macrobenchmark:connectedBenchmarkAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=\
 com.letta.mobile.macrobenchmark.StartupBenchmark#coldStartupCompilationPartial,\
-com.letta.mobile.macrobenchmark.StartupBenchmark#warmStartup,\
-com.letta.mobile.macrobenchmark.ScrollJankBenchmark#scrollChatListCompilationPartial,\
-com.letta.mobile.macrobenchmark.ComposerTypingBenchmark#typeComposerCompilationPartial
+com.letta.mobile.macrobenchmark.StartupBenchmark#warmStartup
 
 python3 perf/check_baselines.py \
   macrobenchmark/build/outputs/connected_android_test_additional_output \
@@ -116,12 +115,19 @@ here rather than hard-coded in the repo.
 - **YAML folded scalars (`>-`) introduce spaces** when you later split or join
   multi-line values. The benchmark class filter is stored as a literal block
   (`|`) and collapsed in shell to avoid leading whitespace in class names.
-- **AndroidX Benchmark rejects emulator measurements by default.** CI passes
-  `androidx.benchmark.suppressErrors=EMULATOR` only in the workflow so local
-  physical-device runs keep the default safety behavior.
+- **AndroidX Benchmark rejects emulator measurements by default.** The
+  `:macrobenchmark` module sets
+  `testInstrumentationRunnerArguments["androidx.benchmark.suppressErrors"] = "EMULATOR"`
+  in Gradle DSL, which is the AndroidX-recommended configuration and avoids the
+  configuration-cache warning emitted by command-line injection.
 - **Pushes during an in-flight perf run cancel it** because the workflow uses
   `concurrency.cancel-in-progress: true`. Time docs-only pushes accordingly,
   especially during the first seed run.
+- **FrameTimingMetric benchmarks are intentionally non-gating in v1.** The
+  canonical emulator currently lands on a generic project home empty state with
+  no guaranteed scrollable list or editable composer, which can yield zero
+  frame samples and false failures. Add a deterministic benchmark launch route
+  before moving jank metrics into CI (`letta-mobile-4ccv`).
 
 ## Investigating flakes
 
@@ -139,8 +145,6 @@ If the job fails unexpectedly:
 that verifies the parser exits non-zero when a benchmark value exceeds the
 allowed ceiling. Keep that test passing so the CI gate itself does not
 silently rot.
-
-## Known quirks
 
 ### `reactivecircus/android-emulator-runner` `script:` line continuations
 

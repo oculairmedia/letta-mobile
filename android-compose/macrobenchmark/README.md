@@ -64,4 +64,9 @@ parses the `*-benchmarkData.json` output and fails the build if any
 measured metric exceeds `baseline + tolerance`. The canonical CI device
 is the API 33 `pixel_6` emulator. Re-baselining is an explicit commit.
 
+Today the CI gate enforces **startup metrics only**. The scroll/composer
+`FrameTimingMetric` benchmarks stay in-tree for local investigation, but they
+are non-gating until the app exposes a deterministic benchmark launch surface
+on the canonical emulator.
+
 See `letta-mobile-o7ob.4.1` for the CI pipeline wiring.

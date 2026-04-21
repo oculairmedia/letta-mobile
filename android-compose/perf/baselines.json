@@ -7,7 +7,9 @@
     "device class via perf/check_baselines.py --rebaseline or the dedicated",
     "workflow_dispatch path before PR verification can pass.",
     "Re-baselining is an explicit commit to this file \u2014 see",
-    "docs/performance/perf-gate.md and letta-mobile-o7ob.4.1."
+    "docs/performance/perf-gate.md and letta-mobile-o7ob.4.1.",
+    "Scroll/composer frame metrics are intentionally non-gating in startup-only v1;",
+    "track deterministic CI emulator coverage restoration in letta-mobile-4ccv."
   ],
   "benchmark_environment": {
     "canonical_device": "GitHub Actions Android Emulator",
@@ -30,23 +32,10 @@
       "baseline": null,
       "tolerance_pct": 10,
       "source": "StartupBenchmark.warmStartup",
-      "metric": "timeToInitialDisplayMs"
-    },
-    "scroll.jank.pct": {
-      "baseline": null,
-      "tolerance_pct": 15,
-      "tolerance_abs": 1.0,
-      "source": "ScrollJankBenchmark.scrollChatListCompilationPartial",
-      "metric": "frameDurationCpuMs",
-      "aggregation": "jankCountPercent"
-    },
-    "composer.typing.jank.pct": {
-      "baseline": null,
-      "tolerance_pct": 15,
-      "tolerance_abs": 1.0,
-      "source": "ComposerTypingBenchmark.typeComposerCompilationPartial",
-      "metric": "frameDurationCpuMs",
-      "aggregation": "jankCountPercent"
+      "metric": "timeToInitialDisplayMs",
+      "notes": [
+        "Startup-only CI gate v1. FrameTimingMetric benchmarks stay non-gating until the app exposes a deterministic benchmark launch surface on the canonical emulator (letta-mobile-4ccv)."
+      ]
     }
   }
 }

@@ -33,8 +33,6 @@ jobs:
       PERF_BENCHMARK_FILTER: |
         com.letta.mobile.macrobenchmark.StartupBenchmark#coldStartupCompilationPartial
         com.letta.mobile.macrobenchmark.StartupBenchmark#warmStartup
-        com.letta.mobile.macrobenchmark.ScrollJankBenchmark#scrollChatListCompilationPartial
-        com.letta.mobile.macrobenchmark.ComposerTypingBenchmark#typeComposerCompilationPartial
       PERF_OUTPUT_DIR: macrobenchmark/build/outputs/connected_android_test_additional_output
       PERF_REPORT_DIR: macrobenchmark/build/reports/androidTests
       PR_TITLE: ${{ github.event.pull_request.title || '' }}
@@ -73,7 +71,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
           working-directory: android-compose
           script: |
-            FILTER=$(printf '%s\n' "$PERF_BENCHMARK_FILTER" | awk 'NF { printf "%s,", $0 } END { print "" }' | sed 's/,$//'); ./gradlew --no-daemon :macrobenchmark:connectedBenchmarkAndroidTest -Pandroid.testInstrumentationRunnerArguments.class="$FILTER" -Pandroid.testInstrumentationRunnerArguments.androidx.benchmark.suppressErrors=EMULATOR
+            FILTER=$(printf '%s\n' "$PERF_BENCHMARK_FILTER" | awk 'NF { printf "%s,", $0 } END { print "" }' | sed 's/,$//'); ./gradlew --no-daemon :macrobenchmark:connectedBenchmarkAndroidTest -Pandroid.testInstrumentationRunnerArguments.class="$FILTER"
 
       - name: Check perf baselines
         run: |

@@ -15,8 +15,9 @@ Tracks issue `letta-mobile-o7ob.4.1`.
 
 ## Workflow
 
-1. CI runs `:macrobenchmark:connectedBenchmarkAndroidTest` against the
-   canonical API 33 `pixel_6` emulator.
+1. CI runs the startup subset of
+   `:macrobenchmark:connectedBenchmarkAndroidTest` against the canonical API 33
+   `pixel_6` emulator.
 2. CI runs `python perf/check_baselines.py <path-to-outputs>` which
    exits non-zero on regression.
 3. Re-baselining is a deliberate commit:
@@ -28,5 +29,9 @@ Tracks issue `letta-mobile-o7ob.4.1`.
 
 If the baselines are still `null`, verify mode exits with code `2`
 until a maintainer seeds them on the canonical CI device.
+
+`ScrollJankBenchmark` and `ComposerTypingBenchmark` remain in the repo for local
+investigation, but they are non-gating until the app exposes a deterministic
+benchmark launch surface on CI.
 
 See `docs/performance/perf-gate.md` and `letta-mobile-o7ob.4.1`.
