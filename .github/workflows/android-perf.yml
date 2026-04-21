@@ -73,7 +73,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
           working-directory: android-compose
           script: |
-            FILTER=$(awk 'NF { printf "%s,", $0 } END { print "" }' <<< "$PERF_BENCHMARK_FILTER" | sed 's/,$//')
+            FILTER=$(printf '%s\n' "$PERF_BENCHMARK_FILTER" | awk 'NF { printf "%s,", $0 } END { print "" }' | sed 's/,$//')
             ./gradlew --no-daemon :macrobenchmark:connectedBenchmarkAndroidTest \
               -Pandroid.testInstrumentationRunnerArguments.class="$FILTER" \
               -Pandroid.testInstrumentationRunnerArguments.androidx.benchmark.suppressErrors=EMULATOR
