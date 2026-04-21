@@ -126,20 +126,20 @@ data class Timeline(
         val otidDupes = events.size != events.map { it.otid }.toSet().size
         
         if (positionViolation) {
-            Telemetry.event(
+            Telemetry.error(
                 "Timeline", "init.positionViolation",
+                IllegalStateException("Timeline events are not strictly ordered by position"),
                 "conversationId" to conversationId,
                 "eventCount" to events.size,
-                level = Telemetry.Level.ERROR
             )
         }
         if (otidDupes) {
-            Telemetry.event(
+            Telemetry.error(
                 "Timeline", "init.otidDuplicates",
+                IllegalStateException("Timeline contains duplicate otids"),
                 "conversationId" to conversationId,
                 "eventCount" to events.size,
                 "uniqueOtids" to events.map { it.otid }.toSet().size,
-                level = Telemetry.Level.ERROR
             )
         }
     }

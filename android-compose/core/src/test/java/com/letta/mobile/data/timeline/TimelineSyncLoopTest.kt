@@ -636,7 +636,13 @@ class TimelineSyncLoopTest {
      *
      * Assertion: observing an EXPIRED ApiException must emit the
      * `streamSubscriber.idle404` Telemetry event (with via=apiException)
-     * and must NOT emit a `streamSubscriber.error` for the same cycle.
+     * and must NOT emit a `streamSubscriber.networkError` for the same cycle.
+     *
+     * (Prior to letta-mobile-3hnh the non-idle branch emitted both
+     * `streamSubscriber.error` and `streamSubscriber.networkError`; those
+     * have since been consolidated into a single `networkError` event via
+     * `Telemetry.error()`. This test guards the idle/error separation
+     * regardless of which name represents the error path.)
      */
     @Test
     fun `EXPIRED run ApiException is classified as idle, not error`() = runBlocking {
@@ -673,15 +679,19 @@ class TimelineSyncLoopTest {
                 "Saw events: ${events.map { "${it.tag}/${it.name}" }}",
             idle404,
         )
-        // And explicitly: there must not be a streamSubscriber.error for this
-        // cycle — before the fix, the wedge produced one error per retry.
+        // And explicitly: there must not be any error-path event for this
+        // cycle — before the gqz3 fix, the wedge produced one error per
+        // retry. Guard against EITHER of the historic error event names so
+        // that a future rename can't accidentally weaken this assertion.
         val errorForGqz3 = events.firstOrNull {
             it.tag == "TimelineSync" &&
-                it.name == "streamSubscriber.error" &&
+                (it.name == "streamSubscriber.error" ||
+                    it.name == "streamSubscriber.networkError") &&
                 (it.attrs["conversationId"] as? String) == "conv-gqz3"
         }
         assertEquals(
-            "EXPIRED must NOT produce a streamSubscriber.error (it's an idle pattern, not a real failure)",
+            "EXPIRED must NOT produce a streamSubscriber.error / .networkError " +
+                "(it's an idle pattern, not a real failure)",
             null,
             errorForGqz3,
         )

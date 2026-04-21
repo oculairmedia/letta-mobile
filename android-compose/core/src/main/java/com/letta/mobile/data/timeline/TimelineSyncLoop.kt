@@ -689,12 +689,10 @@ class TimelineSyncLoop(
                     throw t
                 }
                 lastError = t
-                Telemetry.event(
-                    "TimelineSync", "reconcile.retry",
+                Telemetry.error(
+                    "TimelineSync", "reconcile.retry", t,
                     "otid" to otid,
                     "attempt" to attempt + 1,
-                    "errorClass" to (t::class.simpleName ?: "Unknown"),
-                    "errorMessage" to (t.message ?: ""),
                 )
                 delay(RECONCILE_RETRY_BACKOFF_MS shl attempt)
             }
@@ -882,27 +880,15 @@ class TimelineSyncLoop(
                     // letta-mobile-mge5.6: distinguish transient network /
                     // server errors from the idle path. Grafana alerts on
                     // sustained networkError rate, not on idle404.
-                    Telemetry.event(
-                        "TimelineSync", "streamSubscriber.networkError",
-                        "conversationId" to conversationId,
-                        "errorClass" to e.javaClass.simpleName,
-                        "errorMessage" to (e.message ?: "<none>"),
-                    )
                     Telemetry.error(
-                        "TimelineSync", "streamSubscriber.error", e,
+                        "TimelineSync", "streamSubscriber.networkError", e,
                         "conversationId" to conversationId,
                     )
                     delay(STREAM_BACKOFF_MAX_MS)
                 }
             } catch (t: Throwable) {
-                Telemetry.event(
-                    "TimelineSync", "streamSubscriber.networkError",
-                    "conversationId" to conversationId,
-                    "errorClass" to t.javaClass.simpleName,
-                    "errorMessage" to (t.message ?: "<none>"),
-                )
                 Telemetry.error(
-                    "TimelineSync", "streamSubscriber.error", t,
+                    "TimelineSync", "streamSubscriber.networkError", t,
                     "conversationId" to conversationId,
                 )
                 delay(STREAM_BACKOFF_MAX_MS)

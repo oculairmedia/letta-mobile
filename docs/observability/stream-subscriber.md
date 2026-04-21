@@ -17,8 +17,7 @@ All events are emitted under tag `TimelineSync`.
 | `streamSubscriber.eventDeduped`  | A frame was recognised as already-seen and dropped                    | `conversationId`, `reason` (`otidSeen` \| `approvalAlreadyDecided`), plus `otid` / `approvalRequestId` |
 | `streamSubscriber.closed`        | Stream ended cleanly (run finished)                                   | `conversationId`, `durationMs` (since opened), `eventsReceived`   |
 | `streamSubscriber.idle404`       | Server returned `No active runs found` — idle backoff path            | `conversationId`, `backoffMs`, `via` (absent for typed exception, `apiException` for the 400-JSON variant) |
-| `streamSubscriber.networkError`  | Transient HTTP/connection failure (not an idle 404)                   | `conversationId`, `errorClass`, `errorMessage`                    |
-| `streamSubscriber.error`         | Same failure as above, but logged at ERROR level with the throwable   | `conversationId`                                                  |
+| `streamSubscriber.networkError`  | Transient HTTP/connection failure (not an idle 404), logged at ERROR with the throwable | `conversationId`, `errorClass`, `errorMessage`                    |
 
 Notes:
 

@@ -80,13 +80,19 @@ in-app inspector.
 | `Timeline`           | core/data/timeline/Timeline.kt            | timeline data-structure invariants |
 | `TimelineRepo`       | core/data/timeline/TimelineRepository.kt  | repository cache |
 | `Http`               | core/data/api/TelemetryInterceptor.kt     | HTTP round trips |
+| `App`                | app/LettaApplication.kt                   | process startup, lifecycle, init failures |
+| `Crash`              | app/crash/CrashReporter.kt                | crash persistence and previous-crash surfacing |
 | `ChatPushService`    | app/channel/ChatPushService.kt            | foreground service lifecycle |
 | `ChatComposerAttach` | app/ui/screens/chat/ChatComposerAttach.kt | attachment decoding |
 | `AdminChatVM`        | app/ui/screens/chat/AdminChatViewModel.kt | chat screen actions |
+| `Sentry`             | app/crash/SentryInitializer.kt            | upload lifecycle and transport outcomes |
+| `Perf`               | app/performance/DebugPerformanceMonitor.kt | debug instrumentation enabled state |
+| `Jank`               | app/performance/DebugPerformanceMonitor.kt | frame jank warnings |
+| `StrictMode`         | app/performance/DebugPerformanceMonitor.kt | StrictMode violations |
 
-Open issue: `AdminChatViewModel.kt` currently emits under both
-`AdminChatVM` and `AdminChatViewModel`. Must be consolidated to
-`AdminChatVM` — tracked in a child of `letta-mobile-2uzn`.
+`AdminChatViewModel.kt` now emits telemetry under `AdminChatVM`. Raw
+`Log.*` tags in that file still use `AdminChatViewModel`; these are not
+part of the telemetry taxonomy.
 
 ---
 
@@ -267,17 +273,6 @@ When you add a new Telemetry event:
 
 ## 8. Retrofitting existing code
 
-Known sites that don't yet follow these conventions:
-
-- `Timeline.kt:129` / `Timeline.kt:137` / `Timeline.kt:176` / `Timeline.kt:186`
-  use `Telemetry.event(..., level = Level.ERROR)` — should migrate to
-  `Telemetry.error(...)`.
-- `TimelineSyncLoop.kt:695` / `TimelineSyncLoop.kt:887` / `:898`
-  hand-roll `errorClass` / `errorMessage` attributes — should migrate to
-  `Telemetry.error(...)`. Note the existing attrs are still useful (e.g.
-  `attempt`, `conversationId`); keep those as trailing varargs.
-- `AdminChatViewModel.kt` emits under two different tags
-  (`AdminChatVM` and `AdminChatViewModel`) — must normalize.
-
-These are not blocking; they're tracked under `letta-mobile-2uzn`
-children.
+The known legacy call sites listed in the first draft of this document
+have been migrated. Keep this section empty until a new, concrete drift
+site is found.
