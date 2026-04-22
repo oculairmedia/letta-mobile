@@ -9,4 +9,5 @@
 -->
 <resources>
     <string name="sentry_traces_sample_rate" translatable="false">0.2</string>
+    <string name="sentry_jankstats_sample_rate" translatable="false">0.01</string>
 </resources>
