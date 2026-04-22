@@ -14,6 +14,7 @@ import com.letta.mobile.bot.heartbeat.BotHeartbeatScheduler
 import com.letta.mobile.bot.service.BotServiceAutoStarter
 import com.letta.mobile.crash.CrashReporter
 import com.letta.mobile.performance.DebugPerformanceMonitor
+import com.letta.mobile.performance.ProductionJankStatsMonitor
 import dagger.hilt.android.HiltAndroidApp
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -75,6 +76,11 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
         channelNotificationPublisher.ensureChannel()
         if (isRobolectricRuntime()) {
             return
+        }
+        runCatching {
+            ProductionJankStatsMonitor.install(this)
+        }.onFailure { error ->
+            Log.w("LettaApp", "Skipping production jank monitor", error)
         }
         applicationScope.launch {
             runCatching {

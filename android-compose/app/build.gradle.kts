@@ -145,6 +145,7 @@ android {
     }
 
     buildFeatures {
+        buildConfig = true
         compose = true
     }
 
@@ -227,7 +228,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-process:2.8.7")
     debugImplementation("androidx.compose.ui:ui-tooling")
-    debugImplementation("androidx.metrics:metrics-performance:1.0.0-alpha04")
+    implementation("androidx.metrics:metrics-performance:1.0.0-alpha04")
     debugImplementation("com.squareup.leakcanary:leakcanary-android:2.14")
 
     // Navigation
