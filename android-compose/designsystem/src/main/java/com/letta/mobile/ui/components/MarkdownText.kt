@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.components
 
+import android.util.Patterns
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -213,6 +214,108 @@ internal fun containsLikelyInlineMath(text: String): Boolean {
 private const val INLINE_MATH_PATTERN =
     "(?<=^|[^\\w$])\\$(?![\\s\\d])([^$\\n]+?)(?<!\\s)\\$(?!\\w)"
 
+/**
+ * Auto-linkify bare URLs in the text by wrapping them in markdown link syntax.
+ * This pre-processes URLs so the markdown library can render them as clickable
+ * LinkAnnotation.Url spans.
+ *
+ * Rules:
+ * - Detects URLs via android.util.Patterns.WEB_URL
+ * - Strips trailing punctuation (., ,, ), ], etc.) from detected URLs
+ * - Skips URLs already inside markdown link syntax [text](url)
+ * - Skips URLs inside inline code (`...`) and code fences (```...```)
+ */
+internal fun autolinkBareUrls(text: String): String {
+    // Quick bail-out if no URL-like patterns exist
+    if (!text.contains("http://") && !text.contains("https://") && !text.contains("www.")) {
+        return text
+    }
+
+    // Find all code blocks and inline code spans to exclude from linkification
+    val codeFenceRanges = findCodeFenceRanges(text)
+    val inlineCodeRanges = findInlineCodeRanges(text)
+    val markdownLinkRanges = findMarkdownLinkRanges(text)
+
+    val result = StringBuilder()
+    val urlMatcher = Patterns.WEB_URL.matcher(text)
+    var lastEnd = 0
+
+    while (urlMatcher.find()) {
+        val urlStart = urlMatcher.start()
+        val urlEnd = urlMatcher.end()
+        var url = urlMatcher.group()
+
+        // Skip if inside code fence, inline code, or markdown link
+        val isInCodeFence = codeFenceRanges.any { it.contains(urlStart) }
+        val isInInlineCode = inlineCodeRanges.any { it.contains(urlStart) }
+        val isInMarkdownLink = markdownLinkRanges.any { it.contains(urlStart) }
+
+        if (isInCodeFence || isInInlineCode || isInMarkdownLink) {
+            continue
+        }
+
+        // Strip trailing punctuation that's often not part of the URL
+        url = stripTrailingPunctuation(url)
+        val actualUrlEnd = urlStart + url.length
+
+        // Append text before this URL
+        result.append(text.substring(lastEnd, urlStart))
+
+        // Wrap in markdown link syntax
+        result.append("[").append(url).append("](").append(url).append(")")
+
+        lastEnd = actualUrlEnd
+    }
+
+    // Append remaining text
+    result.append(text.substring(lastEnd))
+
+    return result.toString()
+}
+
+/**
+ * Strip trailing punctuation commonly not part of URLs.
+ * Common cases: "Check https://example.com." or "See (https://example.com)."
+ */
+private fun stripTrailingPunctuation(url: String): String {
+    var cleaned = url
+    while (cleaned.isNotEmpty() && cleaned.last() in setOf('.', ',', ')', ']', ';', ':', '!', '?')) {
+        cleaned = cleaned.dropLast(1)
+    }
+    return cleaned
+}
+
+/** Find ranges of code fences (```...```) to exclude from URL linkification. */
+private fun findCodeFenceRanges(text: String): List<IntRange> {
+    val ranges = mutableListOf<IntRange>()
+    val regex = Regex("```[\\s\\S]*?```")
+    for (match in regex.findAll(text)) {
+        ranges.add(match.range)
+    }
+    return ranges
+}
+
+/** Find ranges of inline code (`...`) to exclude from URL linkification. */
+private fun findInlineCodeRanges(text: String): List<IntRange> {
+    val ranges = mutableListOf<IntRange>()
+    val regex = Regex("`[^`\n]+?`")
+    for (match in regex.findAll(text)) {
+        ranges.add(match.range)
+    }
+    return ranges
+}
+
+/** Find ranges of markdown link syntax [text](url) to avoid double-linkifying. */
+private fun findMarkdownLinkRanges(text: String): List<IntRange> {
+    val ranges = mutableListOf<IntRange>()
+    // Match markdown link syntax: [text](url)
+    val regex = Regex("\\[([^\\]]+)\\]\\(([^)]+)\\)")
+    for (match in regex.findAll(text)) {
+        ranges.add(match.range)
+    }
+    return ranges
+}
+
 /** Internal renderer that handles a single non-math chunk via the Markdown lib. */
 @Composable
 private fun MarkdownTextRaw(
@@ -220,6 +323,8 @@ private fun MarkdownTextRaw(
     modifier: Modifier = Modifier,
     textColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
+    // Auto-linkify bare URLs before passing to the markdown renderer
+    val linkedText = remember(text) { autolinkBareUrls(text) }
     val fontScale = LocalChatFontScale.current
     val isDarkTheme = isSystemInDarkTheme()
 
@@ -288,7 +393,7 @@ private fun MarkdownTextRaw(
 
     CompositionLocalProvider(LocalDensity provides scaledDensity) {
         Markdown(
-            content = text,
+            content = linkedText,
             modifier = modifier.fillMaxWidth(),
             components = components,
             extendedSpans = extendedSpans,
