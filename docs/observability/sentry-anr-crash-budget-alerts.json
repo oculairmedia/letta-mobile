@@ -1,0 +1,93 @@
+{
+  "tracking": "letta-mobile-o7ob.3.5",
+  "organizationApiBase": "https://sentry.io/api/0/organizations/{organization_slug}",
+  "projectApiBase": "https://sentry.io/api/0/projects/{organization_slug}/{project_slug}",
+  "notes": [
+    "Metric alerts are represented here as request payloads for Sentry's alert API.",
+    "The metric-alert endpoints are marked deprecated by Sentry docs in favor of the Monitors/Alerts API, but the payloads remain the closest stable JSON representation for version control today.",
+    "The ANR target does not map 1:1 to a first-class Sentry metric aggregate the way crash-free sessions does, so the app-hang rule below is an issue-alert fallback rather than a true Play-vitals ANR-rate alert."
+  ],
+  "metricAlerts": [
+    {
+      "name": "letta-mobile crash-free sessions below 99.5% (7d)",
+      "endpoint": "POST /api/0/organizations/{organization_slug}/alert-rules/",
+      "payload": {
+        "name": "letta-mobile crash-free sessions below 99.5% (7d)",
+        "queryType": 2,
+        "dataset": "metrics",
+        "aggregate": "percentage(sessions_crashed, sessions) AS _crash_rate_alert_aggregate",
+        "timeWindow": 1440,
+        "projects": [
+          "letta-mobile"
+        ],
+        "query": "",
+        "thresholdType": 1,
+        "resolveThreshold": 99.7,
+        "comparisonDelta": 10080,
+        "triggers": [
+          {
+            "label": "critical",
+            "alertThreshold": 99.5,
+            "actions": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "letta-mobile cold startup p95 above 15% vs previous 7d",
+      "endpoint": "POST /api/0/organizations/{organization_slug}/alert-rules/",
+      "payload": {
+        "name": "letta-mobile cold startup p95 above 15% vs previous 7d",
+        "queryType": 1,
+        "dataset": "transactions",
+        "aggregate": "p95(transaction.duration)",
+        "timeWindow": 1440,
+        "projects": [
+          "letta-mobile"
+        ],
+        "query": "transaction:app.startup startupType:cold",
+        "thresholdType": 0,
+        "comparisonDelta": 10080,
+        "triggers": [
+          {
+            "label": "critical",
+            "alertThreshold": 15,
+            "actions": []
+          }
+        ]
+      }
+    }
+  ],
+  "issueAlerts": [
+    {
+      "name": "letta-mobile app hangs / ANR spike fallback",
+      "endpoint": "POST /api/0/projects/{organization_slug}/{project_slug}/rules/",
+      "payload": {
+        "name": "letta-mobile app hangs / ANR spike fallback",
+        "frequency": 1440,
+        "actionMatch": "all",
+        "filterMatch": "all",
+        "conditions": [
+          {
+            "id": "sentry.rules.conditions.event_frequency.EventFrequencyCondition",
+            "value": 5,
+            "interval": "1w"
+          }
+        ],
+        "filters": [
+          {
+            "id": "sentry.rules.filters.issue_category.IssueCategoryFilter",
+            "value": 2
+          },
+          {
+            "id": "sentry.rules.conditions.event_attribute.EventAttributeCondition",
+            "attribute": "error.main_thread",
+            "match": "eq",
+            "value": "true"
+          }
+        ],
+        "actions": []
+      }
+    }
+  ]
+}

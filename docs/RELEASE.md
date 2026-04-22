@@ -93,6 +93,8 @@ If Grafana is wired:
 - Watch the **ANR / crash budget** panel (from the performance epic) — a
   spike within the first 2h of rollout usually means a regression slipped
   past the pre-release gate.
+  Import path / source of truth:
+  `docs/observability/sentry-anr-crash-budget-dashboard.json`.
 
 Alert rules under the same dashboard will fire warnings if any open chat
 screen sees zero events for > 10 minutes (likely subscriber dead).

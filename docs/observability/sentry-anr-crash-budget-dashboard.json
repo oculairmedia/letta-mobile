@@ -1,0 +1,147 @@
+{
+  "title": "letta-mobile — ANR & crash budget",
+  "widgets": [
+    {
+      "title": "Crash-free sessions (7d)",
+      "description": "Primary stability budget tile. Mirrors the release threshold used for Sentry alerting.",
+      "displayType": "line",
+      "widgetType": "discover",
+      "interval": "1d",
+      "queries": [
+        {
+          "name": "Crash-free sessions",
+          "fields": [
+            "percentage(sessions_crashed, sessions)"
+          ],
+          "aggregates": [
+            "percentage(sessions_crashed, sessions)"
+          ],
+          "conditions": "project:letta-mobile",
+          "orderby": "-percentage(sessions_crashed, sessions)"
+        }
+      ],
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "w": 2,
+        "h": 1
+      }
+    },
+    {
+      "title": "Cold startup p95 (7d)",
+      "description": "Lane C1 startup budget. Query app.startup transactions tagged startupType:cold.",
+      "displayType": "line",
+      "widgetType": "discover",
+      "interval": "1d",
+      "queries": [
+        {
+          "name": "Cold startup p95",
+          "fields": [
+            "p95(transaction.duration)"
+          ],
+          "aggregates": [
+            "p95(transaction.duration)"
+          ],
+          "conditions": "project:letta-mobile transaction:app.startup startupType:cold",
+          "orderby": "-p95(transaction.duration)"
+        }
+      ],
+      "layout": {
+        "x": 2,
+        "y": 0,
+        "w": 2,
+        "h": 1
+      }
+    },
+    {
+      "title": "Warm startup p95 (7d)",
+      "description": "Informational startup tile for comparison with cold startup. Query app.startup transactions tagged startupType:warm.",
+      "displayType": "line",
+      "widgetType": "discover",
+      "interval": "1d",
+      "queries": [
+        {
+          "name": "Warm startup p95",
+          "fields": [
+            "p95(transaction.duration)"
+          ],
+          "aggregates": [
+            "p95(transaction.duration)"
+          ],
+          "conditions": "project:letta-mobile transaction:app.startup startupType:warm",
+          "orderby": "-p95(transaction.duration)"
+        }
+      ],
+      "layout": {
+        "x": 0,
+        "y": 1,
+        "w": 2,
+        "h": 1
+      }
+    },
+    {
+      "title": "App hangs / ANR issue count (7d)",
+      "description": "Fallback ANR tile. Uses Sentry app-hang / ANR issue volume because the API does not expose a first-class Google Play vitals ANR-rate alert aggregate.",
+      "displayType": "line",
+      "widgetType": "discover",
+      "interval": "1d",
+      "queries": [
+        {
+          "name": "App hangs",
+          "fields": [
+            "count()"
+          ],
+          "aggregates": [
+            "count()"
+          ],
+          "conditions": "project:letta-mobile issue.category:performance event.type:error error.main_thread:true",
+          "orderby": "-count()"
+        }
+      ],
+      "layout": {
+        "x": 2,
+        "y": 1,
+        "w": 2,
+        "h": 1
+      }
+    },
+    {
+      "title": "Lane C1 transactions", 
+      "description": "Reference tile for the transaction set already defined in sentry-taxonomy.md.",
+      "displayType": "table",
+      "widgetType": "discover",
+      "queries": [
+        {
+          "name": "Lane C1",
+          "fields": [
+            "count()",
+            "p95(transaction.duration)",
+            "failure_rate()"
+          ],
+          "aggregates": [
+            "count()",
+            "p95(transaction.duration)",
+            "failure_rate()"
+          ],
+          "columns": [
+            "transaction"
+          ],
+          "conditions": "project:letta-mobile transaction:[app.startup,chat.sync_cycle,chat.send_message,bot.turn,composer.keystroke_to_render]",
+          "orderby": "-p95(transaction.duration)"
+        }
+      ],
+      "layout": {
+        "x": 0,
+        "y": 2,
+        "w": 4,
+        "h": 2
+      }
+    }
+  ],
+  "projects": [
+    "letta-mobile"
+  ],
+  "environment": null,
+  "filters": {},
+  "period": "7d"
+}
