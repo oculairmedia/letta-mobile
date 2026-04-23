@@ -619,6 +619,103 @@ class TimelineSyncLoopTest {
             job.cancel()
         }
     }
+
+    /**
+     * letta-mobile-gqz3 regression test.
+     *
+     * Before the fix, the subscriber's `ApiException` catch branch only
+     * treated `"No active runs"` as an idle pattern. When a previously-
+     * active run aged out, the server returned
+     * `EXPIRED: Run was created more than 3 hours ago, and is now expired.`
+     * which the subscriber mis-classified as a generic network error,
+     * wedging at the backoff cap and never opening a fresh stream.
+     *
+     * The fix extends the idle-pattern match to include `EXPIRED:` /
+     * `is now expired`, so the subscriber backs off once and retries on the
+     * next iteration — exactly the same posture as `No active runs`.
+     *
+     * Assertion: observing an EXPIRED ApiException must emit the
+     * `streamSubscriber.idle404` Telemetry event (with via=apiException)
+     * and must NOT emit a `streamSubscriber.error` for the same cycle.
+     */
+    @Test
+    fun `EXPIRED run ApiException is classified as idle, not error`() = runBlocking {
+        // Clear the Telemetry ring so we can look at an empty slate. This is
+        // necessary because other tests sharing the same JVM worker may have
+        // left unrelated events behind.
+        com.letta.mobile.util.Telemetry.clear()
+
+        val api = ExpiredThenIdleApi()
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+
+        // Instantiating TimelineSyncLoop starts the subscriber coroutine in init{}.
+        val sync = TimelineSyncLoop(api, "conv-gqz3", scope)
+
+        // Let the subscriber attempt one stream call. Because the fake throws
+        // immediately, this should flow through the ApiException branch.
+        withTimeout(2_000) {
+            while (api.streamCallCount < 1) delay(10)
+        }
+        // Let the catch branch complete its Telemetry emission.
+        delay(100)
+
+        // Telemetry ring is newest-first (addFirst semantics), so we just
+        // filter the whole thing by (tag, name) rather than slicing.
+        val events = com.letta.mobile.util.Telemetry.snapshot()
+        val idle404 = events.firstOrNull {
+            it.tag == "TimelineSync" &&
+                it.name == "streamSubscriber.idle404" &&
+                (it.attrs["via"] as? String) == "apiException" &&
+                (it.attrs["conversationId"] as? String) == "conv-gqz3"
+        }
+        assertNotNull(
+            "EXPIRED ApiException must be classified as idle (streamSubscriber.idle404 via=apiException). " +
+                "Saw events: ${events.map { "${it.tag}/${it.name}" }}",
+            idle404,
+        )
+        // And explicitly: there must not be a streamSubscriber.error for this
+        // cycle — before the fix, the wedge produced one error per retry.
+        val errorForGqz3 = events.firstOrNull {
+            it.tag == "TimelineSync" &&
+                it.name == "streamSubscriber.error" &&
+                (it.attrs["conversationId"] as? String) == "conv-gqz3"
+        }
+        assertEquals(
+            "EXPIRED must NOT produce a streamSubscriber.error (it's an idle pattern, not a real failure)",
+            null,
+            errorForGqz3,
+        )
+
+        scope.coroutineContext.job.cancel()
+    }
+}
+
+/**
+ * Fake api for the gqz3 regression test. Throws an `ApiException` carrying
+ * the server's EXPIRED detail string on the first `streamConversation`
+ * call, then idles (awaits cancellation) so the subscriber's backoff loop
+ * can settle without a stream of identical failures.
+ */
+private class ExpiredThenIdleApi : MessageApi(mockk(relaxed = true)) {
+    @Volatile var streamCallCount: Int = 0
+
+    override suspend fun streamConversation(conversationId: String): ByteReadChannel {
+        streamCallCount++
+        if (streamCallCount == 1) {
+            throw ApiException(
+                400,
+                """{"detail":"EXPIRED: Run was created more than 3 hours ago, and is now expired."}""",
+            )
+        }
+        kotlinx.coroutines.awaitCancellation()
+    }
+
+    override suspend fun listConversationMessages(
+        conversationId: String,
+        limit: Int?,
+        after: String?,
+        order: String?,
+    ): List<LettaMessage> = emptyList()
 }
 
 /**
