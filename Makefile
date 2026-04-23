@@ -105,8 +105,8 @@ verify-sync: check-cli check-device
 		--watch --iterations "$(ITERATIONS)" --interval "$(INTERVAL)" 2>&1); \
 	echo "$$OUTPUT"; \
 	CLEAN=$$(echo "$$OUTPUT" | sed -r 's/\x1B\[[0-9;]*[mK]//g'); \
-	TOTAL=$$(echo "$$CLEAN" | grep -cE 'drift=[0-9]+s.*(HEALTHY|STALE|BROKEN|UNKNOWN)' || true); \
-	HEALTHY=$$(echo "$$CLEAN" | grep -cE 'drift=[0-9]+s.*HEALTHY$$' || true); \
+	TOTAL=$$(echo "$$CLEAN" | grep -cE 'drift=-?[0-9]+s.*(HEALTHY|STALE|BROKEN|UNKNOWN)' || true); \
+	HEALTHY=$$(echo "$$CLEAN" | grep -cE 'drift=-?[0-9]+s.*HEALTHY$$' || true); \
 	if [[ $$TOTAL -lt $(ITERATIONS) ]]; then \
 		echo ""; \
 		echo "FAIL verify-sync: only $$TOTAL/$$(echo $(ITERATIONS)) samples produced a verdict"; \
