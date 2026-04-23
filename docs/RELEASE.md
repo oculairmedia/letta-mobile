@@ -16,6 +16,8 @@ the release on a live sync-drift check.
 ```bash
 # Prereqs: a device connected via adb, the app installed & logged in, and
 # the chat screen for the target conversation currently open.
+# For debug-only automated auth bootstrap with a disposable non-production
+# identity, see docs/RELEASE-AUTOMATION.md.
 
 make verify-sync \
     AGENT=agent-<id> \
