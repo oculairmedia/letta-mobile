@@ -141,7 +141,9 @@ class AgentListViewModel @Inject constructor(
             try {
                 agentRepository.refreshAgentsIfStale(LIST_CACHE_TTL_MS)
                 _transient.update { it.copy(isLoading = false) }
+                Log.i("AgentListViewModel", "AgentList hydrated count=${agentRepository.agents.value.size}")
             } catch (e: Exception) {
+                Log.w("AgentListViewModel", "AgentList hydrate failed", e)
                 _transient.update {
                     it.copy(
                         isLoading = false,
