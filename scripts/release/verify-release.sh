@@ -260,7 +260,7 @@ for row in rows:
 PY
 )"
   if [[ "$device_status" == "PASS" ]]; then
-    run_gate "verify-sync" "$(gate_level verify-sync)" "$(gate_blocking verify-sync)" "cd '$REPO_ROOT' && '$MAKE_BIN' verify-sync LETTA_URL='$BASE_URL' AGENT='$AGENT' CONV='$CONV' ITERATIONS='$ITERATIONS' INTERVAL='$INTERVAL'"
+    run_gate "verify-sync" "$(gate_level verify-sync)" "$(gate_blocking verify-sync)" "cd '$REPO_ROOT' && '$MAKE_BIN' verify-sync DEVICE='$DEVICE' LETTA_URL='$BASE_URL' AGENT='$AGENT' CONV='$CONV' ITERATIONS='$ITERATIONS' INTERVAL='$INTERVAL'"
   else
     skip_gate "verify-sync" "$(gate_level verify-sync)" "$(gate_blocking verify-sync)" "Skipped because verify-device-ready did not pass"
   fi
