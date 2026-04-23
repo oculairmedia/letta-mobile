@@ -35,6 +35,16 @@ if [[ -n "$ANDROID_SERIAL" ]]; then
 fi
 
 adb_cmd=(adb "${adb_args[@]}")
+host_tmp_xml=""
+device_tmp_xml="/data/local/tmp/${APP_PACKAGE}.automation.xml"
+
+cleanup() {
+  if [[ -n "$host_tmp_xml" && -f "$host_tmp_xml" ]]; then
+    rm -f "$host_tmp_xml"
+  fi
+  "${adb_cmd[@]}" shell rm -f "$device_tmp_xml" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
 
 if ! "${adb_cmd[@]}" get-state >/dev/null 2>&1; then
   printf 'adb cannot reach the target device.\n' >&2
@@ -70,7 +80,7 @@ if mode:
     payload["mode"] = mode
 print(json.dumps(payload, separators=(",", ":")))
 PY
-} | base64 -w0)"
+} | base64 | tr -d '\n')"
 
 xml_value="$(PAYLOAD_BASE64="$payload_json" python3 - <<'PY'
 import os
@@ -84,9 +94,14 @@ print("</map>")
 PY
 )"
 
+host_tmp_xml="$(mktemp)"
+printf '%s\n' "$xml_value" > "$host_tmp_xml"
+
 printf 'Staging automation credentials for %s...\n' "$APP_PACKAGE"
 "${adb_cmd[@]}" shell am force-stop "$APP_PACKAGE"
-printf '%s\n' "$xml_value" | "${adb_cmd[@]}" exec-out run-as "$APP_PACKAGE" sh -c 'mkdir -p shared_prefs && cat > shared_prefs/letta_automation.xml'
+"${adb_cmd[@]}" push "$host_tmp_xml" "$device_tmp_xml" >/dev/null
+"${adb_cmd[@]}" shell run-as "$APP_PACKAGE" mkdir -p shared_prefs
+"${adb_cmd[@]}" shell run-as "$APP_PACKAGE" cp "$device_tmp_xml" shared_prefs/letta_automation.xml
 "${adb_cmd[@]}" shell am start -n "$APP_COMPONENT" >/dev/null
 
 printf 'Automation credentials injected. Launch complete; the app will import the payload once and clear the staging preference.\n'
