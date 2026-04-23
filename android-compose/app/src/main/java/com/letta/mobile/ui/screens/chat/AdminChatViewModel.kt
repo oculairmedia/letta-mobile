@@ -897,7 +897,13 @@ class AdminChatViewModel @Inject constructor(
             timelineHydrateSignalJob = viewModelScope.launch {
                 loop.events.collect { ev ->
                     when (ev) {
-                        is com.letta.mobile.data.timeline.TimelineSyncEvent.Hydrated,
+                        is com.letta.mobile.data.timeline.TimelineSyncEvent.Hydrated -> {
+                            Log.i(
+                                "AdminChatViewModel",
+                                "Timeline ready conv=$conversationId count=${ev.messageCount}",
+                            )
+                            _uiState.value = _uiState.value.copy(isLoadingMessages = false)
+                        }
                         is com.letta.mobile.data.timeline.TimelineSyncEvent.HydrateFailed -> {
                             _uiState.value = _uiState.value.copy(isLoadingMessages = false)
                         }
