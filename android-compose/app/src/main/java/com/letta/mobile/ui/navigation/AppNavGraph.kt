@@ -23,6 +23,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.letta.mobile.AppLaunchTarget
 import com.letta.mobile.NotificationNavigationTarget
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.SettingsRepository
@@ -116,7 +117,7 @@ class NavViewModel @Inject constructor(
 @Composable
 fun AppNavGraph(
     navController: NavHostController = rememberNavController(),
-    notificationTarget: NotificationNavigationTarget? = null,
+    notificationTarget: AppLaunchTarget? = null,
     onNotificationTargetConsumed: () -> Unit = {},
 ) {
     val navViewModel: NavViewModel = hiltViewModel()
