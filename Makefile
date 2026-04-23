@@ -22,8 +22,14 @@ INTERVAL        ?= 10
 STREAM_TIMEOUT  ?= 60
 CLI             := cli/letta-cli
 
+# --- Device-ready bootstrap inputs ---
+DEVICE          ?=
+APK             ?=
+BASE_URL        ?=
+API_KEY         ?=
+
 # --- Meta ---
-.PHONY: help verify-sync verify-stream verify-all check-cli check-device lint-telemetry
+.PHONY: help verify-sync verify-stream verify-device-ready verify-all check-cli check-device lint-telemetry
 
 help:
 	@echo "letta-mobile make targets"
@@ -36,6 +42,9 @@ help:
 	@echo "                 within STREAM_TIMEOUT=$(STREAM_TIMEOUT)s seconds for CONV. Does not require"
 	@echo "                 a device; independently validates server-side realtime delivery."
 	@echo "                 Required:  CONV=<id>"
+	@echo ""
+	@echo "  verify-device-ready  Bootstrap a fresh device to an authenticated conversation."
+	@echo "                       Required: DEVICE=<serial> APK=<path> BASE_URL=<url> API_KEY=<token> AGENT=<id> CONV=<id>"
 	@echo ""
 	@echo "  lint-telemetry  Fail on known Telemetry convention drift (ERROR-shape events,"
 	@echo "                  hand-rolled errorClass/errorMessage, undocumented literal tags)."
@@ -118,6 +127,19 @@ verify-stream: check-cli
 	fi; \
 	echo ""; \
 	echo "PASS verify-stream: $$EVENTS event(s) received"
+
+verify-device-ready:
+	@if [[ -z "$(DEVICE)" || -z "$(APK)" || -z "$(BASE_URL)" || -z "$(API_KEY)" || -z "$(AGENT)" || -z "$(CONV)" ]]; then \
+		echo "ERROR: verify-device-ready requires DEVICE, APK, BASE_URL, API_KEY, AGENT, and CONV"; \
+		exit 2; \
+	fi
+	@./scripts/release/bootstrap-device.sh \
+		--device "$(DEVICE)" \
+		--apk "$(APK)" \
+		--base-url "$(BASE_URL)" \
+		--api-key "$(API_KEY)" \
+		--agent "$(AGENT)" \
+		--conv "$(CONV)"
 
 # --- verify-all ---
 
