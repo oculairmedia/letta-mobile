@@ -17,6 +17,7 @@ import com.letta.mobile.crash.CrashReporter
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.performance.DebugPerformanceMonitor
 import com.letta.mobile.performance.ProductionJankStatsMonitor
+import dagger.Lazy
 import dagger.hilt.android.HiltAndroidApp
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -46,7 +47,7 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
     lateinit var crashReporter: CrashReporter
 
     @Inject
-    lateinit var settingsRepository: SettingsRepository
+    lateinit var settingsRepository: Lazy<SettingsRepository>
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -79,13 +80,13 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
         crashReporter.install()
         setupGlobalExceptionHandler()
         channelNotificationPublisher.ensureChannel()
-        runCatching {
-            AutomationAuthBootstrap.importPendingConfig(this, settingsRepository)
-        }.onFailure { error ->
-            Log.w("LettaApp", "Skipping automation auth bootstrap", error)
-        }
         if (isRobolectricRuntime()) {
             return
+        }
+        runCatching {
+            AutomationAuthBootstrap.importPendingConfig(this, settingsRepository.get())
+        }.onFailure { error ->
+            Log.w("LettaApp", "Skipping automation auth bootstrap", error)
         }
         runCatching {
             ProductionJankStatsMonitor.install(this)
