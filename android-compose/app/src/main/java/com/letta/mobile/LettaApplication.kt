@@ -10,9 +10,11 @@ import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.crossfade
 import com.letta.mobile.channel.ChannelHeartbeatScheduler
 import com.letta.mobile.channel.ChannelNotificationPublisher
+import com.letta.mobile.debug.AutomationAuthBootstrap
 import com.letta.mobile.bot.heartbeat.BotHeartbeatScheduler
 import com.letta.mobile.bot.service.BotServiceAutoStarter
 import com.letta.mobile.crash.CrashReporter
+import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.performance.DebugPerformanceMonitor
 import com.letta.mobile.performance.ProductionJankStatsMonitor
 import dagger.hilt.android.HiltAndroidApp
@@ -42,6 +44,9 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
 
     @Inject
     lateinit var crashReporter: CrashReporter
+
+    @Inject
+    lateinit var settingsRepository: SettingsRepository
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -74,6 +79,11 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
         crashReporter.install()
         setupGlobalExceptionHandler()
         channelNotificationPublisher.ensureChannel()
+        runCatching {
+            AutomationAuthBootstrap.importPendingConfig(this, settingsRepository)
+        }.onFailure { error ->
+            Log.w("LettaApp", "Skipping automation auth bootstrap", error)
+        }
         if (isRobolectricRuntime()) {
             return
         }
