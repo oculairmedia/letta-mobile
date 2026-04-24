@@ -73,6 +73,55 @@ class WsBotClientTest : WordSpec({
             }
         }
 
+        "serialize letta mobile source metadata into websocket messages" {
+            var receivedSourceChannel: String? = null
+            var receivedSourceChatId: String? = null
+
+            val server = websocketServer { socket, text ->
+                val payload = json.parseToJsonElement(text).jsonObject
+                when (payload["type"]!!.jsonPrimitive.content) {
+                    "session_start" -> socket.send(
+                        """
+                        {"type":"session_init","agent_id":"agent-source","conversation_id":"conv-source","session_id":"sess-source"}
+                        """.trimIndent()
+                    )
+
+                    "message" -> {
+                        val source = payload["source"]!!.jsonObject
+                        receivedSourceChannel = source["channel"]!!.jsonPrimitive.content
+                        receivedSourceChatId = source["chatId"]!!.jsonPrimitive.content
+                        val requestId = payload["request_id"]!!.jsonPrimitive.content
+                        socket.send(
+                            """
+                            {"type":"result","success":true,"conversation_id":"conv-source","request_id":"$requestId","duration_ms":1}
+                            """.trimIndent()
+                        )
+                    }
+                }
+            }
+
+            server.use {
+                val client = WsBotClient(gatewayUrl(server), "secret")
+
+                runBlocking {
+                    withTimeout(5_000) {
+                        client.streamMessage(
+                            BotChatRequest(
+                                message = "hello",
+                                agentId = "agent-source",
+                                channelId = "letta-mobile",
+                                chatId = "agent:agent-1",
+                            )
+                        ).toList()
+                    }
+                }
+
+                receivedSourceChannel shouldBe "letta-mobile"
+                receivedSourceChatId shouldBe "agent:agent-1"
+                client.close()
+            }
+        }
+
         "forward tool call and tool result metadata" {
             val server = websocketServer { socket, text ->
                 val payload = json.parseToJsonElement(text).jsonObject
@@ -245,6 +294,79 @@ class WsBotClientTest : WordSpec({
                         }
                     }
                 }
+                client.close()
+            }
+        }
+
+        "read status when agents arrives as an object map" {
+            val server = MockWebServer()
+            server.dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    return when (request.path) {
+                        "/api/v1/status" -> MockResponse()
+                            .setHeader("Content-Type", "application/json")
+                            .setBody(
+                                """
+                                {
+                                  "agents": {
+                                    "LettaBot": {"agentId": "agent-1", "status": "ready"},
+                                    "PM - letta-mobile": {"agentId": "agent-2", "status": "ready"}
+                                  },
+                                  "session_count": 2
+                                }
+                                """.trimIndent()
+                            )
+
+                        else -> MockResponse().setResponseCode(404)
+                    }
+                }
+            }
+
+            server.use {
+                val client = WsBotClient(gatewayUrl(server), "secret")
+
+                val status = runBlocking {
+                    withTimeout(5_000) {
+                        client.getStatus()
+                    }
+                }
+
+                status.status shouldBe "ok"
+                status.agents shouldContainExactly listOf("LettaBot", "PM - letta-mobile")
+                status.sessionCount shouldBe 2
+                status.agentDetails shouldContainExactly listOf(
+                    BotAgentInfo(id = "agent-1", name = "LettaBot", status = "ready"),
+                    BotAgentInfo(id = "agent-2", name = "PM - letta-mobile", status = "ready"),
+                )
+                client.close()
+            }
+        }
+
+        "establish a gateway session without sending a message" {
+            val receivedTypes = mutableListOf<String>()
+            val server = websocketServer { socket, text ->
+                val payload = json.parseToJsonElement(text).jsonObject
+                receivedTypes += payload["type"]!!.jsonPrimitive.content
+                if (payload["type"]!!.jsonPrimitive.content == "session_start") {
+                    socket.send(
+                        """
+                        {"type":"session_init","agent_id":"agent-ready","conversation_id":"conv-ready","session_id":"sess-ready"}
+                        """.trimIndent()
+                    )
+                }
+            }
+
+            server.use {
+                val client = WsBotClient(gatewayUrl(server), "secret")
+
+                runBlocking {
+                    withTimeout(5_000) {
+                        client.ensureGatewayReady(agentId = "agent-ready")
+                    }
+                }
+
+                receivedTypes shouldContainExactly listOf("session_start")
+                client.connectionState.value shouldBe ConnectionState.READY
                 client.close()
             }
         }

@@ -3,7 +3,24 @@ package com.letta.mobile.bot.protocol
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonEncoder
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.longOrNull
 
 @Serializable
 data class BotChatRequest(
@@ -26,8 +43,9 @@ data class BotChatResponse(
 
 @Serializable
 data class BotStatusResponse(
-    val status: String,
-    val agents: List<String>,
+    val status: String = "ok",
+    @Serializable(with = BotStatusAgentsSerializer::class)
+    val agents: List<String> = emptyList(),
     @SerialName("session_count") val sessionCount: Int = 0,
     @SerialName("agent_details") val agentDetails: List<BotAgentInfo> = emptyList(),
     @SerialName("active_profile_ids") val activeProfileIds: List<String> = emptyList(),
@@ -38,12 +56,134 @@ data class BotStatusResponse(
     @SerialName("rate_limit_window_seconds") val rateLimitWindowSeconds: Long = 0,
 )
 
+fun BotStatusResponse.preferredAgent(preferredName: String = "LettaBot"): BotAgentInfo? {
+    if (agentDetails.isNotEmpty()) {
+        return agentDetails.firstOrNull { it.name == preferredName }
+            ?: agentDetails.first()
+    }
+
+    if (agents.isEmpty()) return null
+    val resolvedName = agents.firstOrNull { it == preferredName } ?: agents.first()
+    return BotAgentInfo(
+        id = resolvedName,
+        name = resolvedName,
+        status = status,
+    )
+}
+
 @Serializable
 data class BotAgentInfo(
     val id: String,
     val name: String,
     val status: String,
 )
+
+object BotStatusAgentsSerializer : KSerializer<List<String>> {
+    private val listDelegate = ListSerializer(String.serializer())
+
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("BotStatusAgents")
+
+    override fun deserialize(decoder: Decoder): List<String> {
+        val jd = decoder as? JsonDecoder
+            ?: error("BotStatusAgentsSerializer only supports JSON")
+        val element = jd.decodeJsonElement()
+        return when (element) {
+            is JsonArray -> jd.json.decodeFromJsonElement(listDelegate, element)
+            is JsonObject -> element.keys.toList()
+            else -> emptyList()
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: List<String>) {
+        val je = encoder as? JsonEncoder
+            ?: error("BotStatusAgentsSerializer only supports JSON")
+        je.encodeSerializableValue(listDelegate, value)
+    }
+}
+
+object BotStatusResponseParser {
+    private val agentInfoListSerializer = ListSerializer(BotAgentInfo.serializer())
+
+    fun parse(json: kotlinx.serialization.json.Json, element: JsonElement): BotStatusResponse {
+        val obj = element as? JsonObject ?: return BotStatusResponse()
+        val agentsElement = obj["agents"]
+        val parsedAgents = parseAgentNames(json, agentsElement)
+        val parsedAgentDetails = parseAgentDetails(json, agentsElement)
+        val explicitAgentDetails = parseExplicitAgentDetails(json, obj["agent_details"])
+
+        return BotStatusResponse(
+            status = obj.stringValue("status") ?: "ok",
+            agents = parsedAgents,
+            sessionCount = obj.intValue("session_count") ?: 0,
+            agentDetails = explicitAgentDetails.ifEmpty { parsedAgentDetails },
+            activeProfileIds = obj.stringListValue(json, "active_profile_ids"),
+            activeModes = obj.stringListValue(json, "active_modes"),
+            apiPort = obj.intValue("api_port"),
+            authRequired = obj.booleanValue("auth_required") ?: false,
+            rateLimitRequests = obj.intValue("rate_limit_requests") ?: 0,
+            rateLimitWindowSeconds = obj.longValue("rate_limit_window_seconds") ?: 0L,
+        )
+    }
+
+    private fun parseAgentNames(
+        json: kotlinx.serialization.json.Json,
+        agentsElement: JsonElement?,
+    ): List<String> = when (agentsElement) {
+        is JsonArray -> json.decodeFromJsonElement(ListSerializer(String.serializer()), agentsElement)
+        is JsonObject -> agentsElement.keys.toList()
+        else -> emptyList()
+    }
+
+    private fun parseExplicitAgentDetails(
+        json: kotlinx.serialization.json.Json,
+        detailsElement: JsonElement?,
+    ): List<BotAgentInfo> = when (detailsElement) {
+        is JsonArray -> json.decodeFromJsonElement(agentInfoListSerializer, detailsElement)
+        else -> emptyList()
+    }
+
+    private fun parseAgentDetails(
+        json: kotlinx.serialization.json.Json,
+        agentsElement: JsonElement?,
+    ): List<BotAgentInfo> = when (agentsElement) {
+        is JsonObject -> agentsElement.mapNotNull { (name, value) ->
+            val details = value as? JsonObject ?: return@mapNotNull null
+            val id = details.stringValue("agentId")
+                ?: details.stringValue("agent_id")
+                ?: details.stringValue("id")
+                ?: return@mapNotNull null
+            BotAgentInfo(
+                id = id,
+                name = name,
+                status = details.stringValue("status") ?: "ready",
+            )
+        }
+
+        is JsonArray -> json.decodeFromJsonElement(agentInfoListSerializer, agentsElement)
+        else -> emptyList()
+    }
+
+    private fun JsonObject.stringListValue(
+        json: kotlinx.serialization.json.Json,
+        key: String,
+    ): List<String> = when (val element = this[key]) {
+        is JsonArray -> json.decodeFromJsonElement(ListSerializer(String.serializer()), element)
+        else -> emptyList()
+    }
+
+    private fun JsonObject.stringValue(key: String): String? =
+        (this[key] as? JsonPrimitive)?.contentOrNull
+
+    private fun JsonObject.intValue(key: String): Int? =
+        (this[key] as? JsonPrimitive)?.intOrNull
+
+    private fun JsonObject.longValue(key: String): Long? =
+        (this[key] as? JsonPrimitive)?.longOrNull
+
+    private fun JsonObject.booleanValue(key: String): Boolean? =
+        (this[key] as? JsonPrimitive)?.booleanOrNull
+}
 
 @Serializable
 data class BotStreamChunk(

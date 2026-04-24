@@ -11,6 +11,7 @@ import com.letta.mobile.bot.protocol.BotChatResponse
 import com.letta.mobile.bot.protocol.BotClient
 import com.letta.mobile.bot.protocol.BotStatusResponse
 import com.letta.mobile.bot.protocol.BotStreamChunk
+import com.letta.mobile.bot.protocol.GatewayReadyClient
 import io.kotest.core.spec.style.WordSpec
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
@@ -43,6 +44,7 @@ class RemoteBotSessionTest : WordSpec({
             runBlocking { session.start() }
 
             recorder.transports.single() shouldBe BotConfig.Transport.HTTP
+            recorder.readyAgentIds shouldHaveSize 0
         }
 
         "use WS transport when explicitly configured" {
@@ -55,6 +57,7 @@ class RemoteBotSessionTest : WordSpec({
             runBlocking { session.start() }
 
             recorder.transports.single() shouldBe BotConfig.Transport.WS
+            recorder.readyAgentIds shouldBe listOf("agent-1")
         }
 
         "stream progressive chunks when WS transport is selected" {
@@ -178,10 +181,30 @@ private class FakeBotServerProfileStore : IBotServerProfileStore {
 
 private class RecordingOverride {
     val transports = mutableListOf<BotConfig.Transport>()
+    val readyAgentIds = mutableListOf<String>()
 
     fun create(resolvedProfile: com.letta.mobile.bot.config.ResolvedRemoteProfile): BotClient {
         transports += resolvedProfile.transport
-        return FakeBotClient()
+        if (resolvedProfile.transport == BotConfig.Transport.HTTP) {
+            return FakeBotClient()
+        }
+        return object : BotClient, GatewayReadyClient {
+            private val delegate = FakeBotClient()
+
+            override suspend fun sendMessage(request: BotChatRequest): BotChatResponse =
+                delegate.sendMessage(request)
+
+            override fun streamMessage(request: BotChatRequest): Flow<BotStreamChunk> =
+                delegate.streamMessage(request)
+
+            override suspend fun getStatus(): BotStatusResponse = delegate.getStatus()
+
+            override suspend fun listAgents(): List<BotAgentInfo> = delegate.listAgents()
+
+            override suspend fun ensureGatewayReady(agentId: String, conversationId: String?) {
+                readyAgentIds += agentId
+            }
+        }
     }
 }
 

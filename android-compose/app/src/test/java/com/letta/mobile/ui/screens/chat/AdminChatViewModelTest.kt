@@ -3,6 +3,7 @@ package com.letta.mobile.ui.screens.chat
 import androidx.lifecycle.SavedStateHandle
 import com.letta.mobile.bot.core.BotSession
 import com.letta.mobile.bot.protocol.BotAgentInfo
+import com.letta.mobile.bot.protocol.BotStreamChunk
 import com.letta.mobile.bot.protocol.BotChatResponse
 import com.letta.mobile.bot.protocol.InternalBotClient
 import com.letta.mobile.data.model.Agent
@@ -65,6 +66,7 @@ class AdminChatViewModelTest {
     private lateinit var settingsRepository: SettingsRepository
 
     private lateinit var internalBotClient: InternalBotClient
+    private lateinit var clientModeChatSender: ClientModeChatSender
     private val testDispatcher = UnconfinedTestDispatcher()
     private var messages: List<AppMessage> = emptyList()
     private var streamStates: List<StreamState> = emptyList()
@@ -94,10 +96,15 @@ class AdminChatViewModelTest {
         conversationManager = mockk(relaxed = true)
         settingsRepository = mockk(relaxed = true)
         internalBotClient = mockk(relaxed = true)
+        clientModeChatSender = mockk(relaxed = true)
         activeConversationIds.clear()
 
         every { settingsRepository.getChatBackgroundKey() } returns flowOf("default")
         every { settingsRepository.getChatFontScale() } returns flowOf(1f)
+        every { settingsRepository.observeClientModeEnabled() } returns flowOf(false)
+        every {
+            clientModeChatSender.streamMessage(any(), any(), any(), any())
+        } returns flow { }
         every { conversationManager.getActiveConversationId(any()) } answers {
             activeConversationIds[firstArg()]
         }
@@ -160,6 +167,7 @@ class AdminChatViewModelTest {
             conversationRepository,
             settingsRepository,
             internalBotClient,
+            clientModeChatSender,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
     }
@@ -318,6 +326,104 @@ class AdminChatViewModelTest {
     }
 
     @Test
+    fun `sendMessage uses timeline path when client mode is disabled`() = runTest {
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        vm.sendMessage("Hello from timeline")
+        advanceUntilIdle()
+
+        verify(exactly = 0) {
+            clientModeChatSender.streamMessage(any(), any(), any(), any())
+        }
+        coVerify(exactly = 1) {
+            timelineRepository.sendMessage("conv-1", "Hello from timeline")
+        }
+        assertTrue(vm.uiState.value.isStreaming)
+    }
+
+    @Test
+    fun `sendMessage routes through client mode sender when enabled`() = runTest {
+        every { settingsRepository.observeClientModeEnabled() } returns flowOf(true)
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+                forceFreshConversation = any(),
+            )
+        } returns flow {
+            emit(BotStreamChunk(text = "Hel", conversationId = "client-conv"))
+            emit(BotStreamChunk(text = "Hello from client mode", conversationId = "client-conv", done = true))
+        }
+
+        val vm = createViewModel(conversationId = null)
+        advanceUntilIdle()
+
+        vm.sendMessage("Hello from client mode")
+        advanceUntilIdle()
+
+        verify(exactly = 1) {
+            clientModeChatSender.streamMessage(
+                screenAgentId = "agent-1",
+                text = "Hello from client mode",
+                conversationId = null,
+                forceFreshConversation = true,
+            )
+        }
+        assertEquals(2, vm.uiState.value.messages.size)
+        assertEquals("Hello from client mode", vm.uiState.value.messages.last().content)
+        assertFalse(vm.uiState.value.isStreaming)
+    }
+
+    @Test
+    fun `sendMessage rejects attachments in client mode`() = runTest {
+        every { settingsRepository.observeClientModeEnabled() } returns flowOf(true)
+        val vm = createViewModel(conversationId = null)
+        advanceUntilIdle()
+
+        vm.addAttachment(
+            com.letta.mobile.data.model.MessageContentPart.Image(
+                base64 = "ZmFrZQ==",
+                mediaType = "image/png",
+            )
+        )
+        vm.sendMessage("hello")
+
+        assertEquals(
+            "Client Mode attachments are not supported yet",
+            vm.uiState.value.composerError,
+        )
+    }
+
+    @Test
+    fun `resetMessages clears client mode conversation state`() = runTest {
+        every { settingsRepository.observeClientModeEnabled() } returns flowOf(true)
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+                forceFreshConversation = any(),
+            )
+        } returns flow {
+            emit(BotStreamChunk(text = "Hi", conversationId = "client-conv"))
+            emit(BotStreamChunk(text = "Hi", conversationId = "client-conv", done = true))
+        }
+
+        val vm = createViewModel(conversationId = null)
+        advanceUntilIdle()
+        vm.sendMessage("hello")
+        advanceUntilIdle()
+
+        vm.resetMessages()
+
+        assertEquals(ConversationState.NoConversation, vm.uiState.value.conversationState)
+        assertTrue(vm.uiState.value.messages.isEmpty())
+        assertFalse(vm.uiState.value.isStreaming)
+    }
+
+    @Test
     fun `updateInputText only changes input field`() = runTest {
         messages = listOf(TestData.appMessage(id = "1", messageType = MessageType.USER, content = "Msg"))
 
@@ -359,6 +465,7 @@ class AdminChatViewModelTest {
             conversationRepository,
             settingsRepository,
             internalBotClient,
+            clientModeChatSender,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
 
@@ -460,6 +567,7 @@ class AdminChatViewModelTest {
             conversationRepository,
             settingsRepository,
             internalBotClient,
+            clientModeChatSender,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
         advanceUntilIdle()
@@ -499,6 +607,7 @@ class AdminChatViewModelTest {
             conversationRepository,
             settingsRepository,
             internalBotClient,
+            clientModeChatSender,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
         advanceUntilIdle()
@@ -548,6 +657,7 @@ class AdminChatViewModelTest {
             conversationRepository,
             settingsRepository,
             internalBotClient,
+            clientModeChatSender,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
         advanceUntilIdle()
@@ -581,6 +691,7 @@ class AdminChatViewModelTest {
             conversationRepository,
             settingsRepository,
             internalBotClient,
+            clientModeChatSender,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
 
@@ -609,6 +720,7 @@ class AdminChatViewModelTest {
             conversationRepository,
             settingsRepository,
             internalBotClient,
+            clientModeChatSender,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
         advanceUntilIdle()

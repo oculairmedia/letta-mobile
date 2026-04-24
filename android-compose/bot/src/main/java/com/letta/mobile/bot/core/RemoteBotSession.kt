@@ -11,6 +11,7 @@ import com.letta.mobile.bot.message.DirectiveParser
 import com.letta.mobile.bot.protocol.BotChatRequest
 import com.letta.mobile.bot.protocol.BotClient
 import com.letta.mobile.bot.protocol.ExternalBotClient
+import com.letta.mobile.bot.protocol.GatewayReadyClient
 import com.letta.mobile.bot.protocol.WsBotClient
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
@@ -78,6 +79,7 @@ class RemoteBotSession @AssistedInject constructor(
 
         try {
             client!!.getStatus()
+            (client as? GatewayReadyClient)?.ensureGatewayReady(agentId = agentId)
             _status.value = BotStatus.RUNNING
             Log.i(TAG, "Connected to remote bot at $baseUrl")
         } catch (e: Exception) {

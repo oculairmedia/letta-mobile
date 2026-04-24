@@ -46,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -63,12 +64,19 @@ import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.ErrorContent
+import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.ModelDropdown
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.screens.settings.ClientModeConnectionState
 import com.letta.mobile.ui.screens.tools.ToolPickerDialog
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -149,6 +157,10 @@ fun EditAgentScreen(
                     onMaxOutputTokensChange = { viewModel.updateMaxOutputTokens(it) },
                     onParallelToolCallsChange = { viewModel.updateParallelToolCalls(it) },
                     onEnableSleeptimeChange = { viewModel.updateEnableSleeptime(it) },
+                    onClientModeEnabledChange = { viewModel.updateClientModeEnabled(it) },
+                    onClientModeBaseUrlChange = { viewModel.updateClientModeBaseUrl(it) },
+                    onClientModeApiKeyChange = { viewModel.updateClientModeApiKey(it) },
+                    onTestClientModeConnection = { viewModel.testClientModeConnection() },
                     contentPadding = paddingValues,
                 )
 
@@ -297,6 +309,10 @@ private fun EditAgentContent(
     onMaxOutputTokensChange: (Int) -> Unit,
     onParallelToolCallsChange: (Boolean) -> Unit,
     onEnableSleeptimeChange: (Boolean) -> Unit,
+    onClientModeEnabledChange: (Boolean) -> Unit,
+    onClientModeBaseUrlChange: (String) -> Unit,
+    onClientModeApiKeyChange: (String) -> Unit,
+    onTestClientModeConnection: () -> Unit,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
@@ -484,6 +500,16 @@ private fun EditAgentContent(
                     },
                 )
             }
+        }
+
+        item(key = "client_mode") {
+            EditAgentClientModeSection(
+                state = state,
+                onClientModeEnabledChange = onClientModeEnabledChange,
+                onClientModeBaseUrlChange = onClientModeBaseUrlChange,
+                onClientModeApiKeyChange = onClientModeApiKeyChange,
+                onTestClientModeConnection = onTestClientModeConnection,
+            )
         }
 
         // ── Memory Blocks ──
@@ -678,6 +704,142 @@ private fun EditAgentContent(
             },
         )
     }
+}
+
+@Composable
+private fun EditAgentClientModeSection(
+    state: EditAgentUiState,
+    onClientModeEnabledChange: (Boolean) -> Unit,
+    onClientModeBaseUrlChange: (String) -> Unit,
+    onClientModeApiKeyChange: (String) -> Unit,
+    onTestClientModeConnection: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        CardGroup(title = { Text(stringResource(R.string.screen_settings_client_mode_section)) }) {
+            item(
+                headlineContent = {
+                    FormItem(
+                        label = { Text(stringResource(R.string.screen_settings_client_mode_enable)) },
+                        description = {
+                            Text(stringResource(R.string.screen_settings_client_mode_enable_description))
+                        },
+                        tail = {
+                            Switch(
+                                checked = state.clientModeEnabled,
+                                onCheckedChange = onClientModeEnabledChange,
+                            )
+                        },
+                    )
+                },
+            )
+        }
+
+        if (state.clientModeEnabled) {
+            CardGroup {
+                item(
+                    headlineContent = {
+                        OutlinedTextField(
+                            value = state.clientModeBaseUrl,
+                            onValueChange = onClientModeBaseUrlChange,
+                            label = { Text(stringResource(R.string.screen_settings_client_mode_server_url)) },
+                            placeholder = {
+                                Text(stringResource(R.string.screen_settings_client_mode_server_url_placeholder))
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                        )
+                    },
+                )
+                item(
+                    headlineContent = {
+                        OutlinedTextField(
+                            value = state.clientModeApiKey,
+                            onValueChange = onClientModeApiKeyChange,
+                            label = { Text(stringResource(R.string.screen_settings_client_mode_api_key)) },
+                            placeholder = {
+                                Text(stringResource(R.string.screen_settings_client_mode_api_key_placeholder))
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                        )
+                    },
+                    supportingContent = {
+                        Text(
+                            text = stringResource(R.string.screen_settings_client_mode_api_key_helper),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
+                )
+                item(
+                    headlineContent = {
+                        FormItem(
+                            label = { Text(stringResource(R.string.screen_settings_client_mode_test_connection)) },
+                            description = {
+                                val statusText = clientModeConnectionStatusText(state.clientModeConnectionState)
+                                if (statusText != null) {
+                                    Text(
+                                        text = statusText,
+                                        color = clientModeConnectionStatusColor(state.clientModeConnectionState),
+                                    )
+                                } else {
+                                    Text(stringResource(R.string.screen_settings_client_mode_test_connection_helper))
+                                }
+                            },
+                            tail = {
+                                OutlinedButton(
+                                    onClick = onTestClientModeConnection,
+                                    enabled = state.clientModeConnectionState !is ClientModeConnectionState.Testing &&
+                                        state.clientModeBaseUrl.isNotBlank(),
+                                ) {
+                                    if (state.clientModeConnectionState is ClientModeConnectionState.Testing) {
+                                        androidx.compose.material3.CircularProgressIndicator(
+                                            modifier = Modifier.size(18.dp),
+                                            strokeWidth = 2.dp,
+                                        )
+                                    } else {
+                                        Text(stringResource(R.string.screen_settings_client_mode_test_connection_action))
+                                    }
+                                }
+                            },
+                        )
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun clientModeConnectionStatusText(state: ClientModeConnectionState): String? {
+    val formatter = remember {
+        DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
+            .withLocale(Locale.getDefault())
+    }
+
+    return when (state) {
+        ClientModeConnectionState.Idle -> null
+        ClientModeConnectionState.Testing -> stringResource(R.string.screen_settings_client_mode_testing)
+        is ClientModeConnectionState.Success -> stringResource(
+            R.string.screen_settings_client_mode_success,
+            formatter.format(Instant.ofEpochMilli(state.testedAtMillis).atZone(ZoneId.systemDefault())),
+        )
+        is ClientModeConnectionState.Failure -> stringResource(
+            R.string.screen_settings_client_mode_failure,
+            state.message,
+            formatter.format(Instant.ofEpochMilli(state.testedAtMillis).atZone(ZoneId.systemDefault())),
+        )
+    }
+}
+
+@Composable
+private fun clientModeConnectionStatusColor(state: ClientModeConnectionState) = when (state) {
+    ClientModeConnectionState.Idle,
+    ClientModeConnectionState.Testing,
+    -> MaterialTheme.colorScheme.onSurfaceVariant
+    is ClientModeConnectionState.Success -> MaterialTheme.colorScheme.tertiary
+    is ClientModeConnectionState.Failure -> MaterialTheme.colorScheme.error
 }
 
 // ---------------------------------------------------------------------------

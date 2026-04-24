@@ -52,7 +52,7 @@ import okhttp3.WebSocketListener
 class WsBotClient(
     baseUrl: String,
     apiKey: String?,
-) : BotClient, AutoCloseable {
+) : BotClient, GatewayReadyClient, AutoCloseable {
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
@@ -128,6 +128,20 @@ class WsBotClient(
 
     override suspend fun sendMessage(request: BotChatRequest): BotChatResponse =
         streamMessage(request).toList().collectFinalResponse()
+
+    override suspend fun ensureGatewayReady(
+        agentId: String,
+        conversationId: String?,
+    ) {
+        ensureSession(
+            BotChatRequest(
+                message = "",
+                agentId = agentId,
+                chatId = conversationId ?: "gateway-ready",
+                conversationId = conversationId,
+            )
+        )
+    }
 
     override fun streamMessage(request: BotChatRequest): Flow<BotStreamChunk> = flow {
         requestMutex.withLock {
@@ -209,7 +223,7 @@ class WsBotClient(
         if (response.status.value !in 200..299) {
             throw RuntimeException("Bot server error: ${response.status.value} ${response.bodyAsText()}")
         }
-        return response.body()
+        return BotStatusResponseParser.parse(json, json.parseToJsonElement(response.bodyAsText()))
     }
 
     override suspend fun listAgents(): List<BotAgentInfo> {
@@ -287,7 +301,10 @@ class WsBotClient(
         openDeferred = deferred
 
         val requestBuilder = Request.Builder().url(webSocketUrl)
-        authToken?.let { requestBuilder.header("Authorization", "Bearer $it") }
+        authToken?.let {
+            requestBuilder.header("X-Api-Key", it)
+            requestBuilder.header("Authorization", "Bearer $it")
+        }
         socket = wsClient.newWebSocket(requestBuilder.build(), listener)
 
         withTimeout(10_000) {

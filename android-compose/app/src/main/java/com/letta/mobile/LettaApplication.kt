@@ -10,6 +10,7 @@ import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.crossfade
 import com.letta.mobile.channel.ChannelHeartbeatScheduler
 import com.letta.mobile.channel.ChannelNotificationPublisher
+import com.letta.mobile.clientmode.ClientModeController
 import com.letta.mobile.debug.AutomationAuthBootstrap
 import com.letta.mobile.bot.heartbeat.BotHeartbeatScheduler
 import com.letta.mobile.bot.service.BotServiceAutoStarter
@@ -49,6 +50,9 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
     @Inject
     lateinit var settingsRepository: Lazy<SettingsRepository>
 
+    @Inject
+    lateinit var clientModeController: Lazy<ClientModeController>
+
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private val imageHttpClient: HttpClient by lazy {
@@ -83,6 +87,7 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
         if (isRobolectricRuntime()) {
             return
         }
+        clientModeController.get().initialize()
         runCatching {
             AutomationAuthBootstrap.importPendingConfig(this, settingsRepository.get())
         }.onFailure { error ->

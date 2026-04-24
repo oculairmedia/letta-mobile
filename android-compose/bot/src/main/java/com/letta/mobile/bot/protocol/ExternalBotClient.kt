@@ -95,7 +95,7 @@ class ExternalBotClient(
         if (response.status.value !in 200..299) {
             throw RuntimeException("Bot server error: ${response.status.value} ${response.bodyAsText()}")
         }
-        return response.body()
+        return BotStatusResponseParser.parse(json, json.parseToJsonElement(response.bodyAsText()))
     }
 
     override suspend fun listAgents(): List<BotAgentInfo> {

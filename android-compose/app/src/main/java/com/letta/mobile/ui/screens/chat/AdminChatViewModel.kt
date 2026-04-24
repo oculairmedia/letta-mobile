@@ -37,6 +37,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -204,6 +207,7 @@ class AdminChatViewModel @Inject constructor(
     private val conversationRepository: ConversationRepository,
     private val settingsRepository: SettingsRepository,
     private val internalBotClient: InternalBotClient,
+    private val clientModeChatSender: ClientModeChatSender,
     private val currentConversationTracker: com.letta.mobile.channel.CurrentConversationTracker,
 ) : ViewModel() {
     companion object {
@@ -211,14 +215,19 @@ class AdminChatViewModel @Inject constructor(
         private const val MESSAGE_SYNC_INTERVAL_MS = 5_000L
         private const val COLLAPSED_RUN_IDS_KEY = "collapsedRunIds"
         private const val EXPANDED_REASONING_MESSAGE_IDS_KEY = "expandedReasoningMessageIds"
+        private const val CLIENT_MODE_CONVERSATION_ID_KEY = "clientModeConversationId"
     }
 
     val agentId: String = savedStateHandle.get<String>("agentId")!!
     private val initialMessage: String? = savedStateHandle.get<String>("initialMessage")
+    private val requestedConversationArg: String? = savedStateHandle.get<String>("conversationId")
     val scrollToMessageId: String? = savedStateHandle.get<String>("scrollToMessageId")
     private val activeConversationId: String?
         get() = conversationManager.getActiveConversationId(agentId)
-    val conversationId: String? get() = activeConversationId
+    private val clientModeEnabled: StateFlow<Boolean> = settingsRepository.observeClientModeEnabled()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val conversationId: String?
+        get() = if (clientModeEnabled.value) currentClientModeConversationId() else activeConversationId
     val projectContext: ProjectChatContext? = savedStateHandle.get<String>("projectIdentifier")?.let { identifier ->
         val name = savedStateHandle.get<String>("projectName") ?: identifier
         ProjectChatContext(
@@ -312,9 +321,13 @@ class AdminChatViewModel @Inject constructor(
     private var timelineObserverConversationId: String? = null
 
     init {
-        savedStateHandle.get<String>("conversationId")
+        requestedConversationArg
             ?.takeIf { it.isNotBlank() }
             ?.let { conversationManager.setActiveConversation(agentId, it) }
+        if (requestedConversationArg != null && requestedConversationArg.isBlank()) {
+            setClientModeConversationId(null)
+            currentConversationTracker.setCurrent(null)
+        }
         if (agentId.isBlank()) {
             _uiState.value = _uiState.value.copy(error = "No agent selected")
         } else {
@@ -323,6 +336,14 @@ class AdminChatViewModel @Inject constructor(
                 expandedReasoningMessageIds = expandedReasoningMessageIds().toImmutableSet(),
             )
             resolveConversationAndLoad()
+            viewModelScope.launch {
+                settingsRepository.observeClientModeEnabled()
+                    .distinctUntilChanged()
+                    .drop(1)
+                    .collect {
+                        resolveConversationAndLoad()
+                    }
+            }
             if (projectContext != null) {
                 loadProjectAgents()
                 loadProjectBrief()
@@ -497,6 +518,29 @@ class AdminChatViewModel @Inject constructor(
             )
 
             try {
+                if (settingsRepository.observeClientModeEnabled().first()) {
+                    stopTimelineObserver()
+                    val clientConversationId = currentClientModeConversationId()
+                    currentConversationTracker.setCurrent(clientConversationId)
+                    _uiState.value = _uiState.value.copy(
+                        conversationState = clientConversationId?.let { ConversationState.Ready(it) }
+                            ?: ConversationState.NoConversation,
+                        messages = persistentListOf(),
+                        isLoadingMessages = false,
+                        isLoadingOlderMessages = false,
+                        hasMoreOlderMessages = false,
+                        isStreaming = false,
+                        isAgentTyping = false,
+                        error = null,
+                    )
+                    initialMessage?.let { message ->
+                        if (message.isNotBlank()) {
+                            sendMessage(message)
+                        }
+                    }
+                    return@launch
+                }
+
                 if (activeConversationId == null) {
                     val resolvedConversationId = conversationManager.resolveAndSetActiveConversation(
                         agentId = agentId,
@@ -634,6 +678,7 @@ class AdminChatViewModel @Inject constructor(
     }
 
     fun loadOlderMessages() {
+        if (clientModeEnabled.value) return
         val conversationId = activeConversationId ?: return
         val currentState = _uiState.value
         if (
@@ -713,13 +758,148 @@ class AdminChatViewModel @Inject constructor(
         val attachments = _uiState.value.pendingAttachments.toList()
         if (text.isBlank() && attachments.isEmpty()) return
 
+        val isClientMode = clientModeEnabled.value
         Telemetry.event(
             "AdminChatVM", "sendMessage.route",
-            "via" to "timeline",
+            "via" to if (isClientMode) "client_mode" else "timeline",
             "length" to text.length,
             "attachments" to attachments.size,
         )
+        if (isClientMode) {
+            if (attachments.isNotEmpty()) {
+                _uiState.value = _uiState.value.copy(
+                    composerError = "Client Mode attachments are not supported yet",
+                )
+                return
+            }
+            sendMessageViaClientMode(text)
+            return
+        }
         sendMessageViaTimeline(text, attachments)
+    }
+
+    private fun sendMessageViaClientMode(text: String) {
+        viewModelScope.launch {
+            val startedAt = java.time.Instant.now().toString()
+            val userMessageId = "client-user-${System.currentTimeMillis()}"
+            val assistantMessageId = "client-assistant-${System.currentTimeMillis()}"
+            val priorConversationId = currentClientModeConversationId()
+            val forceFreshConversation = priorConversationId == null
+            stopTimelineObserver()
+            currentConversationTracker.setCurrent(priorConversationId)
+            _inputText.value = ""
+            _uiState.value = _uiState.value.copy(
+                messages = (_uiState.value.messages + UiMessage(
+                    id = userMessageId,
+                    role = "user",
+                    content = text,
+                    timestamp = startedAt,
+                )).toImmutableList(),
+                isLoadingMessages = false,
+                isLoadingOlderMessages = false,
+                hasMoreOlderMessages = false,
+                isStreaming = true,
+                isAgentTyping = true,
+                composerError = null,
+                error = null,
+                pendingAttachments = persistentListOf(),
+                conversationState = priorConversationId?.let { ConversationState.Ready(it) }
+                    ?: ConversationState.NoConversation,
+            )
+
+            var latestConversationId = priorConversationId
+            try {
+                clientModeChatSender.streamMessage(
+                    screenAgentId = agentId,
+                    text = text,
+                    conversationId = priorConversationId,
+                    forceFreshConversation = forceFreshConversation,
+                ).collect { chunk ->
+                    chunk.conversationId?.takeIf { it.isNotBlank() }?.let { conversationId ->
+                        latestConversationId = conversationId
+                    }
+                    if (!latestConversationId.isNullOrBlank()) {
+                        setClientModeConversationId(latestConversationId)
+                        currentConversationTracker.setCurrent(latestConversationId)
+                    }
+
+                    if (!chunk.done) {
+                        chunk.text?.takeIf { it.isNotEmpty() }?.let { delta ->
+                            upsertClientModeAssistantMessage(
+                                messageId = assistantMessageId,
+                                timestamp = startedAt,
+                                content = delta,
+                                append = true,
+                            )
+                        }
+                        return@collect
+                    }
+
+                    chunk.text?.takeIf { it.isNotBlank() }?.let { finalText ->
+                        upsertClientModeAssistantMessage(
+                            messageId = assistantMessageId,
+                            timestamp = startedAt,
+                            content = finalText,
+                            append = false,
+                        )
+                    }
+
+                    _uiState.value = _uiState.value.copy(
+                        conversationState = latestConversationId?.let { ConversationState.Ready(it) }
+                            ?: ConversationState.NoConversation,
+                        isStreaming = false,
+                        isAgentTyping = false,
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    conversationState = latestConversationId?.let { ConversationState.Ready(it) }
+                        ?: ConversationState.NoConversation,
+                    error = e.message ?: "Client Mode send failed",
+                    isStreaming = false,
+                    isAgentTyping = false,
+                )
+            }
+        }
+    }
+
+    private fun upsertClientModeAssistantMessage(
+        messageId: String,
+        timestamp: String,
+        content: String,
+        append: Boolean,
+    ) {
+        val currentMessages = _uiState.value.messages.toMutableList()
+        val index = currentMessages.indexOfFirst { it.id == messageId }
+        if (index >= 0) {
+            val existing = currentMessages[index]
+            currentMessages[index] = existing.copy(
+                content = if (append) existing.content + content else content,
+            )
+        } else {
+            currentMessages += UiMessage(
+                id = messageId,
+                role = "assistant",
+                content = content,
+                timestamp = timestamp,
+            )
+        }
+        _uiState.value = _uiState.value.copy(messages = currentMessages.toImmutableList())
+    }
+
+    private fun currentClientModeConversationId(): String? =
+        savedStateHandle.get<String>(CLIENT_MODE_CONVERSATION_ID_KEY)?.takeIf { it.isNotBlank() }
+
+    private fun setClientModeConversationId(conversationId: String?) {
+        savedStateHandle[CLIENT_MODE_CONVERSATION_ID_KEY] = conversationId?.takeIf { it.isNotBlank() }
+    }
+
+    private fun stopTimelineObserver() {
+        timelineObserverJob?.cancel()
+        timelineObserverJob = null
+        timelineHydrateSignalJob?.cancel()
+        timelineHydrateSignalJob = null
+        timelineObserverConversationId = null
     }
 
     fun reportComposerError(message: String) {
@@ -1049,6 +1229,22 @@ class AdminChatViewModel @Inject constructor(
     }
 
     fun resetMessages() {
+        if (clientModeEnabled.value) {
+            setClientModeConversationId(null)
+            currentConversationTracker.setCurrent(null)
+            stopTimelineObserver()
+            _uiState.value = _uiState.value.copy(
+                conversationState = ConversationState.NoConversation,
+                messages = persistentListOf(),
+                isLoadingMessages = false,
+                isLoadingOlderMessages = false,
+                hasMoreOlderMessages = false,
+                isStreaming = false,
+                isAgentTyping = false,
+                error = null,
+            )
+            return
+        }
         viewModelScope.launch {
             try {
                 val convId = activeConversationId ?: run {
