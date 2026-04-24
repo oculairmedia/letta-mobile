@@ -51,13 +51,13 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var crashReporter: CrashReporter
 
-    private var notificationTarget by mutableStateOf<NotificationNavigationTarget?>(null)
+    private var launchTarget by mutableStateOf<AppLaunchTarget?>(null)
 
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
-        notificationTarget = NotificationNavigationTarget.fromIntent(intent)
+        launchTarget = AppLaunchTarget.fromIntent(intent)
         enableEdgeToEdge()
         setContent {
             val windowSizeClass = calculateWindowSizeClass(this@MainActivity)
@@ -133,8 +133,8 @@ class MainActivity : ComponentActivity() {
                         AdaptiveScaffold(navController = navController) {
                             AppNavGraph(
                                 navController = navController,
-                                notificationTarget = notificationTarget,
-                                onNotificationTargetConsumed = { notificationTarget = null },
+                                 notificationTarget = launchTarget,
+                                 onNotificationTargetConsumed = { launchTarget = null },
                             )
                         }
                     }
@@ -146,6 +146,6 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        notificationTarget = NotificationNavigationTarget.fromIntent(intent)
+        launchTarget = AppLaunchTarget.fromIntent(intent)
     }
 }

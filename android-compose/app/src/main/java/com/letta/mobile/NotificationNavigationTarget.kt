@@ -7,8 +7,8 @@ import com.letta.mobile.ui.navigation.AgentChatRoute
 data class NotificationNavigationTarget(
     val agentId: String,
     val conversationId: String,
-) {
-    fun toRoute(): AgentChatRoute = AgentChatRoute(
+) : AppLaunchTarget {
+    override fun toRoute(): AgentChatRoute = AgentChatRoute(
         agentId = agentId,
         conversationId = conversationId,
     )
