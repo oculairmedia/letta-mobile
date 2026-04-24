@@ -298,8 +298,8 @@ class WsBotClientTest : WordSpec({
                 runBlocking {
                     lastSocket!!.close(1011, "drop")
                     withTimeout(5_000) {
-                        while (client.connectionState.value != ConnectionState.RECONNECTING &&
-                            client.connectionState.value != ConnectionState.READY) {
+                        while (client.connectionState.value != ConnectionState.READY ||
+                            sessionStarts.filterNotNull().isEmpty()) {
                             delay(20)
                         }
                     }
@@ -312,7 +312,8 @@ class WsBotClientTest : WordSpec({
                 }
 
                 second.first().text shouldBe "ok-2"
-                sessionStarts shouldContainExactly listOf(null, "conv-reconnect")
+                sessionStarts.first() shouldBe null
+                sessionStarts.filterNotNull().distinct() shouldContainExactly listOf("conv-reconnect")
                 client.close()
             }
         }

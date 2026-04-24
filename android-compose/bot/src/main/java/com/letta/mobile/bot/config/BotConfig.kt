@@ -31,6 +31,8 @@ data class BotConfig(
     /** For REMOTE mode: authentication token for the bot server API. */
     @SerialName("remote_token") val remoteToken: String? = null,
 
+    val transport: Transport = Transport.HTTP,
+
     @SerialName("server_profile_id") val serverProfileId: String? = null,
 
     /** How conversations are routed for incoming messages. */
@@ -81,6 +83,12 @@ data class BotConfig(
     enum class Mode {
         @SerialName("local") LOCAL,
         @SerialName("remote") REMOTE,
+    }
+
+    @Serializable
+    enum class Transport {
+        @SerialName("http") HTTP,
+        @SerialName("ws") WS,
     }
 
     companion object {

@@ -6,15 +6,19 @@ import com.letta.mobile.bot.channel.ChannelMessage
 import com.letta.mobile.bot.channel.DeliveryResult
 import com.letta.mobile.bot.config.BotConfig
 import com.letta.mobile.bot.config.BotServerProfileResolver
+import com.letta.mobile.bot.config.ResolvedRemoteProfile
 import com.letta.mobile.bot.message.DirectiveParser
 import com.letta.mobile.bot.protocol.BotChatRequest
+import com.letta.mobile.bot.protocol.BotClient
 import com.letta.mobile.bot.protocol.ExternalBotClient
+import com.letta.mobile.bot.protocol.WsBotClient
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 
 /**
@@ -40,7 +44,19 @@ class RemoteBotSession @AssistedInject constructor(
     private val _status = MutableStateFlow(BotStatus.IDLE)
     override val status = _status.asStateFlow()
 
-    private var client: ExternalBotClient? = null
+    private var client: BotClient? = null
+    private var clientFactoryOverride: ((ResolvedRemoteProfile) -> BotClient)? = null
+
+    internal val currentClient: BotClient?
+        get() = client
+
+    internal constructor(
+        config: BotConfig,
+        profileResolver: BotServerProfileResolver,
+        clientFactoryOverride: (ResolvedRemoteProfile) -> BotClient,
+    ) : this(config, profileResolver) {
+        this.clientFactoryOverride = clientFactoryOverride
+    }
 
     override suspend fun start() {
         _status.value = BotStatus.STARTING
@@ -48,7 +64,17 @@ class RemoteBotSession @AssistedInject constructor(
             ?: throw IllegalStateException("Remote profile is not configured")
         val baseUrl = resolvedProfile.baseUrl
 
-        client = ExternalBotClient(baseUrl = baseUrl, token = resolvedProfile.authToken)
+        client = clientFactoryOverride?.invoke(resolvedProfile) ?: when (resolvedProfile.transport) {
+            BotConfig.Transport.HTTP -> ExternalBotClient(
+                baseUrl = resolvedProfile.baseUrl,
+                token = resolvedProfile.authToken,
+            )
+
+            BotConfig.Transport.WS -> WsBotClient(
+                baseUrl = resolvedProfile.baseUrl,
+                apiKey = resolvedProfile.authToken,
+            )
+        }
 
         try {
             client!!.getStatus()
@@ -63,7 +89,7 @@ class RemoteBotSession @AssistedInject constructor(
 
     override suspend fun stop() {
         _status.value = BotStatus.STOPPING
-        client?.close()
+        (client as? AutoCloseable)?.close()
         client = null
         _status.value = BotStatus.STOPPED
     }
@@ -103,16 +129,61 @@ class RemoteBotSession @AssistedInject constructor(
     }
 
     override fun streamToAgent(message: ChannelMessage, conversationId: String?): Flow<BotResponseChunk> = flow {
-        // For remote mode, fall back to non-streaming and emit the full response.
-        // Streaming support can be added later with SSE.
-        val response = sendToAgent(message, conversationId)
-        emit(
-            BotResponseChunk(
-                text = response.text,
-                conversationId = response.conversationId,
-                isComplete = true,
+        val remoteClient = client ?: throw IllegalStateException("Session not started")
+
+        _status.value = BotStatus.PROCESSING
+        try {
+            val request = BotChatRequest(
+                message = message.text,
+                channelId = message.channelId,
+                chatId = message.chatId,
+                senderId = message.senderId,
+                senderName = message.senderName,
+                conversationId = conversationId,
+                agentId = agentId,
             )
-        )
+
+            val accumulated = StringBuilder()
+            var latestConversationId = conversationId
+
+            remoteClient.streamMessage(request).collect { chunk ->
+                if (!chunk.done) {
+                    chunk.text?.let { text ->
+                        accumulated.append(text)
+                        emit(
+                            BotResponseChunk(
+                                text = text,
+                                conversationId = chunk.conversationId ?: latestConversationId,
+                            )
+                        )
+                    }
+                    latestConversationId = chunk.conversationId ?: latestConversationId
+                    return@collect
+                }
+
+                latestConversationId = chunk.conversationId ?: latestConversationId
+                val parseResult = if (config.directivesEnabled) {
+                    DirectiveParser.parse(accumulated.toString())
+                } else {
+                    DirectiveParser.ParseResult(accumulated.toString(), emptyList())
+                }
+
+                emit(
+                    BotResponseChunk(
+                        text = parseResult.cleanText.takeIf { it.isNotBlank() },
+                        conversationId = latestConversationId,
+                        isComplete = true,
+                        directive = parseResult.directives.firstOrNull(),
+                    )
+                )
+            }
+
+            _status.value = BotStatus.RUNNING
+        } catch (e: Exception) {
+            _status.value = BotStatus.RUNNING
+            Log.e(TAG, "Error streaming message for agent $agentId", e)
+            throw e
+        }
     }
 
     override suspend fun deliverToChannel(response: BotResponse, sourceMessage: ChannelMessage): DeliveryResult {

@@ -20,6 +20,7 @@ class BotServerProfileResolver @Inject constructor(
             profileId = resolvedProfile?.id,
             baseUrl = baseUrl,
             authToken = resolvedProfile?.authToken ?: config.remoteToken,
+            transport = resolvedProfile?.transport ?: config.transport,
         )
     }
 }
@@ -28,4 +29,5 @@ data class ResolvedRemoteProfile(
     val profileId: String?,
     val baseUrl: String,
     val authToken: String?,
+    val transport: BotConfig.Transport,
 )
