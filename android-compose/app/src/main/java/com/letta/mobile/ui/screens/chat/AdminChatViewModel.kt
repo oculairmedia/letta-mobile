@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
@@ -337,6 +338,7 @@ class AdminChatViewModel @Inject constructor(
             resolveConversationAndLoad()
             viewModelScope.launch {
                 settingsRepository.observeClientModeEnabled()
+                    .distinctUntilChanged()
                     .drop(1)
                     .collect {
                         resolveConversationAndLoad()
