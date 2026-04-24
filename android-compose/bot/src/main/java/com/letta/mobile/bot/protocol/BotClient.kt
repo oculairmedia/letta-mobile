@@ -11,3 +11,10 @@ interface BotClient {
 
     suspend fun listAgents(): List<BotAgentInfo>
 }
+
+interface GatewayReadyClient {
+    suspend fun ensureGatewayReady(
+        agentId: String,
+        conversationId: String? = null,
+    )
+}
