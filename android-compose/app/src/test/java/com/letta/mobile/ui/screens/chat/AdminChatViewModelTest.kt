@@ -154,10 +154,12 @@ class AdminChatViewModelTest {
     private fun createViewModel(
         agentId: String = "agent-1",
         conversationId: String? = "conv-1",
+        freshRouteKey: Long? = null,
     ): AdminChatViewModel {
         val savedState = SavedStateHandle().apply {
             set("agentId", agentId)
             conversationId?.let { set("conversationId", it) }
+            freshRouteKey?.let { set("freshRouteKey", it) }
         }
         return AdminChatViewModel(
             savedState,
@@ -546,6 +548,46 @@ class AdminChatViewModelTest {
         }
         coVerify(exactly = 0) { timelineRepository.sendMessage(any(), any()) }
         assertTrue(vm.uiState.value.messages.any { it.content == "Fresh route" })
+    }
+
+    @Test
+    fun `fresh route key uses client mode before hydrating active timeline`() = runTest {
+        clientModeEnabledFlow.value = true
+        activeConversationIds["agent-1"] = "conv-1"
+        messages = listOf(
+            TestData.appMessage(id = "timeline-user", messageType = MessageType.USER, content = "Old timeline"),
+        )
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+                forceFreshConversation = any(),
+            )
+        } returns flow {
+            emit(BotStreamChunk(text = "Fresh client reply", conversationId = "client-conv", done = true))
+        }
+
+        val vm = createViewModel(conversationId = null, freshRouteKey = 123L)
+        advanceUntilIdle()
+
+        assertEquals(ConversationState.NoConversation, vm.uiState.value.conversationState)
+        assertTrue(vm.uiState.value.messages.isEmpty())
+
+        vm.sendMessage("hello")
+        advanceUntilIdle()
+
+        verify(exactly = 1) {
+            clientModeChatSender.streamMessage(
+                screenAgentId = "agent-1",
+                text = "hello",
+                conversationId = null,
+                forceFreshConversation = true,
+            )
+        }
+        coVerify(exactly = 0) { timelineRepository.sendMessage(any(), any()) }
+        assertTrue(vm.uiState.value.messages.none { it.content == "Old timeline" })
+        assertTrue(vm.uiState.value.messages.any { it.content == "Fresh client reply" })
     }
 
     @Test

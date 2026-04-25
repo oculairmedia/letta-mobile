@@ -36,6 +36,7 @@ data class McpServerToolsRoute(val serverId: String)
 data class AgentChatRoute(
     val agentId: String,
     val conversationId: String? = null,
+    val freshRouteKey: Long? = null,
     val initialMessage: String? = null,
     val scrollToMessageId: String? = null,
     val projectIdentifier: String? = null,

@@ -16,6 +16,7 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import com.letta.mobile.ui.navigation.AgentChatRoute
 import com.letta.mobile.ui.navigation.ArchivalRoute
 import com.letta.mobile.ui.navigation.EditAgentRoute
@@ -96,7 +97,8 @@ fun TwoPaneConversationsLayout(
                     .weight(1f)
                     .fillMaxHeight(),
             ) {
-                composable<AgentChatRoute> {
+                composable<AgentChatRoute> { backStackEntry ->
+                    val route = backStackEntry.toRoute<AgentChatRoute>()
                     AgentScaffold(
                         onNavigateBack = { hasDetail = false },
                         onNavigateToSettings = { agentId ->
@@ -109,15 +111,21 @@ fun TwoPaneConversationsLayout(
                             outerNavController.navigate(AllToolsRoute)
                         },
                         onSwitchConversation = { agentId, conversationId ->
+                            val normalizedConversationId = conversationId?.takeIf { it.isNotBlank() }
                             detailNavController.navigate(
                                 AgentChatRoute(
                                     agentId = agentId,
-                                    conversationId = conversationId?.takeIf { it.isNotBlank() },
+                                    conversationId = normalizedConversationId,
+                                    freshRouteKey = if (normalizedConversationId == null) System.currentTimeMillis() else null,
                                 )
                             ) {
-                                popUpTo(0) { inclusive = true }
+                                popUpTo(AgentChatRoute::class) { inclusive = true }
                             }
                         },
+                        viewModel = androidx.hilt.navigation.compose.hiltViewModel(
+                            backStackEntry,
+                            key = route.toViewModelKey(),
+                        ),
                     )
                 }
             }
@@ -129,4 +137,12 @@ fun TwoPaneConversationsLayout(
             )
         }
     }
+}
+
+private fun AgentChatRoute.toViewModelKey(): String = buildString {
+    append(agentId)
+    append(':')
+    append(conversationId.orEmpty())
+    append(':')
+    append(freshRouteKey?.toString().orEmpty())
 }
