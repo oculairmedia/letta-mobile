@@ -179,11 +179,25 @@ class ChatPushService : Service() {
     private fun warmupSubscribers() {
         // Pre-create subscribers for the agent's top conversations so streaming
         // kicks in before the user opens any chat screen.
+        //
+        // letta-mobile-qv6d: limit reduced from 20 → WARMUP_CONVERSATION_COUNT
+        // (5). Each warmed conversation runs a permanent runStreamSubscriber
+        // coroutine that polls /v1/conversations/{id}/stream on the idle
+        // backoff ladder forever. At 20 convs and the prior 5s cap that
+        // produced ~4 RPS of background 400 traffic against
+        // letta.oculair.ca per device — saturating the OkHttp dispatcher
+        // (default maxRequestsPerHost = 5) and starving foreground SSE
+        // sends (Emmanuel's letta-mobile-kxsv hang).
+        //
+        // 5 conversations covers the realistic "I might tap any of these
+        // recents next" window. Anything older incurs a one-shot getOrCreate
+        // hydrate on first open (~500ms — imperceptible if the user just
+        // tapped) and starts its own subscriber from there.
         warmupJob?.cancel()
         warmupJob = scope.launch {
             try {
                 val conversations = conversationApi.listConversations(
-                    limit = 20,
+                    limit = WARMUP_CONVERSATION_COUNT,
                     order = "desc",
                     orderBy = "last_message_at",
                 )
@@ -220,6 +234,9 @@ class ChatPushService : Service() {
         private const val TAG = "ChatPushService"
         private const val SERVICE_CHANNEL_ID = "letta-chat-push-service"
         private const val FOREGROUND_NOTIFICATION_ID = 7531
+
+        // letta-mobile-qv6d: see warmupSubscribers() for rationale.
+        private const val WARMUP_CONVERSATION_COUNT = 5
 
         fun start(context: Context) {
             // On Android 13+, POST_NOTIFICATIONS is runtime-granted. We still

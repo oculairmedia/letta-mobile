@@ -830,7 +830,27 @@ class TimelineSyncLoop(
 
         // Resume-stream subscriber (letta-mobile-mge5).
         private const val STREAM_BACKOFF_START_MS = 1_000L
+        // letta-mobile-qv6d: split the backoff cap into two ladders.
+        //
+        //   STREAM_BACKOFF_MAX_MS — used when the stream closed cleanly
+        //     (a run actually ran and finished). We want to re-attach
+        //     quickly because another run is plausibly imminent.
+        //
+        //   STREAM_IDLE_BACKOFF_MAX_MS — used on the idle404 path (server
+        //     said "no active run"). Repeatedly re-asking every 5s
+        //     produced a ~4 RPS background-400 storm against
+        //     letta.oculair.ca per device (20-conv warmup × 1 poll /
+        //     5s) which (a) saturated the OkHttp dispatcher and starved
+        //     foreground SSE sends — Emmanuel's letta-mobile-kxsv hang
+        //     symptom — and (b) burned battery and bandwidth.
+        //
+        //     90s × 20 conv = ~0.22 RPS background, an 18× reduction
+        //     versus the 5s cap. A live run still cuts through within
+        //     90s of starting; if push delivery (ChatPushService) is
+        //     working the FCM payload triggers a fast probe ahead of
+        //     the next idle poll anyway.
         private const val STREAM_BACKOFF_MAX_MS = 5_000L
+        private const val STREAM_IDLE_BACKOFF_MAX_MS = 90_000L
         private const val STREAM_DORMANT_MS = 3_000L
 
         private const val REQUEST_PREVIEW_MAX_CHARS = 2_048
@@ -966,7 +986,8 @@ class TimelineSyncLoop(
                     "backoffMs" to backoffMs,
                 )
                 delay(backoffMs)
-                backoffMs = (backoffMs * 2).coerceAtMost(STREAM_BACKOFF_MAX_MS)
+                // letta-mobile-qv6d: idle path uses the longer cap.
+                backoffMs = (backoffMs * 2).coerceAtMost(STREAM_IDLE_BACKOFF_MAX_MS)
             } catch (e: ApiException) {
                 // The Letta server returns 400 INVALID_ARGUMENT with body
                 // `{"detail":"... No active runs found ..."}` as an alternative
@@ -992,7 +1013,8 @@ class TimelineSyncLoop(
                         "via" to "apiException",
                     )
                     delay(backoffMs)
-                    backoffMs = (backoffMs * 2).coerceAtMost(STREAM_BACKOFF_MAX_MS)
+                    // letta-mobile-qv6d: idle path uses the longer cap.
+                    backoffMs = (backoffMs * 2).coerceAtMost(STREAM_IDLE_BACKOFF_MAX_MS)
                 } else {
                     // letta-mobile-mge5.6: distinguish transient network /
                     // server errors from the idle path. Grafana alerts on
