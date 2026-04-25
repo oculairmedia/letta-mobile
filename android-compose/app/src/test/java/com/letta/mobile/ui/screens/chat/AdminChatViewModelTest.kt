@@ -3,6 +3,7 @@ package com.letta.mobile.ui.screens.chat
 import androidx.lifecycle.SavedStateHandle
 import com.letta.mobile.bot.core.BotSession
 import com.letta.mobile.bot.protocol.BotAgentInfo
+import com.letta.mobile.bot.protocol.BotStreamEvent
 import com.letta.mobile.bot.protocol.BotStreamChunk
 import com.letta.mobile.bot.protocol.BotChatResponse
 import com.letta.mobile.bot.protocol.InternalBotClient
@@ -36,6 +37,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -68,6 +70,7 @@ class AdminChatViewModelTest {
     private lateinit var internalBotClient: InternalBotClient
     private lateinit var clientModeChatSender: ClientModeChatSender
     private val testDispatcher = UnconfinedTestDispatcher()
+    private lateinit var clientModeEnabledFlow: MutableStateFlow<Boolean>
     private var messages: List<AppMessage> = emptyList()
     private var streamStates: List<StreamState> = emptyList()
     private val activeConversationIds = mutableMapOf<String, String?>()
@@ -97,11 +100,12 @@ class AdminChatViewModelTest {
         settingsRepository = mockk(relaxed = true)
         internalBotClient = mockk(relaxed = true)
         clientModeChatSender = mockk(relaxed = true)
+        clientModeEnabledFlow = MutableStateFlow(false)
         activeConversationIds.clear()
 
         every { settingsRepository.getChatBackgroundKey() } returns flowOf("default")
         every { settingsRepository.getChatFontScale() } returns flowOf(1f)
-        every { settingsRepository.observeClientModeEnabled() } returns flowOf(false)
+        every { settingsRepository.observeClientModeEnabled() } returns clientModeEnabledFlow
         every {
             clientModeChatSender.streamMessage(any(), any(), any(), any())
         } returns flow { }
@@ -344,7 +348,7 @@ class AdminChatViewModelTest {
 
     @Test
     fun `sendMessage routes through client mode sender when enabled`() = runTest {
-        every { settingsRepository.observeClientModeEnabled() } returns flowOf(true)
+        clientModeEnabledFlow.value = true
         every {
             clientModeChatSender.streamMessage(
                 screenAgentId = any(),
@@ -378,7 +382,7 @@ class AdminChatViewModelTest {
 
     @Test
     fun `sendMessage rejects attachments in client mode`() = runTest {
-        every { settingsRepository.observeClientModeEnabled() } returns flowOf(true)
+        clientModeEnabledFlow.value = true
         val vm = createViewModel(conversationId = null)
         advanceUntilIdle()
 
@@ -398,7 +402,7 @@ class AdminChatViewModelTest {
 
     @Test
     fun `resetMessages clears client mode conversation state`() = runTest {
-        every { settingsRepository.observeClientModeEnabled() } returns flowOf(true)
+        clientModeEnabledFlow.value = true
         every {
             clientModeChatSender.streamMessage(
                 screenAgentId = any(),
@@ -421,6 +425,145 @@ class AdminChatViewModelTest {
         assertEquals(ConversationState.NoConversation, vm.uiState.value.conversationState)
         assertTrue(vm.uiState.value.messages.isEmpty())
         assertFalse(vm.uiState.value.isStreaming)
+    }
+
+    @Test
+    fun `client mode renders tool call and tool result chunks as tool card`() = runTest {
+        clientModeEnabledFlow.value = true
+        every {
+            clientModeChatSender.streamMessage(any(), any(), any(), any())
+        } returns flow {
+            emit(
+                BotStreamChunk(
+                    event = BotStreamEvent.TOOL_CALL,
+                    toolName = "search",
+                    toolCallId = "call-1",
+                    toolInput = kotlinx.serialization.json.buildJsonObject {
+                        put("query", kotlinx.serialization.json.JsonPrimitive("kotlin"))
+                    },
+                    conversationId = "client-conv",
+                )
+            )
+            emit(
+                BotStreamChunk(
+                    event = BotStreamEvent.TOOL_RESULT,
+                    toolName = "search",
+                    toolCallId = "call-1",
+                    text = "done",
+                    isError = false,
+                    conversationId = "client-conv",
+                )
+            )
+            emit(BotStreamChunk(text = "Final answer", conversationId = "client-conv", done = true))
+        }
+
+        val vm = createViewModel(conversationId = null)
+        advanceUntilIdle()
+
+        vm.sendMessage("hello")
+        advanceUntilIdle()
+
+        val toolMessage = vm.uiState.value.messages.firstOrNull { !it.toolCalls.isNullOrEmpty() }
+        assertTrue(toolMessage != null)
+        assertEquals("search", toolMessage!!.toolCalls!!.single().name)
+        assertEquals("done", toolMessage.toolCalls!!.single().result)
+    }
+
+    @Test
+    fun `toggling client mode off restores timeline messages after client mode session`() = runTest {
+        clientModeEnabledFlow.value = true
+        messages = listOf(
+            TestData.appMessage(id = "timeline-user", messageType = MessageType.USER, content = "Timeline hello"),
+            TestData.appMessage(id = "timeline-assistant", messageType = MessageType.ASSISTANT, content = "Timeline reply"),
+        )
+        every {
+            clientModeChatSender.streamMessage(any(), any(), any(), any())
+        } returns flow {
+            emit(BotStreamChunk(text = "Client reply", conversationId = "client-conv", done = true))
+        }
+
+        val vm = createViewModel(conversationId = null)
+        advanceUntilIdle()
+
+        vm.sendMessage("hello")
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.messages.any { it.content == "Client reply" })
+
+        clientModeEnabledFlow.value = false
+        advanceUntilIdle()
+
+        assertEquals(ConversationState.Ready("conv-1"), vm.uiState.value.conversationState)
+        assertTrue(vm.uiState.value.messages.any { it.id == "timeline-user" })
+        assertTrue(vm.uiState.value.messages.any { it.id == "timeline-assistant" })
+        assertFalse(vm.uiState.value.isStreaming)
+    }
+
+    @Test
+    fun `blank conversation id in saved state behaves like fresh client mode route`() = runTest {
+        clientModeEnabledFlow.value = true
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+                forceFreshConversation = any(),
+            )
+        } returns flow {
+            emit(BotStreamChunk(text = "Fresh route", conversationId = "client-conv", done = true))
+        }
+
+        val savedState = SavedStateHandle().apply {
+            set("agentId", "agent-1")
+            set("conversationId", "")
+        }
+        val vm = AdminChatViewModel(
+            savedState,
+            messageRepository,
+            timelineRepository,
+            agentRepository,
+            blockRepository,
+            bugReportRepository,
+            folderRepository,
+            conversationManager,
+            conversationRepository,
+            settingsRepository,
+            internalBotClient,
+            clientModeChatSender,
+            com.letta.mobile.channel.CurrentConversationTracker(),
+        )
+        advanceUntilIdle()
+
+        vm.sendMessage("hello")
+        advanceUntilIdle()
+
+        verify(exactly = 1) {
+            clientModeChatSender.streamMessage(
+                screenAgentId = "agent-1",
+                text = "hello",
+                conversationId = null,
+                forceFreshConversation = true,
+            )
+        }
+        coVerify(exactly = 0) { timelineRepository.sendMessage(any(), any()) }
+        assertTrue(vm.uiState.value.messages.any { it.content == "Fresh route" })
+    }
+
+    @Test
+    fun `existing conversation route hydrates passed conversation instead of falling back to empty state`() = runTest {
+        messages = listOf(
+            TestData.appMessage(id = "existing-user", messageType = MessageType.USER, content = "Earlier message"),
+            TestData.appMessage(id = "existing-assistant", messageType = MessageType.ASSISTANT, content = "Existing reply"),
+        )
+        every { conversationManager.getActiveConversationId(any()) } returns null
+        coEvery { conversationManager.resolveAndSetActiveConversation(any(), any()) } returns null
+
+        val vm = createViewModel(conversationId = "conv-1")
+        advanceUntilIdle()
+
+        assertEquals(ConversationState.Ready("conv-1"), vm.uiState.value.conversationState)
+        assertTrue(vm.uiState.value.messages.any { it.id == "existing-user" })
+        assertTrue(vm.uiState.value.messages.any { it.id == "existing-assistant" })
+        verify { conversationManager.setActiveConversation("agent-1", "conv-1") }
     }
 
     @Test
