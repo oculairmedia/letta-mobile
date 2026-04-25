@@ -1140,4 +1140,50 @@ class AdminChatViewModelTest {
 
         assertNull(vm.uiState.value.clientModeConversationSwap)
     }
+
+    // ---------------------------------------------------------------
+    // letta-mobile-c87t (PR 2): existing-route Client Mode sends append
+    // the user bubble through the timeline, removing the dual-write to
+    // _uiState.messages flagged by Meridian. Activates the dormant
+    // CLIENT_MODE_HARNESS source path so the fuzzy matcher (PR 1) can
+    // reconcile it against Letta's SSE-persisted echo.
+    // ---------------------------------------------------------------
+
+    @Test
+    fun `c87t pr2 - existing-route Client Mode appends user bubble via timeline`() = runTest {
+        clientModeEnabledFlow.value = true
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+                forceFreshConversation = any(),
+            )
+        } returns flow {
+            emit(BotStreamChunk(text = "ack", conversationId = "conv-existing", done = true))
+        }
+
+        val vm = createViewModel(conversationId = "conv-existing")
+        advanceUntilIdle()
+
+        vm.sendMessage("user-text-routing-via-timeline")
+        advanceUntilIdle()
+
+        // The Client Mode user bubble must NOT touch the legacy
+        // timelineRepository.sendMessage path (which would have queued an
+        // outbound request to Letta directly, bypassing the gateway).
+        coVerify(exactly = 0) {
+            timelineRepository.sendMessage(any(), "user-text-routing-via-timeline")
+        }
+        // It MUST go through appendClientModeLocal so the timeline becomes
+        // the source of truth for the message list and the fuzzy matcher
+        // can later collapse the SSE-persisted Confirmed echo.
+        coVerify(exactly = 1) {
+            timelineRepository.appendClientModeLocal(
+                conversationId = "conv-existing",
+                content = "user-text-routing-via-timeline",
+                attachments = emptyList(),
+            )
+        }
+    }
 }
