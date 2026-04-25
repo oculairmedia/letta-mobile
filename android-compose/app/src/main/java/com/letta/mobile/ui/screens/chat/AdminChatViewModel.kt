@@ -567,23 +567,52 @@ class AdminChatViewModel @Inject constructor(
 
             try {
                 if (shouldUseClientModeForCurrentRoute) {
-                    stopTimelineObserver()
-                    val clientConversationId = currentClientModeConversationId()
+                    // letta-mobile-c87t (PR 2): when we have a Client Mode
+                    // conversationId, route through the timeline observer so
+                    // SSE-side persisted messages flow into the UI alongside
+                    // the optimistic CLIENT_MODE_HARNESS Locals from
+                    // appendClientModeLocal. Without this the chat would only
+                    // ever show in-memory bubbles and history wouldn't load.
+                    //
+                    // Resolution order: explicit nav arg → saved-state-handle
+                    // pointer. Fresh routes that haven't sent yet have neither
+                    // and stay on the in-memory path until the gateway
+                    // provides one (see sendMessageViaClientMode migration).
+                    val clientConversationId = explicitConversationId
+                        ?: currentClientModeConversationId()
                     currentConversationTracker.setCurrent(clientConversationId)
                     val agent = agentRepository.getCachedAgent(agentId)
                         ?: runCatching { agentRepository.getAgent(agentId).first() }.getOrNull()
-                    _uiState.value = _uiState.value.copy(
-                        agentName = agent?.name ?: _uiState.value.agentName,
-                        conversationState = clientConversationId?.let { ConversationState.Ready(it) }
-                            ?: ConversationState.NoConversation,
-                        messages = clientModeMessages.toImmutableList(),
-                        isLoadingMessages = false,
-                        isLoadingOlderMessages = false,
-                        hasMoreOlderMessages = false,
-                        isStreaming = false,
-                        isAgentTyping = false,
-                        error = null,
-                    )
+                    if (clientConversationId != null) {
+                        // Make sure the observer is running for this conv;
+                        // it'll repopulate _uiState.messages on first emission.
+                        startTimelineObserver(clientConversationId)
+                        _uiState.value = _uiState.value.copy(
+                            agentName = agent?.name ?: _uiState.value.agentName,
+                            conversationState = ConversationState.Ready(clientConversationId),
+                            // Don't write messages here — the timeline observer
+                            // is the source of truth.
+                            isLoadingOlderMessages = false,
+                            hasMoreOlderMessages = false,
+                            isStreaming = false,
+                            isAgentTyping = false,
+                            error = null,
+                        )
+                    } else {
+                        // Fresh route, no conv yet — keep in-memory path.
+                        stopTimelineObserver()
+                        _uiState.value = _uiState.value.copy(
+                            agentName = agent?.name ?: _uiState.value.agentName,
+                            conversationState = ConversationState.NoConversation,
+                            messages = clientModeMessages.toImmutableList(),
+                            isLoadingMessages = false,
+                            isLoadingOlderMessages = false,
+                            hasMoreOlderMessages = false,
+                            isStreaming = false,
+                            isAgentTyping = false,
+                            error = null,
+                        )
+                    }
                     initialMessage?.let { message ->
                         if (message.isNotBlank()) {
                             sendMessage(message)
@@ -847,30 +876,89 @@ class AdminChatViewModel @Inject constructor(
             // (no conversation arg AND no in-flight saved-state pointer). For
             // existing-route entries we want resume, not new.
             val forceFreshConversation = isFreshRoute && priorConversationId == null
-            stopTimelineObserver()
+            // letta-mobile-c87t (PR 2): when we already know the
+            // conversationId, append the user bubble through the timeline so
+            // the SSE-side reconcile + fuzzy matcher (PR 1) can collapse it
+            // against the Letta-persisted echo. This activates the dormant
+            // CLIENT_MODE_HARNESS source path, gives 8cm8 the telemetry it
+            // needs, and removes the user-bubble dual-write that Meridian
+            // flagged.
+            //
+            // Fresh-route sends still use the in-memory path until the
+            // gateway returns a conversationId on the first chunk; at that
+            // point we migrate the user bubble into the timeline (see below).
             currentConversationTracker.setCurrent(priorConversationId)
             _inputText.value = ""
-            val baseMessages = clientModeMessages
-            val nextMessages = baseMessages + UiMessage(
+            if (priorConversationId != null) {
+                // Stop any prior observer for a different conversation, then
+                // start one for this Client Mode conversation so the timeline
+                // becomes the source of truth for the message list.
+                val convId = priorConversationId
+                if (timelineObserverConversationId != convId) {
+                    stopTimelineObserver()
+                }
+                runCatching {
+                    timelineRepository.appendClientModeLocal(
+                        conversationId = convId,
+                        content = text,
+                    )
+                }.onFailure { e ->
+                    android.util.Log.w(
+                        "AdminChatViewModel",
+                        "appendClientModeLocal failed; falling back to in-memory bubble",
+                        e,
+                    )
+                    // Fall back to the in-memory path so the user still sees
+                    // their bubble even if the timeline append fails.
+                    val fallback = clientModeMessages + UiMessage(
+                        id = userMessageId,
+                        role = "user",
+                        content = text,
+                        timestamp = startedAt,
+                    )
+                    clientModeMessages = fallback
+                    _uiState.value = _uiState.value.copy(messages = fallback.toImmutableList())
+                }
+                // Ensure observer is running so subsequent timeline state
+                // emissions (and the SSE-driven Confirmed echoes) reach the
+                // UI. Idempotent for the same conversationId.
+                startTimelineObserver(convId)
+                _uiState.value = _uiState.value.copy(
+                    isLoadingMessages = false,
+                    isLoadingOlderMessages = false,
+                    hasMoreOlderMessages = false,
+                    isStreaming = true,
+                    isAgentTyping = true,
+                    composerError = null,
+                    error = null,
+                    pendingAttachments = persistentListOf(),
+                    conversationState = ConversationState.Ready(convId),
+                )
+            } else {
+                // Fresh-route: no conversationId yet; keep the in-memory path
+                // until the gateway echoes one, then migrate.
+                stopTimelineObserver()
+                val baseMessages = clientModeMessages
+                val nextMessages = baseMessages + UiMessage(
                     id = userMessageId,
                     role = "user",
                     content = text,
                     timestamp = startedAt,
                 )
-            clientModeMessages = nextMessages
-            _uiState.value = _uiState.value.copy(
-                messages = nextMessages.toImmutableList(),
-                isLoadingMessages = false,
-                isLoadingOlderMessages = false,
-                hasMoreOlderMessages = false,
-                isStreaming = true,
-                isAgentTyping = true,
-                composerError = null,
-                error = null,
-                pendingAttachments = persistentListOf(),
-                conversationState = priorConversationId?.let { ConversationState.Ready(it) }
-                    ?: ConversationState.NoConversation,
-            )
+                clientModeMessages = nextMessages
+                _uiState.value = _uiState.value.copy(
+                    messages = nextMessages.toImmutableList(),
+                    isLoadingMessages = false,
+                    isLoadingOlderMessages = false,
+                    hasMoreOlderMessages = false,
+                    isStreaming = true,
+                    isAgentTyping = true,
+                    composerError = null,
+                    error = null,
+                    pendingAttachments = persistentListOf(),
+                    conversationState = ConversationState.NoConversation,
+                )
+            }
 
             var latestConversationId = priorConversationId
             // letta-mobile-c87t: track whether the gateway substituted a different
@@ -911,6 +999,19 @@ class AdminChatViewModel @Inject constructor(
                     if (!latestConversationId.isNullOrBlank()) {
                         setClientModeConversationId(latestConversationId)
                         currentConversationTracker.setCurrent(latestConversationId)
+                        // letta-mobile-c87t (PR 2): fresh-route handling.
+                        // Fresh-route sends keep their assistant streaming on
+                        // the in-memory path because TimelineEvent.Local doesn't
+                        // model assistant content + tool-calls + reasoning, and
+                        // mid-stream migration to the timeline causes the
+                        // observer to clobber the in-flight assistant render.
+                        // The next time the user re-enters the conversation it
+                        // will be via the existing-route branch in
+                        // loadMessages, which DOES route through the timeline
+                        // observer (SSE-persisted history loads correctly).
+                        // Eliminating the assistant in-memory path entirely
+                        // requires a TimelineEvent overhaul tracked under
+                        // letta-mobile-26pf and is out of scope for c87t.
                     }
 
                     if (!chunk.done) {
