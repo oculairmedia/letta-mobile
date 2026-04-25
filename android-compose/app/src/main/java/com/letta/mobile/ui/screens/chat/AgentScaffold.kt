@@ -111,7 +111,7 @@ fun AgentScaffold(
     onNavigateToSettings: (String) -> Unit,
     onNavigateToArchival: ((String) -> Unit)? = null,
     onNavigateToTools: (() -> Unit)? = null,
-    onSwitchConversation: ((String, String) -> Unit)? = null,
+    onSwitchConversation: ((String, String?) -> Unit)? = null,
     viewModel: AdminChatViewModel = hiltViewModel()
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -249,7 +249,7 @@ fun AgentScaffold(
             },
             onNewConversation = {
                 showConversationPicker = false
-                onSwitchConversation?.invoke(agentId, "")
+                onSwitchConversation?.invoke(agentId, null)
             },
         )
     }

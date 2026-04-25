@@ -110,7 +110,10 @@ fun TwoPaneConversationsLayout(
                         },
                         onSwitchConversation = { agentId, conversationId ->
                             detailNavController.navigate(
-                                AgentChatRoute(agentId = agentId, conversationId = conversationId)
+                                AgentChatRoute(
+                                    agentId = agentId,
+                                    conversationId = conversationId?.takeIf { it.isNotBlank() },
+                                )
                             ) {
                                 popUpTo(0) { inclusive = true }
                             }

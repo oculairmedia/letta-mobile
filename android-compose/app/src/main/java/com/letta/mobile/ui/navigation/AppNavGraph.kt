@@ -496,7 +496,12 @@ fun AppNavGraph(
                         navController.navigate(AllToolsRoute)
                     },
                     onSwitchConversation = { agentId, conversationId ->
-                        navController.navigate(AgentChatRoute(agentId = agentId, conversationId = conversationId)) {
+                        navController.navigate(
+                            AgentChatRoute(
+                                agentId = agentId,
+                                conversationId = conversationId?.takeIf { it.isNotBlank() },
+                            )
+                        ) {
                             popUpTo<ConversationsRoute>()
                         }
                     },
