@@ -44,7 +44,20 @@ sealed class TimelineEvent {
      */
     abstract val source: MessageSource
 
-    /** Optimistic, not yet confirmed by server. Only ever role=USER in practice. */
+    /**
+     * Optimistic, not yet confirmed by server. Historically only ever USER —
+     * extended for letta-mobile-5s1n (Client Mode assistant streaming) so
+     * in-flight assistant content + reasoning + tool calls can flow through
+     * the timeline rather than the legacy in-memory `clientModeMessages` list.
+     *
+     * Strict-otid sends from Letta REST/SSE remain USER-only; the new fields
+     * default to safe values and are unused for [MessageSource.LETTA_SERVER].
+     * For [MessageSource.CLIENT_MODE_HARNESS] events that represent assistant
+     * streaming, [messageType] is set accordingly and the structured fields
+     * (toolCalls / approval / toolReturn / reasoningContent) carry the
+     * stream payload until the SSE-side Confirmed event lands and the fuzzy
+     * matcher (or future strict-otid path) collapses them.
+     */
     data class Local(
         override val position: Double,
         override val otid: String,
@@ -54,6 +67,17 @@ sealed class TimelineEvent {
         val deliveryState: DeliveryState,
         override val attachments: List<MessageContentPart.Image> = emptyList(),
         override val source: MessageSource = MessageSource.LETTA_SERVER,
+        // letta-mobile-5s1n: assistant-streaming additive fields. All default
+        // to USER-bubble-equivalent values so existing call sites compile
+        // unchanged. Mirrors the corresponding fields on [Confirmed] so the
+        // VM->UiMessage mapper can render Locals and Confirmeds uniformly.
+        val messageType: TimelineMessageType = TimelineMessageType.USER,
+        val toolCalls: List<com.letta.mobile.data.model.ToolCall> = emptyList(),
+        val approvalRequestId: String? = null,
+        val approvalDecided: Boolean = false,
+        val toolReturnContent: String? = null,
+        val toolReturnIsError: Boolean = false,
+        val reasoningContent: String? = null,
     ) : TimelineEvent()
 
     /** Confirmed via server. */
