@@ -12,9 +12,20 @@ data class ChatBubbleStyle(
 )
 
 @Composable
-fun bubbleStyle(role: String, isStreaming: Boolean = false): ChatBubbleStyle {
+fun bubbleStyle(role: String, isStreaming: Boolean = false, isError: Boolean = false): ChatBubbleStyle {
     val colorScheme = MaterialTheme.colorScheme
     val accent = colorScheme.primary
+
+    // letta-mobile-5s1n: server-emitted error frames render with the
+    // destructive accent so the user sees that the run aborted.
+    if (isError) {
+        return ChatBubbleStyle(
+            alignEnd = false,
+            containerColor = colorScheme.errorContainer,
+            roleColor = colorScheme.onErrorContainer,
+            roleLabel = "Error",
+        )
+    }
 
     return when (role) {
         "user" -> ChatBubbleStyle(

@@ -1301,6 +1301,11 @@ internal fun LettaMessage.toTimelineEvent(position: Double): TimelineEvent.Confi
         is ApprovalRequestMessage -> TimelineMessageType.TOOL_CALL to renderToolCallContent(effectiveToolCalls)
         is ToolReturnMessage -> TimelineMessageType.TOOL_RETURN to (toolReturn.funcResponse ?: "")
         is SystemMessage -> TimelineMessageType.SYSTEM to content
+        // letta-mobile-5s1n: server-emitted error frames render as a
+        // dedicated ERROR bubble so the user gets visible feedback when a
+        // run aborts mid-flight (previously absorbed into UnknownMessage
+        // and silently dropped).
+        is com.letta.mobile.data.model.ErrorMessage -> TimelineMessageType.ERROR to text
         else -> return null
     }
     val attachments = when (this) {
@@ -1309,7 +1314,8 @@ internal fun LettaMessage.toTimelineEvent(position: Double): TimelineEvent.Confi
         is SystemMessage -> this.attachments
         is ReasoningMessage, is ToolCallMessage, is ToolReturnMessage, is ApprovalRequestMessage,
         is ApprovalResponseMessage, is HiddenReasoningMessage, is EventMessage,
-        is PingMessage, is UnknownMessage, is StopReason, is UsageStatistics -> emptyList()
+        is PingMessage, is UnknownMessage, is StopReason, is UsageStatistics,
+        is com.letta.mobile.data.model.ErrorMessage -> emptyList()
     }
     val effectiveOtid = otid ?: "server-$id"
     val date = runCatching { date?.let(Instant::parse) ?: Instant.now() }.getOrElse { Instant.now() }

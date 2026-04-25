@@ -186,6 +186,9 @@ internal fun ChatMessageItem(
  * boundaries stay legible.
  */
 private fun UiMessage.shouldRenderBubbleLess(): Boolean {
+    // letta-mobile-5s1n: error frames must render with the error-container
+    // bubble chrome, never bubble-less.
+    if (isError) return false
     if (role != "assistant") return false
     if (!toolCalls.isNullOrEmpty()) return false
     if (generatedUi != null) return false
@@ -208,7 +211,7 @@ private fun MessageBubbleSurface(
 ) {
     val isUser = message.role == "user"
     val isLastAssistant = isStreaming && message.role == "assistant"
-    val style = bubbleStyle(role = message.role, isStreaming = isLastAssistant)
+    val style = bubbleStyle(role = message.role, isStreaming = isLastAssistant, isError = message.isError)
     val colors = MaterialTheme.chatColors
     val dimens = MaterialTheme.chatDimens
     val typo = MaterialTheme.chatTypography

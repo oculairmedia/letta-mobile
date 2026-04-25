@@ -151,6 +151,18 @@ class MessageProcessor @Inject constructor(
                             // Skip unknown message types
                         }
 
+                        is ErrorMessage -> {
+                            // letta-mobile-5s1n: ErrorMessage is canonically
+                            // rendered through the timeline path
+                            // (TimelineMessageType.ERROR → red system
+                            // bubble). MessageProcessor is the legacy
+                            // non-timeline path with a stricter AppMessage
+                            // schema (no system/error MessageType variant);
+                            // skip here so the legacy path doesn't crash on
+                            // an unmapped role. The timeline path is what
+                            // active code reads.
+                        }
+
                         is StopReason -> {
                             // Terminal metadata frame; don't display as bubble
                         }

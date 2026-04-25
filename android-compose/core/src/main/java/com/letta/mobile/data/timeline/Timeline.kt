@@ -185,6 +185,12 @@ enum class TimelineMessageType {
     TOOL_CALL,
     TOOL_RETURN,
     SYSTEM,
+    /**
+     * Server-emitted error frame. Rendered as a system-style bubble with
+     * destructive accent so the user sees that the run aborted instead of
+     * a silent dropped spinner. letta-mobile-5s1n.
+     */
+    ERROR,
     OTHER,
 }
 

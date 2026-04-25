@@ -43,6 +43,10 @@ internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                 TimelineMessageType.REASONING -> "assistant"
                 TimelineMessageType.TOOL_CALL -> "assistant"
                 TimelineMessageType.SYSTEM -> "system"
+                // Locals never originate as ERROR (server-only frame), but
+                // make the `when` exhaustive so adding the type elsewhere
+                // doesn't compile-warn here. letta-mobile-5s1n.
+                TimelineMessageType.ERROR -> "system"
                 TimelineMessageType.TOOL_RETURN, TimelineMessageType.OTHER ->
                     when (ev.role) {
                         Role.USER -> "user"
@@ -102,6 +106,7 @@ internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                 timestamp = ev.sentAt.toString(),
                 isPending = ev.deliveryState == DeliveryState.SENDING,
                 isReasoning = ev.messageType == TimelineMessageType.REASONING,
+                isError = ev.messageType == TimelineMessageType.ERROR,
                 toolCalls = uiToolCalls,
                 approvalRequest = uiApproval,
                 approvalResponse = null,
@@ -116,6 +121,9 @@ internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                 TimelineMessageType.ASSISTANT -> "assistant"
                 TimelineMessageType.REASONING -> "assistant"
                 TimelineMessageType.SYSTEM -> "system"
+                // letta-mobile-5s1n: ERROR frames render as a system bubble
+                // with the destructive accent applied via UiMessage.isError.
+                TimelineMessageType.ERROR -> "system"
                 TimelineMessageType.TOOL_CALL -> "assistant"
                 TimelineMessageType.TOOL_RETURN -> return null
                 TimelineMessageType.OTHER -> return null
@@ -176,6 +184,7 @@ internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                 stepId = ev.stepId,
                 isPending = false,
                 isReasoning = ev.messageType == TimelineMessageType.REASONING,
+                isError = ev.messageType == TimelineMessageType.ERROR,
                 toolCalls = uiToolCalls,
                 approvalRequest = uiApproval,
                 approvalResponse = uiApprovalResponse,

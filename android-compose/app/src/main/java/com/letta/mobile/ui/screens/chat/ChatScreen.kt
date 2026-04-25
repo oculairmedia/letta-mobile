@@ -293,7 +293,13 @@ private fun ChatContent(
             }
         }
         when (chatMode) {
-            "simple" -> result.filter { it.role == "user" || (it.role == "assistant" && !it.isReasoning) }
+            // letta-mobile-5s1n: keep error frames visible in Simple mode so
+            // users see when a run aborts (otherwise the bubble is filtered
+            // out and the experience degrades to the silent-spinner bug
+            // we just fixed).
+            "simple" -> result.filter {
+                it.role == "user" || (it.role == "assistant" && !it.isReasoning) || it.isError
+            }
             else -> result
         }
     }
