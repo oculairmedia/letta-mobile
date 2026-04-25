@@ -28,6 +28,7 @@ import com.letta.mobile.data.model.UsageStatistics
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.stream.SseParser
 import java.time.Instant
+import java.util.UUID
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -324,6 +325,59 @@ class TimelineSyncLoop(
         return otid
     }
 
+    /**
+     * letta-mobile-c87t: optimistic-append for Client Mode sends.
+     *
+     * Client Mode messages travel mobile → lettabot WS gateway → Letta Code SDK
+     * → Letta server. The SDK does not currently accept a client-supplied otid
+     * (`letta-mobile-8pyt`), so server-echoed messages won't carry our otid back
+     * for the strict swap. We give Client Mode its own append path with a
+     * `cm-<uuid>` local id to avoid any chance of conflating with the strict
+     * otid path, and tag the event with `MessageSource.CLIENT_MODE_HARNESS` so
+     * the source-scoped fuzzy matcher in the reconcile path knows it's eligible
+     * for the time+content fallback. We do NOT enqueue to `sendQueue` — the
+     * actual transport happens via `ClientModeChatSender` over WS, not the
+     * standard REST send path. Reconcile will surface the server-echoed user
+     * message as a Confirmed event with a different (server-allocated) otid;
+     * the fuzzy matcher will then collapse the pair.
+     *
+     * Returns the synthetic local id (also used as the otid for storage in the
+     * timeline so existing position/otid invariants hold). The caller must
+     * NEVER pass this id to anything that expects a server-echoed otid match.
+     */
+    suspend fun appendClientModeLocal(
+        content: String,
+        attachments: List<MessageContentPart.Image> = emptyList(),
+    ): String {
+        val localId = "cm-${UUID.randomUUID()}"
+        val sentAt = Instant.now()
+        writeMutex.withLock {
+            val local = TimelineEvent.Local(
+                position = _state.value.nextLocalPosition(),
+                otid = localId,
+                content = content,
+                role = Role.USER,
+                sentAt = sentAt,
+                // SENT, not SENDING — the WS gateway is the source of truth for
+                // delivery, not this repo. We mark the bubble delivered the
+                // moment we append so the UI doesn't show a spinner that the
+                // gateway/SDK pipeline can't drive.
+                deliveryState = DeliveryState.SENT,
+                attachments = attachments,
+                source = MessageSource.CLIENT_MODE_HARNESS,
+            )
+            _state.value = _state.value.append(local)
+        }
+        _events.emit(TimelineSyncEvent.LocalAppended(localId))
+        Telemetry.event(
+            "TimelineSync", "send.clientModeLocalAppended",
+            "localId" to localId,
+            "conversationId" to conversationId,
+            "contentLength" to content.length,
+        )
+        return localId
+    }
+
     /** Retry a failed send by re-enqueueing it. */
     suspend fun retry(otid: String) = writeMutex.withLock {
         val existing = _state.value.findByOtid(otid)
@@ -552,6 +606,34 @@ class TimelineSyncLoop(
                 if (_state.value.findByOtid(msgOtid) == null) {
                     val pos = _state.value.nextLocalPosition()
                     val confirmed = msg.toTimelineEvent(position = pos) ?: return@forEach
+                    // letta-mobile-c87t: before falling through to the standard
+                    // append, attempt a Client-Mode fuzzy collapse. If the user
+                    // sent this message via Client Mode, there's a `cm-<uuid>`
+                    // Local with matching content + recent timestamp + source
+                    // == CLIENT_MODE_HARNESS in the timeline; we collapse the
+                    // pair to a single Confirmed event at the Local's position
+                    // so the UI doesn't transiently show two user bubbles.
+                    //
+                    // This path is scoped strictly via the Local's `source`
+                    // field — never via ambient flags. See
+                    // [Timeline.collapseClientModeFuzzyMatch] for the matcher.
+                    val fuzzy = _state.value.collapseClientModeFuzzyMatch(confirmed)
+                    if (fuzzy.collapsed != null) {
+                        _state.value = fuzzy.timeline
+                        // Meridian guardrail (2): log every fuzzy collapse at
+                        // INFO level so 8cm8 verification + duplicate-bubble
+                        // triage have data to work with.
+                        Telemetry.event(
+                            "TimelineSync", "reconcile.fuzzyCollapsed",
+                            "conversationId" to conversationId,
+                            "localOtid" to fuzzy.collapsed.localOtid,
+                            "serverId" to fuzzy.collapsed.serverId,
+                            "deltaMs" to fuzzy.collapsed.deltaMs,
+                            "contentPrefix" to fuzzy.collapsed.contentPrefix,
+                            "source" to fuzzy.collapsed.source.name,
+                        )
+                        return@forEach
+                    }
                     _state.value = _state.value.append(confirmed)
                     appendedMissing++
                 }
@@ -1049,6 +1131,26 @@ class TimelineSyncLoop(
                 "reason" to "otidSeen",
                 "otid" to (confirmed.otid ?: "<null>"),
                 "conversationId" to conversationId,
+            )
+            return@withLock
+        }
+        // letta-mobile-c87t: Client Mode fuzzy collapse on the live stream path.
+        // Mirrors the reconcile-path collapse above — if there's a recent
+        // CLIENT_MODE_HARNESS-source Local with matching content, swap rather
+        // than appending a duplicate. See [Timeline.collapseClientModeFuzzyMatch].
+        val fuzzy = _state.value.collapseClientModeFuzzyMatch(confirmed)
+        if (fuzzy.collapsed != null) {
+            _state.value = fuzzy.timeline
+            _state.value = _state.value.copy(liveCursor = confirmed.serverId)
+            _events.emit(TimelineSyncEvent.StreamEventIngested(confirmed.serverId, message.messageType))
+            Telemetry.event(
+                "TimelineSync", "streamSubscriber.fuzzyCollapsed",
+                "conversationId" to conversationId,
+                "localOtid" to fuzzy.collapsed.localOtid,
+                "serverId" to fuzzy.collapsed.serverId,
+                "deltaMs" to fuzzy.collapsed.deltaMs,
+                "contentPrefix" to fuzzy.collapsed.contentPrefix,
+                "source" to fuzzy.collapsed.source.name,
             )
             return@withLock
         }

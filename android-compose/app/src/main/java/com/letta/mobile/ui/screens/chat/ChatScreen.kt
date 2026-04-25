@@ -99,6 +99,16 @@ fun ChatScreen(
 
         Box(modifier = modifier.fillMaxSize().then(backgroundModifier).imePadding()) {
             Column(modifier = Modifier.fillMaxSize()) {
+                // letta-mobile-c87t: surfaces a non-modal banner when the
+                // lettabot WS gateway substituted a fresh conversation for the
+                // one we asked to resume. See ClientModeConversationSwapBanner.
+                val swap = state.clientModeConversationSwap
+                com.letta.mobile.ui.components.ClientModeConversationSwapBanner(
+                    visible = swap != null,
+                    onDismiss = { viewModel.dismissClientModeConversationSwap() },
+                    requestedConversationIdSuffix = swap?.requestedConversationId?.takeLast(6),
+                    newConversationIdSuffix = swap?.newConversationId?.takeLast(6),
+                )
                 when (val conversationState = state.conversationState) {
                     ConversationState.Loading -> {
                         MessageSkeletonList(modifier = Modifier.weight(1f))

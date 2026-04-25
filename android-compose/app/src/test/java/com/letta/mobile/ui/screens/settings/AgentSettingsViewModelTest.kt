@@ -191,8 +191,11 @@ class AgentSettingsViewModelTest {
         }
     }
 
+    // Client-mode persistence and connection-testing have moved to
+    // [com.letta.mobile.ui.screens.lettabot.LettaBotConnectionViewModel] (gb57.9).
+    // See LettaBotConnectionViewModelTest for coverage of save / test flows.
     @Test
-    fun `saveSettings persists client mode values through settings repository`() = runTest {
+    fun `saveSettings does not touch global client mode settings`() = runTest {
         val paramsSlot = slot<AgentUpdateParams>()
         coEvery { agentRepository.updateAgent(eq("a1"), capture(paramsSlot)) } answers {
             Agent(
@@ -204,44 +207,11 @@ class AgentSettingsViewModelTest {
             )
         }
 
-        viewModel.updateClientModeEnabled(true)
-        viewModel.updateClientModeBaseUrl("http://192.168.50.90:8407")
-        viewModel.updateClientModeApiKey("secret-key")
         viewModel.saveSettings()
 
-        coVerify(exactly = 1) { settingsRepository.setClientModeEnabled(true) }
-        coVerify(exactly = 1) { settingsRepository.setClientModeBaseUrl("http://192.168.50.90:8407") }
-        coVerify(exactly = 1) { settingsRepository.setClientModeApiKey("secret-key") }
-    }
-
-    @Test
-    fun `testClientModeConnection emits success state`() = runTest {
-        coEvery {
-            clientModeConnectionTester.test(
-                baseUrl = "http://192.168.50.90:8407",
-                apiKey = "secret-key",
-            )
-        } returns Result.success(Unit)
-
-        viewModel.updateClientModeEnabled(true)
-        viewModel.updateClientModeBaseUrl("http://192.168.50.90:8407")
-        viewModel.updateClientModeApiKey("secret-key")
-
-        viewModel.testClientModeConnection()
-
-        val state = awaitSuccessState()
-        assertTrue(state.clientModeConnectionState is ClientModeConnectionState.Success)
-    }
-
-    @Test
-    fun `testClientModeConnection surfaces missing url immediately`() = runTest {
-        viewModel.updateClientModeEnabled(true)
-        viewModel.updateClientModeBaseUrl("")
-
-        viewModel.testClientModeConnection()
-
-        val state = awaitSuccessState()
-        assertTrue(state.clientModeConnectionState is ClientModeConnectionState.Failure)
+        coVerify(exactly = 0) { settingsRepository.setClientModeEnabled(any()) }
+        coVerify(exactly = 0) { settingsRepository.setClientModeBaseUrl(any()) }
+        coVerify(exactly = 0) { settingsRepository.setClientModeApiKey(any()) }
     }
 
     private suspend fun awaitSuccessState(): AgentSettingsUiState {

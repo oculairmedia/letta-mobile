@@ -421,6 +421,13 @@
     <string name="screen_settings_export_unavailable">No compatible app found to share the export</string>
     <string name="screen_settings_messages_reset">Messages reset</string>
     <string name="screen_settings_admin_actions_section">Admin Actions</string>
+    <string name="screen_config_integrations_section">Integrations</string>
+    <string name="screen_lettabot_connection_title">LettaBot Connection</string>
+    <string name="screen_lettabot_connection_section">LettaBot Server</string>
+    <string name="screen_lettabot_connection_entry_description">Configure the global LettaBot server, API key, and master Client Mode toggle.</string>
+    <string name="screen_lettabot_connection_enable">Enable LettaBot Client Mode</string>
+    <string name="screen_lettabot_connection_enable_description">Master switch. When on, agents with LettaBot routing enabled will route through the configured LettaBot server. When off, all chats use the direct-agent path.</string>
+    <string name="screen_lettabot_connection_saved">LettaBot connection saved</string>
     <string name="screen_settings_client_mode_section">LettaBot Client Mode</string>
     <string name="screen_settings_client_mode_enable">Enable Client Mode</string>
     <string name="screen_settings_client_mode_enable_description">Route chat through a configured lettabot server without changing the normal direct-agent path when this is off.</string>

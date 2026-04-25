@@ -32,6 +32,7 @@ import com.letta.mobile.ui.theme.LettaTopBarDefaults
 fun ConfigScreen(
     onNavigateBack: () -> Unit,
     onNavigateToConfigList: () -> Unit,
+    onNavigateToLettaBotConnection: () -> Unit = {},
     viewModel: ConfigViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -72,6 +73,7 @@ fun ConfigScreen(
                 onThemePresetChange = { viewModel.updateThemePreset(it) },
                 onDynamicColorChange = { viewModel.updateDynamicColor(it) },
                 onEnableProjectsChange = { viewModel.updateEnableProjects(it) },
+                onNavigateToLettaBotConnection = onNavigateToLettaBotConnection,
                 onSave = {
                     viewModel.saveConfig(
                         onSuccess = { snackbar.dispatch("Configuration saved"); onNavigateBack() },
@@ -94,6 +96,7 @@ private fun ConfigContent(
     onThemePresetChange: (ThemePreset) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
     onEnableProjectsChange: (Boolean) -> Unit,
+    onNavigateToLettaBotConnection: () -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -252,6 +255,17 @@ private fun ConfigContent(
                         onCheckedChange = onEnableProjectsChange,
                     )
                 },
+            )
+        }
+
+        CardGroup(title = { Text(stringResource(R.string.screen_config_integrations_section)) }) {
+            item(
+                onClick = onNavigateToLettaBotConnection,
+                headlineContent = { Text(stringResource(R.string.screen_lettabot_connection_title)) },
+                supportingContent = {
+                    Text(stringResource(R.string.screen_lettabot_connection_entry_description))
+                },
+                leadingContent = { Icon(LettaIcons.Link, contentDescription = null) },
             )
         }
 

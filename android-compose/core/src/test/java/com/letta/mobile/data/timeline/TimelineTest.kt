@@ -281,4 +281,161 @@ class TimelineTest {
             },
         )
     }
+
+    // ---------------------------------------------------------------
+    // letta-mobile-c87t: Client Mode fuzzy reconcile tests
+    // ---------------------------------------------------------------
+
+    private fun clientModeLocal(
+        otid: String,
+        pos: Double,
+        content: String,
+        sentAt: Instant = Instant.now(),
+    ): TimelineEvent.Local = TimelineEvent.Local(
+        position = pos,
+        otid = otid,
+        content = content,
+        role = Role.USER,
+        sentAt = sentAt,
+        deliveryState = DeliveryState.SENT,
+        source = MessageSource.CLIENT_MODE_HARNESS,
+    )
+
+    private fun confirmedUser(
+        otid: String,
+        pos: Double,
+        content: String,
+        date: Instant = Instant.now(),
+        serverId: String = "server-$otid",
+    ): TimelineEvent.Confirmed = TimelineEvent.Confirmed(
+        position = pos,
+        otid = otid,
+        content = content,
+        serverId = serverId,
+        messageType = TimelineMessageType.USER,
+        date = date,
+        runId = null,
+        stepId = null,
+    )
+
+    @Test
+    fun `collapseClientModeFuzzyMatch collapses matching local within window`() {
+        val now = Instant.now()
+        val t = Timeline("c1")
+            .append(clientModeLocal("cm-1", 1.0, "hello", sentAt = now.minusMillis(500)))
+
+        val incoming = confirmedUser("server-otid", 99.0, "hello", date = now, serverId = "srv-1")
+        val result = t.collapseClientModeFuzzyMatch(incoming)
+
+        assertNotNull("Expected collapse to fire", result.collapsed)
+        assertEquals("cm-1", result.collapsed!!.localOtid)
+        assertEquals("srv-1", result.collapsed.serverId)
+        assertEquals(MessageSource.CLIENT_MODE_HARNESS, result.collapsed.source)
+        assertEquals(1, result.timeline.events.size)
+        val swapped = result.timeline.events[0]
+        assertTrue(swapped is TimelineEvent.Confirmed)
+        // Position preserved from the Local — guards against visual jump.
+        assertEquals(1.0, swapped.position, 0.0001)
+    }
+
+    @Test
+    fun `collapseClientModeFuzzyMatch ignores LETTA_SERVER source local`() {
+        val now = Instant.now()
+        // Default source is LETTA_SERVER — must not be eligible for fuzzy collapse.
+        val t = Timeline("c1").append(local("user-1", 1.0, "hello"))
+
+        val incoming = confirmedUser("server-otid", 99.0, "hello", date = now)
+        val result = t.collapseClientModeFuzzyMatch(incoming)
+
+        assertNull("LETTA_SERVER local must not be collapsed", result.collapsed)
+        // Timeline unchanged.
+        assertEquals(1, result.timeline.events.size)
+        assertTrue(result.timeline.events[0] is TimelineEvent.Local)
+    }
+
+    @Test
+    fun `collapseClientModeFuzzyMatch ignores match outside window`() {
+        val now = Instant.now()
+        val t = Timeline("c1").append(
+            clientModeLocal("cm-1", 1.0, "hello", sentAt = now.minusMillis(15_000))
+        )
+
+        val incoming = confirmedUser("server-otid", 99.0, "hello", date = now)
+        val result = t.collapseClientModeFuzzyMatch(incoming, windowMillis = 10_000)
+
+        assertNull("Match outside the configured window must not be collapsed", result.collapsed)
+    }
+
+    @Test
+    fun `collapseClientModeFuzzyMatch ignores content mismatch`() {
+        val now = Instant.now()
+        val t = Timeline("c1").append(
+            clientModeLocal("cm-1", 1.0, "hello", sentAt = now.minusMillis(200))
+        )
+
+        val incoming = confirmedUser("server-otid", 99.0, "goodbye", date = now)
+        val result = t.collapseClientModeFuzzyMatch(incoming)
+
+        assertNull("Content mismatch must not collapse", result.collapsed)
+    }
+
+    @Test
+    fun `collapseClientModeFuzzyMatch ignores non-USER confirmed message`() {
+        val now = Instant.now()
+        val t = Timeline("c1").append(
+            clientModeLocal("cm-1", 1.0, "hello", sentAt = now.minusMillis(200))
+        )
+
+        // Assistant turn shouldn't trigger user-bubble collapse.
+        val incoming = TimelineEvent.Confirmed(
+            position = 99.0,
+            otid = "server-otid",
+            content = "hello",
+            serverId = "srv-1",
+            messageType = TimelineMessageType.ASSISTANT,
+            date = now,
+            runId = null,
+            stepId = null,
+        )
+        val result = t.collapseClientModeFuzzyMatch(incoming)
+
+        assertNull("Assistant Confirmed events must not collapse user Locals", result.collapsed)
+    }
+
+    @Test
+    fun `collapseClientModeFuzzyMatch picks most recent matching local within window`() {
+        val now = Instant.now()
+        // Two same-content client-mode locals — most recent should win.
+        val t = Timeline("c1")
+            .append(clientModeLocal("cm-old", 1.0, "ping", sentAt = now.minusMillis(8_000)))
+            .append(clientModeLocal("cm-new", 2.0, "ping", sentAt = now.minusMillis(500)))
+
+        val incoming = confirmedUser("server-otid", 99.0, "ping", date = now, serverId = "srv-1")
+        val result = t.collapseClientModeFuzzyMatch(incoming)
+
+        assertNotNull(result.collapsed)
+        assertEquals("cm-new", result.collapsed!!.localOtid)
+        // The older Local must remain in the timeline (not collapsed by this call).
+        val oldStillThere = result.timeline.events.any { it.otid == "cm-old" }
+        assertTrue("Older client-mode local should not be removed", oldStillThere)
+    }
+
+    @Test
+    fun `collapseClientModeFuzzyMatch trace contains content prefix`() {
+        val now = Instant.now()
+        val longContent = "a".repeat(200)
+        val t = Timeline("c1").append(
+            clientModeLocal("cm-1", 1.0, longContent, sentAt = now.minusMillis(100))
+        )
+
+        val incoming = confirmedUser("server-otid", 99.0, longContent, date = now)
+        val result = t.collapseClientModeFuzzyMatch(incoming)
+
+        assertNotNull(result.collapsed)
+        // Trace prefix is bounded — guards against telemetry bloat on long messages.
+        assertTrue(
+            "Content prefix should be at most 40 chars",
+            result.collapsed!!.contentPrefix.length <= 40,
+        )
+    }
 }

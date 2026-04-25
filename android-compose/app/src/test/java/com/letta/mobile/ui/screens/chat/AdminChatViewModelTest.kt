@@ -45,6 +45,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import kotlinx.collections.immutable.persistentListOf
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -363,7 +365,13 @@ class AdminChatViewModelTest {
             emit(BotStreamChunk(text = "Hello from client mode", conversationId = "client-conv", done = true))
         }
 
-        val vm = createViewModel(conversationId = null)
+        // letta-mobile-c87t: real fresh-route entries always carry a
+        // `freshRouteKey` saved-state value (ChatScreen sets it on nav). A null
+        // conversationId arg alone is no longer sufficient to mark the entry
+        // as fresh — see isFreshRoute logic. Without freshRouteKey the
+        // predicate now correctly resumes whatever conversation the gateway
+        // remembers (or opens a new one when there's none).
+        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
         advanceUntilIdle()
 
         vm.sendMessage("Hello from client mode")
@@ -1001,5 +1009,135 @@ class AdminChatViewModelTest {
         // Hard upper bound: something is badly wrong if we've rebound more
         // than 10× for a single conversation.
         coVerify(atMost = 10) { timelineRepository.observe("conv-A") }
+    }
+
+    // ---------------------------------------------------------------
+    // letta-mobile-c87t: routing predicate, conversation pass-through,
+    // substitution handshake, and banner dismiss.
+    // ---------------------------------------------------------------
+
+    @Test
+    fun `c87t - existing-conversation entry under client mode routes through gateway`() = runTest {
+        // Predicate collapse: even with a non-null conversationId, when client
+        // mode is enabled the send must go through ClientModeChatSender, NOT
+        // the timeline path. Pre-c87t, this routed to the timeline.
+        clientModeEnabledFlow.value = true
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+                forceFreshConversation = any(),
+            )
+        } returns flow {
+            emit(BotStreamChunk(text = "hi back", conversationId = "conv-existing"))
+            emit(BotStreamChunk(text = "hi back", conversationId = "conv-existing", done = true))
+        }
+
+        // Existing-conversation entry: route arg conversationId is set.
+        val vm = createViewModel(conversationId = "conv-existing")
+        advanceUntilIdle()
+
+        vm.sendMessage("hi")
+        advanceUntilIdle()
+
+        // Pass-through: existing conversationId carried forward, NOT forceFresh.
+        verify(exactly = 1) {
+            clientModeChatSender.streamMessage(
+                screenAgentId = "agent-1",
+                text = "hi",
+                conversationId = "conv-existing",
+                forceFreshConversation = false,
+            )
+        }
+        // And critically: timeline.sendMessage was NOT called.
+        coVerify(exactly = 0) {
+            timelineRepository.sendMessage("conv-existing", "hi")
+        }
+    }
+
+    @Test
+    fun `c87t - conversation substitution emits banner state and updates savedStateHandle`() = runTest {
+        // Gateway substitutes a fresh conversation when the requested one is
+        // unrecoverable. The VM should surface a banner via clientModeConversationSwap
+        // and update savedStateHandle so re-entering doesn't try the dead id.
+        clientModeEnabledFlow.value = true
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+                forceFreshConversation = any(),
+            )
+        } returns flow {
+            // Note: gateway returns a DIFFERENT conversationId than requested.
+            emit(BotStreamChunk(text = "ok", conversationId = "conv-NEW"))
+            emit(BotStreamChunk(text = "ok", conversationId = "conv-NEW", done = true))
+        }
+
+        val vm = createViewModel(conversationId = "conv-DEAD")
+        advanceUntilIdle()
+
+        vm.sendMessage("hi")
+        advanceUntilIdle()
+
+        val swap = vm.uiState.value.clientModeConversationSwap
+        assertNotNull("Expected banner state to be populated on substitution", swap)
+        assertEquals("conv-DEAD", swap!!.requestedConversationId)
+        assertEquals("conv-NEW", swap.newConversationId)
+    }
+
+    @Test
+    fun `c87t - no banner when gateway returns the requested conversationId`() = runTest {
+        clientModeEnabledFlow.value = true
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+                forceFreshConversation = any(),
+            )
+        } returns flow {
+            emit(BotStreamChunk(text = "ok", conversationId = "conv-existing"))
+            emit(BotStreamChunk(text = "ok", conversationId = "conv-existing", done = true))
+        }
+
+        val vm = createViewModel(conversationId = "conv-existing")
+        advanceUntilIdle()
+
+        vm.sendMessage("hi")
+        advanceUntilIdle()
+
+        assertNull(
+            "Banner must NOT fire when gateway honours the requested conversationId",
+            vm.uiState.value.clientModeConversationSwap,
+        )
+    }
+
+    @Test
+    fun `c87t - dismissClientModeConversationSwap clears banner state`() = runTest {
+        clientModeEnabledFlow.value = true
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+                forceFreshConversation = any(),
+            )
+        } returns flow {
+            emit(BotStreamChunk(text = "ok", conversationId = "conv-NEW"))
+            emit(BotStreamChunk(text = "ok", conversationId = "conv-NEW", done = true))
+        }
+
+        val vm = createViewModel(conversationId = "conv-DEAD")
+        advanceUntilIdle()
+        vm.sendMessage("hi")
+        advanceUntilIdle()
+        // Sanity: banner is up.
+        assertNotNull(vm.uiState.value.clientModeConversationSwap)
+
+        vm.dismissClientModeConversationSwap()
+
+        assertNull(vm.uiState.value.clientModeConversationSwap)
     }
 }

@@ -33,6 +33,7 @@ import com.letta.mobile.ui.screens.dashboard.HomeScreen
 import com.letta.mobile.ui.screens.about.AboutScreen
 import com.letta.mobile.ui.screens.bot.BotConfigEditScreen
 import com.letta.mobile.ui.screens.bot.BotSettingsScreen
+import com.letta.mobile.ui.screens.lettabot.LettaBotConnectionScreen
 import com.letta.mobile.ui.screens.agentlist.AgentListScreen
 import com.letta.mobile.ui.screens.archives.ArchiveAdminScreen
 import com.letta.mobile.ui.screens.archival.ArchivalScreen
@@ -324,7 +325,10 @@ fun AppNavGraph(
                 },
                 onNavigateToConfigList = {
                     navController.navigate(ConfigListRoute)
-                }
+                },
+                onNavigateToLettaBotConnection = {
+                    navController.navigate(LettaBotConnectionRoute)
+                },
             )
         }
 
@@ -437,6 +441,17 @@ fun AppNavGraph(
                 onNavigateToEdit = { configId ->
                     navController.navigate(BotConfigEditRoute(configId))
                 },
+            )
+        }
+
+        composable<LettaBotConnectionRoute>(
+            enterTransition = drillInEnter,
+            exitTransition = drillInExit,
+            popEnterTransition = drillInPopEnter,
+            popExitTransition = drillInPopExit,
+        ) {
+            LettaBotConnectionScreen(
+                onNavigateBack = { navController.popBackStack() },
             )
         }
 

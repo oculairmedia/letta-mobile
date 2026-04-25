@@ -190,6 +190,25 @@ data class ChatUiState(
      */
     val pendingAttachments: ImmutableList<com.letta.mobile.data.model.MessageContentPart.Image> =
         persistentListOf(),
+    /**
+     * Surfaced when the LettaBot harness substituted a fresh conversation ID for
+     * the one we requested (i.e. our requested conv was unrecoverable on the
+     * gateway/SDK side, gateway opened a new conversation and reported it back
+     * via session_init). The original Letta-server timeline rows for the prior
+     * conversation remain visible; new client-mode turns persist under the new
+     * conversation. Dismissable. See `letta-mobile-c87t`.
+     */
+    val clientModeConversationSwap: ClientModeConversationSwap? = null,
+)
+
+/**
+ * Banner state for the gateway's conversation-substitution recovery path.
+ * Emitted by `AdminChatViewModel` when `session_init.conversation_id` differs
+ * from the conversation we asked the gateway to resume.
+ */
+data class ClientModeConversationSwap(
+    val requestedConversationId: String,
+    val newConversationId: String,
 )
 
 /** Upper bound on composer image attachments per message. */
@@ -231,8 +250,16 @@ class AdminChatViewModel @Inject constructor(
         get() = requestedConversationArg?.takeIf { it.isNotBlank() }
     private val isFreshRoute: Boolean
         get() = freshRouteKey != null || requestedConversationArg?.isBlank() == true
+    // letta-mobile-c87t: previously this predicate was
+    //   clientModeEnabled.value && (isFreshRoute || explicitConversationId == null)
+    // which collapsed to "client mode only fires for fresh routes" — meaning any
+    // existing conversation silently bypassed Client Mode and went direct to Letta.
+    // The Client Mode toggle is global per Emmanuel's design; if it's on, ALL
+    // conversations should engage with the LettaBot harness. Existing conversations
+    // are resumed by passing the Letta conversation ID through to the gateway,
+    // which uses Letta Code SDK's resumeSession() to switch into them.
     private val shouldUseClientModeForCurrentRoute: Boolean
-        get() = clientModeEnabled.value && (isFreshRoute || explicitConversationId == null)
+        get() = clientModeEnabled.value
     private val activeConversationId: String?
         get() = conversationManager.getActiveConversationId(agentId)
     private val clientModeEnabled: StateFlow<Boolean> = settingsRepository.observeClientModeEnabled()
@@ -810,8 +837,16 @@ class AdminChatViewModel @Inject constructor(
             val startedAt = java.time.Instant.now().toString()
             val userMessageId = "client-user-${System.currentTimeMillis()}"
             val assistantMessageId = "client-assistant-${System.currentTimeMillis()}"
-            val priorConversationId = currentClientModeConversationId()
-            val forceFreshConversation = priorConversationId == null
+            // letta-mobile-c87t: when entering an existing-conversation route under
+            // Client Mode, prefer the route's conversationId arg so the gateway can
+            // resumeSession() into the matching Letta conversation. Fall back to
+            // the saved-state-handle pointer for cases where Client Mode set up the
+            // conversation itself (fresh-route entry continued in-place).
+            val priorConversationId = explicitConversationId ?: currentClientModeConversationId()
+            // Force-fresh only when the user genuinely entered a fresh-route nav
+            // (no conversation arg AND no in-flight saved-state pointer). For
+            // existing-route entries we want resume, not new.
+            val forceFreshConversation = isFreshRoute && priorConversationId == null
             stopTimelineObserver()
             currentConversationTracker.setCurrent(priorConversationId)
             _inputText.value = ""
@@ -838,6 +873,13 @@ class AdminChatViewModel @Inject constructor(
             )
 
             var latestConversationId = priorConversationId
+            // letta-mobile-c87t: track whether the gateway substituted a different
+            // conversation for the one we requested (recovery path). On the first
+            // chunk that carries a non-null conversationId, compare against
+            // priorConversationId; if it differs, emit a banner + propagate the
+            // new ID to the nav saved-state-handle so a back-then-re-enter doesn't
+            // try to resume the dead requested ID again.
+            var swapEvaluated = false
             try {
                 clientModeChatSender.streamMessage(
                     screenAgentId = agentId,
@@ -847,6 +889,24 @@ class AdminChatViewModel @Inject constructor(
                 ).collect { chunk ->
                     chunk.conversationId?.takeIf { it.isNotBlank() }?.let { conversationId ->
                         latestConversationId = conversationId
+                        if (!swapEvaluated) {
+                            swapEvaluated = true
+                            // Substitution detected: gateway opened a fresh conversation
+                            // because our requested one was unrecoverable. Surface the
+                            // banner and update the nav arg so subsequent renavigations
+                            // pick up the new ID.
+                            if (priorConversationId != null && priorConversationId != conversationId) {
+                                _uiState.update { state ->
+                                    state.copy(
+                                        clientModeConversationSwap = ClientModeConversationSwap(
+                                            requestedConversationId = priorConversationId,
+                                            newConversationId = conversationId,
+                                        ),
+                                    )
+                                }
+                                savedStateHandle["conversationId"] = conversationId
+                            }
+                        }
                     }
                     if (!latestConversationId.isNullOrBlank()) {
                         setClientModeConversationId(latestConversationId)
@@ -1039,6 +1099,16 @@ class AdminChatViewModel @Inject constructor(
     fun clearComposerError() {
         if (_uiState.value.composerError == null) return
         _uiState.value = _uiState.value.copy(composerError = null)
+    }
+
+    /**
+     * Dismiss the conversation-substitution banner emitted when the gateway
+     * substituted a fresh conversation for the one we asked it to resume.
+     * See `letta-mobile-c87t` and [ClientModeConversationSwap].
+     */
+    fun dismissClientModeConversationSwap() {
+        if (_uiState.value.clientModeConversationSwap == null) return
+        _uiState.update { it.copy(clientModeConversationSwap = null) }
     }
 
     /**
