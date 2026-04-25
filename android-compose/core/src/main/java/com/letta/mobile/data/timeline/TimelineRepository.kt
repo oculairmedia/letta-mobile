@@ -135,6 +135,28 @@ open class TimelineRepository @Inject constructor(
         attachments: List<com.letta.mobile.data.model.MessageContentPart.Image> = emptyList(),
     ): String = getOrCreate(conversationId).appendClientModeLocal(content, attachments)
 
+    /**
+     * letta-mobile-5s1n: upsert a Client Mode assistant-streaming Local.
+     * See [TimelineSyncLoop.upsertClientModeLocalAssistantChunk] for full
+     * contract.
+     *
+     * Caller-supplied [localId] should be stable across repeat chunks for
+     * the same logical event:
+     *  - Assistant text:  `cm-assist-<runId or stable id>`
+     *  - Reasoning:       `cm-reason-<runId or stable id>`
+     *  - Tool call:       `cm-tool-<toolCallId>`
+     */
+    suspend fun upsertClientModeLocalAssistantChunk(
+        conversationId: String,
+        localId: String,
+        build: () -> TimelineEvent.Local,
+        transform: (TimelineEvent.Local) -> TimelineEvent.Local,
+    ): String = getOrCreate(conversationId).upsertClientModeLocalAssistantChunk(
+        localId = localId,
+        build = build,
+        transform = transform,
+    )
+
     /** Force a reload — clears the cached loop for the conversation. */
     suspend fun clear(conversationId: String) = loopsMutex.withLock {
         loops.remove(conversationId)

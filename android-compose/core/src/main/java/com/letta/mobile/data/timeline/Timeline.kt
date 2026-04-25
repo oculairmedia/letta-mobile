@@ -418,6 +418,51 @@ data class Timeline(
         return copy(events = events.toMutableList().also { it[idx] = stabilized })
     }
 
+    /**
+     * letta-mobile-5s1n: insert-or-update a Client Mode assistant-streaming
+     * Local. Used by [TimelineSyncLoop.upsertClientModeLocalAssistantChunk]
+     * to thread incremental SSE-style chunks through the timeline.
+     *
+     * Contract: identifies the target Local by `otid`. If present, applies
+     * [transform] preserving position. If absent, builds a new Local via
+     * [build] and appends at end. Always returns a Timeline; never throws.
+     *
+     * Scoped to Locals with `source = CLIENT_MODE_HARNESS` — strict-otid
+     * USER Locals on the LETTA_SERVER path remain untouched.
+     */
+    fun upsertClientModeLocal(
+        otid: String,
+        transform: (TimelineEvent.Local) -> TimelineEvent.Local,
+        build: () -> TimelineEvent.Local,
+    ): Timeline {
+        val idx = events.indexOfFirst { it.otid == otid && it is TimelineEvent.Local }
+        if (idx >= 0) {
+            val existing = events[idx] as TimelineEvent.Local
+            if (existing.source != MessageSource.CLIENT_MODE_HARNESS) {
+                Telemetry.event(
+                    "Timeline", "upsertClientModeLocal.wrongSource",
+                    "conversationId" to conversationId,
+                    "otid" to otid,
+                    "source" to existing.source.name,
+                    level = Telemetry.Level.WARN,
+                )
+                return this
+            }
+            val updated = transform(existing).copy(
+                position = existing.position,
+                otid = existing.otid,
+                source = MessageSource.CLIENT_MODE_HARNESS,
+            )
+            return copy(events = events.toMutableList().also { it[idx] = updated })
+        }
+        val seed = build().copy(
+            otid = otid,
+            position = nextLocalPosition(),
+            source = MessageSource.CLIENT_MODE_HARNESS,
+        )
+        return append(seed)
+    }
+
     /** Mark a Local event as [DeliveryState.SENT]. No-op for Confirmed events. */
     fun markSent(otid: String): Timeline = updateLocal(otid) { it.copy(deliveryState = DeliveryState.SENT) }
 

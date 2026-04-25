@@ -82,17 +82,83 @@ class AdminChatViewModelTest {
         Dispatchers.setMain(testDispatcher)
         messageRepository = mockk(relaxed = true)
         timelineRepository = mockk(relaxed = true)
-        // Timeline observer requires non-null Flows. By default, mirror the
-        // current `messages` seed list (used by legacy tests) into a
-        // Timeline.Confirmed snapshot so `_uiState.messages` stays populated.
+        // letta-mobile-5s1n: stateful per-conversation Timeline state so the
+        // client-mode rewire (writes through the timeline) is observable in
+        // tests. `observe(convId)` returns the same MutableStateFlow that
+        // append/upsert calls mutate; `messages` seed list still hydrates the
+        // initial Confirmed snapshot for legacy tests.
+        val timelineFlows = mutableMapOf<String, kotlinx.coroutines.flow.MutableStateFlow<com.letta.mobile.data.timeline.Timeline>>()
+        // Per-conversation seed: only the canonical "conv-1" the test fixtures
+        // pre-populate via the `messages` field hydrates from that seed.
+        // Other conv ids (e.g. fresh-route gateway-allocated client-conv,
+        // tool-related ids, etc.) start empty.
+        fun flowFor(convId: String): kotlinx.coroutines.flow.MutableStateFlow<com.letta.mobile.data.timeline.Timeline> =
+            timelineFlows.getOrPut(convId) {
+                val initial = if (convId == "conv-1") {
+                    messagesToTimeline(convId, messages)
+                } else {
+                    com.letta.mobile.data.timeline.Timeline(conversationId = convId)
+                }
+                kotlinx.coroutines.flow.MutableStateFlow(initial)
+            }
         val emptyTimelineLoop = io.mockk.mockk<com.letta.mobile.data.timeline.TimelineSyncLoop>(relaxed = true) {
             every { events } returns kotlinx.coroutines.flow.MutableSharedFlow()
         }
         coEvery { timelineRepository.observe(any()) } answers {
-            val convId = firstArg<String>()
-            kotlinx.coroutines.flow.MutableStateFlow(messagesToTimeline(convId, messages))
+            flowFor(firstArg<String>())
         }
         coEvery { timelineRepository.getOrCreate(any()) } returns emptyTimelineLoop
+        coEvery {
+            timelineRepository.appendClientModeLocal(any(), any(), any())
+        } answers {
+            val convId = firstArg<String>()
+            val content = secondArg<String>()
+            val flow = flowFor(convId)
+            val localId = "cm-test-${flow.value.events.size}"
+            val local = com.letta.mobile.data.timeline.TimelineEvent.Local(
+                position = (flow.value.events.size + 1).toDouble(),
+                otid = localId,
+                content = content,
+                role = com.letta.mobile.data.timeline.Role.USER,
+                sentAt = Instant.now(),
+                deliveryState = com.letta.mobile.data.timeline.DeliveryState.SENT,
+                source = com.letta.mobile.data.timeline.MessageSource.CLIENT_MODE_HARNESS,
+            )
+            flow.value = flow.value.copy(events = flow.value.events + local)
+            localId
+        }
+        coEvery {
+            timelineRepository.upsertClientModeLocalAssistantChunk(any(), any(), any(), any())
+        } answers {
+            val convId = firstArg<String>()
+            val localId = secondArg<String>()
+            @Suppress("UNCHECKED_CAST")
+            val build = thirdArg<() -> com.letta.mobile.data.timeline.TimelineEvent.Local>()
+            @Suppress("UNCHECKED_CAST")
+            val transform = arg<(com.letta.mobile.data.timeline.TimelineEvent.Local) -> com.letta.mobile.data.timeline.TimelineEvent.Local>(3)
+            val flow = flowFor(convId)
+            val tl = flow.value
+            val idx = tl.events.indexOfFirst {
+                it.otid == localId && it is com.letta.mobile.data.timeline.TimelineEvent.Local
+            }
+            flow.value = if (idx >= 0) {
+                val existing = tl.events[idx] as com.letta.mobile.data.timeline.TimelineEvent.Local
+                val updated = transform(existing).copy(
+                    position = existing.position,
+                    otid = existing.otid,
+                    source = com.letta.mobile.data.timeline.MessageSource.CLIENT_MODE_HARNESS,
+                )
+                tl.copy(events = tl.events.toMutableList().also { it[idx] = updated })
+            } else {
+                val seed = build().copy(
+                    otid = localId,
+                    position = (tl.events.size + 1).toDouble(),
+                    source = com.letta.mobile.data.timeline.MessageSource.CLIENT_MODE_HARNESS,
+                )
+                tl.copy(events = tl.events + seed)
+            }
+            localId
+        }
         agentRepository = mockk(relaxed = true)
         blockRepository = BlockRepository(FakeBlockApi())
         bugReportRepository = mockk(relaxed = true)

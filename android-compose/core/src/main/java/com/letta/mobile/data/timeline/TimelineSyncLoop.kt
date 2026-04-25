@@ -378,6 +378,41 @@ class TimelineSyncLoop(
         return localId
     }
 
+    /**
+     * letta-mobile-5s1n: insert-or-update a Client Mode Local for assistant
+     * streaming through the WS gateway. Identified by [localId] (caller
+     * supplies a stable id per stream, e.g. `cm-assist-<runId>` for assistant
+     * text, `cm-tool-<toolCallId>` for tool calls, `cm-reason-<uuid>` for
+     * reasoning). Idempotent across repeat chunks.
+     *
+     * The first call appends a fresh Local; subsequent calls in-place update
+     * the same event so the UI sees a single bubble grow rather than a flood
+     * of new events.
+     *
+     * Stamps [MessageSource.CLIENT_MODE_HARNESS] and [DeliveryState.SENT]
+     * (the gateway is the delivery authority). Caller is responsible for
+     * choosing the appropriate [TimelineMessageType] and field shape via
+     * the [build] / [transform] callbacks.
+     */
+    suspend fun upsertClientModeLocalAssistantChunk(
+        localId: String,
+        build: () -> TimelineEvent.Local,
+        transform: (TimelineEvent.Local) -> TimelineEvent.Local,
+    ): String {
+        writeMutex.withLock {
+            val before = _state.value.findByOtid(localId) is TimelineEvent.Local
+            _state.value = _state.value.upsertClientModeLocal(
+                otid = localId,
+                transform = transform,
+                build = build,
+            )
+            if (!before) {
+                _events.emit(TimelineSyncEvent.LocalAppended(localId))
+            }
+        }
+        return localId
+    }
+
     /** Retry a failed send by re-enqueueing it. */
     suspend fun retry(otid: String) = writeMutex.withLock {
         val existing = _state.value.findByOtid(otid)
