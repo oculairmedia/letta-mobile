@@ -581,6 +581,249 @@ class AdminChatViewModelTest {
         assertFalse(vm.uiState.value.isStreaming)
     }
 
+    /**
+     * letta-mobile-5s1n / "thinking bubble flashes then nothing" regression:
+     *
+     * Repro of the in-the-wild symptom where a Client Mode send shows the
+     * assistant typing indicator briefly and then renders no assistant
+     * content. Possible cause #1: the gateway emits the first stream chunk
+     * with a NULL conversationId (it hasn't allocated one yet, or hasn't
+     * echoed it), then echoes the conversationId starting on chunk #2. The
+     * VM's first chunk takes `handleClientModeStreamChunkLegacy` (in-memory),
+     * the migration block then moves the user bubble into the timeline,
+     * and chunks #2..N go through `handleClientModeStreamChunkViaTimeline`.
+     *
+     * Contract: every text fragment emitted by the gateway must be visible
+     * in the final assistant bubble, regardless of whether the chunk
+     * carrying it had a conversationId yet. If the legacy chunk's text is
+     * dropped, the bubble shows only the post-conv-echo fragments (and in
+     * the worst case, when there's no second text chunk before `done`,
+     * shows nothing at all — exactly the reported flash).
+     */
+    @Test
+    fun `client mode preserves first chunk text when conversationId arrives only on chunk 2`() = runTest {
+        clientModeEnabledFlow.value = true
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+                forceFreshConversation = any(),
+            )
+        } returns flow {
+            // Chunk #1 — gateway hasn't echoed conversationId yet.
+            emit(BotStreamChunk(text = "Hel", conversationId = null, event = BotStreamEvent.ASSISTANT))
+            // Chunk #2 — conversationId now present; should NOT erase the
+            // "Hel" fragment from chunk #1.
+            emit(BotStreamChunk(text = "Hello", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            emit(BotStreamChunk(text = "Hello world", conversationId = "client-conv", done = true))
+        }
+
+        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
+        advanceUntilIdle()
+
+        vm.sendMessage("hi")
+        advanceUntilIdle()
+
+        val assistant = vm.uiState.value.messages.lastOrNull { it.role == "assistant" }
+        assertNotNull("assistant bubble must be rendered", assistant)
+        assertEquals(
+            "final assistant bubble must include the chunk-1 (legacy-path) fragment",
+            "Hello world",
+            assistant!!.content,
+        )
+        assertFalse("isStreaming must clear once stream completes", vm.uiState.value.isStreaming)
+        assertFalse("isAgentTyping must clear once stream completes", vm.uiState.value.isAgentTyping)
+    }
+
+    /**
+     * letta-mobile-5s1n / "thinking bubble flashes then nothing" regression
+     * (cause #2): the gateway sends ONLY a terminal result frame with no
+     * preceding text chunks (e.g. the upstream agent stream errored, was
+     * empty, or got short-circuited). WsBotClient.streamMessage maps that
+     * to a single `BotStreamChunk(done = true)` with no text and no event.
+     *
+     * Today the VM clears isStreaming/isAgentTyping and leaves the user
+     * bubble alone, but the user sees no assistant content at all and no
+     * error — exactly the "flash then nothing" symptom.
+     *
+     * Contract: when the stream produces zero assistant text, the VM must
+     * either (a) surface a non-null `error` on uiState OR (b) render an
+     * empty-assistant placeholder. Today it does neither, so this test
+     * pins the loud failure mode: at minimum, isStreaming must clear and
+     * the user must NOT be left with an indefinitely-typing UI.
+     */
+    @Test
+    fun `client mode terminal-only stream with no text clears typing state and surfaces empty turn`() = runTest {
+        clientModeEnabledFlow.value = true
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+                forceFreshConversation = any(),
+            )
+        } returns flow {
+            // Only a terminal frame — no text, no event.
+            emit(BotStreamChunk(conversationId = "client-conv", done = true))
+        }
+
+        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
+        advanceUntilIdle()
+
+        vm.sendMessage("hi")
+        advanceUntilIdle()
+
+        // Hard contract: the typing/streaming spinner must NOT be stuck on.
+        // This is the symptom Emmanuel reported: bubble flashes, then
+        // nothing — but the spinner had at least to clear (it does).
+        assertFalse(
+            "isStreaming must clear on terminal-only stream",
+            vm.uiState.value.isStreaming,
+        )
+        assertFalse(
+            "isAgentTyping must clear on terminal-only stream",
+            vm.uiState.value.isAgentTyping,
+        )
+
+        // Soft contract: the user should know SOMETHING happened. Either
+        // an empty assistant bubble OR a non-null error/composerError. If
+        // neither is present, the UI silently swallows the round-trip and
+        // the user is left staring at their own bubble — that's the bug.
+        val hasAssistantBubble = vm.uiState.value.messages.any { it.role == "assistant" }
+        val hasError = vm.uiState.value.error != null
+        assertTrue(
+            "terminal-only stream must surface either an assistant bubble or an error " +
+                "(otherwise the user sees a silent flash-and-vanish): " +
+                "messages=${vm.uiState.value.messages.map { it.role to it.content }} " +
+                "error=${vm.uiState.value.error}",
+            hasAssistantBubble || hasError,
+        )
+    }
+
+    /**
+     * letta-mobile-lv3e (REPLACES letta-mobile-5s1n / letta-mobile-vu6a
+     * regression): multi-chunk text accumulation on the happy path with
+     * REAL delta-shaped wire data. The lettabot WS gateway emits each
+     * frame's `text` as the NEW fragment only, not a cumulative snapshot
+     * — verified via :cli:run wsstream against the live gateway.
+     *
+     * Previous test fed pretend-snapshot data ["Hel","Hello","Hello world"]
+     * which masked the bug. With delta data ["Hel","lo ","world"] the
+     * snapshot-semantics impl produces just "world" (the last fragment),
+     * which is exactly what Emmanuel saw on-device 2026-04-25.
+     */
+    @Test
+    fun `client mode multi-chunk text stream renders concatenated assistant bubble`() = runTest {
+        clientModeEnabledFlow.value = true
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+                forceFreshConversation = any(),
+            )
+        } returns flow {
+            // DELTA wire shape — each frame is a NEW fragment.
+            emit(BotStreamChunk(text = "Hel", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            emit(BotStreamChunk(text = "lo ", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            emit(BotStreamChunk(text = "world", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            // Terminal frame carries no new text — should NOT clear the bubble.
+            emit(BotStreamChunk(conversationId = "client-conv", done = true))
+        }
+
+        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
+        advanceUntilIdle()
+
+        vm.sendMessage("hi")
+        advanceUntilIdle()
+
+        val assistant = vm.uiState.value.messages.lastOrNull { it.role == "assistant" }
+        assertNotNull("assistant bubble must be rendered", assistant)
+        assertEquals(
+            "deltas must concatenate; terminal-with-no-text frame must not clobber",
+            "Hello world",
+            assistant!!.content,
+        )
+        assertFalse(vm.uiState.value.isStreaming)
+    }
+
+    /**
+     * letta-mobile-lv3e: defensive snapshot-shape guard. If the gateway
+     * EVER switches back to cumulative-snapshot semantics, the merge
+     * heuristic must detect it (incoming.startsWith(existing) → replace
+     * with incoming, don't double-concat). Mirrors the SSE-path guard
+     * in TimelineSyncLoop:1132-1138.
+     */
+    @Test
+    fun `client mode chunks survive accidental cumulative-snapshot frames`() = runTest {
+        clientModeEnabledFlow.value = true
+        every {
+            clientModeChatSender.streamMessage(any(), any(), any(), any())
+        } returns flow {
+            // Simulate a future gateway misbehavior: first two frames are
+            // deltas, third frame mistakenly carries the FULL accumulated
+            // text. Guard must NOT double-concat.
+            emit(BotStreamChunk(text = "Hel", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            emit(BotStreamChunk(text = "lo ", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            emit(BotStreamChunk(text = "Hello world", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            emit(BotStreamChunk(conversationId = "client-conv", done = true))
+        }
+
+        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
+        advanceUntilIdle()
+        vm.sendMessage("hi")
+        advanceUntilIdle()
+
+        val assistant = vm.uiState.value.messages.lastOrNull { it.role == "assistant" }
+        assertNotNull(assistant)
+        assertEquals("Hello world", assistant!!.content)
+    }
+
+    /**
+     * letta-mobile-lv3e: golden trace from a real lettabot WS session.
+     * 12 fragments captured via `:cli:run wsstream`; concatenated they
+     * form the assertion. Catches regressions where a refactor breaks
+     * concatenation for the actual wire shape.
+     */
+    @Test
+    fun `client mode reproduces real wsstream golden trace`() = runTest {
+        clientModeEnabledFlow.value = true
+        val fragments = listOf(
+            "Sure",
+            ", here",
+            "'s a haiku",
+            " about coroutines",
+            ":\n\n",
+            "Suspended threads",
+            " — flow returns",
+            "\nasynchrony",
+            ", awaited",
+            ".\n\nThanks",
+            "!",
+            "",  // terminal-shape no-text frame
+        )
+        every {
+            clientModeChatSender.streamMessage(any(), any(), any(), any())
+        } returns flow {
+            fragments.forEachIndexed { i, frag ->
+                if (frag.isNotEmpty()) {
+                    emit(BotStreamChunk(text = frag, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+                }
+            }
+            emit(BotStreamChunk(conversationId = "client-conv", done = true))
+        }
+
+        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
+        advanceUntilIdle()
+        vm.sendMessage("hi")
+        advanceUntilIdle()
+
+        val assistant = vm.uiState.value.messages.lastOrNull { it.role == "assistant" }
+        assertNotNull(assistant)
+        assertEquals(fragments.joinToString(""), assistant!!.content)
+    }
+
     @Test
     fun `client mode renders tool call and tool result chunks as tool card`() = runTest {
         clientModeEnabledFlow.value = true

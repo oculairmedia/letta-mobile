@@ -306,11 +306,15 @@ private fun MessageBubbleSurface(
                 colors.agentText
             }
             if (message.content.isNotBlank() || message.attachments.isEmpty()) {
+                // letta-mobile-6p4o.1: forward isStreaming to renderers so
+                // assistant prose can be clamped to word boundaries while
+                // mid-stream and decorated with a streaming cursor.
                 renderer.Render(
                     message = message,
                     textColor = textColor,
                     modifier = Modifier,
                     onGeneratedUiMessage = onGeneratedUiMessage,
+                    isStreaming = isLastAssistant,
                 )
             }
         }

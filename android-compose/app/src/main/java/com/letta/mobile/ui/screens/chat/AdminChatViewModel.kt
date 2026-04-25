@@ -1021,6 +1021,13 @@ class AdminChatViewModel @Inject constructor(
             // new ID to the nav saved-state-handle so a back-then-re-enter doesn't
             // try to resume the dead requested ID again.
             var swapEvaluated = false
+            // letta-mobile-hf93: track whether the gateway ever sent any
+            // user-visible payload (text, reasoning, or a tool event) for
+            // this turn. If the stream terminates with no payload — e.g. a
+            // gateway/upstream-agent error that produced only a result
+            // frame — we surface an error instead of silently flashing
+            // the typing indicator.
+            var sawAssistantPayload = false
             // letta-mobile-5s1n: one-shot guard for the fresh-route migration
             // from in-memory clientModeMessages → timeline. Already-known-conv
             // sends skip migration (the bubble was appended to the timeline
@@ -1090,6 +1097,13 @@ class AdminChatViewModel @Inject constructor(
                         }
                     }
 
+                    // letta-mobile-hf93: count any payload-bearing chunk —
+                    // text, reasoning event, tool call/result — as an
+                    // assistant payload. Empty terminal frames don't count.
+                    if (chunkCarriesAssistantPayload(chunk)) {
+                        sawAssistantPayload = true
+                    }
+
                     if (!chunk.done) {
                         handleClientModeStreamChunk(
                             chunk = chunk,
@@ -1108,11 +1122,23 @@ class AdminChatViewModel @Inject constructor(
                         conversationId = latestConversationId?.takeIf { it.isNotBlank() },
                     )
 
+                    // letta-mobile-hf93: a stream that completed without
+                    // any payload would otherwise look identical to a
+                    // dropped network round-trip — typing indicator
+                    // briefly flashes, then nothing. Surface an explicit
+                    // error so the user knows the round-trip happened.
+                    val terminalError = if (!sawAssistantPayload && !chunk.aborted) {
+                        "Agent returned no content. Try again or check the agent's status."
+                    } else {
+                        null
+                    }
+
                     _uiState.value = _uiState.value.copy(
                         conversationState = latestConversationId?.let { ConversationState.Ready(it) }
                             ?: ConversationState.NoConversation,
                         isStreaming = false,
                         isAgentTyping = false,
+                        error = terminalError ?: _uiState.value.error,
                     )
                 }
             } catch (e: Exception) {
@@ -1195,6 +1221,11 @@ class AdminChatViewModel @Inject constructor(
         when (chunk.event) {
             BotStreamEvent.REASONING -> {
                 val localId = "cm-reason-${chunk.uuid ?: assistantMessageId}"
+                // letta-mobile-lv3e (REVERTS letta-mobile-vu6a): reasoning
+                // chunks are deltas, same as assistant text. Append, don't
+                // replace. Defensive snapshot-shape detection mirrors the
+                // TimelineSyncLoop merge so we won't double-concat if the
+                // gateway ever changes shape.
                 val delta = chunk.text.orEmpty()
                 viewModelScope.launch {
                     runCatching {
@@ -1215,9 +1246,16 @@ class AdminChatViewModel @Inject constructor(
                                 )
                             },
                             transform = { existing ->
+                                val prior = existing.reasoningContent.orEmpty()
+                                val merged = when {
+                                    delta.isEmpty() -> prior
+                                    delta == prior -> prior
+                                    delta.startsWith(prior) -> delta
+                                    prior.startsWith(delta) -> prior
+                                    else -> prior + delta
+                                }
                                 existing.copy(
-                                    reasoningContent = if (replaceAssistant) delta
-                                    else (existing.reasoningContent.orEmpty() + delta),
+                                    reasoningContent = merged,
                                     messageType = com.letta.mobile.data.timeline.TimelineMessageType.REASONING,
                                 )
                             },
@@ -1282,6 +1320,19 @@ class AdminChatViewModel @Inject constructor(
             }
 
             else -> {
+                // letta-mobile-lv3e (REVERTS letta-mobile-vu6a):
+                // BotStreamChunk.text is a DELTA — the gateway emits only
+                // the NEW fragment per frame, not the cumulative buffer.
+                // Verified via :cli:run wsstream against the real gateway:
+                // each frame's content is a fragment that must be APPENDED
+                // to the running bubble. vu6a's "snapshot semantics" was
+                // based on a synthetic test feeding ["Hel","Hello","Hello world"]
+                // and produced the user-visible "chunks replace each other"
+                // bug Emmanuel reported 2026-04-25.
+                //
+                // We still ignore empty/null text on the terminal frame so
+                // it doesn't append a no-op (or, worse, clobber via the
+                // empty-string path).
                 val delta = chunk.text?.takeIf { it.isNotEmpty() } ?: return
                 val localId = "cm-assist-$assistantMessageId"
                 viewModelScope.launch {
@@ -1302,9 +1353,18 @@ class AdminChatViewModel @Inject constructor(
                                 )
                             },
                             transform = { existing ->
+                                // Defensive: if the gateway ever DOES send a
+                                // cumulative snapshot (full text starts with
+                                // what we already have), don't double-concat.
+                                // Mirrors TimelineSyncLoop:1132-1138 logic.
+                                val merged = when {
+                                    delta == existing.content -> existing.content
+                                    delta.startsWith(existing.content) -> delta
+                                    existing.content.startsWith(delta) -> existing.content
+                                    else -> existing.content + delta
+                                }
                                 existing.copy(
-                                    content = if (replaceAssistant) delta
-                                    else (existing.content + delta),
+                                    content = merged,
                                     messageType = com.letta.mobile.data.timeline.TimelineMessageType.ASSISTANT,
                                 )
                             },
@@ -1312,6 +1372,24 @@ class AdminChatViewModel @Inject constructor(
                     }.onFailure { logTimelineUpsertFailure(it, "ASSISTANT", localId) }
                 }
             }
+        }
+    }
+
+    /**
+     * letta-mobile-hf93: a chunk "carries assistant payload" when it has
+     * any user-visible content — non-empty text, a tool call/result, or
+     * (eventually) a non-empty reasoning frame. The terminal `done=true`
+     * frame on its own does NOT count, since WsBotClient emits one for
+     * every stream regardless of whether the upstream agent produced
+     * output.
+     */
+    private fun chunkCarriesAssistantPayload(chunk: BotStreamChunk): Boolean {
+        if (!chunk.text.isNullOrEmpty()) return true
+        return when (chunk.event) {
+            BotStreamEvent.TOOL_CALL,
+            BotStreamEvent.TOOL_RESULT,
+            BotStreamEvent.REASONING -> true
+            BotStreamEvent.ASSISTANT, null -> false
         }
     }
 
@@ -1338,10 +1416,22 @@ class AdminChatViewModel @Inject constructor(
         when (chunk.event) {
             BotStreamEvent.REASONING -> {
                 val messageId = chunk.uuid ?: "client-reasoning-${System.currentTimeMillis()}"
+                // letta-mobile-lv3e (REVERTS letta-mobile-vu6a): legacy
+                // path also receives DELTAS — append, not replace. Same
+                // defensive snapshot-shape guard as the timeline path.
+                val delta = chunk.text.orEmpty()
                 upsertClientModeMessage(
                     messageId = messageId,
                     timestamp = timestamp,
                 ) { existing ->
+                    val prior = existing?.content.orEmpty()
+                    val merged = when {
+                        delta.isEmpty() -> prior
+                        delta == prior -> prior
+                        delta.startsWith(prior) -> delta
+                        prior.startsWith(delta) -> prior
+                        else -> prior + delta
+                    }
                     (existing ?: UiMessage(
                         id = messageId,
                         role = "assistant",
@@ -1349,11 +1439,7 @@ class AdminChatViewModel @Inject constructor(
                         timestamp = timestamp,
                         isReasoning = true,
                     )).copy(
-                        content = if (!replaceAssistant && existing != null) {
-                            existing.content + chunk.text.orEmpty()
-                        } else {
-                            chunk.text.orEmpty()
-                        },
+                        content = merged,
                         isReasoning = true,
                     )
                 }
@@ -1397,12 +1483,17 @@ class AdminChatViewModel @Inject constructor(
             }
 
             else -> {
+                // letta-mobile-lv3e (REVERTS letta-mobile-vu6a): legacy
+                // path receives DELTAS, not snapshots. Append each new
+                // fragment to the bubble. The defensive snapshot-shape
+                // guard inside upsertClientModeAssistantMessage handles
+                // any future protocol change.
                 chunk.text?.takeIf { it.isNotEmpty() }?.let { delta ->
                     upsertClientModeAssistantMessage(
                         messageId = assistantMessageId,
                         timestamp = timestamp,
                         content = delta,
-                        append = !replaceAssistant,
+                        append = true,
                     )
                 }
             }
@@ -1420,9 +1511,20 @@ class AdminChatViewModel @Inject constructor(
             timestamp = timestamp,
         ) { existing ->
             if (existing != null) {
-                existing.copy(
-                    content = if (append) existing.content + content else content,
-                )
+                // letta-mobile-lv3e: when append=true, defend against the
+                // gateway ever switching back to cumulative-snapshot shape
+                // — same heuristic TimelineSyncLoop:1132-1138 uses for the
+                // SSE merge.
+                val merged = if (append) {
+                    when {
+                        content.isEmpty() -> existing.content
+                        content == existing.content -> existing.content
+                        content.startsWith(existing.content) -> content
+                        existing.content.startsWith(content) -> existing.content
+                        else -> existing.content + content
+                    }
+                } else content
+                existing.copy(content = merged)
             } else {
                 UiMessage(
                     id = messageId,
