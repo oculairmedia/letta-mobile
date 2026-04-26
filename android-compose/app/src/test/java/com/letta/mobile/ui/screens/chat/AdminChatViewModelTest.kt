@@ -824,6 +824,104 @@ class AdminChatViewModelTest {
         assertEquals(fragments.joinToString(""), assistant!!.content)
     }
 
+    /**
+     * letta-mobile-lv3e acceptance #5: REASONING chunks are deltas just like
+     * ASSISTANT chunks. Mirrors the assistant happy-path test but asserts the
+     * reasoning bubble is rendered with concatenated text.
+     *
+     * Pre-fix bug: reasoning rendered as the LAST fragment only ("world"),
+     * because the REASONING branch in handleClientModeStreamChunkViaTimeline
+     * was using snapshot semantics from vu6a.
+     */
+    @Test
+    fun `client mode multi-chunk reasoning stream renders concatenated reasoning bubble`() = runTest {
+        clientModeEnabledFlow.value = true
+        every {
+            clientModeChatSender.streamMessage(any(), any(), any(), any())
+        } returns flow {
+            emit(BotStreamChunk(text = "Let", conversationId = "client-conv", event = BotStreamEvent.REASONING))
+            emit(BotStreamChunk(text = " me ", conversationId = "client-conv", event = BotStreamEvent.REASONING))
+            emit(BotStreamChunk(text = "think", conversationId = "client-conv", event = BotStreamEvent.REASONING))
+            emit(BotStreamChunk(conversationId = "client-conv", done = true))
+        }
+
+        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
+        advanceUntilIdle()
+        vm.sendMessage("hi")
+        advanceUntilIdle()
+
+        val reasoning = vm.uiState.value.messages.lastOrNull { it.isReasoning }
+        assertNotNull("reasoning bubble must be rendered", reasoning)
+        assertEquals(
+            "reasoning deltas must concatenate across chunks",
+            "Let me think",
+            reasoning!!.content,
+        )
+    }
+
+    /**
+     * letta-mobile-lv3e + letta-mobile-wucn: defensive fallback when the
+     * gateway emits a near-snapshot chunk that fails the strict prefix
+     * check (e.g. server-side punctuation/whitespace normalization).
+     *
+     * Pre-wucn bug: the bubble would render the final message twice
+     * (existing + near-snapshot concatenated together). Fix: when the
+     * incoming chunk is large (>= 32 chars AND >= 50% of existing length)
+     * AND fails the prefix check, prefer the longer string instead of
+     * concatenating.
+     *
+     * This test exercises the legacy upsertClientModeAssistantMessage
+     * path (where the wucn heuristic lives), distinct from the timeline
+     * path tested above.
+     */
+    @Test
+    fun `client mode legacy path recovers from snapshot-shaped chunk that fails prefix check`() = runTest {
+        clientModeEnabledFlow.value = true
+        // 60-char delta that builds a longer accumulator, then a "snapshot"
+        // chunk that's the full content with one mid-string punctuation
+        // change so startsWith() misses. Pre-wucn: bubble = existing + chunk.
+        // Post-wucn: bubble = chunk (longer string wins).
+        val acc1 = "The quick brown fox jumps over the lazy dog and then sits"  // 57 chars
+        val acc2 = " quietly in the moonlight."                                  // 26 chars (delta)
+        val combined = acc1 + acc2  // 83 chars
+        // Server-normalized snapshot — semicolon instead of "and then"
+        val nearSnapshot = "The quick brown fox jumps over the lazy dog; sits quietly in the moonlight."  // 76 chars
+
+        every {
+            clientModeChatSender.streamMessage(any(), any(), any(), any())
+        } returns flow {
+            emit(BotStreamChunk(text = acc1, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            emit(BotStreamChunk(text = acc2, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            // Near-snapshot — same total story, fails strict prefix.
+            emit(BotStreamChunk(text = nearSnapshot, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            emit(BotStreamChunk(conversationId = "client-conv", done = true))
+        }
+
+        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
+        advanceUntilIdle()
+        vm.sendMessage("hi")
+        advanceUntilIdle()
+
+        val assistant = vm.uiState.value.messages.lastOrNull { it.role == "assistant" }
+        assertNotNull(assistant)
+        // Accept either the longer pre-snapshot accumulator OR the near-
+        // snapshot — whichever is longer. The bubble must NOT be the
+        // pathological doubled-bubble (combined + nearSnapshot).
+        val pathological = combined + nearSnapshot
+        assertFalse(
+            "wucn-snapshot-recovery must prevent doubled-bubble (got len=${assistant!!.content.length})",
+            assistant.content == pathological,
+        )
+        // Whichever path the heuristic took, the result must be ≤ the
+        // longer of (combined, nearSnapshot) — never their concatenation.
+        val maxAcceptableLen = maxOf(combined.length, nearSnapshot.length)
+        assertTrue(
+            "wucn-snapshot-recovery: bubble length ${assistant.content.length} must not exceed " +
+                "longer-of-inputs ${maxAcceptableLen}",
+            assistant.content.length <= maxAcceptableLen,
+        )
+    }
+
     @Test
     fun `client mode renders tool call and tool result chunks as tool card`() = runTest {
         clientModeEnabledFlow.value = true

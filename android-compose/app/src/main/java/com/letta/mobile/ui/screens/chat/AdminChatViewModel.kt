@@ -1247,11 +1247,27 @@ class AdminChatViewModel @Inject constructor(
                             },
                             transform = { existing ->
                                 val prior = existing.reasoningContent.orEmpty()
+                                // letta-mobile-wucn (timeline reasoning port):
+                                // same near-snapshot defense as the
+                                // assistant branch. Reasoning content is
+                                // also subject to server normalization.
                                 val merged = when {
                                     delta.isEmpty() -> prior
                                     delta == prior -> prior
                                     delta.startsWith(prior) -> delta
                                     prior.startsWith(delta) -> prior
+                                    delta.length >= 32 &&
+                                        delta.length >= prior.length / 2 -> {
+                                        android.util.Log.w(
+                                            "AdminChatViewModel",
+                                            "wucn-snapshot-recovery (timeline reasoning): " +
+                                                "chunk shaped like snapshot but failed strict " +
+                                                "prefix check. prior.len=${prior.length} " +
+                                                "chunk.len=${delta.length} localId=$localId. " +
+                                                "Falling back to longer-string replacement.",
+                                        )
+                                        if (delta.length >= prior.length) delta else prior
+                                    }
                                     else -> prior + delta
                                 }
                                 existing.copy(
@@ -1357,10 +1373,33 @@ class AdminChatViewModel @Inject constructor(
                                 // cumulative snapshot (full text starts with
                                 // what we already have), don't double-concat.
                                 // Mirrors TimelineSyncLoop:1132-1138 logic.
+                                //
+                                // letta-mobile-wucn (timeline-path port):
+                                // server-side normalization (whitespace,
+                                // quote/punctuation rewrites) can produce a
+                                // near-snapshot chunk that fails the strict
+                                // prefix check. Without this guard the
+                                // bubble doubles. Same heuristic as the
+                                // legacy path: a chunk that's >= 32 chars
+                                // AND >= 50% of existing length is
+                                // overwhelmingly more likely a snapshot
+                                // than a real append — pick the longer.
                                 val merged = when {
                                     delta == existing.content -> existing.content
                                     delta.startsWith(existing.content) -> delta
                                     existing.content.startsWith(delta) -> existing.content
+                                    delta.length >= 32 &&
+                                        delta.length >= existing.content.length / 2 -> {
+                                        android.util.Log.w(
+                                            "AdminChatViewModel",
+                                            "wucn-snapshot-recovery (timeline): chunk shaped " +
+                                                "like snapshot but failed strict prefix check. " +
+                                                "existing.len=${existing.content.length} " +
+                                                "chunk.len=${delta.length} localId=$localId. " +
+                                                "Falling back to longer-string replacement.",
+                                        )
+                                        if (delta.length >= existing.content.length) delta else existing.content
+                                    }
                                     else -> existing.content + delta
                                 }
                                 existing.copy(
