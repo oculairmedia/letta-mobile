@@ -942,40 +942,79 @@ class AdminChatViewModelTest {
     }
 
     /**
-     * letta-mobile-lv3e + letta-mobile-wucn: defensive fallback when the
-     * gateway emits a near-snapshot chunk that fails the strict prefix
-     * check (e.g. server-side punctuation/whitespace normalization).
+     * letta-mobile-aie.7: server-side BotStreamCoalescer
+     * (`LETTABOT_COALESCE_ENABLED=true`) batches consecutive token deltas
+     * inside a ~200ms window into a single fat delta frame. Each batch is
+     * an APPEND fragment with no prefix relationship to existing content
+     * — the second batch starts with "tok20" while existing ends with
+     * "...tok19 ", so neither `delta.startsWith(existing)` nor
+     * `existing.startsWith(delta)` matches.
      *
-     * Pre-wucn bug: the bubble would render the final message twice
-     * (existing + near-snapshot concatenated together). Fix: when the
-     * incoming chunk is large (>= 32 chars AND >= 50% of existing length)
-     * AND fails the prefix check, prefer the longer string instead of
-     * concatenating.
+     * Before aie.7, the wucn-snapshot-recovery heuristic on the WS-stream
+     * path (>=32 chars AND >=50% of existing length) interpreted these
+     * batches as snapshot rewrites and silently dropped or overwrote
+     * text. The fix scopes wucn to TimelineSyncLoop only; on this path
+     * we only do strict prefix-check + concatenation default.
      *
-     * This test exercises the legacy upsertClientModeAssistantMessage
-     * path (where the wucn heuristic lives), distinct from the timeline
-     * path tested above.
+     * Acceptance: every batch is appended; no text is lost; final
+     * content equals the verbatim concatenation of all batches in order.
      */
     @Test
-    fun `client mode legacy path recovers from snapshot-shaped chunk that fails prefix check`() = runTest {
+    fun `client mode WS path appends coalesced batched-delta frames without loss`() = runTest {
         clientModeEnabledFlow.value = true
-        // 60-char delta that builds a longer accumulator, then a "snapshot"
-        // chunk that's the full content with one mid-string punctuation
-        // change so startsWith() misses. Pre-wucn: bubble = existing + chunk.
-        // Post-wucn: bubble = chunk (longer string wins).
-        val acc1 = "The quick brown fox jumps over the lazy dog and then sits"  // 57 chars
-        val acc2 = " quietly in the moonlight."                                  // 26 chars (delta)
-        val combined = acc1 + acc2  // 83 chars
-        // Server-normalized snapshot — semicolon instead of "and then"
-        val nearSnapshot = "The quick brown fox jumps over the lazy dog; sits quietly in the moonlight."  // 76 chars
+        // Three coalescer-flush batches (each ~140 chars, like a real
+        // 200ms window over a token-stream).
+        val batch1 = (0 until 20).joinToString("") { "tok$it " }   // "tok0 tok1 ... tok19 "
+        val batch2 = (20 until 40).joinToString("") { "tok$it " }  // "tok20 ... tok39 "
+        val batch3 = (40 until 60).joinToString("") { "tok$it " }  // "tok40 ... tok59 "
+        val expected = batch1 + batch2 + batch3
+
+        // Sanity: each batch is large enough that the OLD wucn heuristic
+        // would have triggered (>= 32 chars AND >= 50% of existing).
+        assertTrue("batch1 should exceed wucn threshold", batch1.length >= 32)
+        assertTrue("batch2 should exceed wucn threshold", batch2.length >= 32)
 
         every {
             clientModeChatSender.streamMessage(any(), any(), any(), any())
         } returns flow {
-            emit(BotStreamChunk(text = acc1, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
-            emit(BotStreamChunk(text = acc2, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
-            // Near-snapshot — same total story, fails strict prefix.
-            emit(BotStreamChunk(text = nearSnapshot, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            emit(BotStreamChunk(text = batch1, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            emit(BotStreamChunk(text = batch2, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            emit(BotStreamChunk(text = batch3, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            emit(BotStreamChunk(conversationId = "client-conv", done = true))
+        }
+
+        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
+        advanceUntilIdle()
+        vm.sendMessage("hi")
+        advanceUntilIdle()
+
+        val assistant = vm.uiState.value.messages.lastOrNull { it.role == "assistant" }
+        assertNotNull("assistant bubble must render", assistant)
+        assertEquals(
+            "Coalesced batches must be appended verbatim — no text loss, no overwrites",
+            expected,
+            assistant!!.content,
+        )
+    }
+
+    /**
+     * letta-mobile-aie.7: confirms the strict prefix-check still handles
+     * the legitimate snapshot case (gateway emitting cumulative content).
+     * If a frame's content fully extends what we already have, it
+     * REPLACES (not appends) — preserving idempotency for any future
+     * gateway that decides to send cumulative buffers.
+     */
+    @Test
+    fun `client mode WS path treats prefix-extending frame as cumulative replacement`() = runTest {
+        clientModeEnabledFlow.value = true
+        val first = "Hello"
+        val cumulative = "Hello, world!"
+
+        every {
+            clientModeChatSender.streamMessage(any(), any(), any(), any())
+        } returns flow {
+            emit(BotStreamChunk(text = first, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            emit(BotStreamChunk(text = cumulative, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
             emit(BotStreamChunk(conversationId = "client-conv", done = true))
         }
 
@@ -986,22 +1025,8 @@ class AdminChatViewModelTest {
 
         val assistant = vm.uiState.value.messages.lastOrNull { it.role == "assistant" }
         assertNotNull(assistant)
-        // Accept either the longer pre-snapshot accumulator OR the near-
-        // snapshot — whichever is longer. The bubble must NOT be the
-        // pathological doubled-bubble (combined + nearSnapshot).
-        val pathological = combined + nearSnapshot
-        assertFalse(
-            "wucn-snapshot-recovery must prevent doubled-bubble (got len=${assistant!!.content.length})",
-            assistant.content == pathological,
-        )
-        // Whichever path the heuristic took, the result must be ≤ the
-        // longer of (combined, nearSnapshot) — never their concatenation.
-        val maxAcceptableLen = maxOf(combined.length, nearSnapshot.length)
-        assertTrue(
-            "wucn-snapshot-recovery: bubble length ${assistant.content.length} must not exceed " +
-                "longer-of-inputs ${maxAcceptableLen}",
-            assistant.content.length <= maxAcceptableLen,
-        )
+        // Must be the cumulative — not "HelloHello, world!" (double-concat).
+        assertEquals(cumulative, assistant!!.content)
     }
 
     @Test
