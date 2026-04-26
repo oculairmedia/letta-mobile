@@ -105,7 +105,10 @@ class MessageGroupingTest {
         assertEquals("msg-u3", items[0].key)
         assertEquals("run-r2", items[1].key)
         assertEquals("msg-u2", items[2].key)
-        assertEquals("msg-a1", items[3].key)
+        // letta-mobile-w9l3: a1's runId (r1) is unique in the snapshot, so
+        // the Single adopts `run-r1` to keep the LazyColumn slot stable
+        // when a sibling later promotes it to a RunBlock mid-stream.
+        assertEquals("run-r1", items[3].key)
         assertEquals("msg-u1", items[4].key)
     }
 
@@ -147,6 +150,109 @@ class MessageGroupingTest {
         // Blank runIds shouldn't collapse — emit two Singles.
         assertEquals(2, items.size)
         items.forEach { assertTrue(it is ChatRenderItem.Single) }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // letta-mobile-w9l3 — stable LazyColumn key across the Single→RunBlock
+    // transition that happens mid-stream when a sibling message in the same
+    // run arrives. The grouper preemptively adopts `run-$runId` for an
+    // assistant Single whose runId is unique in the snapshot, so when a
+    // sibling lands and the item promotes to a RunBlock, the LazyColumn
+    // slot identity is preserved and Compose reuses the composable instead
+    // of unmount→remount (which used to flash visibly).
+    // ──────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `Single with unique runId adopts run key for stable transition`() {
+        // Mid-stream snapshot 1: only the assistant message has landed so
+        // far. It MUST be keyed `run-$runId` so the next snapshot (when a
+        // sibling joins and promotes it to a RunBlock with the same key)
+        // doesn't trigger an unmount+remount.
+        val items = groupMessagesForRender(
+            listOf(
+                assistant("a1", runId = "r1") to GroupPosition.None,
+                user("u1") to GroupPosition.None,
+            ),
+        )
+        val single = items[0] as ChatRenderItem.Single
+        assertEquals("run-r1", single.key)
+    }
+
+    @Test
+    fun `Single key matches RunBlock key after sibling arrives`() {
+        // Snapshot 1: solo assistant message in a run.
+        val before = groupMessagesForRender(
+            listOf(assistant("a1", runId = "r1") to GroupPosition.None),
+        )
+        // Snapshot 2: a sibling message lands in the same run, promoting
+        // the item to a RunBlock.
+        val after = groupMessagesForRender(
+            listOf(
+                assistant("a2", runId = "r1") to GroupPosition.First,
+                assistant("a1", runId = "r1") to GroupPosition.Last,
+            ),
+        )
+        // The key MUST be identical across both snapshots — that's the
+        // whole point of the w9l3 fix. If these diverge, LazyColumn will
+        // unmount the old slot and remount a new one, causing the flash.
+        assertEquals(before.single().key, after.single().key)
+        assertEquals("run-r1", before.single().key)
+        assertEquals("run-r1", after.single().key)
+    }
+
+    @Test
+    fun `Single without runId still keys by message id`() {
+        // User messages and untagged assistants have no runId — they MUST
+        // fall back to the message-id key, never a run key.
+        val items = groupMessagesForRender(
+            listOf(
+                user("u1") to GroupPosition.None,
+                assistant("a1", runId = null) to GroupPosition.None,
+            ),
+        )
+        assertEquals("msg-u1", items[0].key)
+        assertEquals("msg-a1", items[1].key)
+    }
+
+    @Test
+    fun `non-contiguous duplicate runIds keep msg key to avoid LazyColumn collision`() {
+        // a3(r1), user(u2), a1(r1) — same runId appears twice as Singles
+        // separated by a non-matching message. Adopting `run-r1` on both
+        // would produce two LazyColumn items with the same key, which
+        // crashes Compose. The grouper MUST detect this and keep
+        // `msg-${id}` for safety.
+        val items = groupMessagesForRender(
+            listOf(
+                assistant("a3", runId = "r1") to GroupPosition.None,
+                user("u2") to GroupPosition.None,
+                assistant("a1", runId = "r1") to GroupPosition.None,
+            ),
+        )
+        val keys = items.map { it.key }
+        // No two items may share a key.
+        assertEquals(keys.size, keys.toSet().size)
+        // Specifically, the two r1 Singles must keep msg- keys.
+        assertEquals("msg-a3", items[0].key)
+        assertEquals("msg-u2", items[1].key)
+        assertEquals("msg-a1", items[2].key)
+    }
+
+    @Test
+    fun `Single shares key with RunBlock when both reference same runId is impossible by construction`() {
+        // Sanity: the grouper produces *either* a Single or a RunBlock for
+        // a given runId in a snapshot, never both. With one assistant in
+        // run r1 and a contiguous pair in run r2, we expect:
+        //   Single(run-r1), RunBlock(run-r2) — no key collision.
+        val items = groupMessagesForRender(
+            listOf(
+                assistant("a3b", runId = "r2") to GroupPosition.First,
+                assistant("a3a", runId = "r2") to GroupPosition.Last,
+                assistant("a1", runId = "r1") to GroupPosition.None,
+            ),
+        )
+        val keys = items.map { it.key }
+        assertEquals(listOf("run-r2", "run-r1"), keys)
+        assertEquals(keys.size, keys.toSet().size)
     }
 
     private fun user(id: String, ts: String = "2026-04-19T12:00:00Z") = UiMessage(
