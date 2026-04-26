@@ -135,6 +135,118 @@ class StreamingMarkdownBoundaryTest {
         assertEquals("**hello world wit", text.substring(b))
     }
 
+    // ─── letta-mobile-c8of.6 — table-close detector ─────────────────────
+
+    @Test
+    fun `complete table followed by prose commits boundary right before the prose`() {
+        // After the table row \"| 3 | 4 |\\n\" the next line is prose with
+        // no pipe — table has structurally ended, boundary lives at the
+        // start of the prose line.
+        val text = "Intro\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |\nNext paragraph."
+        val b = findLastSafeBoundary(text)
+        assertEquals("Next paragraph.", text.substring(b))
+    }
+
+    @Test
+    fun `table followed by paragraph break still commits at paragraph break`() {
+        // Both the table-close AND the paragraph break would fire here;
+        // because we walk linearly and the paragraph-break boundary
+        // lands later in the text, it wins. Tail is the paragraph after.
+        val text = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\nAfter table"
+        val b = findLastSafeBoundary(text)
+        assertEquals("After table", text.substring(b))
+    }
+
+    @Test
+    fun `in-progress table (no closing line yet) does NOT commit a boundary`() {
+        // While the table is still streaming (no following non-pipe
+        // line, no following \n\n), there is no safe boundary. The whole
+        // table sits in the tail until either a non-pipe line or a
+        // paragraph break arrives.
+        val text = "Intro paragraph.\n\n| a | b |\n| --- | --- |\n| 1 | 2 "
+        val b = findLastSafeBoundary(text)
+        // Boundary stays at the end of the intro paragraph.
+        assertEquals("| a | b |\n| --- | --- |\n| 1 | 2 ", text.substring(b))
+    }
+
+    @Test
+    fun `prose containing literal pipes does NOT trigger table boundary`() {
+        // "yes | no" prose has pipes but no separator row — should NOT
+        // match the table-close detector.
+        val text = "Choose: yes | no | maybe\nSecond line of prose"
+        val b = findLastSafeBoundary(text)
+        // No safe boundary — there's no \n\n and no table-close pattern.
+        assertEquals(0, b)
+    }
+
+    @Test
+    fun `two-row run without separator does NOT match (rows alone are not enough)`() {
+        // Prose with pipes spanning two lines but no `| --- |` separator
+        // row — must not trigger.
+        val text = "| not | a |\n| table | row |\nProse follows here."
+        val b = findLastSafeBoundary(text)
+        // No table-close, no \n\n → no boundary.
+        assertEquals(0, b)
+    }
+
+    @Test
+    fun `table with alignment colons in separator still matches`() {
+        val text = "| left | right | center |\n| :--- | ---: | :---: |\n| 1 | 2 | 3 |\nDone."
+        val b = findLastSafeBoundary(text)
+        assertEquals("Done.", text.substring(b))
+    }
+
+    @Test
+    fun `table with no leading or trailing pipes still matches`() {
+        // GFM allows borderless tables.
+        val text = "a | b\n--- | ---\n1 | 2\nAfter."
+        val b = findLastSafeBoundary(text)
+        assertEquals("After.", text.substring(b))
+    }
+
+    @Test
+    fun `table inside a code fence does NOT trigger`() {
+        // Pipes inside an open fence are code, not table syntax. The
+        // boundary tracker must ignore line-level signals while a fence
+        // is open.
+        val text = "Intro\n\n```\n| a | b |\n| --- | --- |\n| 1 | 2 |\nplain"
+        val b = findLastSafeBoundary(text)
+        // Only safe boundary is after the intro paragraph.
+        assertEquals("```\n| a | b |\n| --- | --- |\n| 1 | 2 |\nplain", text.substring(b))
+    }
+
+    @Test
+    fun `progressive table stream - boundary commits the moment prose follows`() {
+        val chunks = listOf(
+            "| a | b |\n",                                                    // -> 0 (1 row, no separator yet)
+            "| a | b |\n| --- | --- |\n",                                     // -> 0 (table in progress)
+            "| a | b |\n| --- | --- |\n| 1 | 2 |\n",                          // -> 0 (still in progress, last line is pipe)
+            "| a | b |\n| --- | --- |\n| 1 | 2 |\nAfter",                     // -> 34 (table closed by prose)
+        )
+        val expected = listOf(0, 0, 0, 34)
+        for (i in chunks.indices) {
+            assertEquals(
+                "chunk ${i}: '${chunks[i].replace("\n", "\\n")}'",
+                expected[i],
+                findLastSafeBoundary(chunks[i]),
+            )
+        }
+        // Sanity-check the substring at the boundary.
+        val last = chunks.last()
+        assertEquals("After", last.substring(34))
+    }
+
+    @Test
+    fun `single dashed line is treated as thematic break NOT a one-cell table`() {
+        // "---\n" is an HR in markdown; we must NOT mistake it for a
+        // single-cell table separator.
+        val text = "para\n---\nmore"
+        val b = findLastSafeBoundary(text)
+        assertEquals(0, b)
+    }
+
+    // ─── original progressive-stream simulation ─────────────────────────
+
     @Test
     fun `progressive stream simulation - boundary advances as paragraphs land`() {
         // Simulate chunked arrival; verify boundary moves forward only when

@@ -101,17 +101,20 @@ fun StreamingMarkdownText(
  * Walks [text] once to find the index of the last position that is "safe"
  * to use as a markdown render boundary. A safe boundary satisfies all of:
  *
- * 1. The position is immediately after a paragraph break (`\n\n`).
+ * 1. The position is immediately after either:
+ *    a. A paragraph break (`\n\n`), or
+ *    b. A GFM table that has just structurally ended (the line after
+ *       the last `|`-bearing row contains no pipes — see
+ *       [letta-mobile-c8of.6]).
  * 2. The number of unescaped triple-backtick fences in `text[0..pos]`
  *    is even (no unclosed code fence — an unclosed fence would absorb
  *    subsequent content into a code block on the next chunk).
  * 3. The number of `$$` markers in `text[0..pos]` is even (no unclosed
  *    display-math fence — same reasoning).
  *
- * Returns the index immediately AFTER the last `\n\n` that satisfies these
- * conditions, or `0` if no safe boundary exists yet (e.g. the entire
- * stream so far is one paragraph, or contains an unclosed fence with no
- * subsequent paragraph break).
+ * Returns the index of the boundary, or `0` if no safe boundary exists
+ * yet (e.g. the entire stream so far is one paragraph, or contains an
+ * unclosed fence with no subsequent paragraph break).
  *
  * Inline emphasis closure (`**bold**`, `*ital*`, `` `code` ``) is NOT
  * tracked — those are inline constructs that mikepenz re-parses cheaply
@@ -119,7 +122,8 @@ fun StreamingMarkdownText(
  * BLOCK-level fences (code fence, display math) need parity tracking
  * because they greedily absorb following content.
  *
- * Single-pass O(N), no allocations beyond the index integer.
+ * Single-pass O(N), no allocations beyond the index integer + a small
+ * line-window string for the table-close check.
  */
 internal fun findLastSafeBoundary(text: String): Int {
     if (text.length < 2) return 0
@@ -130,7 +134,25 @@ internal fun findLastSafeBoundary(text: String): Int {
     var i = 0
     val n = text.length
 
+    // Track recent consecutive non-empty lines for the table-close
+    // detector. We only need to know:
+    //   - how many lines are in the current run
+    //   - whether every line so far in the run contains at least one '|'
+    //   - whether line index 1 (zero-indexed) matches the GFM separator
+    //     row pattern: optional leading |, then dash-runs separated by
+    //     pipes, with optional :alignment colons
+    //
+    // The run resets on every blank line.
+    var runLineCount = 0
+    var runAllHavePipe = true
+    var runSeparatorMatches = false
+    var lineStart = 0
+
     while (i < n) {
+        // Block-level constructs first — they take precedence over
+        // line bookkeeping because they can contain newlines that don't
+        // count as paragraph breaks for our purposes.
+
         // Triple backtick fence: ```
         if (i + 2 < n && text[i] == '`' && text[i + 1] == '`' && text[i + 2] == '`') {
             fenceParity = fenceParity xor 1
@@ -143,31 +165,209 @@ internal fun findLastSafeBoundary(text: String): Int {
             i += 2
             continue
         }
-        // Paragraph break: \n\n
-        if (text[i] == '\n' && i + 1 < n && text[i + 1] == '\n') {
-            // Both block-level fences must be CLOSED at this point for
-            // the boundary to be safe. If a fence is open the next chunk
-            // could close it with prose that visually belongs in the
-            // fence — splitting here would render that prose twice (once
-            // as a paragraph in the prefix, then again inside the fence
-            // when the boundary moves past the closing ```).
-            if (fenceParity == 0 && displayMathParity == 0) {
-                // Boundary lives AFTER the second \n so the prefix ends
-                // with a clean paragraph break and the tail starts at
-                // the first non-newline character of the next paragraph.
-                lastSafe = i + 2
-            }
-            // Skip past additional consecutive newlines — they're all
-            // part of the same paragraph break for our purposes.
-            i += 2
-            while (i < n && text[i] == '\n') {
-                lastSafe = i + 1 // consume into the boundary
+
+        if (text[i] == '\n') {
+            // Inside an open block fence, treat newlines as opaque —
+            // the line-tracking heuristics don't apply to fenced content.
+            if (fenceParity != 0 || displayMathParity != 0) {
+                // Still need to advance lineStart so we don't emit a
+                // stale "line" once the fence eventually closes.
+                lineStart = i + 1
                 i++
+                continue
             }
+
+            val lineEnd = i
+            val lineLen = lineEnd - lineStart
+            val lineIsBlank = lineLen == 0
+
+            if (lineIsBlank) {
+                // We're sitting on a `\n` that was preceded by another
+                // `\n` (the previous line had length 0). That's the
+                // SECOND `\n` of a paragraph break — commit the boundary
+                // AFTER this `\n` so the prefix ends with `\n\n` and the
+                // tail starts at the next paragraph's first char.
+                //
+                // Both block-level fences are already CLOSED here (the
+                // open-fence branch above returned early before entering
+                // line bookkeeping).
+                lastSafe = i + 1
+                i++
+                // Skip additional blank lines into the boundary so e.g.
+                // "A\n\n\n\nB" still anchors the boundary just before B.
+                while (i < n && text[i] == '\n') {
+                    lastSafe = i + 1
+                    i++
+                }
+                lineStart = i
+                runLineCount = 0
+                runAllHavePipe = true
+                runSeparatorMatches = false
+                continue
+            }
+
+            // Non-blank line just completed. Check pipe presence + (if
+            // it's the second line of a run) the GFM separator pattern.
+            val hasPipe = lineHasPipe(text, lineStart, lineEnd)
+            if (!hasPipe) {
+                // letta-mobile-c8of.6: table-close detector.
+                // The line we just consumed is non-empty AND has no
+                // pipes. If the immediately-preceding run is a complete
+                // table (≥2 lines, all-pipe, line[1] is separator), the
+                // table structurally ended at the previous \n. Commit a
+                // soft boundary right BEFORE this current line — the
+                // table goes into the prefix, this current line starts
+                // the tail.
+                //
+                // Why this is safe: a GFM table is delimited by either a
+                // blank line OR the first subsequent line that doesn't
+                // contain a pipe. mikepenz's renderer has already
+                // committed the table by the time we reach this point.
+                //
+                // Why no false positive on "yes | no | maybe" prose:
+                // we require the SECOND line of the run to match the
+                // separator pattern (| --- | --- |), which is the GFM
+                // table signature. Plain prose with stray pipes will
+                // never match that.
+                if (runLineCount >= 2 && runAllHavePipe && runSeparatorMatches) {
+                    lastSafe = lineStart
+                }
+                // This line is now line 1 of a NEW run (no pipe → can't
+                // ever satisfy the separator condition for *this* run,
+                // but the run continues for accounting purposes).
+                runLineCount = 1
+                runAllHavePipe = false
+                runSeparatorMatches = false
+            } else {
+                // Line has a pipe — extend the current run.
+                runLineCount += 1
+                if (runLineCount == 2) {
+                    runSeparatorMatches = lineLooksLikeTableSeparator(text, lineStart, lineEnd)
+                }
+                // runAllHavePipe stays true (already true, this line has pipe)
+            }
+
+            lineStart = i + 1
+            i++
             continue
         }
+
         i++
     }
 
+    // End-of-text table-close handling.
+    //
+    // The line bookkeeping above only fires on `\n`, so a streaming
+    // chunk that ends mid-prose (no trailing newline) never reaches
+    // the no-pipe branch. But if the model has just emitted the FIRST
+    // non-pipe character of a new line AFTER a complete table run,
+    // we already have enough information to commit — the table is
+    // structurally closed by the appearance of any non-pipe character
+    // outside the table grid.
+    //
+    // Only do this when we're sure the new line is committed-to-be-non-
+    // pipe: we require it to contain at least one non-whitespace char
+    // and NO pipes through end-of-text. If a pipe later arrives in this
+    // same line region, the next boundary-scan call will see it and
+    // simply not commit (lastSafe is recomputed each call, never
+    // monotonic across calls — that's a property of the caller's
+    // remember(text) wrapping, not this function).
+    if (runLineCount >= 2 && runAllHavePipe && runSeparatorMatches && lineStart < n) {
+        var sawNonWs = false
+        var sawPipe = false
+        for (j in lineStart until n) {
+            val c = text[j]
+            if (c == '|') {
+                sawPipe = true
+                break
+            }
+            if (c != ' ' && c != '\t' && c != '\n') sawNonWs = true
+        }
+        if (sawNonWs && !sawPipe) {
+            lastSafe = lineStart
+        }
+    }
+
     return lastSafe
+}
+
+/**
+ * Returns true if the substring `text[start..end)` contains any `|`
+ * character, ignoring whitespace.
+ *
+ * Used by the table-close detector. We DON'T require the pipe to be
+ * unescaped because in practice the GFM spec lets `\|` mean a literal
+ * pipe inside a cell; it still counts as a table cell. False positives
+ * here are bounded by the SEPARATOR-row check on line 2 of the run,
+ * which is the actual GFM table signature.
+ */
+private fun lineHasPipe(text: String, start: Int, end: Int): Boolean {
+    for (j in start until end) {
+        if (text[j] == '|') return true
+    }
+    return false
+}
+
+/**
+ * Returns true if the substring `text[start..end)` looks like a GFM
+ * table separator row, e.g. one of:
+ *
+ *   `| --- | --- |`
+ *   `|---|---|`
+ *   `| :--- | ---: | :---: |`
+ *   `--- | ---`
+ *
+ * The pattern: optional leading `|`, then one or more dash-runs
+ * (optionally surrounded by `:` for alignment), separated by `|`,
+ * with optional trailing `|`. Whitespace around tokens is ignored.
+ *
+ * This is the unambiguous GFM table signature — prose can contain
+ * stray pipes but won't match a separator row by accident.
+ */
+private fun lineLooksLikeTableSeparator(text: String, start: Int, end: Int): Boolean {
+    // Walk the line, skipping whitespace, expecting a sequence of
+    // separator cells (each one or more `-` optionally bracketed by `:`),
+    // delimited by `|`.
+    var j = start
+    fun skipSpaces() {
+        while (j < end && (text[j] == ' ' || text[j] == '\t')) j++
+    }
+    skipSpaces()
+    // Optional leading pipe.
+    if (j < end && text[j] == '|') {
+        j++
+        skipSpaces()
+    }
+    var cellsSeen = 0
+    while (j < end) {
+        // Optional leading colon for alignment.
+        if (j < end && text[j] == ':') j++
+        // Must have at least one dash.
+        var dashes = 0
+        while (j < end && text[j] == '-') {
+            dashes++
+            j++
+        }
+        if (dashes == 0) return false
+        // Optional trailing colon for alignment.
+        if (j < end && text[j] == ':') j++
+        skipSpaces()
+        cellsSeen++
+        if (j >= end) break
+        if (text[j] != '|') return false
+        j++
+        skipSpaces()
+        // Trailing pipe with no further cell is fine.
+        if (j >= end) break
+    }
+    // GFM tables require at least one column, but since prose can
+    // contain a single "-----" line we require at least one explicit
+    // cell delimiter to avoid matching "thematic break" lines like
+    // `---` that produce an HR, not a table.
+    return cellsSeen >= 2 || (cellsSeen >= 1 && containsPipe(text, start, end))
+}
+
+private fun containsPipe(text: String, start: Int, end: Int): Boolean {
+    for (j in start until end) if (text[j] == '|') return true
+    return false
 }
