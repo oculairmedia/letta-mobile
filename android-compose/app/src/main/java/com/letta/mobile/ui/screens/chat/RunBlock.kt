@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.chat
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -91,12 +92,14 @@ fun RunBlock(
     val gutterColor = MaterialTheme.colorScheme.outlineVariant
     val hiddenCount = if (collapsed) messages.size - 1 else 0
 
-    // letta-mobile-d2z6: removed the outer animateContentSize() — it stacked
-    // with the AnimatedVisibility below and the inner-bubble animateContentSize
-    // calls, producing visible jitter as streaming tokens arrived. The
-    // AnimatedVisibility on collapse/expand still drives the explicit user-
-    // initiated transition; per-token reflow is now layout-only.
-    Column(modifier = modifier.fillMaxWidth()) {
+    // letta-mobile-d2z6 follow-up: kept the outer animateContentSize so
+    // stream-end (final message addition) settles smoothly instead of
+    // popping. Removing it caused a visible duplicate-flash as the prior
+    // tail's GroupPosition flipped from Last → Middle when the new tail
+    // arrived. The inner AnimatedVisibility was removed (we render the
+    // visible set uniformly now) so the previous animation stack is no
+    // longer in play.
+    Column(modifier = modifier.fillMaxWidth().animateContentSize()) {
         RunHeader(
             messageCount = messages.size,
             collapsed = collapsed,
