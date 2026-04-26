@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.components.MarkdownText
+import com.letta.mobile.ui.components.StreamingMarkdownText
 import com.letta.mobile.ui.theme.LocalChatFontScale
 import com.letta.mobile.ui.theme.chatTypography
 import com.letta.mobile.ui.theme.scaledBy
@@ -162,21 +163,41 @@ object TextMessageRenderer : MessageContentRenderer {
                 modifier = modifier,
             )
         } else if (isStreaming) {
-            // letta-mobile-d2z6 (root cause): the third-party Markdown
-            // composable re-parses its content AST on every change and
-            // re-emits a fresh subtree. During streaming this happens on
-            // every chunk and the bubble visibly disappears for a frame as
-            // the old subtree unmounts and the new one mounts. Render
-            // plain Text while the stream is in flight (with the cursor
-            // glyph appended by streamingDisplayText) and snap to the
-            // formatted markdown the instant streaming stops. The user
-            // sees streaming prose render smoothly; markdown formatting
-            // (bold, headings, lists, code blocks) appears in one clean
-            // transition at the end instead of fighting every chunk.
-            Text(
-                text = streamingDisplayText(message.content),
-                style = MaterialTheme.chatTypography.messageBody,
-                color = textColor,
+            // letta-mobile-c8of (ALT-2): boundary-aware incremental
+            // markdown streaming. The committed prefix (everything up to
+            // the last safe paragraph/closed-fence boundary) renders
+            // through the full MarkdownText pipeline so lists, headings,
+            // bold, inline code etc. format LIVE during streaming. Only
+            // the in-progress paragraph (the tail after the last \n\n)
+            // renders as plain Text — and that tail still gets the
+            // letta-mobile-6p4o.1 word-boundary holdback + streaming
+            // cursor via tailTransform = ::streamingDisplayText.
+            //
+            // Why this kills the d2z6 stream-end "snap": the prior
+            // architecture rendered the ENTIRE bubble as plain Text
+            // during streaming, then swapped to MarkdownText on settle —
+            // a visible reflow as plain-text layout (literal \n\n,
+            // unindented lists) became formatted markdown layout. With
+            // boundary-aware streaming, the prefix is ALREADY rendered
+            // as MarkdownText throughout streaming, so on settle only
+            // the final paragraph's tail gets promoted into the prefix.
+            // No layout swap, no snap.
+            //
+            // Why a paragraph-cadence prefix re-render is cheap: chunks
+            // typically arrive every 80–150ms; new paragraph boundaries
+            // arrive every ~1s. The prefix only re-parses on boundary
+            // advances, so MarkdownText's heavy parse cost runs at ~1Hz
+            // instead of ~10Hz. Mid-paragraph chunks only mutate the
+            // tail, which is a flat Text layout.
+            //
+            // d2z6 plain-Text fallback preserved by setting tailTransform
+            // — if anything mid-paragraph regresses, the visible content
+            // is still the same string the user saw before this change.
+            StreamingMarkdownText(
+                text = message.content,
+                textColor = textColor,
+                tailStyle = MaterialTheme.chatTypography.messageBody,
+                tailTransform = ::streamingDisplayText,
                 modifier = modifier,
             )
         } else {
