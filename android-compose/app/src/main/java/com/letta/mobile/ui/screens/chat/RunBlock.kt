@@ -99,7 +99,18 @@ fun RunBlock(
     // arrived. The inner AnimatedVisibility was removed (we render the
     // visible set uniformly now) so the previous animation stack is no
     // longer in play.
-    Column(modifier = modifier.fillMaxWidth().animateContentSize()) {
+    //
+    // letta-mobile-5e0f.r2: suppress animateContentSize during pinch so
+    // we don't get cascading 150ms height interpolations across many
+    // bubbles per pinch frame. The animation is still useful for its
+    // intended trigger (stream-end / new-tail arrival), and that trigger
+    // is impossible during a pinch.
+    val isPinching = com.letta.mobile.ui.theme.LocalChatIsPinching.current
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (isPinching) Modifier else Modifier.animateContentSize()),
+    ) {
         RunHeader(
             messageCount = messages.size,
             collapsed = collapsed,

@@ -66,6 +66,7 @@ import com.letta.mobile.ui.components.TextInputDialog
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LocalChatFontScale
+import com.letta.mobile.ui.theme.LocalChatIsPinching
 import com.letta.mobile.ui.theme.chatBubbleSender
 import com.letta.mobile.ui.theme.chatColors
 import com.letta.mobile.ui.theme.chatDimens
@@ -543,10 +544,17 @@ internal fun MessageReasoning(
     // user-initiated collapse/expand toggle (which only fires when the
     // run is no longer streaming), so we keep it gated rather than
     // removing it outright.
+    //
+    // letta-mobile-5e0f.r2: also suppress during pinch-to-zoom so we
+    // don't get height-interpolation cascades across many bubbles per
+    // pinch frame.
+    val isPinching = LocalChatIsPinching.current
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .then(if (isStreaming) Modifier else Modifier.animateContentSize())
+            .then(
+                if (isStreaming || isPinching) Modifier else Modifier.animateContentSize(),
+            )
             .padding(vertical = 4.dp),
     ) {
         Row(
@@ -711,8 +719,10 @@ private fun ToolCallCard(toolCall: UiToolCall) {
     // more presence — slightly stronger surface tint and a 1.dp outline
     // so it reads as a distinct artifact in a stack of bubbles, without
     // shouting like a colored pill would.
+    // letta-mobile-5e0f.r2: gate animateContentSize on !isPinching.
+    val isPinchingForCard = LocalChatIsPinching.current
     Card(
-        modifier = Modifier.animateContentSize(),
+        modifier = if (isPinchingForCard) Modifier else Modifier.animateContentSize(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
         ),
@@ -860,7 +870,8 @@ private fun ToolCallCard(toolCall: UiToolCall) {
                             },
                             maxLines = if (resultExpanded) Int.MAX_VALUE else 2,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.animateContentSize(),
+                            // letta-mobile-5e0f.r2: gate animateContentSize on !isPinching.
+                            modifier = if (isPinchingForCard) Modifier else Modifier.animateContentSize(),
                         )
                     }
                 }
