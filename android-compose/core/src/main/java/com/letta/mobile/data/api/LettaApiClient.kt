@@ -70,12 +70,31 @@ open class LettaApiClient @Inject constructor(
         val cacheDir = java.io.File(context.cacheDir, "http_cache")
         val cacheSize = 10L * 1024 * 1024
 
+        // letta-mobile-kxsv: dedicated dispatcher with a higher
+        // per-host concurrency limit. Default OkHttp Dispatcher caps
+        // maxRequestsPerHost = 5, but this client routinely runs:
+        //   - up to WARMUP_CONVERSATION_COUNT (5) long-running idle
+        //     stream pollers against letta.oculair.ca, and
+        //   - the user's interactive send-stream against the same host,
+        //     which must NOT queue behind the pollers.
+        //
+        // 5 background slots + queued foreground = the user-visible hang
+        // Emmanuel hit on 2026-04-25. 16 gives generous headroom for
+        // pollers + active send + reconcile fetches without burdening
+        // the server or the device. (Server side already has its own
+        // per-IP rate limiting.)
+        val httpDispatcher = okhttp3.Dispatcher().apply {
+            maxRequests = 64
+            maxRequestsPerHost = 16
+        }
+
         return HttpClient(OkHttp) {
             engine {
                 config {
                     followRedirects(true)
                     followSslRedirects(true)
                     cache(okhttp3.Cache(cacheDir, cacheSize))
+                    dispatcher(httpDispatcher)
                 }
                 addInterceptor(TelemetryInterceptor)
             }

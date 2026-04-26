@@ -378,6 +378,41 @@ class TimelineSyncLoop(
         return localId
     }
 
+    /**
+     * letta-mobile-5s1n: insert-or-update a Client Mode Local for assistant
+     * streaming through the WS gateway. Identified by [localId] (caller
+     * supplies a stable id per stream, e.g. `cm-assist-<runId>` for assistant
+     * text, `cm-tool-<toolCallId>` for tool calls, `cm-reason-<uuid>` for
+     * reasoning). Idempotent across repeat chunks.
+     *
+     * The first call appends a fresh Local; subsequent calls in-place update
+     * the same event so the UI sees a single bubble grow rather than a flood
+     * of new events.
+     *
+     * Stamps [MessageSource.CLIENT_MODE_HARNESS] and [DeliveryState.SENT]
+     * (the gateway is the delivery authority). Caller is responsible for
+     * choosing the appropriate [TimelineMessageType] and field shape via
+     * the [build] / [transform] callbacks.
+     */
+    suspend fun upsertClientModeLocalAssistantChunk(
+        localId: String,
+        build: () -> TimelineEvent.Local,
+        transform: (TimelineEvent.Local) -> TimelineEvent.Local,
+    ): String {
+        writeMutex.withLock {
+            val before = _state.value.findByOtid(localId) is TimelineEvent.Local
+            _state.value = _state.value.upsertClientModeLocal(
+                otid = localId,
+                transform = transform,
+                build = build,
+            )
+            if (!before) {
+                _events.emit(TimelineSyncEvent.LocalAppended(localId))
+            }
+        }
+        return localId
+    }
+
     /** Retry a failed send by re-enqueueing it. */
     suspend fun retry(otid: String) = writeMutex.withLock {
         val existing = _state.value.findByOtid(otid)
@@ -795,7 +830,27 @@ class TimelineSyncLoop(
 
         // Resume-stream subscriber (letta-mobile-mge5).
         private const val STREAM_BACKOFF_START_MS = 1_000L
+        // letta-mobile-qv6d: split the backoff cap into two ladders.
+        //
+        //   STREAM_BACKOFF_MAX_MS — used when the stream closed cleanly
+        //     (a run actually ran and finished). We want to re-attach
+        //     quickly because another run is plausibly imminent.
+        //
+        //   STREAM_IDLE_BACKOFF_MAX_MS — used on the idle404 path (server
+        //     said "no active run"). Repeatedly re-asking every 5s
+        //     produced a ~4 RPS background-400 storm against
+        //     letta.oculair.ca per device (20-conv warmup × 1 poll /
+        //     5s) which (a) saturated the OkHttp dispatcher and starved
+        //     foreground SSE sends — Emmanuel's letta-mobile-kxsv hang
+        //     symptom — and (b) burned battery and bandwidth.
+        //
+        //     90s × 20 conv = ~0.22 RPS background, an 18× reduction
+        //     versus the 5s cap. A live run still cuts through within
+        //     90s of starting; if push delivery (ChatPushService) is
+        //     working the FCM payload triggers a fast probe ahead of
+        //     the next idle poll anyway.
         private const val STREAM_BACKOFF_MAX_MS = 5_000L
+        private const val STREAM_IDLE_BACKOFF_MAX_MS = 90_000L
         private const val STREAM_DORMANT_MS = 3_000L
 
         private const val REQUEST_PREVIEW_MAX_CHARS = 2_048
@@ -931,7 +986,8 @@ class TimelineSyncLoop(
                     "backoffMs" to backoffMs,
                 )
                 delay(backoffMs)
-                backoffMs = (backoffMs * 2).coerceAtMost(STREAM_BACKOFF_MAX_MS)
+                // letta-mobile-qv6d: idle path uses the longer cap.
+                backoffMs = (backoffMs * 2).coerceAtMost(STREAM_IDLE_BACKOFF_MAX_MS)
             } catch (e: ApiException) {
                 // The Letta server returns 400 INVALID_ARGUMENT with body
                 // `{"detail":"... No active runs found ..."}` as an alternative
@@ -957,7 +1013,8 @@ class TimelineSyncLoop(
                         "via" to "apiException",
                     )
                     delay(backoffMs)
-                    backoffMs = (backoffMs * 2).coerceAtMost(STREAM_BACKOFF_MAX_MS)
+                    // letta-mobile-qv6d: idle path uses the longer cap.
+                    backoffMs = (backoffMs * 2).coerceAtMost(STREAM_IDLE_BACKOFF_MAX_MS)
                 } else {
                     // letta-mobile-mge5.6: distinguish transient network /
                     // server errors from the idle path. Grafana alerts on
@@ -1063,7 +1120,19 @@ class TimelineSyncLoop(
             return@withLock
         }
         val confirmed = message.toTimelineEvent(position = _state.value.nextLocalPosition())
-            ?: return@withLock
+        if (confirmed == null) {
+            // letta-mobile-5s1n probe: message types we don't render
+            // (PingMessage, StopReason, etc.) should be the only callers
+            // here. If assistant_message ever shows up, it means
+            // toTimelineEvent has a bug.
+            Telemetry.event(
+                "TimelineSync", "streamSubscriber.toTimelineEventNull",
+                "messageType" to message.messageType,
+                "messageId" to message.id,
+                "conversationId" to conversationId,
+            )
+            return@withLock
+        }
         // Letta streams one assistant_message per step with an incrementing
         // `seq_id`, and each frame's `content` carries only the NEWLY-EMITTED
         // tokens since the last frame (not the cumulative text). The correct
@@ -1082,11 +1151,40 @@ class TimelineSyncLoop(
         if (existing != null) {
             val oldText = existing.content
             val newText = confirmed.content
+            // letta-mobile-wucn (round 2): defensive snapshot-recovery
+            // for the timeline-path SSE merge. Same root cause as the
+            // in-memory upsert reducer in AdminChatViewModel: when the
+            // gateway emits a closing/final assistant chunk whose content
+            // is a near-snapshot of the streamed accumulator but fails
+            // strict startsWith() (server-side normalization, smart-quote
+            // conversion, markdown re-serialization), the fall-through
+            // `else -> oldText + newText` concatenates the full final
+            // message onto its own accumulator → doubled bubble. This is
+            // the dominant render path once a conversation has an ID
+            // (the in-memory clientModeMessages path is only used pre-
+            // migration); the wucn fix in AdminChatViewModel did not
+            // protect this code, so the original bug persisted post-fix.
+            //
+            // Guard: if newText is >= 32 chars AND >= 50% of oldText
+            // length, it's overwhelmingly more likely to be a snapshot
+            // than a true delta. Pick the longer string. Logs at WARN
+            // for next-repro forensics.
             val mergedText = when {
                 newText.isEmpty() -> oldText
                 newText == oldText -> oldText
                 newText.startsWith(oldText) -> newText
                 oldText.startsWith(newText) -> oldText
+                newText.length >= 32 && newText.length >= oldText.length / 2 -> {
+                    android.util.Log.w(
+                        "TimelineSyncLoop",
+                        "wucn-snapshot-recovery: chunk shaped like snapshot but " +
+                            "failed strict prefix check. oldText.len=${oldText.length} " +
+                            "newText.len=${newText.length} serverId=${confirmed.serverId} " +
+                            "conversationId=$conversationId. Falling back to longer-" +
+                            "string replacement to avoid doubled-bubble.",
+                    )
+                    if (newText.length >= oldText.length) newText else oldText
+                }
                 else -> oldText + newText
             }
             // Merge toolCalls: a later delta frame may have null/blank
@@ -1118,6 +1216,25 @@ class TimelineSyncLoop(
             _state.value = _state.value.replaceByServerId(merged)
             _state.value = _state.value.copy(liveCursor = confirmed.serverId)
             _events.emit(TimelineSyncEvent.StreamEventIngested(confirmed.serverId, message.messageType))
+            // letta-mobile-5s1n probe: assistant deltas after the first frame
+            // hit this branch silently. Track them so we can prove (or
+            // disprove) that the merged content is actually accumulating —
+            // and that the existing event we're merging into came from
+            // SSE/REST (i.e. is a Confirmed) rather than a Local that the
+            // observer's `toUiMessageOrNull` projection might be dropping.
+            Telemetry.event(
+                "TimelineSync", "streamSubscriber.merged",
+                "serverId" to confirmed.serverId,
+                "messageType" to (message.messageType ?: "?"),
+                "existingType" to existing.messageType.name,
+                "oldLen" to oldText.length,
+                "newLen" to newText.length,
+                "mergedLen" to mergedText.length,
+                "oldToolCalls" to oldCalls.size,
+                "newToolCalls" to newCalls.size,
+                "mergedToolCalls" to mergedCalls.size,
+                "conversationId" to conversationId,
+            )
             // No notification-publish for in-place updates — we already
             // published when the event first appeared.
             return@withLock
@@ -1235,6 +1352,11 @@ internal fun LettaMessage.toTimelineEvent(position: Double): TimelineEvent.Confi
         is ApprovalRequestMessage -> TimelineMessageType.TOOL_CALL to renderToolCallContent(effectiveToolCalls)
         is ToolReturnMessage -> TimelineMessageType.TOOL_RETURN to (toolReturn.funcResponse ?: "")
         is SystemMessage -> TimelineMessageType.SYSTEM to content
+        // letta-mobile-5s1n: server-emitted error frames render as a
+        // dedicated ERROR bubble so the user gets visible feedback when a
+        // run aborts mid-flight (previously absorbed into UnknownMessage
+        // and silently dropped).
+        is com.letta.mobile.data.model.ErrorMessage -> TimelineMessageType.ERROR to text
         else -> return null
     }
     val attachments = when (this) {
@@ -1243,7 +1365,8 @@ internal fun LettaMessage.toTimelineEvent(position: Double): TimelineEvent.Confi
         is SystemMessage -> this.attachments
         is ReasoningMessage, is ToolCallMessage, is ToolReturnMessage, is ApprovalRequestMessage,
         is ApprovalResponseMessage, is HiddenReasoningMessage, is EventMessage,
-        is PingMessage, is UnknownMessage, is StopReason, is UsageStatistics -> emptyList()
+        is PingMessage, is UnknownMessage, is StopReason, is UsageStatistics,
+        is com.letta.mobile.data.model.ErrorMessage -> emptyList()
     }
     val effectiveOtid = otid ?: "server-$id"
     val date = runCatching { date?.let(Instant::parse) ?: Instant.now() }.getOrElse { Instant.now() }

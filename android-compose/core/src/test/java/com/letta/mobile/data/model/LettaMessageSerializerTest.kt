@@ -141,6 +141,37 @@ class LettaMessageSerializerTest {
     }
 
     @Test
+    fun `deserialize error_message picks up content`() {
+        // letta-mobile-5s1n: server emits error_message frames when a run
+        // aborts mid-flight; previously fell through to UnknownMessage and
+        // was silently dropped, leaving the user with a vanished spinner.
+        val raw = """{"id":"err-1","message_type":"error_message","content":"tool exec failed"}"""
+        val msg = json.decodeFromString<LettaMessage>(raw)
+        assertTrue(msg is ErrorMessage)
+        assertEquals("tool exec failed", (msg as ErrorMessage).text)
+        assertEquals("err-1", msg.id)
+    }
+
+    @Test
+    fun `deserialize error short form falls back to message field`() {
+        // SSE sometimes uses the short discriminator "error" and puts the
+        // human-readable string under `message` rather than `content`.
+        val raw = """{"id":"err-2","message_type":"error","message":"rate limited"}"""
+        val msg = json.decodeFromString<LettaMessage>(raw)
+        assertTrue(msg is ErrorMessage)
+        assertEquals("rate limited", (msg as ErrorMessage).text)
+    }
+
+    @Test
+    fun `deserialize error_message without id synthesizes one`() {
+        val raw = """{"message_type":"error_message","content":"oops"}"""
+        val msg = json.decodeFromString<LettaMessage>(raw)
+        assertTrue(msg is ErrorMessage)
+        assertNotNull(msg.id)
+        assertTrue(msg.id.startsWith("error-"))
+    }
+
+    @Test
     fun `deserialize usage_statistics`() {
         val raw = """{"prompt_tokens":100,"completion_tokens":50,"total_tokens":150,"message_type":"usage_statistics"}"""
         val msg = json.decodeFromString<LettaMessage>(raw)

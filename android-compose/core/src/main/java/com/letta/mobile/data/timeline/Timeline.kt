@@ -44,7 +44,20 @@ sealed class TimelineEvent {
      */
     abstract val source: MessageSource
 
-    /** Optimistic, not yet confirmed by server. Only ever role=USER in practice. */
+    /**
+     * Optimistic, not yet confirmed by server. Historically only ever USER —
+     * extended for letta-mobile-5s1n (Client Mode assistant streaming) so
+     * in-flight assistant content + reasoning + tool calls can flow through
+     * the timeline rather than the legacy in-memory `clientModeMessages` list.
+     *
+     * Strict-otid sends from Letta REST/SSE remain USER-only; the new fields
+     * default to safe values and are unused for [MessageSource.LETTA_SERVER].
+     * For [MessageSource.CLIENT_MODE_HARNESS] events that represent assistant
+     * streaming, [messageType] is set accordingly and the structured fields
+     * (toolCalls / approval / toolReturn / reasoningContent) carry the
+     * stream payload until the SSE-side Confirmed event lands and the fuzzy
+     * matcher (or future strict-otid path) collapses them.
+     */
     data class Local(
         override val position: Double,
         override val otid: String,
@@ -54,6 +67,17 @@ sealed class TimelineEvent {
         val deliveryState: DeliveryState,
         override val attachments: List<MessageContentPart.Image> = emptyList(),
         override val source: MessageSource = MessageSource.LETTA_SERVER,
+        // letta-mobile-5s1n: assistant-streaming additive fields. All default
+        // to USER-bubble-equivalent values so existing call sites compile
+        // unchanged. Mirrors the corresponding fields on [Confirmed] so the
+        // VM->UiMessage mapper can render Locals and Confirmeds uniformly.
+        val messageType: TimelineMessageType = TimelineMessageType.USER,
+        val toolCalls: List<com.letta.mobile.data.model.ToolCall> = emptyList(),
+        val approvalRequestId: String? = null,
+        val approvalDecided: Boolean = false,
+        val toolReturnContent: String? = null,
+        val toolReturnIsError: Boolean = false,
+        val reasoningContent: String? = null,
     ) : TimelineEvent()
 
     /** Confirmed via server. */
@@ -161,6 +185,12 @@ enum class TimelineMessageType {
     TOOL_CALL,
     TOOL_RETURN,
     SYSTEM,
+    /**
+     * Server-emitted error frame. Rendered as a system-style bubble with
+     * destructive accent so the user sees that the run aborted instead of
+     * a silent dropped spinner. letta-mobile-5s1n.
+     */
+    ERROR,
     OTHER,
 }
 
@@ -392,6 +422,51 @@ data class Timeline(
         val existing = events[idx] as TimelineEvent.Confirmed
         val stabilized = confirmed.copy(position = existing.position)
         return copy(events = events.toMutableList().also { it[idx] = stabilized })
+    }
+
+    /**
+     * letta-mobile-5s1n: insert-or-update a Client Mode assistant-streaming
+     * Local. Used by [TimelineSyncLoop.upsertClientModeLocalAssistantChunk]
+     * to thread incremental SSE-style chunks through the timeline.
+     *
+     * Contract: identifies the target Local by `otid`. If present, applies
+     * [transform] preserving position. If absent, builds a new Local via
+     * [build] and appends at end. Always returns a Timeline; never throws.
+     *
+     * Scoped to Locals with `source = CLIENT_MODE_HARNESS` — strict-otid
+     * USER Locals on the LETTA_SERVER path remain untouched.
+     */
+    fun upsertClientModeLocal(
+        otid: String,
+        transform: (TimelineEvent.Local) -> TimelineEvent.Local,
+        build: () -> TimelineEvent.Local,
+    ): Timeline {
+        val idx = events.indexOfFirst { it.otid == otid && it is TimelineEvent.Local }
+        if (idx >= 0) {
+            val existing = events[idx] as TimelineEvent.Local
+            if (existing.source != MessageSource.CLIENT_MODE_HARNESS) {
+                Telemetry.event(
+                    "Timeline", "upsertClientModeLocal.wrongSource",
+                    "conversationId" to conversationId,
+                    "otid" to otid,
+                    "source" to existing.source.name,
+                    level = Telemetry.Level.WARN,
+                )
+                return this
+            }
+            val updated = transform(existing).copy(
+                position = existing.position,
+                otid = existing.otid,
+                source = MessageSource.CLIENT_MODE_HARNESS,
+            )
+            return copy(events = events.toMutableList().also { it[idx] = updated })
+        }
+        val seed = build().copy(
+            otid = otid,
+            position = nextLocalPosition(),
+            source = MessageSource.CLIENT_MODE_HARNESS,
+        )
+        return append(seed)
     }
 
     /** Mark a Local event as [DeliveryState.SENT]. No-op for Confirmed events. */

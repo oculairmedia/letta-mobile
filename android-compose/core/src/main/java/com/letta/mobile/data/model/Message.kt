@@ -361,6 +361,45 @@ data class ApprovalResult(
     val stderr: List<String>? = null,
 )
 
+/**
+ * Server-emitted error frame on the SSE stream. Letta sends an
+ * `error_message` (sometimes `error`) when a run aborts mid-flight —
+ * tool execution failed, model returned a structured error, rate-limit,
+ * etc. Previously fell through to [UnknownMessage] and was silently
+ * dropped by [ingestStreamEvent], so users saw a thinking spinner that
+ * cleared with no visible feedback (letta-mobile-5s1n diagnosis).
+ *
+ * The exact payload shape varies across server versions; we keep it
+ * permissive: prefer `content`, fall back to `message` or `error`. The
+ * bound `text` accessor returns the first non-blank we find.
+ */
+@Serializable
+data class ErrorMessage(
+    override val id: String = "error-${java.util.UUID.randomUUID()}",
+    @SerialName("content") val contentRaw: JsonElement? = null,
+    @SerialName("message") val messageField: String? = null,
+    @SerialName("error") val errorField: String? = null,
+    val code: String? = null,
+    override val date: String? = null,
+    @SerialName("run_id") override val runId: String? = null,
+    @SerialName("step_id") override val stepId: String? = null,
+    override val otid: String? = null,
+    @SerialName("sender_id") override val senderId: String? = null,
+    @SerialName("is_err") override val isErr: Boolean? = true,
+    @SerialName("seq_id") override val seqId: Int? = null,
+    @SerialName("message_type") override val messageType: String = "error_message",
+) : LettaMessage {
+    /** Best-effort human-readable error text for display. */
+    val text: String
+        get() {
+            val fromContent = contentRaw?.let { extractContent(it) }?.takeIf { it.isNotBlank() }
+            return fromContent
+                ?: messageField?.takeIf { it.isNotBlank() }
+                ?: errorField?.takeIf { it.isNotBlank() }
+                ?: "An error occurred."
+        }
+}
+
 @Serializable
 data class UnknownMessage(
     override val id: String = "unknown-${java.util.UUID.randomUUID()}",
@@ -537,6 +576,12 @@ object LettaMessageSerializer : JsonContentPolymorphicSerializer<LettaMessage>(L
         "ping" -> PingMessage.serializer()
         "stop_reason" -> StopReason.serializer()
         "usage_statistics" -> UsageStatistics.serializer()
+        // letta-mobile-5s1n: surface server-emitted error frames as a
+        // dedicated message type so they render as a visible system note
+        // instead of being silently absorbed by UnknownMessage. SSE stream
+        // uses both forms across versions; tolerate both like elsewhere.
+        "error_message",
+        "error" -> ErrorMessage.serializer()
         else -> UnknownMessage.serializer() // fallback for unknown types
     }
 }

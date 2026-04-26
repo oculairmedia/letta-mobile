@@ -1,15 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  letta-mobile-oknr: Letta-mobile is a self-host-first client. Real-world
+  deployments point the app at:
+    - Tailscale CGNAT IPs (100.64.0.0/10) — most common
+    - LAN IPs (192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12)
+    - Custom self-hosted hostnames
+  None of these can be enumerated ahead of time, and Android's network
+  security config doesn't support CIDR ranges. The previous allow-list
+  was incomplete for the actual user base, causing release builds to
+  hard-crash with UnknownServiceException whenever the user pointed the
+  app at their own server over HTTP.
+
+  Permitting cleartext at the base config is the pragmatic choice for a
+  self-hosted app where the user owns the network path. HTTPS is still
+  used (and validated) whenever the user configures an https:// URL.
+-->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="false">
+    <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">localhost</domain>
-        <domain includeSubdomains="true">10.0.2.2</domain>
-        <domain includeSubdomains="false">127.0.0.1</domain>
-        <domain includeSubdomains="true">letta2.oculair.ca</domain>
-        <domain includeSubdomains="true">oculair.ca</domain>
-    </domain-config>
 </network-security-config>

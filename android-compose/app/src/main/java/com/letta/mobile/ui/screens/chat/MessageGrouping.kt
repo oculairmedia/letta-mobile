@@ -31,12 +31,29 @@ sealed interface ChatRenderItem {
     /** True if [messageId] appears anywhere inside this render item. */
     fun containsMessageId(messageId: String): Boolean
 
-    /** A single, stand-alone message bubble. */
+    /**
+     * A single, stand-alone message bubble.
+     *
+     * The [stableRunKey] hint lets the grouper preemptively use the
+     * `run-$runId` key for an assistant Single whose runId is unique in the
+     * current snapshot. This keeps the LazyColumn slot identity stable across
+     * the Single → RunBlock transition that happens mid-stream when a sibling
+     * message in the same run arrives (letta-mobile-w9l3). Without this,
+     * Compose unmounts the Single and remounts a RunBlock on the next frame,
+     * producing a visible flash.
+     *
+     * `stableRunKey` is null in two cases: (a) the message has no runId
+     * (user messages, untagged assistants) — falls back to `msg-${id}`; or
+     * (b) the same runId appears in multiple non-contiguous Singles in this
+     * snapshot, where adopting `run-$runId` would cause duplicate keys and
+     * crash the LazyColumn. In case (b) we keep `msg-${id}` for safety.
+     */
     data class Single(
         val message: UiMessage,
         val groupPosition: GroupPosition,
+        val stableRunKey: String? = null,
     ) : ChatRenderItem {
-        override val key: String = "msg-${message.id}"
+        override val key: String = stableRunKey ?: "msg-${message.id}"
         override val boundaryTimestamp: String = message.timestamp
         override fun containsMessageId(messageId: String): Boolean =
             message.id == messageId
@@ -98,6 +115,20 @@ fun groupMessagesForRender(
 ): List<ChatRenderItem> {
     if (reversed.isEmpty()) return emptyList()
 
+    // letta-mobile-w9l3: pre-scan to count how often each assistant runId
+    // appears. A runId that occurs exactly once across the entire snapshot is
+    // a candidate for the "stable run key" optimisation on its Single — we
+    // can safely key it by `run-$runId` because no other item will adopt the
+    // same key. If the runId occurs more than once (non-contiguous Singles,
+    // or a soon-to-be RunBlock), Singles must keep `msg-${id}` so we don't
+    // collide with the RunBlock's `run-$runId` or with another Single.
+    val runIdCounts = HashMap<String, Int>()
+    for ((msg, _) in reversed) {
+        val rid = msg.runId.takeIf { msg.role == "assistant" && !it.isNullOrBlank() }
+            ?: continue
+        runIdCounts[rid] = (runIdCounts[rid] ?: 0) + 1
+    }
+
     val out = ArrayList<ChatRenderItem>(reversed.size)
     var i = 0
     while (i < reversed.size) {
@@ -124,7 +155,13 @@ fun groupMessagesForRender(
             }
         }
         if (acc.size == 1) {
-            out.add(ChatRenderItem.Single(acc[0].first, acc[0].second))
+            // Adopt the future RunBlock key when this runId is unique in the
+            // snapshot (count == 1 means: just this one Single, no other
+            // Single or RunBlock will use `run-$runId`). This keeps the
+            // LazyColumn slot stable when a sibling message later arrives and
+            // promotes this Single into a RunBlock mid-stream.
+            val stableKey = if ((runIdCounts[runId] ?: 0) == 1) "run-$runId" else null
+            out.add(ChatRenderItem.Single(acc[0].first, acc[0].second, stableRunKey = stableKey))
         } else {
             out.add(ChatRenderItem.RunBlock(runId = runId, messages = acc.asReversed()))
         }

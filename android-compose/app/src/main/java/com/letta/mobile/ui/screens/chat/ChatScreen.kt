@@ -5,7 +5,11 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -41,6 +45,10 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.CompositionLocalProvider
+import com.letta.mobile.ui.theme.LocalChatIsPinching
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -97,7 +105,22 @@ fun ChatScreen(
             viewModel.clearComposerError()
         }
 
-        Box(modifier = modifier.fillMaxSize().then(backgroundModifier).imePadding()) {
+        // letta-mobile-6vsx: use union(ime, navigationBars) instead of
+        // bare imePadding() so the bottom inset is min-floored at nav-bar
+        // height. With enableEdgeToEdge() + windowSoftInputMode=adjustNothing,
+        // bare imePadding() lets the composer animate down to the absolute
+        // screen bottom (under the nav bar) during the IME-hide animation,
+        // then snaps back up when an outer scaffold's nav-bar inset
+        // re-takes effect — the visible "drop then rise" symptom.
+        // With the union the IME animation interpolates between IME_height
+        // and nav_bar_height, never below, and the composer's resting
+        // position is correct from the very start of the hide animation.
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .then(backgroundModifier)
+                .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)),
+        ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // letta-mobile-c87t: surfaces a non-modal banner when the
                 // lettabot WS gateway substituted a fresh conversation for the
@@ -221,6 +244,26 @@ private fun ChatContent(
     var hasScrolledToTarget by remember { mutableStateOf(false) }
     var showFontIndicator by remember { mutableStateOf(false) }
     var pinchTick by remember { mutableStateOf(0L) }
+    // letta-mobile-5e0f.r2: pinch-active flag plumbed via
+    // LocalChatIsPinching so animateContentSize sites in the chat tree
+    // can suppress themselves during the gesture (and re-enable for
+    // their normal triggers like collapse/expand). True from the first
+    // 2-finger event in a gesture until the user lifts.
+    var isPinching by remember { mutableStateOf(false) }
+
+    // letta-mobile-5e0f.r3: GPU-only visual scale applied via
+    // Modifier.graphicsLayer during the pinch gesture. We no longer
+    // mutate fontScale on every quantized step (r2's "continuous reflow"
+    // approach) — that recomposed the entire chat tree at gesture rate
+    // (~5–10 fontScale changes/sec × every Text reading LocalChatTypography
+    // × cascading height interpolations) which produced the high-frequency
+    // strobe Emmanuel reported. Instead the chat list scales as a single
+    // GPU layer (zero recomposition, zero re-measure, zero re-layout)
+    // and we commit one true font-scale reflow on lift. Bias: smoothness
+    // > pixel-perfect text shaping mid-gesture. Accepted UX trade-off:
+    // a tiny snap on release as the layer rasters at scale 1.0 but
+    // typography re-flows to the committed scale.
+    var transientPinchScale by remember { mutableFloatStateOf(1f) }
 
     LaunchedEffect(pinchTick) {
         if (pinchTick > 0) {
@@ -258,6 +301,11 @@ private fun ChatContent(
         }
     }
 
+    // letta-mobile-d2z6 follow-up: the streaming/animated scroll branch
+    // introduced a duplicate-flash on stream end (the LaunchedEffect
+    // re-emitted as isStreaming flipped, racing with the bubble's settled
+    // layout). Reverted to the original animateScrollToItem behaviour;
+    // bubble flicker is being addressed at the rendering layer instead.
     LaunchedEffect(Unit) {
         snapshotFlow { messageCount }
             .distinctUntilChanged()
@@ -293,7 +341,13 @@ private fun ChatContent(
             }
         }
         when (chatMode) {
-            "simple" -> result.filter { it.role == "user" || (it.role == "assistant" && !it.isReasoning) }
+            // letta-mobile-5s1n: keep error frames visible in Simple mode so
+            // users see when a run aborts (otherwise the bubble is filtered
+            // out and the experience degrades to the silent-spinner bug
+            // we just fixed).
+            "simple" -> result.filter {
+                it.role == "user" || (it.role == "assistant" && !it.isReasoning) || it.isError
+            }
             else -> result
         }
     }
@@ -364,55 +418,123 @@ private fun ChatContent(
                 modifier = Modifier
                     .weight(1f)
                     .pointerInput(Unit) {
-                        // Quantize font scale to 2% steps so we only recompose
-                        // the chat tree on visible changes (~45 steps across 0.7..1.6),
-                        // not every pointer frame. This is the main smoothness win.
-                        val step = 0.02f
+                        // letta-mobile-5e0f.r3: GPU-only pinch.
+                        //
+                        // Why this approach: r2 tried "continuous reflow"
+                        // (push fontScale to the theme on every quantized
+                        // 2% step). Even with memoized ChatTypography +
+                        // compositionLocalOf + animateContentSize gating,
+                        // every fontScale tick re-measured every Text in
+                        // every visible bubble at a new size — and on a
+                        // device with markdown/code blocks/tool cards
+                        // that's a measurable repaint. At 5–10 ticks/sec
+                        // the result was the high-frequency strobe
+                        // Emmanuel reported.
+                        //
+                        // r3 fix: during the gesture we ONLY mutate
+                        // transientPinchScale, which is wired to a single
+                        // Modifier.graphicsLayer { scaleX/scaleY } on the
+                        // chat-list Box. graphicsLayer is GPU compositor
+                        // work — no recomposition, no remeasure, no
+                        // relayout, no Text re-shaping. The chat scales
+                        // as a single textured layer at native frame
+                        // rate.
+                        //
+                        // On gesture commit (lift) we:
+                        //   1. Compute the final snapped fontScale.
+                        //   2. Push it through onActiveFontScaleChange
+                        //      so the theme reflows ONCE.
+                        //   3. Reset transientPinchScale to 1f in the
+                        //      same recomposition so the layer un-scales
+                        //      as the new typography lays out — a single
+                        //      visible "snap" instead of 45 stuttering
+                        //      reflows.
+                        //
+                        // Trade-off: mid-gesture the text is rastered at
+                        // scale 1.0 and stretched, so glyphs are slightly
+                        // softer than a true reflow would render. This is
+                        // the same trade-off iOS Mail / Messages / Slack
+                        // make. Accepted in exchange for smoothness.
                         awaitEachGesture {
                             awaitFirstDown(requireUnconsumed = false)
-                            var isPinching = false
-                            var rawScale = activeFontScale
-                            var committedScale = activeFontScale
-                            var pinchStarted = false
+                            var gesturePinching = false
+                            // The committed (already-applied to theme) scale
+                            // at the start of the gesture. The visual layer
+                            // multiplies further pinch deltas on top.
+                            val baseScale = activeFontScale
+                            // Live raw zoom accumulator — drives the
+                            // graphicsLayer directly so the user sees
+                            // every pointer frame.
+                            var liveZoom = 1f
                             do {
                                 val event = awaitPointerEvent(PointerEventPass.Initial)
                                 val activePointers = event.changes.filter { it.pressed }
                                 if (activePointers.size >= 2) {
-                                    isPinching = true
+                                    if (!gesturePinching) {
+                                        gesturePinching = true
+                                        isPinching = true
+                                        pinchTick = System.nanoTime()
+                                    }
                                     val zoom = event.calculateZoom()
                                     if (zoom != 1f) {
                                         event.changes.forEach { it.consume() }
-                                        rawScale = (rawScale * zoom).coerceIn(0.7f, 1.6f)
-                                        // Snap to nearest step; only push state + indicator
-                                        // when the quantized value actually changes.
-                                        val snapped = (kotlin.math.round(rawScale / step) * step)
-                                            .coerceIn(0.7f, 1.6f)
-                                        if (snapped != committedScale) {
-                                            committedScale = snapped
-                                            onActiveFontScaleChange(snapped)
-                                            if (!pinchStarted) {
-                                                pinchTick = System.nanoTime()
-                                                pinchStarted = true
-                                            }
-                                        }
+                                        liveZoom *= zoom
+                                        // Clamp the visual layer to the
+                                        // committable range (relative to
+                                        // baseScale) so the user can't
+                                        // scale past what we'll snap to.
+                                        val targetScale = (baseScale * liveZoom).coerceIn(0.7f, 1.6f)
+                                        liveZoom = targetScale / baseScale
+                                        transientPinchScale = liveZoom
                                     }
                                 }
                             } while (event.changes.any { it.pressed })
-                            if (isPinching) {
-                                // Refresh indicator timer at gesture end so it hides
-                                // 1s after the user lifts, not mid-pinch.
+                            if (gesturePinching) {
+                                // Snap to 2% step on commit. Quantization
+                                // happens once on lift — not 45 times
+                                // during the gesture.
+                                val step = 0.02f
+                                val finalRaw = (baseScale * liveZoom).coerceIn(0.7f, 1.6f)
+                                val snapped = (kotlin.math.round(finalRaw / step) * step)
+                                    .coerceIn(0.7f, 1.6f)
+                                // Atomic-ish flip: theme + scale layer
+                                // reset in the same recomposition pass.
+                                onActiveFontScaleChange(snapped)
+                                onFontScaleChange(snapped)
+                                transientPinchScale = 1f
                                 pinchTick = System.nanoTime()
-                                onFontScaleChange(committedScale)
+                                isPinching = false
                             }
                         }
                     },
             ) {
+                // letta-mobile-5e0f.r2: provide LocalChatIsPinching to
+                // the entire chat content tree so animateContentSize
+                // sites can suppress themselves during the gesture.
+                CompositionLocalProvider(LocalChatIsPinching provides isPinching) {
                 LazyColumn(
                     state = listState,
                     // letta-mobile-23h5 (polish 2026-04-19): wider side
                     // gutters so bubbles don't kiss the screen edge.
                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
-                    reverseLayout = true
+                    reverseLayout = true,
+                    // letta-mobile-5e0f.r3: GPU-only pinch scale. During
+                    // a pinch gesture transientPinchScale ranges 0.7..1.6
+                    // (relative to the committed fontScale baseline) and
+                    // is rendered as a single uniform layer transform.
+                    // At rest it's exactly 1f and graphicsLayer becomes
+                    // a no-op (Compose elides identity transforms). The
+                    // transformOrigin is the visual centre of the list
+                    // so pinch feels like it's happening at the focal
+                    // point of the user's fingers (close enough — true
+                    // focal-point scaling would require tracking the
+                    // gesture centroid; this is the standard messaging
+                    // app behaviour and feels natural).
+                    modifier = Modifier.graphicsLayer {
+                        scaleX = transientPinchScale
+                        scaleY = transientPinchScale
+                        transformOrigin = TransformOrigin(0.5f, 0.5f)
+                    },
                 ) {
                     if (state.isStreaming) {
                         item(key = "typing") {
@@ -436,17 +558,53 @@ private fun ChatContent(
                                     // RunBlock uses so behaviour is consistent across modes
                                     // and group sizes.
                                     val msg = renderItem.message
-                                    RenderChatMessage(
-                                        message = msg,
-                                        position = renderItem.groupPosition,
-                                        state = state,
-                                        chatMode = chatMode,
-                                        highlightedMessageId = highlightedMessageId,
-                                        onSendMessage = onSendMessage,
-                                        onSubmitApproval = onSubmitApproval,
-                                        reasoningCollapsed = msg.id !in state.expandedReasoningMessageIds,
-                                        onToggleReasoning = { onToggleReasoningExpanded(msg.id) },
-                                    )
+                                    // letta-mobile-d2z6 (real fix): when w9l3 marked this
+                                    // Single with a stableRunKey it means "this message's
+                                    // run has exactly one message *right now* but a sibling
+                                    // is likely about to land, promoting it to a RunBlock
+                                    // with the same LazyColumn key". Routing both states
+                                    // through the same composable (RunBlock) keeps the
+                                    // slot's composable subtree identical across the
+                                    // transition — Compose just sees the messages list
+                                    // grow from 1 to N inside the existing RunBlock. The
+                                    // RunBlock's messages.size == 1 short-circuit renders
+                                    // exactly what RenderChatMessage would render, so
+                                    // there's no visible change for true singletons.
+                                    val stableKey = renderItem.stableRunKey
+                                    if (stableKey != null) {
+                                        val runId = stableKey.removePrefix("run-")
+                                        RunBlock(
+                                            messages = listOf(msg),
+                                            collapsed = runId in state.collapsedRunIds,
+                                            onToggleCollapsed = { onToggleRunCollapsed(runId) },
+                                            modifier = Modifier.padding(top = 6.dp, bottom = 0.dp),
+                                        ) { message, position, rowModifier ->
+                                            RenderChatMessage(
+                                                message = message,
+                                                position = position,
+                                                state = state,
+                                                chatMode = chatMode,
+                                                highlightedMessageId = highlightedMessageId,
+                                                onSendMessage = onSendMessage,
+                                                onSubmitApproval = onSubmitApproval,
+                                                reasoningCollapsed = message.id !in state.expandedReasoningMessageIds,
+                                                onToggleReasoning = { onToggleReasoningExpanded(message.id) },
+                                                modifier = rowModifier,
+                                            )
+                                        }
+                                    } else {
+                                        RenderChatMessage(
+                                            message = msg,
+                                            position = renderItem.groupPosition,
+                                            state = state,
+                                            chatMode = chatMode,
+                                            highlightedMessageId = highlightedMessageId,
+                                            onSendMessage = onSendMessage,
+                                            onSubmitApproval = onSubmitApproval,
+                                            reasoningCollapsed = msg.id !in state.expandedReasoningMessageIds,
+                                            onToggleReasoning = { onToggleReasoningExpanded(msg.id) },
+                                        )
+                                    }
                                 }
 
                                 is ChatRenderItem.RunBlock -> {
@@ -513,6 +671,7 @@ private fun ChatContent(
                     }
 
                 }
+                } // letta-mobile-5e0f.r2: end CompositionLocalProvider(LocalChatIsPinching)
 
                 ScrollToBottomFab(
                     visible = showScrollFab,
@@ -523,6 +682,9 @@ private fun ChatContent(
                 )
 
                 if (showFontIndicator) {
+                    // letta-mobile-5e0f.r2: activeFontScale is now updated
+                    // continuously during the gesture (memoized typography
+                    // makes that cheap), so the indicator reads it directly.
                     Text(
                         text = "${(activeFontScale * 100).toInt()}%",
                         style = MaterialTheme.typography.headlineMedium,

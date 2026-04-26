@@ -101,6 +101,22 @@ class WsBotClient(
 
     @Volatile
     private var isUserClosing = false
+    // letta-mobile-2psc: set by ensureSession() when it deliberately closes
+    // the socket to switch agents. Consumed by the okhttp onClosed callback
+    // so a clean code-1000 close doesn't get treated as an unexpected
+    // disconnect (which would fail the next request and race with the
+    // ensureSession-initiated reconnect).
+    private var isSwitchingAgent = false
+
+    /**
+     * Sockets that ensureSession (or another internal path) has explicitly
+     * retired. Any onClosed/onFailure callback originating from a socket
+     * in this set is residual and must NOT be propagated as an unexpected
+     * disconnect. Identity-based; uses Collections.newSetFromMap on a
+     * weak-key IdentityHashMap so retired sockets are GC'd naturally.
+     */
+    private val retiredSockets: MutableSet<WebSocket> =
+        java.util.Collections.newSetFromMap(java.util.WeakHashMap())
 
     @Volatile
     private var activeAgentId: String? = null
@@ -275,7 +291,13 @@ class WsBotClient(
             }
 
             if (socketOpen && activeAgentId != requestedAgentId) {
+                // letta-mobile-2psc: arm the switching-agent flag BEFORE
+                // we initiate the close so the okhttp onClosed listener
+                // can suppress its handleUnexpectedDisconnect. Cleared in
+                // openSocketLocked alongside isUserClosing.
+                isSwitchingAgent = true
                 sendWebSocketMessage(WsSessionCloseMessage)
+                socket?.let { retiredSockets += it }
                 socket?.close(1000, "switching agent")
                 socket = null
                 socketOpen = false
@@ -297,6 +319,7 @@ class WsBotClient(
 
         _connectionState.value = if (activeAgentId == null) ConnectionState.CONNECTING else ConnectionState.RECONNECTING
         isUserClosing = false
+        isSwitchingAgent = false
         val deferred = CompletableDeferred<Unit>()
         openDeferred = deferred
 
@@ -455,6 +478,26 @@ class WsBotClient(
         }
 
         target.trySend(RequestSignal.Message(message))
+    }
+
+    /**
+     * Returns true if [incoming] is a socket we've already retired or
+     * replaced (e.g. the one ensureSession just closed during an agent
+     * switch). Stale sockets can fire onFailure/onClosed callbacks on
+     * okhttp's reader thread *after* we've swapped in their replacement;
+     * treating those as "the current connection died" would incorrectly
+     * kill the brand-new in-flight request. See letta-mobile-2psc.
+     *
+     * The check is two-pronged because there is a brief window in
+     * ensureSession where `socket = null` (between close and the
+     * subsequent openSocketLocked) — during that window we still need
+     * to know that the incoming socket is the retired one.
+     */
+    private fun isResidualSocket(incoming: WebSocket?): Boolean {
+        if (incoming == null) return false
+        if (incoming in retiredSockets) return true
+        val current = socket
+        return current != null && incoming !== current
     }
 
     private fun handleUnexpectedDisconnect(cause: Throwable?) {
@@ -619,10 +662,43 @@ class WsBotClient(
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
             Log.i(TAG, "WebSocket closed ($code): $reason")
+            // letta-mobile-2psc: residual callback from a socket we've
+            // already replaced (e.g. via agent-switch). Ignore — the
+            // current socket is healthy.
+            if (isResidualSocket(webSocket)) {
+                Log.d(TAG, "Ignoring onClosed from stale socket ($code: $reason)")
+                return
+            }
+            // Deliberate agent-switch close initiated by ensureSession
+            // also lands here; ensureSession is already reconnecting.
+            if (isSwitchingAgent) {
+                isSwitchingAgent = false
+                socket = null
+                socketOpen = false
+                return
+            }
             handleUnexpectedDisconnect(null)
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+            // letta-mobile-2psc: residual EOF/IO failure from a socket we've
+            // already replaced (typical race when ensureSession closes the
+            // old socket and immediately opens a new one). The new socket
+            // is already running; we must not fail the in-flight request
+            // on the new socket because of the dying old one.
+            if (isResidualSocket(webSocket)) {
+                Log.d(TAG, "Ignoring onFailure from stale socket: ${t.message}")
+                return
+            }
+            // Deliberate agent-switch close: okhttp can fire onFailure
+            // (EOF) before onClosed during the close handshake.
+            if (isSwitchingAgent) {
+                Log.i(TAG, "WebSocket onFailure during agent switch — suppressed: ${t.message}")
+                isSwitchingAgent = false
+                socket = null
+                socketOpen = false
+                return
+            }
             val failure = when {
                 response?.code == 401 -> BotGatewayException(
                     code = BotGatewayErrorCode.AUTH_FAILED,
