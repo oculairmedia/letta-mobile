@@ -245,6 +245,30 @@ internal fun findLastSafeBoundary(text: String): Int {
                     runSeparatorMatches = lineLooksLikeTableSeparator(text, lineStart, lineEnd)
                 }
                 // runAllHavePipe stays true (already true, this line has pipe)
+
+                // letta-mobile-c8of.6: PROGRESSIVE row-by-row commit.
+                //
+                // As soon as we have header + separator + ≥1 data row
+                // committed (runLineCount >= 3), each subsequent
+                // row-terminating \n produces a VALID truncated GFM
+                // table prefix. mikepenz parses the prefix as a
+                // complete N-row table — so committing the boundary at
+                // i+1 (right after this \n) renders the table grid up
+                // to and including this row.
+                //
+                // Without this branch, the table sits entirely in the
+                // raw-text tail until a non-pipe line arrives —
+                // exactly the bug Emmanuel reported (rows don't render
+                // until the model emits the post-table prose).
+                //
+                // Note: we deliberately do NOT commit at
+                // runLineCount == 2 (after the separator alone) because
+                // a header + separator with no data row is rendered by
+                // some markdown engines as an empty table that flickers
+                // when the first row arrives.
+                if (runAllHavePipe && runSeparatorMatches && runLineCount >= 3) {
+                    lastSafe = i + 1
+                }
             }
 
             lineStart = i + 1
@@ -255,35 +279,56 @@ internal fun findLastSafeBoundary(text: String): Int {
         i++
     }
 
-    // End-of-text table-close handling.
+    // End-of-text handling for in-flight content (no trailing \n).
     //
-    // The line bookkeeping above only fires on `\n`, so a streaming
-    // chunk that ends mid-prose (no trailing newline) never reaches
-    // the no-pipe branch. But if the model has just emitted the FIRST
-    // non-pipe character of a new line AFTER a complete table run,
-    // we already have enough information to commit — the table is
-    // structurally closed by the appearance of any non-pipe character
-    // outside the table grid.
+    // The per-line bookkeeping above only fires on `\n`, so a streaming
+    // chunk that ends mid-line never reaches the line branches. Two
+    // cases matter for the table progressive-render:
     //
-    // Only do this when we're sure the new line is committed-to-be-non-
-    // pipe: we require it to contain at least one non-whitespace char
-    // and NO pipes through end-of-text. If a pipe later arrives in this
-    // same line region, the next boundary-scan call will see it and
-    // simply not commit (lastSafe is recomputed each call, never
-    // monotonic across calls — that's a property of the caller's
-    // remember(text) wrapping, not this function).
-    if (runLineCount >= 2 && runAllHavePipe && runSeparatorMatches && lineStart < n) {
+    //   (A) After a complete table run (header + separator + ≥1 data
+    //       row), the model has just emitted the FIRST non-pipe char of
+    //       a new line — table is structurally closed by the appearance
+    //       of any non-pipe character outside the grid. Commit at
+    //       lineStart so the table goes into the prefix and the prose
+    //       starts the tail.
+    //
+    //   (B) After header + separator (runLineCount == 2 + separator),
+    //       the model is mid-way through emitting the FIRST data row
+    //       (partial line starts with a pipe). Commit at lineStart so
+    //       the header+separator land in the prefix; the partial row
+    //       sits briefly in the tail until its \n lands and the row
+    //       commit branch in the main loop takes over.
+    //
+    //       Note: we DO NOT commit here when runLineCount >= 3 because
+    //       the post-newline branch in the main loop already committed
+    //       at the end of the last completed row (lastSafe was set when
+    //       we processed that \n). The partial in-flight row is the
+    //       tail by construction.
+    //
+    // We only commit when we're sure the in-flight content commits to
+    // a particular shape: at least one non-whitespace char must exist.
+    if (runAllHavePipe && runSeparatorMatches && runLineCount >= 2 && lineStart < n) {
         var sawNonWs = false
         var sawPipe = false
         for (j in lineStart until n) {
             val c = text[j]
             if (c == '|') {
                 sawPipe = true
-                break
+                // Don't break — we want the full sawNonWs picture too.
             }
             if (c != ' ' && c != '\t' && c != '\n') sawNonWs = true
         }
-        if (sawNonWs && !sawPipe) {
+        if (sawNonWs) {
+            // Case A: non-pipe line after complete table → table-close.
+            // Case B: pipe-bearing line right after separator with no
+            // completed data row yet → commit so header+separator render.
+            // Either way, the boundary lives at lineStart.
+            //
+            // When sawPipe AND runLineCount >= 3, the main-loop row
+            // commit already moved lastSafe forward to end of the last
+            // completed row, which equals lineStart for this in-flight
+            // partial. So setting lastSafe = lineStart here is a no-op
+            // in that case (correct).
             lastSafe = lineStart
         }
     }

@@ -158,15 +158,32 @@ class StreamingMarkdownBoundaryTest {
     }
 
     @Test
-    fun `in-progress table (no closing line yet) does NOT commit a boundary`() {
-        // While the table is still streaming (no following non-pipe
-        // line, no following \n\n), there is no safe boundary. The whole
-        // table sits in the tail until either a non-pipe line or a
-        // paragraph break arrives.
+    fun `in-progress table commits at start of the partial in-flight row`() {
+        // [letta-mobile-c8of.6] PROGRESSIVE rendering: as rows complete,
+        // boundary advances row-by-row. The partial in-flight row "| 1 | 2 "
+        // (no terminating \n yet) sits in the tail; everything before
+        // (intro + header + separator) goes to the prefix. mikepenz will
+        // render the prefix as a header-only table during the brief
+        // moment between separator landing and the first row terminating.
         val text = "Intro paragraph.\n\n| a | b |\n| --- | --- |\n| 1 | 2 "
         val b = findLastSafeBoundary(text)
-        // Boundary stays at the end of the intro paragraph.
-        assertEquals("| a | b |\n| --- | --- |\n| 1 | 2 ", text.substring(b))
+        // Boundary advances past the separator line — the partial first
+        // data row stays in the tail.
+        assertEquals("| 1 | 2 ", text.substring(b))
+    }
+
+    @Test
+    fun `progressive table renders row by row as each newline lands`() {
+        // The whole point of c8of.6: as each row \n arrives, that row
+        // joins the prefix. Caller renders the prefix as MarkdownText
+        // (a real table grid), so the user sees rows append.
+        val full = "| a | b |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |\n| 5 | 6 |\n"
+        // After the FIRST data row's terminating \n, boundary moves to
+        // the start of "| 3 | 4 |" line.
+        val afterRow1 = "| a | b |\n| --- | --- |\n| 1 | 2 |\n"
+        assertEquals(afterRow1.length, findLastSafeBoundary(afterRow1))
+        // After three data rows, boundary at end of last completed row.
+        assertEquals(full.length, findLastSafeBoundary(full))
     }
 
     @Test
@@ -216,14 +233,19 @@ class StreamingMarkdownBoundaryTest {
     }
 
     @Test
-    fun `progressive table stream - boundary commits the moment prose follows`() {
+    fun `progressive table stream - rows commit one-by-one as they complete`() {
+        // [letta-mobile-c8of.6] core acceptance test: each row \n
+        // advances the boundary, so the prefix grows one row at a time
+        // and renders progressively as a real table grid. The user sees
+        // rows appear, not raw `| a | b |` syntax.
         val chunks = listOf(
-            "| a | b |\n",                                                    // -> 0 (1 row, no separator yet)
-            "| a | b |\n| --- | --- |\n",                                     // -> 0 (table in progress)
-            "| a | b |\n| --- | --- |\n| 1 | 2 |\n",                          // -> 0 (still in progress, last line is pipe)
+            "| a | b |\n",                                                    // -> 0 (header alone, no separator yet)
+            "| a | b |\n| --- | --- |\n",                                     // -> 0 (separator alone, no data row yet)
+            "| a | b |\n| --- | --- |\n| 1 | 2 |\n",                          // -> 34 (1st data row committed)
+            "| a | b |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |\n",                // -> 44 (2nd data row committed)
             "| a | b |\n| --- | --- |\n| 1 | 2 |\nAfter",                     // -> 34 (table closed by prose)
         )
-        val expected = listOf(0, 0, 0, 34)
+        val expected = listOf(0, 0, 34, 44, 34)
         for (i in chunks.indices) {
             assertEquals(
                 "chunk ${i}: '${chunks[i].replace("\n", "\\n")}'",
@@ -231,7 +253,7 @@ class StreamingMarkdownBoundaryTest {
                 findLastSafeBoundary(chunks[i]),
             )
         }
-        // Sanity-check the substring at the boundary.
+        // Sanity-check the substring at the boundary for the final chunk.
         val last = chunks.last()
         assertEquals("After", last.substring(34))
     }
