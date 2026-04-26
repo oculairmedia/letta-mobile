@@ -447,17 +447,53 @@ private fun ChatContent(
                                     // RunBlock uses so behaviour is consistent across modes
                                     // and group sizes.
                                     val msg = renderItem.message
-                                    RenderChatMessage(
-                                        message = msg,
-                                        position = renderItem.groupPosition,
-                                        state = state,
-                                        chatMode = chatMode,
-                                        highlightedMessageId = highlightedMessageId,
-                                        onSendMessage = onSendMessage,
-                                        onSubmitApproval = onSubmitApproval,
-                                        reasoningCollapsed = msg.id !in state.expandedReasoningMessageIds,
-                                        onToggleReasoning = { onToggleReasoningExpanded(msg.id) },
-                                    )
+                                    // letta-mobile-d2z6 (real fix): when w9l3 marked this
+                                    // Single with a stableRunKey it means "this message's
+                                    // run has exactly one message *right now* but a sibling
+                                    // is likely about to land, promoting it to a RunBlock
+                                    // with the same LazyColumn key". Routing both states
+                                    // through the same composable (RunBlock) keeps the
+                                    // slot's composable subtree identical across the
+                                    // transition — Compose just sees the messages list
+                                    // grow from 1 to N inside the existing RunBlock. The
+                                    // RunBlock's messages.size == 1 short-circuit renders
+                                    // exactly what RenderChatMessage would render, so
+                                    // there's no visible change for true singletons.
+                                    val stableKey = renderItem.stableRunKey
+                                    if (stableKey != null) {
+                                        val runId = stableKey.removePrefix("run-")
+                                        RunBlock(
+                                            messages = listOf(msg),
+                                            collapsed = runId in state.collapsedRunIds,
+                                            onToggleCollapsed = { onToggleRunCollapsed(runId) },
+                                            modifier = Modifier.padding(top = 6.dp, bottom = 0.dp),
+                                        ) { message, position, rowModifier ->
+                                            RenderChatMessage(
+                                                message = message,
+                                                position = position,
+                                                state = state,
+                                                chatMode = chatMode,
+                                                highlightedMessageId = highlightedMessageId,
+                                                onSendMessage = onSendMessage,
+                                                onSubmitApproval = onSubmitApproval,
+                                                reasoningCollapsed = message.id !in state.expandedReasoningMessageIds,
+                                                onToggleReasoning = { onToggleReasoningExpanded(message.id) },
+                                                modifier = rowModifier,
+                                            )
+                                        }
+                                    } else {
+                                        RenderChatMessage(
+                                            message = msg,
+                                            position = renderItem.groupPosition,
+                                            state = state,
+                                            chatMode = chatMode,
+                                            highlightedMessageId = highlightedMessageId,
+                                            onSendMessage = onSendMessage,
+                                            onSubmitApproval = onSubmitApproval,
+                                            reasoningCollapsed = msg.id !in state.expandedReasoningMessageIds,
+                                            onToggleReasoning = { onToggleReasoningExpanded(msg.id) },
+                                        )
+                                    }
                                 }
 
                                 is ChatRenderItem.RunBlock -> {
