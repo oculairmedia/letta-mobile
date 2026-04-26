@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -68,18 +69,30 @@ fun StreamingMarkdownText(
     val rawTail = if (boundary < text.length) text.substring(boundary) else ""
     val tail = remember(rawTail) { if (rawTail.isEmpty()) "" else tailTransform(rawTail) }
 
+    // letta-mobile-flk.1: split the committed prefix into independently-
+    // keyed blocks so already-rendered paragraphs Compose-skip when the
+    // prefix advances. Without this, every prefix-advance forces mikepenz
+    // to reparse the ENTIRE prefix AST — the dominant cost when the
+    // gateway streams snapshot-shaped frames at high frequency (e.g.
+    // LETTABOT_PARTIAL_JSON_ENABLED=true emits paragraph-cadence
+    // snapshots much more often than the boundary detector originally
+    // assumed). Per-block keying caps reparse cost at the size of the
+    // block that actually changed (typically the just-committed
+    // paragraph), independent of how long the conversation grows.
+    val blocks = remember(prefix) { splitMarkdownBlocks(prefix) }
+
     Column(modifier = modifier) {
-        if (prefix.isNotEmpty()) {
-            // Note: passing the prefix to the full MarkdownText keeps the
-            // existing math / mermaid / code-fence / autolink machinery
-            // active for everything that has reached a safe boundary.
-            // mikepenz's renderer caches per-input subtrees, so when the
-            // boundary doesn't advance between chunks the prefix recompose
-            // is a structural-equality skip.
-            MarkdownText(
-                text = prefix,
-                textColor = textColor,
-            )
+        blocks.forEach { block ->
+            // The block's text is stable once committed; its index +
+            // hash is the key so Compose treats unchanged blocks as
+            // structurally identical across recompositions and skips
+            // their MarkdownText recompose entirely.
+            key(block.key) {
+                MarkdownText(
+                    text = block.text,
+                    textColor = textColor,
+                )
+            }
         }
         if (tail.isNotEmpty()) {
             // Plain Text for the in-progress paragraph. We intentionally
@@ -415,4 +428,231 @@ private fun lineLooksLikeTableSeparator(text: String, start: Int, end: Int): Boo
 private fun containsPipe(text: String, start: Int, end: Int): Boolean {
     for (j in start until end) if (text[j] == '|') return true
     return false
+}
+
+// ─── letta-mobile-flk.1: per-block prefix splitter ─────────────────────
+
+/**
+ * One renderable block emitted by [splitMarkdownBlocks]. The [key] is
+ * stable across recompositions for any block whose [text] hasn't changed,
+ * so wrapping the renderer in `key(block.key) { ... }` lets Compose
+ * skip-recompose unchanged blocks during streaming. [text] is the raw
+ * markdown source for the block (suitable input to [MarkdownText]).
+ */
+internal data class MarkdownBlock(val key: String, val text: String)
+
+/**
+ * Split a committed markdown [prefix] into independently-keyed blocks
+ * for incremental rendering. The boundary detector ([findLastSafeBoundary])
+ * already guarantees [prefix] ends at a "safe" point (no open code/math
+ * fence, no in-flight table row), so we can scan forward from the start
+ * and emit one block per:
+ *
+ *   - **Paragraph** — a run of text terminated by `\n\n` (the standard
+ *     CommonMark paragraph break).
+ *   - **Closed code fence** — `` ``` ... ``` ``, treated as a single
+ *     block even if it contains internal blank lines (otherwise we'd
+ *     shred fenced code and lose syntax highlighting context).
+ *   - **Closed display-math fence** — `$$ ... $$`, same reasoning.
+ *   - **Complete GFM table** — header + separator + ≥1 data row,
+ *     terminated by either `\n\n` or a non-pipe line. Splitting
+ *     mid-table would render rows as separate one-row tables, which
+ *     mikepenz cannot stitch back together.
+ *
+ * Block keys encode `(index, contentHash)` — the index makes ordering
+ * explicit (so swapping two structurally-similar paragraphs invalidates
+ * both keys, not neither), and the hash defends against the rare case
+ * where a snapshot-shaped re-emission silently mutates an
+ * already-committed block (we want the renderer to invalidate, not
+ * silently reuse the stale tree).
+ *
+ * Performance: O(N) over [prefix] length with no allocations beyond the
+ * block list itself (substring views into the source string). Called
+ * inside `remember(prefix)` so it runs once per prefix-advance, not
+ * per-recompose.
+ *
+ * Returns an empty list for an empty prefix.
+ */
+internal fun splitMarkdownBlocks(prefix: String): List<MarkdownBlock> {
+    if (prefix.isEmpty()) return emptyList()
+
+    val blocks = mutableListOf<MarkdownBlock>()
+    val n = prefix.length
+    var blockStart = 0
+    var i = 0
+
+    // Per-line state for table detection. Mirrors the bookkeeping in
+    // findLastSafeBoundary so the splitter agrees with the boundary
+    // detector about what counts as a complete table.
+    var lineStart = 0
+    var runStart = -1            // index where current pipe-bearing run started
+    var runLineCount = 0
+    var runAllHavePipe = true
+    var runSeparatorMatches = false
+
+    fun emitBlock(end: Int) {
+        if (end <= blockStart) return
+        // Trim only LEADING blank-line padding from the block text;
+        // preserve the trailing \n\n that terminated it so mikepenz
+        // sees a fully-formed paragraph break.
+        val raw = prefix.substring(blockStart, end)
+        if (raw.isEmpty()) return
+        val key = "blk-${blocks.size}-${raw.hashCode()}"
+        blocks.add(MarkdownBlock(key, raw))
+        blockStart = end
+        // Reset table-run state — block boundary always ends any run.
+        runStart = -1
+        runLineCount = 0
+        runAllHavePipe = true
+        runSeparatorMatches = false
+    }
+
+    while (i < n) {
+        // Closed code fence: scan to the matching ``` and treat the
+        // whole span as one atomic block. NB: i must be at line-start
+        // (immediately after a \n or at index 0) for this to be a real
+        // fence — backticks mid-line are inline code and don't open
+        // block-level fences. We approximate "line-start" by checking
+        // i == blockStart after a fresh emit OR i == lineStart.
+        val atLineStart = (i == 0) || (i == lineStart)
+        if (atLineStart && i + 2 < n &&
+            prefix[i] == '`' && prefix[i + 1] == '`' && prefix[i + 2] == '`'
+        ) {
+            // Anything before this fence (a paragraph that ended
+            // without a \n\n terminator) becomes its own block first.
+            if (i > blockStart) {
+                emitBlock(i)
+            }
+            // Find the matching close fence. The boundary detector
+            // guarantees one exists in the committed prefix.
+            var j = i + 3
+            while (j + 2 <= n) {
+                if (prefix[j] == '`' && prefix[j + 1] == '`' && prefix[j + 2] == '`') {
+                    j += 3
+                    break
+                }
+                j++
+            }
+            // Consume any trailing \n\n after the close so the fence
+            // and its paragraph-break go into the same block. (A fence
+            // followed by another fence with no blank line between is
+            // legal but unusual; we handle the common case.)
+            while (j < n && prefix[j] == '\n') j++
+            // Emit the fence (plus its trailing \n\n) as its own block.
+            emitBlock(j)
+            i = j
+            // Update line tracking to start fresh after the fence.
+            lineStart = i
+            continue
+        }
+
+        // Closed display-math fence: same atomic-block treatment.
+        if (atLineStart && i + 1 < n && prefix[i] == '$' && prefix[i + 1] == '$') {
+            if (i > blockStart) {
+                emitBlock(i)
+            }
+            var j = i + 2
+            while (j + 1 <= n) {
+                if (prefix[j] == '$' && prefix[j + 1] == '$') {
+                    j += 2
+                    break
+                }
+                j++
+            }
+            while (j < n && prefix[j] == '\n') j++
+            emitBlock(j)
+            i = j
+            lineStart = i
+            continue
+        }
+
+        if (prefix[i] == '\n') {
+            val lineEnd = i
+            val lineLen = lineEnd - lineStart
+            val lineIsBlank = lineLen == 0
+
+            if (lineIsBlank) {
+                // Blank line = paragraph break. Emit everything up to
+                // and including this \n as a block; advance past any
+                // additional blank \n's (collapse them into the
+                // preceding block's terminator).
+                var end = i + 1
+                while (end < n && prefix[end] == '\n') end++
+                emitBlock(end)
+                i = end
+                lineStart = i
+                continue
+            }
+
+            // Non-blank line just completed.
+            val hasPipe = lineHasPipe(prefix, lineStart, lineEnd)
+            if (hasPipe) {
+                if (runStart < 0) {
+                    runStart = lineStart
+                    runLineCount = 1
+                    runAllHavePipe = true
+                } else {
+                    runLineCount += 1
+                }
+                if (runLineCount == 2) {
+                    runSeparatorMatches =
+                        lineLooksLikeTableSeparator(prefix, lineStart, lineEnd)
+                }
+            } else {
+                // Non-pipe line ends any in-progress table run. If the
+                // run was a complete table (≥3 lines, separator on
+                // line 2), emit the table as its own block — without
+                // including this current non-pipe line. The non-pipe
+                // line starts a new prose run.
+                if (runLineCount >= 3 && runAllHavePipe && runSeparatorMatches) {
+                    emitBlock(lineStart)
+                }
+                runStart = -1
+                runLineCount = 1
+                runAllHavePipe = false
+                runSeparatorMatches = false
+            }
+
+            lineStart = i + 1
+            i++
+            continue
+        }
+
+        i++
+    }
+
+    // Tail of the prefix: handle the case where a complete table is
+    // followed by a non-pipe prose line that has no terminating \n
+    // (the prose line is the LAST committed line in the prefix). We
+    // need to detect "current line has started but isn't terminated,
+    // and the run before it is a complete table" and split there.
+    //
+    // The boundary detector commits at lineStart for this case, so
+    // the prefix DOES end with a partial-but-committed prose line. We
+    // mirror that here: if there's a complete table run still active
+    // AND there's content past the last \n that doesn't have pipes,
+    // emit the table as its own block before the EOF emit.
+    if (lineStart > blockStart && lineStart < n) {
+        // There's content past the last \n — check if it's pipe-free.
+        var hasPipeInTail = false
+        for (j in lineStart until n) {
+            if (prefix[j] == '|') { hasPipeInTail = true; break }
+            if (prefix[j] == '\n') break
+        }
+        if (!hasPipeInTail &&
+            runLineCount >= 3 && runAllHavePipe && runSeparatorMatches
+        ) {
+            emitBlock(lineStart)
+        }
+    }
+
+    // Tail of the prefix: emit anything left as a final block. The
+    // boundary detector's contract means this is always a complete
+    // paragraph or complete table; we don't need to handle in-flight
+    // partial structures here (those live in the tail, not the prefix).
+    if (blockStart < n) {
+        emitBlock(n)
+    }
+
+    return blocks
 }
