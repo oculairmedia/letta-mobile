@@ -1247,11 +1247,27 @@ class AdminChatViewModel @Inject constructor(
                             },
                             transform = { existing ->
                                 val prior = existing.reasoningContent.orEmpty()
+                                // letta-mobile-wucn (timeline reasoning port):
+                                // same near-snapshot defense as the
+                                // assistant branch. Reasoning content is
+                                // also subject to server normalization.
                                 val merged = when {
                                     delta.isEmpty() -> prior
                                     delta == prior -> prior
                                     delta.startsWith(prior) -> delta
                                     prior.startsWith(delta) -> prior
+                                    delta.length >= 32 &&
+                                        delta.length >= prior.length / 2 -> {
+                                        android.util.Log.w(
+                                            "AdminChatViewModel",
+                                            "wucn-snapshot-recovery (timeline reasoning): " +
+                                                "chunk shaped like snapshot but failed strict " +
+                                                "prefix check. prior.len=${prior.length} " +
+                                                "chunk.len=${delta.length} localId=$localId. " +
+                                                "Falling back to longer-string replacement.",
+                                        )
+                                        if (delta.length >= prior.length) delta else prior
+                                    }
                                     else -> prior + delta
                                 }
                                 existing.copy(
@@ -1267,6 +1283,24 @@ class AdminChatViewModel @Inject constructor(
             BotStreamEvent.TOOL_CALL,
             BotStreamEvent.TOOL_RESULT,
             -> {
+                // letta-mobile-lv3e (audit): wire contract for tool_call /
+                // tool_result is SNAPSHOT-shaped (NOT delta), unlike the
+                // assistant/reasoning text streams. The lettabot WS gateway
+                // (ws-gateway.ts:330-370) accumulates tool_call argument
+                // deltas server-side and flushes ONE complete tool_call
+                // event with fully-merged `toolInput` per tool invocation.
+                // tool_result is similarly emitted as a single frame with
+                // the complete `content` payload.
+                //
+                // Replace-not-append semantics here are correct given that
+                // contract: each frame fully describes the tool call. If
+                // the gateway ever changes to stream tool_input deltas
+                // directly (without server-side accumulation), this
+                // transform would silently keep only the LAST non-blank
+                // toolInput — same shape as the vu6a bug. The
+                // `arguments.ifBlank { existing }` fallback below preserves
+                // prior args if a follow-up frame omits them, which is
+                // the only documented variation.
                 val toolCallId = chunk.toolCallId ?: chunk.uuid ?: return
                 val localId = "cm-tool-$toolCallId"
                 val toolName = chunk.toolName ?: "tool"
@@ -1357,10 +1391,33 @@ class AdminChatViewModel @Inject constructor(
                                 // cumulative snapshot (full text starts with
                                 // what we already have), don't double-concat.
                                 // Mirrors TimelineSyncLoop:1132-1138 logic.
+                                //
+                                // letta-mobile-wucn (timeline-path port):
+                                // server-side normalization (whitespace,
+                                // quote/punctuation rewrites) can produce a
+                                // near-snapshot chunk that fails the strict
+                                // prefix check. Without this guard the
+                                // bubble doubles. Same heuristic as the
+                                // legacy path: a chunk that's >= 32 chars
+                                // AND >= 50% of existing length is
+                                // overwhelmingly more likely a snapshot
+                                // than a real append — pick the longer.
                                 val merged = when {
                                     delta == existing.content -> existing.content
                                     delta.startsWith(existing.content) -> delta
                                     existing.content.startsWith(delta) -> existing.content
+                                    delta.length >= 32 &&
+                                        delta.length >= existing.content.length / 2 -> {
+                                        android.util.Log.w(
+                                            "AdminChatViewModel",
+                                            "wucn-snapshot-recovery (timeline): chunk shaped " +
+                                                "like snapshot but failed strict prefix check. " +
+                                                "existing.len=${existing.content.length} " +
+                                                "chunk.len=${delta.length} localId=$localId. " +
+                                                "Falling back to longer-string replacement.",
+                                        )
+                                        if (delta.length >= existing.content.length) delta else existing.content
+                                    }
                                     else -> existing.content + delta
                                 }
                                 existing.copy(
