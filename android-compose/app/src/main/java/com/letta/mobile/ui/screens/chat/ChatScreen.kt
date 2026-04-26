@@ -45,6 +45,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.CompositionLocalProvider
 import com.letta.mobile.ui.theme.LocalChatIsPinching
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -249,6 +251,20 @@ private fun ChatContent(
     // 2-finger event in a gesture until the user lifts.
     var isPinching by remember { mutableStateOf(false) }
 
+    // letta-mobile-5e0f.r3: GPU-only visual scale applied via
+    // Modifier.graphicsLayer during the pinch gesture. We no longer
+    // mutate fontScale on every quantized step (r2's "continuous reflow"
+    // approach) — that recomposed the entire chat tree at gesture rate
+    // (~5–10 fontScale changes/sec × every Text reading LocalChatTypography
+    // × cascading height interpolations) which produced the high-frequency
+    // strobe Emmanuel reported. Instead the chat list scales as a single
+    // GPU layer (zero recomposition, zero re-measure, zero re-layout)
+    // and we commit one true font-scale reflow on lift. Bias: smoothness
+    // > pixel-perfect text shaping mid-gesture. Accepted UX trade-off:
+    // a tiny snap on release as the layer rasters at scale 1.0 but
+    // typography re-flows to the committed scale.
+    var transientPinchScale by remember { mutableFloatStateOf(1f) }
+
     LaunchedEffect(pinchTick) {
         if (pinchTick > 0) {
             showFontIndicator = true
@@ -402,34 +418,54 @@ private fun ChatContent(
                 modifier = Modifier
                     .weight(1f)
                     .pointerInput(Unit) {
-                        // letta-mobile-5e0f.r2: continuous reflow pinch.
-                        // We push every quantized fontScale change through
-                        // to the theme as the user pinches — the chat
-                        // tree truly re-flows at gesture rate. The earlier
-                        // graphicsLayer band-aid is gone; smoothness is
-                        // now achieved by:
-                        //   1. ChatTypography is memoized per fontScale in
-                        //      LettaChatTheme so identical values reuse
-                        //      the same TextStyle instances.
-                        //   2. LocalChatTypography / LocalChatFontScale
-                        //      use compositionLocalOf (not static) so
-                        //      Compose can structural-equality-skip
-                        //      readers whose inputs didn't change.
-                        //   3. LocalChatIsPinching=true suppresses the
-                        //      four animateContentSize sites in the chat
-                        //      tree so we don't get cascading 150ms
-                        //      height interpolations across many bubbles
-                        //      per pinch frame.
+                        // letta-mobile-5e0f.r3: GPU-only pinch.
                         //
-                        // Quantization: 2% steps so we recompose only on
-                        // visible changes (~45 steps across 0.7..1.6),
-                        // not on every pointer frame.
-                        val step = 0.02f
+                        // Why this approach: r2 tried "continuous reflow"
+                        // (push fontScale to the theme on every quantized
+                        // 2% step). Even with memoized ChatTypography +
+                        // compositionLocalOf + animateContentSize gating,
+                        // every fontScale tick re-measured every Text in
+                        // every visible bubble at a new size — and on a
+                        // device with markdown/code blocks/tool cards
+                        // that's a measurable repaint. At 5–10 ticks/sec
+                        // the result was the high-frequency strobe
+                        // Emmanuel reported.
+                        //
+                        // r3 fix: during the gesture we ONLY mutate
+                        // transientPinchScale, which is wired to a single
+                        // Modifier.graphicsLayer { scaleX/scaleY } on the
+                        // chat-list Box. graphicsLayer is GPU compositor
+                        // work — no recomposition, no remeasure, no
+                        // relayout, no Text re-shaping. The chat scales
+                        // as a single textured layer at native frame
+                        // rate.
+                        //
+                        // On gesture commit (lift) we:
+                        //   1. Compute the final snapped fontScale.
+                        //   2. Push it through onActiveFontScaleChange
+                        //      so the theme reflows ONCE.
+                        //   3. Reset transientPinchScale to 1f in the
+                        //      same recomposition so the layer un-scales
+                        //      as the new typography lays out — a single
+                        //      visible "snap" instead of 45 stuttering
+                        //      reflows.
+                        //
+                        // Trade-off: mid-gesture the text is rastered at
+                        // scale 1.0 and stretched, so glyphs are slightly
+                        // softer than a true reflow would render. This is
+                        // the same trade-off iOS Mail / Messages / Slack
+                        // make. Accepted in exchange for smoothness.
                         awaitEachGesture {
                             awaitFirstDown(requireUnconsumed = false)
                             var gesturePinching = false
-                            var rawScale = activeFontScale
-                            var committedScale = activeFontScale
+                            // The committed (already-applied to theme) scale
+                            // at the start of the gesture. The visual layer
+                            // multiplies further pinch deltas on top.
+                            val baseScale = activeFontScale
+                            // Live raw zoom accumulator — drives the
+                            // graphicsLayer directly so the user sees
+                            // every pointer frame.
+                            var liveZoom = 1f
                             do {
                                 val event = awaitPointerEvent(PointerEventPass.Initial)
                                 val activePointers = event.changes.filter { it.pressed }
@@ -442,24 +478,31 @@ private fun ChatContent(
                                     val zoom = event.calculateZoom()
                                     if (zoom != 1f) {
                                         event.changes.forEach { it.consume() }
-                                        rawScale = (rawScale * zoom).coerceIn(0.7f, 1.6f)
-                                        val snapped = (kotlin.math.round(rawScale / step) * step)
-                                            .coerceIn(0.7f, 1.6f)
-                                        if (snapped != committedScale) {
-                                            committedScale = snapped
-                                            onActiveFontScaleChange(snapped)
-                                        }
+                                        liveZoom *= zoom
+                                        // Clamp the visual layer to the
+                                        // committable range (relative to
+                                        // baseScale) so the user can't
+                                        // scale past what we'll snap to.
+                                        val targetScale = (baseScale * liveZoom).coerceIn(0.7f, 1.6f)
+                                        liveZoom = targetScale / baseScale
+                                        transientPinchScale = liveZoom
                                     }
                                 }
                             } while (event.changes.any { it.pressed })
                             if (gesturePinching) {
-                                // Refresh indicator timer at gesture end
-                                // so it hides 1s after the user lifts,
-                                // not mid-pinch. Persist the committed
-                                // scale to the ViewModel here (not on
-                                // every step) to avoid repository churn.
+                                // Snap to 2% step on commit. Quantization
+                                // happens once on lift — not 45 times
+                                // during the gesture.
+                                val step = 0.02f
+                                val finalRaw = (baseScale * liveZoom).coerceIn(0.7f, 1.6f)
+                                val snapped = (kotlin.math.round(finalRaw / step) * step)
+                                    .coerceIn(0.7f, 1.6f)
+                                // Atomic-ish flip: theme + scale layer
+                                // reset in the same recomposition pass.
+                                onActiveFontScaleChange(snapped)
+                                onFontScaleChange(snapped)
+                                transientPinchScale = 1f
                                 pinchTick = System.nanoTime()
-                                onFontScaleChange(committedScale)
                                 isPinching = false
                             }
                         }
@@ -475,6 +518,23 @@ private fun ChatContent(
                     // gutters so bubbles don't kiss the screen edge.
                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
                     reverseLayout = true,
+                    // letta-mobile-5e0f.r3: GPU-only pinch scale. During
+                    // a pinch gesture transientPinchScale ranges 0.7..1.6
+                    // (relative to the committed fontScale baseline) and
+                    // is rendered as a single uniform layer transform.
+                    // At rest it's exactly 1f and graphicsLayer becomes
+                    // a no-op (Compose elides identity transforms). The
+                    // transformOrigin is the visual centre of the list
+                    // so pinch feels like it's happening at the focal
+                    // point of the user's fingers (close enough — true
+                    // focal-point scaling would require tracking the
+                    // gesture centroid; this is the standard messaging
+                    // app behaviour and feels natural).
+                    modifier = Modifier.graphicsLayer {
+                        scaleX = transientPinchScale
+                        scaleY = transientPinchScale
+                        transformOrigin = TransformOrigin(0.5f, 0.5f)
+                    },
                 ) {
                     if (state.isStreaming) {
                         item(key = "typing") {

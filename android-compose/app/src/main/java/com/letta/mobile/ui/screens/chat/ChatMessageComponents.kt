@@ -7,6 +7,8 @@ import android.os.Build
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -219,9 +221,32 @@ private fun MessageBubbleSurface(
     val renderer = remember(message.role, message.toolCalls, message.generatedUi) { resolveRenderer(message) }
     val bubbleLess = message.shouldRenderBubbleLess()
 
+    // letta-mobile-d2z6.s1 (Emmanuel 2026-04-26 01:28 EDT): ease bubble
+    // height growth as streaming chunks land. Short 60ms LinearEasing
+    // tween — fast enough that successive chunks (typically 80–150ms
+    // apart) don't stack into compounding wobble, but long enough that
+    // the user's eye perceives "growing" rather than "popping".
+    //
+    // Pinch suppresses the animation entirely (avoids height-interp
+    // cascades across many bubbles during the gesture, see
+    // letta-mobile-5e0f).
+    //
+    // Non-streaming, non-pinching bubbles get NO animateContentSize on
+    // the Surface itself — historically that fought with the per-bubble
+    // collapse/reasoning animations downstream. The Surface stays
+    // size-stable; only mid-stream growth is animated.
+    val isPinchingForBubble = LocalChatIsPinching.current
+    val bubbleSizeAnimation = if (isLastAssistant && !isPinchingForBubble) {
+        Modifier.animateContentSize(
+            animationSpec = tween(durationMillis = 60, easing = LinearEasing),
+        )
+    } else {
+        Modifier
+    }
+
     val contentColumn: @Composable () -> Unit = {
         Column(
-            modifier = if (bubbleLess) {
+            modifier = (if (bubbleLess) {
                 // No surface chrome → no horizontal padding; the message
                 // list's own contentPadding is the only side gutter.
                 Modifier.padding(vertical = dimens.bubblePaddingVertical)
@@ -230,7 +255,7 @@ private fun MessageBubbleSurface(
                     horizontal = dimens.bubblePaddingHorizontal,
                     vertical = dimens.bubblePaddingVertical,
                 )
-            },
+            }).then(bubbleSizeAnimation),
             verticalArrangement = Arrangement.spacedBy(dimens.messageSpacing),
         ) {
             // Suppress the role label header for bubble-less assistant prose
@@ -539,22 +564,37 @@ internal fun MessageReasoning(
 
     // letta-mobile-d2z6: gate animateContentSize on !isStreaming. While
     // assistant tokens are arriving the reasoning bubble grows on every
-    // frame; animating that growth produces visible wobble that compounds
-    // with the RunBlock layout. The animation is still useful for the
-    // user-initiated collapse/expand toggle (which only fires when the
-    // run is no longer streaming), so we keep it gated rather than
-    // removing it outright.
+    // frame; the default 150ms FastOutSlowIn animation produces visible
+    // wobble that compounds with the RunBlock layout. The animation is
+    // still useful for the user-initiated collapse/expand toggle, so we
+    // keep it gated rather than removing it outright.
     //
     // letta-mobile-5e0f.r2: also suppress during pinch-to-zoom so we
     // don't get height-interpolation cascades across many bubbles per
     // pinch frame.
+    //
+    // letta-mobile-d2z6.s1 (Emmanuel 2026-04-26 01:28 EDT — "add easing
+    // to the chunks coming on so it's smoother"): instead of fully
+    // suppressing the animation while streaming, swap to a SHORT linear
+    // tween (60ms) that's faster than typical token inter-arrival
+    // (~80–150ms). Each chunk's height delta interpolates briefly
+    // instead of snapping in, but the spec is short enough that
+    // successive chunks don't stack into compounding wobble — the
+    // animation always finishes (or near-finishes) before the next
+    // chunk arrives. The collapse/expand toggle keeps the default
+    // (longer, eased) spec by virtue of the !isStreaming branch.
     val isPinching = LocalChatIsPinching.current
+    val sizeAnimation = when {
+        isPinching -> Modifier
+        isStreaming -> Modifier.animateContentSize(
+            animationSpec = tween(durationMillis = 60, easing = LinearEasing),
+        )
+        else -> Modifier.animateContentSize()
+    }
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .then(
-                if (isStreaming || isPinching) Modifier else Modifier.animateContentSize(),
-            )
+            .then(sizeAnimation)
             .padding(vertical = 4.dp),
     ) {
         Row(
