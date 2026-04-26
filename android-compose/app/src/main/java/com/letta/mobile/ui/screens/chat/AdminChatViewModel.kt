@@ -1283,6 +1283,24 @@ class AdminChatViewModel @Inject constructor(
             BotStreamEvent.TOOL_CALL,
             BotStreamEvent.TOOL_RESULT,
             -> {
+                // letta-mobile-lv3e (audit): wire contract for tool_call /
+                // tool_result is SNAPSHOT-shaped (NOT delta), unlike the
+                // assistant/reasoning text streams. The lettabot WS gateway
+                // (ws-gateway.ts:330-370) accumulates tool_call argument
+                // deltas server-side and flushes ONE complete tool_call
+                // event with fully-merged `toolInput` per tool invocation.
+                // tool_result is similarly emitted as a single frame with
+                // the complete `content` payload.
+                //
+                // Replace-not-append semantics here are correct given that
+                // contract: each frame fully describes the tool call. If
+                // the gateway ever changes to stream tool_input deltas
+                // directly (without server-side accumulation), this
+                // transform would silently keep only the LAST non-blank
+                // toolInput — same shape as the vu6a bug. The
+                // `arguments.ifBlank { existing }` fallback below preserves
+                // prior args if a follow-up frame omits them, which is
+                // the only documented variation.
                 val toolCallId = chunk.toolCallId ?: chunk.uuid ?: return
                 val localId = "cm-tool-$toolCallId"
                 val toolName = chunk.toolName ?: "tool"

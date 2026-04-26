@@ -50,6 +50,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -782,35 +786,27 @@ class AdminChatViewModelTest {
 
     /**
      * letta-mobile-lv3e: golden trace from a real lettabot WS session.
-     * 12 fragments captured via `:cli:run wsstream`; concatenated they
-     * form the assertion. Catches regressions where a refactor breaks
-     * concatenation for the actual wire shape.
+     * 58 fragments captured via `:cli:run wsstream` (see
+     * `app/src/test/resources/wsstream-golden-lv3e.json`); concatenated
+     * they reproduce the original assistant message. Catches regressions
+     * where a refactor breaks concatenation for the actual wire shape
+     * (markdown, code fences, multi-line punctuation, embedded backticks).
+     *
+     * The same fixture is exercised at the wire level by
+     * `WsBotClientLifecycleTest` ("real captured wsstream trace ..."), so
+     * end-to-end the gateway → WsBotClient → VM merge path is covered.
      */
     @Test
     fun `client mode reproduces real wsstream golden trace`() = runTest {
         clientModeEnabledFlow.value = true
-        val fragments = listOf(
-            "Sure",
-            ", here",
-            "'s a haiku",
-            " about coroutines",
-            ":\n\n",
-            "Suspended threads",
-            " — flow returns",
-            "\nasynchrony",
-            ", awaited",
-            ".\n\nThanks",
-            "!",
-            "",  // terminal-shape no-text frame
-        )
+        val (fragments, expected) = loadWsstreamGoldenFragments()
         every {
             clientModeChatSender.streamMessage(any(), any(), any(), any())
         } returns flow {
-            fragments.forEachIndexed { i, frag ->
-                if (frag.isNotEmpty()) {
-                    emit(BotStreamChunk(text = frag, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
-                }
+            fragments.forEach { frag ->
+                emit(BotStreamChunk(text = frag, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
             }
+            // Terminal frame carries no text — must not clobber.
             emit(BotStreamChunk(conversationId = "client-conv", done = true))
         }
 
@@ -821,7 +817,7 @@ class AdminChatViewModelTest {
 
         val assistant = vm.uiState.value.messages.lastOrNull { it.role == "assistant" }
         assertNotNull(assistant)
-        assertEquals(fragments.joinToString(""), assistant!!.content)
+        assertEquals(expected, assistant!!.content)
     }
 
     /**
@@ -857,6 +853,92 @@ class AdminChatViewModelTest {
             "Let me think",
             reasoning!!.content,
         )
+    }
+
+    /**
+     * letta-mobile-lv3e (audit acceptance #4 — tool-call wire contract):
+     *
+     * The gateway accumulates `tool_call` argument deltas server-side
+     * (ws-gateway.ts:330-370) and emits exactly ONE frame per tool
+     * invocation with fully-merged `toolInput`. tool_result is similarly
+     * emitted as a single frame. Therefore the VM uses replace-not-append
+     * semantics for tool args / results — opposite of the assistant text
+     * stream.
+     *
+     * This test pins that contract: a single TOOL_CALL frame with full
+     * args followed by a single TOOL_RESULT frame produces a tool card
+     * whose `arguments` matches the original JSON verbatim and whose
+     * `result` matches the gateway's `text` payload. Interleaved with
+     * an assistant text stream that uses delta semantics, the two paths
+     * must not bleed into each other.
+     *
+     * Regression guard: if a future refactor accidentally applies the
+     * lv3e append-semantics fix to the tool-call branch, the args field
+     * would double-concatenate any subsequent metadata frame and break
+     * tool argument display. If the gateway is ever changed to stream
+     * tool_input deltas instead of accumulating, this test will start
+     * passing trivially and must be revisited.
+     */
+    @Test
+    fun `tool-call arguments are surfaced verbatim from a single snapshot-shaped frame (lv3e audit)`() = runTest {
+        clientModeEnabledFlow.value = true
+        val argsJson = kotlinx.serialization.json.buildJsonObject {
+            put("query", kotlinx.serialization.json.JsonPrimitive("kotlin coroutines"))
+            put("limit", kotlinx.serialization.json.JsonPrimitive(5))
+        }
+        every {
+            clientModeChatSender.streamMessage(any(), any(), any(), any())
+        } returns flow {
+            // Interleaved with delta-shaped assistant text — the two
+            // wire shapes must not interfere with each other.
+            emit(BotStreamChunk(text = "Looking", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            emit(BotStreamChunk(text = " up", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            // SINGLE tool_call frame carrying complete arguments.
+            emit(
+                BotStreamChunk(
+                    event = BotStreamEvent.TOOL_CALL,
+                    toolName = "search",
+                    toolCallId = "call-audit",
+                    toolInput = argsJson,
+                    conversationId = "client-conv",
+                )
+            )
+            // SINGLE tool_result frame carrying complete result.
+            emit(
+                BotStreamChunk(
+                    event = BotStreamEvent.TOOL_RESULT,
+                    toolName = "search",
+                    toolCallId = "call-audit",
+                    text = "5 results found",
+                    isError = false,
+                    conversationId = "client-conv",
+                )
+            )
+            emit(BotStreamChunk(text = "...", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            emit(BotStreamChunk(conversationId = "client-conv", done = true))
+        }
+
+        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
+        advanceUntilIdle()
+        vm.sendMessage("search kotlin")
+        advanceUntilIdle()
+
+        val toolMessage = vm.uiState.value.messages.firstOrNull { !it.toolCalls.isNullOrEmpty() }
+        assertNotNull("tool card must be rendered", toolMessage)
+        val tc = toolMessage!!.toolCalls!!.single()
+        assertEquals("search", tc.name)
+        // Arguments are the verbatim JSON object stringification — NOT
+        // doubled, NOT empty, NOT concatenated with the assistant deltas.
+        assertEquals(argsJson.toString(), tc.arguments)
+        assertEquals("5 results found", tc.result)
+
+        // Assistant deltas concatenate independently, unaffected by the
+        // tool frames in between.
+        val assistant = vm.uiState.value.messages.firstOrNull {
+            it.role == "assistant" && it.toolCalls.isNullOrEmpty() && it.content.isNotEmpty()
+        }
+        assertNotNull("assistant text bubble must be rendered alongside tool card", assistant)
+        assertEquals("Looking up...", assistant!!.content)
     }
 
     /**
@@ -1671,4 +1753,26 @@ class AdminChatViewModelTest {
             )
         }
     }
+}
+
+/**
+ * letta-mobile-lv3e: load the wsstream golden capture from
+ * `app/src/test/resources/wsstream-golden-lv3e.json`.
+ *
+ * Returns (fragments, joined). The fixture is captured via :cli:run wsstream
+ * against the live lettabot gateway (delta-shaped: each fragment is a NEW
+ * fragment, not a cumulative snapshot). The same fixture is also bundled
+ * with the bot module's tests for wire-level round-trip coverage.
+ */
+private fun loadWsstreamGoldenFragments(): Pair<List<String>, String> {
+    val stream = AdminChatViewModelTest::class.java.classLoader
+        ?.getResourceAsStream("wsstream-golden-lv3e.json")
+        ?: error(
+            "wsstream-golden-lv3e.json not on the test classpath — expected at " +
+                "android-compose/app/src/test/resources/wsstream-golden-lv3e.json",
+        )
+    val payload = stream.bufferedReader().use { it.readText() }
+    val obj = Json { ignoreUnknownKeys = true }.parseToJsonElement(payload).jsonObject
+    val fragments = obj["fragments"]!!.jsonArray.map { it.jsonPrimitive.content }
+    return fragments to fragments.joinToString("")
 }
