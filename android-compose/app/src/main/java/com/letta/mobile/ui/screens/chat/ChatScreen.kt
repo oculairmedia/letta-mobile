@@ -5,7 +5,11 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -99,7 +103,22 @@ fun ChatScreen(
             viewModel.clearComposerError()
         }
 
-        Box(modifier = modifier.fillMaxSize().then(backgroundModifier).imePadding()) {
+        // letta-mobile-6vsx: use union(ime, navigationBars) instead of
+        // bare imePadding() so the bottom inset is min-floored at nav-bar
+        // height. With enableEdgeToEdge() + windowSoftInputMode=adjustNothing,
+        // bare imePadding() lets the composer animate down to the absolute
+        // screen bottom (under the nav bar) during the IME-hide animation,
+        // then snaps back up when an outer scaffold's nav-bar inset
+        // re-takes effect — the visible "drop then rise" symptom.
+        // With the union the IME animation interpolates between IME_height
+        // and nav_bar_height, never below, and the composer's resting
+        // position is correct from the very start of the hide animation.
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .then(backgroundModifier)
+                .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)),
+        ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // letta-mobile-c87t: surfaces a non-modal banner when the
                 // lettabot WS gateway substituted a fresh conversation for the
