@@ -1151,42 +1151,29 @@ class TimelineSyncLoop(
         if (existing != null) {
             val oldText = existing.content
             val newText = confirmed.content
-            // letta-mobile-wucn (round 2): defensive snapshot-recovery
-            // for the timeline-path SSE merge. Same root cause as the
-            // in-memory upsert reducer in AdminChatViewModel: when the
-            // gateway emits a closing/final assistant chunk whose content
-            // is a near-snapshot of the streamed accumulator but fails
-            // strict startsWith() (server-side normalization, smart-quote
-            // conversion, markdown re-serialization), the fall-through
-            // `else -> oldText + newText` concatenates the full final
-            // message onto its own accumulator → doubled bubble. This is
-            // the dominant render path once a conversation has an ID
-            // (the in-memory clientModeMessages path is only used pre-
-            // migration); the wucn fix in AdminChatViewModel did not
-            // protect this code, so the original bug persisted post-fix.
+            // letta-mobile (lettabot-uww.11 fix): the WS gateway emits
+            // assistant text as PURE DELTAS. Verified by the gateway's
+            // ws-gateway.e2e.test.ts § "assistant text reassembly"
+            // suite (37 byte-perfect reassembly cases including
+            // adversarial chunking, mermaid blocks, prefix-collision
+            // sequences, and unicode/emoji boundaries).
             //
-            // Guard: if newText is >= 32 chars AND >= 50% of oldText
-            // length, it's overwhelmingly more likely to be a snapshot
-            // than a true delta. Pick the longer string. Logs at WARN
-            // for next-repro forensics.
-            val mergedText = when {
-                newText.isEmpty() -> oldText
-                newText == oldText -> oldText
-                newText.startsWith(oldText) -> newText
-                oldText.startsWith(newText) -> oldText
-                newText.length >= 32 && newText.length >= oldText.length / 2 -> {
-                    android.util.Log.w(
-                        "TimelineSyncLoop",
-                        "wucn-snapshot-recovery: chunk shaped like snapshot but " +
-                            "failed strict prefix check. oldText.len=${oldText.length} " +
-                            "newText.len=${newText.length} serverId=${confirmed.serverId} " +
-                            "conversationId=$conversationId. Falling back to longer-" +
-                            "string replacement to avoid doubled-bubble.",
-                    )
-                    if (newText.length >= oldText.length) newText else oldText
-                }
-                else -> oldText + newText
-            }
+            // The previous wucn-snapshot-recovery cascade had two
+            // defects that silently corrupted user-visible text:
+            //   - `oldText.startsWith(newText)` dropped any delta
+            //     whose head matched a prefix of the accumulator
+            //     (frequent for repeated tokens / coalescer
+            //     boundaries). This produced silent character loss
+            //     such as the 2026-04-26 mermaid field repro
+            //     `A[LLM snapshots]` → `A[LLMapshots|`.
+            //   - the >=32-char "near-snapshot" branch replaced the
+            //     accumulator wholesale, destroying everything
+            //     before the incoming delta.
+            //
+            // The contract is delta-append. Trust it. If the gateway
+            // ever changes shape, the e2e tests will fail loudly
+            // before reaching the device.
+            val mergedText = if (newText.isEmpty()) oldText else oldText + newText
             // Merge toolCalls: a later delta frame may have null/blank
             // arguments but a still-valid name/id; keep whichever list has
             // more data. Specifically, prefer the list that has more calls

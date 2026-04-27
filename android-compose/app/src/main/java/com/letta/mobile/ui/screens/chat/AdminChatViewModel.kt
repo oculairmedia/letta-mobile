@@ -616,11 +616,28 @@ class AdminChatViewModel @Inject constructor(
                     // ever show in-memory bubbles and history wouldn't load.
                     //
                     // Resolution order: explicit nav arg → saved-state-handle
-                    // pointer. Fresh routes that haven't sent yet have neither
-                    // and stay on the in-memory path until the gateway
-                    // provides one (see sendMessageViaClientMode migration).
+                    // pointer → most-recent server-side conversation for this
+                    // agent (Client Mode default-load behavior). Fresh routes
+                    // — when the user explicitly opened a new conversation
+                    // (freshRouteKey set, or conversationId arg was blank) —
+                    // skip the recent-conversation fallback and stay on the
+                    // in-memory path until the gateway provides one (see
+                    // sendMessageViaClientMode migration). See
+                    // letta-mobile-c87t and the Apr 26 default-load change.
                     val clientConversationId = explicitConversationId
                         ?: currentClientModeConversationId()
+                        ?: if (!isFreshRoute) {
+                            runCatching {
+                                conversationManager.resolveAndSetActiveConversation(
+                                    agentId = agentId,
+                                    maxAgeMs = CONVERSATION_CACHE_TTL_MS,
+                                )
+                            }.getOrNull()?.also { resolved ->
+                                setClientModeConversationId(resolved)
+                            }
+                        } else {
+                            null
+                        }
                     currentConversationTracker.setCurrent(clientConversationId)
                     val agent = agentRepository.getCachedAgent(agentId)
                         ?: runCatching { agentRepository.getAgent(agentId).first() }.getOrNull()
@@ -1081,10 +1098,100 @@ class AdminChatViewModel @Inject constructor(
                                         conversationId = newConvId,
                                         content = text,
                                     )
-                                    // Drop the in-memory user bubble; the
-                                    // observer will render it as a Local.
+                                    // letta-mobile-flk.4: carry over any
+                                    // assistant content that the legacy
+                                    // in-memory path already accumulated
+                                    // BEFORE the gateway echoed conversationId.
+                                    // Without this, chunk #1's assistant
+                                    // delta lives only in clientModeMessages
+                                    // (now invisible because the observer
+                                    // takes over), and the timeline-path
+                                    // chunk #2 seeds a fresh assistant Local
+                                    // with only chunk #2's delta — visibly
+                                    // truncating the assistant reply by
+                                    // the leading characters and breaking
+                                    // markdown rendering when those leading
+                                    // chars contained markdown openers
+                                    // (`**`, `# `, ``` ``` `, etc.).
+                                    //
+                                    // We pre-seed the timeline assistant
+                                    // Local at the SAME localId the
+                                    // timeline path will use
+                                    // (`cm-assist-$assistantMessageId`)
+                                    // so the next chunk's transform sees
+                                    // the prior content and appends/merges
+                                    // correctly via the existing snapshot
+                                    // heuristics.
+                                    val carryover = clientModeMessages
+                                        .firstOrNull { it.id == assistantMessageId }
+                                    val carryoverContent = carryover?.content
+                                        ?.takeIf { it.isNotEmpty() }
+                                    if (carryoverContent != null) {
+                                        val carryoverLocalId =
+                                            "cm-assist-$assistantMessageId"
+                                        val carryoverSentAt = runCatching {
+                                            java.time.Instant.parse(startedAt)
+                                        }.getOrDefault(java.time.Instant.now())
+                                        timelineRepository
+                                            .upsertClientModeLocalAssistantChunk(
+                                                conversationId = newConvId,
+                                                localId = carryoverLocalId,
+                                                build = {
+                                                    com.letta.mobile.data
+                                                        .timeline.TimelineEvent
+                                                        .Local(
+                                                            position = 0.0,
+                                                            otid = carryoverLocalId,
+                                                            content = carryoverContent,
+                                                            role = com.letta
+                                                                .mobile.data.timeline
+                                                                .Role.ASSISTANT,
+                                                            sentAt = carryoverSentAt,
+                                                            deliveryState = com.letta
+                                                                .mobile.data.timeline
+                                                                .DeliveryState.SENT,
+                                                            source = com.letta
+                                                                .mobile.data.timeline
+                                                                .MessageSource
+                                                                .CLIENT_MODE_HARNESS,
+                                                            messageType = com.letta
+                                                                .mobile.data.timeline
+                                                                .TimelineMessageType
+                                                                .ASSISTANT,
+                                                        )
+                                                },
+                                                transform = { existing ->
+                                                    // letta-mobile (lettabot-uww.11):
+                                                    // idempotent migration
+                                                    // carryover. This is NOT
+                                                    // a stream-delta path —
+                                                    // both strings are the
+                                                    // same accumulated bubble
+                                                    // under retries, so equal
+                                                    // ⇒ keep, otherwise prefer
+                                                    // the longer of the two.
+                                                    // No append/concatenate
+                                                    // path — that would
+                                                    // double the bubble on
+                                                    // retry.
+                                                    val merged =
+                                                        if (carryoverContent.length >=
+                                                            existing.content.length
+                                                        ) carryoverContent
+                                                        else existing.content
+                                                    existing.copy(content = merged)
+                                                },
+                                            )
+                                    }
+                                    // Drop the in-memory bubbles; the
+                                    // observer will render the user bubble
+                                    // and (if carried over) assistant
+                                    // bubble as Locals.
                                     clientModeMessages = clientModeMessages
-                                        .filterNot { it.id == userMessageId }
+                                        .filterNot {
+                                            it.id == userMessageId ||
+                                                it.id == assistantMessageId
+                                        }
                                     startTimelineObserver(newConvId)
                                 }.onFailure { e ->
                                     android.util.Log.w(
@@ -1247,29 +1354,15 @@ class AdminChatViewModel @Inject constructor(
                             },
                             transform = { existing ->
                                 val prior = existing.reasoningContent.orEmpty()
-                                // letta-mobile-wucn (timeline reasoning port):
-                                // same near-snapshot defense as the
-                                // assistant branch. Reasoning content is
-                                // also subject to server normalization.
-                                val merged = when {
-                                    delta.isEmpty() -> prior
-                                    delta == prior -> prior
-                                    delta.startsWith(prior) -> delta
-                                    prior.startsWith(delta) -> prior
-                                    delta.length >= 32 &&
-                                        delta.length >= prior.length / 2 -> {
-                                        android.util.Log.w(
-                                            "AdminChatViewModel",
-                                            "wucn-snapshot-recovery (timeline reasoning): " +
-                                                "chunk shaped like snapshot but failed strict " +
-                                                "prefix check. prior.len=${prior.length} " +
-                                                "chunk.len=${delta.length} localId=$localId. " +
-                                                "Falling back to longer-string replacement.",
-                                        )
-                                        if (delta.length >= prior.length) delta else prior
-                                    }
-                                    else -> prior + delta
-                                }
+                                // letta-mobile (lettabot-uww.11 fix): reasoning
+                                // text is emitted by the gateway as PURE
+                                // DELTAS, same contract as assistant text.
+                                // The previous wucn-snapshot-recovery cascade
+                                // silently dropped chars on prefix collisions
+                                // and destructively replaced the accumulator
+                                // on >=32-char "near-snapshots". Trust the
+                                // contract and append.
+                                val merged = if (delta.isEmpty()) prior else prior + delta
                                 existing.copy(
                                     reasoningContent = merged,
                                     messageType = com.letta.mobile.data.timeline.TimelineMessageType.REASONING,
@@ -1387,41 +1480,32 @@ class AdminChatViewModel @Inject constructor(
                                 )
                             },
                             transform = { existing ->
-                                // Defensive: if the gateway ever DOES send a
-                                // cumulative snapshot (full text starts with
-                                // what we already have), don't double-concat.
-                                // Mirrors TimelineSyncLoop:1132-1138 logic.
+                                // letta-mobile (lettabot-uww.11 fix): the WS
+                                // gateway emits assistant text as PURE DELTAS
+                                // (verified by ws-gateway.e2e.test.ts §
+                                // "assistant text reassembly" — 37 byte-perfect
+                                // reassembly cases including adversarial
+                                // chunking, mermaid blocks, prefix-collision
+                                // sequences, and unicode/emoji boundaries).
                                 //
-                                // letta-mobile-wucn (timeline-path port):
-                                // server-side normalization (whitespace,
-                                // quote/punctuation rewrites) can produce a
-                                // near-snapshot chunk that fails the strict
-                                // prefix check. Without this guard the
-                                // bubble doubles. Same heuristic as the
-                                // legacy path: a chunk that's >= 32 chars
-                                // AND >= 50% of existing length is
-                                // overwhelmingly more likely a snapshot
-                                // than a real append — pick the longer.
-                                val merged = when {
-                                    delta == existing.content -> existing.content
-                                    delta.startsWith(existing.content) -> delta
-                                    existing.content.startsWith(delta) -> existing.content
-                                    delta.length >= 32 &&
-                                        delta.length >= existing.content.length / 2 -> {
-                                        android.util.Log.w(
-                                            "AdminChatViewModel",
-                                            "wucn-snapshot-recovery (timeline): chunk shaped " +
-                                                "like snapshot but failed strict prefix check. " +
-                                                "existing.len=${existing.content.length} " +
-                                                "chunk.len=${delta.length} localId=$localId. " +
-                                                "Falling back to longer-string replacement.",
-                                        )
-                                        if (delta.length >= existing.content.length) delta else existing.content
-                                    }
-                                    else -> existing.content + delta
-                                }
+                                // The previous wucn-snapshot-recovery cascade
+                                // had two defects that silently dropped or
+                                // destroyed user-visible characters:
+                                //   - `existing.content.startsWith(delta)`
+                                //     dropped any delta whose head matched
+                                //     a prefix of the accumulator (frequent
+                                //     for repeated tokens / coalescer
+                                //     boundaries).
+                                //   - the >=32-char "near-snapshot" branch
+                                //     replaced the accumulator wholesale,
+                                //     destroying everything before the
+                                //     incoming delta.
+                                // Together they produced the field repro
+                                // `A[LLM snapshots]` → `A[LLMapshots|`.
+                                //
+                                // The contract is delta-append. Trust it.
                                 existing.copy(
-                                    content = merged,
+                                    content = existing.content + delta,
                                     messageType = com.letta.mobile.data.timeline.TimelineMessageType.ASSISTANT,
                                 )
                             },
@@ -1482,13 +1566,11 @@ class AdminChatViewModel @Inject constructor(
                     timestamp = timestamp,
                 ) { existing ->
                     val prior = existing?.content.orEmpty()
-                    val merged = when {
-                        delta.isEmpty() -> prior
-                        delta == prior -> prior
-                        delta.startsWith(prior) -> delta
-                        prior.startsWith(delta) -> prior
-                        else -> prior + delta
-                    }
+                    // letta-mobile (lettabot-uww.11 fix): reasoning text is
+                    // emitted as PURE DELTAS, same contract as assistant
+                    // text. The previous prefix-collision guard silently
+                    // dropped chars; trust the contract and append.
+                    val merged = if (delta.isEmpty()) prior else prior + delta
                     (existing ?: UiMessage(
                         id = messageId,
                         role = "assistant",
@@ -1568,58 +1650,26 @@ class AdminChatViewModel @Inject constructor(
             timestamp = timestamp,
         ) { existing ->
             if (existing != null) {
-                // letta-mobile-lv3e: when append=true, defend against the
-                // gateway ever switching back to cumulative-snapshot shape
-                // — same heuristic TimelineSyncLoop:1132-1138 uses for the
-                // SSE merge.
+                // letta-mobile (lettabot-uww.11 fix): when append=true,
+                // the WS gateway emits assistant text as PURE DELTAS.
+                // Verified by ws-gateway.e2e.test.ts § "assistant text
+                // reassembly" (37 byte-perfect reassembly cases).
                 //
-                // letta-mobile-wucn: harden the heuristic. Observed bug:
-                // bubble rendered final message twice (byte-for-byte
-                // identical content concatenated to itself in a single
-                // UiMessage). Root cause inferred: gateway emitted a
-                // closing/final assistant chunk whose content was a
-                // near-snapshot of the streamed accumulator but failed
-                // strict prefix check (e.g. server-side whitespace or
-                // quote normalization). The strict startsWith branches
-                // missed it and we fell through to existing.content +
-                // content = doubled bubble.
+                // The previous wucn-snapshot-recovery cascade had two
+                // defects that silently corrupted user-visible text:
+                //   - `existing.content.startsWith(content)` dropped
+                //     any delta whose head matched a prefix of the
+                //     accumulator (frequent for repeated tokens /
+                //     coalescer boundaries).
+                //   - the >=32-char "near-snapshot" branch replaced
+                //     the accumulator wholesale, destroying everything
+                //     before the incoming delta.
+                // Together they produced the field repro
+                // `A[LLM snapshots]` → `A[LLMapshots|`.
                 //
-                // New defensive rule: if the incoming `content`'s length
-                // is >= 50% of `existing.content` length AND >= 32 chars,
-                // treat it as a snapshot replacement candidate, not a
-                // delta. True streaming deltas are always small (single
-                // token, typically < 50 chars). A "delta" that's half
-                // the size of everything we've accumulated so far is
-                // overwhelmingly more likely a snapshot than a real
-                // append. Picking max(existing.content, content) is the
-                // safe replacement — never loses content, never doubles.
+                // The contract is delta-append. Trust it.
                 val merged = if (append) {
-                    when {
-                        content.isEmpty() -> existing.content
-                        content == existing.content -> existing.content
-                        content.startsWith(existing.content) -> content
-                        existing.content.startsWith(content) -> existing.content
-                        // wucn defensive: snapshot-shaped chunk with
-                        // mid-string divergence (e.g. server-normalized
-                        // punctuation). Prefer the longer string; never
-                        // concatenate a near-snapshot onto its own
-                        // accumulator.
-                        content.length >= 32 &&
-                            content.length >= existing.content.length / 2 -> {
-                            android.util.Log.w(
-                                "AdminChatViewModel",
-                                "wucn-snapshot-recovery: chunk shaped " +
-                                    "like snapshot but failed strict prefix " +
-                                    "check. existing.len=${existing.content.length} " +
-                                    "chunk.len=${content.length} " +
-                                    "messageId=$messageId. Falling back to " +
-                                    "longer-string replacement to avoid " +
-                                    "doubled-bubble.",
-                            )
-                            if (content.length >= existing.content.length) content else existing.content
-                        }
-                        else -> existing.content + content
-                    }
+                    if (content.isEmpty()) existing.content else existing.content + content
                 } else content
                 existing.copy(content = merged)
             } else {

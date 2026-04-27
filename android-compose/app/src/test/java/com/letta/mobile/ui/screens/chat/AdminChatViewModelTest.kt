@@ -433,7 +433,12 @@ class AdminChatViewModelTest {
                 forceFreshConversation = any(),
             )
         } returns flow {
-            emit(BotStreamChunk(text = "Hel", conversationId = "client-conv"))
+            // letta-mobile (lettabot-uww.11): WS gateway emits PURE DELTAS.
+            // This test verifies routing through the client-mode sender,
+            // not merge semantics; emit a single delta that already reads
+            // as the final bubble content so the assertion below stays
+            // focused on routing. Adversarial multi-delta merge coverage
+            // lives in the byte-perfect reassembly tests below.
             emit(BotStreamChunk(text = "Hello from client mode", conversationId = "client-conv", done = true))
         }
 
@@ -460,6 +465,54 @@ class AdminChatViewModelTest {
         assertEquals(2, vm.uiState.value.messages.size)
         assertEquals("Hello from client mode", vm.uiState.value.messages.last().content)
         assertFalse(vm.uiState.value.isStreaming)
+    }
+
+    /**
+     * Apr 26 default-load: when entering an agent chat in Client Mode without
+     * an explicit conversationId nav arg and without a freshRouteKey, the VM
+     * should resolve the agent's most-recent server-side conversation and
+     * land the user there (rather than starting on an empty NoConversation
+     * screen). Fresh routes (`freshRouteKey != null`) keep their "new
+     * conversation" semantics.
+     */
+    @Test
+    fun `client mode resolves to most recent conversation when no nav arg and not fresh`() = runTest {
+        clientModeEnabledFlow.value = true
+
+        val vm = createViewModel(conversationId = null, freshRouteKey = null)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) {
+            conversationManager.resolveAndSetActiveConversation(
+                agentId = "agent-1",
+                maxAgeMs = any(),
+            )
+        }
+        assertEquals(
+            ConversationState.Ready("conv-1"),
+            vm.uiState.value.conversationState,
+        )
+    }
+
+    /**
+     * Apr 26 default-load: a fresh route (`freshRouteKey != null`) must NOT
+     * trigger the most-recent fallback in Client Mode — the user explicitly
+     * chose to start a new conversation, so we keep the in-memory path.
+     */
+    @Test
+    fun `client mode does not resolve recent conversation on fresh route`() = runTest {
+        clientModeEnabledFlow.value = true
+
+        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) {
+            conversationManager.resolveAndSetActiveConversation(any(), any())
+        }
+        assertEquals(
+            ConversationState.NoConversation,
+            vm.uiState.value.conversationState,
+        )
     }
 
     @Test
@@ -615,12 +668,32 @@ class AdminChatViewModelTest {
                 forceFreshConversation = any(),
             )
         } returns flow {
-            // Chunk #1 — gateway hasn't echoed conversationId yet.
+            // letta-mobile-flk.4 regression repro: realistic DELTA wire
+            // shape (each frame contributes a NEW fragment, not a
+            // cumulative snapshot — verified against the live lettabot WS
+            // gateway). Earlier this test used snapshot-shape data
+            // ["Hel","Hello","Hello world"] which masked the migration
+            // carry-over bug because chunks #2/#3 happened to be
+            // prefix-shaped relative to the timeline's seed-from-chunk-#2
+            // content. With genuine delta shape, the absence of carry-over
+            // produces a final bubble of "lo world" instead of "Hello world"
+            // — which is exactly the "lost first few characters" symptom
+            // Emmanuel reported. Markdown rendering then breaks if the
+            // dropped leading characters contained markdown openers (`**`,
+            // `# `, ``` ``` `, etc.).
+            //
+            // Chunk #1 — gateway hasn't echoed conversationId yet (legacy
+            // in-memory path); accumulated assistant content is "Hel".
             emit(BotStreamChunk(text = "Hel", conversationId = null, event = BotStreamEvent.ASSISTANT))
-            // Chunk #2 — conversationId now present; should NOT erase the
-            // "Hel" fragment from chunk #1.
-            emit(BotStreamChunk(text = "Hello", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
-            emit(BotStreamChunk(text = "Hello world", conversationId = "client-conv", done = true))
+            // Chunk #2 — conversationId now present. Migration runs; must
+            // carry "Hel" into the timeline before this chunk's delta
+            // ("lo ") is applied. Without carry-over, the timeline's
+            // assistant Local seeds with just "lo " and the "Hel" prefix
+            // is lost forever.
+            emit(BotStreamChunk(text = "lo ", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            // Chunk #3 — pure delta on top of the timeline seed.
+            emit(BotStreamChunk(text = "world", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            emit(BotStreamChunk(conversationId = "client-conv", done = true))
         }
 
         val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
@@ -632,12 +705,54 @@ class AdminChatViewModelTest {
         val assistant = vm.uiState.value.messages.lastOrNull { it.role == "assistant" }
         assertNotNull("assistant bubble must be rendered", assistant)
         assertEquals(
-            "final assistant bubble must include the chunk-1 (legacy-path) fragment",
+            "final assistant bubble must include the chunk-1 (legacy-path) fragment " +
+                "carried over by the timeline migration",
             "Hello world",
             assistant!!.content,
         )
         assertFalse("isStreaming must clear once stream completes", vm.uiState.value.isStreaming)
         assertFalse("isAgentTyping must clear once stream completes", vm.uiState.value.isAgentTyping)
+    }
+
+    /**
+     * letta-mobile-flk.4 regression test (markdown-specific): when the
+     * dropped leading chars contained markdown openers, the entire bubble
+     * renders unformatted (the unmatched closer `**` becomes literal text).
+     * This pins the carry-over so we don't regress on markdown rendering.
+     */
+    @Test
+    fun `client mode carries markdown openers across migration`() = runTest {
+        clientModeEnabledFlow.value = true
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+                forceFreshConversation = any(),
+            )
+        } returns flow {
+            // Chunk #1 — pre-conv, contains the OPENING `**`.
+            emit(BotStreamChunk(text = "**bold", conversationId = null, event = BotStreamEvent.ASSISTANT))
+            // Chunk #2 — post-conv, contains the CLOSING `**`. If chunk #1
+            // is dropped by migration, the bubble shows " text**" with an
+            // unmatched closer (literal asterisks).
+            emit(BotStreamChunk(text = " text**", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            emit(BotStreamChunk(conversationId = "client-conv", done = true))
+        }
+
+        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
+        advanceUntilIdle()
+
+        vm.sendMessage("hi")
+        advanceUntilIdle()
+
+        val assistant = vm.uiState.value.messages.lastOrNull { it.role == "assistant" }
+        assertNotNull("assistant bubble must be rendered", assistant)
+        assertEquals(
+            "final assistant bubble must contain the full markdown including the chunk-1 opener",
+            "**bold text**",
+            assistant!!.content,
+        )
     }
 
     /**
@@ -752,37 +867,20 @@ class AdminChatViewModelTest {
         assertFalse(vm.uiState.value.isStreaming)
     }
 
-    /**
-     * letta-mobile-lv3e: defensive snapshot-shape guard. If the gateway
-     * EVER switches back to cumulative-snapshot semantics, the merge
-     * heuristic must detect it (incoming.startsWith(existing) → replace
-     * with incoming, don't double-concat). Mirrors the SSE-path guard
-     * in TimelineSyncLoop:1132-1138.
-     */
-    @Test
-    fun `client mode chunks survive accidental cumulative-snapshot frames`() = runTest {
-        clientModeEnabledFlow.value = true
-        every {
-            clientModeChatSender.streamMessage(any(), any(), any(), any())
-        } returns flow {
-            // Simulate a future gateway misbehavior: first two frames are
-            // deltas, third frame mistakenly carries the FULL accumulated
-            // text. Guard must NOT double-concat.
-            emit(BotStreamChunk(text = "Hel", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
-            emit(BotStreamChunk(text = "lo ", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
-            emit(BotStreamChunk(text = "Hello world", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
-            emit(BotStreamChunk(conversationId = "client-conv", done = true))
-        }
-
-        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
-        advanceUntilIdle()
-        vm.sendMessage("hi")
-        advanceUntilIdle()
-
-        val assistant = vm.uiState.value.messages.lastOrNull { it.role == "assistant" }
-        assertNotNull(assistant)
-        assertEquals("Hello world", assistant!!.content)
-    }
+    // letta-mobile (lettabot-uww.11): the prior test
+    // `client mode chunks survive accidental cumulative-snapshot frames`
+    // intentionally codified the wucn-snapshot-recovery client-side defense
+    // (collapse a frame whose text equals the running accumulator). That
+    // defense was the bug: it silently dropped legitimate deltas whose
+    // head matched a prefix of the accumulator (the "A[LLM snapshots]" →
+    // "A[LLMapshots|" field repro). The contract — verified by the
+    // server-side gateway e2e suite ws-gateway.e2e.test.ts §
+    // "assistant text reassembly" (37 byte-perfect reassembly cases) —
+    // is that the gateway emits PURE DELTAS. If we ever see a true
+    // duplicate frame on the wire, that's a server-side gateway bug to
+    // fix at the source, not papered over on the client. The byte-perfect
+    // reassembly tests below (prefix collisions, mermaid char-by-char,
+    // exact field repro) already enforce the new contract.
 
     /**
      * letta-mobile-lv3e: golden trace from a real lettabot WS session.
@@ -942,40 +1040,94 @@ class AdminChatViewModelTest {
     }
 
     /**
-     * letta-mobile-lv3e + letta-mobile-wucn: defensive fallback when the
-     * gateway emits a near-snapshot chunk that fails the strict prefix
-     * check (e.g. server-side punctuation/whitespace normalization).
+     * lettabot-uww.11 regression: assistant-text deltas must concatenate
+     * byte-for-byte regardless of prefix collisions between deltas and
+     * the running accumulator. Without this guarantee the rendered
+     * bubble silently drops user-visible characters at chunk boundaries.
      *
-     * Pre-wucn bug: the bubble would render the final message twice
-     * (existing + near-snapshot concatenated together). Fix: when the
-     * incoming chunk is large (>= 32 chars AND >= 50% of existing length)
-     * AND fails the prefix check, prefer the longer string instead of
-     * concatenating.
+     * Pre-fix bug (letta-mobile-wucn): the merge cascade dropped any
+     * delta whose head matched a prefix of the accumulator (branch
+     * `existing.content.startsWith(delta) -> existing.content`) and
+     * destructively replaced the accumulator on >=32-char "near-
+     * snapshots". Field repro 2026-04-26: rendered mermaid block
+     * `A[LLM snapshots]` came out as `A[LLMapshots|`.
      *
-     * This test exercises the legacy upsertClientModeAssistantMessage
-     * path (where the wucn heuristic lives), distinct from the timeline
-     * path tested above.
+     * Post-fix contract (per ws-gateway.e2e.test.ts § "assistant text
+     * reassembly"): the gateway emits PURE DELTAS. Trust the contract;
+     * append.
+     *
+     * This test drives the legacy in-memory upsertClientModeAssistantMessage
+     * path with a delta sequence engineered to exercise every defective
+     * branch the wucn cascade had:
+     *   - delta head equals accumulator (the silent-drop branch)
+     *   - delta is >=32 chars AND >= half the accumulator (the
+     *     destructive-replace branch)
+     *   - duplicate deltas (idempotency under retransmit)
      */
     @Test
-    fun `client mode legacy path recovers from snapshot-shaped chunk that fails prefix check`() = runTest {
+    fun `client mode legacy path concatenates deltas byte-for-byte under prefix collisions`() = runTest {
         clientModeEnabledFlow.value = true
-        // 60-char delta that builds a longer accumulator, then a "snapshot"
-        // chunk that's the full content with one mid-string punctuation
-        // change so startsWith() misses. Pre-wucn: bubble = existing + chunk.
-        // Post-wucn: bubble = chunk (longer string wins).
-        val acc1 = "The quick brown fox jumps over the lazy dog and then sits"  // 57 chars
-        val acc2 = " quietly in the moonlight."                                  // 26 chars (delta)
-        val combined = acc1 + acc2  // 83 chars
-        // Server-normalized snapshot — semicolon instead of "and then"
-        val nearSnapshot = "The quick brown fox jumps over the lazy dog; sits quietly in the moonlight."  // 76 chars
+        // Each fragment was hand-picked so the running accumulator's
+        // tail-prefixes collide with the next fragment's head — exactly
+        // the shape that misfired the wucn `existing.content.startsWith`
+        // branch in production.
+        val fragments = listOf(
+            "The ",                                                 //  4 chars
+            "quick brown fox ",                                     // 16
+            "jumps over ",                                          // 11
+            "the lazy dog ",                                        // 13 (note: starts with "the" — collides with "The " head when lowercased? we use exact match so no, but...)
+            "The quick brown fox jumps over the lazy dog ",         // 44 chars — head EQUALS the accumulator so far → wucn would have silently dropped this whole 44-char delta
+            "again, ",                                              //  7
+            "and again — quietly in the moonlight.",                // 38 — >=32 chars, >=50% of accumulator → wucn would have destructively replaced everything before it
+        )
+        val expected = fragments.joinToString("")
 
         every {
             clientModeChatSender.streamMessage(any(), any(), any(), any())
         } returns flow {
-            emit(BotStreamChunk(text = acc1, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
-            emit(BotStreamChunk(text = acc2, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
-            // Near-snapshot — same total story, fails strict prefix.
-            emit(BotStreamChunk(text = nearSnapshot, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            fragments.forEach { f ->
+                emit(BotStreamChunk(text = f, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            }
+            emit(BotStreamChunk(conversationId = "client-conv", done = true))
+        }
+
+        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
+        advanceUntilIdle()
+        vm.sendMessage("hi")
+        advanceUntilIdle()
+
+        val assistant = vm.uiState.value.messages.lastOrNull { it.role == "assistant" }
+        assertNotNull("assistant bubble must be rendered", assistant)
+        // The smoking-gun assertion. If this fails, characters were
+        // silently dropped or the accumulator was destructively
+        // replaced — the exact bug shape from the field repro.
+        assertEquals(
+            "lettabot-uww.11: assistant text must concatenate byte-for-byte across prefix-colliding deltas",
+            expected,
+            assistant!!.content,
+        )
+    }
+
+    /**
+     * lettabot-uww.11 regression: the mermaid field repro itself.
+     * Streams the literal block `A[LLM snapshots] --> B[Coalesce]`
+     * split character-by-character (the worst-case adversarial
+     * chunking exercised on the server side by ws-gateway.e2e.test.ts).
+     * Asserts byte-perfect reassembly so we'd catch a regression of
+     * the original screenshot.
+     */
+    @Test
+    fun `client mode legacy path reassembles mermaid block char-by-char`() = runTest {
+        clientModeEnabledFlow.value = true
+        val mermaid = "A[LLM snapshots] --> B[Coalesce?]"
+        val chunks = mermaid.map { it.toString() }
+
+        every {
+            clientModeChatSender.streamMessage(any(), any(), any(), any())
+        } returns flow {
+            chunks.forEach { c ->
+                emit(BotStreamChunk(text = c, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            }
             emit(BotStreamChunk(conversationId = "client-conv", done = true))
         }
 
@@ -986,21 +1138,21 @@ class AdminChatViewModelTest {
 
         val assistant = vm.uiState.value.messages.lastOrNull { it.role == "assistant" }
         assertNotNull(assistant)
-        // Accept either the longer pre-snapshot accumulator OR the near-
-        // snapshot — whichever is longer. The bubble must NOT be the
-        // pathological doubled-bubble (combined + nearSnapshot).
-        val pathological = combined + nearSnapshot
-        assertFalse(
-            "wucn-snapshot-recovery must prevent doubled-bubble (got len=${assistant!!.content.length})",
-            assistant.content == pathological,
+        assertEquals(
+            "lettabot-uww.11: mermaid char-by-char reassembly must be byte-perfect",
+            mermaid,
+            assistant!!.content,
         )
-        // Whichever path the heuristic took, the result must be ≤ the
-        // longer of (combined, nearSnapshot) — never their concatenation.
-        val maxAcceptableLen = maxOf(combined.length, nearSnapshot.length)
+        // Guard against the specific corruption signature from the
+        // 2026-04-26 field repro. If either of these substrings is
+        // missing, the bubble looks like `A[LLMapshots|`.
         assertTrue(
-            "wucn-snapshot-recovery: bubble length ${assistant.content.length} must not exceed " +
-                "longer-of-inputs ${maxAcceptableLen}",
-            assistant.content.length <= maxAcceptableLen,
+            "missing 'A[LLM snapshots]' (silent character drop signature)",
+            assistant.content.contains("A[LLM snapshots]"),
+        )
+        assertTrue(
+            "missing closing bracket before --> (destructive-replace signature)",
+            assistant.content.contains("] --> B[Coalesce?]"),
         )
     }
 
@@ -1034,7 +1186,14 @@ class AdminChatViewModelTest {
             emit(BotStreamChunk(text = "Final answer", conversationId = "client-conv", done = true))
         }
 
-        val vm = createViewModel(conversationId = null)
+        // letta-mobile-c87t / Apr 26 default-load: a null conversationId
+        // arg WITHOUT a freshRouteKey now resolves to the agent's most
+        // recent server-side conversation (here: conv-1 via the fake
+        // conversationManager.resolveAndSetActiveConversation). To exercise
+        // the fresh-route streaming path the test setup assumes (chunks
+        // landing on the gateway-allocated "client-conv" timeline), we
+        // pass an explicit freshRouteKey so isFreshRoute=true.
+        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
         advanceUntilIdle()
 
         vm.sendMessage("hello")
@@ -1059,7 +1218,11 @@ class AdminChatViewModelTest {
             emit(BotStreamChunk(text = "Client reply", conversationId = "client-conv", done = true))
         }
 
-        val vm = createViewModel(conversationId = null)
+        // letta-mobile-c87t / Apr 26 default-load: see sibling test above.
+        // Pass freshRouteKey so the VM takes the fresh-route in-memory path
+        // before chunks arrive, matching this test's gateway-allocated
+        // "client-conv" stream.
+        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
         advanceUntilIdle()
 
         vm.sendMessage("hello")
