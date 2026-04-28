@@ -14,6 +14,37 @@ import com.letta.mobile.data.timeline.TimelineMessageType
 import com.letta.mobile.util.Telemetry
 
 /**
+ * lettabot-y4j (defensive client-side scrub):
+ *
+ * Lettabot wraps every inbound user message in a `<system-reminder>...
+ * </system-reminder>` envelope before forwarding to the agent. Letta
+ * persists the wrapped form in conversation history. The Android app
+ * fetches history directly from the Letta server (not through lettabot's
+ * REST proxy), so the server-side scrub in `conversations-proxy.ts` does
+ * NOT run for our reads — leaked envelopes show up as user bubbles
+ * containing the full metadata block.
+ *
+ * Mitigate at the rendering chokepoint: any USER-role timeline event
+ * gets its content scrubbed of complete `<system-reminder>...
+ * </system-reminder>` blocks. Defensive (cheap regex on already-small
+ * content), idempotent, and survives any upstream path that sneaks an
+ * envelope into the timeline.
+ *
+ * Returns null when the message becomes empty after stripping (envelope-
+ * only payload) so the caller can drop the bubble entirely.
+ */
+private val SYSTEM_REMINDER_BLOCK = Regex(
+    "<system-reminder>[\\s\\S]*?</system-reminder>",
+    RegexOption.IGNORE_CASE,
+)
+
+internal fun scrubUserEnvelope(content: String): String {
+    if (content.isEmpty()) return content
+    if (!content.contains("<system-reminder", ignoreCase = true)) return content
+    return SYSTEM_REMINDER_BLOCK.replace(content, "").trim()
+}
+
+/**
  * Pure mapping from a [TimelineEvent] to the [UiMessage] the chat screen
  * renders. Extracted as a top-level function so it can be unit-tested without
  * instantiating [AdminChatViewModel].
@@ -117,10 +148,18 @@ internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                     ev.reasoningContent?.takeIf { it.isNotEmpty() } ?: ev.content
                 else -> ev.content
             }
+            // lettabot-y4j: defensive strip of leaked envelope blocks on
+            // USER bubbles. If nothing remains after stripping, drop the
+            // bubble entirely (it was envelope-only).
+            val finalContent = if (role == "user") {
+                val stripped = scrubUserEnvelope(displayContent)
+                if (stripped.isEmpty() && displayContent.isNotEmpty()) return null
+                stripped
+            } else displayContent
             UiMessage(
                 id = ev.otid,
                 role = role,
-                content = displayContent,
+                content = finalContent,
                 timestamp = ev.sentAt.toString(),
                 isPending = ev.deliveryState == DeliveryState.SENDING,
                 isReasoning = ev.messageType == TimelineMessageType.REASONING,
@@ -223,10 +262,20 @@ internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                     "uiToolCallsEmitted" to (uiToolCalls?.size ?: 0),
                 )
             }
+            // lettabot-y4j: defensive strip of leaked envelope blocks on
+            // USER bubbles. Confirmed events come from `GET /v1/conversations/
+            // :id/messages` which goes directly to the Letta server (the
+            // lettabot REST scrub doesn't run here), so we MUST strip on
+            // render. Drop the bubble entirely if the content was envelope-only.
+            val confirmedContent = if (role == "user") {
+                val stripped = scrubUserEnvelope(ev.content)
+                if (stripped.isEmpty() && ev.content.isNotEmpty()) return null
+                stripped
+            } else ev.content
             UiMessage(
                 id = ev.serverId,
                 role = role,
-                content = ev.content,
+                content = confirmedContent,
                 timestamp = ev.date.toString(),
                 runId = ev.runId,
                 stepId = ev.stepId,

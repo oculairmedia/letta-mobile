@@ -282,4 +282,56 @@ class TimelineEventToUiMessageTest {
         assertNull(ui.toolCalls)
         assertFalse(ui.isReasoning)
     }
+
+    /**
+     * lettabot-y4j regression test: USER bubbles must have any leaked
+     * <system-reminder>...</system-reminder> envelope blocks stripped at
+     * render time. The Letta server persists envelope-wrapped user
+     * messages and Android reads them via direct GET, bypassing the
+     * lettabot REST scrub. The defensive strip in scrubUserEnvelope must
+     * remove the block while preserving the user's actual prompt text.
+     */
+    @Test
+    fun `user message with leaked system-reminder envelope has envelope stripped`() {
+        val leaked = "<system-reminder>\n## Message Metadata\n- Channel: Matrix\n- Sender: Emmanuel\n</system-reminder>\n\nhi there"
+        val ev = confirmed(TimelineMessageType.USER, content = leaked)
+        val ui = timelineEventToUiMessage(ev)!!
+        assertEquals("user", ui.role)
+        assertEquals("hi there", ui.content)
+    }
+
+    @Test
+    fun `user message that is envelope-only after strip is dropped entirely`() {
+        // No body text outside the envelope -> drop the bubble.
+        val envelopeOnly = "<system-reminder>\n## Session Context\n- Agent: PM\n</system-reminder>"
+        val ev = confirmed(TimelineMessageType.USER, content = envelopeOnly)
+        assertNull(timelineEventToUiMessage(ev))
+    }
+
+    @Test
+    fun `assistant message with system-reminder-like text is NOT scrubbed`() {
+        // Only USER bubbles get scrubbed. An assistant explaining the
+        // envelope mechanism shouldn't have its content mutilated.
+        val text = "Lettabot wraps user input in <system-reminder>blocks</system-reminder>."
+        val ev = confirmed(TimelineMessageType.ASSISTANT, content = text)
+        val ui = timelineEventToUiMessage(ev)!!
+        assertEquals(text, ui.content)
+    }
+
+    @Test
+    fun `user message without envelope passes through unchanged`() {
+        val ev = confirmed(TimelineMessageType.USER, content = "just a normal message")
+        val ui = timelineEventToUiMessage(ev)!!
+        assertEquals("just a normal message", ui.content)
+    }
+
+    @Test
+    fun `user message with multiple envelope blocks has all stripped`() {
+        // Defensive against future formatter changes that emit multiple
+        // blocks (e.g. one for session context, one for metadata).
+        val leaked = "<system-reminder>a</system-reminder>real text<system-reminder>b</system-reminder>"
+        val ev = confirmed(TimelineMessageType.USER, content = leaked)
+        val ui = timelineEventToUiMessage(ev)!!
+        assertEquals("real text", ui.content)
+    }
 }
