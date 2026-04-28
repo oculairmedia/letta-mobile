@@ -25,7 +25,11 @@ class InternalBotClient @Inject constructor(
 
     override fun streamMessage(request: BotChatRequest): Flow<BotStreamChunk> {
         val message = request.toChannelMessage()
-        return gateway.streamMessage(message, request.conversationId).map { chunk ->
+        // letta-mobile-flk.6: forward request.forceNew to the gateway so
+        // the WS layer can flip force_new in its session_start envelope.
+        // Without this the flag is silently dropped at the InternalBotClient
+        // boundary and the gateway auto-resumes the previous conversation.
+        return gateway.streamMessage(message, request.conversationId, request.forceNew).map { chunk ->
             BotStreamChunk(
                 text = chunk.text,
                 conversationId = chunk.conversationId ?: request.conversationId,
@@ -41,11 +45,16 @@ class InternalBotClient @Inject constructor(
     }
 
     override suspend fun getStatus(): BotStatusResponse {
+        // letta-mobile-w2hx.4: gateway sessions are now keyed on
+        // `config.id`, not agent ID. The "agents" field on the status
+        // response now reports configured agents — heartbeat target if
+        // set, falling back to the config ID — rather than transport
+        // session keys, which would be meaningless to API callers.
         val sessions = gateway.sessions.value
         val enabledConfigs = configStore.getAll().filter { it.enabled }
-        val agentDetails = sessions.map { (id, session) ->
+        val agentDetails = sessions.map { (configId, session) ->
             BotAgentInfo(
-                id = id,
+                id = configId,
                 name = session.displayName,
                 status = session.status.value.name.lowercase(),
             )
@@ -53,7 +62,7 @@ class InternalBotClient @Inject constructor(
 
         return BotStatusResponse(
             status = gateway.status.value.name.lowercase(),
-            agents = sessions.keys.toList(),
+            agents = enabledConfigs.mapNotNull { it.heartbeatAgentId }.distinct(),
             sessionCount = sessions.size,
             agentDetails = agentDetails,
             activeProfileIds = enabledConfigs.mapNotNull { it.serverProfileId }.distinct(),
@@ -61,9 +70,9 @@ class InternalBotClient @Inject constructor(
         )
     }
 
-    override suspend fun listAgents(): List<BotAgentInfo> = gateway.sessions.value.map { (id, session) ->
+    override suspend fun listAgents(): List<BotAgentInfo> = gateway.sessions.value.map { (configId, session) ->
         BotAgentInfo(
-            id = id,
+            id = configId,
             name = session.displayName,
             status = session.status.value.name.lowercase(),
         )

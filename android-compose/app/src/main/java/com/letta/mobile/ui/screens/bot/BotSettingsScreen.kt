@@ -124,8 +124,16 @@ fun BotSettingsScreen(
                                 Text(config.displayName.ifBlank { "Unnamed Bot" })
                             },
                             supportingContent = {
+                                // letta-mobile-w2hx.4: was `${mode} · ${agentId.take(12)}…`
+                                // Bot is now a transport, not an agent binder — show
+                                // mode + transport + a heartbeat indicator instead.
+                                val heartbeatLabel = if (config.heartbeatEnabled &&
+                                    !config.heartbeatAgentId.isNullOrBlank()
+                                ) {
+                                    " \u00B7 \u23F1 ${config.heartbeatAgentId!!.take(8)}\u2026"
+                                } else ""
                                 Text(
-                                    "${config.mode.name} \u00B7 ${config.agentId.take(12)}\u2026",
+                                    "${config.mode.name} \u00B7 ${config.transport.name}$heartbeatLabel",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )

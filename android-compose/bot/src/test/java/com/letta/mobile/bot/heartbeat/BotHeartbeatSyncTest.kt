@@ -15,7 +15,7 @@ class BotHeartbeatSyncTest : WordSpec({
     "shouldRunHeartbeat" should {
         "run when enabled and no previous execution exists" {
             shouldRunHeartbeat(
-                config = BotConfig(id = "bot-1", agentId = "agent-1", enabled = true, heartbeatEnabled = true),
+                config = BotConfig(id = "bot-1", heartbeatAgentId = "agent-1", enabled = true, heartbeatEnabled = true),
                 lastRunAt = null,
                 nowMillis = 1_000L,
             ) shouldBe true
@@ -24,7 +24,7 @@ class BotHeartbeatSyncTest : WordSpec({
         "wait until the configured interval has elapsed" {
             val config = BotConfig(
                 id = "bot-1",
-                agentId = "agent-1",
+                heartbeatAgentId = "agent-1",
                 enabled = true,
                 heartbeatEnabled = true,
                 heartbeatIntervalMinutes = 30,
@@ -35,12 +35,12 @@ class BotHeartbeatSyncTest : WordSpec({
 
         "ignore disabled or heartbeat-disabled configs" {
             shouldRunHeartbeat(
-                BotConfig(id = "bot-1", agentId = "agent-1", enabled = false, heartbeatEnabled = true),
+                BotConfig(id = "bot-1", heartbeatAgentId = "agent-1", enabled = false, heartbeatEnabled = true),
                 lastRunAt = null,
                 nowMillis = 1_000L,
             ) shouldBe false
             shouldRunHeartbeat(
-                BotConfig(id = "bot-1", agentId = "agent-1", enabled = true, heartbeatEnabled = false),
+                BotConfig(id = "bot-1", heartbeatAgentId = "agent-1", enabled = true, heartbeatEnabled = false),
                 lastRunAt = null,
                 nowMillis = 1_000L,
             ) shouldBe false
@@ -51,7 +51,7 @@ class BotHeartbeatSyncTest : WordSpec({
         "preserve the configured heartbeat prompt and target agent" {
             val config = BotConfig(
                 id = "bot-1",
-                agentId = "agent-1",
+                heartbeatAgentId = "agent-1",
                 heartbeatEnabled = true,
                 heartbeatMessage = "Review notifications and surface anything important.",
             )
@@ -140,7 +140,7 @@ class BotHeartbeatSyncTest : WordSpec({
     "toChannelMessage" should {
         "emit scheduled jobs through the shared bot message format" {
             val scheduledJob = DueScheduledJob(
-                config = BotConfig(id = "bot-1", agentId = "agent-1"),
+                config = BotConfig(id = "bot-1", heartbeatAgentId = "agent-1"),
                 job = BotScheduledJob(
                     id = "briefing",
                     displayName = "Morning briefing",

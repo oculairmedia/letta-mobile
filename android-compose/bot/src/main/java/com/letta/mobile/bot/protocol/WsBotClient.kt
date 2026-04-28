@@ -171,6 +171,14 @@ class WsBotClient(
             val requestId = UUID.randomUUID().toString()
             val requestChannel = Channel<RequestSignal>(capacity = Channel.UNLIMITED)
 
+            // letta-mobile-flk.6 debug: log the inbound BotChatRequest so we
+            // can confirm forceNew is propagating from the UI -> sender ->
+            // WsBotClient. Remove once the new-chat flow is verified green.
+            Log.i(
+                TAG,
+                "flk6.streamMessage agent=${request.agentId} conv=${request.conversationId} " +
+                    "forceNew=${request.forceNew} active=${activeConversationId}",
+            )
             try {
                 ensureSession(request)
                 activeRequestId = requestId
@@ -305,12 +313,27 @@ class WsBotClient(
                 )
 
             val requestedConversationId = request.conversationId
+            // letta-mobile-flk.6: a fresh-route request must always trigger
+            // a re-init even if the socket+agent already match — we need
+            // the gateway to clear its persisted conv mapping and hand us
+            // a brand-new Letta conversation. Without this branch, an idle
+            // socket reused from a previous chat would short-circuit at
+            // !needsNewSession and silently resume the old conversation.
             val needsNewSession = !socketOpen || activeAgentId != requestedAgentId ||
-                (requestedConversationId != null && requestedConversationId != activeConversationId)
+                (requestedConversationId != null && requestedConversationId != activeConversationId) ||
+                request.forceNew
 
             if (!needsNewSession) {
                 return
             }
+
+            // letta-mobile-flk.6: when the caller wants a fresh conversation
+            // on the *same* agent, tear down the active session frame so
+            // the upcoming session_start with force_new=true isn't merged
+            // with the existing session_id on the gateway.
+            val forceNewOnSameAgent = socketOpen &&
+                activeAgentId == requestedAgentId &&
+                request.forceNew
 
             if (socketOpen && activeAgentId != requestedAgentId) {
                 // letta-mobile-2psc: arm the switching-agent flag BEFORE
@@ -325,13 +348,19 @@ class WsBotClient(
                 socketOpen = false
                 activeConversationId = null
                 activeSessionId = null
+            } else if (forceNewOnSameAgent) {
+                // Close the in-flight session cleanly but keep the socket
+                // up; the gateway expects a fresh session_start to follow.
+                sendWebSocketMessage(WsSessionCloseMessage)
+                activeConversationId = null
+                activeSessionId = null
             }
 
             openSocketLocked()
             initializeSessionLocked(
                 agentId = requestedAgentId,
                 conversationId = requestedConversationId,
-                forceNew = false,
+                forceNew = request.forceNew,
             )
         }
     }

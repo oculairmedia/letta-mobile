@@ -58,7 +58,7 @@ class LocalBotSession @AssistedInject constructor(
     private val contextProviders: @JvmSuppressWildcards Set<DeviceContextProvider>,
 ) : BotSession {
 
-    override val agentId: String = config.agentId
+    override val configId: String = config.id
     override val displayName: String = config.displayName
 
     private val _status = MutableStateFlow(BotStatus.IDLE)
@@ -73,6 +73,16 @@ class LocalBotSession @AssistedInject constructor(
         activeSkills.map { skill -> "[${skill.displayName}]\n${skill.promptFragment}" }
             .filter { it.isNotBlank() }
     }
+
+    /**
+     * letta-mobile-w2hx.4: tool attachment is per-agent in Letta, but
+     * sessions are now agent-agnostic (the agent travels per-message).
+     * Track which agents this transport has already attached its tools
+     * to so we sync once-per-agent on first contact instead of once at
+     * session start.
+     */
+    private val toolsSyncedFor = mutableSetOf<String>()
+    private val toolsSyncMutex = Mutex()
 
     /** The active context providers for this session (filtered by config). */
     private val activeProviders: List<DeviceContextProvider> by lazy {
@@ -89,9 +99,9 @@ class LocalBotSession @AssistedInject constructor(
         val unknownSkillIds = skillRegistry.findUnknownSkillIds(config.enabledSkills)
         require(unknownSkillIds.isEmpty()) {
             buildString {
-                append("Unknown skill IDs in bot config for agent ")
-                append(agentId)
-                append(": ")
+                append("Unknown skill IDs in bot config '")
+                append(configId)
+                append("': ")
                 append(unknownSkillIds.joinToString(", "))
                 val availableSkills = skillRegistry.listAvailableSkills().map { it.id }
                 if (availableSkills.isNotEmpty()) {
@@ -101,11 +111,9 @@ class LocalBotSession @AssistedInject constructor(
             }
         }
 
-        val requestedToolNames = when {
-            config.enabledSkills.isEmpty() -> null
-            else -> activeSkills.flatMap { it.localToolNames }.toSet()
-        }
-        toolSync.syncTools(agentId, requestedToolNames)
+        // letta-mobile-w2hx.4: tool sync moved to ensureToolsSynced()
+        // and runs lazily on first message per agent. The transport
+        // doesn't know which agent(s) it'll serve at start time.
 
         // Start the message processing loop
         scope.launch {
@@ -122,7 +130,7 @@ class LocalBotSession @AssistedInject constructor(
         }
 
         _status.value = BotStatus.RUNNING
-        Log.i(TAG, "Local bot session started for agent $agentId")
+        Log.i(TAG, "Local bot session started for config $configId")
     }
 
     override suspend fun stop() {
@@ -130,7 +138,30 @@ class LocalBotSession @AssistedInject constructor(
         messageQueue.close()
         scope.cancel()
         _status.value = BotStatus.STOPPED
-        Log.i(TAG, "Local bot session stopped for agent $agentId")
+        Log.i(TAG, "Local bot session stopped for config $configId")
+    }
+
+    /**
+     * Resolve the per-message agent target. Throws if the message has no
+     * `targetAgentId` — required since the transport no longer carries a
+     * default agent binding.
+     */
+    private fun requireAgent(message: ChannelMessage): String =
+        message.targetAgentId
+            ?: error("ChannelMessage(messageId=${message.messageId}) has no targetAgentId; " +
+                "the bound-agent concept was removed in w2hx.4 — callers must populate it.")
+
+    private suspend fun ensureToolsSynced(agentId: String) {
+        if (agentId in toolsSyncedFor) return
+        toolsSyncMutex.withLock {
+            if (agentId in toolsSyncedFor) return
+            val requestedToolNames = when {
+                config.enabledSkills.isEmpty() -> null
+                else -> activeSkills.flatMap { it.localToolNames }.toSet()
+            }
+            toolSync.syncTools(agentId, requestedToolNames)
+            toolsSyncedFor += agentId
+        }
     }
 
     override suspend fun sendToAgent(message: ChannelMessage, conversationId: String?): BotResponse {
@@ -142,7 +173,17 @@ class LocalBotSession @AssistedInject constructor(
         return result.await().getOrThrow()
     }
 
-    override fun streamToAgent(message: ChannelMessage, conversationId: String?): Flow<BotResponseChunk> = flow {
+    override fun streamToAgent(
+        message: ChannelMessage,
+        conversationId: String?,
+        @Suppress("UNUSED_PARAMETER") forceNew: Boolean,
+    ): Flow<BotResponseChunk> = flow {
+        // letta-mobile-flk.6: LocalBotSession resolves conversations
+        // entirely client-side (resolveConversation), so forceNew has no
+        // server-side mapping to clear. Accepted on the interface to
+        // satisfy BotSession; intentionally unused here.
+        val agentId = requireAgent(message)
+        ensureToolsSynced(agentId)
         _status.value = BotStatus.PROCESSING
         try {
             val resolvedConversationId = conversationId ?: resolveConversation(message)
@@ -198,7 +239,7 @@ class LocalBotSession @AssistedInject constructor(
             }
         } catch (e: Exception) {
             _status.value = BotStatus.RUNNING
-            Log.e(TAG, "Error streaming message for agent $agentId", e)
+            Log.e(TAG, "Error streaming message for agent $agentId on config $configId", e)
             throw e
         }
     }
@@ -211,22 +252,28 @@ class LocalBotSession @AssistedInject constructor(
     }
 
     override suspend fun resolveConversation(message: ChannelMessage): String {
+        val agentId = requireAgent(message)
+        // letta-mobile-w2hx.4: route key includes the agent so different
+        // agents on the same chat get distinct conversations — sessions
+        // are no longer agent-bound.
         val routeKey = when (config.conversationMode) {
-            ConversationMode.SHARED -> "shared"
-            ConversationMode.PER_CHANNEL -> "channel:${message.channelId}"
-            ConversationMode.PER_CHAT -> "chat:${message.channelId}:${message.chatId}"
-            ConversationMode.DISABLED -> return createConversation()
+            ConversationMode.SHARED -> "shared:$agentId"
+            ConversationMode.PER_CHANNEL -> "channel:${message.channelId}:$agentId"
+            ConversationMode.PER_CHAT -> "chat:${message.channelId}:${message.chatId}:$agentId"
+            ConversationMode.DISABLED -> return createConversation(agentId)
         }
 
         return conversationMutex.withLock {
             conversationCache.getOrPut(routeKey) {
-                config.sharedConversationId ?: createConversation()
+                config.sharedConversationId ?: createConversation(agentId)
             }
         }
     }
 
     /** Process a single message — format, send to agent, parse response. */
     private suspend fun processMessage(message: ChannelMessage, conversationId: String): BotResponse {
+        val agentId = requireAgent(message)
+        ensureToolsSynced(agentId)
         _status.value = BotStatus.PROCESSING
 
         try {
@@ -275,13 +322,13 @@ class LocalBotSession @AssistedInject constructor(
             )
         } catch (e: Exception) {
             _status.value = BotStatus.RUNNING
-            Log.e(TAG, "Error processing message for agent $agentId", e)
+            Log.e(TAG, "Error processing message for agent $agentId on config $configId", e)
             throw e
         }
     }
 
-    /** Create a new conversation for this agent. */
-    private suspend fun createConversation(): String {
+    /** Create a new conversation for the given agent. */
+    private suspend fun createConversation(agentId: String): String {
         return runtimeClient.createConversation(agentId = agentId)
     }
 

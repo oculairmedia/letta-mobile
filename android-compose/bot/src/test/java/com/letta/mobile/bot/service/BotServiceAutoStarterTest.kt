@@ -11,7 +11,7 @@ class BotServiceAutoStarterTest : WordSpec({
         "return true when an enabled bot is marked auto start" {
             shouldAutoStartBotService(
                 listOf(
-                    BotConfig(id = "bot-1", agentId = "agent-1", enabled = true, autoStart = true),
+                    BotConfig(id = "bot-1", enabled = true, autoStart = true),
                 )
             ) shouldBe true
         }
@@ -19,8 +19,8 @@ class BotServiceAutoStarterTest : WordSpec({
         "return false when auto start configs are disabled" {
             shouldAutoStartBotService(
                 listOf(
-                    BotConfig(id = "bot-1", agentId = "agent-1", enabled = false, autoStart = true),
-                    BotConfig(id = "bot-2", agentId = "agent-2", enabled = true, autoStart = false),
+                    BotConfig(id = "bot-1", enabled = false, autoStart = true),
+                    BotConfig(id = "bot-2", enabled = true, autoStart = false),
                 )
             ) shouldBe false
         }

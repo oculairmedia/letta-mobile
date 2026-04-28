@@ -167,7 +167,7 @@ private fun GeneralSection(vm: BotConfigEditViewModel) {
     var expanded by remember { mutableStateOf(true) }
     Accordions(
         title = "General",
-        subtitle = "Agent, mode, connectivity",
+        subtitle = "Display name, mode, connectivity",
         expanded = expanded,
         onExpandedChange = { expanded = it },
     ) {
@@ -193,8 +193,10 @@ private fun GeneralSection(vm: BotConfigEditViewModel) {
                 headlineContent = { AgentSearchField(vm) },
                 trailingContent = {
                     HelpIcon(
-                        title = "Agent",
-                        description = "The Letta agent this bot will communicate with. Search by name to find your agent.",
+                        title = "Heartbeat agent",
+                        description = "The Letta agent that scheduled heartbeats and cron jobs target. " +
+                            "Interactive chats use the agent of the active chat — this only matters when " +
+                            "the bot is firing in the background with no UI.",
                     )
                 },
             )
@@ -286,7 +288,7 @@ private fun AgentSearchField(vm: BotConfigEditViewModel) {
     val agents by vm.agents.collectAsStateWithLifecycle()
 
     Column {
-        if (vm.agentId.isNotBlank() && !vm.agentSearchExpanded) {
+        if (vm.heartbeatAgentId.isNotBlank() && !vm.agentSearchExpanded) {
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -313,7 +315,7 @@ private fun AgentSearchField(vm: BotConfigEditViewModel) {
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                         )
                         Text(
-                            text = vm.agentId,
+                            text = vm.heartbeatAgentId,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
                             maxLines = 1,
@@ -330,7 +332,7 @@ private fun AgentSearchField(vm: BotConfigEditViewModel) {
                 }
             }
         } else {
-            Text("Agent *", style = MaterialTheme.typography.bodyMedium)
+            Text("Heartbeat agent (optional)", style = MaterialTheme.typography.bodyMedium)
             Spacer(modifier = Modifier.height(4.dp))
             LettaSearchBar(
                 query = vm.agentSearchQuery,

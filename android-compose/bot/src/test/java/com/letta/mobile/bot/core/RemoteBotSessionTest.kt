@@ -24,6 +24,10 @@ import org.junit.jupiter.api.Tag
 
 @Tag("unit")
 class RemoteBotSessionTest : WordSpec({
+    // letta-mobile-w2hx.4: every ChannelMessage flowing through a
+    // RemoteBotSession now MUST carry a targetAgentId — the bot is a
+    // transport, the agent travels per-message. Tests covering the
+    // session must populate it; `requireAgent` errors otherwise.
     val message = ChannelMessage(
         messageId = "msg-1",
         channelId = "in_app",
@@ -31,6 +35,7 @@ class RemoteBotSessionTest : WordSpec({
         senderId = "user-1",
         senderName = "User",
         text = "hello",
+        targetAgentId = "agent-1",
     )
 
     "RemoteBotSession" should {
@@ -57,7 +62,11 @@ class RemoteBotSessionTest : WordSpec({
             runBlocking { session.start() }
 
             recorder.transports.single() shouldBe BotConfig.Transport.WS
-            recorder.readyAgentIds shouldBe listOf("agent-1")
+            // letta-mobile-w2hx.4: start() no longer pre-warms a bound
+            // agent's gateway session. The per-agent WS pool (w2hx.3)
+            // opens sessions lazily on first real message, so start
+            // does not call ensureGatewayReady at all.
+            recorder.readyAgentIds shouldHaveSize 0
         }
 
         "stream progressive chunks when WS transport is selected" {
@@ -197,7 +206,6 @@ private fun remoteConfig(
     directivesEnabled: Boolean = true,
 ): BotConfig = BotConfig(
     id = "bot-1",
-    agentId = "agent-1",
     displayName = "Remote Bot",
     mode = BotConfig.Mode.REMOTE,
     remoteUrl = "https://bot.example",

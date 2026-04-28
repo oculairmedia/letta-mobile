@@ -319,6 +319,13 @@ class AdminChatViewModel @Inject constructor(
 
     private val pendingToolsMap = java.util.concurrent.ConcurrentHashMap<String, PendingToolCall>()
     private var hasSummary = false
+    // letta-mobile-flk.6: tracks whether the VM has already resolved its
+    // conversation at least once. Used to gate the fresh-route fallback
+    // suppression so it only fires on the very first resolveConversationAndLoad
+    // call (the actual nav entry). Subsequent re-resolutions — like a
+    // mid-session client-mode toggle — are allowed to fall back to the
+    // most-recent persisted conversation as before.
+    private var hasResolvedConversationOnce: Boolean = false
 
     private fun collapsedRunIds(): Set<String> =
         savedStateHandle.get<ArrayList<String>>(COLLAPSED_RUN_IDS_KEY)?.toSet().orEmpty()
@@ -599,6 +606,31 @@ class AdminChatViewModel @Inject constructor(
     }
 
     private fun resolveConversationAndLoad() {
+        // letta-mobile-flk.6: capture the fresh-route bit at entry. It's
+        // only honored on the *first* call (initial nav entry) — see
+        // `hasResolvedConversationOnce` and `suppressFreshRouteFallback`
+        // below. Subsequent calls (e.g. mid-session client-mode toggle)
+        // resolve normally so legacy behavior is preserved.
+        val isFirstResolve = !hasResolvedConversationOnce
+        hasResolvedConversationOnce = true
+        // letta-mobile-flk.6: ConversationManager is a process-wide
+        // @Singleton in-memory map keyed only on agentId. The agent list,
+        // recent-conversations drawer, and other surfaces populate it via
+        // `resolveAndSetActiveConversation` so by the time the user taps
+        // "New chat" on an agent the map ALREADY has an entry for that
+        // agent — pointing at whichever conversation was most-recent on
+        // last fetch. Just suppressing our own resolve call isn't enough;
+        // the cached entry leaks back in via `activeConversationId` reads
+        // elsewhere in the VM (see loadMessagesInternal line ~781). On a
+        // genuine fresh-route entry we actively clear the entry so the
+        // entire VM observes `null` and the UI starts truly empty.
+        if (isFreshRoute && isFirstResolve && explicitConversationId == null) {
+            conversationManager.clearActiveConversation(agentId)
+            android.util.Log.i(
+                "AdminChatViewModel",
+                "flk6.clearActive agent=$agentId reason=freshRouteInitialResolve",
+            )
+        }
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
                 conversationState = ConversationState.Loading,
@@ -624,9 +656,14 @@ class AdminChatViewModel @Inject constructor(
                     // in-memory path until the gateway provides one (see
                     // sendMessageViaClientMode migration). See
                     // letta-mobile-c87t and the Apr 26 default-load change.
+                    // letta-mobile-flk.6: same suppression rule as the
+                    // timeline branch below — only block the fallback on
+                    // the *initial* fresh-route nav entry, not on
+                    // subsequent re-resolutions.
+                    val suppressFreshRouteFallbackClient = isFreshRoute && isFirstResolve
                     val clientConversationId = explicitConversationId
                         ?: currentClientModeConversationId()
-                        ?: if (!isFreshRoute) {
+                        ?: if (!suppressFreshRouteFallbackClient) {
                             runCatching {
                                 conversationManager.resolveAndSetActiveConversation(
                                     agentId = agentId,
@@ -679,16 +716,44 @@ class AdminChatViewModel @Inject constructor(
                     return@launch
                 }
 
-                if (activeConversationId == null && explicitConversationId == null) {
+                // letta-mobile-flk.6: on the *initial* fresh-route entry,
+                // suppress the most-recent-conversation fallback so a "New
+                // chat" tap doesn't silently hydrate the UI with the
+                // agent's previous server-side conversation. Once the VM
+                // has resolved at least once (`hasResolvedConversationOnce`),
+                // subsequent re-resolutions (e.g. a mid-session client-mode
+                // toggle, exercised by the
+                // "toggling client mode off restores timeline messages"
+                // test) are allowed to fall back to most-recent as before.
+                // This mirrors the existing guard in the Client-Mode branch
+                // above (line ~629).
+                val suppressFreshRouteFallback = isFreshRoute && isFirstResolve
+                if (
+                    !suppressFreshRouteFallback &&
+                    activeConversationId == null &&
+                    explicitConversationId == null
+                ) {
                     val resolvedConversationId = conversationManager.resolveAndSetActiveConversation(
                         agentId = agentId,
                         maxAgeMs = CONVERSATION_CACHE_TTL_MS,
                     )
                 }
 
-                val conversationId = activeConversationId ?: explicitConversationId?.also {
-                    conversationManager.setActiveConversation(agentId, it)
+                // letta-mobile-flk.6: a fresh-route entry must NOT inherit
+                // `activeConversationId` either — that map is keyed only on
+                // agent_id, so without this branch a "New chat" tap silently
+                // resumes the agent's previous conversation pointer. Once
+                // `hasResolvedConversationOnce` flips, behave normally.
+                val conversationId = if (suppressFreshRouteFallback) {
+                    explicitConversationId?.also {
+                        conversationManager.setActiveConversation(agentId, it)
+                    }
+                } else {
+                    activeConversationId ?: explicitConversationId?.also {
+                        conversationManager.setActiveConversation(agentId, it)
+                    }
                 }
+
                 if (conversationId == null) {
                     _uiState.value = _uiState.value.copy(
                         conversationState = ConversationState.NoConversation,
@@ -904,6 +969,16 @@ class AdminChatViewModel @Inject constructor(
             "via" to if (isClientMode) "client_mode" else "timeline",
             "length" to text.length,
             "attachments" to attachments.size,
+        )
+        // letta-mobile-flk.6 debug: log the route + freshness predicates so
+        // we can correlate device taps with the lettabot gateway's
+        // Auto-resuming vs Forced-new outcome. Remove once verified.
+        android.util.Log.i(
+            "AdminChatViewModel",
+            "flk6.sendMessage agent=$agentId via=${if (isClientMode) "client_mode" else "timeline"} " +
+                "isFreshRoute=$isFreshRoute explicitConv=$explicitConversationId " +
+                "clientModeConv=${currentClientModeConversationId()} " +
+                "active=$activeConversationId",
         )
         if (isClientMode) {
             if (attachments.isNotEmpty()) {
@@ -1871,7 +1946,18 @@ class AdminChatViewModel @Inject constructor(
                 pendingAttachments = persistentListOf(),
             )
             try {
-                var convId = activeConversationId
+                // letta-mobile-flk.6: a fresh-route entry (user tapped "New
+                // chat" with no conversationId arg and no in-flight pointer)
+                // must NOT inherit `conversationManager.getActiveConversationId`
+                // — that map is keyed only on agent_id and would silently
+                // route the new chat into the agent's most-recent conv. Use
+                // the route's explicit conversationId arg if present;
+                // otherwise force a fresh Letta conversation create.
+                var convId: String? = if (isFreshRoute) {
+                    explicitConversationId
+                } else {
+                    explicitConversationId ?: activeConversationId
+                }
                 if (convId == null) {
                     val summary = text.take(80).let { if (text.length > 80) "$it\u2026" else it }
                     convId = conversationManager.createAndSetActiveConversation(agentId, summary)

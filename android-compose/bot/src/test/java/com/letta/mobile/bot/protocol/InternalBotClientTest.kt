@@ -24,19 +24,23 @@ class InternalBotClientTest : WordSpec({
             val session = mockk<BotSession>()
 
             every { gateway.status } returns MutableStateFlow(com.letta.mobile.bot.core.GatewayStatus.RUNNING)
-            every { gateway.sessions } returns MutableStateFlow(mapOf("agent-1" to session))
+            // letta-mobile-w2hx.4: gateway sessions are keyed on
+            // `config.id`, not on the bound agent ID.
+            every { gateway.sessions } returns MutableStateFlow(mapOf("local" to session))
             every { session.displayName } returns "Primary agent"
             every { session.status } returns MutableStateFlow(BotStatus.RUNNING)
             coEvery { configStore.getAll() } returns listOf(
                 BotConfig(
                     id = "local",
-                    agentId = "agent-1",
+                    heartbeatAgentId = "agent-1",
+                    heartbeatEnabled = true,
                     enabled = true,
                     mode = BotConfig.Mode.LOCAL,
                 ),
                 BotConfig(
                     id = "remote",
-                    agentId = "agent-2",
+                    heartbeatAgentId = "agent-2",
+                    heartbeatEnabled = true,
                     enabled = true,
                     mode = BotConfig.Mode.REMOTE,
                     serverProfileId = "profile-a",
@@ -46,11 +50,12 @@ class InternalBotClientTest : WordSpec({
             val status = runBlocking { InternalBotClient(gateway, configStore).getStatus() }
 
             status.status shouldBe "running"
-            status.agents shouldContainExactly listOf("agent-1")
+            // .agents now reports configured heartbeat targets, not session keys.
+            status.agents shouldContainExactly listOf("agent-1", "agent-2")
             status.sessionCount shouldBe 1
             status.agentDetails shouldContainExactly listOf(
                 BotAgentInfo(
-                    id = "agent-1",
+                    id = "local",
                     name = "Primary agent",
                     status = "running",
                 )

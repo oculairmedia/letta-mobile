@@ -38,9 +38,6 @@ class ClientModeController @Inject constructor(
     @Volatile
     private var activeConfigSignature: String? = null
 
-    @Volatile
-    private var activeRemoteAgentId: String? = null
-
     fun initialize() {
         if (initialized) return
         initialized = true
@@ -70,29 +67,29 @@ class ClientModeController @Inject constructor(
         }
     }
 
-    suspend fun ensureReady(): String {
+    /**
+     * Ensure the Client Mode gateway transport is up.
+     *
+     * letta-mobile-w2hx.4: previously returned a bound agent ID. The
+     * transport no longer binds to an agent — the caller supplies the
+     * target agent per-message via `BotChatRequest.agentId`. This now
+     * just guarantees that the transport session exists and is healthy.
+     */
+    suspend fun ensureReady() {
         initialize()
         reconcile(forceForeground = true)
-        val remoteAgentId = requireNotNull(activeRemoteAgentId) {
+        check(botGateway.getSession(CLIENT_MODE_CONFIG_ID) != null) {
             "Client Mode gateway session is unavailable"
         }
-        check(botGateway.getSession(remoteAgentId) != null) {
-            "Client Mode gateway session is unavailable"
-        }
-        return remoteAgentId
     }
 
-    suspend fun restartSession(): String {
+    suspend fun restartSession() {
         initialize()
         stopGateway()
         reconcile(forceForeground = true)
-        val remoteAgentId = requireNotNull(activeRemoteAgentId) {
+        check(botGateway.getSession(CLIENT_MODE_CONFIG_ID) != null) {
             "Client Mode gateway session is unavailable"
         }
-        check(botGateway.getSession(remoteAgentId) != null) {
-            "Client Mode gateway session is unavailable"
-        }
-        return remoteAgentId
     }
 
     private suspend fun reconcile(forceForeground: Boolean) {
@@ -107,15 +104,13 @@ class ClientModeController @Inject constructor(
                 return
             }
 
-            val remoteAgent = resolveClientModeRemoteAgent(
-                baseUrl = baseUrl,
-                apiKey = apiKey.ifBlank { null },
-            )
-
+            // letta-mobile-w2hx.4: no agent resolution here. The
+            // transport is agent-agnostic — chats pass their own agent
+            // ID per-message. Saves a /status round-trip on every
+            // reconcile and removes the layer violation.
             val config = BotConfig(
                 id = CLIENT_MODE_CONFIG_ID,
-                agentId = remoteAgent.id,
-                displayName = "${remoteAgent.name} Client Mode",
+                displayName = "Client Mode",
                 mode = BotConfig.Mode.REMOTE,
                 remoteUrl = baseUrl,
                 remoteToken = apiKey.ifBlank { null },
@@ -127,26 +122,19 @@ class ClientModeController @Inject constructor(
                 config.remoteUrl.orEmpty(),
                 config.remoteToken.orEmpty(),
                 config.transport.name,
-                config.agentId,
             )
                 .joinToString(separator = "|")
 
             if (activeConfigSignature == signature &&
                 botGateway.status.value == GatewayStatus.RUNNING &&
-                botGateway.getSession(config.agentId) != null
+                botGateway.getSession(config.id) != null
             ) {
                 return
             }
 
             stopGatewayLocked()
             botGateway.start(listOf(config))
-            if (botGateway.getSession(config.agentId) != null) {
-                activeConfigSignature = signature
-                activeRemoteAgentId = config.agentId
-            } else {
-                activeConfigSignature = null
-                activeRemoteAgentId = null
-            }
+            activeConfigSignature = if (botGateway.getSession(config.id) != null) signature else null
         }
     }
 
@@ -161,7 +149,6 @@ class ClientModeController @Inject constructor(
             botGateway.stop()
         }
         activeConfigSignature = null
-        activeRemoteAgentId = null
     }
 
     fun release() {

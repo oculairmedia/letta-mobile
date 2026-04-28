@@ -14,16 +14,25 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Multi-agent router — Kotlin equivalent of lettabot's LettaGateway.
+ * Multi-transport router — Kotlin equivalent of lettabot's LettaGateway.
  *
- * Routes incoming messages to the correct [BotSession] based on agent mapping.
- * Manages the lifecycle of all active bot sessions and provides a unified
- * entry point for channel adapters to deliver messages.
+ * Manages the lifecycle of all active bot **transport** sessions. Each
+ * [BotConfig] creates one session keyed on `config.id`. The agent
+ * identity travels per-message on [ChannelMessage.targetAgentId] and is
+ * multiplexed on the wire by the per-agent session pool inside
+ * `RemoteBotSession`'s WS client (see lettabot AgentSessionManager
+ * connection pool, w2hx.3).
+ *
+ * letta-mobile-w2hx.4: this used to key sessions on the bound agent ID.
+ * That coupled "which transport am I using" with "which agent am I
+ * talking to" — a layer violation. Sessions are now agent-agnostic and
+ * the gateway picks one per `targetAgentId → configId` mapping.
  */
 @Singleton
 class BotGateway @Inject constructor(
     private val sessionFactory: BotSessionFactory,
 ) {
+    /** sessions keyed on `config.id` (NOT agent ID) */
     private val _sessions = MutableStateFlow<Map<String, BotSession>>(emptyMap())
     val sessions: StateFlow<Map<String, BotSession>> = _sessions.asStateFlow()
 
@@ -34,7 +43,9 @@ class BotGateway @Inject constructor(
 
     /**
      * Start the gateway with the given configurations.
-     * Creates and starts a [BotSession] for each agent config.
+     * Creates and starts a [BotSession] for each config; sessions are
+     * keyed on `config.id`, so multiple configs targeting the same Letta
+     * server with different transport settings can coexist.
      */
     suspend fun start(configs: List<BotConfig>) {
         mutex.withLock {
@@ -44,10 +55,10 @@ class BotGateway @Inject constructor(
                 try {
                     val session = sessionFactory.create(config)
                     session.start()
-                    sessions[config.agentId] = session
-                    Log.i(TAG, "Started session for agent ${config.agentId} (${config.displayName})")
+                    sessions[config.id] = session
+                    Log.i(TAG, "Started session for config ${config.id} (${config.displayName})")
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to start session for ${config.agentId}", e)
+                    Log.e(TAG, "Failed to start session for ${config.id}", e)
                 }
             }
             _sessions.value = sessions
@@ -63,7 +74,7 @@ class BotGateway @Inject constructor(
                 try {
                     session.stop()
                 } catch (e: Exception) {
-                    Log.w(TAG, "Error stopping session ${session.agentId}", e)
+                    Log.w(TAG, "Error stopping session ${session.configId}", e)
                 }
             }
             _sessions.value = emptyMap()
@@ -71,38 +82,46 @@ class BotGateway @Inject constructor(
         }
     }
 
-    /** Get a session by agent ID, or null if not running. */
-    fun getSession(agentId: String): BotSession? = _sessions.value[agentId]
+    /** Get a session by config ID, or null if not running. */
+    fun getSession(configId: String): BotSession? = _sessions.value[configId]
 
     /** Get the default (first) session, or null. */
     fun getDefaultSession(): BotSession? = _sessions.value.values.firstOrNull()
 
     /**
-     * Route an incoming message to the appropriate agent.
-     * Uses the message's agentId if present, otherwise falls back to default.
+     * Route an incoming message to a transport session.
+     *
+     * letta-mobile-w2hx.4: previously dispatched on `message.targetAgentId`
+     * (treating agent ID as session key). Now we always pick the default
+     * (and currently only) session — the agent identity is forwarded
+     * per-message and the WS layer's per-agent pool handles multiplex.
      */
     suspend fun routeMessage(message: ChannelMessage, conversationId: String? = null): BotResponse {
-        val session = message.targetAgentId?.let { getSession(it) }
-            ?: getDefaultSession()
+        val session = getDefaultSession()
             ?: throw IllegalStateException("No active bot sessions")
 
         return session.sendToAgent(message, conversationId)
     }
 
-    fun streamMessage(message: ChannelMessage, conversationId: String? = null): Flow<BotResponseChunk> {
-        val session = message.targetAgentId?.let { getSession(it) }
-            ?: getDefaultSession()
+    fun streamMessage(
+        message: ChannelMessage,
+        conversationId: String? = null,
+        forceNew: Boolean = false,
+    ): Flow<BotResponseChunk> {
+        val session = getDefaultSession()
             ?: throw IllegalStateException("No active bot sessions")
 
-        return session.streamToAgent(message, conversationId)
+        // letta-mobile-flk.6: forward forceNew to the session so the
+        // WS layer can include force_new=true in its session_start. See
+        // ClientModeChatSender + RemoteBotSession.streamToAgent.
+        return session.streamToAgent(message, conversationId, forceNew)
     }
 
     /**
      * Route a message and deliver the response back to the channel.
      */
     suspend fun routeAndDeliver(message: ChannelMessage): DeliveryResult {
-        val session = message.targetAgentId?.let { getSession(it) }
-            ?: getDefaultSession()
+        val session = getDefaultSession()
             ?: throw IllegalStateException("No active bot sessions")
 
         val response = session.sendToAgent(message)

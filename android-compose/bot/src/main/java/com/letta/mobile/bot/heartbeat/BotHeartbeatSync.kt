@@ -77,6 +77,10 @@ class BotHeartbeatSync @Inject constructor(
         nowMillis: Long,
     ): List<DueScheduledJob> {
         return configs.flatMap { config ->
+            // letta-mobile-w2hx.4: scheduled jobs share the same
+            // deterministic-target requirement as heartbeats — no agent,
+            // no fire.
+            if (config.heartbeatAgentId.isNullOrBlank()) return@flatMap emptyList()
             config.scheduledJobs
                 .filter { it.enabled }
                 .mapNotNull { job ->
@@ -93,6 +97,9 @@ class BotHeartbeatSync @Inject constructor(
 
 internal fun shouldRunHeartbeat(config: BotConfig, lastRunAt: Long?, nowMillis: Long): Boolean {
     if (!config.enabled || !config.heartbeatEnabled) return false
+    // letta-mobile-w2hx.4: a heartbeat with no explicit target agent is
+    // a no-op — there is no fallback "default agent" anymore.
+    if (config.heartbeatAgentId.isNullOrBlank()) return false
     val intervalMillis = config.heartbeatIntervalMinutes.coerceAtLeast(15L) * 60_000L
     val previous = lastRunAt ?: return true
     return nowMillis - previous >= intervalMillis
@@ -128,7 +135,11 @@ internal fun BotConfig.toHeartbeatMessage(timestampMillis: Long): ChannelMessage
     senderId = HEARTBEAT_SENDER_ID,
     senderName = "Heartbeat",
     text = heartbeatMessage,
-    targetAgentId = agentId,
+    // letta-mobile-w2hx.4: heartbeats need a deterministic target —
+    // there is no "active chat" when WorkManager fires offline. Schedules
+    // without `heartbeatAgentId` are filtered upstream in
+    // [shouldRunHeartbeatNow] so the !! is safe by contract.
+    targetAgentId = heartbeatAgentId!!,
     timestamp = timestampMillis,
     metadata = mapOf(
         "source" to "heartbeat",
@@ -143,7 +154,10 @@ internal fun DueScheduledJob.toChannelMessage(): ChannelMessage = ChannelMessage
     senderId = SCHEDULED_JOB_SENDER_ID,
     senderName = job.displayName.ifBlank { "Scheduled Job" },
     text = job.message,
-    targetAgentId = config.agentId,
+    // letta-mobile-w2hx.4: scheduled jobs route through the same
+    // deterministic `heartbeatAgentId` channel as heartbeats — schedules
+    // without it are filtered upstream.
+    targetAgentId = config.heartbeatAgentId!!,
     timestamp = runAtMillis,
     metadata = mapOf(
         "source" to "scheduled_job",

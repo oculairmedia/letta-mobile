@@ -2,6 +2,7 @@ package com.letta.mobile.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.letta.mobile.bot.protocol.BotChatRequest
@@ -64,6 +65,11 @@ class WsStreamCommand : CliktCommand(
         help = "User message text to send."
     ).required()
 
+    private val forceNew by option(
+        "--force-new",
+        help = "Send session_start with force_new=true to make the gateway clear its persisted conversation map and start a fresh Letta conversation. Mirrors the mobile 'New chat' tap.",
+    ).flag(default = false)
+
     override fun run() {
         val client = WsBotClient(
             baseUrl = baseUrl,
@@ -73,7 +79,7 @@ class WsStreamCommand : CliktCommand(
         try {
             runBlocking {
                 println("[CLI] WS  connect $baseUrl/api/v1/agent-gateway")
-                println("[CLI]   agent=$agentId  conversation=${conversationId.ifBlank { "<auto>" }}")
+                println("[CLI]   agent=$agentId  conversation=${conversationId.ifBlank { "<auto>" }}  force_new=$forceNew")
                 println("[CLI]   message=\"${message.take(80)}${if (message.length > 80) "..." else ""}\"")
                 println("[CLI] -----------------------------------------------------")
 
@@ -83,6 +89,7 @@ class WsStreamCommand : CliktCommand(
                     agentId = agentId,
                     chatId = chatId,
                     conversationId = conversationId.ifBlank { null },
+                    forceNew = forceNew,
                 )
 
                 client.streamMessage(request).collect { chunk: BotStreamChunk ->

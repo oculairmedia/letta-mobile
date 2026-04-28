@@ -39,7 +39,7 @@ class RemoteBotSession @AssistedInject constructor(
     private val profileResolver: BotServerProfileResolver,
 ) : BotSession {
 
-    override val agentId: String = config.agentId
+    override val configId: String = config.id
     override val displayName: String = config.displayName
 
     private val _status = MutableStateFlow(BotStatus.IDLE)
@@ -83,9 +83,12 @@ class RemoteBotSession @AssistedInject constructor(
 
         try {
             client!!.getStatus()
-            (client as? GatewayReadyClient)?.ensureGatewayReady(agentId = agentId)
+            // letta-mobile-w2hx.4: was ensureGatewayReady(agentId) here.
+            // Sessions are now agent-agnostic transports — the per-agent
+            // WS pool (w2hx.3) opens sessions lazily on first message, so
+            // at start time we just confirm the HTTP layer is reachable.
             _status.value = BotStatus.RUNNING
-            Log.i(TAG, "Connected to remote bot at $baseUrl")
+            Log.i(TAG, "Connected to remote bot at $baseUrl (config $configId)")
         } catch (e: Exception) {
             _status.value = BotStatus.ERROR
             Log.e(TAG, "Failed to connect to remote bot at $baseUrl", e)
@@ -102,6 +105,7 @@ class RemoteBotSession @AssistedInject constructor(
 
     override suspend fun sendToAgent(message: ChannelMessage, conversationId: String?): BotResponse {
         val remoteClient = client ?: throw IllegalStateException("Session not started")
+        val agentId = requireAgent(message)
 
         _status.value = BotStatus.PROCESSING
         try {
@@ -112,6 +116,7 @@ class RemoteBotSession @AssistedInject constructor(
                 senderId = message.senderId,
                 senderName = message.senderName,
                 conversationId = conversationId,
+                agentId = agentId,
             )
 
             val chatResponse = remoteClient.sendMessage(request)
@@ -134,8 +139,13 @@ class RemoteBotSession @AssistedInject constructor(
         }
     }
 
-    override fun streamToAgent(message: ChannelMessage, conversationId: String?): Flow<BotResponseChunk> = flow {
+    override fun streamToAgent(
+        message: ChannelMessage,
+        conversationId: String?,
+        forceNew: Boolean,
+    ): Flow<BotResponseChunk> = flow {
         val remoteClient = client ?: throw IllegalStateException("Session not started")
+        val agentId = requireAgent(message)
 
         _status.value = BotStatus.PROCESSING
         try {
@@ -147,6 +157,12 @@ class RemoteBotSession @AssistedInject constructor(
                 senderName = message.senderName,
                 conversationId = conversationId,
                 agentId = agentId,
+                // letta-mobile-flk.6: propagate the fresh-route signal to
+                // the WS gateway so it clears its persisted conversation
+                // map and starts a new Letta conversation. Without this
+                // the Client-Mode "New chat" tap silently resumes the
+                // previous conversation server-side.
+                forceNew = forceNew,
             )
 
             val accumulated = StringBuilder()
@@ -221,10 +237,15 @@ class RemoteBotSession @AssistedInject constructor(
             _status.value = BotStatus.RUNNING
         } catch (e: Exception) {
             _status.value = BotStatus.RUNNING
-            Log.e(TAG, "Error streaming message for agent $agentId", e)
+            Log.e(TAG, "Error streaming message for agent $agentId on config $configId", e)
             throw e
         }
     }
+
+    private fun requireAgent(message: ChannelMessage): String =
+        message.targetAgentId
+            ?: error("ChannelMessage(messageId=${message.messageId}) has no targetAgentId; " +
+                "the bound-agent concept was removed in w2hx.4 — callers must populate it.")
 
     override suspend fun deliverToChannel(response: BotResponse, sourceMessage: ChannelMessage): DeliveryResult {
         // In remote mode, the bot server handles delivery.
