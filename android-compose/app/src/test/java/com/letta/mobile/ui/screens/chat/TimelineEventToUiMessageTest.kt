@@ -334,4 +334,50 @@ class TimelineEventToUiMessageTest {
         val ui = timelineEventToUiMessage(ev)!!
         assertEquals("real text", ui.content)
     }
+
+    /**
+     * Real-world case from Emmanuel's screenshot in the
+     * "Letta Mobile Admin" conversation: Letta Code injects three
+     * back-to-back system-reminder envelopes in a single user turn
+     * (device info + agent info + permission mode). The first envelope
+     * is preceded by the lettabot wrapper's own `<system-reminder>` open
+     * — so the persisted form has a stray closing tag separating
+     * lettabot's envelope end from Letta Code's envelope start, and a
+     * naive non-greedy single-block regex leaves orphan tags visible.
+     */
+    @Test
+    fun `user message with three back-to-back envelope blocks has all stripped`() {
+        val leaked = """
+            <system-reminder>
+            ## Message Metadata
+            - Channel: Matrix
+            </system-reminder>
+            <system-reminder>
+            This is automated info about you.
+            - Agent ID: agent-d53a5c94
+            </system-reminder>
+            <system-reminder>Permission mode active: bypassPermissions.</system-reminder>
+            actual user prompt here
+        """.trimIndent()
+        val ev = confirmed(TimelineMessageType.USER, content = leaked)
+        val ui = timelineEventToUiMessage(ev)!!
+        assertEquals("actual user prompt here", ui.content)
+    }
+
+    @Test
+    fun `user message with orphan closing tag has it stripped`() {
+        // Defends against the malformed-envelope shape where lettabot's
+        // wrapping closes BEFORE Letta Code's nested envelope opens,
+        // leaving a stray `</system-reminder>` mid-content.
+        val leaked = "</system-reminder>\n<system-reminder>X</system-reminder>\nbody"
+        val ev = confirmed(TimelineMessageType.USER, content = leaked)
+        val ui = timelineEventToUiMessage(ev)!!
+        assertEquals("body", ui.content)
+    }
+
+    @Test
+    fun `user message with only orphan tags and no content is dropped`() {
+        val ev = confirmed(TimelineMessageType.USER, content = "</system-reminder>\n<system-reminder>")
+        assertNull(timelineEventToUiMessage(ev))
+    }
 }

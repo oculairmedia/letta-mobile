@@ -37,11 +37,38 @@ private val SYSTEM_REMINDER_BLOCK = Regex(
     "<system-reminder>[\\s\\S]*?</system-reminder>",
     RegexOption.IGNORE_CASE,
 )
+// Orphan tags survive after block stripping when an envelope was
+// truncated, malformed, or back-to-back with another envelope (e.g.
+// `</system-reminder><system-reminder>X</system-reminder>` — the
+// non-greedy block match consumes the inner pair and leaves the leading
+// orphan close behind). Strip any standalone open/close markers as a
+// final cleanup pass.
+private val SYSTEM_REMINDER_ORPHAN_TAG = Regex(
+    "</?system-reminder>",
+    RegexOption.IGNORE_CASE,
+)
 
 internal fun scrubUserEnvelope(content: String): String {
     if (content.isEmpty()) return content
-    if (!content.contains("<system-reminder", ignoreCase = true)) return content
-    return SYSTEM_REMINDER_BLOCK.replace(content, "").trim()
+    if (!content.contains("<system-reminder", ignoreCase = true) &&
+        !content.contains("</system-reminder", ignoreCase = true)) return content
+    // 1) Strip well-formed <system-reminder>...</system-reminder> blocks.
+    //    Run the regex to a fixed point so multiple back-to-back blocks
+    //    inside a single content payload are all consumed even if the
+    //    non-greedy match leaves the outer pair behind on the first pass.
+    var out = content
+    while (true) {
+        val next = SYSTEM_REMINDER_BLOCK.replace(out, "")
+        if (next == out) break
+        out = next
+    }
+    // 2) Strip any orphan open/close tags left over from malformed or
+    //    truncated envelopes. Their textual content (between an orphan
+    //    open and the next orphan close, or trailing past an orphan close)
+    //    is preserved — we'd rather show too much than swallow real user
+    //    text.
+    out = SYSTEM_REMINDER_ORPHAN_TAG.replace(out, "")
+    return out.trim()
 }
 
 /**
