@@ -1,0 +1,15 @@
+[package]
+name = "letta_mermaid_renderer"
+version = "0.1.0"
+edition = "2024"
+description = "Android JNI bridge for Mermaid SVG rendering in Letta Mobile"
+license = "MIT"
+publish = false
+
+[lib]
+name = "letta_mermaid_renderer"
+crate-type = ["cdylib"]
+
+[dependencies]
+jni = "0.21"
+mermaid-rs-renderer = { version = "0.2.2", default-features = false }

@@ -1,77 +1,119 @@
 package com.letta.mobile.ui.components
 
-import android.annotation.SuppressLint
-import android.graphics.Color as AndroidColor
-import android.os.Build
-import android.util.Base64
-import android.view.ViewGroup
-import android.webkit.JavascriptInterface
-import android.webkit.WebChromeClient
-import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
-import android.webkit.WebSettings
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.util.Log
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.svg.SvgDecoder
 import com.letta.mobile.ui.icons.LettaIcons
-import java.io.ByteArrayInputStream
-import java.io.IOException
 
-/**
- * Renders a Mermaid diagram from the supplied DSL `source` using a bundled
- * `mermaid.min.js` (see `designsystem/src/main/assets/mermaid.min.js`).
- *
- * Runs fully offline inside a sandboxed [WebView] — no network access. Bridges
- * a single `onRenderError(msg)` callback back to Compose so malformed diagrams
- * can degrade gracefully to the raw source without crashing.
- *
- * Theme follows the current Compose dark/light theme and passes a matching
- * mermaid `theme` config token. Supports pinch-to-zoom via WebView built-in
- * controls.
- */
-@OptIn(ExperimentalComposeUiApi::class)
-@SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun MermaidDiagram(
     source: String,
     modifier: Modifier = Modifier,
 ) {
     val clipboard = LocalClipboardManager.current
-    val isDark = isSystemInDarkTheme()
-    val backgroundArgb = MaterialTheme.colorScheme.surfaceVariant.toArgb()
-    val foregroundArgb = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
+    val context = LocalContext.current
 
-    // Hoisted so we can flip back to raw source if mermaid throws.
-    var renderError by rememberSaveable(source) { mutableStateOf<String?>(null) }
+    val isDark = isSystemInDarkTheme()
+    val textColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val borderColor = MaterialTheme.colorScheme.outlineVariant
+    val surfaceColor = MaterialTheme.colorScheme.surfaceVariant
+    val primaryColor = MaterialTheme.colorScheme.primaryContainer
+    val secondaryColor = MaterialTheme.colorScheme.secondaryContainer
+    val tertiaryColor = MaterialTheme.colorScheme.tertiaryContainer
+    val nativeStyle = remember(
+        textColor,
+        borderColor,
+        surfaceColor,
+        primaryColor,
+        secondaryColor,
+        tertiaryColor,
+    ) {
+        MermaidStyleSpec(
+            textArgb = textColor.toArgb(),
+            borderArgb = borderColor.toArgb(),
+            surfaceArgb = surfaceColor.toArgb(),
+            primaryArgb = primaryColor.toArgb(),
+            secondaryArgb = secondaryColor.toArgb(),
+            tertiaryArgb = tertiaryColor.toArgb(),
+        )
+    }
+
+    var renderError by mutableStateOf<String?>(null)
+
+    val nativeRender = remember(source, isDark, nativeStyle) {
+        MermaidNativeBridge.renderToSvg(
+            source = source,
+            darkTheme = isDark,
+            style = nativeStyle,
+        )
+    }
+
+    when (nativeRender) {
+        is MermaidNativeRenderResult.Rendered -> {
+            MermaidSvgDiagram(
+                svg = nativeRender.svg,
+                modifier = modifier,
+                onCopy = { clipboard.setText(AnnotatedString(source)) },
+                context = context,
+            )
+            return
+        }
+        is MermaidNativeRenderResult.Failed -> {
+            Log.w(TAG, "Native Mermaid render failed: ${nativeRender.reason}")
+            renderError = nativeRender.reason
+        }
+        MermaidNativeRenderResult.Unavailable -> {
+            renderError = "Native Mermaid renderer not available"
+        }
+    }
 
     if (renderError != null) {
         MermaidErrorFallback(
@@ -79,92 +121,176 @@ fun MermaidDiagram(
             errorMessage = renderError!!,
             modifier = modifier,
         )
-        return
     }
+}
 
-    val html = remember(source, isDark, backgroundArgb, foregroundArgb) {
-        buildMermaidHtml(
-            source = source,
-            dark = isDark,
-            backgroundArgb = backgroundArgb,
-            foregroundArgb = foregroundArgb,
-        )
+@Composable
+private fun MermaidSvgDiagram(
+    svg: String,
+    modifier: Modifier,
+    onCopy: () -> Unit,
+    context: android.content.Context,
+) {
+    var showFullscreen by mutableStateOf(false)
+    val request = remember(svg, context) {
+        ImageRequest.Builder(context)
+            .data(svg.toByteArray(Charsets.UTF_8))
+            .decoderFactory(SvgDecoder.Factory())
+            .build()
     }
 
     Surface(
         shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        color = Color.Transparent,
         modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
     ) {
         Column {
-            MermaidHeader(
-                onCopy = { clipboard.setText(AnnotatedString(source)) },
-            )
-
-            AndroidView(
+            MermaidHeader(onCopy = onCopy)
+            AsyncImage(
+                model = request,
+                contentDescription = "Mermaid diagram rendered natively",
                 modifier = Modifier
                     .fillMaxWidth()
                     .defaultMinSize(minHeight = 120.dp)
                     .combinedClickable(
-                        onClick = {},
-                        onLongClick = { clipboard.setText(AnnotatedString(source)) },
+                        onClick = { showFullscreen = true },
+                        onLongClick = onCopy,
                     ),
-                factory = { ctx ->
-                    createMermaidWebView(
-                        ctx = ctx,
-                        html = html,
-                        onError = { renderError = it },
-                    )
-                },
-                update = { webView ->
-                    webView.loadMermaid(html)
-                },
+                contentScale = ContentScale.Fit,
             )
         }
     }
+
+    if (showFullscreen) {
+        MermaidFullscreenDialog(
+            request = request,
+            onDismiss = { showFullscreen = false },
+            onCopy = onCopy,
+        )
+    }
 }
 
-@SuppressLint("SetJavaScriptEnabled")
-private fun createMermaidWebView(
-    ctx: android.content.Context,
-    html: String,
-    onError: (String) -> Unit,
-): WebView = WebView(ctx).apply {
-    layoutParams = ViewGroup.LayoutParams(
-        ViewGroup.LayoutParams.MATCH_PARENT,
-        ViewGroup.LayoutParams.WRAP_CONTENT,
-    )
-    setBackgroundColor(AndroidColor.TRANSPARENT)
-    settings.apply {
-        javaScriptEnabled = true
-        // Only asset-intercept and the base HTML are ever loaded; keep
-        // file and content access off for belt-and-braces.
-        allowFileAccess = false
-        allowContentAccess = false
-        cacheMode = WebSettings.LOAD_NO_CACHE
-        builtInZoomControls = true
-        displayZoomControls = false
-        setSupportZoom(true)
-        useWideViewPort = true
-        loadWithOverviewMode = true
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+@Composable
+private fun MermaidFullscreenDialog(
+    request: ImageRequest,
+    onDismiss: () -> Unit,
+    onCopy: () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        var zoom by mutableStateOf(1f)
+        var pan by mutableStateOf(Offset.Zero)
+        fun resetViewport() {
+            zoom = 1f
+            pan = Offset.Zero
+        }
+        fun setHundredPercentViewport() {
+            zoom = FULLSCREEN_ONE_TO_ONE_APPROX_ZOOM
+            pan = Offset.Zero
+        }
+
+        val transformableState = rememberTransformableState { zoomChange, panChange, _ ->
+            val nextZoom = (zoom * zoomChange).coerceIn(1f, 4f)
+            val appliedScale = nextZoom / zoom
+            zoom = nextZoom
+            pan = if (zoom <= 1.01f) {
+                Offset.Zero
+            } else {
+                (pan + panChange * appliedScale)
+            }
+        }
+
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xE6000000)),
+        ) {
+            val isCompact = maxWidth < 600.dp
+            val contentModifier = if (isCompact) {
+                Modifier.fillMaxSize()
+            } else {
+                Modifier
+                    .widthIn(max = 1000.dp)
+                    .fillMaxWidth()
+                    .padding(32.dp)
+            }
+
+            Card(
+                modifier = contentModifier.align(Alignment.Center),
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "mermaid",
+                            style = MaterialTheme.typography.titleSmall,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = ::resetViewport) {
+                            Text("Fit")
+                        }
+                        TextButton(onClick = ::setHundredPercentViewport) {
+                            Text("100%")
+                        }
+                        TextButton(onClick = onDismiss) {
+                            Text("Done")
+                        }
+                        FilledTonalButton(
+                            onClick = onCopy,
+                            modifier = Modifier.padding(start = 8.dp),
+                        ) {
+                            Icon(
+                                imageVector = LettaIcons.Copy,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Text(
+                                text = "Copy",
+                                modifier = Modifier.padding(start = 8.dp),
+                            )
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.08f))
+                            .pointerInput(Unit) {
+                                detectTapGestures(
+                                    onDoubleTap = { resetViewport() },
+                                )
+                            }
+                            .transformable(transformableState),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        AsyncImage(
+                            model = request,
+                            contentDescription = "Mermaid diagram fullscreen",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer(
+                                    scaleX = zoom,
+                                    scaleY = zoom,
+                                    translationX = pan.x,
+                                    translationY = pan.y,
+                                ),
+                            contentScale = ContentScale.Fit,
+                        )
+                    }
+                }
+            }
         }
     }
-    webViewClient = MermaidWebViewClient(ctx)
-    webChromeClient = WebChromeClient()
-    addJavascriptInterface(MermaidBridge(onError), MermaidBridge.NAME)
-    loadMermaid(html)
-}
-
-private fun WebView.loadMermaid(html: String) {
-    loadDataWithBaseURL(
-        "https://mermaid.local/",
-        html,
-        "text/html",
-        "utf-8",
-        null,
-    )
 }
 
 @Composable
@@ -224,106 +350,5 @@ private fun MermaidErrorFallback(
     }
 }
 
-private class MermaidBridge(private val onError: (String) -> Unit) {
-    @JavascriptInterface
-    fun onRenderError(message: String) {
-        onError(message)
-    }
-
-    companion object {
-        const val NAME = "LettaMermaid"
-    }
-}
-
-/**
- * Serves the bundled `mermaid.min.js` from the designsystem module's assets
- * so the rendered page can `<script src="mermaid.min.js">` offline without
- * needing `allowFileAccess`.
- */
-private class MermaidWebViewClient(
-    private val context: android.content.Context,
-) : WebViewClient() {
-    override fun shouldInterceptRequest(
-        view: WebView,
-        request: WebResourceRequest,
-    ): WebResourceResponse? {
-        val url = request.url?.toString() ?: return null
-        if (url.endsWith("/mermaid.min.js")) {
-            return try {
-                val stream = context.assets.open("mermaid.min.js")
-                WebResourceResponse("application/javascript", "utf-8", stream)
-            } catch (e: IOException) {
-                WebResourceResponse(
-                    "text/plain",
-                    "utf-8",
-                    ByteArrayInputStream(
-                        "window.LettaMermaid?.onRenderError('asset load failed: ${e.message}');"
-                            .toByteArray(),
-                    ),
-                )
-            }
-        }
-        return null
-    }
-}
-
-internal fun buildMermaidHtml(
-    source: String,
-    dark: Boolean,
-    backgroundArgb: Int,
-    foregroundArgb: Int,
-): String {
-    val theme = if (dark) "dark" else "default"
-    val bgCss = argbToCssHex(backgroundArgb)
-    val fgCss = argbToCssHex(foregroundArgb)
-    // Base64 so we don't have to escape backticks / newlines / quotes inside
-    // the mermaid source.
-    val encoded = Base64.encodeToString(source.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
-    return """
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <style>
-      html, body {
-        margin: 0;
-        padding: 8px;
-        background: $bgCss;
-        color: $fgCss;
-        font-family: sans-serif;
-      }
-      #container { width: 100%; overflow: auto; }
-      #container svg { max-width: 100%; height: auto; }
-      .mermaid-error { color: #b00020; white-space: pre-wrap; }
-    </style>
-  </head>
-  <body>
-    <div id="container"><div class="mermaid" id="diagram"></div></div>
-    <script src="mermaid.min.js"></script>
-    <script>
-      (function () {
-        try {
-          var src = atob('$encoded');
-          document.getElementById('diagram').textContent = src;
-          mermaid.initialize({ startOnLoad: false, theme: '$theme', securityLevel: 'strict' });
-          mermaid.run({ nodes: [document.getElementById('diagram')] }).catch(function (err) {
-            try { LettaMermaid.onRenderError(String(err && err.message ? err.message : err)); } catch (e) {}
-          });
-        } catch (err) {
-          try { LettaMermaid.onRenderError(String(err && err.message ? err.message : err)); } catch (e) {}
-        }
-      })();
-    </script>
-  </body>
-</html>
-""".trimIndent()
-}
-
-private fun argbToCssHex(argb: Int): String {
-    val r = (argb shr 16) and 0xFF
-    val g = (argb shr 8) and 0xFF
-    val b = argb and 0xFF
-    return String.format(java.util.Locale.ROOT, "#%02x%02x%02x", r, g, b)
-}
-
+private const val TAG = "MermaidDiagram"
+private const val FULLSCREEN_ONE_TO_ONE_APPROX_ZOOM = 2f
