@@ -1387,37 +1387,39 @@ class AdminChatViewModel @Inject constructor(
                                 )
                             },
                             transform = { existing ->
-                                // Defensive: if the gateway ever DOES send a
-                                // cumulative snapshot (full text starts with
-                                // what we already have), don't double-concat.
-                                // Mirrors TimelineSyncLoop:1132-1138 logic.
+                                // letta-mobile-aie.7 (scope wucn to
+                                // timeline-sync only): the WS streaming path
+                                // sees raw delta fragments from the gateway;
+                                // it does NOT see server-normalized
+                                // near-snapshots (those originate in the
+                                // upstream Letta SSE stream, which is
+                                // processed by TimelineSyncLoop where the
+                                // wucn heuristic still lives).
                                 //
-                                // letta-mobile-wucn (timeline-path port):
-                                // server-side normalization (whitespace,
-                                // quote/punctuation rewrites) can produce a
-                                // near-snapshot chunk that fails the strict
-                                // prefix check. Without this guard the
-                                // bubble doubles. Same heuristic as the
-                                // legacy path: a chunk that's >= 32 chars
-                                // AND >= 50% of existing length is
-                                // overwhelmingly more likely a snapshot
-                                // than a real append — pick the longer.
+                                // The previous wucn copy on this path was
+                                // added defensively but was never required
+                                // by any observed gateway behaviour. With
+                                // server-side stream coalescing
+                                // (LETTABOT_COALESCE_ENABLED) batching ~140-
+                                // char text deltas, those batches have NO
+                                // prefix relationship to existing content
+                                // and would trip the >=32-char heuristic on
+                                // every batch after the first — silently
+                                // dropping or overwriting text. So we drop
+                                // the heuristic from this path.
+                                //
+                                // The three explicit prefix checks below
+                                // still cover the legitimate snapshot case
+                                // (gateway emitting a full content reissue
+                                // that exactly contains or extends our
+                                // accumulator) and idempotency. Anything
+                                // else is treated as an append, which is
+                                // the correct behaviour for delta streams,
+                                // including coalesced delta streams.
                                 val merged = when {
                                     delta == existing.content -> existing.content
                                     delta.startsWith(existing.content) -> delta
                                     existing.content.startsWith(delta) -> existing.content
-                                    delta.length >= 32 &&
-                                        delta.length >= existing.content.length / 2 -> {
-                                        android.util.Log.w(
-                                            "AdminChatViewModel",
-                                            "wucn-snapshot-recovery (timeline): chunk shaped " +
-                                                "like snapshot but failed strict prefix check. " +
-                                                "existing.len=${existing.content.length} " +
-                                                "chunk.len=${delta.length} localId=$localId. " +
-                                                "Falling back to longer-string replacement.",
-                                        )
-                                        if (delta.length >= existing.content.length) delta else existing.content
-                                    }
                                     else -> existing.content + delta
                                 }
                                 existing.copy(
