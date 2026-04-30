@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.union
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -52,6 +50,7 @@ import com.letta.mobile.ui.theme.LocalChatIsPinching
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -73,6 +72,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LocalWindowSizeClass
+import com.letta.mobile.ui.theme.isExpandedWidth
+import kotlin.math.max
 
 @Composable
 fun ChatScreen(
@@ -98,6 +100,12 @@ fun ChatScreen(
 
     LettaChatTheme(fontScale = activeFontScale) {
         val snackbarHostState = remember { SnackbarHostState() }
+        val density = LocalDensity.current
+        val windowSizeClass = LocalWindowSizeClass.current
+        val imeBottomPx = WindowInsets.ime.getBottom(density)
+        val navBottomPx = WindowInsets.navigationBars.getBottom(density)
+        val bottomBarPx = if (windowSizeClass.isExpandedWidth) 0 else with(density) { 56.dp.roundToPx() }
+        val bottomInsetDp = with(density) { max(imeBottomPx, navBottomPx + bottomBarPx).toDp() }
 
         LaunchedEffect(state.composerError) {
             val message = state.composerError ?: return@LaunchedEffect
@@ -105,21 +113,11 @@ fun ChatScreen(
             viewModel.clearComposerError()
         }
 
-        // letta-mobile-6vsx: use union(ime, navigationBars) instead of
-        // bare imePadding() so the bottom inset is min-floored at nav-bar
-        // height. With enableEdgeToEdge() + windowSoftInputMode=adjustNothing,
-        // bare imePadding() lets the composer animate down to the absolute
-        // screen bottom (under the nav bar) during the IME-hide animation,
-        // then snaps back up when an outer scaffold's nav-bar inset
-        // re-takes effect — the visible "drop then rise" symptom.
-        // With the union the IME animation interpolates between IME_height
-        // and nav_bar_height, never below, and the composer's resting
-        // position is correct from the very start of the hide animation.
         Box(
             modifier = modifier
                 .fillMaxSize()
                 .then(backgroundModifier)
-                .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)),
+                .padding(bottom = bottomInsetDp),
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // letta-mobile-c87t: surfaces a non-modal banner when the
