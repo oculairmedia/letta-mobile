@@ -4,6 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.bot.protocol.BotAgentInfo
+import com.letta.mobile.bot.protocol.BotGatewayErrorCode
+import com.letta.mobile.bot.protocol.BotGatewayException
 import com.letta.mobile.bot.protocol.BotStreamChunk
 import com.letta.mobile.bot.protocol.BotStreamEvent
 import com.letta.mobile.bot.protocol.InternalBotClient
@@ -45,10 +47,12 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
@@ -202,12 +206,55 @@ data class ChatUiState(
 
 /**
  * Banner state for the gateway's conversation-substitution recovery path.
- * Emitted by `AdminChatViewModel` when `session_init.conversation_id` differs
- * from the conversation we asked the gateway to resume.
+ *
+ * Two distinct cases are surfaced here:
+ *
+ *   * [Substituted] — letta-mobile-c87t (legacy path, kept for back-compat
+ *     with older lettabot gateways that don't support the c87t.2 refusal):
+ *     the gateway already silently swapped the conversation underneath us
+ *     and reported the new id via `session_init`. Banner is informational;
+ *     the user is already in the new conversation.
+ *
+ *   * [NotResumable] — letta-mobile-c87t.2: the new (preferred) path. The
+ *     gateway refused the silent substitution and returned a typed
+ *     `CONVERSATION_NOT_RESUMABLE` error frame. The user is still anchored
+ *     to the prior conversation; nothing has been migrated. Banner offers
+ *     an explicit "start a fresh chat" action so the user is in control.
  */
-data class ClientModeConversationSwap(
-    val requestedConversationId: String,
-    val newConversationId: String,
+sealed class ClientModeConversationSwap {
+    /** The conv id the user asked to resume — common to both variants. */
+    abstract val requestedConversationId: String
+
+    /**
+     * The gateway already moved us into a different conversation.
+     * Informational banner, dismissable.
+     */
+    data class Substituted(
+        override val requestedConversationId: String,
+        val newConversationId: String,
+    ) : ClientModeConversationSwap()
+
+    /**
+     * The gateway refused to resume `requestedConversationId`. The user
+     * has not been moved. They can either dismiss (stay anchored,
+     * possibly retry later) or take an action that retries with
+     * `force_new=true` to start a fresh conversation deliberately.
+     */
+    data class NotResumable(
+        override val requestedConversationId: String,
+    ) : ClientModeConversationSwap()
+}
+
+/**
+ * letta-mobile-c87t.2: buffered send context preserved when the gateway
+ * refuses to resume a conversation. Used by
+ * `AdminChatViewModel.startFreshConversationAfterUnresumable` to retry
+ * the original send under a brand-new conversation.
+ */
+private data class PendingClientModeSend(
+    val agentId: String,
+    val text: String,
+    val unresumableConversationId: String,
 )
 
 /** Upper bound on composer image attachments per message. */
@@ -230,6 +277,11 @@ class AdminChatViewModel @Inject constructor(
     private val internalBotClient: InternalBotClient,
     private val clientModeChatSender: ClientModeChatSender,
     private val currentConversationTracker: com.letta.mobile.channel.CurrentConversationTracker,
+    // Doubled-response fix: marks conversations driven by the WS gateway path
+    // so TimelineSyncLoop's direct-Letta SSE subscriber stays dormant for
+    // them. Released when Client Mode is disabled (see clientModeEnabled
+    // observer below). Plan: 2026-04-clientmode-double-bubble-fix.md.
+    private val clientModeSuppressionGate: com.letta.mobile.clientmode.ClientModeSuppressionGate,
 ) : ViewModel() {
     companion object {
         private const val CONVERSATION_CACHE_TTL_MS = 30_000L
@@ -367,6 +419,14 @@ class AdminChatViewModel @Inject constructor(
     private var timelineObserverJob: kotlinx.coroutines.Job? = null
     private var timelineHydrateSignalJob: kotlinx.coroutines.Job? = null
     private var clientModeStreamJob: Job? = null
+    /**
+     * letta-mobile-flk2: per-stream paint-rate smoother. Created in
+     * [sendMessageViaClientMode] before the stream collect, drained by
+     * [ClientModeStreamSmoother.awaitDrained] on `done=true`, and flushed
+     * synchronously by [ClientModeStreamSmoother.flushAndStop] on cancel
+     * / abort / `finally`. Null between streams.
+     */
+    private var clientModeSmoother: ClientModeStreamSmoother? = null
 
     /**
      * letta-mobile-5s1n (regression fix): explicit "Client Mode stream in
@@ -414,6 +474,22 @@ class AdminChatViewModel @Inject constructor(
     // `isActive == true` guard silently ignored conversation switches.
     private var timelineObserverConversationId: String? = null
 
+    /**
+     * letta-mobile-c87t.2: buffered context for a `CONVERSATION_NOT_RESUMABLE`
+     * recovery. Set when the gateway refuses to resume a conv id; consumed
+     * (and cleared) by [startFreshConversationAfterUnresumable] when the
+     * user accepts the actionable banner.
+     */
+    private var pendingResendAfterUnresumable: PendingClientModeSend? = null
+
+    /**
+     * letta-mobile-c87t.2: when set, the next `sendMessageViaClientMode`
+     * resolves `priorConversationId = null` regardless of route args /
+     * client-mode-conversation-id state. The flag clears as soon as it's
+     * read so subsequent sends use the normal resolution.
+     */
+    private var forceFreshOnNextClientModeSend: Boolean = false
+
     init {
         // letta-mobile-w2hx.6: route arg already pre-populated `activeConversationId`
         // at field init; no shared singleton to seed.
@@ -434,7 +510,21 @@ class AdminChatViewModel @Inject constructor(
                     .collect { enabled ->
                         if (!enabled) {
                             clientModeStreamJob?.cancel()
+                            // letta-mobile-flk2: drain smoother on
+                            // disable so any in-flight characters reach
+                            // the timeline before we tear down.
+                            clientModeSmoother?.let { sm ->
+                                viewModelScope.launch { runCatching { sm.flushAndStop() } }
+                            }
+                            clientModeSmoother = null
                             clientModeStreamInFlight = false
+                            // Doubled-response fix: Client Mode is no longer
+                            // the authority for any conversation. Release
+                            // every owned conv so TimelineSyncLoop's direct
+                            // SSE subscriber resumes on the next loop tick.
+                            // Process-wide because a single ClientMode toggle
+                            // governs every chat in the app.
+                            clientModeSuppressionGate.releaseAll()
                             _uiState.update {
                                 it.copy(
                                     isStreaming = false,
@@ -1008,6 +1098,14 @@ class AdminChatViewModel @Inject constructor(
 
     private fun sendMessageViaClientMode(text: String) {
         clientModeStreamJob?.cancel()
+        // letta-mobile-flk2: drain any leftover smoother from a prior
+        // stream synchronously before starting a new one. flushAndStop
+        // is idempotent and safe to call on a never-started smoother
+        // (the paint job won't be active).
+        clientModeSmoother?.let { stale ->
+            viewModelScope.launch { runCatching { stale.flushAndStop() } }
+        }
+        clientModeSmoother = null
         // letta-mobile-5s1n (regression fix): mark stream in flight BEFORE
         // launching, so observer emissions inside the launch (which run
         // synchronously on UnconfinedTestDispatcher / immediate main) see
@@ -1022,7 +1120,13 @@ class AdminChatViewModel @Inject constructor(
             // resumeSession() into the matching Letta conversation. Fall back to
             // the saved-state-handle pointer for cases where Client Mode set up the
             // conversation itself (fresh-route entry continued in-place).
-            val priorConversationId = explicitConversationId ?: currentClientModeConversationId()
+            // letta-mobile-c87t.2: honor the one-shot forceFresh override
+            // set by [startFreshConversationAfterUnresumable]. Reading
+            // resets it so unrelated subsequent sends use normal resolution.
+            val forceFreshNow = forceFreshOnNextClientModeSend
+            forceFreshOnNextClientModeSend = false
+            val priorConversationId = if (forceFreshNow) null
+                else explicitConversationId ?: currentClientModeConversationId()
             // letta-mobile-w2hx.7: freshness is no longer signalled with a
             // dedicated flag. A fresh-route entry surfaces as
             // `priorConversationId == null` and the gateway opens a new
@@ -1067,6 +1171,12 @@ class AdminChatViewModel @Inject constructor(
                     pendingAttachments = persistentListOf(),
                     conversationState = ConversationState.Ready(convId),
                 )
+                // Doubled-response fix: claim this conversation BEFORE the
+                // first append/observer wires up so TimelineSyncLoop's direct
+                // SSE subscriber stops opening a parallel stream that would
+                // ingest the same upstream events as Confirmed bubbles
+                // alongside our `cm-assist-*` Locals. Idempotent.
+                clientModeSuppressionGate.markOwned(convId)
                 runCatching {
                     timelineRepository.appendClientModeLocal(
                         conversationId = convId,
@@ -1139,6 +1249,29 @@ class AdminChatViewModel @Inject constructor(
             // sends skip migration (the bubble was appended to the timeline
             // up-front in the priorConversationId-non-null branch above).
             var migratedToTimeline = priorConversationId != null
+            // letta-mobile-flk2: instantiate the paint-rate smoother for
+            // this stream. The onPaint callback delegates to the slice
+            // painters which run the original timeline upserts, so byte
+            // semantics are unchanged. We capture conversationId
+            // dynamically (latestConversationId can update mid-stream
+            // when the gateway echoes a fresh conv on the first frame).
+            val freshSentAt = runCatching {
+                java.time.Instant.parse(startedAt)
+            }.getOrDefault(java.time.Instant.now())
+            clientModeSmoother = ClientModeStreamSmoother(
+                scope = viewModelScope,
+                onPaint = { kind, lid, slice ->
+                    val conv = latestConversationId?.takeIf { it.isNotBlank() }
+                        ?: priorConversationId
+                        ?: return@ClientModeStreamSmoother
+                    when (kind) {
+                        ClientModeStreamSmoother.Kind.ASSISTANT ->
+                            paintClientModeAssistantSlice(conv, lid, freshSentAt, slice)
+                        ClientModeStreamSmoother.Kind.REASONING ->
+                            paintClientModeReasoningSlice(conv, lid, freshSentAt, slice)
+                    }
+                },
+            )
             try {
                 clientModeChatSender.streamMessage(
                     screenAgentId = agentId,
@@ -1156,7 +1289,7 @@ class AdminChatViewModel @Inject constructor(
                             if (priorConversationId != null && priorConversationId != conversationId) {
                                 _uiState.update { state ->
                                     state.copy(
-                                        clientModeConversationSwap = ClientModeConversationSwap(
+                                        clientModeConversationSwap = ClientModeConversationSwap.Substituted(
                                             requestedConversationId = priorConversationId,
                                             newConversationId = conversationId,
                                         ),
@@ -1187,6 +1320,16 @@ class AdminChatViewModel @Inject constructor(
                                 // for their write target via
                                 // handleClientModeStreamChunk.
                                 runCatching {
+                                    // Doubled-response fix: gateway swap means
+                                    // Client Mode now owns the NEW conversation.
+                                    // Mark it before appending so the direct-SSE
+                                    // subscriber for that conv stays dormant.
+                                    // We intentionally DO NOT release the old
+                                    // priorConversationId — the gateway abandoned
+                                    // it and we don't want a sudden direct-SSE
+                                    // open to flood the user's now-stale chat
+                                    // before they navigate.
+                                    clientModeSuppressionGate.markOwned(conversationId)
                                     timelineRepository.appendClientModeLocal(
                                         conversationId = conversationId,
                                         content = text,
@@ -1229,6 +1372,12 @@ class AdminChatViewModel @Inject constructor(
                             migratedToTimeline = true
                             val newConvId = latestConversationId
                             if (newConvId != null) {
+                                // Doubled-response fix: fresh-route migration
+                                // — the gateway has now decided which Letta
+                                // conversation owns this turn. Claim it
+                                // before the first timeline write so the
+                                // direct-SSE subscriber stays dormant.
+                                clientModeSuppressionGate.markOwned(newConvId)
                                 runCatching {
                                     timelineRepository.appendClientModeLocal(
                                         conversationId = newConvId,
@@ -1357,13 +1506,52 @@ class AdminChatViewModel @Inject constructor(
                         return@collect
                     }
 
-                    handleClientModeStreamChunk(
-                        chunk = chunk,
-                        assistantMessageId = assistantMessageId,
-                        timestamp = startedAt,
-                        replaceAssistant = true,
-                        conversationId = latestConversationId?.takeIf { it.isNotBlank() },
-                    )
+                    // letta-mobile-flk2 (revised): the gateway may ship
+                    // the last text/reasoning delta IN THE SAME FRAME
+                    // as `done=true`. Feed that final delta through the
+                    // smoother FIRST so it lands in arrival order, then
+                    // mark complete and await the tail. Tool-call /
+                    // tool-result terminal frames are snapshot-shaped
+                    // and go through the legacy chunk handler (which
+                    // upserts directly, bypassing the smoother).
+                    val isToolFrame = chunk.event == BotStreamEvent.TOOL_CALL ||
+                        chunk.event == BotStreamEvent.TOOL_RESULT
+                    if (isToolFrame) {
+                        handleClientModeStreamChunk(
+                            chunk = chunk,
+                            assistantMessageId = assistantMessageId,
+                            timestamp = startedAt,
+                            conversationId = latestConversationId?.takeIf { it.isNotBlank() },
+                        )
+                    } else if (!chunk.text.isNullOrEmpty() ||
+                        chunk.event == BotStreamEvent.REASONING) {
+                        // Same path as the !chunk.done branch above,
+                        // routing through the smoother. This MUST run
+                        // before markStreamComplete so the last delta
+                        // is in the buffer when the tail accelerates.
+                        handleClientModeStreamChunk(
+                            chunk = chunk,
+                            assistantMessageId = assistantMessageId,
+                            timestamp = startedAt,
+                            conversationId = latestConversationId?.takeIf { it.isNotBlank() },
+                        )
+                    }
+
+                    // letta-mobile-flk2: now drain the smoother. The
+                    // tail-drain budget (DRAIN_TAIL_MS=120ms) bounds
+                    // perceived latency. Watchdog inside awaitDrained
+                    // (DRAIN_TIMEOUT_MS=500ms) ensures we never wedge
+                    // here even if the tick job died.
+                    clientModeSmoother?.markStreamComplete()
+                    clientModeSmoother?.awaitDrained()
+                    // letta-mobile-flk2: NO replaceAssistant repaint.
+                    // The smoother delivered every byte in arrival
+                    // order via paintClientModeAssistantSlice /
+                    // paintClientModeReasoningSlice, which use the
+                    // identical delta-append upsert. A second
+                    // "replace" pass over the same content was the
+                    // source of the end-of-stream flicker — markdown
+                    // re-parses, layout shifts, cursor toggles.
 
                     // letta-mobile-hf93: a stream that completed without
                     // any payload would otherwise look identical to a
@@ -1385,14 +1573,61 @@ class AdminChatViewModel @Inject constructor(
                     )
                 }
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    conversationState = latestConversationId?.let { ConversationState.Ready(it) }
-                        ?: ConversationState.NoConversation,
-                    error = e.message ?: "Client Mode send failed",
-                    isStreaming = false,
-                    isAgentTyping = false,
-                )
+                // letta-mobile-c87t.2: when the gateway refused to resume the
+                // requested conversation (because the underlying letta-code
+                // CLI silently allocated a different one and our new
+                // server-side guard rejected the substitution), surface an
+                // actionable banner instead of a generic error toast. The
+                // user's optimistic bubble stays in the prior conversation's
+                // timeline (we don't roll it back — it represents a real
+                // attempt). The buffered text is stashed on the swap state
+                // so [startFreshConversationAfterUnresumable] can resend it
+                // verbatim with force_new=true.
+                if (
+                    e is BotGatewayException &&
+                    e.code == BotGatewayErrorCode.CONVERSATION_NOT_RESUMABLE &&
+                    priorConversationId != null
+                ) {
+                    android.util.Log.w(
+                        "AdminChatViewModel",
+                        "c87t.2 gateway refused to resume conv=${priorConversationId.take(12)}... — surfacing NotResumable banner",
+                    )
+                    pendingResendAfterUnresumable = PendingClientModeSend(
+                        agentId = agentId,
+                        text = text,
+                        unresumableConversationId = priorConversationId,
+                    )
+                    _uiState.value = _uiState.value.copy(
+                        conversationState = ConversationState.Ready(priorConversationId),
+                        clientModeConversationSwap = ClientModeConversationSwap.NotResumable(
+                            requestedConversationId = priorConversationId,
+                        ),
+                        isStreaming = false,
+                        isAgentTyping = false,
+                        // Don't show a generic error — the actionable banner
+                        // tells the user exactly what happened and offers
+                        // the start-fresh action.
+                        error = null,
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        conversationState = latestConversationId?.let { ConversationState.Ready(it) }
+                            ?: ConversationState.NoConversation,
+                        error = e.message ?: "Client Mode send failed",
+                        isStreaming = false,
+                        isAgentTyping = false,
+                    )
+                }
             } finally {
+                // letta-mobile-flk2: drain whatever the smoother still
+                // holds (success path will already be drained from the
+                // done branch; cancel/throw paths still have buffered
+                // characters we must not drop). flushAndStop is
+                // synchronous w.r.t. onPaint completion.
+                clientModeSmoother?.let { sm ->
+                    runCatching { sm.flushAndStop() }
+                }
+                clientModeSmoother = null
                 clientModeStreamInFlight = false
                 if (clientModeStreamJob?.isCancelled != false) {
                     clientModeStreamJob = null
@@ -1464,48 +1699,43 @@ class AdminChatViewModel @Inject constructor(
         when (chunk.event) {
             BotStreamEvent.REASONING -> {
                 val localId = "cm-reason-${chunk.uuid ?: assistantMessageId}"
-                // letta-mobile-lv3e (REVERTS letta-mobile-vu6a): reasoning
-                // chunks are deltas, same as assistant text. Append, don't
-                // replace. Defensive snapshot-shape detection mirrors the
-                // TimelineSyncLoop merge so we won't double-concat if the
-                // gateway ever changes shape.
+                // letta-mobile-flk2: enqueue into the paint-rate smoother
+                // instead of upserting directly. The smoother drains the
+                // queue at a smoothed cadence (~90-120 cps adaptive) and
+                // calls back into [paintClientModeReasoningSlice] which
+                // runs the original upsert. Concatenation order and
+                // total bytes are preserved (FIFO per channel) so the
+                // lettabot-uww.11 byte-perfect reassembly invariants
+                // still hold; the smoother only changes WHEN bytes hit
+                // the timeline, never WHICH bytes or in what order.
                 val delta = chunk.text.orEmpty()
-                viewModelScope.launch {
-                    runCatching {
-                        timelineRepository.upsertClientModeLocalAssistantChunk(
+                if (delta.isEmpty()) return
+                val smoother = clientModeSmoother
+                if (smoother != null) {
+                    // letta-mobile-flk2 (revision): enqueue is now
+                    // synchronous (JVM monitor lock), so we no longer
+                    // launch a coroutine. This eliminates the race
+                    // where markStreamComplete() ran before the
+                    // launched enqueue acquired its lock — which
+                    // caused the typing indicator to stay stuck on at
+                    // end-of-stream.
+                    smoother.enqueue(
+                        kind = ClientModeStreamSmoother.Kind.REASONING,
+                        localId = localId,
+                        delta = delta,
+                    )
+                } else {
+                    // Defensive fallback: smoother should always be
+                    // active during a stream, but if it isn't, paint
+                    // synchronously so we never drop characters.
+                    viewModelScope.launch {
+                        paintClientModeReasoningSlice(
                             conversationId = conversationId,
                             localId = localId,
-                            build = {
-                                com.letta.mobile.data.timeline.TimelineEvent.Local(
-                                    position = 0.0, // upsert assigns nextLocalPosition
-                                    otid = localId,
-                                    content = "",
-                                    role = com.letta.mobile.data.timeline.Role.ASSISTANT,
-                                    sentAt = sentAt,
-                                    deliveryState = com.letta.mobile.data.timeline.DeliveryState.SENT,
-                                    source = com.letta.mobile.data.timeline.MessageSource.CLIENT_MODE_HARNESS,
-                                    messageType = com.letta.mobile.data.timeline.TimelineMessageType.REASONING,
-                                    reasoningContent = delta,
-                                )
-                            },
-                            transform = { existing ->
-                                val prior = existing.reasoningContent.orEmpty()
-                                // letta-mobile (lettabot-uww.11 fix): reasoning
-                                // text is emitted by the gateway as PURE
-                                // DELTAS, same contract as assistant text.
-                                // The previous wucn-snapshot-recovery cascade
-                                // silently dropped chars on prefix collisions
-                                // and destructively replaced the accumulator
-                                // on >=32-char "near-snapshots". Trust the
-                                // contract and append.
-                                val merged = if (delta.isEmpty()) prior else prior + delta
-                                existing.copy(
-                                    reasoningContent = merged,
-                                    messageType = com.letta.mobile.data.timeline.TimelineMessageType.REASONING,
-                                )
-                            },
+                            sentAt = sentAt,
+                            slice = delta,
                         )
-                    }.onFailure { logTimelineUpsertFailure(it, "REASONING", localId) }
+                    }
                 }
             }
 
@@ -1583,72 +1813,371 @@ class AdminChatViewModel @Inject constructor(
             }
 
             else -> {
-                // letta-mobile-lv3e (REVERTS letta-mobile-vu6a):
-                // BotStreamChunk.text is a DELTA — the gateway emits only
-                // the NEW fragment per frame, not the cumulative buffer.
-                // Verified via :cli:run wsstream against the real gateway:
-                // each frame's content is a fragment that must be APPENDED
-                // to the running bubble. vu6a's "snapshot semantics" was
-                // based on a synthetic test feeding ["Hel","Hello","Hello world"]
-                // and produced the user-visible "chunks replace each other"
-                // bug Emmanuel reported 2026-04-25.
-                //
-                // We still ignore empty/null text on the terminal frame so
-                // it doesn't append a no-op (or, worse, clobber via the
-                // empty-string path).
+                // letta-mobile-flk2: enqueue assistant deltas into the
+                // paint-rate smoother instead of upserting directly. The
+                // smoother drains the queue at smoothed cadence and calls
+                // back into [paintClientModeAssistantSlice]. See class
+                // doc on [ClientModeStreamSmoother] for invariant
+                // analysis vs. the lettabot-uww.11 byte-perfect
+                // reassembly suite (concatenation order + total bytes
+                // both preserved).
                 val delta = chunk.text?.takeIf { it.isNotEmpty() } ?: return
                 val localId = "cm-assist-$assistantMessageId"
-                viewModelScope.launch {
-                    runCatching {
-                        timelineRepository.upsertClientModeLocalAssistantChunk(
+                val smoother = clientModeSmoother
+                if (smoother != null) {
+                    // letta-mobile-flk2 (revision): enqueue is now
+                    // synchronous (JVM monitor lock); see the
+                    // REASONING site above for the rationale.
+                    smoother.enqueue(
+                        kind = ClientModeStreamSmoother.Kind.ASSISTANT,
+                        localId = localId,
+                        delta = delta,
+                    )
+                } else {
+                    viewModelScope.launch {
+                        paintClientModeAssistantSlice(
                             conversationId = conversationId,
                             localId = localId,
-                            build = {
-                                com.letta.mobile.data.timeline.TimelineEvent.Local(
-                                    position = 0.0,
-                                    otid = localId,
-                                    content = delta,
-                                    role = com.letta.mobile.data.timeline.Role.ASSISTANT,
-                                    sentAt = sentAt,
-                                    deliveryState = com.letta.mobile.data.timeline.DeliveryState.SENT,
-                                    source = com.letta.mobile.data.timeline.MessageSource.CLIENT_MODE_HARNESS,
-                                    messageType = com.letta.mobile.data.timeline.TimelineMessageType.ASSISTANT,
-                                )
-                            },
-                            transform = { existing ->
-                                // letta-mobile (lettabot-uww.11 fix): the WS
-                                // gateway emits assistant text as PURE DELTAS
-                                // (verified by ws-gateway.e2e.test.ts §
-                                // "assistant text reassembly" — 37 byte-perfect
-                                // reassembly cases including adversarial
-                                // chunking, mermaid blocks, prefix-collision
-                                // sequences, and unicode/emoji boundaries).
-                                //
-                                // The previous wucn-snapshot-recovery cascade
-                                // had two defects that silently dropped or
-                                // destroyed user-visible characters:
-                                //   - `existing.content.startsWith(delta)`
-                                //     dropped any delta whose head matched
-                                //     a prefix of the accumulator (frequent
-                                //     for repeated tokens / coalescer
-                                //     boundaries).
-                                //   - the >=32-char "near-snapshot" branch
-                                //     replaced the accumulator wholesale,
-                                //     destroying everything before the
-                                //     incoming delta.
-                                // Together they produced the field repro
-                                // `A[LLM snapshots]` → `A[LLMapshots|`.
-                                //
-                                // The contract is delta-append. Trust it.
-                                existing.copy(
-                                    content = existing.content + delta,
-                                    messageType = com.letta.mobile.data.timeline.TimelineMessageType.ASSISTANT,
-                                )
-                            },
+                            sentAt = sentAt,
+                            slice = delta,
                         )
-                    }.onFailure { logTimelineUpsertFailure(it, "ASSISTANT", localId) }
+                    }
                 }
             }
+        }
+    }
+
+    /**
+     * letta-mobile-flk2: paints a slice of assistant text into the
+     * Client Mode timeline bubble. Called by the smoother's onPaint
+     * callback (and by the defensive fallback if no smoother is
+     * active). Concatenates the slice onto the existing bubble — same
+     * contract as the original delta-append upsert that this method
+     * extracted.
+     */
+    private suspend fun paintClientModeAssistantSlice(
+        conversationId: String,
+        localId: String,
+        sentAt: java.time.Instant,
+        slice: String,
+    ) {
+        if (slice.isEmpty()) return
+        runCatching {
+            timelineRepository.upsertClientModeLocalAssistantChunk(
+                conversationId = conversationId,
+                localId = localId,
+                build = {
+                    com.letta.mobile.data.timeline.TimelineEvent.Local(
+                        position = 0.0,
+                        otid = localId,
+                        content = slice,
+                        role = com.letta.mobile.data.timeline.Role.ASSISTANT,
+                        sentAt = sentAt,
+                        deliveryState = com.letta.mobile.data.timeline.DeliveryState.SENT,
+                        source = com.letta.mobile.data.timeline.MessageSource.CLIENT_MODE_HARNESS,
+                        messageType = com.letta.mobile.data.timeline.TimelineMessageType.ASSISTANT,
+                    )
+                },
+                transform = { existing ->
+                    // The contract is delta-append. The smoother
+                    // preserves FIFO order and total bytes, so this
+                    // remains byte-perfect with the lettabot-uww.11
+                    // reassembly invariants.
+                    existing.copy(
+                        content = existing.content + slice,
+                        messageType = com.letta.mobile.data.timeline.TimelineMessageType.ASSISTANT,
+                    )
+                },
+            )
+        }.onFailure { logTimelineUpsertFailure(it, "ASSISTANT", localId) }
+    }
+
+    /**
+     * letta-mobile-flk2: paints a slice of reasoning text into the
+     * Client Mode timeline bubble. Called by the smoother's onPaint
+     * callback. See [paintClientModeAssistantSlice] for invariant notes.
+     */
+    private suspend fun paintClientModeReasoningSlice(
+        conversationId: String,
+        localId: String,
+        sentAt: java.time.Instant,
+        slice: String,
+    ) {
+        if (slice.isEmpty()) return
+        runCatching {
+            timelineRepository.upsertClientModeLocalAssistantChunk(
+                conversationId = conversationId,
+                localId = localId,
+                build = {
+                    com.letta.mobile.data.timeline.TimelineEvent.Local(
+                        position = 0.0,
+                        otid = localId,
+                        content = "",
+                        role = com.letta.mobile.data.timeline.Role.ASSISTANT,
+                        sentAt = sentAt,
+                        deliveryState = com.letta.mobile.data.timeline.DeliveryState.SENT,
+                        source = com.letta.mobile.data.timeline.MessageSource.CLIENT_MODE_HARNESS,
+                        messageType = com.letta.mobile.data.timeline.TimelineMessageType.REASONING,
+                        reasoningContent = slice,
+                    )
+                },
+                transform = { existing ->
+                    val prior = existing.reasoningContent.orEmpty()
+                    existing.copy(
+                        reasoningContent = prior + slice,
+                        messageType = com.letta.mobile.data.timeline.TimelineMessageType.REASONING,
+                    )
+                },
+            )
+        }.onFailure { logTimelineUpsertFailure(it, "REASONING", localId) }
+    }
+
+    /**
+     * letta-mobile-flk2: paint-rate smoother for Client Mode streaming.
+     *
+     * The lettabot WS gateway forwards SDK deltas at network-frame
+     * cadence — a single WS frame can carry 5–40 chars, which the
+     * timeline upsert paints atomically. The user sees the bubble grow
+     * in visible "chunks" rather than typing smoothly, and at
+     * `done=true` a redundant repaint flickers the bubble.
+     *
+     * This class is a pure pacing layer:
+     *   - per-(kind, localId) FIFO character queues
+     *   - one render-tick coroutine drains all queues at a smoothed
+     *     velocity tracking the moving-average input rate
+     *   - tail drains within ~120ms of `markStreamComplete()`
+     *   - cancel flushes everything synchronously so no characters
+     *     are ever dropped
+     *
+     * Concatenation order is preserved (FIFO per channel) and total
+     * bytes are preserved, so this is invariant-safe with respect to
+     * the lettabot-uww.11 byte-perfect reassembly tests — the smoother
+     * only changes WHEN bytes are flushed to the timeline, never WHICH
+     * bytes or in what order.
+     */
+    internal class ClientModeStreamSmoother(
+        private val scope: CoroutineScope,
+        private val onPaint: suspend (kind: Kind, localId: String, slice: String) -> Unit,
+        private val clock: () -> Long = { System.nanoTime() },
+        private val tickMillis: Long = TICK_MS_DEFAULT,
+        // Suspends used by the tick loop. Tests pass `delay` from the
+        // TestDispatcher so virtual time controls pacing.
+        private val sleep: suspend (Long) -> Unit = { kotlinx.coroutines.delay(it) },
+    ) {
+        enum class Kind { ASSISTANT, REASONING }
+
+        private data class Channel(
+            val kind: Kind,
+            val localId: String,
+            val pending: StringBuilder = StringBuilder(),
+        )
+
+        private data class ArrivalSample(val nanos: Long, val chars: Int)
+
+        // letta-mobile-flk2 (revision): switched from a coroutine
+        // Mutex to a JVM monitor so enqueue/markStreamComplete are
+        // both synchronous and non-suspending. The previous design had
+        // a race: callers fire-and-forget `viewModelScope.launch {
+        // smoother.enqueue(...) }` then synchronously call
+        // `markStreamComplete()`; with a suspending mutex, the
+        // launched coroutine had not yet acquired the lock, so
+        // `markStreamComplete` saw empty channels and completed
+        // `drained` before the terminal delta was queued. The typing
+        // indicator then briefly cleared, then the late paint
+        // re-emitted through the timeline observer with the stream
+        // still in flight, leaving the indicator visually stuck.
+        // Synchronous critical sections eliminate that race.
+        private val lock = Any()
+        private val channels = linkedMapOf<String, Channel>()
+        // Last 500ms of arrivals across all channels — used to compute
+        // the moving-average input velocity.
+        private val arrivals = ArrayDeque<ArrivalSample>()
+        @Volatile private var done: Boolean = false
+        private var doneAtNanos: Long = 0L
+        @Volatile private var paintJob: Job? = null
+        private val drained = kotlinx.coroutines.CompletableDeferred<Unit>()
+
+        fun enqueue(kind: Kind, localId: String, delta: String) {
+            if (delta.isEmpty()) return
+            synchronized(lock) {
+                val key = "${kind.name}:$localId"
+                val ch = channels.getOrPut(key) { Channel(kind, localId) }
+                ch.pending.append(delta)
+                arrivals.addLast(ArrivalSample(clock(), delta.length))
+                pruneArrivalsLocked()
+            }
+            ensurePaintJobStarted()
+        }
+
+        fun markStreamComplete() {
+            val nothingPending = synchronized(lock) {
+                done = true
+                doneAtNanos = clock()
+                channels.values.all { it.pending.isEmpty() }
+            }
+            // letta-mobile-flk2: if nothing was ever enqueued, the paint
+            // job was never started — there's no draining to do, so
+            // signal completion immediately. Otherwise ensurePaintJob
+            // will let the existing tick loop see done==true on its
+            // next iteration and self-terminate.
+            if (nothingPending) {
+                if (!drained.isCompleted) drained.complete(Unit)
+                return
+            }
+            ensurePaintJobStarted()
+        }
+
+        /**
+         * Suspends until every queued character has been flushed via
+         * [onPaint]. Watchdog-bounded by [DRAIN_TIMEOUT_MS] so a tick
+         * job bug can never wedge the stream-complete path forever.
+         * Returns immediately when the smoother has no pending data
+         * (e.g. a stream that emitted only a single terminal frame
+         * with no preceding deltas).
+         */
+        suspend fun awaitDrained() {
+            if (drained.isCompleted) return
+            // Nothing buffered AND no paint job ever started → no
+            // draining to do. Avoid a watchdog wait in this common
+            // case (stream-complete arrives before any deltas, or
+            // every delta was empty).
+            val nothingPending = synchronized(lock) {
+                channels.values.all { it.pending.isEmpty() }
+            }
+            if (nothingPending && paintJob == null) {
+                if (!drained.isCompleted) drained.complete(Unit)
+                return
+            }
+            withTimeoutOrNull(DRAIN_TIMEOUT_MS) { drained.await() }
+        }
+
+        /**
+         * Cancel-path. Drain everything synchronously to the [onPaint]
+         * sink, stop the tick job, and complete [awaitDrained] callers.
+         * Does NOT respect velocity — on cancel the user wants whatever
+         * we have, immediately.
+         */
+        suspend fun flushAndStop() {
+            val toFlush: List<Pair<Channel, String>> = synchronized(lock) {
+                val out = channels.values
+                    .filter { it.pending.isNotEmpty() }
+                    .map { ch ->
+                        val slice = ch.pending.toString()
+                        ch.pending.setLength(0)
+                        ch to slice
+                    }
+                done = true
+                out
+            }
+            for ((ch, slice) in toFlush) {
+                runCatching { onPaint(ch.kind, ch.localId, slice) }
+            }
+            paintJob?.cancel()
+            paintJob = null
+            if (!drained.isCompleted) drained.complete(Unit)
+        }
+
+        private fun ensurePaintJobStarted() {
+            if (paintJob?.isActive == true) return
+            paintJob = scope.launch {
+                runPaintLoop()
+            }
+        }
+
+        private suspend fun runPaintLoop() {
+            while (true) {
+                sleep(tickMillis)
+                val finished = tickOnce()
+                if (finished) {
+                    if (!drained.isCompleted) drained.complete(Unit)
+                    return
+                }
+            }
+        }
+
+        /**
+         * @return true if the smoother has finished (done && all
+         *   channels empty). The tick loop terminates on true.
+         */
+        private suspend fun tickOnce(): Boolean {
+            val (slices, finished) = synchronized(lock) {
+                pruneArrivalsLocked()
+                val totalPending = channels.values.sumOf { it.pending.length }
+                if (totalPending == 0) {
+                    emptyList<Triple<Kind, String, String>>() to done
+                } else {
+                    // Moving-average input velocity over the arrival window.
+                    val windowChars = arrivals.sumOf { it.chars }
+                    val inputCps = windowChars.toDouble() / (ARRIVAL_WINDOW_MS / 1000.0)
+
+                    // Target: stay just above the input rate so steady-state
+                    // doesn't accumulate backlog. Clamped to the cps band.
+                    var paintCps = (inputCps * STEADY_STATE_OVER_FACTOR)
+                        .coerceIn(FLOOR_CPS, CEILING_CPS)
+
+                    // Tail-drain budget: when done=true, accelerate so the
+                    // remaining backlog clears within DRAIN_TAIL_MS.
+                    if (done) {
+                        val tailCps = totalPending.toDouble() /
+                            (DRAIN_TAIL_MS / 1000.0)
+                        if (tailCps > paintCps) paintCps = tailCps
+                    }
+
+                    // Chars to flush this tick.
+                    val budgetChars = (paintCps * tickMillis / 1000.0)
+                        .toInt()
+                        .coerceAtLeast(1)
+
+                    // Distribute the budget across channels weighted by
+                    // their backlog length so reasoning + assistant drain
+                    // proportionally and neither starves.
+                    val out = mutableListOf<Triple<Kind, String, String>>()
+                    var remaining = budgetChars
+                    val ordered = channels.values.toList()
+                    val totalForShare = totalPending
+                    for ((idx, ch) in ordered.withIndex()) {
+                        if (ch.pending.isEmpty()) continue
+                        val share = if (idx == ordered.lastIndex) {
+                            remaining
+                        } else {
+                            ((budgetChars.toLong() * ch.pending.length) /
+                                totalForShare).toInt().coerceAtLeast(1)
+                        }
+                        val take = minOf(share, ch.pending.length, remaining)
+                        if (take <= 0) continue
+                        val slice = ch.pending.substring(0, take)
+                        ch.pending.delete(0, take)
+                        remaining -= take
+                        out += Triple(ch.kind, ch.localId, slice)
+                        if (remaining <= 0) break
+                    }
+
+                    val nowFinished = done && channels.values.all { it.pending.isEmpty() }
+                    out to nowFinished
+                }
+            }
+
+            for ((kind, localId, slice) in slices) {
+                runCatching { onPaint(kind, localId, slice) }
+            }
+            return finished
+        }
+
+        private fun pruneArrivalsLocked() {
+            val cutoff = clock() - ARRIVAL_WINDOW_MS * 1_000_000L
+            while (arrivals.isNotEmpty() && arrivals.first().nanos < cutoff) {
+                arrivals.removeFirst()
+            }
+        }
+
+        companion object {
+            const val TICK_MS_DEFAULT: Long = 16L                  // ~60Hz paint
+            const val ARRIVAL_WINDOW_MS: Long = 500L
+            const val DRAIN_TAIL_MS: Long = 120L
+            const val DRAIN_TIMEOUT_MS: Long = 500L                // watchdog
+            const val FLOOR_CPS: Double = 30.0
+            const val CEILING_CPS: Double = 180.0
+            const val STEADY_STATE_OVER_FACTOR: Double = 1.05
         }
     }
 
@@ -1871,10 +2400,63 @@ class AdminChatViewModel @Inject constructor(
      * Dismiss the conversation-substitution banner emitted when the gateway
      * substituted a fresh conversation for the one we asked it to resume.
      * See `letta-mobile-c87t` and [ClientModeConversationSwap].
+     *
+     * For [ClientModeConversationSwap.NotResumable] (c87t.2), dismissing
+     * also drops the buffered pending-resend so the user is not silently
+     * re-sent later. They stay anchored to the unresumable conversation;
+     * a subsequent send will retry the same prior id (and likely surface
+     * the same banner unless conditions change). To explicitly start a
+     * fresh chat, use [startFreshConversationAfterUnresumable].
      */
     fun dismissClientModeConversationSwap() {
         if (_uiState.value.clientModeConversationSwap == null) return
+        pendingResendAfterUnresumable = null
         _uiState.update { it.copy(clientModeConversationSwap = null) }
+    }
+
+    /**
+     * letta-mobile-c87t.2: user accepted the "start a fresh chat" action
+     * on the [ClientModeConversationSwap.NotResumable] banner. Clears
+     * the unresumable conversation pointer, starts a new client-mode
+     * conversation, and re-sends the buffered text under the new conv.
+     *
+     * If no pending send is buffered (the user dismissed and then asked
+     * to start fresh, or this is called from a stale state) we just
+     * clear the banner without re-sending — the user can compose a new
+     * message manually.
+     */
+    fun startFreshConversationAfterUnresumable() {
+        val swap = _uiState.value.clientModeConversationSwap
+        if (swap !is ClientModeConversationSwap.NotResumable) return
+
+        val pending = pendingResendAfterUnresumable
+        pendingResendAfterUnresumable = null
+
+        // Clear the unresumable pointer so the next send resolves to
+        // a fresh-route flow (priorConversationId == null → gateway
+        // opens a brand-new Letta conversation).
+        setClientModeConversationId(null)
+        savedStateHandle["conversationId"] = null
+        currentConversationTracker.setCurrent(null)
+
+        // Drop the banner; the user is about to see a fresh stream.
+        _uiState.update { it.copy(clientModeConversationSwap = null) }
+
+        if (pending == null || pending.text.isBlank()) {
+            android.util.Log.i(
+                "AdminChatViewModel",
+                "c87t.2 startFresh: no pending text — banner cleared, user composes manually",
+            )
+            return
+        }
+
+        android.util.Log.i(
+            "AdminChatViewModel",
+            "c87t.2 startFresh: re-sending ${pending.text.length} chars under fresh conv " +
+                "(prior unresumable=${pending.unresumableConversationId.take(12)}...)",
+        )
+        forceFreshOnNextClientModeSend = true
+        sendMessage(pending.text)
     }
 
     /**
@@ -2132,8 +2714,6 @@ class AdminChatViewModel @Inject constructor(
                     // coroutine runs eagerly on Unconfined/main and triggers
                     // observer emissions before the job assignment lands.
                     val streamInFlight = clientModeStreamInFlight
-                    // Any non-empty emission also implies hydrate succeeded.
-                    val clearLoading = ui.isNotEmpty()
                     // letta-mobile-23h5 (regression fix 2026-04-19): the
                     // timeline source-of-truth path was never flipping
                     // hasMoreOlderMessages to true, so ChatScreen's scroll
@@ -2155,10 +2735,14 @@ class AdminChatViewModel @Inject constructor(
                                           else anyLettaServerLocalPending
                     val nextIsAgentTyping = if (streamInFlight) prev.isAgentTyping
                                             else (anyLettaServerLocalPending && !tailIsAssistant)
+                    // Chat flash fix: Do NOT clear isLoadingMessages from the
+                    // timeline observer. The Hydrated event (line 2645) is the
+                    // sole authority for clearing the loading state. This
+                    // prevents the flash where partial messages (e.g., only
+                    // user messages) appear before the full hydrated state
+                    // arrives, then agent responses "flash in" later.
                     _uiState.value = prev.copy(
                         messages = ui,
-                        isLoadingMessages = if (clearLoading) false
-                                           else prev.isLoadingMessages,
                         isStreaming = nextIsStreaming,
                         isAgentTyping = nextIsAgentTyping,
                         hasMoreOlderMessages = newHasMoreOlder,

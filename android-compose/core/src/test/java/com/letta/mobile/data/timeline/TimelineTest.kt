@@ -301,6 +301,22 @@ class TimelineTest {
         source = MessageSource.CLIENT_MODE_HARNESS,
     )
 
+    private fun clientModeAssistantLocal(
+        otid: String,
+        pos: Double,
+        content: String,
+        sentAt: Instant = Instant.now(),
+    ): TimelineEvent.Local = TimelineEvent.Local(
+        position = pos,
+        otid = otid,
+        content = content,
+        role = Role.ASSISTANT,
+        sentAt = sentAt,
+        deliveryState = DeliveryState.SENT,
+        source = MessageSource.CLIENT_MODE_HARNESS,
+        messageType = TimelineMessageType.ASSISTANT,
+    )
+
     private fun confirmedUser(
         otid: String,
         pos: Double,
@@ -313,6 +329,23 @@ class TimelineTest {
         content = content,
         serverId = serverId,
         messageType = TimelineMessageType.USER,
+        date = date,
+        runId = null,
+        stepId = null,
+    )
+
+    private fun confirmedAssistant(
+        otid: String,
+        pos: Double,
+        content: String,
+        date: Instant = Instant.now(),
+        serverId: String = "server-$otid",
+    ): TimelineEvent.Confirmed = TimelineEvent.Confirmed(
+        position = pos,
+        otid = otid,
+        content = content,
+        serverId = serverId,
+        messageType = TimelineMessageType.ASSISTANT,
         date = date,
         runId = null,
         stepId = null,
@@ -380,26 +413,47 @@ class TimelineTest {
     }
 
     @Test
-    fun `collapseClientModeFuzzyMatch ignores non-USER confirmed message`() {
+    fun `collapseClientModeFuzzyMatch collapses matching assistant local and preserves accumulated text`() {
         val now = Instant.now()
         val t = Timeline("c1").append(
-            clientModeLocal("cm-1", 1.0, "hello", sentAt = now.minusMillis(200))
+            clientModeAssistantLocal("cm-assist-1", 1.0, "Hello world", sentAt = now.minusMillis(200))
         )
 
-        // Assistant turn shouldn't trigger user-bubble collapse.
+        val incoming = confirmedAssistant("server-otid", 99.0, "world", date = now, serverId = "srv-1")
+        val result = t.collapseClientModeFuzzyMatch(incoming)
+
+        assertNotNull("Assistant Confirmed events should collapse matching Client Mode locals", result.collapsed)
+        assertEquals("cm-assist-1", result.collapsed!!.localOtid)
+        assertEquals(1, result.timeline.events.size)
+        val swapped = result.timeline.events[0] as TimelineEvent.Confirmed
+        assertEquals(1.0, swapped.position, 0.0001)
+        assertEquals(
+            "Local accumulator should remain the baseline when the first Confirmed frame is only a later delta",
+            "Hello world",
+            swapped.content,
+        )
+    }
+
+    @Test
+    fun `collapseClientModeFuzzyMatch ignores unsupported non-user non-assistant confirmed message`() {
+        val now = Instant.now()
+        val t = Timeline("c1").append(
+            clientModeAssistantLocal("cm-assist-1", 1.0, "hello", sentAt = now.minusMillis(200))
+        )
+
         val incoming = TimelineEvent.Confirmed(
             position = 99.0,
             otid = "server-otid",
             content = "hello",
             serverId = "srv-1",
-            messageType = TimelineMessageType.ASSISTANT,
+            messageType = TimelineMessageType.REASONING,
             date = now,
             runId = null,
             stepId = null,
         )
         val result = t.collapseClientModeFuzzyMatch(incoming)
 
-        assertNull("Assistant Confirmed events must not collapse user Locals", result.collapsed)
+        assertNull("Only USER and ASSISTANT Confirmed events are eligible for collapse", result.collapsed)
     }
 
     @Test

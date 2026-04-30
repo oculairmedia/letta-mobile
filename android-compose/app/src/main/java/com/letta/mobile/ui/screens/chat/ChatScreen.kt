@@ -122,16 +122,42 @@ fun ChatScreen(
                 .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)),
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // letta-mobile-c87t: surfaces a non-modal banner when the
-                // lettabot WS gateway substituted a fresh conversation for the
-                // one we asked to resume. See ClientModeConversationSwapBanner.
-                val swap = state.clientModeConversationSwap
-                com.letta.mobile.ui.components.ClientModeConversationSwapBanner(
-                    visible = swap != null,
-                    onDismiss = { viewModel.dismissClientModeConversationSwap() },
-                    requestedConversationIdSuffix = swap?.requestedConversationId?.takeLast(6),
-                    newConversationIdSuffix = swap?.newConversationId?.takeLast(6),
-                )
+                // letta-mobile-c87t / c87t.2: surfaces a banner when the
+                // lettabot WS gateway either silently swapped (legacy
+                // back-compat path) or refused to resume the requested
+                // conversation. The two variants render different surfaces:
+                //   * Substituted -> informational
+                //     [ClientModeConversationSwapBanner]
+                //   * NotResumable -> actionable
+                //     [ClientModeConversationNotResumableBanner] with
+                //     "Start fresh chat" call-to-action.
+                when (val swap = state.clientModeConversationSwap) {
+                    is com.letta.mobile.ui.screens.chat.ClientModeConversationSwap.Substituted -> {
+                        com.letta.mobile.ui.components.ClientModeConversationSwapBanner(
+                            visible = true,
+                            onDismiss = { viewModel.dismissClientModeConversationSwap() },
+                            requestedConversationIdSuffix = swap.requestedConversationId.takeLast(6),
+                            newConversationIdSuffix = swap.newConversationId.takeLast(6),
+                        )
+                    }
+                    is com.letta.mobile.ui.screens.chat.ClientModeConversationSwap.NotResumable -> {
+                        com.letta.mobile.ui.components.ClientModeConversationNotResumableBanner(
+                            visible = true,
+                            onStartFresh = { viewModel.startFreshConversationAfterUnresumable() },
+                            onDismiss = { viewModel.dismissClientModeConversationSwap() },
+                            requestedConversationIdSuffix = swap.requestedConversationId.takeLast(6),
+                        )
+                    }
+                    null -> {
+                        // Render an invisible Substituted banner so the
+                        // dismiss-animation runs out cleanly when
+                        // dismissClientModeConversationSwap clears the state.
+                        com.letta.mobile.ui.components.ClientModeConversationSwapBanner(
+                            visible = false,
+                            onDismiss = { viewModel.dismissClientModeConversationSwap() },
+                        )
+                    }
+                }
                 when (val conversationState = state.conversationState) {
                     ConversationState.Loading -> {
                         MessageSkeletonList(modifier = Modifier.weight(1f))
@@ -597,7 +623,8 @@ private fun ChatContent(
                                             RenderChatMessage(
                                                 message = message,
                                                 position = position,
-                                                state = state,
+                                                isStreaming = state.isStreaming,
+                                                activeApprovalRequestId = state.activeApprovalRequestId,
                                                 chatMode = chatMode,
                                                 highlightedMessageId = highlightedMessageId,
                                                 onSendMessage = onSendMessage,
@@ -611,7 +638,8 @@ private fun ChatContent(
                                         RenderChatMessage(
                                             message = msg,
                                             position = renderItem.groupPosition,
-                                            state = state,
+                                            isStreaming = state.isStreaming,
+                                            activeApprovalRequestId = state.activeApprovalRequestId,
                                             chatMode = chatMode,
                                             highlightedMessageId = highlightedMessageId,
                                             onSendMessage = onSendMessage,
@@ -641,7 +669,8 @@ private fun ChatContent(
                                         RenderChatMessage(
                                             message = message,
                                             position = position,
-                                            state = state,
+                                            isStreaming = state.isStreaming,
+                                            activeApprovalRequestId = state.activeApprovalRequestId,
                                             chatMode = chatMode,
                                             highlightedMessageId = highlightedMessageId,
                                             onSendMessage = onSendMessage,
@@ -723,7 +752,21 @@ private fun ChatContent(
 private fun RenderChatMessage(
     message: UiMessage,
     position: GroupPosition,
-    state: ChatUiState,
+    // letta-mobile-flk2 (revision): pass only the scalar/stable bits
+    // each item needs, NOT the full `ChatUiState`. Previously we
+    // accepted `state: ChatUiState` here and read `state.isStreaming`
+    // + `state.activeApprovalRequestId` inline — but because the
+    // streaming smoother mutates `state.messages.last().content`
+    // every 50ms, every paint cadence tick produced a fresh
+    // ChatUiState instance, which Compose could not prove stable.
+    // That forced EVERY item in the LazyColumn (including the user's
+    // prior prompt) to recompose on every tick, producing the
+    // "entire message flickers in and out" symptom Emmanuel
+    // reported. Narrowing the parameter set lets Compose skip
+    // recomposition for items whose inputs are byte-equal across
+    // ticks (which is true for every non-streaming item).
+    isStreaming: Boolean,
+    activeApprovalRequestId: String?,
     chatMode: String,
     highlightedMessageId: String?,
     onSendMessage: (String) -> Unit,
@@ -757,14 +800,14 @@ private fun RenderChatMessage(
         ChatMessageItem(
             message = message,
             groupPosition = position,
-            isStreaming = state.isStreaming,
+            isStreaming = isStreaming,
             reasoningCollapsed = reasoningCollapsed,
             onToggleReasoning = onToggleReasoning,
             onGeneratedUiMessage = onSendMessage,
             onApprovalDecision = { requestId, toolCallIds, approve, reason ->
                 onSubmitApproval(requestId, toolCallIds, approve, reason)
             },
-            approvalInFlight = state.activeApprovalRequestId == message.approvalRequest?.requestId,
+            approvalInFlight = activeApprovalRequestId == message.approvalRequest?.requestId,
             modifier = modifier.then(highlightModifier).padding(top = spacingBelow, bottom = spacingAbove),
         )
     }

@@ -27,6 +27,14 @@ import kotlinx.coroutines.sync.withLock
 open class TimelineRepository @Inject constructor(
     private val messageApi: MessageApi,
     private val pendingLocalStore: PendingLocalStore,
+    // Doubled-response fix (Client Mode): per-conversation gate that the
+    // resume-stream subscriber consults before opening a direct-Letta SSE.
+    // Defaults to never-suppress so unit tests and non-Client-Mode call paths
+    // keep their current behaviour. The :app module supplies a gate backed by
+    // [com.letta.mobile.clientmode.ClientModeSuppressionGate] which marks
+    // conversations owned by the WS gateway path.
+    private val subscriberSuppression: SubscriberSuppressionGate =
+        SubscriberSuppressionGate.Always,
 ) {
     // Dedicated supervisor scope — child jobs fail in isolation.
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -75,6 +83,7 @@ open class TimelineRepository @Inject constructor(
                 scope = scope,
                 ingestedListener = ingestedListener,
                 pendingLocalStore = pendingLocalStore,
+                subscriberSuppression = subscriberSuppression,
             )
             loops[conversationId] = created
             created

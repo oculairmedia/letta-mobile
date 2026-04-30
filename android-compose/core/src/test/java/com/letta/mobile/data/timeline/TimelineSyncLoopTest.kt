@@ -1133,6 +1133,68 @@ class TimelineSyncLoopImageRestoreTest {
     }
 
     @Test
+    fun `assistant confirmed catch-up does not re-append content already present in collapsed client mode local`() = runBlocking {
+        val api = FakeSyncApi()
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val sync = TimelineSyncLoop(api, "conv-assist-dedup", scope)
+        try {
+            sync.hydrate()
+            sync.upsertClientModeLocalAssistantChunk(
+                localId = "cm-assist-1",
+                build = {
+                    TimelineEvent.Local(
+                        position = 0.0,
+                        otid = "cm-assist-1",
+                        content = "Hello world",
+                        role = Role.ASSISTANT,
+                        sentAt = java.time.Instant.parse("2026-04-29T10:00:00Z"),
+                        deliveryState = DeliveryState.SENT,
+                        source = MessageSource.CLIENT_MODE_HARNESS,
+                        messageType = TimelineMessageType.ASSISTANT,
+                    )
+                },
+                transform = { it },
+            )
+
+            sync.ingestStreamEvent(
+                AssistantMessage(
+                    id = "srv-assist-1",
+                    contentRaw = JsonPrimitive("world"),
+                    date = "2026-04-29T10:00:00Z",
+                    runId = "run-1",
+                )
+            )
+
+            sync.ingestStreamEvent(
+                AssistantMessage(
+                    id = "srv-assist-1",
+                    contentRaw = JsonPrimitive("world"),
+                    date = "2026-04-29T10:00:01Z",
+                    runId = "run-1",
+                )
+            )
+
+            sync.ingestStreamEvent(
+                AssistantMessage(
+                    id = "srv-assist-1",
+                    contentRaw = JsonPrimitive("!"),
+                    date = "2026-04-29T10:00:02Z",
+                    runId = "run-1",
+                )
+            )
+
+            val final = sync.state.value.events
+                .filterIsInstance<TimelineEvent.Confirmed>()
+                .firstOrNull { it.serverId == "srv-assist-1" }
+            assertNotNull("assistant confirmed event should exist after catch-up", final)
+            assertEquals("Hello world!", final!!.content)
+            assertEquals(MessageSource.LETTA_SERVER, final.source)
+        } finally {
+            scope.coroutineContext.job.cancel()
+        }
+    }
+
+    @Test
     fun `text-only send does not write to store`() = runBlocking {
         val api = FakeSyncApi()
         val store = FakeStore()
@@ -1144,5 +1206,146 @@ class TimelineSyncLoopImageRestoreTest {
         scope.coroutineContext.job.cancel()
 
         assertEquals("Text-only sends must not be persisted", 0, store.rows.size)
+    }
+
+    /**
+     * Doubled-response fix regression test (plan:
+     * 2026-04-clientmode-double-bubble-fix.md).
+     *
+     * When [SubscriberSuppressionGate.isSuppressed] returns true for the
+     * loop's conversationId, the subscriber MUST NOT call
+     * [MessageApi.streamConversation]. This is the core invariant that
+     * stops the duplicate Confirmed bubble in Client Mode.
+     *
+     * We use a stricter assertion than \"streamCallCount stays low\":
+     *  - drive the subscriber for several STREAM_DORMANT_MS windows,
+     *  - assert ZERO stream opens occurred,
+     *  - assert exactly ONE \"streamSubscriber.suppressed\" telemetry event
+     *    was emitted (state-transition, not per-tick).
+     */
+    @Test
+    fun `subscriber stays dormant when suppression gate returns true`() = runTest {
+        com.letta.mobile.util.Telemetry.clear()
+        val api = AlwaysIdleApi()
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
+        // Always-suppress gate.
+        val gate = SubscriberSuppressionGate { true }
+
+        val sync = TimelineSyncLoop(
+            messageApi = api,
+            conversationId = "conv-suppressed",
+            scope = scope,
+            subscriberSuppression = gate,
+        )
+
+        // Drive several dormant cycles (STREAM_DORMANT_MS = 3_000L).
+        repeat(5) {
+            testScheduler.advanceTimeBy(3_500)
+            testScheduler.runCurrent()
+        }
+
+        assertEquals(
+            "Suppressed subscriber must not open any direct-Letta streams",
+            0,
+            api.streamCallCount,
+        )
+
+        val events = com.letta.mobile.util.Telemetry.snapshot()
+        val suppressedEvents = events.filter {
+            it.tag == "TimelineSync" &&
+                it.name == "streamSubscriber.suppressed" &&
+                (it.attrs["conversationId"] as? String) == "conv-suppressed"
+        }
+        assertEquals(
+            "Should emit exactly one streamSubscriber.suppressed event " +
+                "(state-transition, not per-tick). Saw: $suppressedEvents",
+            1,
+            suppressedEvents.size,
+        )
+        scope.coroutineContext.job.cancel()
+        Unit
+    }
+
+    /**
+     * When the gate flips false after a suppression window, the subscriber
+     * MUST resume — opening a direct-Letta SSE on the next loop tick. This
+     * guards against the suppression hook accidentally turning into a
+     * one-way kill switch.
+     */
+    @Test
+    fun `subscriber resumes when suppression gate flips false`() = runTest {
+        com.letta.mobile.util.Telemetry.clear()
+        val api = AlwaysIdleApi()
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
+        val suppressed = java.util.concurrent.atomic.AtomicBoolean(true)
+        val gate = SubscriberSuppressionGate { suppressed.get() }
+
+        val sync = TimelineSyncLoop(
+            messageApi = api,
+            conversationId = "conv-flipping",
+            scope = scope,
+            subscriberSuppression = gate,
+        )
+
+        // Sit in the suppressed branch for two dormant windows.
+        repeat(2) {
+            testScheduler.advanceTimeBy(3_500)
+            testScheduler.runCurrent()
+        }
+        assertEquals(0, api.streamCallCount)
+
+        // Flip the gate. Next loop tick should hit the resume branch.
+        suppressed.set(false)
+        // Walk forward enough to (a) wake from the dormant delay and (b)
+        // run at least one stream open + idle backoff cycle.
+        repeat(5) {
+            testScheduler.advanceTimeBy(3_500)
+            testScheduler.runCurrent()
+        }
+
+        assertTrue(
+            "Subscriber must resume (open ≥ 1 stream) after gate flips false; saw ${api.streamCallCount}",
+            api.streamCallCount >= 1,
+        )
+        val lifted = com.letta.mobile.util.Telemetry.snapshot().firstOrNull {
+            it.tag == "TimelineSync" &&
+                it.name == "streamSubscriber.suppressionLifted" &&
+                (it.attrs["conversationId"] as? String) == "conv-flipping"
+        }
+        assertNotNull(
+            "Lifting suppression must emit streamSubscriber.suppressionLifted",
+            lifted,
+        )
+        scope.coroutineContext.job.cancel()
+        Unit
+    }
+
+    /**
+     * Default behaviour (no gate parameter passed) MUST be never-suppress —
+     * otherwise every existing call site in the codebase would silently
+     * stop receiving SSE. This test pins the default constructor argument.
+     */
+    @Test
+    fun `default constructor never suppresses the subscriber`() = runTest {
+        val api = AlwaysIdleApi()
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
+
+        // Note: NO subscriberSuppression argument — must default to
+        // SubscriberSuppressionGate.Always (which returns false).
+        val sync = TimelineSyncLoop(api, "conv-default", scope)
+
+        repeat(3) {
+            testScheduler.advanceTimeBy(3_500)
+            testScheduler.runCurrent()
+        }
+        assertTrue(
+            "Default subscriber must open at least one stream; saw ${api.streamCallCount}",
+            api.streamCallCount >= 1,
+        )
+        scope.coroutineContext.job.cancel()
+        Unit
     }
 }

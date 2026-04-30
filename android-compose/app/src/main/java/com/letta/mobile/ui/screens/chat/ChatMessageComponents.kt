@@ -7,6 +7,7 @@ import android.os.Build
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -221,28 +222,40 @@ private fun MessageBubbleSurface(
     val renderer = remember(message.role, message.toolCalls, message.generatedUi) { resolveRenderer(message) }
     val bubbleLess = message.shouldRenderBubbleLess()
 
-    // letta-mobile-d2z6.s1 (Emmanuel 2026-04-26 01:28 EDT): ease bubble
-    // height growth as streaming chunks land. Short 60ms LinearEasing
-    // tween — fast enough that successive chunks (typically 80–150ms
-    // apart) don't stack into compounding wobble, but long enough that
-    // the user's eye perceives "growing" rather than "popping".
+    // letta-mobile-flk2 (revision 2): NO animateContentSize on the
+    // streaming bubble.
     //
-    // Pinch suppresses the animation entirely (avoids height-interp
-    // cascades across many bubbles during the gesture, see
-    // letta-mobile-5e0f).
+    // Background: the previous revision tuned animateContentSize to
+    // 180ms FastOutSlowInEasing to smooth bubble growth at the new
+    // 20Hz paint cadence. That made successive growths blend, but
+    // introduced a worse problem: animateContentSize interpolates
+    // the bubble's layout bounds on every animation frame (~60Hz).
+    // That re-measurement forces the inner MarkdownText subtree to
+    // re-layout on each frame, and mikepenz fully re-parses on
+    // re-layout — producing a sustained 60Hz markdown parse during
+    // the entire animation window.
     //
-    // Non-streaming, non-pinching bubbles get NO animateContentSize on
-    // the Surface itself — historically that fought with the per-bubble
-    // collapse/reasoning animations downstream. The Surface stays
-    // size-stable; only mid-stream growth is animated.
-    val isPinchingForBubble = LocalChatIsPinching.current
-    val bubbleSizeAnimation = if (isLastAssistant && !isPinchingForBubble) {
-        Modifier.animateContentSize(
-            animationSpec = tween(durationMillis = 60, easing = LinearEasing),
-        )
-    } else {
-        Modifier
-    }
+    // Compounded with the paint-cadence updates landing every 50ms,
+    // the markdown parser was effectively running ~60–80Hz with
+    // overlapping animation curves. Emmanuel reported this as the
+    // bubble flickering "as the line breaks and if the streaming
+    // happens to fall off the viewport" — because content extending
+    // offscreen still triggered measurement passes, but produced no
+    // visible smoothing benefit (you can't see the eased growth at
+    // the bottom; you only see the layout-induced reflow at the
+    // top).
+    //
+    // Trade-off: stepped height growth at 20Hz is visually present
+    // but acceptable. The paint coalescer in StreamingMarkdownText
+    // already caps the markdown re-parse rate, so the steps are
+    // bounded to one per 50ms. No animation = no per-frame
+    // measurement loop = no markdown re-parse storm.
+    //
+    // Pinch still bypasses any animation; that branch is preserved
+    // for source compatibility and the (currently-unused) ability to
+    // re-introduce easing later if we add a stable-layout markdown
+    // renderer that doesn't re-parse on remeasure.
+    val bubbleSizeAnimation: Modifier = Modifier
 
     val contentColumn: @Composable () -> Unit = {
         Column(

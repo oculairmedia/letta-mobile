@@ -342,15 +342,42 @@ data class Timeline(
         confirmed: TimelineEvent.Confirmed,
         windowMillis: Long = CLIENT_MODE_FUZZY_WINDOW_MS,
     ): FuzzyCollapseResult {
-        // Only consider user-role Confirmed events; assistant/tool turns can't
-        // be fuzzy-collapsed (they don't have client-side Locals).
-        if (confirmed.messageType != TimelineMessageType.USER) return FuzzyCollapseResult(this, null)
+        // Client Mode persists optimistic USER and ASSISTANT locals before the
+        // Letta-backed timeline subscriber ingests the matching Confirmed
+        // server event. Collapse those pairs so the UI doesn't render two
+        // bubbles for the same logical turn. USER uses exact content; assistant
+        // uses a looser prefix/suffix match because the local accumulator may
+        // already contain more deltas than the first Confirmed frame.
+        val candidateMessageType = when (confirmed.messageType) {
+            TimelineMessageType.USER,
+            TimelineMessageType.ASSISTANT,
+            -> confirmed.messageType
+            else -> return FuzzyCollapseResult(this, null)
+        }
+        val candidateRole = when (candidateMessageType) {
+            TimelineMessageType.USER -> Role.USER
+            TimelineMessageType.ASSISTANT -> Role.ASSISTANT
+            else -> return FuzzyCollapseResult(this, null)
+        }
 
         val candidate = events.asSequence()
             .filterIsInstance<TimelineEvent.Local>()
             .filter { it.source == MessageSource.CLIENT_MODE_HARNESS }
-            .filter { it.role == Role.USER }
-            .filter { it.content == confirmed.content }
+            .filter { it.role == candidateRole }
+            .filter { it.messageType == candidateMessageType }
+            .filter {
+                when (candidateMessageType) {
+                    TimelineMessageType.USER -> it.content == confirmed.content
+                    TimelineMessageType.ASSISTANT -> {
+                        val local = it.content
+                        val incoming = confirmed.content
+                        local == incoming ||
+                            local.startsWith(incoming) ||
+                            local.endsWith(incoming) ||
+                            incoming.startsWith(local)
+                    }
+                }
+            }
             .filter {
                 val deltaMs = kotlin.math.abs(
                     java.time.Duration.between(it.sentAt, confirmed.date).toMillis()
@@ -363,7 +390,23 @@ data class Timeline(
             ?: return FuzzyCollapseResult(this, null)
 
         val deltaMs = java.time.Duration.between(candidate.sentAt, confirmed.date).toMillis()
-        val stabilized = confirmed.copy(position = candidate.position)
+        val stabilized = confirmed.copy(
+            position = candidate.position,
+            source = candidate.source,
+            content = when (candidateMessageType) {
+                TimelineMessageType.ASSISTANT -> {
+                    when {
+                        confirmed.content.isEmpty() -> candidate.content
+                        candidate.content == confirmed.content -> candidate.content
+                        candidate.content.startsWith(confirmed.content) -> candidate.content
+                        candidate.content.endsWith(confirmed.content) -> candidate.content
+                        confirmed.content.startsWith(candidate.content) -> confirmed.content
+                        else -> candidate.content
+                    }
+                }
+                TimelineMessageType.USER -> confirmed.content
+            },
+        )
         val newEvents = events.toMutableList().apply {
             removeAll { it.otid == candidate.otid }
             // Re-insert at correct position (which may now differ since we just

@@ -447,6 +447,250 @@ class WsBotClientLifecycleTest : WordSpec({
                 client.close()
             }
         }
+
+        // ----------------------------------------------------------------
+        // letta-mobile-flk1.no_session — gateway idle-evicted the session
+        //
+        // Production scenario: the lettabot gateway evicts an idle SDK
+        // session after `DEFAULT_IDLE_TIMEOUT_MS` (5 min) WITHOUT closing
+        // the WebSocket. The next `client_message` the client sends gets
+        //
+        //     {"type":"error","code":"NO_SESSION",
+        //      "message":"Send session_start first", "request_id": "..."}
+        //
+        // Pre-fix: WsBotClient.streamMessage's collector throws
+        // BotGatewayException(NO_SESSION) and the user sees a stuck
+        // optimistic bubble with no reply. Higher-level retry then often
+        // produced a duplicate user bubble.
+        //
+        // Post-fix contract: WsBotClient must transparently re-handshake
+        // and resend the original WsClientMessage exactly once. The
+        // caller must observe a normal stream completing end-to-end with
+        // its original requestId; the gateway must see exactly two
+        // session_starts on this single socket (the original one and the
+        // recovery one).
+        // ----------------------------------------------------------------
+        "transparently recovers from NO_SESSION mid-flight (idle-eviction)" {
+            val openSockets = AtomicInteger(0)
+            val sessionStarts = AtomicInteger(0)
+            val messageFrames = AtomicInteger(0)
+            // Toggle: the gateway "loses" the session after the first
+            // successful turn, so the NEXT `message` gets NO_SESSION,
+            // and only the session_start that follows reinstates it.
+            val sessionLive = java.util.concurrent.atomic.AtomicBoolean(true)
+            // Capture the request_ids the gateway sees on `message`
+            // frames so we can prove the recovery resend used the SAME
+            // request id (not a freshly minted one — that would change
+            // collapse semantics on the VM side).
+            val messageRequestIds = ConcurrentLinkedQueue<String>()
+
+            val server = lifecycleServer(onOpen = { openSockets.incrementAndGet() }) { socket, text ->
+                val payload = json.parseToJsonElement(text).jsonObject
+                when (payload["type"]!!.jsonPrimitive.content) {
+                    "session_start" -> {
+                        sessionStarts.incrementAndGet()
+                        sessionLive.set(true)
+                        val convId =
+                            payload["conversation_id"]?.jsonPrimitive?.contentOrNull ?: "conv-1"
+                        socket.send(
+                            """{"type":"session_init","agent_id":"agent-1","conversation_id":"$convId","session_id":"sess-1"}"""
+                        )
+                    }
+
+                    "message" -> {
+                        val requestId = payload["request_id"]!!.jsonPrimitive.content
+                        messageRequestIds += requestId
+                        val ordinal = messageFrames.incrementAndGet()
+                        if (!sessionLive.get()) {
+                            // Mirror the gateway's NO_SESSION error frame
+                            // exactly (src/api/ws-gateway.ts:612).
+                            socket.send(
+                                """{"type":"error","code":"NO_SESSION","message":"Send session_start first","request_id":"$requestId"}"""
+                            )
+                        } else {
+                            socket.send(
+                                """{"type":"stream","event":"assistant","content":"reply $ordinal","request_id":"$requestId"}"""
+                            )
+                            socket.send(
+                                """{"type":"result","success":true,"conversation_id":"conv-1","request_id":"$requestId","duration_ms":1}"""
+                            )
+                            // Simulate the idle sweep: after every
+                            // successful reply the gateway "forgets"
+                            // the session until the client re-handshakes.
+                            sessionLive.set(false)
+                        }
+                    }
+
+                    "session_close" -> Unit
+                }
+            }
+
+            server.use {
+                val client = WsBotClient(gatewayUrl(server), "secret")
+
+                // Turn 1: warms the session, gateway then evicts.
+                val first = runBlocking {
+                    withTimeout(5_000) {
+                        client.streamMessage(
+                            BotChatRequest(
+                                message = "warm",
+                                agentId = "agent-1",
+                                chatId = "chat-1",
+                                conversationId = "conv-1",
+                            )
+                        ).toList()
+                    }
+                }
+                first.first().text shouldBe "reply 1"
+                first.last().done shouldBe true
+
+                // Turn 2: gateway has evicted the session. Pre-fix this
+                // throws BotGatewayException(NO_SESSION); post-fix it
+                // re-handshakes and resends transparently.
+                val second = runBlocking {
+                    withTimeout(5_000) {
+                        client.streamMessage(
+                            BotChatRequest(
+                                message = "after-idle",
+                                agentId = "agent-1",
+                                chatId = "chat-1",
+                                conversationId = "conv-1",
+                            )
+                        ).toList()
+                    }
+                }
+                // Recovery must produce a normal end-to-end stream — the
+                // caller never sees the NO_SESSION error.
+                second.first().text shouldBe "reply 3"
+                second.last().done shouldBe true
+                second.last().conversationId shouldBe "conv-1"
+
+                // Exactly two session_starts (original + recovery), all
+                // on a SINGLE WebSocket. A reconnect-the-whole-socket
+                // strategy would have produced openSockets >= 2.
+                sessionStarts.get() shouldBe 2
+                openSockets.get() shouldBe 1
+
+                // The recovery resend must reuse the SAME request_id as
+                // the failed attempt so the gateway/Letta layer can
+                // dedupe on the rare path where the original DID land.
+                // Frames seen by the gateway, in order:
+                //   - turn1 message     (request_id=R1)
+                //   - turn2 message     (request_id=R2, gets NO_SESSION)
+                //   - turn2 message     (request_id=R2, recovery resend)
+                val ids = messageRequestIds.toList()
+                ids shouldHaveSize 3
+                ids[1] shouldBe ids[2]
+                // R1 is distinct from R2 (each streamMessage mints a
+                // fresh request_id; recovery preserves it).
+                (ids[0] != ids[1]) shouldBe true
+
+                client.close()
+            }
+        }
+
+        // ----------------------------------------------------------------
+        // letta-mobile-flk1.no_session — recovery is one-shot
+        //
+        // If the recovery handshake itself fails (e.g. the gateway is
+        // permanently broken / agent was deleted), the second NO_SESSION
+        // must propagate as BotGatewayException — we must NOT loop.
+        // ----------------------------------------------------------------
+        "NO_SESSION recovery is one-shot (does not loop on persistent failure)" {
+            val sessionStarts = AtomicInteger(0)
+            val messageFrames = AtomicInteger(0)
+
+            val server = lifecycleServer { socket, text ->
+                val payload = json.parseToJsonElement(text).jsonObject
+                when (payload["type"]!!.jsonPrimitive.content) {
+                    "session_start" -> {
+                        // First session_start succeeds (warms the
+                        // socket), every subsequent one is treated as
+                        // a no-op so the gateway still has no session
+                        // when the recovery `message` arrives.
+                        val n = sessionStarts.incrementAndGet()
+                        if (n == 1) {
+                            socket.send(
+                                """{"type":"session_init","agent_id":"agent-1","conversation_id":"conv-1","session_id":"sess-1"}"""
+                            )
+                        } else {
+                            // Pretend session_init succeeded so the
+                            // client thinks it has a session, but reply
+                            // NO_SESSION on the very next message —
+                            // simulating a gateway that has lost state
+                            // permanently.
+                            socket.send(
+                                """{"type":"session_init","agent_id":"agent-1","conversation_id":"conv-1","session_id":"sess-1"}"""
+                            )
+                        }
+                    }
+
+                    "message" -> {
+                        val requestId = payload["request_id"]!!.jsonPrimitive.content
+                        val n = messageFrames.incrementAndGet()
+                        if (n == 1) {
+                            // Warm turn — succeed, then "evict".
+                            socket.send(
+                                """{"type":"stream","event":"assistant","content":"warm","request_id":"$requestId"}"""
+                            )
+                            socket.send(
+                                """{"type":"result","success":true,"conversation_id":"conv-1","request_id":"$requestId","duration_ms":1}"""
+                            )
+                        } else {
+                            // Every subsequent `message` (turn2 + the
+                            // recovery resend) gets NO_SESSION.
+                            socket.send(
+                                """{"type":"error","code":"NO_SESSION","message":"Send session_start first","request_id":"$requestId"}"""
+                            )
+                        }
+                    }
+                }
+            }
+
+            server.use {
+                val client = WsBotClient(gatewayUrl(server), "secret")
+
+                runBlocking {
+                    withTimeout(5_000) {
+                        client.streamMessage(
+                            BotChatRequest(
+                                message = "warm",
+                                agentId = "agent-1",
+                                chatId = "chat-1",
+                                conversationId = "conv-1",
+                            )
+                        ).toList()
+                    }
+                }
+
+                val thrown = runCatching {
+                    runBlocking {
+                        withTimeout(5_000) {
+                            client.streamMessage(
+                                BotChatRequest(
+                                    message = "doomed",
+                                    agentId = "agent-1",
+                                    chatId = "chat-1",
+                                    conversationId = "conv-1",
+                                )
+                            ).toList()
+                        }
+                    }
+                }.exceptionOrNull()
+
+                (thrown is BotGatewayException) shouldBe true
+                (thrown as BotGatewayException).code shouldBe BotGatewayErrorCode.NO_SESSION
+
+                // The retry attempted exactly one recovery —
+                // session_starts ≥ 2 (the warm one + at least one
+                // recovery handshake) but message frames must be
+                // exactly 3 (turn1, turn2-original, turn2-recovery).
+                // No 4th attempt = no infinite loop.
+                messageFrames.get() shouldBe 3
+
+                client.close()
+            }
+        }
     }
 })
 

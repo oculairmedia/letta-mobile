@@ -266,6 +266,17 @@ enum class BotGatewayErrorCode {
     SESSION_BUSY,
     SESSION_INIT_FAILED,
     STREAM_ERROR,
+
+    /**
+     * letta-mobile-c87t.2: the gateway refused to resume the requested
+     * conversation_id because the underlying letta-code SDK silently
+     * allocated a different conversation. Surfaced from session_start
+     * when the SDK's letta-code CLI cannot find the prior conv (typical
+     * after a doze cycle reaped the previous SDK subprocess). Clients
+     * should offer the user an explicit "start fresh" action rather
+     * than silently migrating into the new conversation.
+     */
+    CONVERSATION_NOT_RESUMABLE,
 }
 
 class BotGatewayException(

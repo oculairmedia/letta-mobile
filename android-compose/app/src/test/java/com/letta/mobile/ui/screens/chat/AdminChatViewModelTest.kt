@@ -3,6 +3,8 @@ package com.letta.mobile.ui.screens.chat
 import androidx.lifecycle.SavedStateHandle
 import com.letta.mobile.bot.core.BotSession
 import com.letta.mobile.bot.protocol.BotAgentInfo
+import com.letta.mobile.bot.protocol.BotGatewayErrorCode
+import com.letta.mobile.bot.protocol.BotGatewayException
 import com.letta.mobile.bot.protocol.BotStreamEvent
 import com.letta.mobile.bot.protocol.BotStreamChunk
 import com.letta.mobile.bot.protocol.BotChatResponse
@@ -236,6 +238,8 @@ class AdminChatViewModelTest {
         agentId: String = "agent-1",
         conversationId: String? = "conv-1",
         freshRouteKey: Long? = null,
+        clientModeSuppressionGate: com.letta.mobile.clientmode.ClientModeSuppressionGate =
+            com.letta.mobile.clientmode.ClientModeSuppressionGate(),
     ): AdminChatViewModel {
         val savedState = SavedStateHandle().apply {
             set("agentId", agentId)
@@ -255,6 +259,7 @@ class AdminChatViewModelTest {
             internalBotClient,
             clientModeChatSender,
             com.letta.mobile.channel.CurrentConversationTracker(),
+            clientModeSuppressionGate,
         )
     }
 
@@ -646,6 +651,170 @@ class AdminChatViewModelTest {
         assertEquals(ConversationState.NoConversation, vm.uiState.value.conversationState)
         assertTrue(vm.uiState.value.messages.isEmpty())
         assertFalse(vm.uiState.value.isStreaming)
+    }
+
+    // region Doubled-response (cm-assist + Confirmed) regression
+    //
+    // Plan: 2026-04-clientmode-double-bubble-fix.md
+    //
+    // The bug: in Client Mode, the WS-gateway path writes assistant deltas
+    // as `cm-assist-*` Locals into the timeline, AND TimelineSyncLoop's
+    // always-on resume-stream subscriber opens a direct-Letta SSE for the
+    // SAME conversation, ingesting the same upstream events as Confirmed
+    // bubbles. Result: the user sees both the live cm-assist Local and a
+    // duplicate Confirmed bubble for every assistant turn.
+    //
+    // The fix: AdminChatViewModel claims ownership of every conversation it
+    // streams via Client Mode through ClientModeSuppressionGate. The gate
+    // is consulted by the timeline subscriber before opening SSE — owned
+    // conversations stay dormant.
+    //
+    // These tests pin the AdminChatViewModel ↔ ClientModeSuppressionGate
+    // contract: ownership is claimed at every Client Mode send entry point
+    // (known-conv, gateway swap, fresh-route migration) and released when
+    // Client Mode is disabled. The companion gate-mechanism + subscriber
+    // suppression invariants live in
+    //   - ClientModeSuppressionGateTest (mark/release lifecycle)
+    //   - TimelineSyncLoopTest (subscriber stays dormant when suppressed)
+    // endregion
+
+    /**
+     * Regression: a Client Mode send on a known conversation must claim
+     * ownership BEFORE any timeline write, so the always-on SSE subscriber
+     * sees the gate flipped and stays dormant for that conversation.
+     */
+    @Test
+    fun `client mode send claims suppression ownership of known conversation`() = runTest {
+        clientModeEnabledFlow.value = true
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
+        } returns flow {
+            emit(BotStreamChunk(text = "Hello", conversationId = "conv-1", done = true))
+        }
+
+        val gate = com.letta.mobile.clientmode.ClientModeSuppressionGate()
+        val vm = createViewModel(
+            conversationId = "conv-1",
+            clientModeSuppressionGate = gate,
+        )
+        advanceUntilIdle()
+
+        assertFalse(
+            "Gate must be empty before any Client Mode send",
+            gate.isSuppressed("conv-1"),
+        )
+
+        vm.sendMessage("hello")
+        advanceUntilIdle()
+
+        assertTrue(
+            "Client Mode must claim ownership of the known conversation BEFORE the timeline " +
+                "subscriber could open a duplicate SSE; saw gate=${gate.snapshot()}",
+            gate.isSuppressed("conv-1"),
+        )
+    }
+
+    /**
+     * Regression: when the WS gateway echoes a NEW conversationId on the
+     * first chunk (fresh-route migration), the VM must claim ownership of
+     * that gateway-allocated id — otherwise the migration moves the user
+     * bubble into a timeline whose subscriber would race the gateway and
+     * produce the duplicate Confirmed bubble.
+     */
+    @Test
+    fun `client mode fresh route migration claims gateway-allocated conversation`() = runTest {
+        clientModeEnabledFlow.value = true
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
+        } returns flow {
+            // Fresh route: first chunk allocates a brand-new conversation
+            // id on the gateway side. This is the migration trigger that
+            // moves the user bubble from in-memory legacy into the timeline.
+            emit(BotStreamChunk(text = "Hi", conversationId = "gw-fresh-conv"))
+            emit(BotStreamChunk(text = "Hi", conversationId = "gw-fresh-conv", done = true))
+        }
+
+        val gate = com.letta.mobile.clientmode.ClientModeSuppressionGate()
+        // Real fresh route: no conversationId, freshRouteKey set (matches
+        // ChatScreen nav contract — see "sendMessage routes through client
+        // mode sender when enabled" for the c87t fix).
+        val vm = createViewModel(
+            conversationId = null,
+            freshRouteKey = 1L,
+            clientModeSuppressionGate = gate,
+        )
+        advanceUntilIdle()
+
+        vm.sendMessage("hello")
+        advanceUntilIdle()
+
+        assertTrue(
+            "Fresh-route migration must claim the gateway-allocated conversation id; " +
+                "saw gate=${gate.snapshot()}",
+            gate.isSuppressed("gw-fresh-conv"),
+        )
+    }
+
+    /**
+     * Regression: disabling Client Mode must release every owned
+     * conversation so direct-SSE subscribers can resume on the next loop
+     * tick. A leaked entry would silently keep the timeline subscriber
+     * dormant for that conversation forever after the user toggled Client
+     * Mode off — i.e. they'd stop receiving messages with no way to
+     * recover short of an app restart.
+     */
+    @Test
+    fun `disabling client mode releases all owned conversations`() = runTest {
+        clientModeEnabledFlow.value = true
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
+        } returns flow {
+            emit(BotStreamChunk(text = "Hi", conversationId = "conv-1", done = true))
+        }
+
+        val gate = com.letta.mobile.clientmode.ClientModeSuppressionGate()
+        val vm = createViewModel(
+            conversationId = "conv-1",
+            clientModeSuppressionGate = gate,
+        )
+        advanceUntilIdle()
+
+        vm.sendMessage("hello")
+        advanceUntilIdle()
+        // Sanity: ownership claimed.
+        assertTrue(
+            "Pre-condition: gate should own conv-1 after a Client Mode send",
+            gate.isSuppressed("conv-1"),
+        )
+        // Simulate a couple of additional owned conversations so we're
+        // exercising the multi-entry release path, not the trivial
+        // single-entry case.
+        gate.markOwned("conv-other-a")
+        gate.markOwned("conv-other-b")
+
+        // Toggle Client Mode off — the VM observes settingsRepository's
+        // flow and should hit the releaseAll() path.
+        clientModeEnabledFlow.value = false
+        advanceUntilIdle()
+
+        assertEquals(
+            "Disabling Client Mode must release every owned conversation; " +
+                "saw gate=${gate.snapshot()}",
+            emptySet<String>(),
+            gate.snapshot(),
+        )
     }
 
     /**
@@ -1274,6 +1443,7 @@ class AdminChatViewModelTest {
             internalBotClient,
             clientModeChatSender,
             com.letta.mobile.channel.CurrentConversationTracker(),
+            com.letta.mobile.clientmode.ClientModeSuppressionGate(),
         )
         advanceUntilIdle()
 
@@ -1391,6 +1561,7 @@ class AdminChatViewModelTest {
             internalBotClient,
             clientModeChatSender,
             com.letta.mobile.channel.CurrentConversationTracker(),
+            com.letta.mobile.clientmode.ClientModeSuppressionGate(),
         )
 
         val project = vm.projectContext
@@ -1492,6 +1663,7 @@ class AdminChatViewModelTest {
             internalBotClient,
             clientModeChatSender,
             com.letta.mobile.channel.CurrentConversationTracker(),
+            com.letta.mobile.clientmode.ClientModeSuppressionGate(),
         )
         advanceUntilIdle()
 
@@ -1531,6 +1703,7 @@ class AdminChatViewModelTest {
             internalBotClient,
             clientModeChatSender,
             com.letta.mobile.channel.CurrentConversationTracker(),
+            com.letta.mobile.clientmode.ClientModeSuppressionGate(),
         )
         advanceUntilIdle()
 
@@ -1580,6 +1753,7 @@ class AdminChatViewModelTest {
             internalBotClient,
             clientModeChatSender,
             com.letta.mobile.channel.CurrentConversationTracker(),
+            com.letta.mobile.clientmode.ClientModeSuppressionGate(),
         )
         advanceUntilIdle()
 
@@ -1613,6 +1787,7 @@ class AdminChatViewModelTest {
             internalBotClient,
             clientModeChatSender,
             com.letta.mobile.channel.CurrentConversationTracker(),
+            com.letta.mobile.clientmode.ClientModeSuppressionGate(),
         )
 
         assertTrue(vm.tryHandleSlashCommand("/bug"))
@@ -1641,6 +1816,7 @@ class AdminChatViewModelTest {
             internalBotClient,
             clientModeChatSender,
             com.letta.mobile.channel.CurrentConversationTracker(),
+            com.letta.mobile.clientmode.ClientModeSuppressionGate(),
         )
         advanceUntilIdle()
 
@@ -1809,8 +1985,17 @@ class AdminChatViewModelTest {
 
         val swap = vm.uiState.value.clientModeConversationSwap
         assertNotNull("Expected banner state to be populated on substitution", swap)
-        assertEquals("conv-DEAD", swap!!.requestedConversationId)
-        assertEquals("conv-NEW", swap.newConversationId)
+        // c87t.2: the legacy substitution path now constructs the
+        // ClientModeConversationSwap.Substituted variant of the sealed
+        // class. (The actionable NotResumable variant is exercised by
+        // the c87t.2 tests below.)
+        assertTrue(
+            "Expected Substituted variant for the legacy silent-swap path, got $swap",
+            swap is ClientModeConversationSwap.Substituted,
+        )
+        val substituted = swap as ClientModeConversationSwap.Substituted
+        assertEquals("conv-DEAD", substituted.requestedConversationId)
+        assertEquals("conv-NEW", substituted.newConversationId)
     }
 
     @Test
@@ -1863,6 +2048,208 @@ class AdminChatViewModelTest {
         vm.dismissClientModeConversationSwap()
 
         assertNull(vm.uiState.value.clientModeConversationSwap)
+    }
+
+    // -------------------------------------------------------------------
+    // letta-mobile-c87t.2: gateway-side resume guard surfaces a typed
+    // BotGatewayException(CONVERSATION_NOT_RESUMABLE) instead of silently
+    // accepting a substituted conversation. T5-T8 below cover the mobile
+    // VM behaviour: actionable banner state, dismiss semantics, and the
+    // start-fresh action that re-sends under a brand-new conversation.
+    // -------------------------------------------------------------------
+
+    @Test
+    fun `c87t2 T5 - sender CONVERSATION_NOT_RESUMABLE surfaces NotResumable banner`() = runTest {
+        clientModeEnabledFlow.value = true
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
+        } returns flow {
+            // No chunks emitted — the gateway aborted SESSION_START before
+            // any stream could open. The error frame is mapped to a typed
+            // BotGatewayException by WsBotClient.toGatewayErrorCode().
+            throw BotGatewayException(
+                code = BotGatewayErrorCode.CONVERSATION_NOT_RESUMABLE,
+                message = "Conversation conv-DEAD cannot be resumed",
+            )
+        }
+
+        val vm = createViewModel(conversationId = "conv-DEAD")
+        advanceUntilIdle()
+
+        vm.sendMessage("hello-after-doze")
+        advanceUntilIdle()
+
+        val swap = vm.uiState.value.clientModeConversationSwap
+        assertNotNull("Expected NotResumable banner to be populated", swap)
+        assertTrue(
+            "Expected NotResumable variant, got $swap",
+            swap is ClientModeConversationSwap.NotResumable,
+        )
+        val notResumable = swap as ClientModeConversationSwap.NotResumable
+        assertEquals("conv-DEAD", notResumable.requestedConversationId)
+
+        // No generic error toast — the banner is the actionable surface.
+        assertNull(
+            "Generic error must NOT be set when the typed banner is up",
+            vm.uiState.value.error,
+        )
+        assertFalse(
+            "Streaming spinner must clear after the gateway refusal",
+            vm.uiState.value.isStreaming,
+        )
+    }
+
+    @Test
+    fun `c87t2 T6 - dismissClientModeConversationSwap clears NotResumable banner`() = runTest {
+        clientModeEnabledFlow.value = true
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
+        } returns flow {
+            throw BotGatewayException(
+                code = BotGatewayErrorCode.CONVERSATION_NOT_RESUMABLE,
+                message = "no resume",
+            )
+        }
+
+        val vm = createViewModel(conversationId = "conv-DEAD")
+        advanceUntilIdle()
+        vm.sendMessage("hi")
+        advanceUntilIdle()
+        // Sanity: banner is up.
+        assertTrue(
+            vm.uiState.value.clientModeConversationSwap is ClientModeConversationSwap.NotResumable,
+        )
+
+        vm.dismissClientModeConversationSwap()
+        advanceUntilIdle()
+
+        assertNull(
+            "Banner must be cleared after dismiss",
+            vm.uiState.value.clientModeConversationSwap,
+        )
+    }
+
+    @Test
+    fun `c87t2 T7 - startFreshConversationAfterUnresumable resends with fresh conv`() = runTest {
+        clientModeEnabledFlow.value = true
+
+        // Track every conversationId the sender is invoked with so we can
+        // assert the second send is forced fresh (conversationId = null).
+        val capturedConversationIds = mutableListOf<String?>()
+        var callCount = 0
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
+        } answers {
+            val convArg = thirdArg<String?>()
+            capturedConversationIds += convArg
+            callCount++
+            if (callCount == 1) {
+                // First send (anchored to conv-DEAD): gateway refuses.
+                flow<BotStreamChunk> {
+                    throw BotGatewayException(
+                        code = BotGatewayErrorCode.CONVERSATION_NOT_RESUMABLE,
+                        message = "no resume",
+                    )
+                }
+            } else {
+                // Second send (forced fresh): gateway opens a brand-new
+                // Letta conversation conv-FRESH and the stream completes.
+                flow {
+                    emit(BotStreamChunk(text = "ok", conversationId = "conv-FRESH"))
+                    emit(BotStreamChunk(text = "ok", conversationId = "conv-FRESH", done = true))
+                }
+            }
+        }
+
+        val vm = createViewModel(conversationId = "conv-DEAD")
+        advanceUntilIdle()
+
+        vm.sendMessage("retry me please")
+        advanceUntilIdle()
+
+        // Sanity: NotResumable banner is up after the first send.
+        assertTrue(
+            vm.uiState.value.clientModeConversationSwap is ClientModeConversationSwap.NotResumable,
+        )
+
+        // User taps the call-to-action.
+        vm.startFreshConversationAfterUnresumable()
+        advanceUntilIdle()
+
+        // The first call carried the dead conv id; the second must be null
+        // (fresh-route) so the gateway opens a brand-new Letta conversation.
+        assertEquals(
+            "Expected exactly two sender invocations (refused + retry-fresh), got $capturedConversationIds",
+            2,
+            capturedConversationIds.size,
+        )
+        assertEquals(
+            "First send must carry the requested-but-unresumable conv id",
+            "conv-DEAD",
+            capturedConversationIds[0],
+        )
+        assertNull(
+            "Retry must be a fresh-route send (conversationId == null) so the gateway " +
+                "opens a brand-new Letta conversation",
+            capturedConversationIds[1],
+        )
+        // Banner must clear once the user has accepted the start-fresh path.
+        assertNull(
+            "Banner must clear after startFreshConversationAfterUnresumable",
+            vm.uiState.value.clientModeConversationSwap,
+        )
+    }
+
+    @Test
+    fun `c87t2 T8 - startFreshConversationAfterUnresumable is no-op for Substituted variant`() = runTest {
+        clientModeEnabledFlow.value = true
+        // Substituted path: gateway honors the SDK's silent swap (legacy
+        // c87t behaviour). The action is meant ONLY for NotResumable.
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
+        } returns flow {
+            emit(BotStreamChunk(text = "ok", conversationId = "conv-NEW"))
+            emit(BotStreamChunk(text = "ok", conversationId = "conv-NEW", done = true))
+        }
+
+        val vm = createViewModel(conversationId = "conv-DEAD")
+        advanceUntilIdle()
+        vm.sendMessage("hi")
+        advanceUntilIdle()
+
+        // Sanity: Substituted banner is up.
+        val before = vm.uiState.value.clientModeConversationSwap
+        assertTrue(
+            "Setup expected Substituted banner, got $before",
+            before is ClientModeConversationSwap.Substituted,
+        )
+
+        // Call the wrong-variant action — must NOT clear the banner or
+        // mutate state. The Substituted path uses the dismiss action.
+        vm.startFreshConversationAfterUnresumable()
+        advanceUntilIdle()
+
+        assertEquals(
+            "startFreshConversationAfterUnresumable must be a no-op for Substituted",
+            before,
+            vm.uiState.value.clientModeConversationSwap,
+        )
     }
 
     // ---------------------------------------------------------------

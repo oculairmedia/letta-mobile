@@ -98,6 +98,31 @@ interface IngestedMessageListener {
     )
 }
 
+/**
+ * Per-conversation gate consulted by [TimelineSyncLoop.runStreamSubscriber]
+ * before opening a direct-Letta SSE stream. Returning `true` keeps the
+ * subscriber dormant for that conversation until the gate flips back.
+ *
+ * Use case: Client Mode routes assistant deltas through the lettabot WS
+ * gateway, which writes the same upstream Letta SSE events into the
+ * timeline as `cm-assist-*` Locals. Without a gate the resume-stream
+ * subscriber would also open the SSE for the same conversation and ingest
+ * the same events as Confirmed bubbles — producing duplicate rendering
+ * (the "doubled response" bug). The Client Mode owner in `:app` flips this
+ * gate true for every conversation it claims authority over.
+ *
+ * Implementations MUST be cheap and side-effect-free; called repeatedly on
+ * the subscriber's loop.
+ */
+fun interface SubscriberSuppressionGate {
+    fun isSuppressed(conversationId: String): Boolean
+
+    companion object {
+        /** Default: never suppress. Used by tests and non-Client-Mode paths. */
+        val Always: SubscriberSuppressionGate = SubscriberSuppressionGate { false }
+    }
+}
+
 class TimelineSyncLoop(
     private val messageApi: MessageApi,
     private val conversationId: String,
@@ -109,6 +134,14 @@ class TimelineSyncLoop(
     // records carrying non-text content. Defaults to no-op for tests that
     // don't care about persistence.
     private val pendingLocalStore: PendingLocalStore = NoOpPendingLocalStore,
+    // Gate consulted by runStreamSubscriber before opening a direct-Letta SSE
+    // stream. Default `Always` (never suppress) preserves legacy behaviour for
+    // every existing test and the non-Client-Mode call path. Client Mode wires
+    // a real gate in :app to suppress the subscriber on conversations the
+    // WS gateway is already streaming. See doubled-response fix
+    // (plan: 2026-04-clientmode-double-bubble-fix.md).
+    private val subscriberSuppression: SubscriberSuppressionGate =
+        SubscriberSuppressionGate.Always,
 ) {
     private val previewJson = Json {
         encodeDefaults = true
@@ -902,7 +935,40 @@ class TimelineSyncLoop(
         var backoffMs = STREAM_BACKOFF_START_MS
         var runOpenedAtMs = 0L
         var runEventsCount = 0
+        // Tracks the previous suppression state so we only emit a state-
+        // transition telemetry event once per flip — otherwise we'd log every
+        // STREAM_DORMANT_MS tick while suppressed.
+        var wasSuppressed = false
         while (currentCoroutineContext().isActive) {
+            // Doubled-response fix: when an authoritative WS-gateway path
+            // (Client Mode) is already streaming this conversation, do not
+            // open a parallel direct-Letta SSE — the gateway forwards the same
+            // upstream events and the duplicate ingestion produces a second
+            // Confirmed bubble alongside the gateway's `cm-assist-*` Local.
+            // Sleep STREAM_DORMANT_MS and re-check; the gate will flip off
+            // when Client Mode is disabled.
+            if (subscriberSuppression.isSuppressed(conversationId)) {
+                if (!wasSuppressed) {
+                    Telemetry.event(
+                        "TimelineSync", "streamSubscriber.suppressed",
+                        "conversationId" to conversationId,
+                        "reason" to "clientModeOwnsConversation",
+                    )
+                    wasSuppressed = true
+                }
+                delay(STREAM_DORMANT_MS)
+                continue
+            }
+            if (wasSuppressed) {
+                Telemetry.event(
+                    "TimelineSync", "streamSubscriber.suppressionLifted",
+                    "conversationId" to conversationId,
+                )
+                wasSuppressed = false
+                // Reset backoff so we attempt to open the stream immediately
+                // when suppression lifts (don't pay the previous failure cost).
+                backoffMs = STREAM_BACKOFF_START_MS
+            }
             try {
                 val channel = messageApi.streamConversation(conversationId)
                 runOpenedAtMs = System.currentTimeMillis()
@@ -1173,7 +1239,15 @@ class TimelineSyncLoop(
             // The contract is delta-append. Trust it. If the gateway
             // ever changes shape, the e2e tests will fail loudly
             // before reaching the device.
-            val mergedText = if (newText.isEmpty()) oldText else oldText + newText
+            val seededFromClientModeLocal =
+                existing.source == MessageSource.CLIENT_MODE_HARNESS &&
+                    confirmed.messageType == TimelineMessageType.ASSISTANT
+            val isCatchUpOverlap = seededFromClientModeLocal && oldText.endsWith(newText)
+            val mergedText = when {
+                newText.isEmpty() -> oldText
+                isCatchUpOverlap -> oldText
+                else -> oldText + newText
+            }
             // Merge toolCalls: a later delta frame may have null/blank
             // arguments but a still-valid name/id; keep whichever list has
             // more data. Specifically, prefer the list that has more calls
@@ -1191,6 +1265,11 @@ class TimelineSyncLoop(
                 else oldCalls
             val merged = confirmed.copy(
                 content = mergedText,
+                source = if (isCatchUpOverlap) {
+                    existing.source
+                } else {
+                    confirmed.source
+                },
                 toolCalls = mergedCalls,
                 // Preserve these fields from the existing event — a delta
                 // that arrives AFTER a tool_return attachment would

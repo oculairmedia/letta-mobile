@@ -209,6 +209,27 @@ class WsBotClient(
                 "w2hx8.streamMessage agent=${request.agentId} conv=${request.conversationId} " +
                     "active=$activeConversationId rid=${requestId.take(8)}",
             )
+            // letta-mobile-flk1.no_session: the WsClientMessage we send
+            // (and may need to resend on a transparent NO_SESSION
+            // recovery) lives here so the recovery branch below can
+            // reach it without re-deriving its identity. The request_id
+            // MUST be reused on resend so a stray successful echo of
+            // the original send is recognized as the same logical
+            // request by Letta's dedup/replay layer.
+            val clientMessage = WsClientMessage(
+                content = request.outboundContent(json),
+                requestId = requestId,
+                source = WsSource(
+                    channel = "letta-mobile",
+                    chatId = request.chatId ?: request.channelId ?: "api",
+                ),
+            )
+            // One-shot NO_SESSION recovery flag. Set when we begin a
+            // recovery attempt; if the recovered send ALSO produces a
+            // NO_SESSION error we propagate instead of looping
+            // forever (gateway is permanently broken / agent gone).
+            var noSessionRecoveryAttempted = false
+
             try {
                 ensureSession(request)
                 if (initialConvId != null) {
@@ -218,17 +239,7 @@ class WsBotClient(
                 }
                 _connectionState.value = ConnectionState.PROCESSING
 
-                sendClientMessageWithRetry(
-                    request = request,
-                    message = WsClientMessage(
-                        content = request.outboundContent(json),
-                        requestId = requestId,
-                        source = WsSource(
-                            channel = "letta-mobile",
-                            chatId = request.chatId ?: request.channelId ?: "api",
-                        ),
-                    ),
-                )
+                sendClientMessageWithRetry(request = request, message = clientMessage)
 
                 var finished = false
                 while (!finished) {
@@ -277,10 +288,82 @@ class WsBotClient(
                                 }
 
                                 is WsErrorMessage -> {
-                                    throw BotGatewayException(
-                                        code = message.code.toGatewayErrorCode(),
-                                        message = message.message,
-                                    )
+                                    val gatewayCode = message.code.toGatewayErrorCode()
+                                    // letta-mobile-flk1.no_session:
+                                    // the lettabot gateway evicts an
+                                    // idle SDK session after
+                                    // DEFAULT_IDLE_TIMEOUT_MS (5 min)
+                                    // WITHOUT closing the WebSocket.
+                                    // The next client_message we send
+                                    // gets back a NO_SESSION error
+                                    // and the user-visible result is
+                                    // a stuck thinking-bubble. Recover
+                                    // transparently on the same
+                                    // socket exactly once: invalidate
+                                    // our local session pointers,
+                                    // re-handshake, resend the SAME
+                                    // WsClientMessage (same
+                                    // request_id), and resume
+                                    // collecting. If recovery itself
+                                    // gets NO_SESSION, propagate so
+                                    // we don't loop.
+                                    if (gatewayCode == BotGatewayErrorCode.NO_SESSION &&
+                                        !noSessionRecoveryAttempted &&
+                                        socketOpen
+                                    ) {
+                                        noSessionRecoveryAttempted = true
+                                        Log.w(
+                                            TAG,
+                                            "flk1.no_session recovering rid=${requestId.take(8)} " +
+                                                "agent=${request.agentId} conv=${request.conversationId} " +
+                                                "msg='${message.message}'",
+                                        )
+                                        // Re-handshake on the SAME
+                                        // socket (the TCP/WS connection
+                                        // is still healthy — only the
+                                        // gateway-side SDK session has
+                                        // been evicted). We send a
+                                        // fresh session_start and wait
+                                        // for session_init under the
+                                        // connectionMutex, mirroring
+                                        // what ensureSession does for
+                                        // a same-agent reconnect, but
+                                        // without tearing down the
+                                        // socket. Active pointers are
+                                        // intentionally left in place
+                                        // — initializeSessionLocked
+                                        // overwrites them from the
+                                        // session_init reply.
+                                        connectionMutex.withLock {
+                                            initializeSessionLocked(
+                                                agentId = request.agentId
+                                                    ?: activeAgentId
+                                                    ?: throw BotGatewayException(
+                                                        code = BotGatewayErrorCode.BAD_MESSAGE,
+                                                        message = "WsBotClient requires request.agentId for NO_SESSION recovery",
+                                                    ),
+                                                conversationId = request.conversationId
+                                                    ?: activeConversationId,
+                                            )
+                                        }
+                                        // Resend the SAME WsClientMessage
+                                        // (preserving requestId so the
+                                        // route still matches and any
+                                        // server-side dedup works).
+                                        sendClientMessageWithRetry(
+                                            request = request,
+                                            message = clientMessage,
+                                        )
+                                        // Stay in the receive loop —
+                                        // the resend's stream/result
+                                        // frames will arrive on this
+                                        // same channel.
+                                    } else {
+                                        throw BotGatewayException(
+                                            code = gatewayCode,
+                                            message = message.message,
+                                        )
+                                    }
                                 }
 
                                 else -> Unit
