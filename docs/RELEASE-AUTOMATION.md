@@ -22,6 +22,9 @@ The supported interface is environment variables:
 
 - `AUTOMATION_SERVER_URL` (or fallback `LETTA_SERVER_URL`)
 - `AUTOMATION_ACCESS_TOKEN` (or fallback `LETTA_TOKEN`)
+- optional `AUTOMATION_GATEWAY_URL` (or fallback `LETTABOT_GATEWAY_URL`)
+- optional `AUTOMATION_GATEWAY_API_KEY` (or fallback `LETTABOT_API_KEY`)
+- optional `AUTOMATION_GATEWAY_ENABLED`
 - optional `AUTOMATION_CONFIG_ID` (defaults to `automation-auth`)
 - optional `AUTOMATION_MODE` (`CLOUD` or `SELF_HOSTED`)
 - optional `ANDROID_SERIAL` for multi-device setups
@@ -34,7 +37,10 @@ The staged payload is a base64-encoded JSON object with this exact shape:
   "serverUrl": "https://api.letta.com",
   "accessToken": "token-value",
   "configId": "automation-auth",
-  "mode": "CLOUD"
+  "mode": "CLOUD",
+  "gatewayUrl": "ws://192.168.50.90:8407/api/v1/agent-gateway",
+  "gatewayApiKey": "token-value",
+  "gatewayEnabled": true
 }
 ```
 
@@ -42,11 +48,31 @@ The staged payload is a base64-encoded JSON object with this exact shape:
 - `configId` is optional and defaults to `automation-auth`.
 - `mode` is optional; when omitted, the app derives `CLOUD` for
   `https://api.letta.com` and `SELF_HOSTED` otherwise.
+- `gatewayUrl` and `gatewayApiKey` are optional, but when either is present both
+  must be provided.
+- `gatewayEnabled` is optional; when omitted and gateway credentials are present,
+  the bootstrap enables the LettaBot connection automatically.
 
 ## Usage
 
-Install a debug build, then inject the credentials before running higher-level
-release gates:
+Fastest path for repeat local deploys:
+
+```bash
+export BASE_URL="https://letta.oculair.ca"
+export API_KEY="<disposable-token>"
+export AUTOMATION_GATEWAY_URL="ws://192.168.50.90:8407/api/v1/agent-gateway"
+export AUTOMATION_GATEWAY_API_KEY="<gateway-token>"
+make install-debug-with-creds
+```
+
+This helper:
+
+1. builds `:app:assembleDebug` unless `SKIP_BUILD=1`
+2. installs the debug APK to the connected device
+3. retries with uninstall + reinstall if Android reports a signature mismatch
+4. stages automation credentials and launches the app
+
+Manual two-step path (equivalent under the hood):
 
 ```bash
 cd android-compose
@@ -57,6 +83,20 @@ export AUTOMATION_SERVER_URL="https://api.letta.com"
 export AUTOMATION_ACCESS_TOKEN="<disposable-token>"
 scripts/release/inject-automation-creds.sh
 ```
+
+Optional overrides for the helper:
+
+- `DEVICE` / `ANDROID_SERIAL` — target device serial
+- `APK` — alternate debug APK path
+- `SKIP_BUILD=1` — skip Gradle build and reuse an existing APK
+- URL precedence: `AUTOMATION_SERVER_URL` → `LETTA_SERVER_URL` → `BASE_URL` → `LETTA_URL`
+- token precedence: `AUTOMATION_ACCESS_TOKEN` → `LETTA_TOKEN` → `API_KEY`
+- gateway URL precedence: `AUTOMATION_GATEWAY_URL` → `LETTABOT_GATEWAY_URL`
+- gateway key precedence: `AUTOMATION_GATEWAY_API_KEY` → `LETTABOT_API_KEY`
+
+When both USB and TCP/IP adb transports are present for the same phone, the
+helper prefers the single wireless `host:port` device automatically. Set
+`DEVICE` / `ANDROID_SERIAL` explicitly to override that choice.
 
 What the script does:
 

@@ -26,6 +26,9 @@ class AutomationAuthBootstrapTest {
     private lateinit var stagingPrefs: android.content.SharedPreferences
     private val savedConfigs = mutableListOf<LettaConfig>()
     private var activeConfig: LettaConfig? = null
+    private var gatewayEnabled: Boolean? = null
+    private var gatewayBaseUrl: String? = null
+    private var gatewayApiKey: String? = null
 
     @Before
     fun setUp() {
@@ -34,6 +37,9 @@ class AutomationAuthBootstrapTest {
         stagingPrefs.edit().clear().commit()
         savedConfigs.clear()
         activeConfig = null
+        gatewayEnabled = null
+        gatewayBaseUrl = null
+        gatewayApiKey = null
     }
 
     @After
@@ -84,6 +90,27 @@ class AutomationAuthBootstrapTest {
     }
 
     @Test
+    fun importPendingConfig_populatesGatewaySettingsWhenProvided() = runBlocking {
+        stagePayload(
+            """
+            {"serverUrl":"demo.letta.internal/","accessToken":"fresh-token","gatewayUrl":"192.168.50.90:8407/api/v1/agent-gateway","gatewayApiKey":" gateway-secret ","gatewayEnabled":true}
+            """.trimIndent(),
+        )
+
+        AutomationAuthBootstrap.importPendingConfig(
+            context = context,
+            saveConfig = ::recordConfig,
+            setGatewayEnabled = { gatewayEnabled = it },
+            setGatewayBaseUrl = { gatewayBaseUrl = it },
+            setGatewayApiKey = { gatewayApiKey = it },
+        )
+
+        assertEquals("ws://192.168.50.90:8407/api/v1/agent-gateway", gatewayBaseUrl)
+        assertEquals("gateway-secret", gatewayApiKey)
+        assertEquals(true, gatewayEnabled)
+    }
+
+    @Test
     fun importPendingConfig_dropsInvalidPayloadAndLeavesExistingConfigUntouched() = runBlocking {
         recordConfig(
             LettaConfig(
@@ -100,6 +127,49 @@ class AutomationAuthBootstrapTest {
         assertEquals("existing", activeConfig?.id)
         assertEquals("stable-token", activeConfig?.accessToken)
         assertNull(stagingPrefs.getString(AutomationAuthBootstrap.KEY_PAYLOAD_BASE64, null))
+    }
+
+    @Test
+    fun importPendingConfig_rejects_partialGatewayPayload() = runBlocking {
+        stagePayload(
+            """
+            {"serverUrl":"demo.letta.internal/","accessToken":"fresh-token","gatewayUrl":"ws://192.168.50.90:8407/api/v1/agent-gateway"}
+            """.trimIndent(),
+        )
+
+        AutomationAuthBootstrap.importPendingConfig(
+            context = context,
+            saveConfig = ::recordConfig,
+            setGatewayEnabled = { gatewayEnabled = it },
+            setGatewayBaseUrl = { gatewayBaseUrl = it },
+            setGatewayApiKey = { gatewayApiKey = it },
+        )
+
+        assertNull(gatewayBaseUrl)
+        assertNull(gatewayApiKey)
+        assertNull(gatewayEnabled)
+        assertNull(stagingPrefs.getString(AutomationAuthBootstrap.KEY_PAYLOAD_BASE64, null))
+    }
+
+    @Test
+    fun importPendingConfig_honorsExplicitGatewayDisabledFlag() = runBlocking {
+        stagePayload(
+            """
+            {"serverUrl":"demo.letta.internal/","accessToken":"fresh-token","gatewayUrl":"ws://192.168.50.90:8407/api/v1/agent-gateway","gatewayApiKey":"gateway-secret","gatewayEnabled":false}
+            """.trimIndent(),
+        )
+
+        AutomationAuthBootstrap.importPendingConfig(
+            context = context,
+            saveConfig = ::recordConfig,
+            setGatewayEnabled = { gatewayEnabled = it },
+            setGatewayBaseUrl = { gatewayBaseUrl = it },
+            setGatewayApiKey = { gatewayApiKey = it },
+        )
+
+        assertEquals(false, gatewayEnabled)
+        assertEquals("ws://192.168.50.90:8407/api/v1/agent-gateway", gatewayBaseUrl)
+        assertEquals("gateway-secret", gatewayApiKey)
     }
 
     private fun stagePayload(jsonPayload: String) {

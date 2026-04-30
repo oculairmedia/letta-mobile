@@ -31,7 +31,7 @@ GRADLEW             := ./gradlew
 ANDROID_DIR         := android-compose
 VERIFY_RELEASE_SCRIPT := scripts/release/verify-release.sh
 
-.PHONY: help lint-telemetry verify-build verify-unit-tests verify-device-ready verify-sync verify-stream verify-all verify-release check-cli check-device
+.PHONY: help lint-telemetry verify-build verify-unit-tests install-debug-with-creds verify-device-ready verify-sync verify-stream verify-all verify-release check-cli check-device
 
 help:
 	@echo "letta-mobile make targets"
@@ -40,6 +40,9 @@ help:
 	@echo "                      hand-rolled errorClass/errorMessage, undocumented literal tags)."
 	@echo "  verify-build        Compile the Android debug build."
 	@echo "  verify-unit-tests   Run debug unit tests."
+	@echo "  install-debug-with-creds Build/install the debug APK and inject auth creds for a connected device."
+	@echo "                      Required: BASE_URL/LETTA_URL and API_KEY/LETTA_TOKEN (or AUTOMATION_* equivalents)"
+	@echo "                      Optional: DEVICE=<serial> APK=<path> SKIP_BUILD=1 AUTOMATION_GATEWAY_URL=... AUTOMATION_GATEWAY_API_KEY=..."
 	@echo "  verify-device-ready Bootstrap a fresh device to an authenticated conversation."
 	@echo "                      Required: DEVICE=<serial> APK=<path> BASE_URL=<url> API_KEY=<token> AGENT=<id> CONV=<id>"
 	@echo "  verify-sync         Run sync-drift against a live device. Asserts every sample HEALTHY."
@@ -80,6 +83,18 @@ verify-build:
 verify-unit-tests:
 	@echo "=== verify-unit-tests :app:testDebugUnitTest ==="
 	@cd $(ANDROID_DIR) && $(GRADLEW) :app:testDebugUnitTest
+
+install-debug-with-creds: check-device
+	@if [[ -z "$(BASE_URL)" || -z "$(API_KEY)" ]]; then \
+		echo "ERROR: install-debug-with-creds requires BASE_URL/LETTA_URL and API_KEY/LETTA_TOKEN (or AUTOMATION_* env vars)"; \
+		exit 2; \
+	fi
+	@ANDROID_SERIAL="$(DEVICE)" \
+	APK="$(APK)" \
+	SKIP_BUILD="$(SKIP_BUILD)" \
+	BASE_URL="$(BASE_URL)" \
+	API_KEY="$(API_KEY)" \
+	./scripts/release/install-debug-with-creds.sh
 
 verify-device-ready:
 	@if [[ -z "$(DEVICE)" || -z "$(APK)" || -z "$(BASE_URL)" || -z "$(API_KEY)" || -z "$(AGENT)" || -z "$(CONV)" ]]; then \

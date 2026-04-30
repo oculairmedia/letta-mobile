@@ -19,14 +19,21 @@ object AutomationAuthBootstrap {
     private val json = Json { ignoreUnknownKeys = true }
 
     fun importPendingConfig(context: Context, settingsRepository: SettingsRepository) {
-        importPendingConfig(context) { config ->
-            settingsRepository.saveConfig(config)
-        }
+        importPendingConfig(
+            context = context,
+            saveConfig = { config -> settingsRepository.saveConfig(config) },
+            setGatewayEnabled = { enabled -> settingsRepository.setClientModeEnabled(enabled) },
+            setGatewayBaseUrl = { baseUrl -> settingsRepository.setClientModeBaseUrl(baseUrl) },
+            setGatewayApiKey = { apiKey -> settingsRepository.setClientModeApiKey(apiKey) },
+        )
     }
 
     internal fun importPendingConfig(
         context: Context,
         saveConfig: suspend (LettaConfig) -> Unit,
+        setGatewayEnabled: suspend (Boolean) -> Unit = {},
+        setGatewayBaseUrl: suspend (String) -> Unit = {},
+        setGatewayApiKey: suspend (String?) -> Unit = {},
     ) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val encodedPayload = prefs.getString(KEY_PAYLOAD_BASE64, null)?.trim().orEmpty()
@@ -38,6 +45,11 @@ object AutomationAuthBootstrap {
             val payload = decodePayload(encodedPayload)
             runBlocking {
                 saveConfig(payload.toLettaConfig())
+                payload.gatewaySettings()?.let { gateway ->
+                    setGatewayEnabled(gateway.enabled)
+                    setGatewayBaseUrl(gateway.baseUrl)
+                    setGatewayApiKey(gateway.apiKey)
+                }
             }
             Log.i(TAG, "Imported automation credentials for ${payload.serverUrl}")
         }.onFailure { error ->
@@ -59,6 +71,9 @@ object AutomationAuthBootstrap {
         val accessToken: String,
         val configId: String = DEFAULT_CONFIG_ID,
         val mode: String? = null,
+        val gatewayUrl: String? = null,
+        val gatewayApiKey: String? = null,
+        val gatewayEnabled: Boolean? = null,
     ) {
         fun normalized(): AutomationAuthPayload {
             val normalizedUrl = serverUrl.trim()
@@ -70,10 +85,36 @@ object AutomationAuthBootstrap {
             val normalizedToken = accessToken.trim()
                 .ifBlank { throw IllegalArgumentException("accessToken is required") }
             val normalizedId = configId.trim().ifBlank { DEFAULT_CONFIG_ID }
+            val normalizedGatewayUrl = gatewayUrl?.trim().orEmpty()
+                .takeIf { it.isNotBlank() }
+                ?.let { url ->
+                    when {
+                        url.startsWith("http://") ||
+                            url.startsWith("https://") ||
+                            url.startsWith("ws://") ||
+                            url.startsWith("wss://") -> url
+                        else -> "ws://$url"
+                    }
+                }
+                ?.removeSuffix("/")
+            val normalizedGatewayApiKey = gatewayApiKey?.trim().orEmpty()
+                .takeIf { it.isNotBlank() }
+            if ((normalizedGatewayUrl == null) != (normalizedGatewayApiKey == null)) {
+                throw IllegalArgumentException(
+                    "gatewayUrl and gatewayApiKey must both be provided when bootstrapping LettaBot credentials"
+                )
+            }
             return copy(
                 serverUrl = normalizedUrl,
                 accessToken = normalizedToken,
                 configId = normalizedId,
+                gatewayUrl = normalizedGatewayUrl,
+                gatewayApiKey = normalizedGatewayApiKey,
+                gatewayEnabled = if (normalizedGatewayUrl != null) {
+                    gatewayEnabled ?: true
+                } else {
+                    null
+                },
             )
         }
 
@@ -95,5 +136,21 @@ object AutomationAuthBootstrap {
                 accessToken = accessToken,
             )
         }
+
+        fun gatewaySettings(): GatewaySettings? {
+            val baseUrl = gatewayUrl ?: return null
+            val apiKey = gatewayApiKey ?: return null
+            return GatewaySettings(
+                baseUrl = baseUrl,
+                apiKey = apiKey,
+                enabled = gatewayEnabled ?: true,
+            )
+        }
     }
+
+    internal data class GatewaySettings(
+        val baseUrl: String,
+        val apiKey: String,
+        val enabled: Boolean,
+    )
 }
