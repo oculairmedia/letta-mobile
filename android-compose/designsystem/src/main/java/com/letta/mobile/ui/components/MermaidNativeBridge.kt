@@ -18,11 +18,10 @@ internal data class MermaidStyleSpec(
 )
 
 /**
- * Optional JNI bridge for the Rust Mermaid spike.
+ * JNI bridge for the Rust Mermaid renderer.
  *
- * The app remains buildable and runnable even when the native library is absent:
- * in that case [renderToSvg] returns [MermaidNativeRenderResult.Unavailable] and
- * the caller falls back to the existing WebView renderer.
+ * Loads `libletta_mermaid_renderer.so` on first call.
+ * Returns [MermaidNativeRenderResult.Unavailable] if the native library is absent.
  */
 internal object MermaidNativeBridge {
     private const val TAG = "MermaidNativeBridge"
@@ -33,7 +32,7 @@ internal object MermaidNativeBridge {
             System.loadLibrary(LIB_NAME)
             true
         }.getOrElse { error ->
-            Log.i(TAG, "Native Mermaid library unavailable; using WebView fallback", error)
+            Log.i(TAG, "Native Mermaid library unavailable", error)
             false
         }
     }
