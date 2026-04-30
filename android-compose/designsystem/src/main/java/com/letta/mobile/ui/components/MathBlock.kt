@@ -4,8 +4,11 @@ import android.annotation.SuppressLint
 import android.graphics.Color as AndroidColor
 import android.os.Build
 import android.util.Base64
+import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.webkit.JavascriptInterface
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
@@ -23,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,12 +61,21 @@ fun MathBlock(
     modifier: Modifier = Modifier,
     displayMode: Boolean = true,
 ) {
+    val clipboard = LocalClipboardManager.current
+
     val isDark = isSystemInDarkTheme()
     val foregroundArgb = MaterialTheme.colorScheme.onSurface.toArgb()
     val backgroundArgb = MaterialTheme.colorScheme.surfaceVariant.toArgb()
-    val clipboard = LocalClipboardManager.current
+    var webViewRef by remember(source, displayMode) { mutableStateOf<WebView?>(null) }
 
     var renderError by rememberSaveable(source) { mutableStateOf<String?>(null) }
+
+    DisposableEffect(source, displayMode) {
+        onDispose {
+            webViewRef?.destroySafely()
+            webViewRef = null
+        }
+    }
 
     if (renderError != null) {
         MathErrorFallback(source = source, errorMessage = renderError!!, modifier = modifier)
@@ -94,48 +107,75 @@ fun MathBlock(
                     onClick = {},
                     onLongClick = { clipboard.setText(AnnotatedString(source)) },
                 ),
-            factory = { ctx -> createKatexWebView(ctx, html) { renderError = it } },
-            update = { it.loadDataWithBaseURL("https://appassets/", html, "text/html", "utf-8", null) },
+            factory = { ctx ->
+                createKatexWebViewContainer(
+                    ctx = ctx,
+                    html = html,
+                    onError = { renderError = it },
+                    onWebViewReady = { webViewRef = it },
+                )
+            },
+            update = { container ->
+                container.findViewWithTag<WebView>(KATEX_WEBVIEW_TAG)?.let { webView ->
+                    webViewRef = webView
+                    webView.loadDataWithBaseURL("https://appassets/", html, "text/html", "utf-8", null)
+                }
+            },
         )
     }
 }
 
 @SuppressLint("SetJavaScriptEnabled")
-private fun createKatexWebView(
+private fun createKatexWebViewContainer(
     ctx: android.content.Context,
     html: String,
     onError: (String) -> Unit,
-): WebView = WebView(ctx).apply {
+    onWebViewReady: (WebView) -> Unit,
+): FrameLayout = FrameLayout(ctx).apply {
     layoutParams = ViewGroup.LayoutParams(
         ViewGroup.LayoutParams.MATCH_PARENT,
         ViewGroup.LayoutParams.WRAP_CONTENT,
     )
-    settings.apply {
-        javaScriptEnabled = true
-        // No file:// or content:// access; only the asset intercept is allowed
-        allowFileAccess = false
-        allowContentAccess = false
-        @Suppress("DEPRECATION")
-        allowFileAccessFromFileURLs = false
-        @Suppress("DEPRECATION")
-        allowUniversalAccessFromFileURLs = false
-        domStorageEnabled = false
-        cacheMode = WebSettings.LOAD_NO_CACHE
-        builtInZoomControls = false
-        displayZoomControls = false
-        useWideViewPort = false
-        loadWithOverviewMode = false
-        textZoom = 100
-    }
     setBackgroundColor(AndroidColor.TRANSPARENT)
-    isVerticalScrollBarEnabled = false
-    isHorizontalScrollBarEnabled = false
-    addJavascriptInterface(KatexBridge { onError(it) }, "LettaKatex")
-    webViewClient = KatexWebViewClient(ctx)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_NO
-    }
-    loadDataWithBaseURL("https://appassets/", html, "text/html", "utf-8", null)
+    addView(
+        WebView(ctx).apply {
+            tag = KATEX_WEBVIEW_TAG
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+            settings.apply {
+                javaScriptEnabled = true
+                // No file:// or content:// access; only the asset intercept is allowed
+                allowFileAccess = false
+                allowContentAccess = false
+                @Suppress("DEPRECATION")
+                allowFileAccessFromFileURLs = false
+                @Suppress("DEPRECATION")
+                allowUniversalAccessFromFileURLs = false
+                domStorageEnabled = false
+                cacheMode = WebSettings.LOAD_NO_CACHE
+                builtInZoomControls = false
+                displayZoomControls = false
+                useWideViewPort = false
+                loadWithOverviewMode = false
+                textZoom = 100
+            }
+            setBackgroundColor(AndroidColor.TRANSPARENT)
+            isVerticalScrollBarEnabled = false
+            isHorizontalScrollBarEnabled = false
+            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R) {
+                setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+            }
+            addJavascriptInterface(KatexBridge { onError(it) }, KATEX_BRIDGE_NAME)
+            webViewClient = KatexWebViewClient(ctx, onError)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_NO
+            }
+            loadDataWithBaseURL("https://appassets/", html, "text/html", "utf-8", null)
+            onWebViewReady(this)
+        }
+    )
 }
 
 private class KatexBridge(private val onError: (String) -> Unit) {
@@ -150,7 +190,10 @@ private class KatexBridge(private val onError: (String) -> Unit) {
  * Only paths under appassets/katex/ are allowed; everything else 404s, which
  * (combined with allowFileAccess=false) keeps the WebView fully offline.
  */
-private class KatexWebViewClient(private val ctx: android.content.Context) : WebViewClient() {
+private class KatexWebViewClient(
+    private val ctx: android.content.Context,
+    private val onError: (String) -> Unit,
+) : WebViewClient() {
     override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
         val url = request?.url?.toString() ?: return null
         val prefix = "https://appassets/"
@@ -171,7 +214,28 @@ private class KatexWebViewClient(private val ctx: android.content.Context) : Web
             WebResourceResponse(mime, "utf-8", ByteArrayInputStream(bytes))
         }.getOrNull()
     }
+
+    override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
+        onError("KaTeX renderer crashed${detail?.let { " (didCrash=${it.didCrash()})" } ?: ""}")
+        view?.destroySafely()
+        return true
+    }
 }
+
+private fun WebView.destroySafely() {
+    stopLoading()
+    onPause()
+    pauseTimers()
+    removeJavascriptInterface(KATEX_BRIDGE_NAME)
+    clearHistory()
+    loadUrl("about:blank")
+    removeAllViews()
+    (parent as? ViewGroup)?.removeView(this)
+    destroy()
+}
+
+private const val KATEX_WEBVIEW_TAG = "katex-webview"
+private const val KATEX_BRIDGE_NAME = "LettaKatex"
 
 @Composable
 private fun MathErrorFallback(source: String, errorMessage: String, modifier: Modifier = Modifier) {

@@ -4,8 +4,11 @@ import android.annotation.SuppressLint
 import android.graphics.Color as AndroidColor
 import android.os.Build
 import android.util.Base64
+import android.view.View
+import android.widget.FrameLayout
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -28,6 +31,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,12 +70,21 @@ fun MermaidDiagram(
     modifier: Modifier = Modifier,
 ) {
     val clipboard = LocalClipboardManager.current
+
     val isDark = isSystemInDarkTheme()
     val backgroundArgb = MaterialTheme.colorScheme.surfaceVariant.toArgb()
     val foregroundArgb = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
+    var webViewRef by remember(source) { mutableStateOf<WebView?>(null) }
 
     // Hoisted so we can flip back to raw source if mermaid throws.
     var renderError by rememberSaveable(source) { mutableStateOf<String?>(null) }
+
+    DisposableEffect(source) {
+        onDispose {
+            webViewRef?.destroySafely()
+            webViewRef = null
+        }
+    }
 
     if (renderError != null) {
         MermaidErrorFallback(
@@ -110,14 +123,18 @@ fun MermaidDiagram(
                         onLongClick = { clipboard.setText(AnnotatedString(source)) },
                     ),
                 factory = { ctx ->
-                    createMermaidWebView(
+                    createMermaidWebViewContainer(
                         ctx = ctx,
                         html = html,
                         onError = { renderError = it },
+                        onWebViewReady = { webViewRef = it },
                     )
                 },
-                update = { webView ->
-                    webView.loadMermaid(html)
+                update = { container ->
+                    container.findViewWithTag<WebView>(MERMAID_WEBVIEW_TAG)?.let { webView ->
+                        webViewRef = webView
+                        webView.loadMermaid(html)
+                    }
                 },
             )
         }
@@ -125,36 +142,51 @@ fun MermaidDiagram(
 }
 
 @SuppressLint("SetJavaScriptEnabled")
-private fun createMermaidWebView(
+private fun createMermaidWebViewContainer(
     ctx: android.content.Context,
     html: String,
     onError: (String) -> Unit,
-): WebView = WebView(ctx).apply {
+    onWebViewReady: (WebView) -> Unit,
+): FrameLayout = FrameLayout(ctx).apply {
     layoutParams = ViewGroup.LayoutParams(
         ViewGroup.LayoutParams.MATCH_PARENT,
         ViewGroup.LayoutParams.WRAP_CONTENT,
     )
     setBackgroundColor(AndroidColor.TRANSPARENT)
-    settings.apply {
-        javaScriptEnabled = true
-        // Only asset-intercept and the base HTML are ever loaded; keep
-        // file and content access off for belt-and-braces.
-        allowFileAccess = false
-        allowContentAccess = false
-        cacheMode = WebSettings.LOAD_NO_CACHE
-        builtInZoomControls = true
-        displayZoomControls = false
-        setSupportZoom(true)
-        useWideViewPort = true
-        loadWithOverviewMode = true
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+    addView(
+        WebView(ctx).apply {
+            tag = MERMAID_WEBVIEW_TAG
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+            setBackgroundColor(AndroidColor.TRANSPARENT)
+            settings.apply {
+                javaScriptEnabled = true
+                // Only asset-intercept and the base HTML are ever loaded; keep
+                // file and content access off for belt-and-braces.
+                allowFileAccess = false
+                allowContentAccess = false
+                cacheMode = WebSettings.LOAD_NO_CACHE
+                builtInZoomControls = true
+                displayZoomControls = false
+                setSupportZoom(true)
+                useWideViewPort = true
+                loadWithOverviewMode = true
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                }
+            }
+            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R) {
+                setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+            }
+            webViewClient = MermaidWebViewClient(ctx, onError)
+            webChromeClient = WebChromeClient()
+            addJavascriptInterface(MermaidBridge(onError), MermaidBridge.NAME)
+            loadMermaid(html)
+            onWebViewReady(this)
         }
-    }
-    webViewClient = MermaidWebViewClient(ctx)
-    webChromeClient = WebChromeClient()
-    addJavascriptInterface(MermaidBridge(onError), MermaidBridge.NAME)
-    loadMermaid(html)
+    )
 }
 
 private fun WebView.loadMermaid(html: String) {
@@ -242,6 +274,7 @@ private class MermaidBridge(private val onError: (String) -> Unit) {
  */
 private class MermaidWebViewClient(
     private val context: android.content.Context,
+    private val onError: (String) -> Unit,
 ) : WebViewClient() {
     override fun shouldInterceptRequest(
         view: WebView,
@@ -265,7 +298,27 @@ private class MermaidWebViewClient(
         }
         return null
     }
+
+    override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
+        onError("Mermaid renderer crashed${detail?.let { " (didCrash=${it.didCrash()})" } ?: ""}")
+        view?.destroySafely()
+        return true
+    }
 }
+
+private fun WebView.destroySafely() {
+    stopLoading()
+    onPause()
+    pauseTimers()
+    removeJavascriptInterface(MermaidBridge.NAME)
+    clearHistory()
+    loadUrl("about:blank")
+    removeAllViews()
+    (parent as? ViewGroup)?.removeView(this)
+    destroy()
+}
+
+private const val MERMAID_WEBVIEW_TAG = "mermaid-webview"
 
 internal fun buildMermaidHtml(
     source: String,
@@ -326,4 +379,3 @@ private fun argbToCssHex(argb: Int): String {
     val b = argb and 0xFF
     return String.format(java.util.Locale.ROOT, "#%02x%02x%02x", r, g, b)
 }
-

@@ -137,13 +137,10 @@ private fun LettaNavigationRail(
             NavigationRailItem(
                 selected = selected,
                 onClick = {
-                    navController.navigate(destination.route) {
-                        popUpTo(navController.graph.startDestinationId) {
-                            saveState = true
-                        }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
+                    navController.navigateToTopLevelDestination(
+                        destination = destination,
+                        currentDestination = currentDestination,
+                    )
                 },
                 icon = {
                     Icon(destination.icon, contentDescription = destination.label)
@@ -195,13 +192,10 @@ private fun LettaBottomBar(
                     label = destination.label,
                     selected = destination.isSelected(currentDestination),
                     onClick = {
-                        navController.navigate(destination.route) {
-                            popUpTo(navController.graph.startDestinationId) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
+                        navController.navigateToTopLevelDestination(
+                            destination = destination,
+                            currentDestination = currentDestination,
+                        )
                     },
                 )
             }
@@ -246,6 +240,38 @@ private fun LettaBottomBarItem(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+    }
+}
+
+private fun NavController.navigateToTopLevelDestination(
+    destination: TopLevelDestination,
+    currentDestination: NavDestination?,
+) {
+    val isInAgentChat = currentDestination
+        ?.hierarchy
+        ?.any { navDestination -> navDestination.hasRoute(AgentChatRoute::class) } == true
+
+    if (destination == TopLevelDestination.ADMIN && isInAgentChat) {
+        if (popBackStack<AdminRoute>(inclusive = false)) {
+            return
+        }
+
+        navigate(destination.route) {
+            popUpTo(graph.startDestinationId) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+        return
+    }
+
+    navigate(destination.route) {
+        popUpTo(graph.startDestinationId) {
+            saveState = true
+        }
+        launchSingleTop = true
+        restoreState = true
     }
 }
 
