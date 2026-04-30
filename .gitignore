@@ -25,6 +25,7 @@ keystore.properties
 
 # Kotlin compiler error logs
 android-compose/.kotlin/
+android-compose/native/mermaid_renderer/target/
 
 # Letta local config
 .letta/
