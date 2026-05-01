@@ -20,6 +20,20 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+/**
+ * Client Mode session authority.
+ *
+ * Contract:
+ * - The route agent (from AdminChatViewModel navigation state) is the
+ *   authoritative owner of a Client Mode chat route.
+ * - Existing conversations are only valid when resumed under that same
+ *   route agent.
+ * - When a route agent is explicitly known, this controller MUST bind the
+ *   gateway session to that agent and MUST NOT fall back to a previously
+ *   active agent or an arbitrary preferred remote agent.
+ * - Preferred-agent resolution is allowed only when the caller does not know
+ *   which agent owns the route.
+ */
 @Singleton
 class ClientModeController @Inject constructor(
     private val botGateway: BotGateway,
@@ -44,7 +58,9 @@ class ClientModeController @Inject constructor(
     fun initialize() {
         if (initialized) return
         initialized = true
-        ProcessLifecycleOwner.get().lifecycle.addObserver(this)
+        runCatching {
+            ProcessLifecycleOwner.get().lifecycle.addObserver(this)
+        }
         scope.launch {
             combine(
                 settingsRepository.observeClientModeEnabled(),
@@ -107,7 +123,8 @@ class ClientModeController @Inject constructor(
                 return
             }
 
-            val resolvedAgentId = routeAgentId ?: activeRemoteAgentId ?: resolveClientModeRemoteAgent(
+            val explicitRouteAgentId = routeAgentId?.trim()?.takeIf { it.isNotEmpty() }
+            val resolvedAgentId = explicitRouteAgentId ?: activeRemoteAgentId ?: resolveClientModeRemoteAgent(
                 baseUrl = baseUrl,
                 apiKey = apiKey.ifBlank { null },
             ).id
