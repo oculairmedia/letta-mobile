@@ -86,6 +86,41 @@ class EditAgentViewModel @Inject constructor(
     private val clientModeConnectionTester: ClientModeConnectionTester,
 ) : ViewModel() {
 
+    companion object {
+        private val supportedModelSettingsProviderTypes = setOf(
+            "openai",
+            "sglang",
+            "anthropic",
+            "google_ai",
+            "google_vertex",
+            "azure",
+            "xai",
+            "zai",
+            "groq",
+            "deepseek",
+            "together",
+            "bedrock",
+            "baseten",
+            "openrouter",
+            "chatgpt_oauth",
+        )
+
+        private fun normalizeModelSettingsProviderType(providerType: String?, modelHandle: String?): String? {
+            val normalizedProviderType = providerType?.trim()?.lowercase().orEmpty()
+            if (normalizedProviderType in supportedModelSettingsProviderTypes) {
+                return normalizedProviderType
+            }
+
+            val handleProvider = modelHandle
+                ?.substringBefore('/', missingDelimiterValue = "")
+                ?.trim()
+                ?.lowercase()
+                .orEmpty()
+
+            return handleProvider.takeIf { it in supportedModelSettingsProviderTypes }
+        }
+    }
+
     private val agentId: String = savedStateHandle.get<String>("agentId")!!
 
     private val _uiState = MutableStateFlow<UiState<EditAgentUiState>>(UiState.Loading)
@@ -142,10 +177,14 @@ class EditAgentViewModel @Inject constructor(
                     ?: agent.llmConfig?.modelEndpointType
                     ?: agent.llmConfig?.providerName
                     ?: ""
+                val normalizedProviderType = normalizeModelSettingsProviderType(
+                    providerType = resolvedProviderType,
+                    modelHandle = agent.model ?: agent.llmConfig?.handle ?: agent.llmConfig?.model,
+                ).orEmpty()
                 val clientModeEnabled = settingsRepository.observeClientModeEnabled().first()
                 val clientModeBaseUrl = settingsRepository.observeClientModeBaseUrl().first()
                 val clientModeApiKey = settingsRepository.getClientModeApiKey().orEmpty()
-                originalProviderType = resolvedProviderType
+                originalProviderType = normalizedProviderType
                 _uiState.value = UiState.Success(
                     EditAgentUiState(
                         agent = agent,
@@ -159,7 +198,7 @@ class EditAgentViewModel @Inject constructor(
                         tags = agent.tags.toImmutableList(),
                         attachedTools = agent.tools.toImmutableList(),
                         availableTools = availableTools.toImmutableList(),
-                        providerType = resolvedProviderType,
+                        providerType = normalizedProviderType,
                         temperature = agent.modelSettings?.temperature?.toFloat() ?: agent.llmConfig?.temperature?.toFloat() ?: 1.0f,
                         maxOutputTokens = agent.modelSettings?.maxOutputTokens ?: agent.llmConfig?.maxTokens ?: 4096,
                         parallelToolCalls = agent.modelSettings?.parallelToolCalls ?: agent.llmConfig?.parallelToolCalls ?: true,
@@ -196,7 +235,23 @@ class EditAgentViewModel @Inject constructor(
     fun updateModel(value: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(model = value))
+            val selectedModel = llmModels.value.firstOrNull { model ->
+                model.handle.equals(value, ignoreCase = true) ||
+                    model.name.equals(value, ignoreCase = true) ||
+                    model.displayName.equals(value, ignoreCase = true)
+            }
+            val normalizedProviderType = selectedModel?.let { model ->
+                normalizeModelSettingsProviderType(
+                    providerType = model.providerType,
+                    modelHandle = model.handle ?: value,
+                )
+            }
+            _uiState.value = UiState.Success(
+                currentState.copy(
+                    model = selectedModel?.handle ?: value,
+                    providerType = normalizedProviderType.orEmpty(),
+                )
+            )
         }
     }
 
@@ -440,11 +495,20 @@ class EditAgentViewModel @Inject constructor(
             try {
                 val state = (_uiState.value as? UiState.Success)?.data ?: return@launch
                 val embeddingChanged = state.embedding != originalEmbedding
-                val providerTypeChanged = state.providerType != originalProviderType
-                val resolvedProviderType = when {
-                    providerTypeChanged -> state.providerType.ifBlank { null }
-                    originalProviderType.isNotBlank() -> originalProviderType
-                    else -> null
+                val resolvedProviderType = normalizeModelSettingsProviderType(
+                    providerType = state.providerType,
+                    modelHandle = state.model,
+                )
+                    ?: normalizeModelSettingsProviderType(
+                        providerType = originalProviderType,
+                        modelHandle = state.model,
+                    )
+
+                if (resolvedProviderType == null) {
+                    _uiState.value = UiState.Error(
+                        "Couldn't determine a supported provider type for the selected model. Please re-select the model and try again."
+                    )
+                    return@launch
                 }
                 agentRepository.updateAgent(
                     agentId,

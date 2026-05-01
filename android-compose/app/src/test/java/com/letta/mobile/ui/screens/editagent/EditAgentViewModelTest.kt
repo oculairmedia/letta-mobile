@@ -16,6 +16,8 @@ import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.ModelRepository
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.repository.ToolRepository
+import com.letta.mobile.data.model.EmbeddingModel
+import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeBlockApi
 import com.letta.mobile.testutil.FakeToolApi
@@ -56,6 +58,8 @@ class EditAgentViewModelTest {
     private lateinit var mockClientModeConnectionTester: ClientModeConnectionTester
     private lateinit var mockMessageRepository: MessageRepository
     private lateinit var mockModelRepository: ModelRepository
+    private lateinit var llmModelsFlow: MutableStateFlow<List<LlmModel>>
+    private lateinit var embeddingModelsFlow: MutableStateFlow<List<EmbeddingModel>>
     private lateinit var viewModel: EditAgentViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
     private var clientModeEnabled: Boolean = false
@@ -75,6 +79,20 @@ class EditAgentViewModelTest {
         mockClientModeConnectionTester = mockk(relaxed = true)
         mockMessageRepository = mockk(relaxed = true)
         mockModelRepository = mockk(relaxed = true)
+        llmModelsFlow = MutableStateFlow(
+            listOf(
+                LlmModel(id = "m1", name = "Letta Free", handle = "letta/letta-free", providerType = "openai"),
+                LlmModel(id = "m2", name = "Claude Sonnet", handle = "anthropic/claude-3-5-sonnet", providerType = "anthropic"),
+                LlmModel(id = "m3", name = "MiniMax M1", handle = "openrouter/minimax-m1", providerType = "minimax"),
+            )
+        )
+        embeddingModelsFlow = MutableStateFlow(
+            listOf(
+                EmbeddingModel(id = "e1", name = "text-embedding-3-small", handle = "openai/text-embedding-3-small", providerType = "openai"),
+            )
+        )
+        every { mockModelRepository.llmModels } returns llmModelsFlow.asStateFlow()
+        every { mockModelRepository.embeddingModels } returns embeddingModelsFlow.asStateFlow()
         every { mockSettingsRepository.observeClientModeEnabled() } answers { flowOf(clientModeEnabled) }
         every { mockSettingsRepository.observeClientModeBaseUrl() } answers { flowOf(clientModeBaseUrl) }
         every { mockSettingsRepository.getClientModeApiKey() } answers { clientModeApiKey }
@@ -189,6 +207,66 @@ class EditAgentViewModelTest {
     }
 
     @Test
+    fun `updateModel stores selected handle and syncs provider type`() = runTest {
+        viewModel.loadAgent()
+
+        viewModel.updateModel("anthropic/claude-3-5-sonnet")
+
+        viewModel.uiState.test {
+            val state = awaitItem() as UiState.Success
+            assertEquals("anthropic/claude-3-5-sonnet", state.data.model)
+            assertEquals("anthropic", state.data.providerType)
+        }
+    }
+
+    @Test
+    fun `saveAgent persists selected model handle`() = runTest {
+        viewModel.loadAgent()
+        viewModel.updateModel("anthropic/claude-3-5-sonnet")
+
+        viewModel.saveAgent {}
+
+        assertEquals("anthropic/claude-3-5-sonnet", fakeAgentRepo.lastUpdateParams?.model)
+        assertEquals("anthropic", fakeAgentRepo.lastUpdateParams?.modelSettings?.providerType)
+    }
+
+    @Test
+    fun `updateModel normalizes unsupported provider type from handle`() = runTest {
+        viewModel.loadAgent()
+
+        viewModel.updateModel("openrouter/minimax-m1")
+
+        viewModel.uiState.test {
+            val state = awaitItem() as UiState.Success
+            assertEquals("openrouter/minimax-m1", state.data.model)
+            assertEquals("openrouter", state.data.providerType)
+        }
+    }
+
+    @Test
+    fun `saveAgent omits unsupported provider type and uses supported handle prefix`() = runTest {
+        viewModel.loadAgent()
+
+        viewModel.updateModel("openrouter/minimax-m1")
+        viewModel.saveAgent {}
+
+        assertEquals("openrouter/minimax-m1", fakeAgentRepo.lastUpdateParams?.model)
+        assertEquals("openrouter", fakeAgentRepo.lastUpdateParams?.modelSettings?.providerType)
+    }
+
+    @Test
+    fun `saveAgent derives provider type from handle when loaded provider is unsupported`() = runTest {
+        fakeAgentRepo.loadedModel = "openrouter/minimax-m1"
+        fakeAgentRepo.loadedProviderType = "minimax"
+
+        viewModel.loadAgent()
+        viewModel.saveAgent {}
+
+        assertEquals("openrouter/minimax-m1", fakeAgentRepo.lastUpdateParams?.model)
+        assertEquals("openrouter", fakeAgentRepo.lastUpdateParams?.modelSettings?.providerType)
+    }
+
+    @Test
     fun `loadAgent includes client mode settings`() = runTest {
         clientModeEnabled = true
         clientModeBaseUrl = "http://192.168.50.90:8407"
@@ -297,6 +375,8 @@ class EditAgentViewModelTest {
         override val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
         var shouldFail = false
         var lastUpdateParams: AgentUpdateParams? = null
+        var loadedModel: String = "letta/letta-free"
+        var loadedProviderType: String? = "openai"
 
         override fun getAgent(id: String): Flow<Agent> = flow {
             if (shouldFail) throw Exception("Load failed")
@@ -304,7 +384,7 @@ class EditAgentViewModelTest {
                 id = "a1",
                 name = "Test Agent",
                 description = "A test agent",
-                model = "letta/letta-free",
+                model = loadedModel,
                 embedding = "openai/text-embedding-3-small",
                 tags = listOf("test"),
                 system = "System prompt",
@@ -312,7 +392,7 @@ class EditAgentViewModelTest {
                 enableSleeptime = true,
                 tools = listOf(TestData.tool(id = "t1", name = "attached_tool")),
                 modelSettings = com.letta.mobile.data.model.ModelSettings(
-                    providerType = "openai",
+                    providerType = loadedProviderType,
                     temperature = 0.9,
                     maxOutputTokens = 4096,
                     parallelToolCalls = false,

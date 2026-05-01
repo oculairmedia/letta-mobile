@@ -419,6 +419,7 @@ private fun EditAgentContent(
                                 LlmModel(
                                     id = it.id,
                                     name = it.displayName,
+                                    handle = it.handle ?: it.embeddingModel,
                                     providerType = it.providerType,
                                     contextWindow = it.embeddingDim,
                                 )
