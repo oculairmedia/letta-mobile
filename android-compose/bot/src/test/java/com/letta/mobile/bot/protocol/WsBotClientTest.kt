@@ -68,6 +68,10 @@ class WsBotClientTest : WordSpec({
                 chunks[2].done shouldBe true
                 chunks[2].conversationId shouldBe "conv-1"
                 chunks[2].agentId shouldBe "agent-1"
+                chunks[2].text shouldBe null
+                chunks[2].event shouldBe null
+                chunks[2].toolName shouldBe null
+                chunks[2].toolCallId shouldBe null
 
                 runBlocking { client.close() }
             }
@@ -170,6 +174,9 @@ class WsBotClientTest : WordSpec({
                 chunks[1].text shouldBe "done"
                 chunks[1].toolCallId shouldBe "call-1"
                 chunks[2].done shouldBe true
+                chunks[2].text shouldBe null
+                chunks[2].event shouldBe null
+                chunks[2].toolInput shouldBe null
 
                 client.close()
             }
@@ -226,6 +233,8 @@ class WsBotClientTest : WordSpec({
 
                 chunks.last().done shouldBe true
                 chunks.last().aborted shouldBe true
+                chunks.last().text shouldBe null
+                chunks.last().event shouldBe null
 
                 client.close()
             }

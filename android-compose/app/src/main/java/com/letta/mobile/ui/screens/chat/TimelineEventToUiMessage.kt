@@ -11,6 +11,7 @@ import com.letta.mobile.data.timeline.DeliveryState
 import com.letta.mobile.data.timeline.Role
 import com.letta.mobile.data.timeline.TimelineEvent
 import com.letta.mobile.data.timeline.TimelineMessageType
+import com.letta.mobile.data.timeline.stripEnvelopeReminders
 import com.letta.mobile.util.Telemetry
 
 /**
@@ -38,12 +39,13 @@ internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
             // returns are folded into the invoking TOOL_CALL Local instead.
             if (ev.messageType == TimelineMessageType.TOOL_RETURN) return null
             if (ev.messageType == TimelineMessageType.OTHER) return null
+            if (ev.messageType == TimelineMessageType.SYSTEM) return null
             val role = when (ev.messageType) {
                 TimelineMessageType.USER -> "user"
                 TimelineMessageType.ASSISTANT -> "assistant"
                 TimelineMessageType.REASONING -> "assistant"
                 TimelineMessageType.TOOL_CALL -> "assistant"
-                TimelineMessageType.SYSTEM -> "system"
+                TimelineMessageType.SYSTEM -> return null
                 // Locals never originate as ERROR (server-only frame), but
                 // make the `when` exhaustive so adding the type elsewhere
                 // doesn't compile-warn here. letta-mobile-5s1n.
@@ -100,7 +102,7 @@ internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                 TimelineMessageType.REASONING ->
                     ev.reasoningContent?.takeIf { it.isNotEmpty() } ?: ev.content
                 else -> ev.content
-            }
+            }.stripEnvelopeReminders()
             UiMessage(
                 id = ev.otid,
                 role = role,
@@ -118,11 +120,13 @@ internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
             )
         }
         is TimelineEvent.Confirmed -> {
+            if (ev.messageType == TimelineMessageType.SYSTEM) return null
+            
             val role = when (ev.messageType) {
                 TimelineMessageType.USER -> "user"
                 TimelineMessageType.ASSISTANT -> "assistant"
                 TimelineMessageType.REASONING -> "assistant"
-                TimelineMessageType.SYSTEM -> "system"
+                TimelineMessageType.SYSTEM -> return null
                 // letta-mobile-5s1n: ERROR frames render as a system bubble
                 // with the destructive accent applied via UiMessage.isError.
                 TimelineMessageType.ERROR -> "system"
@@ -201,7 +205,7 @@ internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
             UiMessage(
                 id = ev.serverId,
                 role = role,
-                content = ev.content,
+                content = ev.content.stripEnvelopeReminders(),
                 timestamp = ev.date.toString(),
                 runId = ev.runId,
                 stepId = ev.stepId,

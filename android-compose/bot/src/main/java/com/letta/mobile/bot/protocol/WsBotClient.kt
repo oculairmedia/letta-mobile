@@ -187,7 +187,10 @@ class WsBotClient(
                     when (val signal = requestChannel.receive()) {
                         is RequestSignal.Message -> {
                             when (val message = signal.message) {
-                                is WsStreamEventMessage -> emit(message.toChunk(activeConversationId, activeAgentId))
+                                is WsStreamEventMessage -> emit(
+                                    message.toChunk(activeConversationId, activeAgentId)
+                                        .requireValidTerminalShape("WsBotClient stream event")
+                                )
                                 is WsResultMessage -> {
                                     activeConversationId = message.conversationId ?: activeConversationId
                                     emit(
@@ -197,7 +200,7 @@ class WsBotClient(
                                             requestId = message.requestId,
                                             aborted = message.aborted,
                                             done = true,
-                                        )
+                                        ).requireValidTerminalShape("WsBotClient result frame")
                                     )
                                     finished = true
                                 }

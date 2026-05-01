@@ -28,6 +28,8 @@ class BotSseParserTest : WordSpec({
             chunks[0].conversationId shouldBe "c1"
             chunks[0].done shouldBe false
             chunks[1].done shouldBe true
+            chunks[1].text shouldBe null
+            chunks[1].event shouldBe null
         }
     }
 })

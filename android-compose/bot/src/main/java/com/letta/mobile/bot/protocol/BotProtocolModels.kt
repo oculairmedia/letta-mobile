@@ -185,6 +185,20 @@ object BotStatusResponseParser {
         (this[key] as? JsonPrimitive)?.booleanOrNull
 }
 
+/**
+ * Streaming contract shared by bot protocol and app chat consumers.
+ *
+ * Event semantics:
+ * - [BotStreamEvent.ASSISTANT] and [BotStreamEvent.REASONING] emit delta-shaped
+ *   text fragments while [done] is false. Callers append or defensively merge
+ *   them into the running bubble.
+ * - [BotStreamEvent.TOOL_CALL] and [BotStreamEvent.TOOL_RESULT] are
+ *   snapshot-shaped while [done] is false. Each frame fully describes the
+ *   current tool payload/result for that event.
+ * - [done] frames are completion-only markers. They may carry terminal metadata
+ *   like [conversationId], [agentId], [requestId], and [aborted], but must not
+ *   replay user-visible content or event-specific payload.
+ */
 @Serializable
 data class BotStreamChunk(
     val text: String? = null,
@@ -199,7 +213,22 @@ data class BotStreamChunk(
     val uuid: String? = null,
     val aborted: Boolean = false,
     val done: Boolean = false,
-)
+) {
+    internal fun requireValidTerminalShape(context: String): BotStreamChunk {
+        if (!done) return this
+
+        require(text.isNullOrEmpty()) {
+            "$context emitted a terminal BotStreamChunk with text payload"
+        }
+        require(event == null) {
+            "$context emitted a terminal BotStreamChunk with event payload"
+        }
+        require(toolName == null && toolCallId == null && toolInput == null) {
+            "$context emitted a terminal BotStreamChunk with tool payload"
+        }
+        return this
+    }
+}
 
 @Serializable
 data class BotErrorResponse(
@@ -208,9 +237,13 @@ data class BotErrorResponse(
 
 @Serializable
 enum class BotStreamEvent {
+    /** Delta-shaped text fragment. */
     @SerialName("assistant") ASSISTANT,
+    /** Snapshot-shaped tool invocation metadata. */
     @SerialName("tool_call") TOOL_CALL,
+    /** Snapshot-shaped tool result payload. */
     @SerialName("tool_result") TOOL_RESULT,
+    /** Delta-shaped reasoning fragment. */
     @SerialName("reasoning") REASONING,
 }
 

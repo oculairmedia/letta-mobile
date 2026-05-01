@@ -32,7 +32,11 @@ object GeneratedUiRenderer : MessageContentRenderer {
         Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (message.content.isNotBlank()) {
                 val displayText = if (isStreaming && message.role == "assistant") {
-                    streamingDisplayText(message.content)
+                    val smoothed = rememberSmoothedStreamingText(
+                        rawText = message.content,
+                        isStreaming = true,
+                    )
+                    streamingDisplayText(smoothed)
                 } else {
                     message.content
                 }
@@ -186,15 +190,24 @@ object TextMessageRenderer : MessageContentRenderer {
             // Why a paragraph-cadence prefix re-render is cheap: chunks
             // typically arrive every 80–150ms; new paragraph boundaries
             // arrive every ~1s. The prefix only re-parses on boundary
-            // advances, so MarkdownText's heavy parse cost runs at ~1Hz
-            // instead of ~10Hz. Mid-paragraph chunks only mutate the
-            // tail, which is a flat Text layout.
+            // advances, which happens at PARAGRAPH cadence (~once per second) rather than
+            // chunk cadence (~10/sec).
             //
             // d2z6 plain-Text fallback preserved by setting tailTransform
             // — if anything mid-paragraph regresses, the visible content
             // is still the same string the user saw before this change.
+            //
+            // d2z6.s1 stream-smoothing: the smoother meters out bursty
+            // arrivals at a steady per-character cadence before they
+            // reach the boundary splitter. StreamingMarkdownText still
+            // gets the same tailTransform for word-boundary holdback +
+            // cursor.
+            val smoothedText = rememberSmoothedStreamingText(
+                rawText = message.content,
+                isStreaming = true,
+            )
             StreamingMarkdownText(
-                text = message.content,
+                text = smoothedText,
                 textColor = textColor,
                 tailStyle = MaterialTheme.chatTypography.messageBody,
                 tailTransform = ::streamingDisplayText,
@@ -225,7 +238,11 @@ object ToolCallRenderer : MessageContentRenderer {
         Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (message.content.isNotBlank()) {
                 val displayText = if (isStreaming && message.role == "assistant") {
-                    streamingDisplayText(message.content)
+                    val smoothed = rememberSmoothedStreamingText(
+                        rawText = message.content,
+                        isStreaming = true,
+                    )
+                    streamingDisplayText(smoothed)
                 } else {
                     message.content
                 }

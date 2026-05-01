@@ -15,6 +15,7 @@ import com.letta.mobile.bot.protocol.GatewayReadyClient
 import io.kotest.core.spec.style.WordSpec
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
+import io.kotest.assertions.throwables.shouldThrow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -84,6 +85,8 @@ class RemoteBotSessionTest : WordSpec({
             chunks[1].isComplete shouldBe false
             chunks[2].isComplete shouldBe true
             chunks[2].conversationId shouldBe "conv-1"
+            chunks[2].text shouldBe null
+            chunks[2].event shouldBe null
         }
 
         "parse directives only on the final chunk" {
@@ -108,6 +111,26 @@ class RemoteBotSessionTest : WordSpec({
             chunks[2].isComplete shouldBe true
             chunks[2].directive shouldBe Directive.NoReply
             chunks[2].text shouldBe null
+        }
+
+        "reject terminal chunks that replay assistant content" {
+            val session = remoteSession(
+                config = remoteConfig(transport = BotConfig.Transport.WS),
+                clientFactoryOverride = {
+                    FakeBotClient(
+                        streamChunks = listOf(
+                            BotStreamChunk(text = "Hel", conversationId = "conv-1"),
+                            BotStreamChunk(text = "Hello", conversationId = "conv-1", done = true),
+                        )
+                    )
+                },
+            )
+
+            runBlocking { session.start() }
+
+            shouldThrow<IllegalArgumentException> {
+                runBlocking { session.streamToAgent(message).toList() }
+            }.message shouldBe "RemoteBotSession emitted a terminal BotStreamChunk with text payload"
         }
 
         "pick up a different transport after stop and restart" {
@@ -210,7 +233,10 @@ private class RecordingOverride {
 
 private class FakeBotClient(
     private val chatResponse: BotChatResponse = BotChatResponse(response = "ok", conversationId = "conv-1", agentId = "agent-1"),
-    private val streamChunks: List<BotStreamChunk> = listOf(BotStreamChunk(text = "ok", conversationId = "conv-1", done = true)),
+    private val streamChunks: List<BotStreamChunk> = listOf(
+        BotStreamChunk(text = "ok", conversationId = "conv-1", event = com.letta.mobile.bot.protocol.BotStreamEvent.ASSISTANT),
+        BotStreamChunk(conversationId = "conv-1", done = true),
+    ),
 ) : BotClient {
     override suspend fun sendMessage(request: BotChatRequest): BotChatResponse = chatResponse
 

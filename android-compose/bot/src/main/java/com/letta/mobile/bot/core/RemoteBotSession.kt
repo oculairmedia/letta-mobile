@@ -148,7 +148,8 @@ class RemoteBotSession @AssistedInject constructor(
             val accumulated = StringBuilder()
             var latestConversationId = conversationId
 
-            remoteClient.streamMessage(request).collect { chunk ->
+            remoteClient.streamMessage(request).collect { rawChunk ->
+                val chunk = rawChunk.requireValidTerminalShape("RemoteBotSession")
                 if (!chunk.done) {
                     chunk.text?.let { text -> accumulated.append(text) }
                     emit(

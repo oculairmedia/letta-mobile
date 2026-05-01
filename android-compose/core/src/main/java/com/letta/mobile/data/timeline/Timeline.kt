@@ -6,6 +6,12 @@ import com.letta.mobile.util.Telemetry
 import java.time.Instant
 import java.util.UUID
 
+fun String.stripEnvelopeReminders(): String {
+    return this.replace(Regex("<system-reminder>.*?</system-reminder>\\s*", RegexOption.DOT_MATCHES_ALL), "")
+               .replace(Regex("<skill-reminder>.*?</skill-reminder>\\s*", RegexOption.DOT_MATCHES_ALL), "")
+               .trim()
+}
+
 /**
  * Matrix-inspired unified timeline event model.
  *
@@ -342,15 +348,28 @@ data class Timeline(
         confirmed: TimelineEvent.Confirmed,
         windowMillis: Long = CLIENT_MODE_FUZZY_WINDOW_MS,
     ): FuzzyCollapseResult {
-        // Only consider user-role Confirmed events; assistant/tool turns can't
-        // be fuzzy-collapsed (they don't have client-side Locals).
-        if (confirmed.messageType != TimelineMessageType.USER) return FuzzyCollapseResult(this, null)
+        // In Client Mode, we must fuzzy-collapse both USER and agent-generated turns 
+        // (Assistant, Reasoning, Tool Call) because they are dual-streamed locally and via SSE.
+        if (confirmed.messageType != TimelineMessageType.USER && 
+            confirmed.messageType != TimelineMessageType.ASSISTANT &&
+            confirmed.messageType != TimelineMessageType.REASONING &&
+            confirmed.messageType != TimelineMessageType.TOOL_CALL) {
+            return FuzzyCollapseResult(this, null)
+        }
 
         val candidate = events.asSequence()
             .filterIsInstance<TimelineEvent.Local>()
             .filter { it.source == MessageSource.CLIENT_MODE_HARNESS }
-            .filter { it.role == Role.USER }
-            .filter { it.content == confirmed.content }
+            .filter { it.role == confirmed.role }
+            .filter { 
+                if (confirmed.messageType == TimelineMessageType.USER) {
+                    it.content.stripEnvelopeReminders() == confirmed.content.stripEnvelopeReminders()
+                } else {
+                    // For streaming agent messages, content lengths may differ mid-stream.
+                    // We rely on role and time proximity to match the ongoing local stream.
+                    true
+                }
+            }
             .filter {
                 val deltaMs = kotlin.math.abs(
                     java.time.Duration.between(it.sentAt, confirmed.date).toMillis()
@@ -363,7 +382,10 @@ data class Timeline(
             ?: return FuzzyCollapseResult(this, null)
 
         val deltaMs = java.time.Duration.between(candidate.sentAt, confirmed.date).toMillis()
-        val stabilized = confirmed.copy(position = candidate.position)
+        val stabilized = confirmed.copy(
+            position = candidate.position,
+            otid = candidate.otid // Preserve local otid so upsertClientModeLocal stops updating
+        )
         val newEvents = events.toMutableList().apply {
             removeAll { it.otid == candidate.otid }
             // Re-insert at correct position (which may now differ since we just
@@ -420,7 +442,10 @@ data class Timeline(
         }
         if (idx == -1) return this
         val existing = events[idx] as TimelineEvent.Confirmed
-        val stabilized = confirmed.copy(position = existing.position)
+        val stabilized = confirmed.copy(
+            position = existing.position,
+            otid = existing.otid ?: confirmed.otid // Preserve the local otid so upsertClientModeLocal can stop updating
+        )
         return copy(events = events.toMutableList().also { it[idx] = stabilized })
     }
 
@@ -441,9 +466,15 @@ data class Timeline(
         transform: (TimelineEvent.Local) -> TimelineEvent.Local,
         build: () -> TimelineEvent.Local,
     ): Timeline {
-        val idx = events.indexOfFirst { it.otid == otid && it is TimelineEvent.Local }
+        val idx = events.indexOfFirst { it.otid == otid }
         if (idx >= 0) {
-            val existing = events[idx] as TimelineEvent.Local
+            val existingEvent = events[idx]
+            if (existingEvent is TimelineEvent.Confirmed) {
+                // The server has already confirmed this event and we collapsed it.
+                // Drop the local update so we don't recreate it.
+                return this
+            }
+            val existing = existingEvent as TimelineEvent.Local
             if (existing.source != MessageSource.CLIENT_MODE_HARNESS) {
                 Telemetry.event(
                     "Timeline", "upsertClientModeLocal.wrongSource",
