@@ -175,7 +175,6 @@ class RemoteBotSession @AssistedInject constructor(
 
                 emit(
                     BotResponseChunk(
-                        text = parseResult.cleanText.takeIf { it.isNotBlank() },
                         conversationId = latestConversationId,
                         isComplete = true,
                         directive = parseResult.directives.firstOrNull(),

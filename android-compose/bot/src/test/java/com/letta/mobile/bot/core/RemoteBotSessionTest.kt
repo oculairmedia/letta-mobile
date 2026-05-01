@@ -107,7 +107,7 @@ class RemoteBotSessionTest : WordSpec({
             chunks[1].directive shouldBe null
             chunks[2].isComplete shouldBe true
             chunks[2].directive shouldBe Directive.NoReply
-            chunks[2].text shouldBe "Before"
+            chunks[2].text shouldBe null
         }
 
         "pick up a different transport after stop and restart" {
