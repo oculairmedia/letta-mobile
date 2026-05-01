@@ -141,3 +141,62 @@ data class AgentUpdateParams(
     val hidden: Boolean? = null,
     @SerialName("parallel_tool_calls") val parallelToolCalls: Boolean? = null,
 )
+
+/**
+ * Checkpoint of critical agent configuration fields that should be preserved
+ * across operations like conversation compaction/recompilation.
+ *
+ * Captures the essential model and behavior configuration without including
+ * runtime state like message_ids or timestamps.
+ */
+data class AgentConfigCheckpoint(
+    val model: String?,
+    val embedding: String?,
+    val modelSettings: ModelSettings?,
+    val embeddingConfig: EmbeddingConfig?,
+    val contextWindowLimit: Int?,
+    val system: String?,
+    val responseFormat: JsonElement?,
+) {
+    companion object {
+        /**
+         * Create a checkpoint from the current agent state.
+         */
+        fun from(agent: Agent) = AgentConfigCheckpoint(
+            model = agent.model,
+            embedding = agent.embedding,
+            modelSettings = agent.modelSettings,
+            embeddingConfig = agent.embeddingConfig,
+            contextWindowLimit = agent.contextWindowLimit,
+            system = agent.system,
+            responseFormat = agent.responseFormat,
+        )
+    }
+
+    /**
+     * Check if the current agent configuration matches this checkpoint.
+     * Returns true if all checkpointed fields match.
+     */
+    fun matches(agent: Agent): Boolean {
+        return model == agent.model &&
+            embedding == agent.embedding &&
+            modelSettings == agent.modelSettings &&
+            embeddingConfig == agent.embeddingConfig &&
+            contextWindowLimit == agent.contextWindowLimit &&
+            system == agent.system &&
+            responseFormat == agent.responseFormat
+    }
+
+    /**
+     * Convert this checkpoint to AgentUpdateParams for restoration.
+     */
+    fun toUpdateParams() = AgentUpdateParams(
+        model = model,
+        embedding = embedding,
+        modelSettings = modelSettings,
+        embeddingConfig = embeddingConfig,
+        contextWindowLimit = contextWindowLimit,
+        system = system,
+        responseFormat = responseFormat,
+    )
+}

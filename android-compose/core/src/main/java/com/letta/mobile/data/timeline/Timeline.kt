@@ -360,7 +360,15 @@ data class Timeline(
         val candidate = events.asSequence()
             .filterIsInstance<TimelineEvent.Local>()
             .filter { it.source == MessageSource.CLIENT_MODE_HARNESS }
-            .filter { it.role == confirmed.role }
+            .filter { 
+                val confirmedRole = when (confirmed.messageType) {
+                    TimelineMessageType.USER -> Role.USER
+                    TimelineMessageType.ASSISTANT, TimelineMessageType.REASONING, TimelineMessageType.TOOL_CALL -> Role.ASSISTANT
+                    TimelineMessageType.SYSTEM, TimelineMessageType.ERROR -> Role.SYSTEM
+                    else -> null
+                }
+                confirmedRole != null && it.role == confirmedRole
+            }
             .filter { 
                 if (confirmed.messageType == TimelineMessageType.USER) {
                     it.content.stripEnvelopeReminders() == confirmed.content.stripEnvelopeReminders()
