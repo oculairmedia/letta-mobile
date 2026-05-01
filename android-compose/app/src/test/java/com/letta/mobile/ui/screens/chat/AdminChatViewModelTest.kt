@@ -77,6 +77,7 @@ class AdminChatViewModelTest {
 
     private lateinit var internalBotClient: InternalBotClient
     private lateinit var clientModeChatSender: ClientModeChatSender
+    private lateinit var chatRouteSessionResolver: ChatRouteSessionResolver
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var clientModeEnabledFlow: MutableStateFlow<Boolean>
     private var messages: List<AppMessage> = emptyList()
@@ -174,6 +175,7 @@ class AdminChatViewModelTest {
         settingsRepository = mockk(relaxed = true)
         internalBotClient = mockk(relaxed = true)
         clientModeChatSender = mockk(relaxed = true)
+        chatRouteSessionResolver = ChatRouteSessionResolver(conversationManager)
         clientModeEnabledFlow = MutableStateFlow(false)
         activeConversationIds.clear()
 
@@ -248,6 +250,7 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
+            chatRouteSessionResolver,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
     }
@@ -351,7 +354,7 @@ class AdminChatViewModelTest {
     fun `resolveConversationAndLoad exposes error state when conversation resolution fails`() = runTest {
         coEvery { conversationManager.resolveAndSetActiveConversation(any(), any()) } throws IllegalStateException("Resolver offline")
 
-        val vm = createViewModel(conversationId = null)
+        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
         advanceUntilIdle()
 
         assertEquals(
@@ -465,7 +468,7 @@ class AdminChatViewModelTest {
     @Test
     fun `sendMessage rejects attachments in client mode`() = runTest {
         clientModeEnabledFlow.value = true
-        val vm = createViewModel(conversationId = null)
+        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
         advanceUntilIdle()
 
         vm.addAttachment(
@@ -1059,7 +1062,7 @@ class AdminChatViewModelTest {
             emit(BotStreamChunk(text = "Final answer", conversationId = "client-conv", done = true))
         }
 
-        val vm = createViewModel(conversationId = null)
+        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
         advanceUntilIdle()
 
         vm.sendMessage("hello")
@@ -1084,7 +1087,7 @@ class AdminChatViewModelTest {
             emit(BotStreamChunk(text = "Client reply", conversationId = "client-conv", done = true))
         }
 
-        val vm = createViewModel(conversationId = null)
+        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
         advanceUntilIdle()
 
         vm.sendMessage("hello")
@@ -1131,6 +1134,7 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
+            chatRouteSessionResolver,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
         advanceUntilIdle()
@@ -1209,6 +1213,24 @@ class AdminChatViewModelTest {
     }
 
     @Test
+    fun `client mode without explicit conversation restores most recent conversation`() = runTest {
+        clientModeEnabledFlow.value = true
+        messages = listOf(
+            TestData.appMessage(id = "recent-user", messageType = MessageType.USER, content = "Recent message"),
+        )
+        activeConversationIds.clear()
+
+        val vm = createViewModel(conversationId = null)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) {
+            conversationManager.resolveAndSetActiveConversation("agent-1", any())
+        }
+        assertEquals(ConversationState.Ready("conv-1"), vm.uiState.value.conversationState)
+        assertTrue(vm.uiState.value.messages.any { it.id == "recent-user" })
+    }
+
+    @Test
     fun `updateInputText only changes input field`() = runTest {
         messages = listOf(TestData.appMessage(id = "1", messageType = MessageType.USER, content = "Msg"))
 
@@ -1251,6 +1273,7 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
+            chatRouteSessionResolver,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
 
@@ -1353,6 +1376,7 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
+            chatRouteSessionResolver,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
         advanceUntilIdle()
@@ -1393,6 +1417,7 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
+            chatRouteSessionResolver,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
         advanceUntilIdle()
@@ -1443,6 +1468,7 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
+            chatRouteSessionResolver,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
         advanceUntilIdle()
@@ -1477,6 +1503,7 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
+            chatRouteSessionResolver,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
 
@@ -1506,6 +1533,7 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
+            chatRouteSessionResolver,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
         advanceUntilIdle()
@@ -1551,7 +1579,7 @@ class AdminChatViewModelTest {
         // Seed the conversation manager to resolve to "conv-A" first.
         activeConversationIds["agent-1"] = "conv-A"
 
-        val vm = createViewModel(agentId = "agent-1", conversationId = "conv-A")
+        val vm = createViewModel(agentId = "agent-1", conversationId = null)
         advanceUntilIdle()
 
         // Capture arguments of every observe() + getOrCreate() call the VM

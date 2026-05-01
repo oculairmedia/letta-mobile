@@ -231,6 +231,7 @@ class AdminChatViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val internalBotClient: InternalBotClient,
     private val clientModeChatSender: ClientModeChatSender,
+    private val chatRouteSessionResolver: ChatRouteSessionResolver,
     private val currentConversationTracker: com.letta.mobile.channel.CurrentConversationTracker,
 ) : ViewModel() {
     companion object {
@@ -245,11 +246,15 @@ class AdminChatViewModel @Inject constructor(
     private val initialMessage: String? = savedStateHandle.get<String>("initialMessage")
     private val requestedConversationArg: String? = savedStateHandle.get<String>("conversationId")
     private val freshRouteKey: Long? = savedStateHandle.get<Long>("freshRouteKey")
+    private val routeState = chatRouteSessionResolver.routeState(
+        requestedConversationArg = requestedConversationArg,
+        freshRouteKey = freshRouteKey,
+    )
     val scrollToMessageId: String? = savedStateHandle.get<String>("scrollToMessageId")
     private val explicitConversationId: String?
-        get() = requestedConversationArg?.takeIf { it.isNotBlank() }
+        get() = routeState.explicitConversationId
     private val isFreshRoute: Boolean
-        get() = freshRouteKey != null || requestedConversationArg?.isBlank() == true
+        get() = routeState.isFreshRoute
     // letta-mobile-c87t: previously this predicate was
     //   clientModeEnabled.value && (isFreshRoute || explicitConversationId == null)
     // which collapsed to "client mode only fires for fresh routes" — meaning any
@@ -607,6 +612,16 @@ class AdminChatViewModel @Inject constructor(
             )
 
             try {
+                val resolution = chatRouteSessionResolver.resolve(
+                    ChatConversationResolveRequest(
+                        agentId = agentId,
+                        routeState = routeState,
+                        clientModeEnabled = shouldUseClientModeForCurrentRoute,
+                        activeConversationId = activeConversationId,
+                        savedClientModeConversationId = currentClientModeConversationId(),
+                        maxConversationAgeMs = CONVERSATION_CACHE_TTL_MS,
+                    )
+                )
                 if (shouldUseClientModeForCurrentRoute) {
                     // letta-mobile-c87t (PR 2): when we have a Client Mode
                     // conversationId, route through the timeline observer so
@@ -619,8 +634,13 @@ class AdminChatViewModel @Inject constructor(
                     // pointer. Fresh routes that haven't sent yet have neither
                     // and stay on the in-memory path until the gateway
                     // provides one (see sendMessageViaClientMode migration).
-                    val clientConversationId = explicitConversationId
-                        ?: currentClientModeConversationId()
+                    val clientConversationId = (resolution as? ChatConversationResolution.Ready)
+                        ?.conversationId
+                        ?.also { resolvedConversationId ->
+                            if (explicitConversationId == null && currentClientModeConversationId() == null) {
+                                setClientModeConversationId(resolvedConversationId)
+                            }
+                        }
                     currentConversationTracker.setCurrent(clientConversationId)
                     val agent = agentRepository.getCachedAgent(agentId)
                         ?: runCatching { agentRepository.getAgent(agentId).first() }.getOrNull()
@@ -640,7 +660,7 @@ class AdminChatViewModel @Inject constructor(
                             error = null,
                         )
                     } else {
-                        // Fresh route, no conv yet — keep in-memory path.
+                        // Fresh route or no fallback conversation — keep the in-memory path.
                         stopTimelineObserver()
                         _uiState.value = _uiState.value.copy(
                             agentName = agent?.name ?: _uiState.value.agentName,
@@ -662,31 +682,27 @@ class AdminChatViewModel @Inject constructor(
                     return@launch
                 }
 
-                if (activeConversationId == null && explicitConversationId == null) {
-                    val resolvedConversationId = conversationManager.resolveAndSetActiveConversation(
-                        agentId = agentId,
-                        maxAgeMs = CONVERSATION_CACHE_TTL_MS,
-                    )
-                }
+                when (resolution) {
+                    is ChatConversationResolution.Ready -> {
+                        _uiState.value = _uiState.value.copy(
+                            conversationState = ConversationState.Ready(resolution.conversationId),
+                            error = null,
+                        )
+                        loadMessagesInternal(resolution.conversationId)
+                    }
 
-                val conversationId = activeConversationId ?: explicitConversationId?.also {
-                    conversationManager.setActiveConversation(agentId, it)
-                }
-                if (conversationId == null) {
-                    _uiState.value = _uiState.value.copy(
-                        conversationState = ConversationState.NoConversation,
-                        messages = persistentListOf(),
-                        isLoadingMessages = false,
-                        isLoadingOlderMessages = false,
-                        hasMoreOlderMessages = false,
-                        error = null,
-                    )
-                } else {
-                    _uiState.value = _uiState.value.copy(
-                        conversationState = ConversationState.Ready(conversationId),
-                        error = null,
-                    )
-                    loadMessagesInternal()
+                    ChatConversationResolution.FreshConversation,
+                    ChatConversationResolution.NoConversation,
+                    -> {
+                        _uiState.value = _uiState.value.copy(
+                            conversationState = ConversationState.NoConversation,
+                            messages = persistentListOf(),
+                            isLoadingMessages = false,
+                            isLoadingOlderMessages = false,
+                            hasMoreOlderMessages = false,
+                            error = null,
+                        )
+                    }
                 }
 
                 initialMessage?.let { message ->
@@ -712,26 +728,9 @@ class AdminChatViewModel @Inject constructor(
         }
     }
 
-    private suspend fun loadMessagesInternal() {
+    private suspend fun loadMessagesInternal(requestedConversationId: String) {
         val loadTimer = Telemetry.startTimer("AdminChatVM", "loadMessages")
-        val requestedConversationId = activeConversationId ?: explicitConversationId?.also {
-            conversationManager.setActiveConversation(agentId, it)
-        }
         val currentConversationId = activeConversationId ?: explicitConversationId
-        if (requestedConversationId == null) {
-            if (requestedConversationId == currentConversationId) {
-                _uiState.value = _uiState.value.copy(
-                    conversationState = ConversationState.NoConversation,
-                    messages = persistentListOf(),
-                    isLoadingMessages = false,
-                    isLoadingOlderMessages = false,
-                    hasMoreOlderMessages = false,
-                    error = null,
-                )
-            }
-            loadTimer.stop("result" to "noConversation")
-            return
-        }
         val cachedAgent = agentRepository.getCachedAgent(agentId)
         // Timeline is the source of truth — legacy cache is never read here.
         val cachedMessages = emptyList<AppMessage>()
@@ -793,7 +792,8 @@ class AdminChatViewModel @Inject constructor(
             resolveConversationAndLoad()
             return
         }
-        viewModelScope.launch { loadMessagesInternal() }
+        val requestedConversationId = activeConversationId ?: explicitConversationId ?: return
+        viewModelScope.launch { loadMessagesInternal(requestedConversationId) }
     }
 
     fun retryConversationLoad() {
