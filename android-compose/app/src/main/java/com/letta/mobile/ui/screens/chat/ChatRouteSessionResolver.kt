@@ -40,10 +40,10 @@ class ChatRouteSessionResolver @Inject constructor(
         val explicitConversationId = request.routeState.explicitConversationId
         if (request.clientModeEnabled) {
             explicitConversationId?.let { return ChatConversationResolution.Ready(it) }
-            if (request.routeState.isFreshRoute) return ChatConversationResolution.FreshConversation
             request.savedClientModeConversationId?.let {
                 return ChatConversationResolution.Ready(it)
             }
+            if (request.routeState.isFreshRoute) return ChatConversationResolution.FreshConversation
             val resolvedConversationId = conversationManager.resolveAndSetActiveConversation(
                 agentId = request.agentId,
                 maxAgeMs = request.maxConversationAgeMs,
