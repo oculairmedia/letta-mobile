@@ -429,12 +429,7 @@ class AdminChatViewModelTest {
     fun `sendMessage routes through client mode sender when enabled`() = runTest {
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(
-                screenAgentId = any(),
-                text = any(),
-                conversationId = any(),
-                forceFreshConversation = any(),
-            )
+            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
         } returns flow {
             emit(BotStreamChunk(text = "Hel", conversationId = "client-conv"))
             emit(BotStreamChunk(text = "Hello from client mode", conversationId = "client-conv", done = true))
@@ -453,12 +448,7 @@ class AdminChatViewModelTest {
         advanceUntilIdle()
 
         verify(exactly = 1) {
-            clientModeChatSender.streamMessage(
-                screenAgentId = "agent-1",
-                text = "Hello from client mode",
-                conversationId = null,
-                forceFreshConversation = true,
-            )
+            clientModeChatSender.streamMessage(screenAgentId = "agent-1", text = "Hello from client mode", existingConversationId = null, isFreshRoute = true)
         }
         assertEquals(2, vm.uiState.value.messages.size)
         assertEquals("Hello from client mode", vm.uiState.value.messages.last().content)
@@ -509,12 +499,7 @@ class AdminChatViewModelTest {
         // the observer has had a chance to emit).
         val chunks = Channel<BotStreamChunk>(capacity = Channel.UNLIMITED)
         every {
-            clientModeChatSender.streamMessage(
-                screenAgentId = any(),
-                text = any(),
-                conversationId = any(),
-                forceFreshConversation = any(),
-            )
+            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
         } returns chunks.consumeAsFlow()
 
         val vm = createViewModel(conversationId = "conv-1")
@@ -565,12 +550,7 @@ class AdminChatViewModelTest {
     fun `resetMessages clears client mode conversation state`() = runTest {
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(
-                screenAgentId = any(),
-                text = any(),
-                conversationId = any(),
-                forceFreshConversation = any(),
-            )
+            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
         } returns flow {
             emit(BotStreamChunk(text = "Hi", conversationId = "client-conv"))
             emit(BotStreamChunk(text = "Hi", conversationId = "client-conv", done = true))
@@ -611,12 +591,7 @@ class AdminChatViewModelTest {
     fun `client mode preserves first chunk text when conversationId arrives only on chunk 2`() = runTest {
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(
-                screenAgentId = any(),
-                text = any(),
-                conversationId = any(),
-                forceFreshConversation = any(),
-            )
+            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
         } returns flow {
             // Chunk #1 — gateway hasn't echoed conversationId yet.
             emit(BotStreamChunk(text = "Hel", conversationId = null, event = BotStreamEvent.ASSISTANT))
@@ -664,12 +639,7 @@ class AdminChatViewModelTest {
     fun `client mode terminal-only stream with no text clears typing state and surfaces empty turn`() = runTest {
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(
-                screenAgentId = any(),
-                text = any(),
-                conversationId = any(),
-                forceFreshConversation = any(),
-            )
+            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
         } returns flow {
             // Only a terminal frame — no text, no event.
             emit(BotStreamChunk(conversationId = "client-conv", done = true))
@@ -724,12 +694,7 @@ class AdminChatViewModelTest {
     fun `client mode multi-chunk text stream renders concatenated assistant bubble`() = runTest {
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(
-                screenAgentId = any(),
-                text = any(),
-                conversationId = any(),
-                forceFreshConversation = any(),
-            )
+            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
         } returns flow {
             // DELTA wire shape — each frame is a NEW fragment.
             emit(BotStreamChunk(text = "Hel", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
@@ -1107,12 +1072,7 @@ class AdminChatViewModelTest {
     fun `blank conversation id in saved state behaves like fresh client mode route`() = runTest {
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(
-                screenAgentId = any(),
-                text = any(),
-                conversationId = any(),
-                forceFreshConversation = any(),
-            )
+            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
         } returns flow {
             emit(BotStreamChunk(text = "Fresh route", conversationId = "client-conv", done = true))
         }
@@ -1143,12 +1103,7 @@ class AdminChatViewModelTest {
         advanceUntilIdle()
 
         verify(exactly = 1) {
-            clientModeChatSender.streamMessage(
-                screenAgentId = "agent-1",
-                text = "hello",
-                conversationId = null,
-                forceFreshConversation = true,
-            )
+            clientModeChatSender.streamMessage(screenAgentId = "agent-1", text = "hello", existingConversationId = null, isFreshRoute = true)
         }
         coVerify(exactly = 0) { timelineRepository.sendMessage(any(), any()) }
         assertTrue(vm.uiState.value.messages.any { it.content == "Fresh route" })
@@ -1162,12 +1117,7 @@ class AdminChatViewModelTest {
             TestData.appMessage(id = "timeline-user", messageType = MessageType.USER, content = "Old timeline"),
         )
         every {
-            clientModeChatSender.streamMessage(
-                screenAgentId = any(),
-                text = any(),
-                conversationId = any(),
-                forceFreshConversation = any(),
-            )
+            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
         } returns flow {
             emit(BotStreamChunk(text = "Fresh client reply", conversationId = "client-conv", done = true))
         }
@@ -1182,12 +1132,7 @@ class AdminChatViewModelTest {
         advanceUntilIdle()
 
         verify(exactly = 1) {
-            clientModeChatSender.streamMessage(
-                screenAgentId = "agent-1",
-                text = "hello",
-                conversationId = null,
-                forceFreshConversation = true,
-            )
+            clientModeChatSender.streamMessage(screenAgentId = "agent-1", text = "hello", existingConversationId = null, isFreshRoute = true)
         }
         coVerify(exactly = 0) { timelineRepository.sendMessage(any(), any()) }
         assertTrue(vm.uiState.value.messages.none { it.content == "Old timeline" })
@@ -1643,12 +1588,7 @@ class AdminChatViewModelTest {
         // the timeline path. Pre-c87t, this routed to the timeline.
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(
-                screenAgentId = any(),
-                text = any(),
-                conversationId = any(),
-                forceFreshConversation = any(),
-            )
+            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
         } returns flow {
             emit(BotStreamChunk(text = "hi back", conversationId = "conv-existing"))
             emit(BotStreamChunk(text = "hi back", conversationId = "conv-existing", done = true))
@@ -1663,12 +1603,7 @@ class AdminChatViewModelTest {
 
         // Pass-through: existing conversationId carried forward, NOT forceFresh.
         verify(exactly = 1) {
-            clientModeChatSender.streamMessage(
-                screenAgentId = "agent-1",
-                text = "hi",
-                conversationId = "conv-existing",
-                forceFreshConversation = false,
-            )
+            clientModeChatSender.streamMessage(screenAgentId = "agent-1", text = "hi", existingConversationId = "conv-existing", isFreshRoute = false)
         }
         // And critically: timeline.sendMessage was NOT called.
         coVerify(exactly = 0) {
@@ -1683,12 +1618,7 @@ class AdminChatViewModelTest {
         // and update savedStateHandle so re-entering doesn't try the dead id.
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(
-                screenAgentId = any(),
-                text = any(),
-                conversationId = any(),
-                forceFreshConversation = any(),
-            )
+            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
         } returns flow {
             // Note: gateway returns a DIFFERENT conversationId than requested.
             emit(BotStreamChunk(text = "ok", conversationId = "conv-NEW"))
@@ -1711,12 +1641,7 @@ class AdminChatViewModelTest {
     fun `c87t - no banner when gateway returns the requested conversationId`() = runTest {
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(
-                screenAgentId = any(),
-                text = any(),
-                conversationId = any(),
-                forceFreshConversation = any(),
-            )
+            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
         } returns flow {
             emit(BotStreamChunk(text = "ok", conversationId = "conv-existing"))
             emit(BotStreamChunk(text = "ok", conversationId = "conv-existing", done = true))
@@ -1738,12 +1663,7 @@ class AdminChatViewModelTest {
     fun `c87t - dismissClientModeConversationSwap clears banner state`() = runTest {
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(
-                screenAgentId = any(),
-                text = any(),
-                conversationId = any(),
-                forceFreshConversation = any(),
-            )
+            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
         } returns flow {
             emit(BotStreamChunk(text = "ok", conversationId = "conv-NEW"))
             emit(BotStreamChunk(text = "ok", conversationId = "conv-NEW", done = true))
@@ -1773,12 +1693,7 @@ class AdminChatViewModelTest {
     fun `c87t pr2 - existing-route Client Mode appends user bubble via timeline`() = runTest {
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(
-                screenAgentId = any(),
-                text = any(),
-                conversationId = any(),
-                forceFreshConversation = any(),
-            )
+            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
         } returns flow {
             emit(BotStreamChunk(text = "ack", conversationId = "conv-existing", done = true))
         }
