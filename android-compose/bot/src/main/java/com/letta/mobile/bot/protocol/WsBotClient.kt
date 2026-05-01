@@ -367,6 +367,13 @@ class WsBotClient(
             }
         }
 
+        if (sessionInit.agentId != agentId) {
+            throw BotGatewayException(
+                code = BotGatewayErrorCode.BAD_MESSAGE,
+                message = "Requested agent '$agentId' but session_init returned '${sessionInit.agentId}'",
+            )
+        }
+
         activeAgentId = sessionInit.agentId
         activeConversationId = sessionInit.conversationId
         activeSessionId = sessionInit.sessionId

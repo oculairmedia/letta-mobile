@@ -4,6 +4,7 @@ import io.kotest.core.spec.style.WordSpec
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveAtLeastSize
 import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.matchers.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.toList
@@ -213,6 +214,35 @@ class WsBotClientLifecycleTest : WordSpec({
                 // open a fresh conv.
                 sessionStartConvIds shouldContainExactly listOf("conv-existing-123")
 
+                client.close()
+            }
+        }
+
+        "session init must not silently switch to a different agent" {
+            val server = lifecycleServer { socket, text ->
+                val payload = json.parseToJsonElement(text).jsonObject
+                when (payload["type"]!!.jsonPrimitive.content) {
+                    "session_start" -> socket.send(
+                        """{"type":"session_init","agent_id":"different-agent","conversation_id":"conv-1","session_id":"sess-1"}"""
+                    )
+                }
+            }
+
+            server.use {
+                val client = WsBotClient(gatewayUrl(server), "secret")
+
+                val error = shouldThrow<BotGatewayException> {
+                    runBlocking {
+                        withTimeout(5_000) {
+                            client.streamMessage(
+                                BotChatRequest(message = "follow-up", agentId = "route-agent", chatId = "chat-existing")
+                            ).toList()
+                        }
+                    }
+                }
+
+                error.code shouldBe BotGatewayErrorCode.BAD_MESSAGE
+                error.message shouldBe "Requested agent 'route-agent' but session_init returned 'different-agent'"
                 client.close()
             }
         }
