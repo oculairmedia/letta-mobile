@@ -740,7 +740,7 @@ private fun RenderChatMessage(
         ChatMessageItem(
             message = message,
             groupPosition = position,
-            isStreaming = state.isStreaming,
+            isStreaming = state.isStreaming && message.id == state.messages.lastOrNull()?.id,
             reasoningCollapsed = reasoningCollapsed,
             onToggleReasoning = onToggleReasoning,
             onGeneratedUiMessage = onSendMessage,
