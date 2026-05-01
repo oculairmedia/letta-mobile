@@ -622,6 +622,7 @@ class AdminChatViewModel @Inject constructor(
                         maxConversationAgeMs = CONVERSATION_CACHE_TTL_MS,
                     )
                 )
+                android.util.Log.w("AdminChatVM-DEBUG", "resolveConversationAndLoad: resolution=$resolution clientMode=$shouldUseClientModeForCurrentRoute streamInFlight=$clientModeStreamInFlight")
                 if (shouldUseClientModeForCurrentRoute) {
                     // letta-mobile-c87t (PR 2): when we have a Client Mode
                     // conversationId, route through the timeline observer so
@@ -909,6 +910,7 @@ class AdminChatViewModel @Inject constructor(
         // the flag even before `clientModeStreamJob` is assigned.
         clientModeStreamInFlight = true
         clientModeStreamJob = viewModelScope.launch {
+            android.util.Log.w("AdminChatVM-DEBUG", "sendMessageViaClientMode: launch started")
             val startedAt = java.time.Instant.now().toString()
             val userMessageId = "client-user-${System.currentTimeMillis()}"
             val assistantMessageId = "client-assistant-${System.currentTimeMillis()}"
@@ -922,6 +924,7 @@ class AdminChatViewModel @Inject constructor(
             // (no conversation arg AND no in-flight saved-state pointer). For
             // existing-route entries we want resume, not new.
             val forceFreshConversation = isFreshRoute && priorConversationId == null
+            android.util.Log.w("AdminChatVM-DEBUG", "sendViaClientMode: priorConvId=$priorConversationId forceFresh=$forceFreshConversation isFreshRoute=$isFreshRoute explicitConvId=$explicitConversationId savedClientModeConvId=${currentClientModeConversationId()}")
             // letta-mobile-c87t (PR 2): when we already know the
             // conversationId, append the user bubble through the timeline so
             // the SSE-side reconcile + fuzzy matcher (PR 1) can collapse it
@@ -1034,12 +1037,14 @@ class AdminChatViewModel @Inject constructor(
             // up-front in the priorConversationId-non-null branch above).
             var migratedToTimeline = priorConversationId != null
             try {
+                android.util.Log.w("AdminChatVM-DEBUG", "sendViaClientMode: calling streamMessage agentId=$agentId convId=$priorConversationId forceFresh=$forceFreshConversation")
                 clientModeChatSender.streamMessage(
                     screenAgentId = agentId,
                     text = text,
-                    conversationId = priorConversationId,
-                    forceFreshConversation = forceFreshConversation,
+                    existingConversationId = priorConversationId,
+                    isFreshRoute = forceFreshConversation,
                 ).collect { chunk ->
+                    android.util.Log.w("AdminChatVM-DEBUG", "sendViaClientMode: chunk received done=${chunk.done} event=${chunk.event} textLen=${chunk.text?.length} convId=${chunk.conversationId}")
                     chunk.conversationId?.takeIf { it.isNotBlank() }?.let { conversationId ->
                         latestConversationId = conversationId
                         if (!swapEvaluated) {
@@ -1073,6 +1078,7 @@ class AdminChatViewModel @Inject constructor(
                         // content uniformly. Idempotent — guarded by
                         // `migratedToTimeline`.
                         if (priorConversationId == null && !migratedToTimeline) {
+                            android.util.Log.w("AdminChatVM-DEBUG", "sendViaClientMode: fresh-route migration triggered, newConvId=$latestConversationId")
                             migratedToTimeline = true
                             val newConvId = latestConversationId
                             if (newConvId != null) {
@@ -1132,6 +1138,7 @@ class AdminChatViewModel @Inject constructor(
                     } else {
                         null
                     }
+                    android.util.Log.w("AdminChatVM-DEBUG", "sendViaClientMode: stream completed done=true sawPayload=$sawAssistantPayload aborted=${chunk.aborted} terminalError=$terminalError latestConvId=$latestConversationId")
 
                     _uiState.value = _uiState.value.copy(
                         conversationState = latestConversationId?.let { ConversationState.Ready(it) }
@@ -1142,6 +1149,7 @@ class AdminChatViewModel @Inject constructor(
                     )
                 }
             } catch (e: Exception) {
+                android.util.Log.e("AdminChatVM-DEBUG", "sendViaClientMode: EXCEPTION in stream", e)
                 _uiState.value = _uiState.value.copy(
                     conversationState = latestConversationId?.let { ConversationState.Ready(it) }
                         ?: ConversationState.NoConversation,

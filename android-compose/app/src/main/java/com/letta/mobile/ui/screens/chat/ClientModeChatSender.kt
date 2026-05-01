@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.screens.chat
 
-import com.letta.mobile.bot.config.BotConfig
 import com.letta.mobile.bot.protocol.BotChatRequest
 import com.letta.mobile.bot.protocol.BotStreamChunk
 import com.letta.mobile.bot.protocol.InternalBotClient
@@ -19,13 +18,12 @@ class ClientModeChatSender @Inject constructor(
     fun streamMessage(
         screenAgentId: String,
         text: String,
-        conversationId: String?,
-        forceFreshConversation: Boolean,
+        existingConversationId: String?,
+        isFreshRoute: Boolean,
     ): Flow<BotStreamChunk> = flow {
-        val remoteAgentId = if (forceFreshConversation) {
-            clientModeController.restartSession()
-        } else {
-            clientModeController.ensureReady()
+        val targetAgentId = when {
+            isFreshRoute -> clientModeController.restartSession(screenAgentId)
+            else -> clientModeController.ensureReady(screenAgentId)
         }
 
         internalBotClient.streamMessage(
@@ -34,8 +32,8 @@ class ClientModeChatSender @Inject constructor(
                 channelId = "letta-mobile",
                 chatId = "agent:$screenAgentId",
                 senderId = "letta-mobile-user",
-                agentId = remoteAgentId,
-                conversationId = conversationId,
+                agentId = targetAgentId,
+                conversationId = existingConversationId,
             )
         ).collect { emit(it) }
     }

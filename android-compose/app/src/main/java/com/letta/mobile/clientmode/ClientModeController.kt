@@ -70,9 +70,9 @@ class ClientModeController @Inject constructor(
         }
     }
 
-    suspend fun ensureReady(): String {
+    suspend fun ensureReady(routeAgentId: String? = null): String {
         initialize()
-        reconcile(forceForeground = true)
+        reconcile(forceForeground = true, routeAgentId = routeAgentId)
         val remoteAgentId = requireNotNull(activeRemoteAgentId) {
             "Client Mode gateway session is unavailable"
         }
@@ -82,10 +82,10 @@ class ClientModeController @Inject constructor(
         return remoteAgentId
     }
 
-    suspend fun restartSession(): String {
+    suspend fun restartSession(routeAgentId: String? = null): String {
         initialize()
         stopGateway()
-        reconcile(forceForeground = true)
+        reconcile(forceForeground = true, routeAgentId = routeAgentId)
         val remoteAgentId = requireNotNull(activeRemoteAgentId) {
             "Client Mode gateway session is unavailable"
         }
@@ -95,7 +95,7 @@ class ClientModeController @Inject constructor(
         return remoteAgentId
     }
 
-    private suspend fun reconcile(forceForeground: Boolean) {
+    private suspend fun reconcile(forceForeground: Boolean, routeAgentId: String? = null) {
         mutex.withLock {
             val enabled = settingsRepository.observeClientModeEnabled().first()
             val baseUrl = settingsRepository.observeClientModeBaseUrl().first().trim()
@@ -107,15 +107,15 @@ class ClientModeController @Inject constructor(
                 return
             }
 
-            val remoteAgent = resolveClientModeRemoteAgent(
+            val resolvedAgentId = routeAgentId ?: activeRemoteAgentId ?: resolveClientModeRemoteAgent(
                 baseUrl = baseUrl,
                 apiKey = apiKey.ifBlank { null },
-            )
+            ).id
 
             val config = BotConfig(
                 id = CLIENT_MODE_CONFIG_ID,
-                agentId = remoteAgent.id,
-                displayName = "${remoteAgent.name} Client Mode",
+                agentId = resolvedAgentId,
+                displayName = "$resolvedAgentId Client Mode",
                 mode = BotConfig.Mode.REMOTE,
                 remoteUrl = baseUrl,
                 remoteToken = apiKey.ifBlank { null },
