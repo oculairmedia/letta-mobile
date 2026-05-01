@@ -58,6 +58,7 @@ class ChatRouteSessionResolver @Inject constructor(
             return ChatConversationResolution.Ready(it)
         }
         request.activeConversationId?.let {
+            conversationManager.setActiveConversation(request.agentId, it)
             return ChatConversationResolution.Ready(it)
         }
         val resolvedConversationId = conversationManager.resolveAndSetActiveConversation(

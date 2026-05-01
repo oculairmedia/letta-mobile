@@ -730,7 +730,7 @@ class AdminChatViewModel @Inject constructor(
 
     private suspend fun loadMessagesInternal(requestedConversationId: String) {
         val loadTimer = Telemetry.startTimer("AdminChatVM", "loadMessages")
-        val currentConversationId = activeConversationId ?: explicitConversationId
+        val currentConversationId = conversationId ?: explicitConversationId
         val cachedAgent = agentRepository.getCachedAgent(agentId)
         // Timeline is the source of truth — legacy cache is never read here.
         val cachedMessages = emptyList<AppMessage>()
@@ -750,7 +750,7 @@ class AdminChatViewModel @Inject constructor(
         }
         try {
             val agent = agentRepository.getAgent(agentId).first()
-            if (requestedConversationId != (activeConversationId ?: explicitConversationId)) {
+            if (requestedConversationId != (conversationId ?: explicitConversationId)) {
                 loadTimer.stop("result" to "staleConversation")
                 return
             }
@@ -775,7 +775,7 @@ class AdminChatViewModel @Inject constructor(
             )
         } catch (e: Exception) {
             loadTimer.stopError(e, "conversationId" to requestedConversationId)
-            if (requestedConversationId != (activeConversationId ?: explicitConversationId)) {
+            if (requestedConversationId != (conversationId ?: explicitConversationId)) {
                 return
             }
             _uiState.value = _uiState.value.copy(
@@ -792,7 +792,7 @@ class AdminChatViewModel @Inject constructor(
             resolveConversationAndLoad()
             return
         }
-        val requestedConversationId = activeConversationId ?: explicitConversationId ?: return
+        val requestedConversationId = conversationId ?: explicitConversationId ?: return
         viewModelScope.launch { loadMessagesInternal(requestedConversationId) }
     }
 
