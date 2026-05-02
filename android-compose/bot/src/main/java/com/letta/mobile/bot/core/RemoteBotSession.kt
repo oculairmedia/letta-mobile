@@ -165,7 +165,8 @@ class RemoteBotSession @AssistedInject constructor(
             val accumulated = StringBuilder()
             var latestConversationId = conversationId
 
-            remoteClient.streamMessage(request).collect { chunk ->
+            remoteClient.streamMessage(request).collect { rawChunk ->
+                val chunk = rawChunk.requireValidTerminalShape("RemoteBotSession")
                 if (!chunk.done) {
                     chunk.text?.let { text -> accumulated.append(text) }
                     emit(
@@ -214,16 +215,9 @@ class RemoteBotSession @AssistedInject constructor(
                 } else {
                     DirectiveParser.ParseResult(accumulated.toString(), emptyList())
                 }
-                val accumulatedText = accumulated.toString()
-                val terminalText = if (parseResult.cleanText != accumulatedText) {
-                    parseResult.cleanText.takeIf { it.isNotBlank() }
-                } else {
-                    null
-                }
-
                 emit(
                     BotResponseChunk(
-                        text = terminalText,
+                        text = null,
                         conversationId = latestConversationId,
                         isComplete = true,
                         directive = parseResult.directives.firstOrNull(),
