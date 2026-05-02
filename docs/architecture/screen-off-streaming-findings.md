@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-01
 **Scope:** Why incoming messages may stop arriving when the device screen is off, and what the current architecture does (and does not) do to keep SSE/WebSocket subscribers alive.
-**Status:** Findings only — no code changes proposed in this document. Use as input for follow-up `bd` issues.
+**Status:** Historical findings. Several remediation items below have since shipped (heartbeat parsing/watchdog, OkHttp ping interval, battery optimization exemption UI, and inexact alarm service recovery). Use [`screen-off-streaming-measurement.md`](screen-off-streaming-measurement.md) for the current validation protocol before making a wake-lock product decision.
 
 ---
 
