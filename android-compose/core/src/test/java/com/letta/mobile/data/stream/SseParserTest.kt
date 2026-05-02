@@ -91,6 +91,65 @@ data: {"id":"2","message_type":"assistant_message","content":"OK"}
     }
 
     @Test
+    fun `parseFrames emits heartbeat for comment heartbeat`() = runTest {
+        val sse = ": ping\n\n"
+        val results = SseParser.parseFrames(channelFrom(sse)).toList()
+        assertEquals(listOf(SseFrame.Heartbeat), results)
+    }
+
+    @Test
+    fun `parseFrames emits heartbeat for ping message`() = runTest {
+        val sse = "data: {\"id\":\"1\",\"message_type\":\"ping\"}\n\n"
+        val results = SseParser.parseFrames(channelFrom(sse)).toList()
+        assertEquals(listOf(SseFrame.Heartbeat), results)
+    }
+
+    @Test
+    fun `parse ignores heartbeat comments and ping frames`() = runTest {
+        val sse = """: ping
+
+data: {"id":"1","message_type":"ping"}
+
+"""
+        val results = SseParser.parse(channelFrom(sse)).toList()
+        assertTrue(results.isEmpty())
+    }
+
+    @Test
+    fun `parseFrames mixed stream preserves heartbeat and message order`() = runTest {
+        val sse = """: ping
+
+data: {"id":"1","message_type":"user_message","content":"Hi"}
+
+data: {"id":"2","message_type":"ping"}
+
+data: {"id":"3","message_type":"assistant_message","content":"Hello"}
+
+"""
+        val results = SseParser.parseFrames(channelFrom(sse)).toList()
+        assertEquals(4, results.size)
+        assertEquals(SseFrame.Heartbeat, results[0])
+        assertTrue(results[1] is SseFrame.Message)
+        assertTrue((results[1] as SseFrame.Message).message is UserMessage)
+        assertEquals(SseFrame.Heartbeat, results[2])
+        assertTrue(results[3] is SseFrame.Message)
+        assertTrue((results[3] as SseFrame.Message).message is AssistantMessage)
+    }
+
+    @Test
+    fun `parseFrames DONE sentinel terminates stream without emitting done`() = runTest {
+        val sse = """: ping
+
+data: [DONE]
+
+data: {"id":"2","message_type":"assistant_message","content":"Should not appear"}
+
+"""
+        val results = SseParser.parseFrames(channelFrom(sse)).toList()
+        assertEquals(listOf(SseFrame.Heartbeat), results)
+    }
+
+    @Test
     fun `reasoning_message parsed correctly`() = runTest {
         val sse = "data: {\"id\":\"1\",\"message_type\":\"reasoning_message\",\"reasoning\":\"Thinking...\"}\n\n"
         val results = SseParser.parse(channelFrom(sse)).toList()

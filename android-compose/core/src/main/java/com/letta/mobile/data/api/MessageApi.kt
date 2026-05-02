@@ -2,6 +2,8 @@ package com.letta.mobile.data.api
 
 import com.letta.mobile.data.model.*
 import io.ktor.client.call.*
+import io.ktor.client.plugins.HttpTimeoutConfig
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -142,6 +144,13 @@ open class MessageApi @Inject constructor(
         val response = client.post("$baseUrl/v1/conversations/$conversationId/messages") {
             contentType(ContentType.Application.Json)
             setBody(request)
+            // Message sends can stream responses for longer than the normal REST
+            // budget. Keep connect timeout bounded globally, but do not let the
+            // generic request/socket timeout own stream lifetime.
+            timeout {
+                requestTimeoutMillis = HttpTimeoutConfig.INFINITE_TIMEOUT_MS
+                socketTimeoutMillis = HttpTimeoutConfig.INFINITE_TIMEOUT_MS
+            }
         }
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())
@@ -179,6 +188,14 @@ open class MessageApi @Inject constructor(
             contentType(ContentType.Application.Json)
             setBody("{}")
             header(HttpHeaders.Accept, "text/event-stream")
+            // Ambient SSE streams are intentionally long-lived. OkHttp PING
+            // helps HTTP/2 transport liveness; HTTP/1.1 SSE still needs server
+            // heartbeats and the explicit stale-stream watchdog to reconnect.
+            // Keep normal REST calls on the bounded global timeout policy.
+            timeout {
+                requestTimeoutMillis = HttpTimeoutConfig.INFINITE_TIMEOUT_MS
+                socketTimeoutMillis = HttpTimeoutConfig.INFINITE_TIMEOUT_MS
+            }
         }
         // The server has returned either 400 INVALID_ARGUMENT or 404 NOT_FOUND
         // for "no active runs" depending on version/endpoint. Treat both the

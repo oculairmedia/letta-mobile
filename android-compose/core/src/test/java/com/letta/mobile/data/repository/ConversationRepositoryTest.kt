@@ -2,6 +2,8 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.TestData
+import io.mockk.coEvery
+import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -21,7 +23,11 @@ class ConversationRepositoryTest {
     @Before
     fun setup() {
         fakeApi = FakeConversationApi()
-        repository = ConversationRepository(fakeApi)
+        val agentRepository = mockk<AgentRepository>(relaxed = true)
+        coEvery { agentRepository.checkpointAndRestoreConfig(any(), any()) } coAnswers {
+            secondArg<suspend () -> Unit>().invoke()
+        }
+        repository = ConversationRepository(fakeApi, agentRepository)
     }
 
     @Test

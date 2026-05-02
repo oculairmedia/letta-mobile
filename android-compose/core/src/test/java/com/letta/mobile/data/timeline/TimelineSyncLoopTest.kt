@@ -8,7 +8,9 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.SystemMessage
 import com.letta.mobile.data.model.UserMessage
+import io.ktor.utils.io.ByteChannel
 import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.writeStringUtf8
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -755,6 +757,69 @@ scope.coroutineContext.job.cancel()
 
         scope.coroutineContext.job.cancel()
     }
+
+    @Test
+    fun `silent open stream triggers watchdog reconnect`() = runTest {
+        com.letta.mobile.util.Telemetry.clear()
+
+        val api = SilentAfterHeartbeatApi()
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
+
+        TimelineSyncLoop(
+            api,
+            "conv-watchdog",
+            scope,
+            streamSilenceTimeoutMs = 1_000L,
+        )
+
+        testScheduler.advanceTimeBy(6_000)
+        testScheduler.runCurrent()
+
+        assertTrue(
+            "expected watchdog reconnect to open the stream more than once, saw ${api.streamCallCount}",
+            api.streamCallCount >= 2,
+        )
+
+        val events = com.letta.mobile.util.Telemetry.snapshot()
+        assertNotNull(
+            "expected streamSubscriber.silenceTimeout telemetry",
+            events.firstOrNull {
+                it.tag == "TimelineSync" &&
+                    it.name == "streamSubscriber.silenceTimeout" &&
+                    (it.attrs["conversationId"] as? String) == "conv-watchdog"
+            },
+        )
+        assertNotNull(
+            "expected streamSubscriber.watchdogReconnect telemetry",
+            events.firstOrNull {
+                it.tag == "TimelineSync" &&
+                    it.name == "streamSubscriber.watchdogReconnect" &&
+                    (it.attrs["conversationId"] as? String) == "conv-watchdog" &&
+                    (it.attrs["reason"] as? String) == "silenceTimeout"
+            },
+        )
+
+        scope.coroutineContext.job.cancel()
+    }
+}
+
+private class SilentAfterHeartbeatApi : MessageApi(mockk(relaxed = true)) {
+    @Volatile var streamCallCount: Int = 0
+
+    override suspend fun streamConversation(conversationId: String): ByteReadChannel {
+        streamCallCount++
+        val channel = ByteChannel(autoFlush = true)
+        channel.writeStringUtf8(": ping\n\n")
+        return channel
+    }
+
+    override suspend fun listConversationMessages(
+        conversationId: String,
+        limit: Int?,
+        after: String?,
+        order: String?,
+    ): List<LettaMessage> = emptyList()
 }
 
 private class AlwaysIdleApi : MessageApi(mockk(relaxed = true)) {
@@ -774,7 +839,6 @@ private class AlwaysIdleApi : MessageApi(mockk(relaxed = true)) {
         after: String?,
         order: String?,
     ): List<LettaMessage> = emptyList()
-}
 }
 
 /**

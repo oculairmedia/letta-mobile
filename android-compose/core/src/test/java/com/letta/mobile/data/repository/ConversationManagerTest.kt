@@ -3,6 +3,7 @@ package com.letta.mobile.data.repository
 import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.TestData
 import com.letta.mobile.data.model.Conversation
+import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -17,7 +18,7 @@ class ConversationManagerTest {
 
     @Test
     fun `setActiveConversation updates tracked state`() {
-        val repository = ConversationRepository(FakeConversationApi())
+        val repository = ConversationRepository(FakeConversationApi(), mockk(relaxed = true))
         val manager = ConversationManager(repository)
 
         assertNull(manager.getActiveConversationId("agent-1"))
@@ -29,7 +30,7 @@ class ConversationManagerTest {
 
     @Test
     fun `different agents keep independent active conversations`() {
-        val repository = ConversationRepository(FakeConversationApi())
+        val repository = ConversationRepository(FakeConversationApi(), mockk(relaxed = true))
         val manager = ConversationManager(repository)
 
         manager.setActiveConversation("agent-1", "conv-A")
@@ -41,7 +42,7 @@ class ConversationManagerTest {
 
     @Test
     fun `observeActiveConversationId emits updates for matching agent`() = runTest {
-        val repository = ConversationRepository(FakeConversationApi())
+        val repository = ConversationRepository(FakeConversationApi(), mockk(relaxed = true))
         val manager = ConversationManager(repository)
 
         manager.setActiveConversation("agent-1", "conv-1")
@@ -59,7 +60,7 @@ class ConversationManagerTest {
                 )
             )
         }
-        val repository = ConversationRepository(fakeApi)
+        val repository = ConversationRepository(fakeApi, mockk(relaxed = true))
         val manager = ConversationManager(repository)
 
         val resolved = manager.resolveAndSetActiveConversation("agent-1")
@@ -70,7 +71,7 @@ class ConversationManagerTest {
 
     @Test
     fun `createAndSetActiveConversation stores created conversation as active`() = runTest {
-        val repository = ConversationRepository(FakeConversationApi())
+        val repository = ConversationRepository(FakeConversationApi(), mockk(relaxed = true))
         val manager = ConversationManager(repository)
 
         val created = manager.createAndSetActiveConversation("agent-1", "Fresh summary")

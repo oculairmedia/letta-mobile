@@ -26,12 +26,15 @@ import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.model.UnknownMessage
 import com.letta.mobile.data.model.UsageStatistics
 import com.letta.mobile.data.model.UserMessage
+import com.letta.mobile.data.stream.SseFrame
 import com.letta.mobile.data.stream.SseParser
 import java.time.Instant
 import java.util.UUID
 import java.io.IOException
+import kotlin.random.Random
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.channels.Channel
@@ -43,7 +46,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.produceIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -109,6 +114,9 @@ class TimelineSyncLoop(
     // records carrying non-text content. Defaults to no-op for tests that
     // don't care about persistence.
     private val pendingLocalStore: PendingLocalStore = NoOpPendingLocalStore,
+    // Production default expects 25-30s server heartbeats; tests can inject a
+    // shorter budget without changing the public repository API.
+    private val streamSilenceTimeoutMs: Long = STREAM_SILENCE_TIMEOUT_MS,
 ) {
     private val previewJson = Json {
         encodeDefaults = true
@@ -852,6 +860,9 @@ class TimelineSyncLoop(
         private const val STREAM_BACKOFF_MAX_MS = 5_000L
         private const val STREAM_IDLE_BACKOFF_MAX_MS = 90_000L
         private const val STREAM_DORMANT_MS = 3_000L
+        private const val STREAM_HEARTBEAT_EXPECTED_MS = 30_000L
+        private const val STREAM_SILENCE_TIMEOUT_MS = STREAM_HEARTBEAT_EXPECTED_MS * 3
+        private const val HEARTBEAT_TELEMETRY_MIN_INTERVAL_MS = 5 * 60 * 1000L
 
         private const val REQUEST_PREVIEW_MAX_CHARS = 2_048
 
@@ -902,65 +913,132 @@ class TimelineSyncLoop(
         var backoffMs = STREAM_BACKOFF_START_MS
         var runOpenedAtMs = 0L
         var runEventsCount = 0
+        var runHeartbeatCount = 0
         while (currentCoroutineContext().isActive) {
             try {
                 val channel = messageApi.streamConversation(conversationId)
                 runOpenedAtMs = System.currentTimeMillis()
                 runEventsCount = 0
+                runHeartbeatCount = 0
+                var lastHeartbeatTelemetryAtMs = 0L
                 _events.emit(TimelineSyncEvent.StreamSubscriberOpened)
                 // letta-mobile-mge5.6: per-phase telemetry for observability.
                 Telemetry.event(
                     "TimelineSync", "streamSubscriber.opened",
                     "conversationId" to conversationId,
                 )
-                SseParser.parse(channel).collect { message ->
-                    // letta-mobile-mge5.6: raw-event counter for rate metrics.
-                    runEventsCount++
-                    Telemetry.event(
-                        "TimelineSync", "streamSubscriber.eventReceived",
-                        "conversationId" to conversationId,
-                        "messageType" to (message.messageType ?: "?"),
-                        "runId" to (message.runId ?: "<null>"),
-                    )
-                    // Detect a new run_id: this is a run we didn't start
-                    // ourselves (the locally-initiated send path tracks its
-                    // own otids). BLOCK on the reconcile for the first frame
-                    // so the user_message that started the run lands in the
-                    // timeline BEFORE the assistant frames — otherwise the
-                    // user bubble appears below the reply. Subsequent frames
-                    // for the same run hit seenRunIds.add()=false and skip
-                    // the reconcile.  letta-mobile-mge5 for Matrix-originated
-                    // messages.
-                    val runId = message.runId
-                    if (runId != null && seenRunIds.add(runId)) {
-                        runCatching { reconcileForExternalRun(runId) }.onFailure { t ->
-                            Telemetry.error(
-                                "TimelineSync", "externalRunReconcile.failed", t,
-                                "conversationId" to conversationId,
-                                "runId" to runId,
-                            )
-                        }
-                    }
-                    ingestStreamEvent(message)
-                    // letta-mobile-mge5.21: the server emits stop_reason=
-                    // requires_approval then FINISHES the stream without
-                    // ever sending tool_return/approval_response frames,
-                    // even though these land in REST storage shortly after.
-                    // Schedule a delayed reconcile to pick them up.
-                    if (message is StopReason && message.reason == "requires_approval" && runId != null) {
-                        scope.launch {
-                            kotlinx.coroutines.delay(1500)
-                            runCatching { reconcileForExternalRun(runId) }.onFailure { t ->
-                                Telemetry.error(
-                                    "TimelineSync", "postApprovalReconcile.failed", t,
-                                    "runId" to runId,
-                                )
+                var lastLivenessAtMs = runOpenedAtMs
+                var streamTimedOut = false
+                var timedOutSilenceMs = 0L
+                coroutineScope {
+                    val frames = SseParser.parseFrames(channel).produceIn(this)
+                    try {
+                        while (currentCoroutineContext().isActive) {
+                            val result = withTimeoutOrNull(streamSilenceTimeoutMs) {
+                                frames.receiveCatching()
                             }
-                            // And one more a little later for long-running tools.
-                            kotlinx.coroutines.delay(3500)
-                            runCatching { reconcileForExternalRun(runId) }
+                            if (result == null) {
+                                val now = System.currentTimeMillis()
+                                timedOutSilenceMs = now - lastLivenessAtMs
+                                streamTimedOut = true
+                                Telemetry.event(
+                                    "TimelineSync", "streamSubscriber.silenceTimeout",
+                                    "conversationId" to conversationId,
+                                    "silenceMs" to timedOutSilenceMs,
+                                    "timeoutMs" to streamSilenceTimeoutMs,
+                                    "eventsReceived" to runEventsCount,
+                                    "heartbeatsReceived" to runHeartbeatCount,
+                                )
+                                channel.cancel(CancellationException("SSE silence timeout"))
+                                break
+                            }
+
+                            val frame = result.getOrNull() ?: break
+                            lastLivenessAtMs = System.currentTimeMillis()
+                            when (frame) {
+                                SseFrame.Heartbeat -> {
+                                    runHeartbeatCount++
+                                    val now = lastLivenessAtMs
+                                    if (lastHeartbeatTelemetryAtMs == 0L ||
+                                        now - lastHeartbeatTelemetryAtMs >= HEARTBEAT_TELEMETRY_MIN_INTERVAL_MS
+                                    ) {
+                                        lastHeartbeatTelemetryAtMs = now
+                                        Telemetry.event(
+                                            "TimelineSync", "streamSubscriber.heartbeat",
+                                            "conversationId" to conversationId,
+                                            "sinceOpenMs" to (now - runOpenedAtMs),
+                                            "heartbeatsReceived" to runHeartbeatCount,
+                                        )
+                                    }
+                                }
+                                is SseFrame.Message -> {
+                                    val message = frame.message
+                                    // letta-mobile-mge5.6: raw-event counter for rate metrics.
+                                    runEventsCount++
+                                    Telemetry.event(
+                                        "TimelineSync", "streamSubscriber.eventReceived",
+                                        "conversationId" to conversationId,
+                                        "messageType" to (message.messageType ?: "?"),
+                                        "runId" to (message.runId ?: "<null>"),
+                                    )
+                                    // Detect a new run_id: this is a run we didn't start
+                                    // ourselves (the locally-initiated send path tracks its
+                                    // own otids). BLOCK on the reconcile for the first frame
+                                    // so the user_message that started the run lands in the
+                                    // timeline BEFORE the assistant frames — otherwise the
+                                    // user bubble appears below the reply. Subsequent frames
+                                    // for the same run hit seenRunIds.add()=false and skip
+                                    // the reconcile.  letta-mobile-mge5 for Matrix-originated
+                                    // messages.
+                                    val runId = message.runId
+                                    if (runId != null && seenRunIds.add(runId)) {
+                                        runCatching { reconcileForExternalRun(runId) }.onFailure { t ->
+                                            Telemetry.error(
+                                                "TimelineSync", "externalRunReconcile.failed", t,
+                                                "conversationId" to conversationId,
+                                                "runId" to runId,
+                                            )
+                                        }
+                                    }
+                                    ingestStreamEvent(message)
+                                    // letta-mobile-mge5.21: the server emits stop_reason=
+                                    // requires_approval then FINISHES the stream without
+                                    // ever sending tool_return/approval_response frames,
+                                    // even though these land in REST storage shortly after.
+                                    // Schedule a delayed reconcile to pick them up.
+                                    if (message is StopReason && message.reason == "requires_approval" && runId != null) {
+                                        scope.launch {
+                                            kotlinx.coroutines.delay(1500)
+                                            runCatching { reconcileForExternalRun(runId) }.onFailure { t ->
+                                                Telemetry.error(
+                                                    "TimelineSync", "postApprovalReconcile.failed", t,
+                                                    "runId" to runId,
+                                                )
+                                            }
+                                            // And one more a little later for long-running tools.
+                                            kotlinx.coroutines.delay(3500)
+                                            runCatching { reconcileForExternalRun(runId) }
+                                        }
+                                    }
+                                }
+                                SseFrame.Done -> Unit
+                            }
                         }
+                    } finally {
+                        frames.cancel()
                     }
+                }
+                if (streamTimedOut) {
+                    val reconnectDelayMs = STREAM_BACKOFF_START_MS + Random.nextLong(STREAM_BACKOFF_START_MS)
+                    Telemetry.event(
+                        "TimelineSync", "streamSubscriber.watchdogReconnect",
+                        "conversationId" to conversationId,
+                        "reason" to "silenceTimeout",
+                        "silenceMs" to timedOutSilenceMs,
+                        "delayMs" to reconnectDelayMs,
+                    )
+                    delay(reconnectDelayMs)
+                    continue
                 }
                 // Stream closed cleanly: run finished. Reset backoff.
                 _events.emit(TimelineSyncEvent.StreamSubscriberClosed)
@@ -972,6 +1050,7 @@ class TimelineSyncLoop(
                     "conversationId" to conversationId,
                     "durationMs" to (System.currentTimeMillis() - runOpenedAtMs),
                     "eventsReceived" to runEventsCount,
+                    "heartbeatsReceived" to runHeartbeatCount,
                 )
                 backoffMs = STREAM_BACKOFF_START_MS
             } catch (e: CancellationException) {

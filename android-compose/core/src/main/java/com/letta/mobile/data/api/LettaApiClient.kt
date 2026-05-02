@@ -16,6 +16,7 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -95,6 +96,10 @@ open class LettaApiClient @Inject constructor(
                     followSslRedirects(true)
                     cache(okhttp3.Cache(cacheDir, cacheSize))
                     dispatcher(httpDispatcher)
+                    // Keep long-lived streams alive at the transport layer when the
+                    // connection negotiates HTTP/2. HTTP/1.1 SSE still depends on
+                    // app/server heartbeats plus the explicit stream watchdog.
+                    pingInterval(30, TimeUnit.SECONDS)
                 }
                 addInterceptor(TelemetryInterceptor)
             }
