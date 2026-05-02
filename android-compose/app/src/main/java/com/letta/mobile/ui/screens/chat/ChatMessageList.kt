@@ -109,7 +109,7 @@ fun ChatMessageList(
         }
     }
 
-    val messageCount by rememberUpdatedState(state.messages.size)
+    val autoScrollSignature by rememberUpdatedState(newestMessageAutoScrollSignature(state.messages))
 
     val isNearBottom by remember {
         derivedStateOf {
@@ -136,16 +136,14 @@ fun ChatMessageList(
         }
     }
 
-    // letta-mobile-d2z6 follow-up: the streaming/animated scroll branch
-    // introduced a duplicate-flash on stream end (the LaunchedEffect
-    // re-emitted as isStreaming flipped, racing with the bubble's settled
-    // layout). Reverted to the original animateScrollToItem behaviour;
-    // bubble flicker is being addressed at the rendering layer instead.
+    // Keep the bottom anchored while new messages arrive or the newest assistant
+    // bubble grows during streaming. With reverseLayout=true, item 0 is the
+    // newest edge (the typing slot), so scrolling to 0 means "bottom".
     LaunchedEffect(Unit) {
-        snapshotFlow { messageCount }
+        snapshotFlow { autoScrollSignature }
             .distinctUntilChanged()
-            .collect {
-                if (it > 0 && isNearBottom && scrollToMessageId == null) {
+            .collect { signature ->
+                if (signature != null && isNearBottom && scrollToMessageId == null) {
                     listState.animateScrollToItem(0)
                 }
             }
@@ -170,7 +168,6 @@ fun ChatMessageList(
                 calculateLazyIndexForRenderItem(
                     targetRenderIndex = targetIdx,
                     renderItems = renderItems,
-                    isStreaming = state.isStreaming,
                 ),
             )
             highlightedMessageId = scrollToMessageId
@@ -473,10 +470,37 @@ fun ChatMessageList(
     }
 }
 
+internal data class ChatAutoScrollSignature(
+    val messageId: String,
+    val role: String,
+    val contentLength: Int,
+    val contentHash: Int,
+    val latencyMs: Long?,
+    val toolCallsHash: Int,
+    val generatedUiHash: Int,
+    val approvalHash: Int,
+    val attachmentCount: Int,
+)
+
+internal fun newestMessageAutoScrollSignature(messages: List<UiMessage>): ChatAutoScrollSignature? {
+    val newest = messages.lastOrNull() ?: return null
+    return ChatAutoScrollSignature(
+        messageId = newest.id,
+        role = newest.role,
+        contentLength = newest.content.length,
+        contentHash = newest.content.hashCode(),
+        latencyMs = newest.latencyMs,
+        toolCallsHash = newest.toolCalls?.hashCode() ?: 0,
+        generatedUiHash = newest.generatedUi?.hashCode() ?: 0,
+        approvalHash = 31 * (newest.approvalRequest?.hashCode() ?: 0) +
+            (newest.approvalResponse?.hashCode() ?: 0),
+        attachmentCount = newest.attachments.size,
+    )
+}
+
 fun calculateLazyIndexForRenderItem(
     targetRenderIndex: Int,
     renderItems: List<ChatRenderItem>,
-    isStreaming: Boolean,
 ): Int {
     var lazyIndex = 1
     for (j in 0 until targetRenderIndex) {
