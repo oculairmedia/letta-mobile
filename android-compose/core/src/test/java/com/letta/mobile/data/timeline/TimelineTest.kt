@@ -369,6 +369,11 @@ class TimelineTest {
         assertTrue(swapped is TimelineEvent.Confirmed)
         // Position preserved from the Local — guards against visual jump.
         assertEquals(1.0, swapped.position, 0.0001)
+        assertEquals(
+            "Collapsed Confirmed must retain harness source so later duplicate server frames are not delta-appended",
+            MessageSource.CLIENT_MODE_HARNESS,
+            swapped.source,
+        )
     }
 
     @Test

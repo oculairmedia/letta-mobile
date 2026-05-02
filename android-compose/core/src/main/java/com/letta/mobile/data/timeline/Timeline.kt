@@ -382,7 +382,12 @@ data class Timeline(
         val deltaMs = java.time.Duration.between(candidate.sentAt, confirmed.date).toMillis()
         val stabilized = confirmed.copy(
             position = candidate.position,
-            otid = candidate.otid // Preserve local otid so upsertClientModeLocal stops updating
+            otid = candidate.otid, // Preserve local otid so upsertClientModeLocal stops updating
+            // Preserve the Client Mode origin so later same-server-id stream /
+            // reconcile frames know this Confirmed replaced a locally streamed
+            // harness bubble. That lets the merge path treat matching content
+            // as cumulative/duplicate instead of appending it as another delta.
+            source = candidate.source,
         )
         val newEvents = events.toMutableList().apply {
             removeAll { it.otid == candidate.otid }

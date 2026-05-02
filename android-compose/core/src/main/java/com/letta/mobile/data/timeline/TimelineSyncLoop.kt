@@ -1252,7 +1252,21 @@ class TimelineSyncLoop(
             // The contract is delta-append. Trust it. If the gateway
             // ever changes shape, the e2e tests will fail loudly
             // before reaching the device.
-            val mergedText = if (newText.isEmpty()) oldText else oldText + newText
+            val mergedText = if (existing.source == MessageSource.CLIENT_MODE_HARNESS) {
+                // Client Mode has two producers for the same logical assistant
+                // turn: the WS-local harness stream and the Letta SSE/reconcile
+                // stream. Once a local harness bubble has been fuzzy-collapsed
+                // to a Confirmed event, a subsequent server frame with the same
+                // server id may carry the already-rendered full/cumulative text
+                // rather than a novel delta. Do not append that content again.
+                when {
+                    newText.isEmpty() -> oldText
+                    newText == oldText -> oldText
+                    newText.startsWith(oldText) -> newText
+                    oldText.endsWith(newText) -> oldText
+                    else -> oldText + newText
+                }
+            } else if (newText.isEmpty()) oldText else oldText + newText
             // Merge toolCalls: a later delta frame may have null/blank
             // arguments but a still-valid name/id; keep whichever list has
             // more data. Specifically, prefer the list that has more calls
@@ -1278,6 +1292,7 @@ class TimelineSyncLoop(
                 toolReturnContent = confirmed.toolReturnContent ?: existing.toolReturnContent,
                 toolReturnIsError = confirmed.toolReturnIsError || existing.toolReturnIsError,
                 approvalRequestId = confirmed.approvalRequestId ?: existing.approvalRequestId,
+                source = existing.source,
             )
             _state.value = _state.value.replaceByServerId(merged)
             _state.value = _state.value.copy(liveCursor = confirmed.serverId)

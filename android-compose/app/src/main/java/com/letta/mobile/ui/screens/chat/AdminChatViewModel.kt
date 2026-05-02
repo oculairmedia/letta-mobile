@@ -1212,6 +1212,21 @@ class AdminChatViewModel @Inject constructor(
         // the flag even before `clientModeStreamJob` is assigned.
         clientModeStreamInFlight = true
         clientModeStreamStartedAtElapsedMs = android.os.SystemClock.elapsedRealtime()
+        // Fresh Client Mode bootstrap can spend noticeable time creating the
+        // blank Letta conversation before a timeline append or gateway chunk
+        // happens. Surface the run as streaming immediately so the UI shows
+        // the thinking affordance and a second composer submit is routed as a
+        // steering/stop action instead of starting a new send that cancels the
+        // in-flight bootstrap. Keep the conversation state unchanged until a
+        // real conversation id exists.
+        _uiState.value = _uiState.value.copy(
+            isLoadingMessages = false,
+            isLoadingOlderMessages = false,
+            hasMoreOlderMessages = false,
+            isStreaming = true,
+            isAgentTyping = true,
+            error = null,
+        )
         clientModeStreamJob = viewModelScope.launch {
             android.util.Log.w("AdminChatVM-DEBUG", "sendMessageViaClientMode: launch started")
             val startedAt = java.time.Instant.now().toString()

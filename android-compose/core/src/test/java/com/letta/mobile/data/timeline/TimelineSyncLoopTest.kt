@@ -189,6 +189,53 @@ class TimelineSyncLoopTest {
     }
 
     @Test
+    fun `client mode collapsed assistant duplicate server frame does not double content`() = runBlocking {
+        val api = FakeSyncApi()
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val sync = TimelineSyncLoop(api, "conv1", scope)
+        val now = java.time.Instant.now()
+
+        sync.upsertClientModeLocalAssistantChunk(
+            localId = "cm-assist-1",
+            build = {
+                TimelineEvent.Local(
+                    position = 0.0,
+                    otid = "cm-assist-1",
+                    content = "final answer",
+                    role = Role.ASSISTANT,
+                    sentAt = now,
+                    deliveryState = DeliveryState.SENT,
+                    source = MessageSource.CLIENT_MODE_HARNESS,
+                    messageType = TimelineMessageType.ASSISTANT,
+                )
+            },
+            transform = { it },
+        )
+
+        sync.ingestStreamEvent(
+            AssistantMessage(
+                id = "server-assist-1",
+                contentRaw = JsonPrimitive("final answer"),
+            )
+        )
+        sync.ingestStreamEvent(
+            AssistantMessage(
+                id = "server-assist-1",
+                contentRaw = JsonPrimitive("final answer"),
+            )
+        )
+
+        val assistant = sync.state.value.events.single() as TimelineEvent.Confirmed
+        assertEquals(MessageSource.CLIENT_MODE_HARNESS, assistant.source)
+        assertEquals(
+            "Client Mode duplicate full-content server frame must not be appended to the local stream content",
+            "final answer",
+            assistant.content,
+        )
+        scope.coroutineContext.job.cancel()
+    }
+
+    @Test
     fun `streamed reasoning and assistant frames with same server id stay separate`() = runBlocking {
         val api = FakeSyncApi()
         api.nextStreamMessages = listOf(

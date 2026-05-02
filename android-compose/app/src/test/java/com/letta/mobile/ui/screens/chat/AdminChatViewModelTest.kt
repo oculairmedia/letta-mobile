@@ -676,6 +676,78 @@ class AdminChatViewModelTest {
     }
 
     @Test
+    fun `fresh client mode bootstrap shows streaming before conversation create completes and blocks duplicate submit`() = runTest {
+        clientModeEnabledFlow.value = true
+        activeConversationIds.clear()
+        messages = emptyList()
+
+        val createGate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        var createCalls = 0
+        coEvery { conversationRepository.createConversation("agent-1", "hello fresh") } coAnswers {
+            createCalls += 1
+            createGate.await()
+            TestData.conversation(id = "new-conv", agentId = "agent-1", summary = "hello fresh")
+        }
+
+        val chunks = Channel<BotStreamChunk>(capacity = Channel.UNLIMITED)
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
+        } returns chunks.consumeAsFlow()
+
+        val vm = createViewModel(conversationId = null, freshRouteKey = 4242L)
+        advanceUntilIdle()
+
+        vm.sendMessage("hello fresh")
+
+        assertTrue(
+            "Fresh bootstrap must show streaming while createConversation is still pending",
+            vm.uiState.value.isStreaming,
+        )
+        assertTrue(
+            "Fresh bootstrap must show typing while createConversation is still pending",
+            vm.uiState.value.isAgentTyping,
+        )
+        assertEquals(ConversationState.NoConversation, vm.uiState.value.conversationState)
+
+        vm.submitComposer("second tap")
+        advanceUntilIdle()
+
+        assertEquals(
+            "Second composer submit during bootstrap must not start another create/send",
+            1,
+            createCalls,
+        )
+        assertTrue(vm.uiState.value.isStreaming)
+        verify(exactly = 0) {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = "second tap",
+                conversationId = any(),
+            )
+        }
+
+        createGate.complete(Unit)
+        advanceUntilIdle()
+
+        verify(exactly = 1) {
+            clientModeChatSender.streamMessage(
+                screenAgentId = "agent-1",
+                text = "hello fresh",
+                conversationId = "new-conv",
+            )
+        }
+
+        chunks.send(BotStreamChunk(text = "reply", conversationId = "new-conv", done = true))
+        chunks.close()
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.isStreaming)
+    }
+
+    @Test
     fun `resetMessages clears client mode conversation state`() = runTest {
         clientModeEnabledFlow.value = true
         every {
