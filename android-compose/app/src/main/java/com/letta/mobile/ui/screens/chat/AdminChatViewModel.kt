@@ -898,8 +898,7 @@ class AdminChatViewModel @Inject constructor(
             resolveConversationAndLoad()
             return
         }
-        val requestedConversationId = conversationId ?: explicitConversationId ?: return
-        viewModelScope.launch { loadMessagesInternal(requestedConversationId) }
+        viewModelScope.launch { loadMessagesInternal() }
     }
 
     fun retryConversationLoad() {
