@@ -18,7 +18,6 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -40,6 +39,7 @@ data class ConversationsUiState(
     val searchQuery: String = "",
     val selectedConversation: ConversationDisplay? = null,
     val inspectorMessages: ImmutableList<ConversationInspectorMessage> = persistentListOf(),
+    val isInspectorLoading: Boolean = false,
     val inspectorError: String? = null,
     val recompilePreview: String? = null,
     val error: String? = null,
@@ -97,19 +97,23 @@ class ConversationsViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(isLoading = true)
             }
             try {
-                val agentsChanged = async { agentRepository.refreshAgentsIfStale(LIST_CACHE_TTL_MS) }
-                val conversationsChanged = async { allConversationsRepository.refreshIfStale(LIST_CACHE_TTL_MS) }
-                agentsChanged.await()
-                conversationsChanged.await()
-                agentNameCache = agentRepository.agents.value
-                    .associate { it.id to it.name }
-                    .toMutableMap()
-                _uiState.value = _uiState.value.copy(
-                    conversations = applyPinnedState(allConversationsRepository.conversations.value.map { it.toDisplay() }).toImmutableList(),
-                    agents = agentRepository.agents.value.toImmutableList(),
-                    isLoading = false,
-                    error = null,
-                )
+                launch { 
+                    agentRepository.refreshAgentsIfStale(LIST_CACHE_TTL_MS)
+                    agentNameCache = agentRepository.agents.value
+                        .associate { it.id to it.name }
+                        .toMutableMap()
+                    _uiState.value = _uiState.value.copy(
+                        agents = agentRepository.agents.value.toImmutableList(),
+                    )
+                }
+                launch {
+                    allConversationsRepository.refreshIfStale(LIST_CACHE_TTL_MS)
+                    _uiState.value = _uiState.value.copy(
+                        conversations = applyPinnedState(allConversationsRepository.conversations.value.map { it.toDisplay() }).toImmutableList(),
+                        isLoading = false,
+                        error = null,
+                    )
+                }
             } catch (e: Exception) {
                 Log.w("ConversationsVM", "Load failed", e)
                 _uiState.value = _uiState.value.copy(
@@ -203,6 +207,13 @@ class ConversationsViewModel @Inject constructor(
 
     fun openConversationAdmin(display: ConversationDisplay) {
         viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                selectedConversation = display,
+                isInspectorLoading = true,
+                inspectorMessages = persistentListOf(),
+                inspectorError = null,
+                recompilePreview = null,
+            )
             try {
                 val conversation = conversationRepository.getConversation(display.conversation.id)
                 val inspectorResult = runCatching {
@@ -212,7 +223,7 @@ class ConversationsViewModel @Inject constructor(
                     selectedConversation = display.copy(conversation = conversation),
                     inspectorMessages = inspectorResult.getOrDefault(emptyList()).toImmutableList(),
                     inspectorError = inspectorResult.exceptionOrNull()?.message,
-                    recompilePreview = null,
+                    isInspectorLoading = false,
                 )
             } catch (e: Exception) {
                 Log.w("ConversationsVM", "Admin detail load failed", e)
@@ -220,6 +231,7 @@ class ConversationsViewModel @Inject constructor(
                     selectedConversation = null,
                     inspectorMessages = persistentListOf(),
                     inspectorError = e.message,
+                    isInspectorLoading = false,
                 )
             }
         }
@@ -229,6 +241,7 @@ class ConversationsViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(
             selectedConversation = null,
             inspectorMessages = persistentListOf(),
+            isInspectorLoading = false,
             inspectorError = null,
             recompilePreview = null,
         )

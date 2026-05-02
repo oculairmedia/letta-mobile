@@ -93,6 +93,7 @@ import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.ExpandableTitleSearch
 import com.letta.mobile.ui.components.LettaInputBar
+import com.letta.mobile.ui.components.ShimmerBox
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.customColors
@@ -347,32 +348,6 @@ private fun HomeContent(
             }
         }
 
-        if (!state.isSearchActive) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = LettaSpacing.screenHorizontal)
-                    .padding(bottom = LettaSpacing.cardGap),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                ),
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = state.serverUrl,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-        }
-
         if (state.isSearchActive) {
             SearchResultsContent(
                 agentResults = state.agentResults,
@@ -401,7 +376,18 @@ private fun HomeContent(
                 modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
             ) {
-                if (state.pinnedShortcuts.isNotEmpty()) {
+                if (state.isPinnedShortcutsLoading) {
+                    Column(
+                        modifier = Modifier
+                            .padding(horizontal = LettaSpacing.screenHorizontal)
+                            .height(228.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        for (i in 0..5) {
+                            ShimmerBox(height = 68.dp, widthFraction = 1f)
+                        }
+                    }
+                } else if (state.pinnedShortcuts.isNotEmpty()) {
                     ReorderableWidgetGrid(
                         shortcuts = state.pinnedShortcuts,
                         state = state,
@@ -413,7 +399,26 @@ private fun HomeContent(
                     )
                 }
 
-                if (state.pinnedAgents.isNotEmpty()) {
+                if (state.isPinnedAgentsLoading) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = LettaSpacing.screenHorizontal),
+                        verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
+                    ) {
+                        for (row in 0..1) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
+                            ) {
+                                for (col in 0..2) {
+                                    ShimmerBox(
+                                        modifier = Modifier.weight(1f),
+                                        height = 90.dp,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else if (state.pinnedAgents.isNotEmpty()) {
                     val agentColumns = 3
                     Column(
                         modifier = Modifier.padding(horizontal = LettaSpacing.screenHorizontal),
@@ -538,23 +543,29 @@ private fun resolveContextualInfo(
     state: DashboardUiState,
 ): String? {
     return when (shortcut) {
-        DashboardShortcut.AGENTS -> state.agentCount?.let {
-            stringResource(R.string.widget_tile_count_format, it)
+        DashboardShortcut.AGENTS -> {
+            if (state.isAgentCountLoading) "—"
+            else state.agentCount?.let { stringResource(R.string.widget_tile_count_format, it) }
         }
-        DashboardShortcut.CONVERSATIONS -> state.conversationCount?.let {
-            stringResource(R.string.widget_tile_count_format, it)
+        DashboardShortcut.CONVERSATIONS -> {
+            if (state.isConversationCountLoading) "—"
+            else state.conversationCount?.let { stringResource(R.string.widget_tile_count_format, it) }
         }
-        DashboardShortcut.TOOLS -> state.toolCount?.let {
-            stringResource(R.string.widget_tile_count_format, it)
+        DashboardShortcut.TOOLS -> {
+            if (state.isToolCountLoading) "—"
+            else state.toolCount?.let { stringResource(R.string.widget_tile_count_format, it) }
         }
-        DashboardShortcut.BLOCKS -> state.blockCount?.let {
-            stringResource(R.string.widget_tile_count_format, it)
+        DashboardShortcut.BLOCKS -> {
+            if (state.isBlockCountLoading) "—"
+            else state.blockCount?.let { stringResource(R.string.widget_tile_count_format, it) }
         }
         DashboardShortcut.USAGE -> state.usageSummary?.let {
             formatNumber(it.totalTokens) + " tokens"
-        } ?: if (state.isUsageLoading) "Loading…" else stringResource(shortcut.descriptionResId)
-        DashboardShortcut.FAVORITE_AGENT -> state.favoriteAgentName
-            ?: stringResource(shortcut.descriptionResId)
+        } ?: if (state.isUsageLoading) "—" else stringResource(shortcut.descriptionResId)
+        DashboardShortcut.FAVORITE_AGENT -> {
+            if (state.isPinnedAgentsLoading) "—" 
+            else state.favoriteAgentName ?: stringResource(shortcut.descriptionResId)
+        }
         else -> {
             if (shortcut.descriptionResId != 0) {
                 stringResource(shortcut.descriptionResId)

@@ -623,6 +623,14 @@ class AdminChatViewModel @Inject constructor(
                     )
                 )
                 android.util.Log.w("AdminChatVM-DEBUG", "resolveConversationAndLoad: resolution=$resolution clientMode=$shouldUseClientModeForCurrentRoute streamInFlight=$clientModeStreamInFlight")
+                android.util.Log.w(
+                    "AdminChatVM-DEBUG",
+                    "resolveConversationAndLoad: prior convId=$explicitConversationId " +
+                        "savedClientModeConvId=${currentClientModeConversationId()} " +
+                        "activeConvId=$activeConversationId " +
+                        "timelineObserverConvId=$timelineObserverConversationId " +
+                        "timelineObserverJobActive=${timelineObserverJob?.isActive}",
+                )
                 if (shouldUseClientModeForCurrentRoute) {
                     // letta-mobile-c87t (PR 2): when we have a Client Mode
                     // conversationId, route through the timeline observer so
@@ -1832,11 +1840,23 @@ class AdminChatViewModel @Inject constructor(
      * left the UI locked onto the first-selected conversation's timeline.
      */
     private fun startTimelineObserver(conversationId: String) {
-        if (timelineObserverConversationId == conversationId &&
-            timelineObserverJob?.isActive == true
-        ) {
+        val convIdSame = timelineObserverConversationId == conversationId
+        val jobActive = timelineObserverJob?.isActive == true
+        if (convIdSame && jobActive) {
+            // letta-mobile-nw2e: also log why we're returning early so
+            // rotation-trigger repro has telemetry to correlate against.
+            android.util.Log.w(
+                "AdminChatVM-DEBUG",
+                "startTimelineObserver: SKIP (already observing conv=$conversationId " +
+                    "jobActive=$jobActive) timelineObserverConversationId=$timelineObserverConversationId",
+            )
             return
         }
+        android.util.Log.w(
+            "AdminChatVM-DEBUG",
+            "startTimelineObserver: START (convIdSame=$convIdSame jobActive=$jobActive) " +
+                "starting fresh observer for conv=$conversationId",
+        )
         // Conversation switch (or first bind): tear down any in-flight
         // subscriptions from the previous conversation before starting new
         // ones. Without this the hydrate-signal job would leak on every
@@ -1902,6 +1922,12 @@ class AdminChatViewModel @Inject constructor(
             try {
                 flow.collect { timeline ->
                     val live = timeline.events.mapNotNull { it.toUiMessageOrNull() }
+                    val prevMsgCount = _uiState.value.messages.size
+                    android.util.Log.w(
+                        "AdminChatVM-DEBUG",
+                        "timeline observer emit: convId=$conversationId " +
+                            "liveCount=${live.size} prevCount=$prevMsgCount",
+                    )
                     // Prepend any backfilled older pages for THIS conversation.
                     val (prefixConv, prefixList) = olderMessagesPrefix
                     val prefix = if (prefixConv == conversationId) prefixList else emptyList()

@@ -54,12 +54,21 @@ fun ExpandableTitleSearch(
     openSearchContentDescription: String = "Open search",
     closeSearchContentDescription: String = "Close search",
     clearSearchContentDescription: String = "Clear search",
+    autoFocus: Boolean = true,
+    showCollapseButton: Boolean = true,
+    isAppBarCollapsed: Boolean = false,
 ) {
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(expanded, enabled) {
-        if (expanded && enabled) {
+        if (expanded && enabled && autoFocus) {
             focusRequester.requestFocus()
+        }
+    }
+
+    LaunchedEffect(isAppBarCollapsed) {
+        if (isAppBarCollapsed && expanded) {
+            onExpandedChange(false)
         }
     }
 
@@ -79,20 +88,22 @@ fun ExpandableTitleSearch(
             )
 
             if (expanded) {
-                Spacer(modifier = Modifier.weight(1f))
-                IconButton(
-                    enabled = enabled,
-                    onClick = {
-                        if (clearQueryOnCollapse && query.isNotBlank()) {
-                            onClear()
-                        }
-                        onExpandedChange(false)
-                    },
-                ) {
-                    Icon(
-                        imageVector = LettaIcons.Clear,
-                        contentDescription = closeSearchContentDescription,
-                    )
+                if (showCollapseButton) {
+                    Spacer(modifier = Modifier.weight(1f))
+                    IconButton(
+                        enabled = enabled,
+                        onClick = {
+                            if (clearQueryOnCollapse && query.isNotBlank()) {
+                                onClear()
+                            }
+                            onExpandedChange(false)
+                        },
+                    ) {
+                        Icon(
+                            imageVector = LettaIcons.Clear,
+                            contentDescription = closeSearchContentDescription,
+                        )
+                    }
                 }
             } else {
                 Surface(
@@ -144,6 +155,7 @@ fun ExpandableTitleSearch(
                 clearIconContentDescription = clearSearchContentDescription,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(bottom = 8.dp)
                     .heightIn(min = PillHeight)
                     .focusRequester(focusRequester),
             )
