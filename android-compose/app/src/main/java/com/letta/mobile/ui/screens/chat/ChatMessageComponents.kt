@@ -8,6 +8,10 @@ import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -51,6 +55,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -591,6 +596,21 @@ internal fun MessageReasoning(
         )
         else -> Modifier.animateContentSize()
     }
+    val thinkingPulseAlpha = if (isStreaming) {
+        val infiniteTransition = rememberInfiniteTransition(label = "thinkingPulse")
+        val alpha by infiniteTransition.animateFloat(
+            initialValue = 0.35f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 700),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "thinkingPulseAlpha",
+        )
+        alpha
+    } else {
+        1f
+    }
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -608,10 +628,25 @@ internal fun MessageReasoning(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
+            if (isStreaming) {
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .alpha(thinkingPulseAlpha)
+                        .background(
+                            color = MaterialTheme.colorScheme.primary,
+                            shape = RoundedCornerShape(percent = 50),
+                        ),
+                )
+            }
             Text(
                 text = if (isStreaming) "Thinking…" else "Reasoning",
                 style = MaterialTheme.typography.sectionTitle,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (isStreaming) {
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.92f)
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
             )
             Text(
                 text = if (isCollapsed) previewText else "Shown",
@@ -636,19 +671,23 @@ internal fun MessageReasoning(
             enter = fadeIn() + slideInVertically(initialOffsetY = { it / 4 }) + expandVertically(),
             exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 4 }) + shrinkVertically(),
         ) {
-            val lineColor = MaterialTheme.colorScheme.outlineVariant
+            val lineColor = if (isStreaming) {
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.45f + (thinkingPulseAlpha * 0.35f))
+            } else {
+                MaterialTheme.colorScheme.outlineVariant
+            }
             Column(
                 modifier = Modifier
-                    .padding(top = 6.dp, start = 8.dp, bottom = 4.dp)
+                    .padding(top = 12.dp, start = 8.dp, bottom = 4.dp)
                     .drawBehind {
                         drawLine(
                             color = lineColor,
-                            start = androidx.compose.ui.geometry.Offset(0f, 0f),
-                            end = androidx.compose.ui.geometry.Offset(0f, size.height),
-                            strokeWidth = 2.dp.toPx(),
+                            start = Offset(0f, 0f),
+                            end = Offset(0f, size.height),
+                            strokeWidth = 3.dp.toPx(),
                         )
                     }
-                    .padding(start = 12.dp),
+                    .padding(start = 14.dp),
             ) {
                 // letta-mobile-d2z6 (root cause): MarkdownText re-parses on
                 // every content change and re-emits a fresh subtree, which
