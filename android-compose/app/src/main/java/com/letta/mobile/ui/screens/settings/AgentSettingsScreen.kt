@@ -65,6 +65,10 @@ fun AgentSettingsScreen(
             onHumanChange = { viewModel.updateHumanBlock(it) },
             onSleeptimeChange = { viewModel.updateSleeptime(it) },
             onSystemPromptChange = { viewModel.updateSystemPrompt(it) },
+            onClientModeEnabledChange = { viewModel.updateClientModeEnabled(it) },
+            onClientModeBaseUrlChange = { viewModel.updateClientModeBaseUrl(it) },
+            onClientModeApiKeyChange = { viewModel.updateClientModeApiKey(it) },
+            onTestClientModeConnection = { viewModel.testClientModeConnection() },
             onSave = { viewModel.saveSettings { snackbar.dispatch(context.getString(R.string.screen_settings_saved)) } },
             onExport = {
                 viewModel.exportAgent { exportData ->
@@ -117,6 +121,10 @@ private fun SettingsContent(
     onHumanChange: (String) -> Unit,
     onSleeptimeChange: (Boolean) -> Unit,
     onSystemPromptChange: (String) -> Unit,
+    onClientModeEnabledChange: (Boolean) -> Unit,
+    onClientModeBaseUrlChange: (String) -> Unit,
+    onClientModeApiKeyChange: (String) -> Unit,
+    onTestClientModeConnection: () -> Unit,
     onSave: () -> Unit,
     onExport: () -> Unit,
     onClone: (cloneName: String?, overrideExistingTools: Boolean, stripMessages: Boolean) -> Unit,
@@ -169,6 +177,14 @@ private fun SettingsContent(
                 },
             )
         }
+
+        ClientModeSettingsSection(
+            state = state,
+            onClientModeEnabledChange = onClientModeEnabledChange,
+            onClientModeBaseUrlChange = onClientModeBaseUrlChange,
+            onClientModeApiKeyChange = onClientModeApiKeyChange,
+            onTestClientModeConnection = onTestClientModeConnection,
+        )
 
         CardGroup(title = { Text(stringResource(R.string.screen_settings_temperature_value, state.temperature)) }) {
             item(
