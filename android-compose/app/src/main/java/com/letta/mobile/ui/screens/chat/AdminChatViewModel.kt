@@ -377,6 +377,7 @@ class AdminChatViewModel @Inject constructor(
     private val clientModeEnabled: StateFlow<Boolean> = settingsRepository.observeClientModeEnabled()
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     private val initialMessageConsumed = AtomicBoolean(false)
+    private var followingDuplicateInitialMessageInFlight = false
     val conversationId: String?
         get() = if (shouldUseClientModeForCurrentRoute) currentClientModeConversationId() else activeConversationId
     val projectContext: ProjectChatContext? = savedStateHandle.get<String>("projectIdentifier")?.let { identifier ->
@@ -1332,6 +1333,17 @@ class AdminChatViewModel @Inject constructor(
                 "Suppressed duplicate initial route message agent=$agentId " +
                     "conversation=${activeConversationId ?: explicitConversationId ?: currentClientModeConversationId()} " +
                     "messageHash=${message.hashCode()}",
+            )
+            // A duplicate share route/ViewModel can win the send race before
+            // the user-visible route settles. The visible VM still needs to
+            // reflect that the shared message is in flight; the timeline
+            // observer for the resolved conversation will clear these flags
+            // when the assistant response lands.
+            followingDuplicateInitialMessageInFlight = true
+            _uiState.value = _uiState.value.copy(
+                isLoadingMessages = false,
+                isStreaming = true,
+                isAgentTyping = true,
             )
             null
         }
@@ -2736,10 +2748,16 @@ class AdminChatViewModel @Inject constructor(
                     // when fewer than PAGE_SIZE rows come back).
                     val newHasMoreOlder = if (anyConfirmed) true
                                           else _uiState.value.hasMoreOlderMessages
+                    if (followingDuplicateInitialMessageInFlight && tailIsAssistant) {
+                        followingDuplicateInitialMessageInFlight = false
+                    }
+                    val duplicateInitialMessageInFlight = followingDuplicateInitialMessageInFlight
                     val prev = _uiState.value
                     val nextIsStreaming = if (streamInFlight) prev.isStreaming
+                                          else if (duplicateInitialMessageInFlight) true
                                           else anyLettaServerLocalPending
                     val nextIsAgentTyping = if (streamInFlight) prev.isAgentTyping
+                                            else if (duplicateInitialMessageInFlight) true
                                             else (anyLettaServerLocalPending && !tailIsAssistant)
                     _uiState.value = collapseCompletedRunsIfStreamingFinished(
                         previous = prev,

@@ -2391,12 +2391,17 @@ class AdminChatViewModelTest {
             initialMessage = "https://example.com/shared-link",
         )
         advanceUntilIdle()
-        createViewModel(
+        val visibleDuplicateVm = createViewModel(
             conversationId = null,
             initialMessage = "https://example.com/shared-link",
         )
         advanceUntilIdle()
 
+        assertTrue(
+            "Visible duplicate route should still show thinking while following the in-flight shared send",
+            visibleDuplicateVm.uiState.value.isStreaming,
+        )
+        assertTrue(visibleDuplicateVm.uiState.value.isAgentTyping)
         coVerify(exactly = 1) {
             timelineRepository.sendMessage("conv-1", "https://example.com/shared-link")
         }
