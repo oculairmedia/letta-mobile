@@ -90,7 +90,6 @@ import com.letta.mobile.ui.components.Accordions
 import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.FormItem
-import com.letta.mobile.ui.components.TextInputDialog
 
 import com.letta.mobile.util.ConnectivityMonitor
 import com.letta.mobile.ui.navigation.agentAvatarSharedElementKey
@@ -122,7 +121,6 @@ fun AgentScaffold(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showConversationPicker by remember { mutableStateOf(false) }
     var showBugReportSheet by remember { mutableStateOf(false) }
-    var showClientModeLocationDialog by remember { mutableStateOf(false) }
     val chatBackground by viewModel.chatBackground.collectAsStateWithLifecycle()
 
     val agentName = uiState.agentName
@@ -229,13 +227,6 @@ fun AgentScaffold(
                         onCreateReport = { showBugReportSheet = true },
                     )
                 }
-                if (uiState.isClientModeEnabled) {
-                    ClientModeLocationCard(
-                        state = uiState.clientModeLocation,
-                        onRefresh = viewModel::refreshClientModeLocation,
-                        onChangeLocation = { showClientModeLocationDialog = true },
-                    )
-                }
                 AgentConversationHeader(
                     agentId = agentId,
                     projectName = projectContext?.name,
@@ -268,27 +259,6 @@ fun AgentScaffold(
         )
     }
 
-    if (showClientModeLocationDialog) {
-        val initialLocation = uiState.clientModeLocation.currentPath
-            ?: uiState.clientModeLocation.lastRequestedPath
-            ?: uiState.clientModeLocation.defaultPath
-            ?: ""
-        TextInputDialog(
-            show = true,
-            title = stringResource(R.string.screen_chat_client_location_change_title),
-            label = stringResource(R.string.screen_chat_client_location_path_label),
-            confirmText = stringResource(R.string.screen_chat_client_location_send_action),
-            dismissText = stringResource(R.string.action_cancel),
-            initialValue = initialLocation,
-            placeholder = stringResource(R.string.screen_chat_client_location_path_placeholder),
-            onConfirm = { path ->
-                showClientModeLocationDialog = false
-                viewModel.sendClientModeLocationChange(path)
-            },
-            onDismiss = { showClientModeLocationDialog = false },
-        )
-    }
-
     if (showBugReportSheet && projectContext != null) {
         ProjectBugReportSheet(
             state = uiState.bugReports,
@@ -298,103 +268,6 @@ fun AgentScaffold(
                 showBugReportSheet = false
             },
         )
-    }
-}
-
-@Composable
-private fun ClientModeLocationCard(
-    state: ClientModeLocationUiState,
-    onRefresh: () -> Unit,
-    onChangeLocation: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val displayPath = state.currentPath ?: state.lastRequestedPath ?: state.defaultPath
-    val label = when {
-        state.currentPath != null -> stringResource(R.string.screen_chat_client_location_current_label)
-        state.lastRequestedPath != null -> stringResource(R.string.screen_chat_client_location_requested_label)
-        state.defaultPath != null -> stringResource(R.string.screen_chat_client_location_start_label)
-        else -> stringResource(R.string.screen_chat_client_location_unknown_label)
-    }
-
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-        ),
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(
-                    LettaIcons.Storage,
-                    contentDescription = null,
-                    modifier = Modifier.size(LettaIconSizing.Toolbar),
-                )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.screen_chat_client_location_title),
-                        style = MaterialTheme.typography.listItemHeadline,
-                    )
-                    Text(
-                        text = stringResource(R.string.screen_chat_client_location_subtitle),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.78f),
-                    )
-                }
-                if (state.isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer,
-                    )
-                }
-            }
-
-            FormItem(
-                label = { Text(label) },
-                description = {
-                    Text(
-                        text = displayPath ?: stringResource(R.string.screen_chat_client_location_unknown_body),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-            )
-
-            state.error?.let { error ->
-                Text(
-                    text = error,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AssistChip(
-                    onClick = onRefresh,
-                    enabled = !state.isLoading,
-                    leadingIcon = { Icon(LettaIcons.Refresh, contentDescription = null) },
-                    label = { Text(stringResource(R.string.action_refresh)) },
-                )
-                OutlinedButton(onClick = onChangeLocation) {
-                    Icon(LettaIcons.Send, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.screen_chat_client_location_change_action))
-                }
-            }
-        }
     }
 }
 

@@ -10,6 +10,7 @@ import io.ktor.client.plugins.auth.providers.BearerTokens
 import io.ktor.client.plugins.auth.providers.bearer
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
+import io.ktor.client.request.parameter
 import io.ktor.client.statement.bodyAsText
 import io.ktor.serialization.kotlinx.json.json
 import java.net.URI
@@ -354,6 +355,17 @@ class WsBotClient(
 
     override suspend fun listAgents(): List<BotAgentInfo> {
         val response = httpClient.get("$httpBaseUrl/api/v1/agents")
+        if (response.status.value !in 200..299) {
+            throw RuntimeException("Bot server error: ${response.status.value} ${response.bodyAsText()}")
+        }
+        return response.body()
+    }
+
+    suspend fun browseFilesystem(path: String? = null, limit: Int = 500): BotFilesystemBrowseResponse {
+        val response = httpClient.get("$httpBaseUrl/api/v1/filesystem/browse") {
+            path?.takeIf { it.isNotBlank() }?.let { parameter("path", it) }
+            parameter("limit", limit)
+        }
         if (response.status.value !in 200..299) {
             throw RuntimeException("Bot server error: ${response.status.value} ${response.bodyAsText()}")
         }

@@ -157,6 +157,17 @@ data class ClientModeLocationUiState(
 )
 
 @androidx.compose.runtime.Immutable
+data class ClientModeFilesystemPickerUiState(
+    val isVisible: Boolean = false,
+    val isLoading: Boolean = false,
+    val path: String? = null,
+    val parent: String? = null,
+    val entries: ImmutableList<ClientModeDirectoryEntry> = persistentListOf(),
+    val truncated: Boolean = false,
+    val error: String? = null,
+)
+
+@androidx.compose.runtime.Immutable
 data class ContextWindowUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
@@ -214,6 +225,7 @@ data class ChatUiState(
     val contextWindow: ContextWindowUiState = ContextWindowUiState(),
     val isClientModeEnabled: Boolean = false,
     val clientModeLocation: ClientModeLocationUiState = ClientModeLocationUiState(),
+    val clientModeFilesystemPicker: ClientModeFilesystemPickerUiState = ClientModeFilesystemPickerUiState(),
     /**
      * Surfaced when the LettaBot harness substituted a fresh conversation ID for
      * the one we requested (i.e. our requested conv was unrecoverable on the
@@ -562,6 +574,73 @@ class AdminChatViewModel @Inject constructor(
             )
         }
         sendMessage(buildClientModeLocationPrompt(normalized))
+    }
+
+    fun openClientModeLocationPicker() {
+        if (!clientModeEnabled.value) return
+        val initialPath = _uiState.value.clientModeLocation.currentPath
+            ?: _uiState.value.clientModeLocation.lastRequestedPath
+            ?: _uiState.value.clientModeLocation.defaultPath
+        _uiState.update {
+            it.copy(
+                clientModeFilesystemPicker = it.clientModeFilesystemPicker.copy(
+                    isVisible = true,
+                    error = null,
+                )
+            )
+        }
+        browseClientModeLocation(initialPath)
+    }
+
+    fun closeClientModeLocationPicker() {
+        _uiState.update {
+            it.copy(clientModeFilesystemPicker = it.clientModeFilesystemPicker.copy(isVisible = false))
+        }
+    }
+
+    fun browseClientModeLocation(path: String?) {
+        if (!clientModeEnabled.value) return
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    clientModeFilesystemPicker = it.clientModeFilesystemPicker.copy(
+                        isLoading = true,
+                        error = null,
+                    )
+                )
+            }
+            runCatching { clientModeAgentLocationRepository.browseDirectories(path) }
+                .onSuccess { listing ->
+                    _uiState.update {
+                        it.copy(
+                            clientModeFilesystemPicker = it.clientModeFilesystemPicker.copy(
+                                isVisible = true,
+                                isLoading = false,
+                                path = listing?.path ?: path,
+                                parent = listing?.parent,
+                                entries = listing?.entries ?: persistentListOf(),
+                                truncated = listing?.truncated ?: false,
+                                error = if (listing == null) "Client-mode server is not configured" else null,
+                            )
+                        )
+                    }
+                }
+                .onFailure { e ->
+                    _uiState.update {
+                        it.copy(
+                            clientModeFilesystemPicker = it.clientModeFilesystemPicker.copy(
+                                isLoading = false,
+                                error = mapErrorToUserMessage(e.asException(), "Failed to browse server filesystem"),
+                            )
+                        )
+                    }
+                }
+        }
+    }
+
+    fun selectClientModeLocation(path: String) {
+        closeClientModeLocationPicker()
+        sendClientModeLocationChange(path)
     }
 
     fun refreshContextWindow() {

@@ -314,6 +314,11 @@
     <string name="screen_chat_client_location_path_label">Filesystem path</string>
     <string name="screen_chat_client_location_path_placeholder">/path/on/target/server</string>
     <string name="screen_chat_client_location_send_action">Send</string>
+    <string name="screen_chat_client_location_picker_title">Choose server directory</string>
+    <string name="screen_chat_client_location_picker_parent">Parent</string>
+    <string name="screen_chat_client_location_picker_select">Use this location</string>
+    <string name="screen_chat_client_location_picker_empty">No child directories found.</string>
+    <string name="screen_chat_client_location_picker_truncated">Showing the first directories only.</string>
     <string name="screen_project_chat_path_label">Path</string>
     <string name="screen_project_chat_git_url_label">Git URL</string>
     <string name="screen_project_chat_active_agents_label">Active coding agents</string>

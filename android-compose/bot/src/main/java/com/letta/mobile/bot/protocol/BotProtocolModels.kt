@@ -89,6 +89,22 @@ data class BotAgentInfo(
     @SerialName("project_path") val projectPath: String? = null,
 )
 
+@Serializable
+data class BotFilesystemBrowseResponse(
+    val path: String,
+    val parent: String? = null,
+    val entries: List<BotFilesystemEntry> = emptyList(),
+    val truncated: Boolean = false,
+)
+
+@Serializable
+data class BotFilesystemEntry(
+    val name: String,
+    val path: String,
+    val type: String,
+    val isSymlink: Boolean = false,
+)
+
 object BotStatusAgentsSerializer : KSerializer<List<String>> {
     private val listDelegate = ListSerializer(String.serializer())
 
