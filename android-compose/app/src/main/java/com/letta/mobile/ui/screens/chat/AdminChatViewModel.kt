@@ -54,6 +54,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.flow.update
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 internal fun runIdsEligibleForCompletionAutoCollapse(messages: List<UiMessage>): Set<String> {
@@ -332,7 +333,7 @@ class AdminChatViewModel @Inject constructor(
         requestedConversationArg?.takeIf { it.isNotBlank() }
     private val clientModeEnabled: StateFlow<Boolean> = settingsRepository.observeClientModeEnabled()
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
-    private var initialMessageConsumed: Boolean = false
+    private val initialMessageConsumed = AtomicBoolean(false)
     val conversationId: String?
         get() = if (shouldUseClientModeForCurrentRoute) currentClientModeConversationId() else activeConversationId
     val projectContext: ProjectChatContext? = savedStateHandle.get<String>("projectIdentifier")?.let { identifier ->
@@ -1273,9 +1274,11 @@ class AdminChatViewModel @Inject constructor(
 
     private fun consumeInitialMessageIfPresent(): String? {
         val message = initialMessage?.takeIf { it.isNotBlank() } ?: return null
-        if (initialMessageConsumed) return null
-        initialMessageConsumed = true
-        return message
+        return if (initialMessageConsumed.compareAndSet(false, true)) {
+            message
+        } else {
+            null
+        }
     }
 
     fun loadMessages() {
