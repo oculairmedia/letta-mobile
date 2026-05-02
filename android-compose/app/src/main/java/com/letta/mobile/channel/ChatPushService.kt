@@ -86,6 +86,13 @@ class ChatPushService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // letta-mobile-jmzq.5: track service restarts (Android may restart after
+        // being killed, onStartCommand fires without onCreate in that case).
+        Telemetry.event(
+            "ChatPushService", "startCommand",
+            "startId" to startId,
+            "intentAction" to (intent?.action ?: "<null>"),
+        )
         ensureForegroundNotification()
         return START_STICKY
     }
@@ -232,7 +239,14 @@ class ChatPushService : Service() {
         // tapped) and starts its own subscriber from there.
         warmupJob?.cancel()
         warmupJob = scope.launch {
+            val warmupTimer = Telemetry.startTimer("ChatPushService", "warmup")
             try {
+                // letta-mobile-jmzq.5: emit warmup.start so we can measure
+                // time-to-first-hydrate and detect warmup that never starts.
+                Telemetry.event(
+                    "ChatPushService", "warmup.start",
+                    "budget" to WARMUP_CONVERSATION_COUNT,
+                )
                 val conversations = conversationApi.listConversations(
                     limit = WARMUP_CONVERSATION_COUNT,
                     order = "desc",
@@ -257,12 +271,15 @@ class ChatPushService : Service() {
                         }
                     }.awaitAll()
                 }
-                Telemetry.event(
-                    "ChatPushService", "warmup.complete",
+                warmupTimer.stop(
                     "conversationCount" to conversations.size,
+                    "budget" to WARMUP_CONVERSATION_COUNT,
                 )
             } catch (t: Throwable) {
-                Telemetry.error("ChatPushService", "warmup.failed", t)
+                warmupTimer.stopError(
+                    t,
+                    "budget" to WARMUP_CONVERSATION_COUNT,
+                )
             }
         }
     }
