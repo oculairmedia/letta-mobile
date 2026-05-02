@@ -215,7 +215,6 @@ class AdminChatViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val internalBotClient: InternalBotClient,
     private val clientModeChatSender: ClientModeChatSender,
-    private val chatRouteSessionResolver: ChatRouteSessionResolver,
     private val currentConversationTracker: com.letta.mobile.channel.CurrentConversationTracker,
 ) : ViewModel() {
     companion object {
@@ -230,15 +229,11 @@ class AdminChatViewModel @Inject constructor(
     private val initialMessage: String? = savedStateHandle.get<String>("initialMessage")
     private val requestedConversationArg: String? = savedStateHandle.get<String>("conversationId")
     private val freshRouteKey: Long? = savedStateHandle.get<Long>("freshRouteKey")
-    private val routeState = chatRouteSessionResolver.routeState(
-        requestedConversationArg = requestedConversationArg,
-        freshRouteKey = freshRouteKey,
-    )
     val scrollToMessageId: String? = savedStateHandle.get<String>("scrollToMessageId")
     private val explicitConversationId: String?
-        get() = routeState.explicitConversationId
+        get() = requestedConversationArg?.takeIf { it.isNotBlank() }
     private val isFreshRoute: Boolean
-        get() = routeState.isFreshRoute
+        get() = freshRouteKey != null || requestedConversationArg?.isBlank() == true
     // letta-mobile-c87t: previously this predicate was
     //   clientModeEnabled.value && (isFreshRoute || explicitConversationId == null)
     // which collapsed to "client mode only fires for fresh routes" — meaning any

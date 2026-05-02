@@ -75,7 +75,6 @@ class AdminChatViewModelTest {
 
     private lateinit var internalBotClient: InternalBotClient
     private lateinit var clientModeChatSender: ClientModeChatSender
-    private lateinit var chatRouteSessionResolver: ChatRouteSessionResolver
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var clientModeEnabledFlow: MutableStateFlow<Boolean>
     private var messages: List<AppMessage> = emptyList()
@@ -178,7 +177,6 @@ class AdminChatViewModelTest {
         settingsRepository = mockk(relaxed = true)
         internalBotClient = mockk(relaxed = true)
         clientModeChatSender = mockk(relaxed = true)
-        chatRouteSessionResolver = ChatRouteSessionResolver(conversationManager)
         clientModeEnabledFlow = MutableStateFlow(false)
         activeConversationIds.clear()
 
@@ -256,7 +254,6 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
-            chatRouteSessionResolver,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
     }
@@ -1279,7 +1276,6 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
-            chatRouteSessionResolver,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
         advanceUntilIdle()
@@ -1403,7 +1399,6 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
-            chatRouteSessionResolver,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
 
@@ -1505,7 +1500,6 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
-            chatRouteSessionResolver,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
         advanceUntilIdle()
@@ -1545,7 +1539,6 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
-            chatRouteSessionResolver,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
         advanceUntilIdle()
@@ -1595,7 +1588,6 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
-            chatRouteSessionResolver,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
         advanceUntilIdle()
@@ -1629,7 +1621,6 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
-            chatRouteSessionResolver,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
 
@@ -1658,7 +1649,6 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
-            chatRouteSessionResolver,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
         advanceUntilIdle()
