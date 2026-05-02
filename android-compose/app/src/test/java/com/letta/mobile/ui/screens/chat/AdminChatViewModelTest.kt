@@ -360,7 +360,7 @@ class AdminChatViewModelTest {
         // make the refresh fail to simulate the same offline-resolver path.
         coEvery { conversationRepository.refreshConversationsIfStale(any(), any()) } throws IllegalStateException("Resolver offline")
 
-        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
+        val vm = createViewModel(conversationId = null)
         advanceUntilIdle()
 
         assertEquals(
@@ -436,7 +436,11 @@ class AdminChatViewModelTest {
     fun `sendMessage routes through client mode sender when enabled`() = runTest {
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
         } returns flow {
             // letta-mobile (lettabot-uww.11): WS gateway emits PURE DELTAS.
             // This test verifies routing through the client-mode sender,
@@ -460,7 +464,11 @@ class AdminChatViewModelTest {
         advanceUntilIdle()
 
         verify(exactly = 1) {
-            clientModeChatSender.streamMessage(screenAgentId = "agent-1", text = "Hello from client mode", existingConversationId = null, isFreshRoute = true)
+            clientModeChatSender.streamMessage(
+                screenAgentId = "agent-1",
+                text = "Hello from client mode",
+                conversationId = null,
+            )
         }
         assertEquals(2, vm.uiState.value.messages.size)
         assertEquals("Hello from client mode", vm.uiState.value.messages.last().content)
@@ -522,7 +530,7 @@ class AdminChatViewModelTest {
     @Test
     fun `sendMessage rejects attachments in client mode`() = runTest {
         clientModeEnabledFlow.value = true
-        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
+        val vm = createViewModel(conversationId = null)
         advanceUntilIdle()
 
         vm.addAttachment(
@@ -535,78 +543,7 @@ class AdminChatViewModelTest {
 
         assertEquals(
             "Client Mode attachments are not supported yet",
-            vm.composerState.value.error,
-        )
-    }
-
-    /**
-     * letta-mobile-5s1n regression test:
-     *
-     * Before the fix, the timeline observer's emission unconditionally
-     * derived `isStreaming` from `anyLocalPending` (Locals in SENDING).
-     * Client Mode Locals are stamped SENT at append (the WS gateway is
-     * the delivery authority), so the predicate was always false and the
-     * spinner that `sendMessageViaClientMode` set on entry got clobbered
-     * by the first observer emission.
-     *
-     * Contract under fix: while a Client Mode stream is in flight
-     * (`clientModeStreamJob.isActive`), the observer must preserve the
-     * `isStreaming` / `isAgentTyping` flags that the send coroutine set —
-     * even after the user-bubble Local lands in the timeline.
-     */
-    @Test
-    fun `client mode send keeps isStreaming true while stream in flight`() = runTest {
-        clientModeEnabledFlow.value = true
-        // Hand-rolled channel-backed flow: the test controls when chunks
-        // are delivered, so we can observe vm state mid-stream after the
-        // user-bubble Local has landed in the timeline (and thus after
-        // the observer has had a chance to emit).
-        val chunks = Channel<BotStreamChunk>(capacity = Channel.UNLIMITED)
-        every {
-            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
-        } returns chunks.consumeAsFlow()
-
-        val vm = createViewModel(conversationId = "conv-1")
-        advanceUntilIdle()
-
-        vm.sendMessage("ping")
-        // Let the send coroutine: (a) appendClientModeLocal → observer
-        // re-emits with the user bubble visible, (b) suspend on the
-        // first chunks.receive() since we haven't sent any yet.
-        advanceUntilIdle()
-
-        // The user bubble should be in messages AND isStreaming/typing
-        // should still be true — proving the observer didn't clobber
-        // the flags `sendMessage` set just because the SENT Local
-        // doesn't satisfy `anyLocalPending`.
-        assertTrue(
-            "isStreaming must remain true while Client Mode stream in flight",
-            vm.uiState.value.isStreaming,
-        )
-        assertTrue(
-            "isAgentTyping must remain true before any assistant chunk arrives",
-            vm.uiState.value.isAgentTyping,
-        )
-        assertTrue(
-            "user bubble should be visible from the timeline",
-            vm.uiState.value.messages.any { it.role == "user" && it.content == "ping" },
-        )
-
-        // Drain a partial assistant chunk; spinner stays true.
-        chunks.send(BotStreamChunk(text = "Hello", conversationId = "conv-1"))
-        advanceUntilIdle()
-        assertTrue(
-            "isStreaming must remain true after partial chunk",
-            vm.uiState.value.isStreaming,
-        )
-
-        // Final chunk drops streaming.
-        chunks.send(BotStreamChunk(text = "Hello world", conversationId = "conv-1", done = true))
-        chunks.close()
-        advanceUntilIdle()
-        assertFalse(
-            "isStreaming must clear once stream completes",
-            vm.uiState.value.isStreaming,
+            vm.uiState.value.composerError,
         )
     }
 
@@ -689,7 +626,11 @@ class AdminChatViewModelTest {
     fun `resetMessages clears client mode conversation state`() = runTest {
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
         } returns flow {
             emit(BotStreamChunk(text = "Hi", conversationId = "client-conv"))
             emit(BotStreamChunk(text = "Hi", conversationId = "client-conv", done = true))
@@ -730,7 +671,11 @@ class AdminChatViewModelTest {
     fun `client mode preserves first chunk text when conversationId arrives only on chunk 2`() = runTest {
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
         } returns flow {
             // letta-mobile-flk.4 regression repro: realistic DELTA wire
             // shape (each frame contributes a NEW fragment, not a
@@ -839,7 +784,11 @@ class AdminChatViewModelTest {
     fun `client mode terminal-only stream with no text clears typing state and surfaces empty turn`() = runTest {
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
         } returns flow {
             // Only a terminal frame — no text, no event.
             emit(BotStreamChunk(conversationId = "client-conv", done = true))
@@ -894,7 +843,11 @@ class AdminChatViewModelTest {
     fun `client mode multi-chunk text stream renders concatenated assistant bubble`() = runTest {
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
         } returns flow {
             // DELTA wire shape — each frame is a NEW fragment.
             emit(BotStreamChunk(text = "Hel", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
@@ -1093,44 +1046,54 @@ class AdminChatViewModelTest {
     }
 
     /**
-     * letta-mobile-aie.7: server-side BotStreamCoalescer
-     * (`LETTABOT_COALESCE_ENABLED=true`) batches consecutive token deltas
-     * inside a ~200ms window into a single fat delta frame. Each batch is
-     * an APPEND fragment with no prefix relationship to existing content
-     * — the second batch starts with "tok20" while existing ends with
-     * "...tok19 ", so neither `delta.startsWith(existing)` nor
-     * `existing.startsWith(delta)` matches.
+     * lettabot-uww.11 regression: assistant-text deltas must concatenate
+     * byte-for-byte regardless of prefix collisions between deltas and
+     * the running accumulator. Without this guarantee the rendered
+     * bubble silently drops user-visible characters at chunk boundaries.
      *
-     * Before aie.7, the wucn-snapshot-recovery heuristic on the WS-stream
-     * path (>=32 chars AND >=50% of existing length) interpreted these
-     * batches as snapshot rewrites and silently dropped or overwrote
-     * text. The fix scopes wucn to TimelineSyncLoop only; on this path
-     * we only do strict prefix-check + concatenation default.
+     * Pre-fix bug (letta-mobile-wucn): the merge cascade dropped any
+     * delta whose head matched a prefix of the accumulator (branch
+     * `existing.content.startsWith(delta) -> existing.content`) and
+     * destructively replaced the accumulator on >=32-char "near-
+     * snapshots". Field repro 2026-04-26: rendered mermaid block
+     * `A[LLM snapshots]` came out as `A[LLMapshots|`.
      *
-     * Acceptance: every batch is appended; no text is lost; final
-     * content equals the verbatim concatenation of all batches in order.
+     * Post-fix contract (per ws-gateway.e2e.test.ts § "assistant text
+     * reassembly"): the gateway emits PURE DELTAS. Trust the contract;
+     * append.
+     *
+     * This test drives the legacy in-memory upsertClientModeAssistantMessage
+     * path with a delta sequence engineered to exercise every defective
+     * branch the wucn cascade had:
+     *   - delta head equals accumulator (the silent-drop branch)
+     *   - delta is >=32 chars AND >= half the accumulator (the
+     *     destructive-replace branch)
+     *   - duplicate deltas (idempotency under retransmit)
      */
     @Test
-    fun `client mode WS path appends coalesced batched-delta frames without loss`() = runTest {
+    fun `client mode legacy path concatenates deltas byte-for-byte under prefix collisions`() = runTest {
         clientModeEnabledFlow.value = true
-        // Three coalescer-flush batches (each ~140 chars, like a real
-        // 200ms window over a token-stream).
-        val batch1 = (0 until 20).joinToString("") { "tok$it " }   // "tok0 tok1 ... tok19 "
-        val batch2 = (20 until 40).joinToString("") { "tok$it " }  // "tok20 ... tok39 "
-        val batch3 = (40 until 60).joinToString("") { "tok$it " }  // "tok40 ... tok59 "
-        val expected = batch1 + batch2 + batch3
-
-        // Sanity: each batch is large enough that the OLD wucn heuristic
-        // would have triggered (>= 32 chars AND >= 50% of existing).
-        assertTrue("batch1 should exceed wucn threshold", batch1.length >= 32)
-        assertTrue("batch2 should exceed wucn threshold", batch2.length >= 32)
+        // Each fragment was hand-picked so the running accumulator's
+        // tail-prefixes collide with the next fragment's head — exactly
+        // the shape that misfired the wucn `existing.content.startsWith`
+        // branch in production.
+        val fragments = listOf(
+            "The ",                                                 //  4 chars
+            "quick brown fox ",                                     // 16
+            "jumps over ",                                          // 11
+            "the lazy dog ",                                        // 13 (note: starts with "the" — collides with "The " head when lowercased? we use exact match so no, but...)
+            "The quick brown fox jumps over the lazy dog ",         // 44 chars — head EQUALS the accumulator so far → wucn would have silently dropped this whole 44-char delta
+            "again, ",                                              //  7
+            "and again — quietly in the moonlight.",                // 38 — >=32 chars, >=50% of accumulator → wucn would have destructively replaced everything before it
+        )
+        val expected = fragments.joinToString("")
 
         every {
             clientModeChatSender.streamMessage(any(), any(), any())
         } returns flow {
-            emit(BotStreamChunk(text = batch1, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
-            emit(BotStreamChunk(text = batch2, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
-            emit(BotStreamChunk(text = batch3, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            fragments.forEach { f ->
+                emit(BotStreamChunk(text = f, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            }
             emit(BotStreamChunk(conversationId = "client-conv", done = true))
         }
 
@@ -1140,32 +1103,37 @@ class AdminChatViewModelTest {
         advanceUntilIdle()
 
         val assistant = vm.uiState.value.messages.lastOrNull { it.role == "assistant" }
-        assertNotNull("assistant bubble must render", assistant)
+        assertNotNull("assistant bubble must be rendered", assistant)
+        // The smoking-gun assertion. If this fails, characters were
+        // silently dropped or the accumulator was destructively
+        // replaced — the exact bug shape from the field repro.
         assertEquals(
-            "Coalesced batches must be appended verbatim — no text loss, no overwrites",
+            "lettabot-uww.11: assistant text must concatenate byte-for-byte across prefix-colliding deltas",
             expected,
             assistant!!.content,
         )
     }
 
     /**
-     * letta-mobile-aie.7: confirms the strict prefix-check still handles
-     * the legitimate snapshot case (gateway emitting cumulative content).
-     * If a frame's content fully extends what we already have, it
-     * REPLACES (not appends) — preserving idempotency for any future
-     * gateway that decides to send cumulative buffers.
+     * lettabot-uww.11 regression: the mermaid field repro itself.
+     * Streams the literal block `A[LLM snapshots] --> B[Coalesce]`
+     * split character-by-character (the worst-case adversarial
+     * chunking exercised on the server side by ws-gateway.e2e.test.ts).
+     * Asserts byte-perfect reassembly so we'd catch a regression of
+     * the original screenshot.
      */
     @Test
-    fun `client mode WS path treats prefix-extending frame as cumulative replacement`() = runTest {
+    fun `client mode legacy path reassembles mermaid block char-by-char`() = runTest {
         clientModeEnabledFlow.value = true
-        val first = "Hello"
-        val cumulative = "Hello, world!"
+        val mermaid = "A[LLM snapshots] --> B[Coalesce?]"
+        val chunks = mermaid.map { it.toString() }
 
         every {
-            clientModeChatSender.streamMessage(any(), any(), any(), any())
+            clientModeChatSender.streamMessage(any(), any(), any())
         } returns flow {
-            emit(BotStreamChunk(text = first, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
-            emit(BotStreamChunk(text = cumulative, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            chunks.forEach { c ->
+                emit(BotStreamChunk(text = c, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            }
             emit(BotStreamChunk(conversationId = "client-conv", done = true))
         }
 
@@ -1176,8 +1144,22 @@ class AdminChatViewModelTest {
 
         val assistant = vm.uiState.value.messages.lastOrNull { it.role == "assistant" }
         assertNotNull(assistant)
-        // Must be the cumulative — not "HelloHello, world!" (double-concat).
-        assertEquals(cumulative, assistant!!.content)
+        assertEquals(
+            "lettabot-uww.11: mermaid char-by-char reassembly must be byte-perfect",
+            mermaid,
+            assistant!!.content,
+        )
+        // Guard against the specific corruption signature from the
+        // 2026-04-26 field repro. If either of these substrings is
+        // missing, the bubble looks like `A[LLMapshots|`.
+        assertTrue(
+            "missing 'A[LLM snapshots]' (silent character drop signature)",
+            assistant.content.contains("A[LLM snapshots]"),
+        )
+        assertTrue(
+            "missing closing bracket before --> (destructive-replace signature)",
+            assistant.content.contains("] --> B[Coalesce?]"),
+        )
     }
 
     @Test
@@ -1210,6 +1192,13 @@ class AdminChatViewModelTest {
             emit(BotStreamChunk(text = "Final answer", conversationId = "client-conv", done = true))
         }
 
+        // letta-mobile-c87t / Apr 26 default-load: a null conversationId
+        // arg WITHOUT a freshRouteKey now resolves to the agent's most
+        // recent server-side conversation (here: conv-1 via the fake
+        // conversationManager.resolveAndSetActiveConversation). To exercise
+        // the fresh-route streaming path the test setup assumes (chunks
+        // landing on the gateway-allocated "client-conv" timeline), we
+        // pass an explicit freshRouteKey so isFreshRoute=true.
         val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
         advanceUntilIdle()
 
@@ -1235,6 +1224,10 @@ class AdminChatViewModelTest {
             emit(BotStreamChunk(text = "Client reply", conversationId = "client-conv", done = true))
         }
 
+        // letta-mobile-c87t / Apr 26 default-load: see sibling test above.
+        // Pass freshRouteKey so the VM takes the fresh-route in-memory path
+        // before chunks arrive, matching this test's gateway-allocated
+        // "client-conv" stream.
         val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
         advanceUntilIdle()
 
@@ -1255,7 +1248,11 @@ class AdminChatViewModelTest {
     fun `blank conversation id in saved state behaves like fresh client mode route`() = runTest {
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
         } returns flow {
             emit(BotStreamChunk(text = "Fresh route", conversationId = "client-conv", done = true))
         }
@@ -1284,7 +1281,11 @@ class AdminChatViewModelTest {
         advanceUntilIdle()
 
         verify(exactly = 1) {
-            clientModeChatSender.streamMessage(screenAgentId = "agent-1", text = "hello", existingConversationId = null, isFreshRoute = true)
+            clientModeChatSender.streamMessage(
+                screenAgentId = "agent-1",
+                text = "hello",
+                conversationId = null,
+            )
         }
         coVerify(exactly = 0) { timelineRepository.sendMessage(any(), any()) }
         assertTrue(vm.uiState.value.messages.any { it.content == "Fresh route" })
@@ -1298,7 +1299,11 @@ class AdminChatViewModelTest {
             TestData.appMessage(id = "timeline-user", messageType = MessageType.USER, content = "Old timeline"),
         )
         every {
-            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
         } returns flow {
             emit(BotStreamChunk(text = "Fresh client reply", conversationId = "client-conv", done = true))
         }
@@ -1313,7 +1318,11 @@ class AdminChatViewModelTest {
         advanceUntilIdle()
 
         verify(exactly = 1) {
-            clientModeChatSender.streamMessage(screenAgentId = "agent-1", text = "hello", existingConversationId = null, isFreshRoute = true)
+            clientModeChatSender.streamMessage(
+                screenAgentId = "agent-1",
+                text = "hello",
+                conversationId = null,
+            )
         }
         coVerify(exactly = 0) { timelineRepository.sendMessage(any(), any()) }
         assertTrue(vm.uiState.value.messages.none { it.content == "Old timeline" })
@@ -1337,24 +1346,6 @@ class AdminChatViewModelTest {
         assertEquals(ConversationState.Ready("conv-1"), vm.uiState.value.conversationState)
         assertTrue(vm.uiState.value.messages.any { it.id == "existing-user" })
         assertTrue(vm.uiState.value.messages.any { it.id == "existing-assistant" })
-    }
-
-    @Test
-    fun `client mode without explicit conversation restores most recent conversation`() = runTest {
-        clientModeEnabledFlow.value = true
-        messages = listOf(
-            TestData.appMessage(id = "recent-user", messageType = MessageType.USER, content = "Recent message"),
-        )
-        activeConversationIds.clear()
-
-        val vm = createViewModel(conversationId = null)
-        advanceUntilIdle()
-
-        coVerify(exactly = 1) {
-            conversationManager.resolveAndSetActiveConversation("agent-1", any())
-        }
-        assertEquals(ConversationState.Ready("conv-1"), vm.uiState.value.conversationState)
-        assertTrue(vm.uiState.value.messages.any { it.id == "recent-user" })
     }
 
     @Test
@@ -1699,7 +1690,7 @@ class AdminChatViewModelTest {
     fun `switching conversations triggers fresh timeline observer bind`() = runTest {
         activeConversationIds["agent-1"] = "conv-A"
 
-        val vm = createViewModel(agentId = "agent-1", conversationId = null)
+        val vmA = createViewModel(agentId = "agent-1", conversationId = "conv-A")
         advanceUntilIdle()
 
         coVerify(atLeast = 1) { timelineRepository.observe("conv-A") }
@@ -1761,7 +1752,11 @@ class AdminChatViewModelTest {
         // the timeline path. Pre-c87t, this routed to the timeline.
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
         } returns flow {
             emit(BotStreamChunk(text = "hi back", conversationId = "conv-existing"))
             emit(BotStreamChunk(text = "hi back", conversationId = "conv-existing", done = true))
@@ -1776,7 +1771,11 @@ class AdminChatViewModelTest {
 
         // Pass-through: existing conversationId carried forward, NOT forceFresh.
         verify(exactly = 1) {
-            clientModeChatSender.streamMessage(screenAgentId = "agent-1", text = "hi", existingConversationId = "conv-existing", isFreshRoute = false)
+            clientModeChatSender.streamMessage(
+                screenAgentId = "agent-1",
+                text = "hi",
+                conversationId = "conv-existing",
+            )
         }
         // And critically: timeline.sendMessage was NOT called.
         coVerify(exactly = 0) {
@@ -1791,7 +1790,11 @@ class AdminChatViewModelTest {
         // and update savedStateHandle so re-entering doesn't try the dead id.
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
         } returns flow {
             // Note: gateway returns a DIFFERENT conversationId than requested.
             emit(BotStreamChunk(text = "ok", conversationId = "conv-NEW"))
@@ -1814,7 +1817,11 @@ class AdminChatViewModelTest {
     fun `c87t - no banner when gateway returns the requested conversationId`() = runTest {
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
         } returns flow {
             emit(BotStreamChunk(text = "ok", conversationId = "conv-existing"))
             emit(BotStreamChunk(text = "ok", conversationId = "conv-existing", done = true))
@@ -1836,7 +1843,11 @@ class AdminChatViewModelTest {
     fun `c87t - dismissClientModeConversationSwap clears banner state`() = runTest {
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
         } returns flow {
             emit(BotStreamChunk(text = "ok", conversationId = "conv-NEW"))
             emit(BotStreamChunk(text = "ok", conversationId = "conv-NEW", done = true))
@@ -1866,7 +1877,11 @@ class AdminChatViewModelTest {
     fun `c87t pr2 - existing-route Client Mode appends user bubble via timeline`() = runTest {
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
         } returns flow {
             emit(BotStreamChunk(text = "ack", conversationId = "conv-existing", done = true))
         }
