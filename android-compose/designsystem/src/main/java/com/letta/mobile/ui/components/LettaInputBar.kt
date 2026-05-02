@@ -3,6 +3,7 @@ package com.letta.mobile.ui.components
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -83,7 +84,11 @@ fun LettaInputBar(
         verticalAlignment = Alignment.Bottom,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        leadingContent?.invoke()
+        leadingContent?.let { content ->
+            Box(modifier = Modifier.align(Alignment.CenterVertically)) {
+                content()
+            }
+        }
         TextField(
             value = text,
             onValueChange = onTextChange,
