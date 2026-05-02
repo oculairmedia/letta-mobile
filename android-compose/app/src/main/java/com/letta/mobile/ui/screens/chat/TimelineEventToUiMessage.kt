@@ -281,7 +281,19 @@ internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                 stripped
             } else ev.content
             UiMessage(
-                id = ev.serverId,
+                // Letta can use the same message id for multiple event shapes
+                // in a single step (observed Client Mode replay: reasoning_message
+                // and assistant_message both arrived with message-05b...). The
+                // ViewModel and render model dedupe by UiMessage.id to protect
+                // LazyColumn keys, so using bare serverId drops the final
+                // assistant bubble whenever a reasoning bubble with the same id
+                // is present. Scope the render-key suffix to Client Mode
+                // harness-collapsed events so legacy/history IDs remain stable.
+                id = if (ev.source == com.letta.mobile.data.timeline.MessageSource.CLIENT_MODE_HARNESS) {
+                    "${ev.serverId}:${ev.messageType.name}"
+                } else {
+                    ev.serverId
+                },
                 role = role,
                 content = confirmedContent,
                 timestamp = ev.date.toString(),

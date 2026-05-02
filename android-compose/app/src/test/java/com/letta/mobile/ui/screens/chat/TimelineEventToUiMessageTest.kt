@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.screens.chat
 
 import com.letta.mobile.data.model.ToolCall
+import com.letta.mobile.data.timeline.MessageSource
 import com.letta.mobile.data.timeline.TimelineEvent
 import com.letta.mobile.data.timeline.TimelineMessageType
 import org.junit.Assert.assertEquals
@@ -33,6 +34,7 @@ class TimelineEventToUiMessageTest {
         approvalDecided: Boolean = false,
         toolReturnContent: String? = null,
         toolReturnIsError: Boolean = false,
+        source: MessageSource = MessageSource.LETTA_SERVER,
     ) = TimelineEvent.Confirmed(
         position = 1.0,
         otid = "server-$serverId",
@@ -47,6 +49,7 @@ class TimelineEventToUiMessageTest {
         approvalDecided = approvalDecided,
         toolReturnContent = toolReturnContent,
         toolReturnIsError = toolReturnIsError,
+        source = source,
     )
 
     @Test
@@ -181,6 +184,33 @@ class TimelineEventToUiMessageTest {
         assertEquals("assistant", ui.role)
         assertTrue("isReasoning must be true", ui.isReasoning)
         assertEquals("I should check the logs first.", ui.content)
+    }
+
+    @Test
+    fun `confirmed reasoning and assistant with same server id produce unique ui ids`() {
+        val reasoning = timelineEventToUiMessage(
+            confirmed(
+                TimelineMessageType.REASONING,
+                content = "thinking",
+                serverId = "shared-step-id",
+                source = MessageSource.CLIENT_MODE_HARNESS,
+            )
+        )!!
+        val assistant = timelineEventToUiMessage(
+            confirmed(
+                TimelineMessageType.ASSISTANT,
+                content = "answer",
+                serverId = "shared-step-id",
+                source = MessageSource.CLIENT_MODE_HARNESS,
+            )
+        )!!
+
+        assertTrue(
+            "Reasoning and assistant messages sharing a Letta server id need distinct UI ids so render dedupe does not drop the final answer",
+            reasoning.id != assistant.id,
+        )
+        assertEquals("shared-step-id:REASONING", reasoning.id)
+        assertEquals("shared-step-id:ASSISTANT", assistant.id)
     }
 
     @Test
