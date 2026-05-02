@@ -15,7 +15,11 @@ import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.model.ProjectBugReport
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.MessageType
+import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.data.model.buildContentParts
+import com.letta.mobile.data.model.toJsonArray
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.BugReportRepository
@@ -1331,11 +1335,7 @@ class AdminChatViewModel @Inject constructor(
                 "active=$activeConversationId",
         )
         if (isClientMode) {
-            if (attachments.isNotEmpty()) {
-                composerController.setError("Client Mode attachments are not supported yet")
-                return
-            }
-            sendMessageViaClientMode(text)
+            sendMessageViaClientMode(text, attachments)
             return
         }
         sendMessageViaTimeline(text, attachments)
@@ -1364,7 +1364,10 @@ class AdminChatViewModel @Inject constructor(
         false
     }
 
-    private fun sendMessageViaClientMode(text: String) {
+    private fun sendMessageViaClientMode(
+        text: String,
+        attachments: List<MessageContentPart.Image> = emptyList(),
+    ) {
         clientModeStreamJob?.cancel()
         // letta-mobile-5s1n (regression fix): mark stream in flight BEFORE
         // launching, so observer emissions inside the launch (which run
@@ -1390,6 +1393,8 @@ class AdminChatViewModel @Inject constructor(
         val startedAt = java.time.Instant.now().toString()
         val userMessageId = "client-user-${java.util.UUID.randomUUID()}"
         val assistantMessageId = "client-assistant-${java.util.UUID.randomUUID()}"
+        val outboundText = buildClientModeOutboundText(text, attachments)
+        val uiAttachments = attachments.map { UiImageAttachment(base64 = it.base64, mediaType = it.mediaType) }
         // letta-mobile-c87t: when entering an existing-conversation route under
         // Client Mode, prefer the route's conversationId arg so the gateway can
         // resumeSession() into the matching Letta conversation. Fall back to
@@ -1418,6 +1423,7 @@ class AdminChatViewModel @Inject constructor(
                     role = "user",
                     content = text,
                     timestamp = startedAt,
+                    attachments = uiAttachments,
                 ),
             )
             clientModeMessages = optimisticMessages
@@ -1512,6 +1518,7 @@ class AdminChatViewModel @Inject constructor(
                         timelineRepository.appendClientModeLocal(
                             conversationId = convId,
                             content = text,
+                            attachments = attachments,
                         )
                     }.onFailure { e ->
                         android.util.Log.w(
@@ -1526,6 +1533,7 @@ class AdminChatViewModel @Inject constructor(
                             role = "user",
                             content = text,
                             timestamp = startedAt,
+                            attachments = uiAttachments,
                         )
                         clientModeMessages = fallback
                         _uiState.value = _uiState.value.copy(messages = fallback.toImmutableList())
@@ -1545,6 +1553,7 @@ class AdminChatViewModel @Inject constructor(
                     role = "user",
                     content = text,
                     timestamp = startedAt,
+                    attachments = uiAttachments,
                 )
                 clientModeMessages = nextMessages
                 _uiState.value = _uiState.value.copy(
@@ -1583,7 +1592,7 @@ class AdminChatViewModel @Inject constructor(
                 android.util.Log.w("AdminChatVM-DEBUG", "sendViaClientMode: calling streamMessage agentId=$agentId convId=$priorConversationId bootstrapFresh=$bootstrapFreshConversation")
                 clientModeChatSender.streamMessage(
                     screenAgentId = agentId,
-                    text = text,
+                    text = outboundText,
                     conversationId = priorConversationId,
                 ).collect { chunk ->
                     android.util.Log.w("AdminChatVM-DEBUG", "sendViaClientMode: chunk received done=${chunk.done} event=${chunk.event} textLen=${chunk.text?.length} convId=${chunk.conversationId}")
@@ -1632,6 +1641,7 @@ class AdminChatViewModel @Inject constructor(
                                     timelineRepository.appendClientModeLocal(
                                         conversationId = conversationId,
                                         content = text,
+                                        attachments = attachments,
                                     )
                                     clientModeMessages = clientModeMessages
                                         .filterNot {
@@ -1678,6 +1688,7 @@ class AdminChatViewModel @Inject constructor(
                                     timelineRepository.appendClientModeLocal(
                                         conversationId = newConvId,
                                         content = text,
+                                        attachments = attachments,
                                     )
                                     // letta-mobile-flk.4: carry over any
                                     // assistant content that the legacy
@@ -2852,6 +2863,23 @@ $path
 
 Use this as the cwd/base path for subsequent filesystem and shell tool calls in this conversation. After switching, briefly confirm the current working directory.
 """.trim()
+
+/**
+ * Client Mode rides through lettabot's WebSocket gateway, whose Matrix/Tuwunel
+ * client already supports multimodal input by JSON-serializing Letta-native
+ * MessageContentItem[] into the text `content` frame and parsing it back on the
+ * gateway. Mirror that wire contract here: text-only messages stay plain text;
+ * image sends become `[text?, image...]` using Letta's native base64 image part
+ * schema.
+ */
+private fun buildClientModeOutboundText(
+    text: String,
+    attachments: List<MessageContentPart.Image>,
+): String = if (attachments.isEmpty()) {
+    text
+} else {
+    buildContentParts(text, attachments).toJsonArray().toString()
+}
 
 private fun buildBugReportPrompt(draft: ProjectBugReportDraft): String {
     val title = draft.title.trim()

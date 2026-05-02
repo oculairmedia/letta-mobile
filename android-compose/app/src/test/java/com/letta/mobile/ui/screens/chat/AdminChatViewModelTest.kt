@@ -72,6 +72,7 @@ class AdminChatViewModelTest {
     private lateinit var folderRepository: FolderRepository
     private lateinit var conversationRepository: ConversationRepository
     private lateinit var settingsRepository: SettingsRepository
+    private lateinit var clientModeAgentLocationRepository: ClientModeAgentLocationRepository
 
     private lateinit var internalBotClient: InternalBotClient
     private lateinit var clientModeChatSender: ClientModeChatSender
@@ -125,6 +126,7 @@ class AdminChatViewModelTest {
             val content = secondArg<String>()
             val flow = flowFor(convId)
             val localId = "cm-test-${flow.value.events.size}"
+            val attachments = arg<List<com.letta.mobile.data.model.MessageContentPart.Image>>(2)
             val local = com.letta.mobile.data.timeline.TimelineEvent.Local(
                 position = (flow.value.events.size + 1).toDouble(),
                 otid = localId,
@@ -133,6 +135,7 @@ class AdminChatViewModelTest {
                 sentAt = Instant.now(),
                 deliveryState = com.letta.mobile.data.timeline.DeliveryState.SENT,
                 source = com.letta.mobile.data.timeline.MessageSource.CLIENT_MODE_HARNESS,
+                attachments = attachments,
             )
             flow.value = flow.value.copy(events = flow.value.events + local)
             localId
@@ -175,6 +178,7 @@ class AdminChatViewModelTest {
         folderRepository = FolderRepository(FakeFolderApi())
         conversationRepository = mockk(relaxed = true)
         settingsRepository = mockk(relaxed = true)
+        clientModeAgentLocationRepository = mockk(relaxed = true)
         internalBotClient = mockk(relaxed = true)
         clientModeChatSender = mockk(relaxed = true)
         clientModeEnabledFlow = MutableStateFlow(false)
@@ -256,6 +260,7 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
+            clientModeAgentLocationRepository,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
     }
@@ -533,10 +538,23 @@ class AdminChatViewModelTest {
     }
 
     @Test
-    fun `sendMessage rejects attachments in client mode`() = runTest {
+    fun `sendMessage sends attachments in client mode as multimodal JSON`() = runTest {
         clientModeEnabledFlow.value = true
-        val vm = createViewModel(conversationId = null)
+        val vm = createViewModel(conversationId = "conv-attach")
         advanceUntilIdle()
+
+        every {
+            clientModeChatSender.streamMessage(any(), any(), any())
+        } returns flowOf(
+            BotStreamChunk(
+                text = "ok",
+                conversationId = "conv-attach",
+            ),
+            BotStreamChunk(
+                done = true,
+                conversationId = "conv-attach",
+            ),
+        )
 
         vm.addAttachment(
             com.letta.mobile.data.model.MessageContentPart.Image(
@@ -545,11 +563,26 @@ class AdminChatViewModelTest {
             )
         )
         vm.sendMessage("hello")
+        advanceUntilIdle()
 
-        assertEquals(
-            "Client Mode attachments are not supported yet",
-            vm.composerState.value.error,
-        )
+        val outbound = slot<String>()
+        verify {
+            clientModeChatSender.streamMessage(
+                screenAgentId = "agent-1",
+                text = capture(outbound),
+                conversationId = "conv-attach",
+            )
+        }
+        val parts = Json.parseToJsonElement(outbound.captured).jsonArray
+        assertEquals("text", parts[0].jsonObject["type"]?.jsonPrimitive?.content)
+        assertEquals("hello", parts[0].jsonObject["text"]?.jsonPrimitive?.content)
+        assertEquals("image", parts[1].jsonObject["type"]?.jsonPrimitive?.content)
+        val source = parts[1].jsonObject["source"]!!.jsonObject
+        assertEquals("base64", source["type"]?.jsonPrimitive?.content)
+        assertEquals("image/png", source["media_type"]?.jsonPrimitive?.content)
+        assertEquals("ZmFrZQ==", source["data"]?.jsonPrimitive?.content)
+        assertNull(vm.composerState.value.error)
+        assertEquals(1, vm.uiState.value.messages.first { it.role == "user" }.attachments.size)
     }
 
     /**
@@ -1423,6 +1456,7 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
+            clientModeAgentLocationRepository,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
         advanceUntilIdle()
@@ -1556,6 +1590,7 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
+            clientModeAgentLocationRepository,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
 
@@ -1657,6 +1692,7 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
+            clientModeAgentLocationRepository,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
         advanceUntilIdle()
@@ -1696,6 +1732,7 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
+            clientModeAgentLocationRepository,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
         advanceUntilIdle()
@@ -1745,6 +1782,7 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
+            clientModeAgentLocationRepository,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
         advanceUntilIdle()
@@ -1778,6 +1816,7 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
+            clientModeAgentLocationRepository,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
 
@@ -1806,6 +1845,7 @@ class AdminChatViewModelTest {
             settingsRepository,
             internalBotClient,
             clientModeChatSender,
+            clientModeAgentLocationRepository,
             com.letta.mobile.channel.CurrentConversationTracker(),
         )
         advanceUntilIdle()
