@@ -342,7 +342,6 @@ fun AppNavGraph(
                         navController.navigate(
                             AgentChatRoute(
                                 agentId = agentId,
-                                freshRouteKey = System.currentTimeMillis(),
                                 initialMessage = route.sharedText,
                             ),
                         ) {
