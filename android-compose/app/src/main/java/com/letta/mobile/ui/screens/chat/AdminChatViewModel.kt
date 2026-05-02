@@ -279,6 +279,7 @@ class AdminChatViewModel @Inject constructor(
         requestedConversationArg?.takeIf { it.isNotBlank() }
     private val clientModeEnabled: StateFlow<Boolean> = settingsRepository.observeClientModeEnabled()
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    private var initialMessageConsumed: Boolean = false
     val conversationId: String?
         get() = if (shouldUseClientModeForCurrentRoute) currentClientModeConversationId() else activeConversationId
     val projectContext: ProjectChatContext? = savedStateHandle.get<String>("projectIdentifier")?.let { identifier ->
@@ -455,7 +456,7 @@ class AdminChatViewModel @Inject constructor(
                                 )
                             }
                         }
-                        resolveConversationAndLoad()
+                        resolveConversationAndLoad(useClientModeForResolve = enabled)
                     }
             }
             if (projectContext != null) {
@@ -755,7 +756,9 @@ class AdminChatViewModel @Inject constructor(
         }
     }
 
-    private fun resolveConversationAndLoad() {
+    private fun resolveConversationAndLoad(
+        useClientModeForResolve: Boolean = clientModeEnabled.value,
+    ) {
         // letta-mobile-flk.6: capture the fresh-route bit at entry. It's
         // only honored on the *first* call (initial nav entry) — see
         // `hasResolvedConversationOnce` and `suppressFreshRouteFallback`
@@ -785,7 +788,7 @@ class AdminChatViewModel @Inject constructor(
             )
 
             try {
-                if (shouldUseClientModeForCurrentRoute) {
+                if (useClientModeForResolve) {
                     // letta-mobile-c87t (PR 2): when we have a Client Mode
                     // conversationId, route through the timeline observer so
                     // SSE-side persisted messages flow into the UI alongside
@@ -851,10 +854,8 @@ class AdminChatViewModel @Inject constructor(
                             error = null,
                         )
                     }
-                    initialMessage?.let { message ->
-                        if (message.isNotBlank()) {
-                            sendMessage(message)
-                        }
+                    consumeInitialMessageIfPresent()?.let { message ->
+                        sendMessageViaClientMode(message)
                     }
                     return@launch
                 }
@@ -907,10 +908,8 @@ class AdminChatViewModel @Inject constructor(
                     loadMessagesInternal()
                 }
 
-                initialMessage?.let { message ->
-                    if (message.isNotBlank()) {
-                        sendMessage(message)
-                    }
+                consumeInitialMessageIfPresent()?.let { message ->
+                    sendMessageViaTimeline(message)
                 }
             } catch (e: Exception) {
                 android.util.Log.w("AdminChatViewModel", "Failed to resolve conversation", e)
@@ -1025,6 +1024,13 @@ class AdminChatViewModel @Inject constructor(
                 error = e.message ?: "Failed to load messages",
             )
         }
+    }
+
+    private fun consumeInitialMessageIfPresent(): String? {
+        val message = initialMessage?.takeIf { it.isNotBlank() } ?: return null
+        if (initialMessageConsumed) return null
+        initialMessageConsumed = true
+        return message
     }
 
     fun loadMessages() {

@@ -236,11 +236,13 @@ class AdminChatViewModelTest {
         agentId: String = "agent-1",
         conversationId: String? = "conv-1",
         freshRouteKey: Long? = null,
+        initialMessage: String? = null,
     ): AdminChatViewModel {
         val savedState = SavedStateHandle().apply {
             set("agentId", agentId)
             conversationId?.let { set("conversationId", it) }
             freshRouteKey?.let { set("freshRouteKey", it) }
+            initialMessage?.let { set("initialMessage", it) }
         }
         return AdminChatViewModel(
             savedState,
@@ -2050,6 +2052,95 @@ class AdminChatViewModelTest {
         chunks.send(BotStreamChunk(text = "reply", conversationId = "client-conv", done = true))
         chunks.close()
         advanceUntilIdle()
+    }
+
+    @Test
+    fun `fresh route initial message in client mode shows optimistic bubble before any chunk arrives`() = runTest {
+        clientModeEnabledFlow.value = true
+        activeConversationIds.clear()
+        messages = emptyList()
+
+        val chunks = Channel<BotStreamChunk>(capacity = Channel.UNLIMITED)
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
+        } returns chunks.consumeAsFlow()
+
+        val vm = createViewModel(
+            conversationId = null,
+            freshRouteKey = 1234L,
+            initialMessage = "hello initial",
+        )
+        advanceUntilIdle()
+
+        verify(exactly = 1) {
+            clientModeChatSender.streamMessage(
+                screenAgentId = "agent-1",
+                text = "hello initial",
+                conversationId = null,
+            )
+        }
+        coVerify(exactly = 0) {
+            timelineRepository.sendMessage(any(), "hello initial")
+        }
+
+        val userBubbles = vm.uiState.value.messages.filter { it.role == "user" }
+        assertEquals(
+            "Initial route message should render exactly one optimistic user bubble; " +
+                "messages=${vm.uiState.value.messages.map { "${it.role}=${it.content}" }}",
+            1,
+            userBubbles.size,
+        )
+        assertEquals("hello initial", userBubbles.first().content)
+        assertTrue("isStreaming must be true for initial message", vm.uiState.value.isStreaming)
+        assertTrue("isAgentTyping must be true for initial message", vm.uiState.value.isAgentTyping)
+
+        chunks.send(BotStreamChunk(text = "reply", conversationId = "client-conv", done = true))
+        chunks.close()
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `initial route message is consumed once across client mode re-resolves`() = runTest {
+        clientModeEnabledFlow.value = true
+        activeConversationIds.clear()
+        messages = emptyList()
+
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
+        } returns flow {
+            emit(BotStreamChunk(text = "reply", conversationId = "client-conv", done = true))
+        }
+
+        createViewModel(
+            conversationId = null,
+            freshRouteKey = 5678L,
+            initialMessage = "send me once",
+        )
+        advanceUntilIdle()
+
+        clientModeEnabledFlow.value = false
+        advanceUntilIdle()
+        clientModeEnabledFlow.value = true
+        advanceUntilIdle()
+
+        verify(exactly = 1) {
+            clientModeChatSender.streamMessage(
+                screenAgentId = "agent-1",
+                text = "send me once",
+                conversationId = null,
+            )
+        }
+        coVerify(exactly = 0) {
+            timelineRepository.sendMessage(any(), "send me once")
+        }
     }
 }
 
