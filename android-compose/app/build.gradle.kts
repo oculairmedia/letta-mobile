@@ -72,6 +72,10 @@ android {
         versionName = "1.2.6"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+        // Keep Play as the conservative dependency target for any future
+        // library module that does not declare the distribution dimension.
+        missingDimensionStrategy("distribution", "play")
+
         // Sentry config is read at runtime by [SentryInitializer] from
         // generated string resources. See letta-mobile-o7ob.7 — manifest
         // meta-data can't express a float like traces.sample-rate.
@@ -81,6 +85,34 @@ android {
         resValue("string", "sentry_env", sentryEnv)
         manifestPlaceholders["SENTRY_DSN"] = sentryDsn
         manifestPlaceholders["SENTRY_ENV"] = sentryEnv
+    }
+
+    flavorDimensions += "distribution"
+
+    productFlavors {
+        create("play") {
+            dimension = "distribution"
+            buildConfigField("String", "SYSTEM_ACCESS_FLAVOR", "\"play\"")
+            buildConfigField("boolean", "ENABLE_LOCAL_SHELL", "false")
+            buildConfigField("boolean", "ENABLE_SHIZUKU", "false")
+            buildConfigField("boolean", "ENABLE_ROOT_TOOLS", "false")
+        }
+        create("sideload") {
+            dimension = "distribution"
+            versionNameSuffix = "-sideload"
+            buildConfigField("String", "SYSTEM_ACCESS_FLAVOR", "\"sideload\"")
+            buildConfigField("boolean", "ENABLE_LOCAL_SHELL", "true")
+            buildConfigField("boolean", "ENABLE_SHIZUKU", "true")
+            buildConfigField("boolean", "ENABLE_ROOT_TOOLS", "false")
+        }
+        create("root") {
+            dimension = "distribution"
+            versionNameSuffix = "-root"
+            buildConfigField("String", "SYSTEM_ACCESS_FLAVOR", "\"root\"")
+            buildConfigField("boolean", "ENABLE_LOCAL_SHELL", "true")
+            buildConfigField("boolean", "ENABLE_SHIZUKU", "true")
+            buildConfigField("boolean", "ENABLE_ROOT_TOOLS", "true")
+        }
     }
 
     signingConfigs {
@@ -311,15 +343,16 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
-// Test tier tasks
+// Test tier tasks use the Play debug variant as the conservative default.
+// Privileged sideload/root code should add explicit variant-specific gates.
 tasks.register<Test>("testUnit") {
     description = "Runs unit-tier tests (pure logic, <50ms per test)"
     group = "verification"
-    
-    val testTask = tasks.named("testDebugUnitTest", Test::class).get()
+
+    val testTask = tasks.named("testPlayDebugUnitTest", Test::class).get()
     testClassesDirs = testTask.testClassesDirs
     classpath = testTask.classpath
-    
+
     useJUnitPlatform {
         includeTags("unit")
     }
@@ -330,11 +363,11 @@ tasks.register<Test>("testUnit") {
 tasks.register<Test>("testIntegration") {
     description = "Runs integration-tier tests (Robolectric, Compose, ViewModels)"
     group = "verification"
-    
-    val testTask = tasks.named("testDebugUnitTest", Test::class).get()
+
+    val testTask = tasks.named("testPlayDebugUnitTest", Test::class).get()
     testClassesDirs = testTask.testClassesDirs
     classpath = testTask.classpath
-    
+
     useJUnitPlatform {
         includeTags("integration")
     }
@@ -345,11 +378,11 @@ tasks.register<Test>("testIntegration") {
 tasks.register<Test>("testScreenshot") {
     description = "Runs screenshot-tier tests (Roborazzi visual regression)"
     group = "verification"
-    
-    val testTask = tasks.named("testDebugUnitTest", Test::class).get()
+
+    val testTask = tasks.named("testPlayDebugUnitTest", Test::class).get()
     testClassesDirs = testTask.testClassesDirs
     classpath = testTask.classpath
-    
+
     useJUnitPlatform {
         includeTags("screenshot")
     }

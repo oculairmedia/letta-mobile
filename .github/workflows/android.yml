@@ -39,14 +39,20 @@ jobs:
       - name: Compile core sequentially
         run: ./gradlew --no-daemon :core:compileDebugKotlin
 
-      - name: Compile app sequentially
-        run: ./gradlew --no-daemon :app:compileDebugKotlin
+      - name: Compile Play app sequentially
+        run: ./gradlew --no-daemon :app:compilePlayDebugKotlin
+
+      - name: Compile sideload system-access boundary
+        run: ./gradlew --no-daemon :app:compileSideloadDebugKotlin
+
+      - name: Compile root system-access boundary
+        run: ./gradlew --no-daemon :app:compileRootDebugKotlin
 
       - name: Run core unit tests
         run: ./gradlew --no-daemon :core:testDebugUnitTest
 
       - name: Run app unit tests
-        run: ./gradlew --no-daemon :app:testDebugUnitTest
+        run: ./gradlew --no-daemon :app:testPlayDebugUnitTest
 
   build-apk:
     runs-on: ubuntu-latest
@@ -55,14 +61,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - variant: debug
-            gradle_task: :app:assembleDebug
-            artifact_name: app-debug-apk
-            artifact_path: android-compose/app/build/outputs/apk/debug/*.apk
-          - variant: release
-            gradle_task: :app:assembleRelease
-            artifact_name: app-release-apk
-            artifact_path: android-compose/app/build/outputs/apk/release/*.apk
+          - variant: play-debug
+            gradle_task: :app:assemblePlayDebug
+            artifact_name: app-play-debug-apk
+            artifact_path: android-compose/app/build/outputs/apk/play/debug/*.apk
+          - variant: play-release
+            gradle_task: :app:assemblePlayRelease
+            artifact_name: app-play-release-apk
+            artifact_path: android-compose/app/build/outputs/apk/play/release/*.apk
     defaults:
       run:
         working-directory: android-compose
@@ -80,12 +86,12 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Decode signing keystore
-        if: matrix.variant == 'release'
+        if: matrix.variant == 'play-release'
         run: echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > app/letta-release.jks
 
       - name: Build ${{ matrix.variant }} APK
         env:
-          SIGNING_STORE_FILE: ${{ matrix.variant == 'release' && 'letta-release.jks' || '' }}
+          SIGNING_STORE_FILE: ${{ matrix.variant == 'play-release' && 'letta-release.jks' || '' }}
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}

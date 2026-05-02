@@ -62,11 +62,34 @@ export JAVA_HOME="/path/to/Android Studio/jbr"
 Run Gradle commands from this directory.
 
 ```bash
-./gradlew :app:compileDebugKotlin
-./gradlew :app:testDebugUnitTest
-./gradlew :app:assembleDebug
-./gradlew installDebug
+./gradlew :app:compilePlayDebugKotlin
+./gradlew :app:testPlayDebugUnitTest
+./gradlew :app:assemblePlayDebug
+./gradlew installPlayDebug
 ./gradlew detekt
+```
+
+## Distribution flavors
+
+The app is split by a `distribution` product-flavor dimension so Android
+system-access features can be kept out of Play artifacts at compile time:
+
+| Flavor | Purpose | Enabled system-access gates |
+| --- | --- | --- |
+| `play` | Google Play / conservative local default | Framework-safe APIs only; no local shell, Shizuku/Sui, or root tools |
+| `sideload` | GitHub/direct APK for power users | Local app-UID shell and Shizuku/Sui integration gates |
+| `root` | Direct APK for rooted devices | Sideload gates plus root-tool gates |
+
+Flavor-specific manifests live under `app/src/play`, `app/src/sideload`, and
+`app/src/root`. Keep policy-sensitive permissions and services out of
+`app/src/main` unless they are approved for every distribution.
+
+System-access smoke compile:
+
+```bash
+./gradlew :app:compilePlayDebugKotlin
+./gradlew :app:compileSideloadDebugKotlin
+./gradlew :app:compileRootDebugKotlin
 ```
 
 ## Release process
@@ -120,20 +143,20 @@ Recommended sequential flow:
 ./gradlew --stop
 pkill -f kotlin-daemon 2>/dev/null || true
 ./gradlew cleanKotlinIC
-./gradlew :app:assembleRelease
+./gradlew :app:assemblePlayRelease
 ```
 
 Expected output:
 
 ```text
-app/build/outputs/apk/release/app-release.apk
+app/build/outputs/apk/play/release/app-play-release.apk
 ```
 
 Useful checks after the build:
 
 ```bash
-ls app/build/outputs/apk/release
-stat app/build/outputs/apk/release/app-release.apk
+ls app/build/outputs/apk/play/release
+stat app/build/outputs/apk/play/release/app-play-release.apk
 ```
 
 ### 4. CI release build behavior
@@ -142,8 +165,8 @@ GitHub Actions already knows how to build a release APK in `.github/workflows/an
 
 - decodes `SIGNING_KEYSTORE_BASE64`
 - sets `SIGNING_*` env vars
-- runs `./gradlew :app:assembleRelease --no-daemon --build-cache`
-- uploads `android-compose/app/build/outputs/apk/release/*.apk` as an artifact
+- runs `./gradlew :app:assemblePlayRelease --no-daemon --build-cache`
+- uploads `android-compose/app/build/outputs/apk/play/release/*.apk` as an artifact
 
 If local release builds fail, compare your setup with the workflow first.
 
@@ -153,14 +176,14 @@ After the APK is built and you have chosen a new tag:
 
 ```bash
 gh release create v0.1.2 \
-  "android-compose/app/build/outputs/apk/release/app-release.apk#letta-mobile-v0.1.2-release.apk" \
+  "android-compose/app/build/outputs/apk/play/release/app-play-release.apk#letta-mobile-v0.1.2-play-release.apk" \
   --target main \
   --title "v0.1.2" \
   --notes "## Summary
 - short release summary
 
 ## Artifact
-- letta-mobile-v0.1.2-release.apk"
+- letta-mobile-v0.1.2-play-release.apk"
 ```
 
 Verify the published release:
@@ -177,7 +200,7 @@ Use this checklist every time:
 2. Pick a new GitHub release tag; do not reuse an existing one.
 3. Confirm signing inputs are present.
 4. Run the sequential release build flow.
-5. Verify `app/build/outputs/apk/release/app-release.apk` exists.
+5. Verify `app/build/outputs/apk/play/release/app-play-release.apk` exists.
 6. Publish the GitHub release and upload the APK.
 7. Verify the release URL and asset.
 8. Document whether the APK was signed with the production key or a temporary local key.
@@ -187,8 +210,8 @@ Use this checklist every time:
 For normal application changes:
 
 ```bash
-./gradlew :app:compileDebugKotlin
-./gradlew :app:testDebugUnitTest
+./gradlew :app:compilePlayDebugKotlin
+./gradlew :app:testPlayDebugUnitTest
 ```
 
 For shared model / repository / serialization changes, it is safer to verify the full stack in order:
@@ -196,8 +219,8 @@ For shared model / repository / serialization changes, it is safer to verify the
 ```bash
 ./gradlew clean :core:compileDebugKotlin
 ./gradlew :designsystem:compileDebugKotlin
-./gradlew :app:compileDebugKotlin
-./gradlew :app:testDebugUnitTest
+./gradlew :app:compilePlayDebugKotlin
+./gradlew :app:testPlayDebugUnitTest
 ```
 
 Run those commands sequentially. KSP state can become unreliable if you try to overlap Gradle work.

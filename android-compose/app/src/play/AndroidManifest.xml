@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:tools="http://schemas.android.com/tools">
+    <!--
+      Play distribution boundary.
+
+      Keep policy-sensitive root, Shizuku/Sui, local-shell, accessibility, and
+      broad-filesystem declarations out of this source set unless a dedicated
+      Play policy review explicitly approves them.
+    -->
+</manifest>

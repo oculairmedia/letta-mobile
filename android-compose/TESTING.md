@@ -10,7 +10,7 @@ The Android test suite is split into explicit tiers so local runs stay fast and 
 | Integration | `@Tag("integration")` | Robolectric, Compose-backed tests, Android runtime setup, ViewModel wiring | `./gradlew :module:testIntegration --max-workers=1` |
 | Screenshot | `@Tag("screenshot")` | Paparazzi or Roborazzi visual regression tests | `./gradlew :module:testScreenshot --max-workers=1` |
 
-`check` and the default `testDebugUnitTest` task still run the full suite. The tiered tasks are additive filters for faster local verification and CI splitting.
+`check` and each module's default debug unit-test task still run the full suite. In the app module, use `testPlayDebugUnitTest` as the conservative default because the app has distribution flavors. The tiered tasks are additive filters for faster local verification and CI splitting.
 
 ## Authoring rules
 
