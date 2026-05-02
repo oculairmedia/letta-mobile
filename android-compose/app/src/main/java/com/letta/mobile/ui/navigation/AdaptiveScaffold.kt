@@ -28,7 +28,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -87,6 +89,7 @@ private fun LettaNavigationRail(
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    val focusManager = LocalFocusManager.current
 
     NavigationRail(
         modifier = modifier.fillMaxHeight(),
@@ -100,13 +103,7 @@ private fun LettaNavigationRail(
             NavigationRailItem(
                 selected = selected,
                 onClick = {
-                    navController.navigate(destination.route) {
-                        popUpTo(navController.graph.startDestinationId) {
-                            saveState = true
-                        }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
+                    navController.navigateTopLevel(destination, focusManager)
                 },
                 icon = {
                     Icon(destination.icon, contentDescription = destination.label)
@@ -132,6 +129,7 @@ private fun LettaBottomBar(
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    val focusManager = LocalFocusManager.current
 
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -158,13 +156,7 @@ private fun LettaBottomBar(
                     label = destination.label,
                     selected = destination.isSelected(currentDestination),
                     onClick = {
-                        navController.navigate(destination.route) {
-                            popUpTo(navController.graph.startDestinationId) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
+                        navController.navigateTopLevel(destination, focusManager)
                     },
                 )
             }
@@ -209,6 +201,20 @@ private fun LettaBottomBarItem(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+    }
+}
+
+private fun NavController.navigateTopLevel(
+    destination: TopLevelDestination,
+    focusManager: FocusManager,
+) {
+    focusManager.clearFocus(force = true)
+    navigate(destination.route) {
+        popUpTo(graph.startDestinationId) {
+            saveState = true
+        }
+        launchSingleTop = true
+        restoreState = true
     }
 }
 
