@@ -224,6 +224,12 @@ data class ClientModeConversationSwap(
     val newConversationId: String,
 )
 
+private sealed interface ClientModeBootstrapState {
+    data object Idle : ClientModeBootstrapState
+    data object NewConversationPending : ClientModeBootstrapState
+    data class Ready(val conversationId: String) : ClientModeBootstrapState
+}
+
 @HiltViewModel
 class AdminChatViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
@@ -346,6 +352,13 @@ class AdminChatViewModel @Inject constructor(
     // mid-session client-mode toggle — are allowed to fall back to the
     // most-recent persisted conversation as before.
     private var hasResolvedConversationOnce: Boolean = false
+    // letta-mobile-vynx: a fresh Client Mode route is an explicit
+    // "new conversation with no history" bootstrap. Keep that as a real VM
+    // state so later Client Mode re-resolves cannot hydrate the agent's most
+    // recent cached conversation before the first send. It transitions to
+    // Ready only after we have created/persisted the empty Letta conversation.
+    private var clientModeBootstrapState: ClientModeBootstrapState =
+        if (isFreshRoute) ClientModeBootstrapState.NewConversationPending else ClientModeBootstrapState.Idle
 
     private fun collapsedRunIds(): Set<String> =
         savedStateHandle.get<ArrayList<String>>(COLLAPSED_RUN_IDS_KEY)?.toSet().orEmpty()
@@ -801,22 +814,23 @@ class AdminChatViewModel @Inject constructor(
                     // agent (Client Mode default-load behavior). Fresh routes
                     // — when the user explicitly opened a new conversation
                     // (freshRouteKey set, or conversationId arg was blank) —
-                    // skip the recent-conversation fallback and stay on the
-                    // in-memory path until the gateway provides one (see
-                    // sendMessageViaClientMode migration). See
-                    // letta-mobile-c87t and the Apr 26 default-load change.
-                    // letta-mobile-flk.6: same suppression rule as the
-                    // timeline branch below — only block the fallback on
-                    // the *initial* fresh-route nav entry, not on
-                    // subsequent re-resolutions.
-                    val suppressFreshRouteFallbackClient = isFreshRoute && isFirstResolve
+                    // remain in NewConversationPending and must not hydrate a
+                    // cached prior conversation on any re-resolve before the
+                    // first send creates the empty bootstrap conversation.
+                    // See letta-mobile-c87t, flk.6, and vynx.
+                    val suppressFreshRouteFallbackClient =
+                        clientModeBootstrapState == ClientModeBootstrapState.NewConversationPending ||
+                            (isFreshRoute && isFirstResolve)
                     val clientConversationId = explicitConversationId
-                        ?: currentClientModeConversationId()
+                        ?: currentClientModeConversationId()?.also {
+                            clientModeBootstrapState = ClientModeBootstrapState.Ready(it)
+                        }
                         ?: if (!suppressFreshRouteFallbackClient) {
                             runCatching {
                                 resolveMostRecentConversation(CONVERSATION_CACHE_TTL_MS)
                             }.getOrNull()?.also { resolved ->
                                 setClientModeConversationId(resolved)
+                                clientModeBootstrapState = ClientModeBootstrapState.Ready(resolved)
                             }
                         } else {
                             null
@@ -840,7 +854,8 @@ class AdminChatViewModel @Inject constructor(
                             error = null,
                         )
                     } else {
-                        // Fresh route, no conv yet — keep in-memory path.
+                        // Fresh route, no conv yet — keep isolated bootstrap
+                        // state and do not observe/hydrate any prior timeline.
                         stopTimelineObserver()
                         _uiState.value = _uiState.value.copy(
                             agentName = agent?.name ?: _uiState.value.agentName,
@@ -1171,12 +1186,40 @@ class AdminChatViewModel @Inject constructor(
             // resumeSession() into the matching Letta conversation. Fall back to
             // the saved-state-handle pointer for cases where Client Mode set up the
             // conversation itself (fresh-route entry continued in-place).
-            val priorConversationId = explicitConversationId ?: currentClientModeConversationId()
-            // Force-fresh only when the user genuinely entered a fresh-route nav
-            // (no conversation arg AND no in-flight saved-state pointer). For
-            // existing-route entries we want resume, not new.
-            val forceFreshConversation = isFreshRoute && priorConversationId == null
-            android.util.Log.w("AdminChatVM-DEBUG", "sendViaClientMode: priorConvId=$priorConversationId forceFresh=$forceFreshConversation isFreshRoute=$isFreshRoute explicitConvId=$explicitConversationId savedClientModeConvId=${currentClientModeConversationId()}")
+            var priorConversationId = explicitConversationId ?: currentClientModeConversationId()
+            // letta-mobile-vynx: a fresh Client Mode route needs an explicit
+            // empty conversation before the first send. Passing null to the
+            // gateway can resume its prior active SDK session, which hydrates
+            // old history and clobbers the optimistic first prompt. Create the
+            // Letta conversation up front, then run normal timeline-backed
+            // Client Mode against that known-empty id.
+            val bootstrapFreshConversation = isFreshRoute && priorConversationId == null
+            if (bootstrapFreshConversation) {
+                try {
+                    val summary = text.take(80).let { if (text.length > 80) "$it\u2026" else it }
+                    val created = conversationRepository.createConversation(agentId, summary)
+                    priorConversationId = created.id
+                    activeConversationId = created.id
+                    setClientModeConversationId(created.id)
+                    clientModeBootstrapState = ClientModeBootstrapState.Ready(created.id)
+                    currentConversationTracker.setCurrent(created.id)
+                    hasSummary = true
+                    clientModeMessages = emptyList()
+                    Telemetry.event(
+                        "AdminChatVM", "clientMode.bootstrapFreshConversation",
+                        "conversationId" to created.id,
+                    )
+                } catch (e: Exception) {
+                    clientModeStreamInFlight = false
+                    _uiState.value = _uiState.value.copy(
+                        error = e.message ?: "Failed to create conversation",
+                        isStreaming = false,
+                        isAgentTyping = false,
+                    )
+                    return@launch
+                }
+            }
+            android.util.Log.w("AdminChatVM-DEBUG", "sendViaClientMode: priorConvId=$priorConversationId bootstrapFresh=$bootstrapFreshConversation isFreshRoute=$isFreshRoute explicitConvId=$explicitConversationId savedClientModeConvId=${currentClientModeConversationId()}")
             // letta-mobile-c87t (PR 2): when we already know the
             // conversationId, append the user bubble through the timeline so
             // the SSE-side reconcile + fuzzy matcher (PR 1) can collapse it
@@ -1185,9 +1228,10 @@ class AdminChatViewModel @Inject constructor(
             // needs, and removes the user-bubble dual-write that Meridian
             // flagged.
             //
-            // Fresh-route sends still use the in-memory path until the
-            // gateway returns a conversationId on the first chunk; at that
-            // point we migrate the user bubble into the timeline (see below).
+            // Truly fresh Client Mode sends now pre-create a blank Letta
+            // conversation above, so the normal timeline-backed path is used
+            // immediately. The in-memory branch remains only as a legacy
+            // fallback for callers that somehow still have no conversationId.
             currentConversationTracker.setCurrent(priorConversationId)
             composerController.clearAfterSend()
             if (priorConversationId != null) {
@@ -1279,13 +1323,13 @@ class AdminChatViewModel @Inject constructor(
             // frame — we surface an error instead of silently flashing
             // the typing indicator.
             var sawAssistantPayload = false
-            // letta-mobile-5s1n: one-shot guard for the fresh-route migration
-            // from in-memory clientModeMessages → timeline. Already-known-conv
-            // sends skip migration (the bubble was appended to the timeline
-            // up-front in the priorConversationId-non-null branch above).
+            // letta-mobile-5s1n: one-shot guard for the legacy migration from
+            // in-memory clientModeMessages → timeline. Known-conv sends —
+            // including vynx's pre-created fresh bootstrap conversation — skip
+            // migration because the bubble was appended up-front.
             var migratedToTimeline = priorConversationId != null
             try {
-                android.util.Log.w("AdminChatVM-DEBUG", "sendViaClientMode: calling streamMessage agentId=$agentId convId=$priorConversationId forceFresh=$forceFreshConversation")
+                android.util.Log.w("AdminChatVM-DEBUG", "sendViaClientMode: calling streamMessage agentId=$agentId convId=$priorConversationId bootstrapFresh=$bootstrapFreshConversation")
                 clientModeChatSender.streamMessage(
                     screenAgentId = agentId,
                     text = text,
@@ -1344,6 +1388,7 @@ class AdminChatViewModel @Inject constructor(
                                                 it.id == assistantMessageId
                                         }
                                     setClientModeConversationId(conversationId)
+                                    clientModeBootstrapState = ClientModeBootstrapState.Ready(conversationId)
                                     currentConversationTracker.setCurrent(conversationId)
                                     startTimelineObserver(conversationId)
                                     // Mark the legacy fresh-route migration
@@ -1363,6 +1408,7 @@ class AdminChatViewModel @Inject constructor(
                     }
                     if (!latestConversationId.isNullOrBlank()) {
                         setClientModeConversationId(latestConversationId)
+                        clientModeBootstrapState = ClientModeBootstrapState.Ready(latestConversationId)
                         currentConversationTracker.setCurrent(latestConversationId)
                         // letta-mobile-5s1n: fresh-route migration. The first
                         // time the gateway echoes a conversationId for a fresh
@@ -2376,6 +2422,11 @@ class AdminChatViewModel @Inject constructor(
     fun resetMessages() {
         if (shouldUseClientModeForCurrentRoute) {
             setClientModeConversationId(null)
+            clientModeBootstrapState = if (isFreshRoute) {
+                ClientModeBootstrapState.NewConversationPending
+            } else {
+                ClientModeBootstrapState.Idle
+            }
             clientModeMessages = emptyList()
             currentConversationTracker.setCurrent(null)
             stopTimelineObserver()

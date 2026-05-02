@@ -465,11 +465,14 @@ class AdminChatViewModelTest {
         vm.sendMessage("Hello from client mode")
         advanceUntilIdle()
 
+        coVerify(exactly = 1) {
+            conversationRepository.createConversation("agent-1", "Hello from client mode")
+        }
         verify(exactly = 1) {
             clientModeChatSender.streamMessage(
                 screenAgentId = "agent-1",
                 text = "Hello from client mode",
-                conversationId = null,
+                conversationId = "new-conv",
             )
         }
         assertEquals(2, vm.uiState.value.messages.size)
@@ -656,18 +659,14 @@ class AdminChatViewModelTest {
      * Repro of the in-the-wild symptom where a Client Mode send shows the
      * assistant typing indicator briefly and then renders no assistant
      * content. Possible cause #1: the gateway emits the first stream chunk
-     * with a NULL conversationId (it hasn't allocated one yet, or hasn't
-     * echoed it), then echoes the conversationId starting on chunk #2. The
-     * VM's first chunk takes `handleClientModeStreamChunkLegacy` (in-memory),
-     * the migration block then moves the user bubble into the timeline,
-     * and chunks #2..N go through `handleClientModeStreamChunkViaTimeline`.
+     * with a NULL conversationId on the first chunk, then echoes the requested
+     * pre-created conversationId starting on chunk #2. Under letta-mobile-vynx
+     * fresh routes already have a blank bootstrap conversation, so chunk #1
+     * should still stream through the timeline path using that known id.
      *
      * Contract: every text fragment emitted by the gateway must be visible
-     * in the final assistant bubble, regardless of whether the chunk
-     * carrying it had a conversationId yet. If the legacy chunk's text is
-     * dropped, the bubble shows only the post-conv-echo fragments (and in
-     * the worst case, when there's no second text chunk before `done`,
-     * shows nothing at all — exactly the reported flash).
+     * in the final assistant bubble, regardless of whether the individual
+     * chunk carrying it echoed the conversationId yet.
      */
     @Test
     fun `client mode preserves first chunk text when conversationId arrives only on chunk 2`() = runTest {
@@ -693,18 +692,18 @@ class AdminChatViewModelTest {
             // dropped leading characters contained markdown openers (`**`,
             // `# `, ``` ``` `, etc.).
             //
-            // Chunk #1 — gateway hasn't echoed conversationId yet (legacy
-            // in-memory path); accumulated assistant content is "Hel".
+            // Chunk #1 — gateway hasn't echoed conversationId yet, but the
+            // VM should use the pre-created bootstrap id; accumulated
+            // assistant content is "Hel".
             emit(BotStreamChunk(text = "Hel", conversationId = null, event = BotStreamEvent.ASSISTANT))
-            // Chunk #2 — conversationId now present. Migration runs; must
-            // carry "Hel" into the timeline before this chunk's delta
-            // ("lo ") is applied. Without carry-over, the timeline's
-            // assistant Local seeds with just "lo " and the "Hel" prefix
-            // is lost forever.
-            emit(BotStreamChunk(text = "lo ", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            // Chunk #2 — conversationId now present. It must append to the
+            // existing timeline Local that chunk #1 created; otherwise the
+            // assistant Local would seed with just "lo " and the "Hel"
+            // prefix would be lost forever.
+            emit(BotStreamChunk(text = "lo ", conversationId = "new-conv", event = BotStreamEvent.ASSISTANT))
             // Chunk #3 — pure delta on top of the timeline seed.
-            emit(BotStreamChunk(text = "world", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
-            emit(BotStreamChunk(conversationId = "client-conv", done = true))
+            emit(BotStreamChunk(text = "world", conversationId = "new-conv", event = BotStreamEvent.ASSISTANT))
+            emit(BotStreamChunk(conversationId = "new-conv", done = true))
         }
 
         val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
@@ -716,8 +715,8 @@ class AdminChatViewModelTest {
         val assistant = vm.uiState.value.messages.lastOrNull { it.role == "assistant" }
         assertNotNull("assistant bubble must be rendered", assistant)
         assertEquals(
-            "final assistant bubble must include the chunk-1 (legacy-path) fragment " +
-                "carried over by the timeline migration",
+            "final assistant bubble must include the chunk-1 fragment even " +
+                "when that chunk did not echo a conversationId",
             "Hello world",
             assistant!!.content,
         )
@@ -741,13 +740,13 @@ class AdminChatViewModelTest {
                 conversationId = any(),
             )
         } returns flow {
-            // Chunk #1 — pre-conv, contains the OPENING `**`.
+            // Chunk #1 — no echoed conv id yet, contains the OPENING `**`.
             emit(BotStreamChunk(text = "**bold", conversationId = null, event = BotStreamEvent.ASSISTANT))
-            // Chunk #2 — post-conv, contains the CLOSING `**`. If chunk #1
-            // is dropped by migration, the bubble shows " text**" with an
+            // Chunk #2 — echoed conv id present, contains the CLOSING `**`.
+            // If chunk #1 is dropped, the bubble shows " text**" with an
             // unmatched closer (literal asterisks).
-            emit(BotStreamChunk(text = " text**", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
-            emit(BotStreamChunk(conversationId = "client-conv", done = true))
+            emit(BotStreamChunk(text = " text**", conversationId = "new-conv", event = BotStreamEvent.ASSISTANT))
+            emit(BotStreamChunk(conversationId = "new-conv", done = true))
         }
 
         val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
@@ -1214,7 +1213,7 @@ class AdminChatViewModelTest {
     }
 
     @Test
-    fun `toggling client mode off restores timeline messages after client mode session`() = runTest {
+    fun `toggling client mode off keeps precreated fresh client conversation`() = runTest {
         clientModeEnabledFlow.value = true
         messages = listOf(
             TestData.appMessage(id = "timeline-user", messageType = MessageType.USER, content = "Timeline hello"),
@@ -1223,13 +1222,12 @@ class AdminChatViewModelTest {
         every {
             clientModeChatSender.streamMessage(any(), any(), any())
         } returns flow {
-            emit(BotStreamChunk(text = "Client reply", conversationId = "client-conv", done = true))
+            emit(BotStreamChunk(text = "Client reply", conversationId = "new-conv", done = true))
         }
 
-        // letta-mobile-c87t / Apr 26 default-load: see sibling test above.
-        // Pass freshRouteKey so the VM takes the fresh-route in-memory path
-        // before chunks arrive, matching this test's gateway-allocated
-        // "client-conv" stream.
+        // letta-mobile-vynx: fresh Client Mode routes now pre-create a blank
+        // Letta conversation before sending so toggling Client Mode off should
+        // stay on that newly-created conversation, not restore old conv-1.
         val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
         advanceUntilIdle()
 
@@ -1240,9 +1238,11 @@ class AdminChatViewModelTest {
         clientModeEnabledFlow.value = false
         advanceUntilIdle()
 
-        assertEquals(ConversationState.Ready("conv-1"), vm.uiState.value.conversationState)
-        assertTrue(vm.uiState.value.messages.any { it.id == "timeline-user" })
-        assertTrue(vm.uiState.value.messages.any { it.id == "timeline-assistant" })
+        assertEquals(ConversationState.Ready("new-conv"), vm.uiState.value.conversationState)
+        assertTrue(vm.uiState.value.messages.any { it.content == "hello" })
+        assertTrue(vm.uiState.value.messages.any { it.content == "Client reply" })
+        assertTrue(vm.uiState.value.messages.none { it.id == "timeline-user" })
+        assertTrue(vm.uiState.value.messages.none { it.id == "timeline-assistant" })
         assertFalse(vm.uiState.value.isStreaming)
     }
 
@@ -1282,11 +1282,14 @@ class AdminChatViewModelTest {
         vm.sendMessage("hello")
         advanceUntilIdle()
 
+        coVerify(exactly = 1) {
+            conversationRepository.createConversation("agent-1", "hello")
+        }
         verify(exactly = 1) {
             clientModeChatSender.streamMessage(
                 screenAgentId = "agent-1",
                 text = "hello",
-                conversationId = null,
+                conversationId = "new-conv",
             )
         }
         coVerify(exactly = 0) { timelineRepository.sendMessage(any(), any()) }
@@ -1316,17 +1319,30 @@ class AdminChatViewModelTest {
         assertEquals(ConversationState.NoConversation, vm.uiState.value.conversationState)
         assertTrue(vm.uiState.value.messages.isEmpty())
 
+        // Regression for letta-mobile-vynx: a second Client Mode resolve before
+        // the first send must stay in the isolated bootstrap state instead of
+        // hydrating the cached prior conversation for this agent.
+        vm.retryConversationLoad()
+        advanceUntilIdle()
+        assertEquals(ConversationState.NoConversation, vm.uiState.value.conversationState)
+        assertTrue(vm.uiState.value.messages.none { it.content == "Old timeline" })
+        coVerify(exactly = 0) { timelineRepository.observe("conv-1") }
+
         vm.sendMessage("hello")
         advanceUntilIdle()
 
+        coVerify(exactly = 1) {
+            conversationRepository.createConversation("agent-1", "hello")
+        }
         verify(exactly = 1) {
             clientModeChatSender.streamMessage(
                 screenAgentId = "agent-1",
                 text = "hello",
-                conversationId = null,
+                conversationId = "new-conv",
             )
         }
         coVerify(exactly = 0) { timelineRepository.sendMessage(any(), any()) }
+        coVerify(exactly = 0) { timelineRepository.observe("conv-1") }
         assertTrue(vm.uiState.value.messages.none { it.content == "Old timeline" })
         assertTrue(vm.uiState.value.messages.any { it.content == "Fresh client reply" })
     }
@@ -2076,11 +2092,14 @@ class AdminChatViewModelTest {
         )
         advanceUntilIdle()
 
+        coVerify(exactly = 1) {
+            conversationRepository.createConversation("agent-1", "hello initial")
+        }
         verify(exactly = 1) {
             clientModeChatSender.streamMessage(
                 screenAgentId = "agent-1",
                 text = "hello initial",
-                conversationId = null,
+                conversationId = "new-conv",
             )
         }
         coVerify(exactly = 0) {
@@ -2131,11 +2150,14 @@ class AdminChatViewModelTest {
         clientModeEnabledFlow.value = true
         advanceUntilIdle()
 
+        coVerify(exactly = 1) {
+            conversationRepository.createConversation("agent-1", "send me once")
+        }
         verify(exactly = 1) {
             clientModeChatSender.streamMessage(
                 screenAgentId = "agent-1",
                 text = "send me once",
-                conversationId = null,
+                conversationId = "new-conv",
             )
         }
         coVerify(exactly = 0) {
