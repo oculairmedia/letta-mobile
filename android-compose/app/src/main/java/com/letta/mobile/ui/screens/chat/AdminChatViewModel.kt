@@ -56,6 +56,24 @@ import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
+internal fun runIdsEligibleForCompletionAutoCollapse(messages: List<UiMessage>): Set<String> {
+    val newestRunId = messages.asReversed().firstNotNullOfOrNull { message ->
+        message.runId?.takeIf { message.role == "assistant" && it.isNotBlank() }
+    }
+    return newestRunId?.let { setOf(it) }.orEmpty()
+}
+
+internal fun collapsedRunIdsAfterRunCompletion(
+    messages: List<UiMessage>,
+    collapsedRunIds: Set<String>,
+    autoCollapseSuppressedRunIds: Set<String>,
+): Set<String> {
+    val eligibleRunIds = runIdsEligibleForCompletionAutoCollapse(messages)
+        .filterNot { it in autoCollapseSuppressedRunIds }
+    if (eligibleRunIds.isEmpty()) return collapsedRunIds
+    return LinkedHashSet<String>(collapsedRunIds).apply { addAll(eligibleRunIds) }
+}
+
 @androidx.compose.runtime.Immutable
 data class ProjectChatContext(
     val identifier: String,
@@ -277,6 +295,7 @@ class AdminChatViewModel @Inject constructor(
         private const val CONVERSATION_CACHE_TTL_MS = 30_000L
         private const val MESSAGE_SYNC_INTERVAL_MS = 5_000L
         private const val COLLAPSED_RUN_IDS_KEY = "collapsedRunIds"
+        private const val AUTO_COLLAPSE_SUPPRESSED_RUN_IDS_KEY = "autoCollapseSuppressedRunIds"
         private const val EXPANDED_REASONING_MESSAGE_IDS_KEY = "expandedReasoningMessageIds"
         private const val CLIENT_MODE_CONVERSATION_ID_KEY = "clientModeConversationId"
     }
@@ -391,6 +410,9 @@ class AdminChatViewModel @Inject constructor(
     private fun collapsedRunIds(): Set<String> =
         savedStateHandle.get<ArrayList<String>>(COLLAPSED_RUN_IDS_KEY)?.toSet().orEmpty()
 
+    private fun autoCollapseSuppressedRunIds(): Set<String> =
+        savedStateHandle.get<ArrayList<String>>(AUTO_COLLAPSE_SUPPRESSED_RUN_IDS_KEY)?.toSet().orEmpty()
+
     private fun expandedReasoningMessageIds(): Set<String> =
         savedStateHandle.get<ArrayList<String>>(EXPANDED_REASONING_MESSAGE_IDS_KEY)?.toSet().orEmpty()
 
@@ -404,11 +426,23 @@ class AdminChatViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(expandedReasoningMessageIds = ids.toImmutableSet())
     }
 
+    private fun persistAutoCollapseSuppressedRunIds(ids: Set<String>) {
+        savedStateHandle[AUTO_COLLAPSE_SUPPRESSED_RUN_IDS_KEY] = ArrayList(ids)
+    }
+
     fun toggleRunCollapsed(runId: String) {
-        val next = collapsedRunIds().toMutableSet().apply {
-            if (!add(runId)) remove(runId)
+        val nextCollapsed = collapsedRunIds().toMutableSet()
+        val nextSuppressed = autoCollapseSuppressedRunIds().toMutableSet()
+        if (nextCollapsed.remove(runId)) {
+            // User expanded an auto-collapsed completed run; do not immediately
+            // collapse it again on the next timeline emission.
+            nextSuppressed.add(runId)
+        } else {
+            nextCollapsed.add(runId)
+            nextSuppressed.remove(runId)
         }
-        persistCollapsedRunIds(next)
+        persistAutoCollapseSuppressedRunIds(nextSuppressed)
+        persistCollapsedRunIds(nextCollapsed)
     }
 
     fun toggleReasoningExpanded(messageId: String) {
@@ -416,6 +450,26 @@ class AdminChatViewModel @Inject constructor(
             if (!add(messageId)) remove(messageId)
         }
         persistExpandedReasoningMessageIds(next)
+    }
+
+    private fun collapseCompletedRunsByDefault(state: ChatUiState): ChatUiState {
+        val nextCollapsed = collapsedRunIdsAfterRunCompletion(
+            messages = state.messages,
+            collapsedRunIds = state.collapsedRunIds,
+            autoCollapseSuppressedRunIds = autoCollapseSuppressedRunIds(),
+        )
+        if (nextCollapsed == state.collapsedRunIds) return state
+        savedStateHandle[COLLAPSED_RUN_IDS_KEY] = ArrayList(nextCollapsed)
+        return state.copy(collapsedRunIds = nextCollapsed.toImmutableSet())
+    }
+
+    private fun collapseCompletedRunsIfStreamingFinished(
+        previous: ChatUiState,
+        next: ChatUiState,
+    ): ChatUiState = if (previous.isStreaming && !next.isStreaming) {
+        collapseCompletedRunsByDefault(next)
+    } else {
+        next
     }
 
     private var timelineObserverJob: kotlinx.coroutines.Job? = null
@@ -1844,12 +1898,16 @@ class AdminChatViewModel @Inject constructor(
                     }
                     android.util.Log.w("AdminChatVM-DEBUG", "sendViaClientMode: stream completed done=true sawPayload=$sawAssistantPayload aborted=${chunk.aborted} terminalError=$terminalError latestConvId=$latestConversationId")
 
-                    _uiState.value = _uiState.value.copy(
-                        conversationState = latestConversationId?.let { ConversationState.Ready(it) }
-                            ?: ConversationState.NoConversation,
-                        isStreaming = false,
-                        isAgentTyping = false,
-                        error = terminalError ?: _uiState.value.error,
+                    val prevState = _uiState.value
+                    _uiState.value = collapseCompletedRunsIfStreamingFinished(
+                        previous = prevState,
+                        next = prevState.copy(
+                            conversationState = latestConversationId?.let { ConversationState.Ready(it) }
+                                ?: ConversationState.NoConversation,
+                            isStreaming = false,
+                            isAgentTyping = false,
+                            error = terminalError ?: prevState.error,
+                        ),
                     )
                 }
             } catch (cancelled: CancellationException) {
@@ -2539,10 +2597,14 @@ class AdminChatViewModel @Inject constructor(
                             // Also clear the streaming/typing indicators so the
                             // UI doesn't stay stuck pretending we're still
                             // waiting on the server.
-                            _uiState.value = _uiState.value.copy(
-                                error = "Couldn't sync agent reply — pull to refresh",
-                                isStreaming = false,
-                                isAgentTyping = false,
+                            val prevState = _uiState.value
+                            _uiState.value = collapseCompletedRunsIfStreamingFinished(
+                                previous = prevState,
+                                next = prevState.copy(
+                                    error = "Couldn't sync agent reply — pull to refresh",
+                                    isStreaming = false,
+                                    isAgentTyping = false,
+                                ),
                             )
                         }
                         else -> Unit
@@ -2620,13 +2682,16 @@ class AdminChatViewModel @Inject constructor(
                                           else anyLettaServerLocalPending
                     val nextIsAgentTyping = if (streamInFlight) prev.isAgentTyping
                                             else (anyLettaServerLocalPending && !tailIsAssistant)
-                    _uiState.value = prev.copy(
-                        messages = ui,
-                        isLoadingMessages = if (clearLoading) false
-                                           else prev.isLoadingMessages,
-                        isStreaming = nextIsStreaming,
-                        isAgentTyping = nextIsAgentTyping,
-                        hasMoreOlderMessages = newHasMoreOlder,
+                    _uiState.value = collapseCompletedRunsIfStreamingFinished(
+                        previous = prev,
+                        next = prev.copy(
+                            messages = ui,
+                            isLoadingMessages = if (clearLoading) false
+                                               else prev.isLoadingMessages,
+                            isStreaming = nextIsStreaming,
+                            isAgentTyping = nextIsAgentTyping,
+                            hasMoreOlderMessages = newHasMoreOlder,
+                        ),
                     )
                 }
             } finally {
