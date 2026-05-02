@@ -23,7 +23,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -85,9 +84,6 @@ class AgentSettingsViewModel @Inject constructor(
                 val agent = agentRepository.getAgent(agentId).last()
                 val persona = agent.blocks.find { it.label == "persona" }?.value ?: ""
                 val human = agent.blocks.find { it.label == "human" }?.value ?: ""
-                val clientModeEnabled = settingsRepository.observeClientModeEnabled().first()
-                val clientModeBaseUrl = settingsRepository.observeClientModeBaseUrl().first()
-                val clientModeApiKey = settingsRepository.getClientModeApiKey().orEmpty()
                 originalPersonaBlock = persona
                 originalHumanBlock = human
                 _uiState.value = UiState.Success(
@@ -104,9 +100,6 @@ class AgentSettingsViewModel @Inject constructor(
                         enableSleeptime = agent.enableSleeptime ?: false,
                         tools = agent.tools.toImmutableList(),
                         secrets = agent.secrets.associate { it.key to (it.value ?: "") },
-                        clientModeEnabled = clientModeEnabled,
-                        clientModeBaseUrl = clientModeBaseUrl,
-                        clientModeApiKey = clientModeApiKey,
                     )
                 )
             } catch (e: Exception) {
@@ -309,9 +302,6 @@ class AgentSettingsViewModel @Inject constructor(
                     blockRepository.updateAgentBlock(agentId, "human", BlockUpdateParams(value = state.humanBlock))
                     originalHumanBlock = state.humanBlock
                 }
-                settingsRepository.setClientModeEnabled(state.clientModeEnabled)
-                settingsRepository.setClientModeBaseUrl(state.clientModeBaseUrl.trim())
-                settingsRepository.setClientModeApiKey(state.clientModeApiKey.trim().ifBlank { null })
                 _uiState.value = UiState.Success(state.copy(agent = updatedAgent))
                 onSuccess()
             } catch (e: Exception) {
