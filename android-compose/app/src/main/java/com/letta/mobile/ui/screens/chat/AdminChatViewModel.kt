@@ -1726,8 +1726,13 @@ class AdminChatViewModel @Inject constructor(
         timestamp: String,
         replaceAssistant: Boolean,
     ) {
-        val sentAt = runCatching { java.time.Instant.parse(timestamp) }
-            .getOrDefault(java.time.Instant.now())
+        // Use chunk arrival time for timeline fuzzy-collapse. This function is
+        // called for Client Mode agent output after the run may have spent
+        // several seconds bootstrapping/thinking. If we stamp reasoning /
+        // assistant locals with the send-start timestamp, the later REST/SSE
+        // confirmed events can fall outside Timeline's 10s Client Mode fuzzy
+        // window and get appended as duplicate extra responses.
+        val sentAt = java.time.Instant.now()
         when (chunk.event) {
             BotStreamEvent.REASONING -> {
                 val localId = "cm-reason-${chunk.uuid ?: assistantMessageId}"
