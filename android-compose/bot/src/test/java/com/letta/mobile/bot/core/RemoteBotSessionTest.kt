@@ -25,6 +25,10 @@ import org.junit.jupiter.api.Tag
 
 @Tag("unit")
 class RemoteBotSessionTest : WordSpec({
+    // letta-mobile-w2hx.4: every ChannelMessage flowing through a
+    // RemoteBotSession now MUST carry a targetAgentId — the bot is a
+    // transport, the agent travels per-message. Tests covering the
+    // session must populate it; `requireAgent` errors otherwise.
     val message = ChannelMessage(
         messageId = "msg-1",
         channelId = "in_app",
@@ -32,6 +36,7 @@ class RemoteBotSessionTest : WordSpec({
         senderId = "user-1",
         senderName = "User",
         text = "hello",
+        targetAgentId = "agent-1",
     )
 
     "RemoteBotSession" should {
@@ -58,7 +63,11 @@ class RemoteBotSessionTest : WordSpec({
             runBlocking { session.start() }
 
             recorder.transports.single() shouldBe BotConfig.Transport.WS
-            recorder.readyAgentIds shouldBe listOf("agent-1")
+            // letta-mobile-w2hx.4: start() no longer pre-warms a bound
+            // agent's gateway session. The per-agent WS pool (w2hx.3)
+            // opens sessions lazily on first real message, so start
+            // does not call ensureGatewayReady at all.
+            recorder.readyAgentIds shouldHaveSize 0
         }
 
         "stream progressive chunks when WS transport is selected" {
@@ -87,6 +96,44 @@ class RemoteBotSessionTest : WordSpec({
             chunks[2].conversationId shouldBe "conv-1"
             chunks[2].text shouldBe null
             chunks[2].event shouldBe null
+        }
+
+        // letta-mobile-uww.12: terminal frame must NOT re-emit accumulated
+        // assistant text under the gateway's pure-delta contract. Field
+        // repro 2026-04-26: assistant bubble rendered twice in a single
+        // contiguous block because the consumer (Client Mode timeline
+        // ASSISTANT branch) appends every emit with `text != null` and
+        // the previous terminal frame re-emitted the full accumulated
+        // string. This regression test pins the contract.
+        "not re-emit assistant text on the terminal frame for delta streams" {
+            val session = remoteSession(
+                config = remoteConfig(
+                    transport = BotConfig.Transport.WS,
+                    directivesEnabled = true,
+                ),
+                clientFactoryOverride = {
+                    FakeBotClient(
+                        streamChunks = listOf(
+                            BotStreamChunk(text = "Hey ", conversationId = "conv-1"),
+                            BotStreamChunk(text = "— I see you. ", conversationId = "conv-1"),
+                            BotStreamChunk(text = "Connection's live", conversationId = "conv-1"),
+                            BotStreamChunk(conversationId = "conv-1", done = true),
+                        )
+                    )
+                },
+            )
+
+            runBlocking { session.start() }
+            val chunks = runBlocking { session.streamToAgent(message).toList() }
+
+            chunks shouldHaveSize 4
+            chunks[0].text shouldBe "Hey "
+            chunks[1].text shouldBe "— I see you. "
+            chunks[2].text shouldBe "Connection's live"
+            chunks[3].isComplete shouldBe true
+            chunks[3].text shouldBe null
+            chunks[3].directive shouldBe null
+            chunks[3].conversationId shouldBe "conv-1"
         }
 
         "parse directives only on the final chunk" {
@@ -182,7 +229,6 @@ private fun remoteConfig(
     directivesEnabled: Boolean = true,
 ): BotConfig = BotConfig(
     id = "bot-1",
-    agentId = "agent-1",
     displayName = "Remote Bot",
     mode = BotConfig.Mode.REMOTE,
     remoteUrl = "https://bot.example",

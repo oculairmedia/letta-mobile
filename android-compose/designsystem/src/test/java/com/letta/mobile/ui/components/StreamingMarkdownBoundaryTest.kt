@@ -290,4 +290,65 @@ class StreamingMarkdownBoundaryTest {
             )
         }
     }
+
+    // ─── letta-mobile-flk.3: tailHasOpenBlockFence ─────────────────────
+    //
+    // Backstop tests for the fence-detector that gates whether the
+    // streaming tail can be rendered through MarkdownText (false → safe
+    // to render markdown live) or must fall back to plain Text (true →
+    // unclosed fence would absorb the rest of the bubble).
+
+    @Test
+    fun `tailHasOpenBlockFence returns false for empty tail`() {
+        assertEquals(false, tailHasOpenBlockFence(""))
+    }
+
+    @Test
+    fun `tailHasOpenBlockFence returns false for plain prose`() {
+        assertEquals(false, tailHasOpenBlockFence("just some streaming prose"))
+    }
+
+    @Test
+    fun `tailHasOpenBlockFence returns false for inline emphasis only`() {
+        // **bold and *italic* and `code` are inline — not block fences.
+        assertEquals(false, tailHasOpenBlockFence("**bold** *ital* `code`"))
+    }
+
+    @Test
+    fun `tailHasOpenBlockFence returns false for partial inline emphasis`() {
+        // Half-typed bold marker is fine — mikepenz tolerates it.
+        assertEquals(false, tailHasOpenBlockFence("**hel"))
+    }
+
+    @Test
+    fun `tailHasOpenBlockFence returns true for unclosed code fence`() {
+        assertEquals(true, tailHasOpenBlockFence("```kotlin\nfun foo()"))
+    }
+
+    @Test
+    fun `tailHasOpenBlockFence returns false for closed code fence`() {
+        assertEquals(false, tailHasOpenBlockFence("```kotlin\nfun foo() = 1\n```"))
+    }
+
+    @Test
+    fun `tailHasOpenBlockFence returns true for unclosed display math`() {
+        assertEquals(true, tailHasOpenBlockFence("\$\$x = "))
+    }
+
+    @Test
+    fun `tailHasOpenBlockFence returns false for closed display math`() {
+        assertEquals(false, tailHasOpenBlockFence("\$\$x = 1\$\$"))
+    }
+
+    @Test
+    fun `tailHasOpenBlockFence returns false for inline math single dollars`() {
+        // Single `$` is inline math — not a block fence.
+        assertEquals(false, tailHasOpenBlockFence("price is \$5"))
+    }
+
+    @Test
+    fun `tailHasOpenBlockFence returns true for one of two fences open`() {
+        // First fence closes, second opens but never closes.
+        assertEquals(true, tailHasOpenBlockFence("```a\n```\n```b\nopen"))
+    }
 }

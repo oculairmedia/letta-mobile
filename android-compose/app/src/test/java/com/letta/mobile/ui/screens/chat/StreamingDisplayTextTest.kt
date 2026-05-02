@@ -1,135 +1,114 @@
 package com.letta.mobile.ui.screens.chat
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Pure-JVM tests for [streamingDisplayText] — the word-boundary clamp +
- * streaming-cursor injection used by [TextMessageRenderer] etc. while
- * `isStreaming = true`.
+ * Pure-JVM tests for [streamingDisplayText] — the streaming-cursor
+ * decorator used while `isStreaming = true`.
  *
- * Background: see letta-mobile-6p4o.1. Wire-level traces from
- * `:cli wsstream` showed lettabot deltas split mid-token, producing
- * brief on-screen flashes like "...no O" before the next chunk lands.
- * This util holds back the trailing partial-word until a boundary
- * arrives, and decorates the visible tail with a cursor glyph (▎).
+ * Background: see letta-mobile-flk2. The original word-boundary
+ * holdback (letta-mobile-6p4o.1) was a defense against bursty WS
+ * frames — a single frame would carry 5–40 chars and the renderer
+ * would paint the whole frame atomically, making mid-word splits
+ * visible to the user. With the [ClientModeStreamSmoother] now
+ * delivering chars at a smoothed 90–180 cps, the renderer never sees
+ * bursts large enough for that to matter, and the held-tail clamp's
+ * leapfrogging cursor became its own visible flicker source.
+ *
+ * The current contract appends the cursor to markdown-stable content,
+ * with two carve-outs:
+ *  - empty input returns empty to avoid a pre-stream cursor flash
+ *  - open code fences return raw text so the cursor doesn't render as
+ *    literal code content
  */
 class StreamingDisplayTextTest {
 
     private val cursor = "\u258E" // must match STREAMING_CURSOR
 
     @Test
-    fun emptyInput_returnsCursorOnly() {
-        assertEquals(cursor, streamingDisplayText(""))
+    fun emptyInput_returnsEmpty() {
+        assertEquals("", streamingDisplayText(""))
     }
 
     @Test
     fun textEndingInWhitespace_rendersFullPlusCursor() {
-        // The whole text already terminates at a boundary — emit it all.
         val out = streamingDisplayText("Hello world ")
         assertEquals("Hello world $cursor", out)
     }
 
     @Test
-    fun textEndingMidWord_holdsBackTrailingFragment() {
-        // "Hello wor" — held back to "Hello " + cursor (no flash of "wor").
+    fun textEndingMidWord_emitsFullPlusCursor() {
+        // letta-mobile-flk2: held-tail clamp removed; smoother now
+        // delivers chars at a smoothed rate so mid-word visibility is
+        // no longer bursty enough to warrant the holdback.
         val out = streamingDisplayText("Hello wor")
-        assertEquals("Hello $cursor", out)
+        assertEquals("Hello wor$cursor", out)
     }
 
     @Test
-    fun trailingPunctuation_isABoundary() {
-        // Period is a boundary char. "Hello, world." ends at a boundary
-        // already, so the whole string is visible + cursor at the end.
+    fun trailingPunctuation_emitsFullPlusCursor() {
         val out = streamingDisplayText("Hello, world.")
         assertEquals("Hello, world.$cursor", out)
     }
 
     @Test
-    fun singleVeryLongTokenWithNoBoundary_emitsFullToAvoidStall() {
-        // No whitespace anywhere — the held-back tail would be the entire
-        // text. Spec says we emit it all rather than stall the UI forever.
+    fun singleVeryLongTokenWithNoBoundary_emitsFull() {
         val raw = "a".repeat(50)
         assertEquals(raw + cursor, streamingDisplayText(raw))
     }
 
     @Test
-    fun longTrailingFragmentExceedingMaxHeld_emitsAnyway() {
-        // 100 chars of "ab" with a leading "Hi " — last whitespace is
-        // index 2; trailing fragment is 100 chars, which exceeds the
-        // 80-char held-tail cap. Spec: emit it all.
+    fun longTrailingFragment_emitsFull() {
         val tail = "ab".repeat(50)
         val raw = "Hi $tail"
         assertEquals(raw + cursor, streamingDisplayText(raw))
     }
 
     @Test
-    fun shortTrailingFragmentUnderCap_isHeldBack() {
-        // "Hello supercalifrag" — last boundary at index 5 (space),
-        // tail is "supercalifrag" = 13 chars, well under the 80 cap,
-        // so we hold it back.
+    fun shortTrailingFragment_emitsFullPlusCursor() {
+        // letta-mobile-flk2: previously held back as "Hello $cursor".
         val out = streamingDisplayText("Hello supercalifrag")
-        assertEquals("Hello $cursor", out)
+        assertEquals("Hello supercalifrag$cursor", out)
     }
 
     @Test
-    fun newlineCountsAsBoundary() {
-        // "Line one\nLineTwoMidWor" — first word on line 2 is unterminated,
-        // and there is no space inside it, so the only boundary visible
-        // before the partial token is the newline at index 8.
+    fun newline_emitsFullPlusCursor() {
         val out = streamingDisplayText("Line one\nLineTwoMidWor")
-        assertEquals("Line one\n$cursor", out)
+        assertEquals("Line one\nLineTwoMidWor$cursor", out)
     }
 
     @Test
-    fun lastBoundaryWins_evenIfAnEarlierOneIsNewline() {
-        // "Line one\nLine tw" — there's a space at index 13 (after "Line"),
-        // which is a *later* boundary than the newline. Spec: clamp to the
-        // last boundary, not the first. So "Line tw" → "Line " is held back
-        // visible portion = "Line one\nLine ".
+    fun multilineMidWord_emitsFullPlusCursor() {
         val out = streamingDisplayText("Line one\nLine tw")
-        assertEquals("Line one\nLine $cursor", out)
+        assertEquals("Line one\nLine tw$cursor", out)
     }
 
     @Test
-    fun realWireFrameFromWsstreamTrace_clampsCorrectly() {
-        // From the actual wsstream trace, frame 3's full assembled text
-        // ended at "...suspension is cheap, no O". Clamp should hold "O"
-        // back since it's a single trailing letter after a comma+space.
+    fun realWireFrameFromWsstreamTrace_emitsFullPlusCursor() {
+        // letta-mobile-flk2: the smoother chose WHEN to paint each
+        // char, so painting the trailing "O" mid-word is no longer a
+        // bursty flash — it's the next char of a smoothly-advancing
+        // stream. No clamp needed.
         val raw = "- **Lightweight threads**: thousands can run concurrently on a small thread pool — suspension is cheap, no O"
-        val out = streamingDisplayText(raw)
-        // Should NOT include the trailing "O"
-        assertFalse("trailing 'O' should be held back, got: $out", out.endsWith("O$cursor"))
-        // Should end at the comma-space boundary or a later space.
-        assertTrue("expected cursor at end, got: $out", out.endsWith(cursor))
-        // Verify the visible portion has no fragment after last boundary.
-        val visible = out.removeSuffix(cursor)
-        val lastChar = visible.last()
-        assertTrue(
-            "expected visible to end at whitespace/punct, got '$lastChar' from: $visible",
-            lastChar.isWhitespace() || lastChar in setOf('.', ',', ';', ':', '!', '?', ')', '\'', '"', '`', ']', '}', '>')
-        )
+        assertEquals(raw + cursor, streamingDisplayText(raw))
     }
 
     @Test
-    fun openCodeFence_skipsClampAndCursor() {
+    fun openCodeFence_skipsCursor() {
         // Open ``` fence — content after the fence opener should be
-        // rendered as-is (whitespace inside code is meaningful and a
-        // ▎ would render literally inside the code block).
+        // rendered as-is (a ▎ would render literally inside the code
+        // block, which looks broken).
         val raw = "Here:\n```kotlin\nfun foo() {\n    val x = 1"
         val out = streamingDisplayText(raw)
         assertEquals(raw, out)
     }
 
     @Test
-    fun closedCodeFence_clampsNormally() {
-        // After a closing ``` the fence count is even — clamp resumes.
+    fun closedCodeFence_appendsCursor() {
+        // After a closing ``` the fence count is even — cursor is OK.
         val raw = "Done:\n```\nfoo\n```\nNext wo"
         val out = streamingDisplayText(raw)
-        // "wo" should be held back.
-        assertFalse(out.endsWith("wo$cursor"))
-        assertTrue(out.endsWith(cursor))
+        assertEquals(raw + cursor, out)
     }
 }

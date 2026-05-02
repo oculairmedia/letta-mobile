@@ -18,8 +18,14 @@ import kotlinx.coroutines.flow.StateFlow
  */
 interface BotSession {
 
-    /** Unique identifier for this bot/agent. */
-    val agentId: String
+    /**
+     * Unique identifier for this *bot transport instance* (== [BotConfig.id]).
+     *
+     * letta-mobile-w2hx.4: this used to be the bound agent ID. It is now
+     * the config ID — sessions are agent-agnostic transports, and the
+     * agent travels per-message on [ChannelMessage.targetAgentId].
+     */
+    val configId: String
 
     /** Human-readable display name. */
     val displayName: String
@@ -40,8 +46,18 @@ interface BotSession {
     /**
      * Send a message and stream the response tokens.
      * Maps to lettabot's `streamToAgent()`.
+     *
+     * letta-mobile-w2hx.7: the prior `forceNew` parameter is gone. A
+     * fresh conversation is requested by passing `conversationId = null`
+     * — the gateway no longer maintains a per-agent "active conv"
+     * fallback that the caller needs to override. The chat row owns its
+     * own `conversation_id`; if it has none, it has none, and the
+     * gateway creates one.
      */
-    fun streamToAgent(message: ChannelMessage, conversationId: String? = null): Flow<BotResponseChunk>
+    fun streamToAgent(
+        message: ChannelMessage,
+        conversationId: String? = null,
+    ): Flow<BotResponseChunk>
 
     /**
      * Deliver the agent's response back to the originating channel.

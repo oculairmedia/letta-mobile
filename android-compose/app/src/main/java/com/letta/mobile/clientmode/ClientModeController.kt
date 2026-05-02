@@ -20,20 +20,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/**
- * Client Mode session authority.
- *
- * Contract:
- * - The route agent (from AdminChatViewModel navigation state) is the
- *   authoritative owner of a Client Mode chat route.
- * - Existing conversations are only valid when resumed under that same
- *   route agent.
- * - When a route agent is explicitly known, this controller MUST bind the
- *   gateway session to that agent and MUST NOT fall back to a previously
- *   active agent or an arbitrary preferred remote agent.
- * - Preferred-agent resolution is allowed only when the caller does not know
- *   which agent owns the route.
- */
 @Singleton
 class ClientModeController @Inject constructor(
     private val botGateway: BotGateway,
@@ -52,15 +38,10 @@ class ClientModeController @Inject constructor(
     @Volatile
     private var activeConfigSignature: String? = null
 
-    @Volatile
-    private var activeRemoteAgentId: String? = null
-
     fun initialize() {
         if (initialized) return
         initialized = true
-        runCatching {
-            ProcessLifecycleOwner.get().lifecycle.addObserver(this)
-        }
+        ProcessLifecycleOwner.get().lifecycle.addObserver(this)
         scope.launch {
             combine(
                 settingsRepository.observeClientModeEnabled(),
@@ -86,32 +67,32 @@ class ClientModeController @Inject constructor(
         }
     }
 
-    suspend fun ensureReady(routeAgentId: String? = null): String {
+    /**
+     * Ensure the Client Mode gateway transport is up.
+     *
+     * letta-mobile-w2hx.4: previously returned a bound agent ID. The
+     * transport no longer binds to an agent — the caller supplies the
+     * target agent per-message via `BotChatRequest.agentId`. This now
+     * just guarantees that the transport session exists and is healthy.
+     */
+    suspend fun ensureReady() {
         initialize()
-        reconcile(forceForeground = true, routeAgentId = routeAgentId)
-        val remoteAgentId = requireNotNull(activeRemoteAgentId) {
+        reconcile(forceForeground = true)
+        check(botGateway.getSession(CLIENT_MODE_CONFIG_ID) != null) {
             "Client Mode gateway session is unavailable"
         }
-        check(botGateway.getSession(remoteAgentId) != null) {
-            "Client Mode gateway session is unavailable"
-        }
-        return remoteAgentId
     }
 
-    suspend fun restartSession(routeAgentId: String? = null): String {
+    suspend fun restartSession() {
         initialize()
         stopGateway()
-        reconcile(forceForeground = true, routeAgentId = routeAgentId)
-        val remoteAgentId = requireNotNull(activeRemoteAgentId) {
+        reconcile(forceForeground = true)
+        check(botGateway.getSession(CLIENT_MODE_CONFIG_ID) != null) {
             "Client Mode gateway session is unavailable"
         }
-        check(botGateway.getSession(remoteAgentId) != null) {
-            "Client Mode gateway session is unavailable"
-        }
-        return remoteAgentId
     }
 
-    private suspend fun reconcile(forceForeground: Boolean, routeAgentId: String? = null) {
+    private suspend fun reconcile(forceForeground: Boolean) {
         mutex.withLock {
             val enabled = settingsRepository.observeClientModeEnabled().first()
             val baseUrl = settingsRepository.observeClientModeBaseUrl().first().trim()
@@ -123,16 +104,13 @@ class ClientModeController @Inject constructor(
                 return
             }
 
-            val explicitRouteAgentId = routeAgentId?.trim()?.takeIf { it.isNotEmpty() }
-            val resolvedAgentId = explicitRouteAgentId ?: activeRemoteAgentId ?: resolveClientModeRemoteAgent(
-                baseUrl = baseUrl,
-                apiKey = apiKey.ifBlank { null },
-            ).id
-
+            // letta-mobile-w2hx.4: no agent resolution here. The
+            // transport is agent-agnostic — chats pass their own agent
+            // ID per-message. Saves a /status round-trip on every
+            // reconcile and removes the layer violation.
             val config = BotConfig(
                 id = CLIENT_MODE_CONFIG_ID,
-                agentId = resolvedAgentId,
-                displayName = "$resolvedAgentId Client Mode",
+                displayName = "Client Mode",
                 mode = BotConfig.Mode.REMOTE,
                 remoteUrl = baseUrl,
                 remoteToken = apiKey.ifBlank { null },
@@ -144,26 +122,19 @@ class ClientModeController @Inject constructor(
                 config.remoteUrl.orEmpty(),
                 config.remoteToken.orEmpty(),
                 config.transport.name,
-                config.agentId,
             )
                 .joinToString(separator = "|")
 
             if (activeConfigSignature == signature &&
                 botGateway.status.value == GatewayStatus.RUNNING &&
-                botGateway.getSession(config.agentId) != null
+                botGateway.getSession(config.id) != null
             ) {
                 return
             }
 
             stopGatewayLocked()
             botGateway.start(listOf(config))
-            if (botGateway.getSession(config.agentId) != null) {
-                activeConfigSignature = signature
-                activeRemoteAgentId = config.agentId
-            } else {
-                activeConfigSignature = null
-                activeRemoteAgentId = null
-            }
+            activeConfigSignature = if (botGateway.getSession(config.id) != null) signature else null
         }
     }
 
@@ -178,7 +149,6 @@ class ClientModeController @Inject constructor(
             botGateway.stop()
         }
         activeConfigSignature = null
-        activeRemoteAgentId = null
     }
 
     fun release() {

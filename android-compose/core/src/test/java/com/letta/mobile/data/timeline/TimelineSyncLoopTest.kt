@@ -112,6 +112,141 @@ class TimelineSyncLoopTest {
         scope.coroutineContext.job.cancel()
     }
 
+    /**
+     * lettabot-uww.11 regression: streaming assistant text deltas that
+     * share a serverId must concatenate byte-for-byte even when the
+     * delta head matches a prefix of the running accumulator. The
+     * pre-fix wucn-snapshot-recovery cascade silently dropped such
+     * deltas (`oldText.startsWith(newText) -> oldText`) and produced
+     * the 2026-04-26 mermaid field repro `A[LLM snapshots]` →
+     * `A[LLMapshots|`.
+     *
+     * This test drives the timeline-path SSE merge — the dominant
+     * render path post-conversation-creation — with a delta sequence
+     * engineered to hit every defective branch of the old cascade:
+     *   - delta head equals accumulator (silent-drop branch)
+     *   - delta is >=32 chars AND >= half the accumulator
+     *     (destructive-replace branch)
+     */
+    @Test
+    fun `streaming assistant text deltas concatenate byte-for-byte under prefix collisions`() = runBlocking {
+        val fragments = listOf(
+            "The ",
+            "quick brown fox ",
+            "jumps over ",
+            "the lazy dog ",
+            "The quick brown fox jumps over the lazy dog ",     // 44 chars; head EQUALS accumulator → wucn silent-drop
+            "again, ",
+            "and again — quietly in the moonlight.",            // 38 chars; >=32 AND >=50% → wucn destructive-replace
+        )
+        val expected = fragments.joinToString("")
+
+        val api = FakeSyncApi()
+        // Same serverId on every frame — that's how the merge path is
+        // entered. otid only on the first frame so subsequent frames
+        // resolve via findByServerId, exercising the production path.
+        api.nextStreamMessages = fragments.mapIndexed { idx, f ->
+            AssistantMessage(
+                id = "reply-stream",
+                contentRaw = JsonPrimitive(f),
+                otid = if (idx == 0) "reply-otid-uww11" else null,
+            )
+        }
+        val scope = CoroutineScope(Dispatchers.IO)
+        val sync = TimelineSyncLoop(api, "conv1", scope)
+
+        sync.send("hello")
+
+        // Wait for the first frame to land (uniquely identifiable by otid),
+        // then for subsequent merges — deltas merge into the same event by
+        // serverId, so its content grows monotonically.
+        withTimeout(5_000) {
+            while (sync.state.value.findByOtid("reply-otid-uww11") == null) delay(10)
+            // Then wait until merging is done (content stable for ~50ms)
+            var stable = 0
+            var lastLen = -1
+            while (stable < 5) {
+                val ev = sync.state.value.events.firstOrNull {
+                    it is TimelineEvent.Confirmed && it.serverId == "reply-stream"
+                }
+                val len = ev?.content?.length ?: -1
+                if (len == lastLen && len >= 0) stable++ else { stable = 0; lastLen = len }
+                delay(10)
+            }
+        }
+
+        val assistant = sync.state.value.events.firstOrNull {
+            it is TimelineEvent.Confirmed && it.serverId == "reply-stream"
+        }
+        assertNotNull("assistant event must be emitted", assistant)
+        assertEquals(
+            "lettabot-uww.11: streaming deltas must concatenate byte-for-byte under prefix collisions",
+            expected,
+            assistant!!.content,
+        )
+        scope.coroutineContext.job.cancel()
+    }
+
+    /**
+     * lettabot-uww.11 regression: the literal mermaid block from the
+     * 2026-04-26 field repro, streamed character-by-character (the
+     * worst-case adversarial chunking exercised on the server side
+     * by ws-gateway.e2e.test.ts). Asserts byte-perfect reassembly so
+     * we'd catch a regression of the original screenshot.
+     */
+    @Test
+    fun `streaming mermaid block character-by-character reassembles byte-perfectly`() = runBlocking {
+        val mermaid = "A[LLM snapshots] --> B[Coalesce?]"
+        val api = FakeSyncApi()
+        api.nextStreamMessages = mermaid.mapIndexed { idx, ch ->
+            AssistantMessage(
+                id = "reply-mermaid",
+                contentRaw = JsonPrimitive(ch.toString()),
+                otid = if (idx == 0) "mermaid-otid" else null,
+            )
+        }
+        val scope = CoroutineScope(Dispatchers.IO)
+        val sync = TimelineSyncLoop(api, "conv1", scope)
+
+        sync.send("draw it")
+
+        withTimeout(5_000) {
+            while (sync.state.value.findByOtid("mermaid-otid") == null) delay(10)
+            var stable = 0
+            var lastLen = -1
+            while (stable < 5) {
+                val ev = sync.state.value.events.firstOrNull {
+                    it is TimelineEvent.Confirmed && it.serverId == "reply-mermaid"
+                }
+                val len = ev?.content?.length ?: -1
+                if (len == lastLen && len >= 0) stable++ else { stable = 0; lastLen = len }
+                delay(10)
+            }
+        }
+
+        val assistant = sync.state.value.events.firstOrNull {
+            it is TimelineEvent.Confirmed && it.serverId == "reply-mermaid"
+        }
+        assertNotNull(assistant)
+        assertEquals(
+            "lettabot-uww.11: mermaid char-by-char reassembly must be byte-perfect",
+            mermaid,
+            assistant!!.content,
+        )
+        // Guard against the specific corruption signature from the
+        // 2026-04-26 field repro. If either of these substrings is
+        // missing, the bubble looked like `A[LLMapshots|`.
+        assertTrue(
+            "missing 'A[LLM snapshots]' (silent character drop signature)",
+            assistant.content.contains("A[LLM snapshots]"),
+        )
+        assertTrue(
+            "missing closing bracket before --> (destructive-replace signature)",
+            assistant.content.contains("] --> B[Coalesce?]"),
+        )
+        scope.coroutineContext.job.cancel()
+    }
+
     @Test
     fun `reconcile swaps local user event to confirmed`() = runBlocking {
         val api = FakeSyncApi()

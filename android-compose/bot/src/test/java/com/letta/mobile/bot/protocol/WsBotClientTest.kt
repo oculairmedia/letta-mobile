@@ -436,9 +436,22 @@ class WsBotClientTest : WordSpec({
                     }
                 }
 
+                // letta-mobile-w2hx.7: the chat row is the source of truth
+                // for `conversation_id`. After a reconnect, the caller —
+                // here, the test stand-in for AdminChatViewModel — passes
+                // the conv id it learned from the first turn. WsBotClient
+                // no longer carries an "active conv" fallback that
+                // backfills a null arg.
                 val second = runBlocking {
                     withTimeout(5_000) {
-                        client.streamMessage(BotChatRequest(message = "second", agentId = "agent-6", chatId = "chat-6")).toList()
+                        client.streamMessage(
+                            BotChatRequest(
+                                message = "second",
+                                agentId = "agent-6",
+                                chatId = "chat-6",
+                                conversationId = "conv-reconnect",
+                            )
+                        ).toList()
                     }
                 }
 
@@ -497,6 +510,337 @@ class WsBotClientTest : WordSpec({
                 encoded[1].jsonObject["type"]!!.jsonPrimitive.content shouldBe "image"
                 encoded[1].jsonObject["source"]!!.jsonObject["media_type"]!!.jsonPrimitive.content shouldBe "image/png"
                 client.close()
+            }
+        }
+
+        // letta-mobile-w2hx.8: receive-side demux is keyed on
+        // conversation_id with request_id as a fallback. The next
+        // three tests exercise the new routing tables directly:
+        //   1. fresh-route promotion (null conv → conv-X on first chunk)
+        //   2. mid-stream conversation swap (gateway recovery rekeys
+        //      the route from conv-A to conv-B)
+        //   3. error frames carrying only a request_id still route to
+        //      the right in-flight stream
+        "promote pending route into activeRoutes on the first conv-id chunk" {
+            val server = websocketServer { socket, text ->
+                val payload = json.parseToJsonElement(text).jsonObject
+                when (payload["type"]!!.jsonPrimitive.content) {
+                    "session_start" -> socket.send(
+                        // session_init requires a conversation_id at the
+                        // socket level (it's the gateway's session-bound
+                        // default); the per-request route is still fresh
+                        // because BotChatRequest.conversationId == null.
+                        """
+                        {"type":"session_init","agent_id":"agent-fresh","conversation_id":"conv-default","session_id":"sess-fresh"}
+                        """.trimIndent()
+                    )
+
+                    "message" -> {
+                        val requestId = payload["request_id"]!!.jsonPrimitive.content
+                        // First chunk announces the brand-new conversation_id —
+                        // the route must be promoted from pendingRoutes into
+                        // activeRoutes for subsequent chunks to demux correctly.
+                        socket.send(
+                            """
+                            {"type":"stream","event":"assistant","content":"hi","conversation_id":"conv-new","request_id":"$requestId"}
+                            """.trimIndent()
+                        )
+                        // Subsequent chunk arrives without request_id — it must
+                        // still find the route via conversation_id lookup.
+                        socket.send(
+                            """
+                            {"type":"stream","event":"assistant","content":" there","conversation_id":"conv-new"}
+                            """.trimIndent()
+                        )
+                        socket.send(
+                            """
+                            {"type":"result","success":true,"conversation_id":"conv-new","request_id":"$requestId","duration_ms":4}
+                            """.trimIndent()
+                        )
+                    }
+                }
+            }
+
+            server.use {
+                val client = WsBotClient(gatewayUrl(server), "secret")
+                val chunks = runBlocking {
+                    withTimeout(5_000) {
+                        client.streamMessage(
+                            BotChatRequest(
+                                message = "hi",
+                                agentId = "agent-fresh",
+                                chatId = "chat-fresh",
+                                conversationId = null,
+                            )
+                        ).toList()
+                    }
+                }
+                chunks shouldHaveSize 3
+                chunks[0].text shouldBe "hi"
+                chunks[0].conversationId shouldBe "conv-new"
+                chunks[1].text shouldBe " there"
+                chunks[1].conversationId shouldBe "conv-new"
+                chunks[2].done shouldBe true
+                client.close()
+            }
+        }
+
+        "rekey route on mid-stream conversation swap" {
+            val server = websocketServer { socket, text ->
+                val payload = json.parseToJsonElement(text).jsonObject
+                when (payload["type"]!!.jsonPrimitive.content) {
+                    "session_start" -> socket.send(
+                        """
+                        {"type":"session_init","agent_id":"agent-swap","conversation_id":"conv-old","session_id":"sess-swap"}
+                        """.trimIndent()
+                    )
+
+                    "message" -> {
+                        val requestId = payload["request_id"]!!.jsonPrimitive.content
+                        // Start streaming under the old conv id...
+                        socket.send(
+                            """
+                            {"type":"stream","event":"assistant","content":"a","conversation_id":"conv-old","request_id":"$requestId"}
+                            """.trimIndent()
+                        )
+                        // ...gateway-side recovery swaps the conversation;
+                        // demux must rekey activeRoutes from conv-old to conv-new
+                        // so this and subsequent frames continue to land on the
+                        // same Channel.
+                        socket.send(
+                            """
+                            {"type":"stream","event":"assistant","content":"b","conversation_id":"conv-new","request_id":"$requestId"}
+                            """.trimIndent()
+                        )
+                        socket.send(
+                            """
+                            {"type":"stream","event":"assistant","content":"c","conversation_id":"conv-new"}
+                            """.trimIndent()
+                        )
+                        socket.send(
+                            """
+                            {"type":"result","success":true,"conversation_id":"conv-new","request_id":"$requestId","duration_ms":7}
+                            """.trimIndent()
+                        )
+                    }
+                }
+            }
+
+            server.use {
+                val client = WsBotClient(gatewayUrl(server), "secret")
+                val chunks = runBlocking {
+                    withTimeout(5_000) {
+                        client.streamMessage(
+                            BotChatRequest(
+                                message = "go",
+                                agentId = "agent-swap",
+                                chatId = "chat-swap",
+                                conversationId = "conv-old",
+                            )
+                        ).toList()
+                    }
+                }
+                chunks shouldHaveSize 4
+                chunks[0].conversationId shouldBe "conv-old"
+                chunks[1].conversationId shouldBe "conv-new"
+                chunks[2].conversationId shouldBe "conv-new"
+                chunks[3].done shouldBe true
+                chunks[3].conversationId shouldBe "conv-new"
+                client.close()
+            }
+        }
+
+        "route error frame to in-flight request via request_id when conv-id is absent" {
+            val server = websocketServer { socket, text ->
+                val payload = json.parseToJsonElement(text).jsonObject
+                when (payload["type"]!!.jsonPrimitive.content) {
+                    "session_start" -> socket.send(
+                        """
+                        {"type":"session_init","agent_id":"agent-err","conversation_id":"conv-err","session_id":"sess-err"}
+                        """.trimIndent()
+                    )
+
+                    "message" -> {
+                        val requestId = payload["request_id"]!!.jsonPrimitive.content
+                        // Error frame today carries no conversation_id — demux
+                        // must fall back to request_id lookup.
+                        socket.send(
+                            """
+                            {"type":"error","code":"STREAM_ERROR","message":"boom","request_id":"$requestId"}
+                            """.trimIndent()
+                        )
+                    }
+                }
+            }
+
+            server.use {
+                val client = WsBotClient(gatewayUrl(server), "secret")
+                val exception = runCatching {
+                    runBlocking {
+                        withTimeout(5_000) {
+                            client.streamMessage(
+                                BotChatRequest(
+                                    message = "x",
+                                    agentId = "agent-err",
+                                    chatId = "chat-err",
+                                    conversationId = "conv-err",
+                                )
+                            ).toList()
+                        }
+                    }
+                }.exceptionOrNull() as BotGatewayException
+                exception.code shouldBe BotGatewayErrorCode.STREAM_ERROR
+                client.close()
+            }
+        }
+
+        // letta-mobile-w2hx.10: end-to-end no-bleedover acceptance.
+        //
+        // Two independent WsBotClients (modelling either two connections,
+        // or one connection with the gateway's per-agent session pool —
+        // either way each chat row gets its own client at the Android
+        // boundary) each drive a stream concurrently. Both servers
+        // interleave their stream chunks before completing. The
+        // architectural guarantee: each client's collected flow contains
+        // only its own (agentId, conversationId, request_id) tuple — zero
+        // cross-talk, even with overlapping timing. This is the regression
+        // test for every bleedover bug we have closed (flk6.sendMessage,
+        // forceNew, ConversationManager cache, screenAgentId mismatch).
+        "two concurrent streams on different agents do not bleed across clients" {
+            // Coordinated barriers so the two servers actually interleave
+            // their chunks on the wire rather than running back-to-back.
+            val aFirstChunkSent = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val bFirstChunkSent = kotlinx.coroutines.CompletableDeferred<Unit>()
+
+            val serverA = websocketServer { socket, text ->
+                val payload = json.parseToJsonElement(text).jsonObject
+                when (payload["type"]!!.jsonPrimitive.content) {
+                    "session_start" -> socket.send(
+                        """
+                        {"type":"session_init","agent_id":"agent-A","conversation_id":"conv-A","session_id":"sess-A"}
+                        """.trimIndent()
+                    )
+
+                    "message" -> {
+                        val requestId = payload["request_id"]!!.jsonPrimitive.content
+                        // Frame 1 from A — under conv-A, request_id rid-A
+                        socket.send(
+                            """
+                            {"type":"stream","event":"assistant","content":"A1","conversation_id":"conv-A","request_id":"$requestId"}
+                            """.trimIndent()
+                        )
+                        aFirstChunkSent.complete(Unit)
+                        // Wait for B's first chunk before continuing — guarantees
+                        // the two streams are actually interleaved in time.
+                        runBlocking { bFirstChunkSent.await() }
+                        socket.send(
+                            """
+                            {"type":"stream","event":"assistant","content":"A2","conversation_id":"conv-A"}
+                            """.trimIndent()
+                        )
+                        socket.send(
+                            """
+                            {"type":"result","success":true,"conversation_id":"conv-A","request_id":"$requestId","duration_ms":3}
+                            """.trimIndent()
+                        )
+                    }
+                }
+            }
+            val serverB = websocketServer { socket, text ->
+                val payload = json.parseToJsonElement(text).jsonObject
+                when (payload["type"]!!.jsonPrimitive.content) {
+                    "session_start" -> socket.send(
+                        """
+                        {"type":"session_init","agent_id":"agent-B","conversation_id":"conv-B","session_id":"sess-B"}
+                        """.trimIndent()
+                    )
+
+                    "message" -> {
+                        val requestId = payload["request_id"]!!.jsonPrimitive.content
+                        // Wait for A to send its first chunk first, then B's.
+                        runBlocking { aFirstChunkSent.await() }
+                        socket.send(
+                            """
+                            {"type":"stream","event":"assistant","content":"B1","conversation_id":"conv-B","request_id":"$requestId"}
+                            """.trimIndent()
+                        )
+                        bFirstChunkSent.complete(Unit)
+                        socket.send(
+                            """
+                            {"type":"stream","event":"assistant","content":"B2","conversation_id":"conv-B"}
+                            """.trimIndent()
+                        )
+                        socket.send(
+                            """
+                            {"type":"result","success":true,"conversation_id":"conv-B","request_id":"$requestId","duration_ms":5}
+                            """.trimIndent()
+                        )
+                    }
+                }
+            }
+
+            serverA.use {
+                serverB.use {
+                    val clientA = WsBotClient(gatewayUrl(serverA), "secretA")
+                    val clientB = WsBotClient(gatewayUrl(serverB), "secretB")
+
+                    val (chunksA, chunksB) = runBlocking {
+                        val a = async {
+                            withTimeout(5_000) {
+                                clientA.streamMessage(
+                                    BotChatRequest(
+                                        message = "from A",
+                                        agentId = "agent-A",
+                                        chatId = "chat-A",
+                                        conversationId = "conv-A",
+                                    )
+                                ).toList()
+                            }
+                        }
+                        val b = async {
+                            withTimeout(5_000) {
+                                clientB.streamMessage(
+                                    BotChatRequest(
+                                        message = "from B",
+                                        agentId = "agent-B",
+                                        chatId = "chat-B",
+                                        conversationId = "conv-B",
+                                    )
+                                ).toList()
+                            }
+                        }
+                        a.await() to b.await()
+                    }
+
+                    // Architectural guarantee: every chunk in A's flow is
+                    // tagged conv-A; every chunk in B's flow is tagged
+                    // conv-B. Zero cross-talk, even though the servers
+                    // interleaved on the wire.
+                    chunksA shouldHaveSize 3
+                    chunksA[0].text shouldBe "A1"
+                    chunksA[1].text shouldBe "A2"
+                    chunksA[2].done shouldBe true
+                    chunksA.forEach { chunk ->
+                        chunk.conversationId shouldBe "conv-A"
+                    }
+
+                    chunksB shouldHaveSize 3
+                    chunksB[0].text shouldBe "B1"
+                    chunksB[1].text shouldBe "B2"
+                    chunksB[2].done shouldBe true
+                    chunksB.forEach { chunk ->
+                        chunk.conversationId shouldBe "conv-B"
+                    }
+
+                    // The terminal chunk from each client carries its own
+                    // agentId — chat headers resolved from this never
+                    // collide.
+                    chunksA[2].agentId shouldBe "agent-A"
+                    chunksB[2].agentId shouldBe "agent-B"
+
+                    clientA.close()
+                    clientB.close()
+                }
             }
         }
     }

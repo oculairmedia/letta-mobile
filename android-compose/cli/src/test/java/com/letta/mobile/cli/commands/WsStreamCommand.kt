@@ -72,6 +72,10 @@ class WsStreamCommand : CliktCommand(
 
         try {
             runBlocking {
+                // letta-mobile-w2hx.7: --force-new is gone. To start a
+                // fresh conversation, omit --conversation (or pass an
+                // empty string); the gateway will create one and echo
+                // the id back on the first chunk.
                 println("[CLI] WS  connect $baseUrl/api/v1/agent-gateway")
                 println("[CLI]   agent=$agentId  conversation=${conversationId.ifBlank { "<auto>" }}")
                 println("[CLI]   message=\"${message.take(80)}${if (message.length > 80) "..." else ""}\"")

@@ -99,37 +99,185 @@ interface MessageContentRenderer {
  *    swallow it).
  */
 private const val STREAMING_CURSOR = "\u258E" // ▎ LEFT VERTICAL BAR
-private const val MAX_HELD_TAIL_CHARS = 80
-private val WORD_BOUNDARY_CHARS = setOf('.', ',', ';', ':', '!', '?', ')', '\'', '"', '`', ']', '}', '>')
 
 internal fun streamingDisplayText(raw: String): String {
-    if (raw.isEmpty()) return STREAMING_CURSOR
+    // letta-mobile-flk2 (revision 11): markdown-stability clamp.
+    //
+    // Background: mikepenz's renderer parses the full text on every
+    // re-emission. While streaming, the latest tail almost always
+    // contains an INCOMPLETE markdown construct — an open `**`, an
+    // open `` ` ``, an open `[link`, etc. The parser refuses to
+    // commit partial syntax: it falls back to rendering those bytes
+    // as literal text. A few ms (one paint tick) later the closer
+    // arrives in the next chunk and the parser re-parses, this time
+    // emitting the formatted markup. The user sees: raw asterisks
+    // and brackets briefly, then they "snap in" to bold/italic/link.
+    // Emmanuel reported this as "flashing the content that streamed
+    // in but hasn't been markdownified yet".
+    //
+    // Mitigation: hold back the trailing region that LOOKS like it's
+    // mid-construct, render only the markdown-stable PREFIX, and
+    // append the cursor at the prefix boundary. The held tail will
+    // be released on the next paint tick (≤50ms) once we can prove
+    // it's either complete or no longer dangling.
+    //
+    // We are intentionally CONSERVATIVE — we'd rather hold a
+    // few extra chars than display unconverted markup. The held
+    // region is small (typically <30 chars) so the visual lag is
+    // imperceptible; the cursor still advances within those bounds.
+    //
+    // Inside an open ``` fence we skip the clamp entirely (whitespace
+    // is meaningful in code, and the parser already renders the
+    // partial fence as a code block — no flicker).
+    // letta-mobile-flk2 (revision 11): suppress cursor-only render
+    // before any chunks have arrived. Previously empty text returned
+    // STREAMING_CURSOR, so a fresh assistant bubble flashed a lone
+    // cursor character for one paint tick before content arrived.
+    // Emmanuel reported this as "a flash before streaming starts
+    // when I send a prompt". Returning empty makes
+    // StreamingMarkdownText short-circuit to no render at all
+    // (the typing indicator already covers the pre-content state).
+    if (raw.isEmpty()) return ""
     if (insideOpenCodeFence(raw)) {
         // Inside an open ``` fence — leave content alone, no cursor
         // (would render as literal text inside the code block).
         return raw
     }
-    // Find the last word/sentence boundary.
-    var boundary = -1
-    for (i in raw.indices.reversed()) {
-        val c = raw[i]
-        if (c.isWhitespace() || c in WORD_BOUNDARY_CHARS) {
-            boundary = i
-            break
+    val safe = clampToStableMarkdown(raw)
+    return safe + STREAMING_CURSOR
+}
+
+/**
+ * Returns the longest prefix of [raw] that does NOT end inside an
+ * open markdown construct. The returned prefix is what the renderer
+ * can safely re-parse without producing a "raw markup flash" when
+ * the construct's closer arrives in a later chunk.
+ *
+ * Constructs we hold back:
+ *  - Trailing `*`/`**`/`***` with no matching closer in the
+ *    *current line* (could be opening italic/bold).
+ *  - Trailing `_`/`__` with no matching closer in the current line.
+ *  - Trailing `` ` `` with no matching closer in the current line.
+ *  - Trailing `~~` with no matching closer.
+ *  - Trailing `[...]` link text without a `(url)` yet.
+ *  - Trailing partial autolink/URL not yet ended by space/newline.
+ *
+ * The clamp scans only the LAST line — most markdown constructs
+ * (emphasis, code spans, links) close on the same line, so we don't
+ * need to look back further. Block constructs (lists, headings,
+ * paragraphs) are stable as soon as their content tokens land; the
+ * parser handles those incrementally without flashing.
+ */
+private fun clampToStableMarkdown(raw: String): String {
+    val lastBreak = raw.lastIndexOf('\n')
+    val lineStart = if (lastBreak < 0) 0 else lastBreak + 1
+    val line = raw.substring(lineStart)
+    if (line.isEmpty()) return raw
+
+    // Scan for unmatched span openers in this line. Track whether the
+    // last unmatched opener exists; if so, return raw clipped to BEFORE
+    // that opener.
+    val unmatchedOpenIdx = findUnmatchedOpenerInLine(line)
+    if (unmatchedOpenIdx >= 0) {
+        return raw.substring(0, lineStart + unmatchedOpenIdx)
+    }
+    return raw
+}
+
+/**
+ * Returns the index (relative to [line]) of the FIRST unmatched
+ * span opener — the position where a closer hasn't yet arrived.
+ * Returns -1 if the line is fully balanced.
+ *
+ * Tokens checked: `***`, `**`, `*`, `___`, `__`, `_`, `` `` ``,
+ * `` ` ``, `~~`, `[`.
+ *
+ * Implementation note: we use a simple stack-based scanner. When we
+ * see an opener whose matching closer isn't found later in the line,
+ * we record its index. If multiple unmatched openers exist we return
+ * the EARLIEST one, since clipping there hides all of them.
+ */
+private fun findUnmatchedOpenerInLine(line: String): Int {
+    var earliestUnmatched = -1
+    var i = 0
+    val len = line.length
+    while (i < len) {
+        val c = line[i]
+        when (c) {
+            '`' -> {
+                // Inline code: find matching ` (single backtick) or
+                // ``...`` style. We only handle single-backtick spans
+                // here — multi-backtick is rare in prose.
+                val close = line.indexOf('`', startIndex = i + 1)
+                if (close < 0) {
+                    if (earliestUnmatched < 0) earliestUnmatched = i
+                    break
+                }
+                i = close + 1
+            }
+            '*', '_' -> {
+                // Count run length
+                var run = 1
+                while (i + run < len && line[i + run] == c) run++
+                // Look for a matching closer of run length later in the line.
+                // For simplicity treat any later run of >= our length as a closer.
+                val searchFrom = i + run
+                val closerIdx = findEmphasisCloser(line, searchFrom, c, run)
+                if (closerIdx < 0) {
+                    if (earliestUnmatched < 0) earliestUnmatched = i
+                    // Stop scanning — anything after is moot since we
+                    // already need to clip here.
+                    break
+                }
+                i = closerIdx + run
+            }
+            '~' -> {
+                if (i + 1 < len && line[i + 1] == '~') {
+                    val close = line.indexOf("~~", startIndex = i + 2)
+                    if (close < 0) {
+                        if (earliestUnmatched < 0) earliestUnmatched = i
+                        break
+                    }
+                    i = close + 2
+                } else {
+                    i++
+                }
+            }
+            '[' -> {
+                // Look for closing `]` then `(...)` in the same line.
+                val closeBracket = line.indexOf(']', startIndex = i + 1)
+                if (closeBracket < 0 || closeBracket + 1 >= len ||
+                    line[closeBracket + 1] != '(') {
+                    if (earliestUnmatched < 0) earliestUnmatched = i
+                    break
+                }
+                val closeParen = line.indexOf(')', startIndex = closeBracket + 2)
+                if (closeParen < 0) {
+                    if (earliestUnmatched < 0) earliestUnmatched = i
+                    break
+                }
+                i = closeParen + 1
+            }
+            else -> i++
         }
     }
-    if (boundary < 0) {
-        // No boundary at all in the entire text (very short stream or
-        // long unbroken token). Render as-is to avoid permanent stall.
-        return raw + STREAMING_CURSOR
+    return earliestUnmatched
+}
+
+private fun findEmphasisCloser(line: String, from: Int, marker: Char, runLen: Int): Int {
+    var i = from
+    val len = line.length
+    while (i < len) {
+        if (line[i] == marker) {
+            var run = 1
+            while (i + run < len && line[i + run] == marker) run++
+            if (run >= runLen) return i
+            i += run
+        } else {
+            i++
+        }
     }
-    val heldTailLen = raw.length - (boundary + 1)
-    return if (heldTailLen > MAX_HELD_TAIL_CHARS) {
-        // Tail exceeds max-hold — emit everything to keep UI moving.
-        raw + STREAMING_CURSOR
-    } else {
-        raw.substring(0, boundary + 1) + STREAMING_CURSOR
-    }
+    return -1
 }
 
 /** True if the text contains an odd number of ``` fences (i.e. a code block is currently open). */
@@ -211,6 +359,7 @@ object TextMessageRenderer : MessageContentRenderer {
                 textColor = textColor,
                 tailStyle = MaterialTheme.chatTypography.messageBody,
                 tailTransform = ::streamingDisplayText,
+                cursorText = STREAMING_CURSOR,
                 modifier = modifier,
             )
         } else {

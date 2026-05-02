@@ -212,6 +212,46 @@ class TimelineEventToUiMessageTest {
         assertNull(timelineEventToUiMessage(ev))
     }
 
+    /**
+     * letta-mobile-e75s: when a brand-new conversation is opened (Letta
+     * `POST /v1/conversations`), the server seeds the message log with a
+     * single `system_message` carrying the agent's base instructions. Pre-fix,
+     * that arrived through the timeline as a Confirmed/SYSTEM event and the
+     * mapper rendered it with role="system" — populating the UI with
+     * "miscellaneous message history" before the user had even sent anything
+     * (Emmanuel report 2026-04-28). The chat surface is for user-facing
+     * conversation; agent-state system messages must not leak into it.
+     */
+    @Test
+    fun `SYSTEM Confirmed events are dropped (e75s)`() {
+        val ev = confirmed(
+            TimelineMessageType.SYSTEM,
+            content = "You are a helpful assistant. Base instructions...",
+            serverId = "system-seed-1",
+        )
+        assertNull(
+            "system_message events must not project into the chat UI",
+            timelineEventToUiMessage(ev),
+        )
+    }
+
+    @Test
+    fun `SYSTEM Local events are dropped (e75s, defense-in-depth)`() {
+        // We don't currently synthesize SYSTEM Locals on the client, but if
+        // any future code path does (e.g. an offline-state bubble), the chat
+        // projection still drops them — the bug class is "agent-state system
+        // text shown as a chat bubble", regardless of source.
+        val ev = TimelineEvent.Local(
+            position = 1.0,
+            otid = "local-system-1",
+            content = "Base instructions...",
+            sentAt = Instant.parse("2026-04-19T06:00:00Z"),
+            deliveryState = com.letta.mobile.data.timeline.DeliveryState.SENT,
+            messageType = TimelineMessageType.SYSTEM,
+        )
+        assertNull(timelineEventToUiMessage(ev))
+    }
+
     @Test
     fun `multi-tool call batch attaches return to first call only`() {
         // Server batches two tools in one approval. tool_return is stored
@@ -241,5 +281,103 @@ class TimelineEventToUiMessageTest {
         assertEquals("Hello!", ui.content)
         assertNull(ui.toolCalls)
         assertFalse(ui.isReasoning)
+    }
+
+    /**
+     * lettabot-y4j regression test: USER bubbles must have any leaked
+     * <system-reminder>...</system-reminder> envelope blocks stripped at
+     * render time. The Letta server persists envelope-wrapped user
+     * messages and Android reads them via direct GET, bypassing the
+     * lettabot REST scrub. The defensive strip in scrubUserEnvelope must
+     * remove the block while preserving the user's actual prompt text.
+     */
+    @Test
+    fun `user message with leaked system-reminder envelope has envelope stripped`() {
+        val leaked = "<system-reminder>\n## Message Metadata\n- Channel: Matrix\n- Sender: Emmanuel\n</system-reminder>\n\nhi there"
+        val ev = confirmed(TimelineMessageType.USER, content = leaked)
+        val ui = timelineEventToUiMessage(ev)!!
+        assertEquals("user", ui.role)
+        assertEquals("hi there", ui.content)
+    }
+
+    @Test
+    fun `user message that is envelope-only after strip is dropped entirely`() {
+        // No body text outside the envelope -> drop the bubble.
+        val envelopeOnly = "<system-reminder>\n## Session Context\n- Agent: PM\n</system-reminder>"
+        val ev = confirmed(TimelineMessageType.USER, content = envelopeOnly)
+        assertNull(timelineEventToUiMessage(ev))
+    }
+
+    @Test
+    fun `assistant message with system-reminder-like text is NOT scrubbed`() {
+        // Only USER bubbles get scrubbed. An assistant explaining the
+        // envelope mechanism shouldn't have its content mutilated.
+        val text = "Lettabot wraps user input in <system-reminder>blocks</system-reminder>."
+        val ev = confirmed(TimelineMessageType.ASSISTANT, content = text)
+        val ui = timelineEventToUiMessage(ev)!!
+        assertEquals(text, ui.content)
+    }
+
+    @Test
+    fun `user message without envelope passes through unchanged`() {
+        val ev = confirmed(TimelineMessageType.USER, content = "just a normal message")
+        val ui = timelineEventToUiMessage(ev)!!
+        assertEquals("just a normal message", ui.content)
+    }
+
+    @Test
+    fun `user message with multiple envelope blocks has all stripped`() {
+        // Defensive against future formatter changes that emit multiple
+        // blocks (e.g. one for session context, one for metadata).
+        val leaked = "<system-reminder>a</system-reminder>real text<system-reminder>b</system-reminder>"
+        val ev = confirmed(TimelineMessageType.USER, content = leaked)
+        val ui = timelineEventToUiMessage(ev)!!
+        assertEquals("real text", ui.content)
+    }
+
+    /**
+     * Real-world case from Emmanuel's screenshot in the
+     * "Letta Mobile Admin" conversation: Letta Code injects three
+     * back-to-back system-reminder envelopes in a single user turn
+     * (device info + agent info + permission mode). The first envelope
+     * is preceded by the lettabot wrapper's own `<system-reminder>` open
+     * — so the persisted form has a stray closing tag separating
+     * lettabot's envelope end from Letta Code's envelope start, and a
+     * naive non-greedy single-block regex leaves orphan tags visible.
+     */
+    @Test
+    fun `user message with three back-to-back envelope blocks has all stripped`() {
+        val leaked = """
+            <system-reminder>
+            ## Message Metadata
+            - Channel: Matrix
+            </system-reminder>
+            <system-reminder>
+            This is automated info about you.
+            - Agent ID: agent-d53a5c94
+            </system-reminder>
+            <system-reminder>Permission mode active: bypassPermissions.</system-reminder>
+            actual user prompt here
+        """.trimIndent()
+        val ev = confirmed(TimelineMessageType.USER, content = leaked)
+        val ui = timelineEventToUiMessage(ev)!!
+        assertEquals("actual user prompt here", ui.content)
+    }
+
+    @Test
+    fun `user message with orphan closing tag has it stripped`() {
+        // Defends against the malformed-envelope shape where lettabot's
+        // wrapping closes BEFORE Letta Code's nested envelope opens,
+        // leaving a stray `</system-reminder>` mid-content.
+        val leaked = "</system-reminder>\n<system-reminder>X</system-reminder>\nbody"
+        val ev = confirmed(TimelineMessageType.USER, content = leaked)
+        val ui = timelineEventToUiMessage(ev)!!
+        assertEquals("body", ui.content)
+    }
+
+    @Test
+    fun `user message with only orphan tags and no content is dropped`() {
+        val ev = confirmed(TimelineMessageType.USER, content = "</system-reminder>\n<system-reminder>")
+        assertNull(timelineEventToUiMessage(ev))
     }
 }

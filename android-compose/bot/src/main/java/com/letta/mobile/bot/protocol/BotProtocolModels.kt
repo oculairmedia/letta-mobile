@@ -30,6 +30,14 @@ data class BotChatRequest(
     @SerialName("sender_id") val senderId: String? = null,
     @SerialName("sender_name") val senderName: String? = null,
     @SerialName("agent_id") val agentId: String? = null,
+    /**
+     * letta-mobile-w2hx.7: routing key. When null, the gateway opens a
+     * fresh Letta conversation; when non-null, the gateway resolves it
+     * directly. The pre-w2hx `force_new` flag is gone — freshness is
+     * now expressed purely by passing a null `conversationId` (which in
+     * practice means a freshly-minted chatId on the client carries no
+     * conversation_id mapping yet). See bead letta-mobile-w2hx.7.
+     */
     @SerialName("conversation_id") val conversationId: String? = null,
     @Transient val contentItems: List<BotMessageContentItem>? = null,
 )
@@ -185,20 +193,6 @@ object BotStatusResponseParser {
         (this[key] as? JsonPrimitive)?.booleanOrNull
 }
 
-/**
- * Streaming contract shared by bot protocol and app chat consumers.
- *
- * Event semantics:
- * - [BotStreamEvent.ASSISTANT] and [BotStreamEvent.REASONING] emit delta-shaped
- *   text fragments while [done] is false. Callers append or defensively merge
- *   them into the running bubble.
- * - [BotStreamEvent.TOOL_CALL] and [BotStreamEvent.TOOL_RESULT] are
- *   snapshot-shaped while [done] is false. Each frame fully describes the
- *   current tool payload/result for that event.
- * - [done] frames are completion-only markers. They may carry terminal metadata
- *   like [conversationId], [agentId], [requestId], and [aborted], but must not
- *   replay user-visible content or event-specific payload.
- */
 @Serializable
 data class BotStreamChunk(
     val text: String? = null,
@@ -213,22 +207,17 @@ data class BotStreamChunk(
     val uuid: String? = null,
     val aborted: Boolean = false,
     val done: Boolean = false,
-) {
-    internal fun requireValidTerminalShape(context: String): BotStreamChunk {
-        if (!done) return this
 
-        require(text.isNullOrEmpty()) {
-            "$context emitted a terminal BotStreamChunk with text payload"
-        }
-        require(event == null) {
-            "$context emitted a terminal BotStreamChunk with event payload"
-        }
-        require(toolName == null && toolCallId == null && toolInput == null) {
-            "$context emitted a terminal BotStreamChunk with tool payload"
-        }
-        return this
-    }
-}
+    /**
+     * letta-mobile-flk.5: present only on `event == CONVERSATION_SWAP`.
+     * The conversation id the client originally requested (the one that
+     * the gateway abandoned). Receivers can use this to assert the
+     * swap is for the conv they care about, and to pull stranded
+     * optimistic locals from the old timeline before the observer is
+     * re-pointed at the new conversation.
+     */
+    @SerialName("old_conversation_id") val oldConversationId: String? = null,
+)
 
 @Serializable
 data class BotErrorResponse(
@@ -237,14 +226,29 @@ data class BotErrorResponse(
 
 @Serializable
 enum class BotStreamEvent {
-    /** Delta-shaped text fragment. */
     @SerialName("assistant") ASSISTANT,
-    /** Snapshot-shaped tool invocation metadata. */
     @SerialName("tool_call") TOOL_CALL,
-    /** Snapshot-shaped tool result payload. */
     @SerialName("tool_result") TOOL_RESULT,
-    /** Delta-shaped reasoning fragment. */
     @SerialName("reasoning") REASONING,
+
+    /**
+     * letta-mobile-flk.5: gateway-emitted notification that the in-flight
+     * request was retried on a fresh Letta conversation because the
+     * original conversation was unrecoverable (typically a stuck
+     * `requires_approval` or stale conversation state).
+     *
+     * Wire shape: `{ type: "stream", event: "conversation_swap",
+     *   old_conversation_id, conversation_id, request_id }`. The new
+     * conv id arrives in the standard `conversation_id` field on
+     * `BotStreamChunk` so existing swap-detection logic in
+     * `AdminChatViewModel` (which keys off `chunk.conversationId`) sees
+     * the change at the same moment as this explicit signal.
+     *
+     * Receivers should switch their timeline observer to the new
+     * conversation, migrate any optimistic local message that was
+     * appended to the old conversation, and update navigation state.
+     */
+    @SerialName("conversation_swap") CONVERSATION_SWAP,
 }
 
 enum class ConnectionState {

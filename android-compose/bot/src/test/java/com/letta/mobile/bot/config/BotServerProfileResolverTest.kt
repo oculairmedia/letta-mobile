@@ -27,7 +27,6 @@ class BotServerProfileResolverTest : WordSpec({
                 resolver.resolve(
                     BotConfig(
                         id = "bot-1",
-                        agentId = "agent-1",
                         mode = BotConfig.Mode.REMOTE,
                         serverProfileId = "selected",
                     )
@@ -51,7 +50,6 @@ class BotServerProfileResolverTest : WordSpec({
                 resolver.resolve(
                     BotConfig(
                         id = "bot-1",
-                        agentId = "agent-1",
                         mode = BotConfig.Mode.REMOTE,
                     )
                 )
@@ -69,7 +67,6 @@ class BotServerProfileResolverTest : WordSpec({
                 resolver.resolve(
                     BotConfig(
                         id = "bot-1",
-                        agentId = "agent-1",
                         mode = BotConfig.Mode.REMOTE,
                         remoteUrl = "https://inline.example",
                         remoteToken = "inline-token",

@@ -111,7 +111,22 @@ fun ChatScreen(
                         )
                     }
                     ConversationState.NoConversation -> {
-                        NoConversationContent(modifier = Modifier.weight(1f))
+                        // letta-mobile: empty-state parity between
+                        // "New Conversation" entry points. Both the chat-
+                        // list FAB (eager server-side create -> lands in
+                        // ConversationState.Ready with empty messages) and
+                        // the in-chat switcher's "New Conversation" button
+                        // (lazy-create on first send -> lands in
+                        // ConversationState.NoConversation) should show the
+                        // same starter prompts. AdminChatViewModel.sendMessage
+                        // already lazy-creates the conversation server-side
+                        // when convId is null (fresh-route branch), so
+                        // tapping a chip here transparently creates the
+                        // Letta conversation and sends the prompt.
+                        com.letta.mobile.ui.components.StarterPrompts(
+                            onPromptClick = { prompt -> viewModel.sendMessage(prompt) },
+                            modifier = Modifier.weight(1f),
+                        )
                     }
                     is ConversationState.Ready -> {
                         if (state.isLoadingMessages && state.messages.isEmpty()) {
@@ -268,24 +283,10 @@ private fun ErrorContent(
     }
 }
 
-@Composable
-private fun NoConversationContent(
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            text = stringResource(R.string.screen_chat_empty_title),
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.screen_chat_empty_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
+// NoConversationContent (the prior placeholder for ConversationState.
+// NoConversation showing only "Start a conversation / Send a message to
+// create a new conversation.") was removed when the empty-state for the
+// in-chat "New Conversation" path was unified with the chat-list FAB
+// path — both now render StarterPrompts. The strings
+// screen_chat_empty_title and screen_chat_empty_subtitle remain in
+// res/values/strings.xml in case a future surface needs them.

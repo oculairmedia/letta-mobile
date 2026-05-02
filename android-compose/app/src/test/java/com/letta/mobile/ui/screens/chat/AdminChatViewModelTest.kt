@@ -17,7 +17,6 @@ import com.letta.mobile.data.model.ProjectBugReport
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.BugReportRepository
-import com.letta.mobile.data.repository.ConversationManager
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.repository.FolderRepository
 import com.letta.mobile.data.repository.MessageRepository
@@ -72,7 +71,6 @@ class AdminChatViewModelTest {
     private lateinit var bugReportRepository: BugReportRepository
     private lateinit var folderRepository: FolderRepository
     private lateinit var conversationRepository: ConversationRepository
-    private lateinit var conversationManager: ConversationManager
     private lateinit var settingsRepository: SettingsRepository
 
     private lateinit var internalBotClient: InternalBotClient
@@ -82,6 +80,12 @@ class AdminChatViewModelTest {
     private lateinit var clientModeEnabledFlow: MutableStateFlow<Boolean>
     private var messages: List<AppMessage> = emptyList()
     private var streamStates: List<StreamState> = emptyList()
+    // letta-mobile-w2hx.6: per-agent "what's the most-recent server-side
+    // conversation" fixture. Pre-w2hx.6 this seeded the singleton
+    // ConversationManager.activeConversationIds map; now it seeds
+    // conversationRepository.getCachedConversations(agentId) so the VM's
+    // resolveMostRecentConversation helper can pick it up. Same shape, same
+    // ergonomics for tests — the routing key just lives on the VM now.
     private val activeConversationIds = mutableMapOf<String, String?>()
 
     @Before
@@ -171,7 +175,6 @@ class AdminChatViewModelTest {
         bugReportRepository = mockk(relaxed = true)
         folderRepository = FolderRepository(FakeFolderApi())
         conversationRepository = mockk(relaxed = true)
-        conversationManager = mockk(relaxed = true)
         settingsRepository = mockk(relaxed = true)
         internalBotClient = mockk(relaxed = true)
         clientModeChatSender = mockk(relaxed = true)
@@ -183,15 +186,26 @@ class AdminChatViewModelTest {
         every { settingsRepository.getChatFontScale() } returns flowOf(1f)
         every { settingsRepository.observeClientModeEnabled() } returns clientModeEnabledFlow
         every {
-            clientModeChatSender.streamMessage(any(), any(), any(), any())
+            clientModeChatSender.streamMessage(any(), any(), any())
         } returns flow { }
-        every { conversationManager.getActiveConversationId(any()) } answers {
-            activeConversationIds[firstArg()]
+        // letta-mobile-w2hx.6: seed conversationRepository.getCachedConversations
+        // from the activeConversationIds fixture map. resolveMostRecentConversation
+        // sorts by lastMessageAt/createdAt desc, so we set both to a fixed
+        // value for the seeded conv to make it the unambiguous "most recent".
+        every { conversationRepository.getCachedConversations(any()) } answers {
+            val agentId = firstArg<String>()
+            val convId = activeConversationIds[agentId]
+            if (convId == null) emptyList() else listOf(
+                com.letta.mobile.data.model.Conversation(
+                    id = convId,
+                    agentId = agentId,
+                    summary = "Seeded test conversation",
+                    createdAt = "2026-04-27T00:00:00Z",
+                    lastMessageAt = "2026-04-28T00:00:00Z",
+                ),
+            )
         }
-        every { conversationManager.setActiveConversation(any(), any()) } answers {
-            activeConversationIds[firstArg()] = secondArg()
-            Unit
-        }
+        coEvery { conversationRepository.refreshConversationsIfStale(any(), any()) } returns false
 
         coEvery { messageRepository.fetchMessages(any(), any(), any()) } answers { messages }
         coEvery { messageRepository.fetchOlderMessages(any(), any(), any()) } returns emptyList()
@@ -207,19 +221,12 @@ class AdminChatViewModelTest {
             TestData.conversation(id = "new-conv", agentId = firstArg(), summary = secondArg())
         }
         coEvery { conversationRepository.updateConversation(any(), any(), any()) } returns Unit
-        coEvery { conversationManager.resolveAndSetActiveConversation(any(), any()) } answers {
-            val agentId = firstArg<String>()
-            val resolved = "conv-1"
-            activeConversationIds[agentId] = resolved
-            resolved
-        }
-        coEvery { conversationManager.createAndSetActiveConversation(any(), any()) } answers {
-            val agentId = firstArg<String>()
-            val summary = secondArg<String?>()
-            val conversation = TestData.conversation(id = "new-conv", agentId = agentId, summary = summary)
-            activeConversationIds[agentId] = conversation.id
-            conversation.id
-        }
+        // letta-mobile-w2hx.6: default fixture — every agent has "conv-1" cached
+        // as its most-recent conversation. This matches the legacy default
+        // (the old conversationManager.resolveAndSetActiveConversation stub
+        // returned "conv-1" for any agent). Tests can override per-agent by
+        // mutating `activeConversationIds`.
+        activeConversationIds.getOrPut("agent-1") { "conv-1" }
     }
 
     @After
@@ -245,7 +252,6 @@ class AdminChatViewModelTest {
             blockRepository,
             bugReportRepository,
             folderRepository,
-            conversationManager,
             conversationRepository,
             settingsRepository,
             internalBotClient,
@@ -352,7 +358,10 @@ class AdminChatViewModelTest {
 
     @Test
     fun `resolveConversationAndLoad exposes error state when conversation resolution fails`() = runTest {
-        coEvery { conversationManager.resolveAndSetActiveConversation(any(), any()) } throws IllegalStateException("Resolver offline")
+        // letta-mobile-w2hx.6: resolution now goes through ConversationRepository
+        // directly (refreshConversationsIfStale + getCachedConversations);
+        // make the refresh fail to simulate the same offline-resolver path.
+        coEvery { conversationRepository.refreshConversationsIfStale(any(), any()) } throws IllegalStateException("Resolver offline")
 
         val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
         advanceUntilIdle()
@@ -367,7 +376,8 @@ class AdminChatViewModelTest {
 
     @Test
     fun `resolveConversationAndLoad exposes no conversation state when no conversation exists`() = runTest {
-        coEvery { conversationManager.resolveAndSetActiveConversation(any(), any()) } returns null
+        // letta-mobile-w2hx.6: empty cache → no most-recent conv to resolve.
+        activeConversationIds.remove("agent-1")
 
         val vm = createViewModel(conversationId = null)
         advanceUntilIdle()
@@ -379,7 +389,7 @@ class AdminChatViewModelTest {
 
     @Test
     fun `sendMessage is blocked while conversation resolution is in error state`() = runTest {
-        coEvery { conversationManager.resolveAndSetActiveConversation(any(), any()) } throws IllegalStateException("Resolver offline")
+        coEvery { conversationRepository.refreshConversationsIfStale(any(), any()) } throws IllegalStateException("Resolver offline")
 
         val vm = createViewModel(conversationId = null)
         advanceUntilIdle()
@@ -417,7 +427,7 @@ class AdminChatViewModelTest {
         advanceUntilIdle()
 
         verify(exactly = 0) {
-            clientModeChatSender.streamMessage(any(), any(), any(), any())
+            clientModeChatSender.streamMessage(any(), any(), any())
         }
         coVerify(exactly = 1) {
             timelineRepository.sendMessage("conv-1", "Hello from timeline")
@@ -431,7 +441,12 @@ class AdminChatViewModelTest {
         every {
             clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
         } returns flow {
-            emit(BotStreamChunk(text = "Hel", conversationId = "client-conv"))
+            // letta-mobile (lettabot-uww.11): WS gateway emits PURE DELTAS.
+            // This test verifies routing through the client-mode sender,
+            // not merge semantics; emit a single delta that already reads
+            // as the final bubble content so the assertion below stays
+            // focused on routing. Adversarial multi-delta merge coverage
+            // lives in the byte-perfect reassembly tests below.
             emit(BotStreamChunk(text = "Hello from client mode", conversationId = "client-conv", done = true))
         }
 
@@ -453,6 +468,58 @@ class AdminChatViewModelTest {
         assertEquals(2, vm.uiState.value.messages.size)
         assertEquals("Hello from client mode", vm.uiState.value.messages.last().content)
         assertFalse(vm.uiState.value.isStreaming)
+    }
+
+    /**
+     * Apr 26 default-load: when entering an agent chat in Client Mode without
+     * an explicit conversationId nav arg and without a freshRouteKey, the VM
+     * should resolve the agent's most-recent server-side conversation and
+     * land the user there (rather than starting on an empty NoConversation
+     * screen). Fresh routes (`freshRouteKey != null`) keep their "new
+     * conversation" semantics.
+     */
+    @Test
+    fun `client mode resolves to most recent conversation when no nav arg and not fresh`() = runTest {
+        clientModeEnabledFlow.value = true
+
+        val vm = createViewModel(conversationId = null, freshRouteKey = null)
+        advanceUntilIdle()
+
+        // letta-mobile-w2hx.6: resolution now goes through ConversationRepository.
+        // Verify the VM ran the cached-conversations refresh + lookup for this
+        // agent, and landed on the most-recent ("conv-1" per the fixture).
+        coVerify(atLeast = 1) {
+            conversationRepository.refreshConversationsIfStale("agent-1", any())
+        }
+        verify(atLeast = 1) {
+            conversationRepository.getCachedConversations("agent-1")
+        }
+        assertEquals(
+            ConversationState.Ready("conv-1"),
+            vm.uiState.value.conversationState,
+        )
+    }
+
+    /**
+     * Apr 26 default-load: a fresh route (`freshRouteKey != null`) must NOT
+     * trigger the most-recent fallback in Client Mode — the user explicitly
+     * chose to start a new conversation, so we keep the in-memory path.
+     */
+    @Test
+    fun `client mode does not resolve recent conversation on fresh route`() = runTest {
+        clientModeEnabledFlow.value = true
+
+        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
+        advanceUntilIdle()
+
+        // letta-mobile-w2hx.6: fresh route → no resolve refresh fired.
+        coVerify(exactly = 0) {
+            conversationRepository.refreshConversationsIfStale(any(), any())
+        }
+        assertEquals(
+            ConversationState.NoConversation,
+            vm.uiState.value.conversationState,
+        )
     }
 
     @Test
@@ -574,7 +641,6 @@ class AdminChatViewModelTest {
                 screenAgentId = any(),
                 text = any(),
                 conversationId = any(),
-                forceFreshConversation = any(),
             )
         } returns chunks.consumeAsFlow()
 
@@ -669,12 +735,32 @@ class AdminChatViewModelTest {
         every {
             clientModeChatSender.streamMessage(screenAgentId = any(), text = any(), existingConversationId = any(), isFreshRoute = any())
         } returns flow {
-            // Chunk #1 — gateway hasn't echoed conversationId yet.
+            // letta-mobile-flk.4 regression repro: realistic DELTA wire
+            // shape (each frame contributes a NEW fragment, not a
+            // cumulative snapshot — verified against the live lettabot WS
+            // gateway). Earlier this test used snapshot-shape data
+            // ["Hel","Hello","Hello world"] which masked the migration
+            // carry-over bug because chunks #2/#3 happened to be
+            // prefix-shaped relative to the timeline's seed-from-chunk-#2
+            // content. With genuine delta shape, the absence of carry-over
+            // produces a final bubble of "lo world" instead of "Hello world"
+            // — which is exactly the "lost first few characters" symptom
+            // Emmanuel reported. Markdown rendering then breaks if the
+            // dropped leading characters contained markdown openers (`**`,
+            // `# `, ``` ``` `, etc.).
+            //
+            // Chunk #1 — gateway hasn't echoed conversationId yet (legacy
+            // in-memory path); accumulated assistant content is "Hel".
             emit(BotStreamChunk(text = "Hel", conversationId = null, event = BotStreamEvent.ASSISTANT))
-            // Chunk #2 — conversationId now present; should NOT erase the
-            // "Hel" fragment from chunk #1.
-            emit(BotStreamChunk(text = "Hello", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
-            emit(BotStreamChunk(text = "Hello world", conversationId = "client-conv", done = true))
+            // Chunk #2 — conversationId now present. Migration runs; must
+            // carry "Hel" into the timeline before this chunk's delta
+            // ("lo ") is applied. Without carry-over, the timeline's
+            // assistant Local seeds with just "lo " and the "Hel" prefix
+            // is lost forever.
+            emit(BotStreamChunk(text = "lo ", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            // Chunk #3 — pure delta on top of the timeline seed.
+            emit(BotStreamChunk(text = "world", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            emit(BotStreamChunk(conversationId = "client-conv", done = true))
         }
 
         val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
@@ -686,12 +772,53 @@ class AdminChatViewModelTest {
         val assistant = vm.uiState.value.messages.lastOrNull { it.role == "assistant" }
         assertNotNull("assistant bubble must be rendered", assistant)
         assertEquals(
-            "final assistant bubble must include the chunk-1 (legacy-path) fragment",
+            "final assistant bubble must include the chunk-1 (legacy-path) fragment " +
+                "carried over by the timeline migration",
             "Hello world",
             assistant!!.content,
         )
         assertFalse("isStreaming must clear once stream completes", vm.uiState.value.isStreaming)
         assertFalse("isAgentTyping must clear once stream completes", vm.uiState.value.isAgentTyping)
+    }
+
+    /**
+     * letta-mobile-flk.4 regression test (markdown-specific): when the
+     * dropped leading chars contained markdown openers, the entire bubble
+     * renders unformatted (the unmatched closer `**` becomes literal text).
+     * This pins the carry-over so we don't regress on markdown rendering.
+     */
+    @Test
+    fun `client mode carries markdown openers across migration`() = runTest {
+        clientModeEnabledFlow.value = true
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
+        } returns flow {
+            // Chunk #1 — pre-conv, contains the OPENING `**`.
+            emit(BotStreamChunk(text = "**bold", conversationId = null, event = BotStreamEvent.ASSISTANT))
+            // Chunk #2 — post-conv, contains the CLOSING `**`. If chunk #1
+            // is dropped by migration, the bubble shows " text**" with an
+            // unmatched closer (literal asterisks).
+            emit(BotStreamChunk(text = " text**", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            emit(BotStreamChunk(conversationId = "client-conv", done = true))
+        }
+
+        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
+        advanceUntilIdle()
+
+        vm.sendMessage("hi")
+        advanceUntilIdle()
+
+        val assistant = vm.uiState.value.messages.lastOrNull { it.role == "assistant" }
+        assertNotNull("assistant bubble must be rendered", assistant)
+        assertEquals(
+            "final assistant bubble must contain the full markdown including the chunk-1 opener",
+            "**bold text**",
+            assistant!!.content,
+        )
     }
 
     /**
@@ -796,37 +923,20 @@ class AdminChatViewModelTest {
         assertFalse(vm.uiState.value.isStreaming)
     }
 
-    /**
-     * letta-mobile-lv3e: defensive snapshot-shape guard. If the gateway
-     * EVER switches back to cumulative-snapshot semantics, the merge
-     * heuristic must detect it (incoming.startsWith(existing) → replace
-     * with incoming, don't double-concat). Mirrors the SSE-path guard
-     * in TimelineSyncLoop:1132-1138.
-     */
-    @Test
-    fun `client mode chunks survive accidental cumulative-snapshot frames`() = runTest {
-        clientModeEnabledFlow.value = true
-        every {
-            clientModeChatSender.streamMessage(any(), any(), any(), any())
-        } returns flow {
-            // Simulate a future gateway misbehavior: first two frames are
-            // deltas, third frame mistakenly carries the FULL accumulated
-            // text. Guard must NOT double-concat.
-            emit(BotStreamChunk(text = "Hel", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
-            emit(BotStreamChunk(text = "lo ", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
-            emit(BotStreamChunk(text = "Hello world", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
-            emit(BotStreamChunk(conversationId = "client-conv", done = true))
-        }
-
-        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
-        advanceUntilIdle()
-        vm.sendMessage("hi")
-        advanceUntilIdle()
-
-        val assistant = vm.uiState.value.messages.lastOrNull { it.role == "assistant" }
-        assertNotNull(assistant)
-        assertEquals("Hello world", assistant!!.content)
-    }
+    // letta-mobile (lettabot-uww.11): the prior test
+    // `client mode chunks survive accidental cumulative-snapshot frames`
+    // intentionally codified the wucn-snapshot-recovery client-side defense
+    // (collapse a frame whose text equals the running accumulator). That
+    // defense was the bug: it silently dropped legitimate deltas whose
+    // head matched a prefix of the accumulator (the "A[LLM snapshots]" →
+    // "A[LLMapshots|" field repro). The contract — verified by the
+    // server-side gateway e2e suite ws-gateway.e2e.test.ts §
+    // "assistant text reassembly" (37 byte-perfect reassembly cases) —
+    // is that the gateway emits PURE DELTAS. If we ever see a true
+    // duplicate frame on the wire, that's a server-side gateway bug to
+    // fix at the source, not papered over on the client. The byte-perfect
+    // reassembly tests below (prefix collisions, mermaid char-by-char,
+    // exact field repro) already enforce the new contract.
 
     /**
      * letta-mobile-lv3e: golden trace from a real lettabot WS session.
@@ -845,7 +955,7 @@ class AdminChatViewModelTest {
         clientModeEnabledFlow.value = true
         val (fragments, expected) = loadWsstreamGoldenFragments()
         every {
-            clientModeChatSender.streamMessage(any(), any(), any(), any())
+            clientModeChatSender.streamMessage(any(), any(), any())
         } returns flow {
             fragments.forEach { frag ->
                 emit(BotStreamChunk(text = frag, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
@@ -877,7 +987,7 @@ class AdminChatViewModelTest {
     fun `client mode multi-chunk reasoning stream renders concatenated reasoning bubble`() = runTest {
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(any(), any(), any(), any())
+            clientModeChatSender.streamMessage(any(), any(), any())
         } returns flow {
             emit(BotStreamChunk(text = "Let", conversationId = "client-conv", event = BotStreamEvent.REASONING))
             emit(BotStreamChunk(text = " me ", conversationId = "client-conv", event = BotStreamEvent.REASONING))
@@ -931,7 +1041,7 @@ class AdminChatViewModelTest {
             put("limit", kotlinx.serialization.json.JsonPrimitive(5))
         }
         every {
-            clientModeChatSender.streamMessage(any(), any(), any(), any())
+            clientModeChatSender.streamMessage(any(), any(), any())
         } returns flow {
             // Interleaved with delta-shaped assistant text — the two
             // wire shapes must not interfere with each other.
@@ -1019,7 +1129,7 @@ class AdminChatViewModelTest {
         assertTrue("batch2 should exceed wucn threshold", batch2.length >= 32)
 
         every {
-            clientModeChatSender.streamMessage(any(), any(), any(), any())
+            clientModeChatSender.streamMessage(any(), any(), any())
         } returns flow {
             emit(BotStreamChunk(text = batch1, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
             emit(BotStreamChunk(text = batch2, conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
@@ -1077,7 +1187,7 @@ class AdminChatViewModelTest {
     fun `client mode renders tool call and tool result chunks as tool card`() = runTest {
         clientModeEnabledFlow.value = true
         every {
-            clientModeChatSender.streamMessage(any(), any(), any(), any())
+            clientModeChatSender.streamMessage(any(), any(), any())
         } returns flow {
             emit(
                 BotStreamChunk(
@@ -1123,7 +1233,7 @@ class AdminChatViewModelTest {
             TestData.appMessage(id = "timeline-assistant", messageType = MessageType.ASSISTANT, content = "Timeline reply"),
         )
         every {
-            clientModeChatSender.streamMessage(any(), any(), any(), any())
+            clientModeChatSender.streamMessage(any(), any(), any())
         } returns flow {
             emit(BotStreamChunk(text = "Client reply", conversationId = "client-conv", done = true))
         }
@@ -1165,7 +1275,6 @@ class AdminChatViewModelTest {
             blockRepository,
             bugReportRepository,
             folderRepository,
-            conversationManager,
             conversationRepository,
             settingsRepository,
             internalBotClient,
@@ -1221,8 +1330,10 @@ class AdminChatViewModelTest {
             TestData.appMessage(id = "existing-user", messageType = MessageType.USER, content = "Earlier message"),
             TestData.appMessage(id = "existing-assistant", messageType = MessageType.ASSISTANT, content = "Existing reply"),
         )
-        every { conversationManager.getActiveConversationId(any()) } returns null
-        coEvery { conversationManager.resolveAndSetActiveConversation(any(), any()) } returns null
+        // letta-mobile-w2hx.6: empty cache → resolve fallback would yield none.
+        // The VM must still hydrate the explicit `conv-1` nav arg rather than
+        // falling back to NoConversation.
+        activeConversationIds.remove("agent-1")
 
         val vm = createViewModel(conversationId = "conv-1")
         advanceUntilIdle()
@@ -1230,7 +1341,6 @@ class AdminChatViewModelTest {
         assertEquals(ConversationState.Ready("conv-1"), vm.uiState.value.conversationState)
         assertTrue(vm.uiState.value.messages.any { it.id == "existing-user" })
         assertTrue(vm.uiState.value.messages.any { it.id == "existing-assistant" })
-        verify { conversationManager.setActiveConversation("agent-1", "conv-1") }
     }
 
     @Test
@@ -1289,7 +1399,6 @@ class AdminChatViewModelTest {
             blockRepository,
             bugReportRepository,
             folderRepository,
-            conversationManager,
             conversationRepository,
             settingsRepository,
             internalBotClient,
@@ -1392,7 +1501,6 @@ class AdminChatViewModelTest {
             blockRepository,
             bugReportRepository,
             folderRepository,
-            conversationManager,
             conversationRepository,
             settingsRepository,
             internalBotClient,
@@ -1433,7 +1541,6 @@ class AdminChatViewModelTest {
             blockRepository,
             bugReportRepository,
             folderRepository,
-            conversationManager,
             conversationRepository,
             settingsRepository,
             internalBotClient,
@@ -1484,7 +1591,6 @@ class AdminChatViewModelTest {
             blockRepository,
             bugReportRepository,
             folderRepository,
-            conversationManager,
             conversationRepository,
             settingsRepository,
             internalBotClient,
@@ -1519,7 +1625,6 @@ class AdminChatViewModelTest {
             blockRepository,
             bugReportRepository,
             folderRepository,
-            conversationManager,
             conversationRepository,
             settingsRepository,
             internalBotClient,
@@ -1549,7 +1654,6 @@ class AdminChatViewModelTest {
             blockRepository,
             bugReportRepository,
             folderRepository,
-            conversationManager,
             conversationRepository,
             settingsRepository,
             internalBotClient,
@@ -1582,44 +1686,47 @@ class AdminChatViewModelTest {
     }
 
     /**
-     * Regression for letta-mobile-nw2e.
+     * Regression for letta-mobile-nw2e — preserved post-w2hx.6 via per-VM
+     * binding instead of cross-VM mutation of a shared singleton.
      *
-     * The prior `startTimelineObserver` used `if (timelineObserverJob?.isActive == true) return`,
-     * which silently ignored conversation switches: once the observer was
-     * bound to conv-A, selecting conv-B would NOT rebind. The user then sat
-     * on conv-B's screen watching it never update because no TimelineSync
-     * loop was ever started for conv-B.
+     * Original failure mode: `startTimelineObserver` used
+     * `if (timelineObserverJob?.isActive == true) return`, silently ignoring
+     * conversation switches once bound to conv-A.
      *
-     * Acceptance: when the viewmodel is asked to resolve a different
-     * conversation after the first one, `timelineRepository.observe(convB)`
-     * AND `getOrCreate(convB)` must both be invoked at least once. Using
-     * atLeast=1 so we're resilient to internal retries or repeated binds.
+     * Pre-w2hx.6 the test mutated the agent-keyed ConversationManager map
+     * and called `vm.retryConversationLoad()` to force a re-resolve to
+     * conv-B in the same VM. After w2hx.6 the VM owns its own
+     * `activeConversationId` (no shared singleton), and conversation
+     * switching is modeled by navigation creating a NEW VM with the new
+     * conversationId nav arg — which is what we exercise here. Each VM
+     * must bind its own observer to its own conv. The original
+     * `isActive == true` guard would have meant a single VM only ever
+     * observed once; the per-VM equivalent failure mode is "two VMs sharing
+     * an observer" or "neither VM ever binds". We assert both VMs bind
+     * their respective conversation ids.
      */
     @Test
     fun `switching conversations triggers fresh timeline observer bind`() = runTest {
-        // Seed the conversation manager to resolve to "conv-A" first.
         activeConversationIds["agent-1"] = "conv-A"
 
         val vm = createViewModel(agentId = "agent-1", conversationId = null)
         advanceUntilIdle()
 
-        // Capture arguments of every observe() + getOrCreate() call the VM
-        // has made so far. Baseline MUST include conv-A.
         coVerify(atLeast = 1) { timelineRepository.observe("conv-A") }
         coVerify(atLeast = 1) { timelineRepository.getOrCreate("conv-A") }
 
-        // Simulate user picking conv-B in the conversation picker. The
-        // production flow invokes conversationManager.setActiveConversation()
-        // and then retryConversationLoad() (== resolveConversationAndLoad()).
-        activeConversationIds["agent-1"] = "conv-B"
-        vm.retryConversationLoad()
+        // Simulate user picking conv-B in the conversation picker, which in
+        // production triggers a nav re-entry with a new conversationId arg
+        // → fresh VM under that nav route.
+        val vmB = createViewModel(agentId = "agent-1", conversationId = "conv-B")
         advanceUntilIdle()
 
-        // The fix: observer must rebind to conv-B. If nw2e regresses,
-        // these verifications fail because the old `isActive == true`
-        // guard short-circuits and conv-B is never observed.
         coVerify(atLeast = 1) { timelineRepository.observe("conv-B") }
         coVerify(atLeast = 1) { timelineRepository.getOrCreate("conv-B") }
+
+        // Sanity: each VM is on its own conv.
+        assertEquals(ConversationState.Ready("conv-A"), vmA.uiState.value.conversationState)
+        assertEquals(ConversationState.Ready("conv-B"), vmB.uiState.value.conversationState)
     }
 
     /**
@@ -1796,6 +1903,148 @@ class AdminChatViewModelTest {
                 attachments = emptyList(),
             )
         }
+    }
+
+    /**
+     * letta-mobile-w2hx.5: two chats opened on different agents must each
+     * resolve their own agent header from conversation/agent metadata, and
+     * a send in chat A must NOT route through chat B's conversation.
+     *
+     * This is the bound-agent no-bleedover acceptance test. The chat row
+     * (today: a (agentId, conversationId) nav route) is the routing key —
+     * conversation_id is the primary identity that flows into the
+     * timeline send path. There is no shared per-agent state that can
+     * leak chat A's text into chat B's conversation.
+     *
+     * Note: removing the residual ConversationManager in-memory map keyed
+     * on agentId is captured by w2hx.6.
+     */
+    @Test
+    fun `w2hx_5 two chats different agents do not bleed over conversation routing`() = runTest {
+        // Per-agent metadata so each VM's agent header is distinguishable.
+        every { agentRepository.getAgent("agent-A") } returns
+            flowOf(TestData.agent(id = "agent-A", name = "Agent Alpha"))
+        every { agentRepository.getAgent("agent-B") } returns
+            flowOf(TestData.agent(id = "agent-B", name = "Agent Beta"))
+
+        // Each agent's "active conversation" is its own server-side conv.
+        // Post-w2hx.6 there's no shared agent-keyed map: each VM (chat row)
+        // owns its own conversation_id, and routing is by conversation_id,
+        // so there's no place for state to leak between sibling chats.
+        // Seed the cached-conversations fixture so the per-VM resolve
+        // helper maps each agent → its own most-recent conv.
+        activeConversationIds["agent-A"] = "conv-A"
+        activeConversationIds["agent-B"] = "conv-B"
+
+        val vmA = createViewModel(agentId = "agent-A", conversationId = "conv-A")
+        val vmB = createViewModel(agentId = "agent-B", conversationId = "conv-B")
+        advanceUntilIdle()
+
+        // Each chat resolves its own agent header from metadata, not a
+        // shared bound-agent slot.
+        assertEquals("Agent Alpha", vmA.uiState.value.agentName)
+        assertEquals("Agent Beta", vmB.uiState.value.agentName)
+        assertEquals(
+            ConversationState.Ready("conv-A"),
+            vmA.uiState.value.conversationState,
+        )
+        assertEquals(
+            ConversationState.Ready("conv-B"),
+            vmB.uiState.value.conversationState,
+        )
+
+        // Send in chat A. The send must target conv-A, never conv-B.
+        vmA.sendMessage("hello from A")
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) {
+            timelineRepository.sendMessage("conv-A", "hello from A")
+        }
+        coVerify(exactly = 0) {
+            timelineRepository.sendMessage("conv-B", any())
+        }
+
+        // Chat B's conversation state is untouched by chat A's send.
+        assertEquals(
+            ConversationState.Ready("conv-B"),
+            vmB.uiState.value.conversationState,
+        )
+        assertFalse(vmB.uiState.value.isStreaming)
+
+        // Now send in chat B. Routing is to conv-B, never conv-A.
+        vmB.sendMessage("hello from B")
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) {
+            timelineRepository.sendMessage("conv-B", "hello from B")
+        }
+        coVerify(exactly = 1) {
+            // Still exactly one A send across the whole test — no
+            // duplication, no cross-talk.
+            timelineRepository.sendMessage("conv-A", "hello from A")
+        }
+    }
+
+    /**
+     * letta-mobile-9pfm regression repro:
+     *
+     * Fresh-route Client Mode send must show the user bubble optimistically
+     * BEFORE any gateway chunk arrives. The send coroutine writes to
+     * `clientModeMessages` + `_uiState.messages` synchronously at lines
+     * 1107–1109 in AdminChatViewModel, with `isStreaming=true` set right
+     * after. If anything between the optimistic write and the first
+     * stream chunk clobbers `_uiState.messages`, the user sees no
+     * echo of their input.
+     *
+     * This test pins the optimistic-bubble contract: send → assert the
+     * "user" message is present BEFORE we deliver any gateway chunk.
+     */
+    @Test
+    fun `fresh route client mode shows optimistic user bubble before any chunk arrives`() = runTest {
+        clientModeEnabledFlow.value = true
+        // Empty active-conv map → fresh route. No timeline pre-seed.
+        activeConversationIds.clear()
+        messages = emptyList()
+
+        // Channel-backed flow: nothing emitted until we explicitly send.
+        val chunks = Channel<BotStreamChunk>(capacity = Channel.UNLIMITED)
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
+        } returns chunks.consumeAsFlow()
+
+        val vm = createViewModel(conversationId = null, freshRouteKey = 9999L)
+        advanceUntilIdle()
+
+        // Pre-condition: empty.
+        assertEquals(ConversationState.NoConversation, vm.uiState.value.conversationState)
+        assertTrue(vm.uiState.value.messages.isEmpty())
+
+        vm.sendMessage("hello fresh")
+        // Drive the send coroutine up to the first chunks.receive() suspend.
+        advanceUntilIdle()
+
+        // CRITICAL: user bubble must be visible before any chunk arrives.
+        val userBubbles = vm.uiState.value.messages.filter { it.role == "user" }
+        assertEquals(
+            "Expected exactly one optimistic user bubble before stream chunks; " +
+                "messages=${vm.uiState.value.messages.map { "${it.role}=${it.content}" }}",
+            1,
+            userBubbles.size,
+        )
+        assertEquals("hello fresh", userBubbles.first().content)
+
+        // And isStreaming/isAgentTyping must be true so the spinner shows.
+        assertTrue("isStreaming must be true mid-flight", vm.uiState.value.isStreaming)
+        assertTrue("isAgentTyping must be true before first chunk", vm.uiState.value.isAgentTyping)
+
+        // Cleanup
+        chunks.send(BotStreamChunk(text = "reply", conversationId = "client-conv", done = true))
+        chunks.close()
+        advanceUntilIdle()
     }
 }
 

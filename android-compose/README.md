@@ -27,7 +27,6 @@ The codebase intentionally has two chat layers:
 
 This split is intentional, not accidental duplication. Shared primitives remain below both paths:
 
-- `ConversationManager`
 - `ConversationRepository`
 - `MessageRepository`
 

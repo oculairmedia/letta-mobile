@@ -5,19 +5,22 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Configuration for a single bot agent — Kotlin equivalent of lettabot's LettaBotConfig.
+ * Configuration for a single bot **transport** — Kotlin equivalent of lettabot's LettaBotConfig.
  *
- * Defines how a bot session should operate: which agent to use, how to route
- * conversations, which channels to enable, and (for local mode) which device
- * context providers to activate.
+ * letta-mobile-w2hx.4: this used to bind one config to one specific agent
+ * via `agentId`. That was a layer violation: the bot is a transport (HTTP
+ * or WebSocket pipe to a lettabot/Letta backend), not an agent binder.
+ * The agent identity travels per-message on `ChannelMessage.targetAgentId`
+ * and is multiplexed on the wire by the per-agent session pool (.3).
+ *
+ * The only remaining agent-bound knob is [heartbeatAgentId], which exists
+ * because heartbeat schedules need a deterministic target (no "current
+ * chat" exists when WorkManager fires offline).
  */
 @Serializable
 data class BotConfig(
-    /** Unique config ID for persistence. */
+    /** Unique config ID for persistence. Sessions are keyed on this, not on any agent ID. */
     val id: String,
-
-    /** The Letta agent ID this bot manages. */
-    @SerialName("agent_id") val agentId: String,
 
     /** Human-readable display name for this bot. */
     @SerialName("display_name") val displayName: String = "",
@@ -59,6 +62,17 @@ data class BotConfig(
     @SerialName("auto_start") val autoStart: Boolean = false,
 
     @SerialName("heartbeat_enabled") val heartbeatEnabled: Boolean = false,
+
+    /**
+     * Optional Letta agent ID that scheduled heartbeats should target.
+     *
+     * Unlike interactive chat, where the active chat row supplies the
+     * target agent per-message, heartbeats fire from WorkManager when no
+     * UI exists. They need a deterministic agent. `null` means heartbeat
+     * is disabled even if `heartbeatEnabled=true` — guarded at the
+     * scheduler.
+     */
+    @SerialName("heartbeat_agent_id") val heartbeatAgentId: String? = null,
 
     @SerialName("heartbeat_interval_minutes") val heartbeatIntervalMinutes: Long = 60,
 

@@ -48,7 +48,11 @@ class BotConfigEditViewModel @Inject constructor(
     var agentSearchExpanded by mutableStateOf(false)
 
     var displayName by mutableStateOf("")
-    var agentId by mutableStateOf("")
+    // letta-mobile-w2hx.4: this field used to be the bot's "bound" agent.
+    // The bot is a transport now — chats supply their own agent per
+    // message. The picker survives because heartbeats and scheduled jobs
+    // still need a deterministic target agent.
+    var heartbeatAgentId by mutableStateOf("")
     var selectedAgentName by mutableStateOf<String?>(null)
     var mode by mutableStateOf(BotConfig.Mode.LOCAL)
     var remoteUrl by mutableStateOf("")
@@ -96,14 +100,14 @@ class BotConfigEditViewModel @Inject constructor(
     }
 
     fun selectAgent(agent: Agent) {
-        agentId = agent.id
+        heartbeatAgentId = agent.id
         selectedAgentName = agent.name
         agentSearchQuery = ""
         agentSearchExpanded = false
     }
 
     fun clearAgentSelection() {
-        agentId = ""
+        heartbeatAgentId = ""
         selectedAgentName = null
     }
 
@@ -112,7 +116,7 @@ class BotConfigEditViewModel @Inject constructor(
         val config = configs.find { it.id == id } ?: return
         configId = config.id
         displayName = config.displayName
-        agentId = config.agentId
+        heartbeatAgentId = config.heartbeatAgentId.orEmpty()
         mode = config.mode
         remoteUrl = config.remoteUrl ?: ""
         remoteToken = config.remoteToken ?: ""
@@ -136,8 +140,9 @@ class BotConfigEditViewModel @Inject constructor(
         scheduledJobs.clear()
         scheduledJobs.addAll(config.scheduledJobs)
 
-        // Resolve agent name from cached agents
-        val cachedAgent = agentRepository.getCachedAgent(config.agentId)
+        // Resolve agent name from cached agents (used for the heartbeat
+        // target picker label; null when heartbeat agent isn't set).
+        val cachedAgent = config.heartbeatAgentId?.let { agentRepository.getCachedAgent(it) }
         selectedAgentName = cachedAgent?.name
     }
 
@@ -177,8 +182,11 @@ class BotConfigEditViewModel @Inject constructor(
     fun unknownEnabledSkillIds(): List<String> = enabledSkills.filterNot { it in availableSkillsById }
 
     fun save(onSuccess: () -> Unit, onError: (String) -> Unit) {
-        if (agentId.isBlank()) {
-            onError("Agent ID is required")
+        // letta-mobile-w2hx.4: agent is no longer required to save a
+        // config — the bot is a transport. Heartbeat needs an agent
+        // though, so guard there:
+        if (heartbeatEnabled && heartbeatAgentId.isBlank()) {
+            onError("Heartbeat agent is required when heartbeat is enabled")
             return
         }
         val unknownSkillIds = unknownEnabledSkillIds()
@@ -188,7 +196,7 @@ class BotConfigEditViewModel @Inject constructor(
         }
         val config = BotConfig(
             id = configId,
-            agentId = agentId.trim(),
+            heartbeatAgentId = heartbeatAgentId.trim().ifBlank { null },
             displayName = displayName.trim(),
             mode = mode,
             remoteUrl = remoteUrl.trim().ifBlank { null },
