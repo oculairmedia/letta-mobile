@@ -758,15 +758,15 @@ class TimelineSyncLoop(
                 order = "desc",
             ).reversed()
             serverMessages.forEach { msg ->
-                val msgOtid = msg.otid ?: return@forEach
-                val byOtid = _state.value.findByOtid(msgOtid)
-                val byServerId = _state.value.findByServerId(msg.id)
+                msg.otid ?: return@forEach
+                // Never append a standalone TOOL_RETURN event — they
+                // attach to their TOOL_CALL below. letta-mobile-mge5.21.
+                val pos = _state.value.nextLocalPosition()
+                val confirmed = msg.toTimelineEvent(position = pos) ?: return@forEach
+                if (confirmed.messageType == TimelineMessageType.TOOL_RETURN) return@forEach
+                val byOtid = _state.value.findByOtid(confirmed.otid)
+                val byServerId = _state.value.findByServerId(msg.id, confirmed.messageType)
                 if (byOtid == null && byServerId == null) {
-                    // Never append a standalone TOOL_RETURN event — they
-                    // attach to their TOOL_CALL below. letta-mobile-mge5.21.
-                    val pos = _state.value.nextLocalPosition()
-                    val confirmed = msg.toTimelineEvent(position = pos) ?: return@forEach
-                    if (confirmed.messageType == TimelineMessageType.TOOL_RETURN) return@forEach
                     _state.value = _state.value.append(confirmed)
                     appended++
                 }
@@ -1226,7 +1226,7 @@ class TimelineSyncLoop(
         // letta-mobile-mge5: initial replaceByServerId-only fix produced
         // "All we got from your last message is look" (one delta's content)
         // instead of the full assistant text — reported 2026-04-18.
-        val existing = _state.value.findByServerId(confirmed.serverId)
+        val existing = _state.value.findByServerId(confirmed.serverId, confirmed.messageType)
         if (existing != null) {
             val oldText = existing.content
             val newText = confirmed.content
@@ -1434,7 +1434,7 @@ internal fun LettaMessage.toTimelineEvent(position: Double): TimelineEvent.Confi
         is PingMessage, is UnknownMessage, is StopReason, is UsageStatistics,
         is com.letta.mobile.data.model.ErrorMessage -> emptyList()
     }
-    val effectiveOtid = otid ?: "server-$id"
+    val effectiveOtid = otid ?: "server-$id-${type.name.lowercase()}"
     val date = runCatching { date?.let(Instant::parse) ?: Instant.now() }.getOrElse { Instant.now() }
     val toolCallsList = when (this) {
         is ToolCallMessage -> effectiveToolCalls

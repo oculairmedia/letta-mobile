@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.MessageCreateRequest
+import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.SystemMessage
 import com.letta.mobile.data.model.UserMessage
 import io.ktor.utils.io.ByteChannel
@@ -183,6 +184,49 @@ class TimelineSyncLoopTest {
             "lettabot-uww.11: streaming deltas must concatenate byte-for-byte under prefix collisions",
             expected,
             assistant!!.content,
+        )
+        scope.coroutineContext.job.cancel()
+    }
+
+    @Test
+    fun `streamed reasoning and assistant frames with same server id stay separate`() = runBlocking {
+        val api = FakeSyncApi()
+        api.nextStreamMessages = listOf(
+            ReasoningMessage(
+                id = "shared-step-id",
+                reasoning = "thinking about it",
+            ),
+            AssistantMessage(
+                id = "shared-step-id",
+                contentRaw = JsonPrimitive("final answer"),
+            ),
+        )
+        val scope = CoroutineScope(Dispatchers.IO)
+        val sync = TimelineSyncLoop(api, "conv1", scope)
+
+        sync.send("hello")
+
+        withTimeout(5_000) {
+            while (true) {
+                val confirmed = sync.state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
+                    .filter { it.serverId == "shared-step-id" }
+                if (
+                    confirmed.any { it.messageType == TimelineMessageType.REASONING } &&
+                    confirmed.any { it.messageType == TimelineMessageType.ASSISTANT }
+                ) break
+                delay(10)
+            }
+        }
+
+        val confirmed = sync.state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.serverId == "shared-step-id" }
+        val reasoning = confirmed.single { it.messageType == TimelineMessageType.REASONING }
+        val assistant = confirmed.single { it.messageType == TimelineMessageType.ASSISTANT }
+        assertEquals("thinking about it", reasoning.content)
+        assertEquals("final answer", assistant.content)
+        assertFalse(
+            "Reasoning and assistant content must not be concatenated into one echoed bubble",
+            assistant.content.contains(reasoning.content) || reasoning.content.contains(assistant.content),
         )
         scope.coroutineContext.job.cancel()
     }

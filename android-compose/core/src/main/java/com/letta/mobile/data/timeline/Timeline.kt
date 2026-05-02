@@ -257,8 +257,15 @@ data class Timeline(
      * subscriber to dedupe events that may arrive via both the stream and
      * a concurrent reconcile. See letta-mobile-mge5.
      */
-    fun findByServerId(serverId: String): TimelineEvent.Confirmed? =
-        events.firstOrNull { it is TimelineEvent.Confirmed && it.serverId == serverId } as? TimelineEvent.Confirmed
+    fun findByServerId(
+        serverId: String,
+        messageType: TimelineMessageType? = null,
+    ): TimelineEvent.Confirmed? =
+        events.firstOrNull {
+            it is TimelineEvent.Confirmed &&
+                it.serverId == serverId &&
+                (messageType == null || it.messageType == messageType)
+        } as? TimelineEvent.Confirmed
 
 
     /**
@@ -429,7 +436,9 @@ data class Timeline(
      */
     fun replaceByServerId(confirmed: TimelineEvent.Confirmed): Timeline {
         val idx = events.indexOfFirst {
-            it is TimelineEvent.Confirmed && it.serverId == confirmed.serverId
+            it is TimelineEvent.Confirmed &&
+                it.serverId == confirmed.serverId &&
+                it.messageType == confirmed.messageType
         }
         if (idx == -1) return this
         val existing = events[idx] as TimelineEvent.Confirmed
