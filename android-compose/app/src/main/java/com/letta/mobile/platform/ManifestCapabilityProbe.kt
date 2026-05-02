@@ -34,20 +34,27 @@ object ManifestCapabilityProbe {
     fun hasDeclaredService(
         context: Context,
         serviceClass: Class<*>,
-    ): Boolean {
-        val component = ComponentName(context, serviceClass)
-        return runCatching {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                context.packageManager.getServiceInfo(
-                    component,
-                    PackageManager.ComponentInfoFlags.of(PackageManager.GET_META_DATA.toLong()),
-                )
-            } else {
-                @Suppress("DEPRECATION")
-                context.packageManager.getServiceInfo(component, PackageManager.GET_META_DATA)
-            }
-        }.isSuccess
-    }
+    ): Boolean = hasDeclaredService(context, ComponentName(context, serviceClass))
+
+    fun hasDeclaredService(
+        context: Context,
+        serviceClassName: String,
+    ): Boolean = hasDeclaredService(context, ComponentName(context.packageName, serviceClassName))
+
+    private fun hasDeclaredService(
+        context: Context,
+        component: ComponentName,
+    ): Boolean = runCatching {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.packageManager.getServiceInfo(
+                component,
+                PackageManager.ComponentInfoFlags.of(PackageManager.GET_META_DATA.toLong()),
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            context.packageManager.getServiceInfo(component, PackageManager.GET_META_DATA)
+        }
+    }.isSuccess
 
     fun hasSystemFeature(
         context: Context,
