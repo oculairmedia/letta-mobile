@@ -4,16 +4,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.theme.customColors
 
@@ -34,24 +33,16 @@ fun TypingIndicator(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            DotPulse(color = MaterialTheme.colorScheme.onSurfaceVariant)
+            @OptIn(ExperimentalMaterial3ExpressiveApi::class)
+            LoadingIndicator(
+                modifier = Modifier.size(18.dp),
+                color = MaterialTheme.colorScheme.primary,
+            )
             Text(
                 text = "Thinking\u2026",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-    }
-}
-
-@Composable
-private fun DotPulse(color: Color) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Surface(modifier = Modifier.size(6.dp).alpha(0.38f), shape = CircleShape, color = color) {}
-        Surface(modifier = Modifier.size(6.dp).alpha(0.62f), shape = CircleShape, color = color) {}
-        Surface(modifier = Modifier.size(6.dp).alpha(0.90f), shape = CircleShape, color = color) {}
     }
 }

@@ -8,10 +8,6 @@ import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -36,9 +32,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -596,21 +594,6 @@ internal fun MessageReasoning(
         )
         else -> Modifier.animateContentSize()
     }
-    val thinkingPulseAlpha = if (isStreaming) {
-        val infiniteTransition = rememberInfiniteTransition(label = "thinkingPulse")
-        val alpha by infiniteTransition.animateFloat(
-            initialValue = 0.35f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 700),
-                repeatMode = RepeatMode.Reverse,
-            ),
-            label = "thinkingPulseAlpha",
-        )
-        alpha
-    } else {
-        1f
-    }
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -629,14 +612,10 @@ internal fun MessageReasoning(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (isStreaming) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .alpha(thinkingPulseAlpha)
-                        .background(
-                            color = MaterialTheme.colorScheme.primary,
-                            shape = RoundedCornerShape(percent = 50),
-                        ),
+                @OptIn(ExperimentalMaterial3ExpressiveApi::class)
+                LoadingIndicator(
+                    modifier = Modifier.size(18.dp),
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
             Text(
@@ -672,7 +651,7 @@ internal fun MessageReasoning(
             exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 4 }) + shrinkVertically(),
         ) {
             val lineColor = if (isStreaming) {
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.45f + (thinkingPulseAlpha * 0.35f))
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.72f)
             } else {
                 MaterialTheme.colorScheme.outlineVariant
             }
