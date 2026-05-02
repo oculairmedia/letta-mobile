@@ -91,6 +91,7 @@ class AdminChatViewModelTest {
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
+        InitialRouteMessageDeliveryGuard.resetForTests()
         messageRepository = mockk(relaxed = true)
         timelineRepository = mockk(relaxed = true)
         // letta-mobile-5s1n: stateful per-conversation Timeline state so the
@@ -2377,6 +2378,31 @@ class AdminChatViewModelTest {
         chunks.send(BotStreamChunk(text = "reply", conversationId = "client-conv", done = true))
         chunks.close()
         advanceUntilIdle()
+    }
+
+    @Test
+    fun `duplicate share route view models only deliver initial message once`() = runTest {
+        clientModeEnabledFlow.value = false
+        activeConversationIds["agent-1"] = "conv-1"
+        messages = emptyList()
+
+        createViewModel(
+            conversationId = null,
+            initialMessage = "https://example.com/shared-link",
+        )
+        advanceUntilIdle()
+        createViewModel(
+            conversationId = null,
+            initialMessage = "https://example.com/shared-link",
+        )
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) {
+            timelineRepository.sendMessage("conv-1", "https://example.com/shared-link")
+        }
+        verify(exactly = 0) {
+            clientModeChatSender.streamMessage(any(), any(), any())
+        }
     }
 
     @Test

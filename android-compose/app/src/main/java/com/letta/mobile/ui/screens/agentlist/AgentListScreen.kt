@@ -132,6 +132,14 @@ fun AgentListScreen(
     var pendingImportStripMessages by remember { mutableStateOf(false) }
     val snackbar = LocalSnackbarDispatcher.current
     val isShareMode = shareContentPreview != null
+    var shareNavigationConsumed by rememberSaveable(shareContentPreview) { mutableStateOf(false) }
+    fun selectAgent(agentId: String) {
+        if (isShareMode) {
+            if (shareNavigationConsumed) return
+            shareNavigationConsumed = true
+        }
+        onNavigateToAgent(agentId)
+    }
     val context = LocalContext.current
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -311,7 +319,7 @@ fun AgentListScreen(
                                     ) {
                                         FavoriteAgentCard(
                                             agent = favoriteAgent,
-                                            onClick = { onNavigateToAgent(favoriteAgent.id) },
+                                            onClick = { selectAgent(favoriteAgent.id) },
                                             onEdit = { onNavigateToEditAgent(favoriteAgent.id) },
                                             onUnfavorite = { viewModel.toggleFavorite(favoriteAgent.id) },
                                             contextualActionsEnabled = !isShareMode,
@@ -330,7 +338,7 @@ fun AgentListScreen(
                                         agent = agent,
                                         isFavorite = agent.id == uiState.favoriteAgentId,
                                         isPinned = agent.id in uiState.pinnedAgentIds,
-                                        onClick = { onNavigateToAgent(agent.id) },
+                                        onClick = { selectAgent(agent.id) },
                                         onLongPress = { onNavigateToEditAgent(agent.id) },
                                         onDelete = { viewModel.deleteAgent(agent.id) },
                                         onToggleFavorite = { viewModel.toggleFavorite(agent.id) },
@@ -355,7 +363,7 @@ fun AgentListScreen(
                                     item(key = "favorite-${favoriteAgent.id}") {
                                         FavoriteAgentCard(
                                             agent = favoriteAgent,
-                                            onClick = { onNavigateToAgent(favoriteAgent.id) },
+                                            onClick = { selectAgent(favoriteAgent.id) },
                                             onEdit = { onNavigateToEditAgent(favoriteAgent.id) },
                                             onUnfavorite = { viewModel.toggleFavorite(favoriteAgent.id) },
                                             contextualActionsEnabled = !isShareMode,
@@ -374,7 +382,7 @@ fun AgentListScreen(
                                         agent = agent,
                                         isFavorite = agent.id == uiState.favoriteAgentId,
                                         isPinned = agent.id in uiState.pinnedAgentIds,
-                                        onClick = { onNavigateToAgent(agent.id) },
+                                        onClick = { selectAgent(agent.id) },
                                         onLongPress = { onNavigateToEditAgent(agent.id) },
                                         onDelete = { viewModel.deleteAgent(agent.id) },
                                         onToggleFavorite = { viewModel.toggleFavorite(agent.id) },
