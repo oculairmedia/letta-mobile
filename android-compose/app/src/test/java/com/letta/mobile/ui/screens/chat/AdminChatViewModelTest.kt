@@ -628,6 +628,54 @@ class AdminChatViewModelTest {
     }
 
     @Test
+    fun `client mode ignores immediate stop emitted by send button recomposition race`() = runTest {
+        clientModeEnabledFlow.value = true
+        val chunks = Channel<BotStreamChunk>(capacity = Channel.UNLIMITED)
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
+        } returns chunks.consumeAsFlow()
+
+        val vm = createViewModel(conversationId = "conv-1")
+        advanceUntilIdle()
+
+        vm.sendMessage("ping")
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.isStreaming)
+        assertTrue(vm.uiState.value.isAgentTyping)
+
+        // On device, the send button can recompose to the stop button between
+        // press-down and release after sendMessage flips isStreaming=true. The
+        // resulting synthetic stop lands within a few hundred ms and must not
+        // cancel the stream before session_init / first assistant payload.
+        vm.interruptRun()
+        advanceUntilIdle()
+
+        assertTrue(
+            "Immediate interrupt should be ignored so the thinking indicator remains visible",
+            vm.uiState.value.isStreaming,
+        )
+        assertTrue(
+            "Immediate interrupt should not clear the typing indicator",
+            vm.uiState.value.isAgentTyping,
+        )
+        coVerify(exactly = 0) { messageRepository.cancelMessage(any(), any()) }
+
+        chunks.send(BotStreamChunk(text = "reply", conversationId = "conv-1", done = true))
+        chunks.close()
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.isStreaming)
+        assertTrue(
+            "Assistant response should still arrive after ignored immediate stop",
+            vm.uiState.value.messages.any { it.role == "assistant" && it.content.contains("reply") },
+        )
+    }
+
+    @Test
     fun `resetMessages clears client mode conversation state`() = runTest {
         clientModeEnabledFlow.value = true
         every {

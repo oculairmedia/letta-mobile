@@ -409,6 +409,7 @@ class AdminChatViewModel @Inject constructor(
      * the observer reads it.
      */
     @Volatile private var clientModeStreamInFlight: Boolean = false
+    @Volatile private var clientModeStreamStartedAtElapsedMs: Long = 0L
     /**
      * letta-mobile-5s1n design note (Option A — retained narrow fallback):
      *
@@ -461,6 +462,7 @@ class AdminChatViewModel @Inject constructor(
                         if (!enabled) {
                             clientModeStreamJob?.cancel()
                             clientModeStreamInFlight = false
+                            clientModeStreamStartedAtElapsedMs = 0L
                             _uiState.update {
                                 it.copy(
                                     isStreaming = false,
@@ -645,6 +647,15 @@ class AdminChatViewModel @Inject constructor(
 
     fun interruptRun() {
         if (!_uiState.value.isStreaming) return
+        val elapsedSinceClientModeStart = android.os.SystemClock.elapsedRealtime() -
+            clientModeStreamStartedAtElapsedMs
+        if (clientModeStreamInFlight && elapsedSinceClientModeStart in 0..750) {
+            Telemetry.event(
+                "AdminChatVM", "clientMode.ignoreImmediateInterrupt",
+                "elapsedMs" to elapsedSinceClientModeStart,
+            )
+            return
+        }
         viewModelScope.launch {
             val runIds = activeRunIds().takeIf { it.isNotEmpty() }
             _uiState.update {
@@ -663,6 +674,7 @@ class AdminChatViewModel @Inject constructor(
             }
             clientModeStreamJob?.cancel(CancellationException("User interrupted active run"))
             clientModeStreamInFlight = false
+            clientModeStreamStartedAtElapsedMs = 0L
         }
     }
 
@@ -1199,6 +1211,7 @@ class AdminChatViewModel @Inject constructor(
         // synchronously on UnconfinedTestDispatcher / immediate main) see
         // the flag even before `clientModeStreamJob` is assigned.
         clientModeStreamInFlight = true
+        clientModeStreamStartedAtElapsedMs = android.os.SystemClock.elapsedRealtime()
         clientModeStreamJob = viewModelScope.launch {
             android.util.Log.w("AdminChatVM-DEBUG", "sendMessageViaClientMode: launch started")
             val startedAt = java.time.Instant.now().toString()
@@ -1234,6 +1247,7 @@ class AdminChatViewModel @Inject constructor(
                     )
                 } catch (e: Exception) {
                     clientModeStreamInFlight = false
+                    clientModeStreamStartedAtElapsedMs = 0L
                     _uiState.value = _uiState.value.copy(
                         error = e.message ?: "Failed to create conversation",
                         isStreaming = false,
@@ -1630,6 +1644,7 @@ class AdminChatViewModel @Inject constructor(
                 )
             } finally {
                 clientModeStreamInFlight = false
+                clientModeStreamStartedAtElapsedMs = 0L
                 refreshContextWindow()
                 if (clientModeStreamJob?.isCancelled != false) {
                     clientModeStreamJob = null
