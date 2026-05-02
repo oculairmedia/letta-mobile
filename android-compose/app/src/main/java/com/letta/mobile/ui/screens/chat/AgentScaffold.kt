@@ -92,8 +92,6 @@ import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.FormItem
 
 import com.letta.mobile.util.ConnectivityMonitor
-import com.letta.mobile.ui.navigation.agentAvatarSharedElementKey
-import com.letta.mobile.ui.navigation.optionalSharedElement
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -175,11 +173,27 @@ fun AgentScaffold(
             topBar = {
                 TopAppBar(
                     title = {
-                        Text(
-                            text = screenTitle,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showConversationPicker = true }
+                                .padding(end = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(
+                                text = screenTitle,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                            Icon(
+                                LettaIcons.ArrowDropDown,
+                                contentDescription = "Switch conversation",
+                                modifier = Modifier.size(LettaIconSizing.Inline),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     },
                     colors = LettaTopBarDefaults.topAppBarColors(),
                     scrollBehavior = scrollBehavior,
@@ -227,13 +241,6 @@ fun AgentScaffold(
                         onCreateReport = { showBugReportSheet = true },
                     )
                 }
-                AgentConversationHeader(
-                    agentId = agentId,
-                    projectName = projectContext?.name,
-                    agentName = agentName,
-                    conversationId = conversationId,
-                    onClick = { showConversationPicker = true },
-                )
                 ChatScreen(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     chatBackground = chatBackground,
@@ -926,76 +933,6 @@ private fun ProjectInfoLine(
             color = MaterialTheme.colorScheme.onTertiaryContainer,
             modifier = Modifier.weight(1f),
         )
-    }
-}
-
-@Composable
-private fun AgentConversationHeader(
-    agentId: String,
-    projectName: String?,
-    agentName: String,
-    conversationId: String?,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val accentColors = MaterialTheme.customColors
-    Card(
-        onClick = onClick,
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = accentColors.freshAccentContainer,
-        ),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Icon(
-                LettaIcons.Agent,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .size(LettaIconSizing.Toolbar)
-                    .optionalSharedElement(agentAvatarSharedElementKey(agentId)),
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = projectName ?: agentName.ifBlank { stringResource(R.string.screen_chat_title) },
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = agentName.ifBlank { stringResource(R.string.common_unknown) },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    Text(
-                        text = if (conversationId != null) "Conversation" else "Default",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Icon(
-                        LettaIcons.ArrowDropDown,
-                        contentDescription = "Switch conversation",
-                        modifier = Modifier.size(LettaIconSizing.Inline),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
     }
 }
 
