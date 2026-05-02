@@ -59,6 +59,9 @@
     <string name="screen_system_access_audit_label">Audit policy</string>
     <string name="screen_system_access_risk_label">Policy risk</string>
     <string name="screen_system_access_settings_unavailable">Android settings could not be opened for this capability.</string>
+    <string name="screen_system_access_saf_file_granted">File access saved.</string>
+    <string name="screen_system_access_saf_folder_granted">Folder access saved.</string>
+    <string name="screen_system_access_saf_grant_failed">Android storage access could not be saved.</string>
     <string name="screen_system_access_action_future">This setup action will be wired by the capability implementation.</string>
     <string name="widget_tile_count_format">%d items</string>
     <string name="screen_home_usage_title">Usage</string>

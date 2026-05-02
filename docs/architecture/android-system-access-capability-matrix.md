@@ -62,6 +62,8 @@ Storage should be split into separate capabilities rather than represented as a 
 
 The app should avoid `MANAGE_EXTERNAL_STORAGE` in the Play flavor unless Letta Mobile becomes a genuine file-manager-style product, which is not the current core use case.
 
+Implementation status (`letta-mobile-wjtr`): the first storage layer now exposes app-private storage helpers for bounded list/read/write operations under `filesDir`, `cacheDir`, and `noBackupFilesDir`. Every app-private path is resolved through canonical containment checks before IO, absolute paths and `..` escapes fail closed, directory listings and reads are capped, and writes refuse to overwrite unless explicitly requested. SAF foundation code persists and lists Android picker grants and supports bounded direct-document read/write only when a matching persisted grant exists; broad tree search remains intentionally unsupported until bounded `DocumentFile` traversal and destructive-write approvals are added.
+
 ### 2. Contacts
 
 Contacts are sensitive personal data and should be exposed as read-only first. Tool design should separate:

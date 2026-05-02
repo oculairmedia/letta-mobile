@@ -74,13 +74,11 @@ fun SystemAccessDashboardScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val snackbar = LocalSnackbarDispatcher.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-    val settingsLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult(),
-    ) {
-        viewModel.refresh()
-    }
+    val permissionIntentHandler = systemAccessPermissionIntentHandler(
+        context = context,
+        onRefresh = viewModel::refresh,
+    )
 
     RefreshSystemAccessOnResume(onRefresh = viewModel::refresh)
 
@@ -108,21 +106,67 @@ fun SystemAccessDashboardScreen(
         SystemAccessDashboardBody(
             uiState = uiState,
             onRetry = viewModel::refresh,
-            onPermissionIntentClick = { intent ->
-                val canOpenSettings = intent.kind == SystemAccessPermissionIntentKind.SettingsDeepLink &&
-                    intent.settingsAction != null
-                if (canOpenSettings) {
-                    try {
-                        settingsLauncher.launch(intent.toAndroidIntent(context))
-                    } catch (_: ActivityNotFoundException) {
-                        snackbar.dispatch(context.getString(R.string.screen_system_access_settings_unavailable))
-                    }
-                } else {
-                    snackbar.dispatch(context.getString(R.string.screen_system_access_action_future))
-                }
-            },
+            onPermissionIntentClick = permissionIntentHandler,
             modifier = Modifier.padding(paddingValues),
         )
+    }
+}
+
+@Composable
+private fun systemAccessPermissionIntentHandler(
+    context: Context,
+    onRefresh: () -> Unit,
+): (SystemAccessPermissionIntent) -> Unit {
+    val snackbar = LocalSnackbarDispatcher.current
+    val settingsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) {
+        onRefresh()
+    }
+    val documentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            val message = if (persistSafGrant(context, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)) {
+                R.string.screen_system_access_saf_file_granted
+            } else {
+                R.string.screen_system_access_saf_grant_failed
+            }
+            snackbar.dispatch(context.getString(message))
+        }
+        onRefresh()
+    }
+    val treeLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree(),
+    ) { uri ->
+        val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        if (uri != null) {
+            val message = if (persistSafGrant(context, uri, flags)) {
+                R.string.screen_system_access_saf_folder_granted
+            } else {
+                R.string.screen_system_access_saf_grant_failed
+            }
+            snackbar.dispatch(context.getString(message))
+        }
+        onRefresh()
+    }
+
+    return { intent ->
+        val canOpenSettings = intent.kind == SystemAccessPermissionIntentKind.SettingsDeepLink &&
+            intent.settingsAction != null
+        if (canOpenSettings) {
+            try {
+                settingsLauncher.launch(intent.toAndroidIntent(context))
+            } catch (_: ActivityNotFoundException) {
+                snackbar.dispatch(context.getString(R.string.screen_system_access_settings_unavailable))
+            }
+        } else if (intent.id == "storage.saf.open_document") {
+            documentLauncher.launch(arrayOf("*/*"))
+        } else if (intent.id == "storage.saf.open_tree") {
+            treeLauncher.launch(null)
+        } else {
+            snackbar.dispatch(context.getString(R.string.screen_system_access_action_future))
+        }
     }
 }
 
@@ -333,6 +377,13 @@ private fun DetailLine(label: String, value: String) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
+
+private fun persistSafGrant(context: Context, uri: Uri, flags: Int): Boolean = try {
+    context.contentResolver.takePersistableUriPermission(uri, flags)
+    true
+} catch (_: SecurityException) {
+    false
 }
 
 private fun SystemAccessPermissionIntent.toAndroidIntent(context: Context): Intent {
