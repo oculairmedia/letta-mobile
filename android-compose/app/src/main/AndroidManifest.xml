@@ -83,6 +83,11 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".channel.ChatPushAlarmReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
         <service
             android:name=".channel.ChatPushService"
             android:exported="false"

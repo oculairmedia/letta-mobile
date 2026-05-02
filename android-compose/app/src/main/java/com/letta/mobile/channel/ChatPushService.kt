@@ -292,7 +292,7 @@ class ChatPushService : Service() {
         // letta-mobile-qv6d: see warmupSubscribers() for rationale.
         private const val WARMUP_CONVERSATION_COUNT = 5
 
-        fun start(context: Context) {
+        fun start(context: Context, scheduleRecoveryAlarm: Boolean = true): Boolean {
             // On Android 13+, POST_NOTIFICATIONS is runtime-granted. We still
             // start the service — the foreground service requires a
             // notification, but user can dismiss/disable the channel.
@@ -305,10 +305,27 @@ class ChatPushService : Service() {
                 // can still run but the notification is suppressed, which
                 // breaks the foreground contract on 13+.
                 Log.w(TAG, "POST_NOTIFICATIONS not granted; deferring ChatPushService start")
-                return
+                return false
             }
-            val intent = Intent(context, ChatPushService::class.java)
-            ContextCompat.startForegroundService(context, intent)
+
+            if (scheduleRecoveryAlarm) {
+                ChatPushAlarmScheduler.schedule(context)
+            }
+
+            return try {
+                val intent = Intent(context, ChatPushService::class.java)
+                ContextCompat.startForegroundService(context, intent)
+                Telemetry.event("ChatPushService", "started")
+                true
+            } catch (t: Throwable) {
+                // Alarm-based recovery may run while the app is backgrounded on
+                // modern Android versions. Foreground-service background-start
+                // restrictions can reject that launch; treat it as a telemetry
+                // signal and let the next inexact alarm try again later.
+                Log.w(TAG, "ChatPushService start rejected", t)
+                Telemetry.error("ChatPushService", "startFailed", t)
+                false
+            }
         }
     }
 }

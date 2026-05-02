@@ -68,7 +68,11 @@ class MainActivity : ComponentActivity() {
             val dynamicColor = settingsRepository.getDynamicColor().collectAsState(initial = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
             val notificationPermissionLauncher = rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.RequestPermission(),
-                onResult = {},
+                onResult = { granted ->
+                    if (granted) {
+                        ChatPushService.start(this@MainActivity)
+                    }
+                },
             )
 
             LaunchedEffect(Unit) {

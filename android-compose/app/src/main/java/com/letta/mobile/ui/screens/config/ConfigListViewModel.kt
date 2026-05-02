@@ -1,11 +1,14 @@
 package com.letta.mobile.ui.screens.config
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.letta.mobile.channel.ChatPushAlarmScheduler
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.ui.common.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -31,6 +34,7 @@ data class ConfigListUiState(
 @HiltViewModel
 class ConfigListViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
+    @param:ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<UiState<ConfigListUiState>>(UiState.Loading)
@@ -76,6 +80,9 @@ class ConfigListViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 settingsRepository.deleteConfig(configId)
+                if (settingsRepository.activeConfig.value == null) {
+                    ChatPushAlarmScheduler.cancel(appContext)
+                }
                 loadConfigs()
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(e.message ?: "Failed to delete config")

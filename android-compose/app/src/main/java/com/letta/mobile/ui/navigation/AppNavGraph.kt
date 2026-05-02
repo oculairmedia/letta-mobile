@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.navigation
 
+import android.content.Context
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -26,6 +27,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.letta.mobile.AppLaunchTarget
 import com.letta.mobile.NotificationNavigationTarget
+import com.letta.mobile.channel.ChatPushAlarmScheduler
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.ui.screens.projects.ProjectHomeScreen
@@ -64,6 +66,7 @@ import com.letta.mobile.ui.screens.telemetry.TelemetryScreen
 import com.letta.mobile.ui.screens.usage.UsageScreen
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -102,11 +105,13 @@ val LocalAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> 
 @HiltViewModel
 class NavViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
+    @param:ApplicationContext private val appContext: Context,
 ) : ViewModel() {
     val hasConfig = settingsRepository.activeConfig.map { it != null }
     val activeConfig = settingsRepository.activeConfig
 
     fun clearAllData() {
+        ChatPushAlarmScheduler.cancel(appContext)
         viewModelScope.launch { settingsRepository.clearAllData() }
     }
 
