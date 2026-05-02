@@ -49,7 +49,7 @@ class ConfigListViewModelTest {
         mockkObject(EncryptedPrefsHelper)
         every { EncryptedPrefsHelper.getEncryptedPrefs(any()) } returns sharedPreferences
         fakeRepo = FakeSettingsRepo(appContext)
-        viewModel = ConfigListViewModel(fakeRepo)
+        viewModel = ConfigListViewModel(fakeRepo, appContext)
     }
 
     @After

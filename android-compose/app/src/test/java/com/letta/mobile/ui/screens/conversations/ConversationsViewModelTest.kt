@@ -55,8 +55,8 @@ class ConversationsViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         fakeAllRepo = FakeAllConversationsRepository()
-        fakeConvRepo = FakeConversationRepository()
         fakeAgentRepo = FakeAgentRepository()
+        fakeConvRepo = FakeConversationRepository(fakeAgentRepo)
         fakeMessageRepo = FakeMessageRepository()
         settingsRepository = mockk(relaxed = true)
         every { settingsRepository.getPinnedConversationIds() } returns pinnedConversationIds
@@ -184,7 +184,9 @@ class ConversationsViewModelTest {
         }
     }
 
-    private class FakeConversationRepository : ConversationRepository(FakeConversationApi()) {
+    private class FakeConversationRepository(
+        agentRepository: AgentRepository,
+    ) : ConversationRepository(FakeConversationApi(), agentRepository) {
         val deletedConversationIds = mutableListOf<String>()
         val archivedUpdates = mutableListOf<Pair<String, Boolean>>()
 
