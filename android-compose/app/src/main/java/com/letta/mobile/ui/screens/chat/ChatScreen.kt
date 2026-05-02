@@ -84,7 +84,7 @@ fun ChatScreen(
     viewModel: AdminChatViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val inputText by viewModel.inputText.collectAsStateWithLifecycle()
+    val composerState by viewModel.composerState.collectAsStateWithLifecycle()
     val fontScale by viewModel.chatFontScale.collectAsStateWithLifecycle()
 
     var activeFontScale by remember { mutableFloatStateOf(fontScale) }
@@ -107,8 +107,8 @@ fun ChatScreen(
         val bottomBarPx = if (windowSizeClass.isExpandedWidth) 0 else with(density) { 56.dp.roundToPx() }
         val bottomInsetDp = with(density) { max(imeBottomPx, navBottomPx + bottomBarPx).toDp() }
 
-        LaunchedEffect(state.composerError) {
-            val message = state.composerError ?: return@LaunchedEffect
+        LaunchedEffect(composerState.error) {
+            val message = composerState.error ?: return@LaunchedEffect
             snackbarHostState.showSnackbar(message)
             viewModel.clearComposerError()
         }
@@ -179,30 +179,18 @@ fun ChatScreen(
                     onError = { viewModel.reportComposerError(it) },
                 )
                 ChatComposer(
-                    inputText = inputText,
-                    pendingAttachments = state.pendingAttachments,
+                    inputText = composerState.inputText,
+                    pendingAttachments = composerState.pendingAttachments,
                     isStreaming = state.isStreaming,
                     canSendMessages = viewModel.canSendMessages,
                     onTextChange = { newText ->
-                        if (newText.endsWith("\n") && !state.isStreaming &&
-                            (inputText.isNotBlank() || state.pendingAttachments.isNotEmpty())
-                        ) {
-                            if (viewModel.tryHandleSlashCommand(inputText)) {
-                                viewModel.updateInputText("")
-                                onBugCommand?.invoke()
-                            } else {
-                                viewModel.sendMessage(inputText)
-                            }
-                        } else {
-                            viewModel.updateInputText(newText)
+                        if (viewModel.handleComposerTextChanged(newText) == ChatComposerEffect.OpenBugReport) {
+                            onBugCommand?.invoke()
                         }
                     },
                     onSend = {
-                        if (viewModel.tryHandleSlashCommand(it)) {
-                            viewModel.updateInputText("")
+                        if (viewModel.submitComposer(it) == ChatComposerEffect.OpenBugReport) {
                             onBugCommand?.invoke()
-                        } else {
-                            viewModel.sendMessage(it)
                         }
                     },
                     onRemoveAttachment = { viewModel.removeAttachment(it) },

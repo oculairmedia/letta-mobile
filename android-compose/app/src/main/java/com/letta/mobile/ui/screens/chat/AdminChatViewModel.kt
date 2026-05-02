@@ -31,7 +31,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentSetOf
-import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableMap
 import kotlinx.collections.immutable.toImmutableSet
@@ -174,7 +173,6 @@ data class ChatUiState(
     val pendingTools: ImmutableList<PendingToolCall> = persistentListOf(),
     val agentName: String = "",
     val error: String? = null,
-    val composerError: String? = null,
     val promptTokens: Int? = null,
     val completionTokens: Int? = null,
     val totalTokens: Int? = null,
@@ -184,12 +182,6 @@ data class ChatUiState(
     val projectBrief: ProjectBriefUiState = ProjectBriefUiState(),
     val bugReports: ProjectBugReportUiState = ProjectBugReportUiState(),
     val projectAgents: ProjectAgentsUiState = ProjectAgentsUiState(),
-    /**
-     * Pending image attachments staged in the composer. Reset on successful send.
-     * Cap enforced by [MAX_COMPOSER_ATTACHMENTS].
-     */
-    val pendingAttachments: ImmutableList<com.letta.mobile.data.model.MessageContentPart.Image> =
-        persistentListOf(),
     /**
      * Surfaced when the LettaBot harness substituted a fresh conversation ID for
      * the one we requested (i.e. our requested conv was unrecoverable on the
@@ -210,12 +202,6 @@ data class ClientModeConversationSwap(
     val requestedConversationId: String,
     val newConversationId: String,
 )
-
-/** Upper bound on composer image attachments per message. */
-const val MAX_COMPOSER_ATTACHMENTS = 4
-
-/** Upper bound on per-message total base64 payload (approximate — ~8 MB). */
-const val MAX_COMPOSER_TOTAL_BYTES = 8 * 1024 * 1024
 
 @HiltViewModel
 class AdminChatViewModel @Inject constructor(
@@ -300,8 +286,11 @@ class AdminChatViewModel @Inject constructor(
      */
     private var olderMessagesPrefix: Pair<String, List<UiMessage>> = "" to emptyList()
 
-    private val _inputText = MutableStateFlow("")
-    val inputText: StateFlow<String> = _inputText.asStateFlow()
+    private val composerController = ChatComposerController()
+    val composerState: StateFlow<ChatComposerState> = composerController.state
+    val inputText: StateFlow<String> = composerState
+        .map { it.inputText }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
     val chatBackground: StateFlow<ChatBackground> = settingsRepository.getChatBackgroundKey()
         .map { ChatBackground.fromKey(it) }
@@ -533,11 +522,32 @@ class AdminChatViewModel @Inject constructor(
         }
     }
 
-    fun tryHandleSlashCommand(text: String): Boolean {
-        if (projectContext == null) return false
-        return when (text.trim()) {
-            "/bug" -> true
-            else -> false
+    fun tryHandleSlashCommand(text: String): Boolean =
+        ChatSlashCommandParser.parse(
+            text = text,
+            projectContextAvailable = projectContext != null,
+        ) != null
+
+    fun handleComposerTextChanged(newText: String): ChatComposerEffect? {
+        val composer = composerState.value
+        return if (newText.endsWith("\n") && !_uiState.value.isStreaming && composer.hasSendableContent) {
+            submitComposer(composer.inputText)
+        } else {
+            updateInputText(newText)
+            null
+        }
+    }
+
+    fun submitComposer(text: String = composerState.value.inputText): ChatComposerEffect? {
+        return when (ChatSlashCommandParser.parse(text, projectContextAvailable = projectContext != null)) {
+            ChatSlashCommand.Bug -> {
+                composerController.clearText()
+                ChatComposerEffect.OpenBugReport
+            }
+            null -> {
+                sendMessage(text)
+                null
+            }
         }
     }
 
@@ -887,8 +897,8 @@ class AdminChatViewModel @Inject constructor(
             -> Unit
         }
 
-        val attachments = _uiState.value.pendingAttachments.toList()
-        if (text.isBlank() && attachments.isEmpty()) return
+        val payload = composerController.payloadForSend(text) ?: return
+        val attachments = payload.attachments
 
         val isClientMode = shouldUseClientModeForCurrentRoute
         Telemetry.event(
@@ -899,9 +909,7 @@ class AdminChatViewModel @Inject constructor(
         )
         if (isClientMode) {
             if (attachments.isNotEmpty()) {
-                _uiState.value = _uiState.value.copy(
-                    composerError = "Client Mode attachments are not supported yet",
-                )
+                composerController.setError("Client Mode attachments are not supported yet")
                 return
             }
             sendMessageViaClientMode(text)
@@ -945,7 +953,7 @@ class AdminChatViewModel @Inject constructor(
             // gateway returns a conversationId on the first chunk; at that
             // point we migrate the user bubble into the timeline (see below).
             currentConversationTracker.setCurrent(priorConversationId)
-            _inputText.value = ""
+            composerController.clearAfterSend()
             if (priorConversationId != null) {
                 // Stop any prior observer for a different conversation, then
                 // start one for this Client Mode conversation so the timeline
@@ -967,9 +975,7 @@ class AdminChatViewModel @Inject constructor(
                     hasMoreOlderMessages = false,
                     isStreaming = true,
                     isAgentTyping = true,
-                    composerError = null,
                     error = null,
-                    pendingAttachments = persistentListOf(),
                     conversationState = ConversationState.Ready(convId),
                 )
                 runCatching {
@@ -1017,9 +1023,7 @@ class AdminChatViewModel @Inject constructor(
                     hasMoreOlderMessages = false,
                     isStreaming = true,
                     isAgentTyping = true,
-                    composerError = null,
                     error = null,
-                    pendingAttachments = persistentListOf(),
                     conversationState = ConversationState.NoConversation,
                 )
             }
@@ -1687,12 +1691,11 @@ class AdminChatViewModel @Inject constructor(
     }
 
     fun reportComposerError(message: String) {
-        _uiState.value = _uiState.value.copy(composerError = message)
+        composerController.setError(message)
     }
 
     fun clearComposerError() {
-        if (_uiState.value.composerError == null) return
-        _uiState.value = _uiState.value.copy(composerError = null)
+        composerController.clearError()
     }
 
     /**
@@ -1705,63 +1708,11 @@ class AdminChatViewModel @Inject constructor(
         _uiState.update { it.copy(clientModeConversationSwap = null) }
     }
 
-    /**
-     * Stage a new image attachment in the composer. Enforces [MAX_COMPOSER_ATTACHMENTS]
-     * count cap and [MAX_COMPOSER_TOTAL_BYTES] cumulative base64 size cap. Returns
-     * true on success; false if a cap was hit (caller should surface the error).
-     */
-    fun addAttachment(image: com.letta.mobile.data.model.MessageContentPart.Image): Boolean {
-        val current = _uiState.value.pendingAttachments
-        if (current.size >= MAX_COMPOSER_ATTACHMENTS) {
-            Telemetry.event(
-                "AdminChatVM",
-                "attachment.rejected",
-                "reason" to "count_cap",
-                "current" to current.size,
-                "max" to MAX_COMPOSER_ATTACHMENTS,
-            )
-            reportComposerError("Attachment limit reached ($MAX_COMPOSER_ATTACHMENTS max).")
-            return false
-        }
-        val newTotal = current.sumOf { it.base64.length } + image.base64.length
-        if (newTotal > MAX_COMPOSER_TOTAL_BYTES) {
-            Telemetry.event(
-                "AdminChatVM",
-                "attachment.rejected",
-                "reason" to "size_cap",
-                "newTotal" to newTotal,
-                "max" to MAX_COMPOSER_TOTAL_BYTES,
-            )
-            reportComposerError("Attachments too large — downscale or remove some before sending.")
-            return false
-        }
-        _uiState.value = _uiState.value.copy(
-            pendingAttachments = (current + image).toPersistentList(),
-            composerError = null,
-        )
-        Telemetry.event(
-            "AdminChatVM",
-            "attachment.added",
-            "size" to image.base64.length,
-            "mediaType" to image.mediaType,
-            "totalCount" to (current.size + 1),
-        )
-        return true
-    }
+    fun addAttachment(image: com.letta.mobile.data.model.MessageContentPart.Image): Boolean =
+        composerController.addAttachment(image)
 
-    /** Remove a staged attachment by index. */
     fun removeAttachment(index: Int) {
-        val current = _uiState.value.pendingAttachments
-        if (index !in current.indices) return
-        _uiState.value = _uiState.value.copy(
-            pendingAttachments = (current.toMutableList().also { it.removeAt(index) })
-                .toPersistentList(),
-        )
-        Telemetry.event(
-            "AdminChatVM",
-            "attachment.removed",
-            "index" to index,
-        )
+        composerController.removeAttachment(index)
     }
 
     /**
@@ -1777,14 +1728,10 @@ class AdminChatViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             val enqueueTimer = Telemetry.startTimer("AdminChatVM", "send.enqueue")
-            _inputText.value = ""
+            composerController.clearAfterSend()
             _uiState.value = _uiState.value.copy(
                 isStreaming = true,
                 isAgentTyping = true,
-                composerError = null,
-                // Clear composer attachments optimistically; they're carried on the
-                // Local event now so the user bubble still shows them.
-                pendingAttachments = persistentListOf(),
             )
             try {
                 var convId = activeConversationId
@@ -2100,7 +2047,7 @@ class AdminChatViewModel @Inject constructor(
     }
 
     fun updateInputText(text: String) {
-        _inputText.value = text
+        composerController.updateText(text)
     }
 
     val canSendMessages: Boolean

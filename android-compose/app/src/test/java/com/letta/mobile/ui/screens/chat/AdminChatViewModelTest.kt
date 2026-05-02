@@ -471,7 +471,7 @@ class AdminChatViewModelTest {
 
         assertEquals(
             "Client Mode attachments are not supported yet",
-            vm.uiState.value.composerError,
+            vm.composerState.value.error,
         )
     }
 
