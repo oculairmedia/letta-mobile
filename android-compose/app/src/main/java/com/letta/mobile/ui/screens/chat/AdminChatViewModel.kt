@@ -148,6 +148,15 @@ data class ProjectAgentsUiState(
 )
 
 @androidx.compose.runtime.Immutable
+data class ClientModeLocationUiState(
+    val isLoading: Boolean = false,
+    val currentPath: String? = null,
+    val defaultPath: String? = null,
+    val lastRequestedPath: String? = null,
+    val error: String? = null,
+)
+
+@androidx.compose.runtime.Immutable
 data class ContextWindowUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
@@ -203,6 +212,8 @@ data class ChatUiState(
     val bugReports: ProjectBugReportUiState = ProjectBugReportUiState(),
     val projectAgents: ProjectAgentsUiState = ProjectAgentsUiState(),
     val contextWindow: ContextWindowUiState = ContextWindowUiState(),
+    val isClientModeEnabled: Boolean = false,
+    val clientModeLocation: ClientModeLocationUiState = ClientModeLocationUiState(),
     /**
      * Surfaced when the LettaBot harness substituted a fresh conversation ID for
      * the one we requested (i.e. our requested conv was unrecoverable on the
@@ -243,6 +254,7 @@ class AdminChatViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val internalBotClient: InternalBotClient,
     private val clientModeChatSender: ClientModeChatSender,
+    private val clientModeAgentLocationRepository: ClientModeAgentLocationRepository,
     private val currentConversationTracker: com.letta.mobile.channel.CurrentConversationTracker,
 ) : ViewModel() {
     companion object {
@@ -465,11 +477,23 @@ class AdminChatViewModel @Inject constructor(
                             clientModeStreamStartedAtElapsedMs = 0L
                             _uiState.update {
                                 it.copy(
+                                    isClientModeEnabled = false,
                                     isStreaming = false,
                                     isAgentTyping = false,
                                     error = null,
                                 )
                             }
+                        } else {
+                            _uiState.update {
+                                it.copy(
+                                    isClientModeEnabled = true,
+                                    clientModeLocation = it.clientModeLocation.copy(
+                                        defaultPath = it.clientModeLocation.defaultPath
+                                            ?: projectContext?.filesystemPath,
+                                    ),
+                                )
+                            }
+                            refreshClientModeLocation()
                         }
                         resolveConversationAndLoad(useClientModeForResolve = enabled)
                     }
@@ -481,6 +505,63 @@ class AdminChatViewModel @Inject constructor(
             }
             refreshContextWindow()
         }
+    }
+
+    fun refreshClientModeLocation() {
+        if (agentId.isBlank() || !clientModeEnabled.value) return
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    clientModeLocation = it.clientModeLocation.copy(
+                        isLoading = true,
+                        error = null,
+                        defaultPath = it.clientModeLocation.defaultPath ?: projectContext?.filesystemPath,
+                    )
+                )
+            }
+            runCatching { clientModeAgentLocationRepository.getLocation(agentId) }
+                .onSuccess { location ->
+                    _uiState.update {
+                        val previous = it.clientModeLocation
+                        it.copy(
+                            clientModeLocation = previous.copy(
+                                isLoading = false,
+                                currentPath = location?.currentPath ?: previous.currentPath,
+                                defaultPath = location?.defaultPath ?: previous.defaultPath ?: projectContext?.filesystemPath,
+                                error = null,
+                            )
+                        )
+                    }
+                }
+                .onFailure { e ->
+                    _uiState.update {
+                        it.copy(
+                            clientModeLocation = it.clientModeLocation.copy(
+                                isLoading = false,
+                                error = mapErrorToUserMessage(e.asException(), "Failed to refresh agent location"),
+                            )
+                        )
+                    }
+                }
+        }
+    }
+
+    fun sendClientModeLocationChange(path: String) {
+        val normalized = path.trim()
+        if (normalized.isBlank()) return
+        if (_uiState.value.isStreaming) {
+            composerController.setError("Wait for the current response before changing location")
+            return
+        }
+        _uiState.update {
+            it.copy(
+                clientModeLocation = it.clientModeLocation.copy(
+                    lastRequestedPath = normalized,
+                    error = null,
+                )
+            )
+        }
+        sendMessage(buildClientModeLocationPrompt(normalized))
     }
 
     fun refreshContextWindow() {
@@ -2684,6 +2765,14 @@ private fun buildProjectBriefSections(blocks: List<Block>): Map<ProjectBriefSect
 
 private fun String.canonicalBriefLabel(): String =
     lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+
+private fun buildClientModeLocationPrompt(path: String): String = """
+Please switch your active working directory to:
+
+$path
+
+Use this as the cwd/base path for subsequent filesystem and shell tool calls in this conversation. After switching, briefly confirm the current working directory.
+""".trim()
 
 private fun buildBugReportPrompt(draft: ProjectBugReportDraft): String {
     val title = draft.title.trim()

@@ -84,6 +84,9 @@ data class BotAgentInfo(
     val id: String,
     val name: String,
     val status: String,
+    @SerialName("current_working_directory") val currentWorkingDirectory: String? = null,
+    @SerialName("default_working_directory") val defaultWorkingDirectory: String? = null,
+    @SerialName("project_path") val projectPath: String? = null,
 )
 
 object BotStatusAgentsSerializer : KSerializer<List<String>> {
@@ -165,6 +168,17 @@ object BotStatusResponseParser {
                 id = id,
                 name = name,
                 status = details.stringValue("status") ?: "ready",
+                currentWorkingDirectory = details.stringValue("current_working_directory")
+                    ?: details.stringValue("currentWorkingDirectory")
+                    ?: details.stringValue("cwd"),
+                defaultWorkingDirectory = details.stringValue("default_working_directory")
+                    ?: details.stringValue("defaultWorkingDirectory")
+                    ?: details.stringValue("default_cwd")
+                    ?: details.stringValue("defaultCwd"),
+                projectPath = details.stringValue("project_path")
+                    ?: details.stringValue("projectPath")
+                    ?: details.stringValue("filesystem_path")
+                    ?: details.stringValue("filesystemPath"),
             )
         }
 
