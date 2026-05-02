@@ -122,7 +122,9 @@ fun LettaInputBar(
         FilledIconButton(
             onClick = { if (canSend) onSend(text) },
             enabled = canSend,
-            modifier = Modifier.size(actionButtonSize),
+            modifier = Modifier
+                .align(Alignment.CenterVertically)
+                .size(actionButtonSize),
             colors = IconButtonDefaults.filledIconButtonColors(
                 containerColor = actionContainerColor ?: colorScheme.primary,
                 contentColor = actionContentColor ?: colorScheme.onPrimary,
