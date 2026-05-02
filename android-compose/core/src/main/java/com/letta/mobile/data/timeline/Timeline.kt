@@ -133,7 +133,7 @@ enum class DeliveryState { SENDING, SENT, FAILED }
  * → reconcile loop and minimising the chance of false positives from the user
  * legitimately sending the same content twice in quick succession.
  */
-const val CLIENT_MODE_FUZZY_WINDOW_MS: Long = 10_000
+const val CLIENT_MODE_FUZZY_WINDOW_MS: Long = 60_000
 
 /**
  * Result of a fuzzy-collapse attempt. [collapsed] is null when no match was

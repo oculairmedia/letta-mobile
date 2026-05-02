@@ -920,8 +920,8 @@ class AdminChatViewModel @Inject constructor(
         clientModeStreamJob = viewModelScope.launch {
             android.util.Log.w("AdminChatVM-DEBUG", "sendMessageViaClientMode: launch started")
             val startedAt = java.time.Instant.now().toString()
-            val userMessageId = "client-user-${System.currentTimeMillis()}"
-            val assistantMessageId = "client-assistant-${System.currentTimeMillis()}"
+            val userMessageId = "client-user-${java.util.UUID.randomUUID()}"
+            val assistantMessageId = "client-assistant-${java.util.UUID.randomUUID()}"
             // letta-mobile-c87t: when entering an existing-conversation route under
             // Client Mode, prefer the route's conversationId arg so the gateway can
             // resumeSession() into the matching Letta conversation. Fall back to
@@ -1490,7 +1490,7 @@ class AdminChatViewModel @Inject constructor(
     ) {
         when (chunk.event) {
             BotStreamEvent.REASONING -> {
-                val messageId = chunk.uuid ?: "client-reasoning-${System.currentTimeMillis()}"
+                val messageId = chunk.uuid ?: "client-reasoning-${java.util.UUID.randomUUID()}"
                 // letta-mobile-lv3e (REVERTS letta-mobile-vu6a): legacy
                 // path also receives DELTAS — append, not replace. Same
                 // defensive snapshot-shape guard as the timeline path.

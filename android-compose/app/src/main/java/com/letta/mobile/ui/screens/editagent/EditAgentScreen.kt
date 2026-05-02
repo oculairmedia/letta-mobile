@@ -1172,7 +1172,7 @@ private fun FullScreenBlockPickerDialog(
                 }
                 is UiState.Error -> ErrorContent(
                     message = state.message,
-                    onRetry = { viewModel.loadAgent() },
+                    onRetry = { },
                     modifier = Modifier.padding(paddingValues),
                 )
                 is UiState.Success -> {
