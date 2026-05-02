@@ -319,6 +319,17 @@ class EditAgentViewModel @Inject constructor(
         }
     }
 
+    fun attachExistingBlocks(blockIds: List<String>) {
+        viewModelScope.launch {
+            try {
+                blockIds.forEach { blockRepository.attachBlock(agentId, it) }
+                loadAgent()
+            } catch (e: Exception) {
+                _uiState.value = UiState.Error(e.message ?: "Failed to attach blocks")
+            }
+        }
+    }
+
     fun deleteBlock(blockId: String) {
         viewModelScope.launch {
             try {
@@ -475,6 +486,17 @@ class EditAgentViewModel @Inject constructor(
                 loadAgent()
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(e.message ?: "Failed to attach tool")
+            }
+        }
+    }
+
+    fun attachTools(toolIds: List<String>) {
+        viewModelScope.launch {
+            try {
+                toolIds.forEach { toolRepository.attachTool(agentId, it) }
+                loadAgent()
+            } catch (e: Exception) {
+                _uiState.value = UiState.Error(e.message ?: "Failed to attach tools")
             }
         }
     }

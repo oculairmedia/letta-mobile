@@ -169,10 +169,12 @@ fun EditAgentScreen(
                     onBlockLimitChange = { label, value -> viewModel.updateBlockLimit(label, value) },
                     onAddBlock = { label, value, description, limit -> viewModel.addBlock(label, value, description, limit) },
                     onAttachExistingBlock = { viewModel.attachExistingBlock(it) },
+                    onAttachExistingBlocks = { viewModel.attachExistingBlocks(it) },
                     onDeleteBlock = { viewModel.deleteBlock(it) },
                     onAddTag = { viewModel.addTag(it) },
                     onRemoveTag = { viewModel.removeTag(it) },
                     onAttachTool = { viewModel.attachTool(it) },
+                    onAttachTools = { viewModel.attachTools(it) },
                     onDetachTool = { viewModel.detachTool(it) },
                     onSystemPromptChange = { viewModel.updateSystemPrompt(it) },
                     onProviderTypeChange = { viewModel.updateProviderType(it) },
@@ -320,10 +322,12 @@ private fun EditAgentContent(
     onBlockLimitChange: (String, Int?) -> Unit,
     onAddBlock: (String, String, String, Int?) -> Unit,
     onAttachExistingBlock: (String) -> Unit,
+    onAttachExistingBlocks: (List<String>) -> Unit,
     onDeleteBlock: (String) -> Unit,
     onAddTag: (String) -> Unit,
     onRemoveTag: (String) -> Unit,
     onAttachTool: (String) -> Unit,
+    onAttachTools: (List<String>) -> Unit,
     onDetachTool: (String) -> Unit,
     onSystemPromptChange: (String) -> Unit,
     onProviderTypeChange: (String) -> Unit,
@@ -353,7 +357,6 @@ private fun EditAgentContent(
                 name = it.displayName,
                 handle = it.handle ?: it.embeddingModel,
                 providerType = it.providerType,
-                contextWindow = it.embeddingDim,
             )
         }
     }
@@ -729,7 +732,7 @@ private fun EditAgentContent(
             excludedBlockIds = state.blocks.map { it.id },
             onDismiss = { showAttachBlockDialog = false },
             onConfirm = { selectedIds ->
-                selectedIds.forEach(onAttachExistingBlock)
+                onAttachExistingBlocks(selectedIds)
                 showAttachBlockDialog = false
             },
         )
@@ -744,7 +747,7 @@ private fun EditAgentContent(
             title = stringResource(R.string.screen_agent_edit_attach_tools),
             onDismiss = { showToolPicker = false },
             onConfirm = { selectedIds ->
-                selectedIds.forEach(onAttachTool)
+                onAttachTools(selectedIds)
                 showToolPicker = false
             },
         )
@@ -927,8 +930,9 @@ private fun FullScreenModelPickerDialog(
                                     verticalArrangement = Arrangement.spacedBy(8.dp),
                                 ) {
                                     providerModels.forEach { model ->
-                                        val selectionValue = model.handle ?: model.name
-                                        val isSelected = selectionValue.equals(selectedValue, ignoreCase = true)
+                                        val selectionValue = model.handle ?: model.name ?: model.displayName
+                                        val isSelected = selectionValue.equals(selectedValue, ignoreCase = true) ||
+                                            model.displayName?.equals(selectedValue, ignoreCase = true) == true
                                         ModelPickerCard(
                                             model = model,
                                             selected = isSelected,
@@ -1065,7 +1069,7 @@ private fun FullScreenToolPickerDialog(
             if (filteredTools.isEmpty()) {
                 EmptyState(
                     icon = LettaIcons.Search,
-                    message = stringResource(R.string.screen_tools_empty_attached),
+                    message = stringResource(R.string.screen_tools_empty_search, query),
                     modifier = Modifier.padding(paddingValues).fillMaxSize(),
                 )
             } else {
@@ -1168,7 +1172,7 @@ private fun FullScreenBlockPickerDialog(
                 }
                 is UiState.Error -> ErrorContent(
                     message = state.message,
-                    onRetry = {},
+                    onRetry = { viewModel.loadAgent() },
                     modifier = Modifier.padding(paddingValues),
                 )
                 is UiState.Success -> {
@@ -1565,16 +1569,14 @@ private fun MemoryBlockItem(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (block.isTemplate) {
-                    InputChip(
-                        selected = false,
-                        enabled = false,
+                    AssistChip(
                         onClick = {},
+                        enabled = false,
                         label = { Text(stringResource(R.string.screen_agent_edit_block_template)) },
                     )
                 }
                 if (block.readOnly) {
-                    InputChip(
-                        selected = false,
+                    AssistChip(
                         enabled = false,
                         onClick = {},
                         label = { Text(stringResource(R.string.screen_agent_edit_block_read_only)) },
