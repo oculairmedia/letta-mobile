@@ -343,13 +343,15 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
-// Test tier tasks use the Play debug variant as the conservative default.
-// Privileged sideload/root code should add explicit variant-specific gates.
+// Test tier tasks use Root debug as the full-featured local default.
+// assembleDebug still builds every distribution debug APK, but these filtered
+// test aliases should exercise the artifact with all compile-time feature gates
+// enabled instead of the Play-policy-constrained variant.
 tasks.register<Test>("testUnit") {
     description = "Runs unit-tier tests (pure logic, <50ms per test)"
     group = "verification"
 
-    val testTask = tasks.named("testPlayDebugUnitTest", Test::class).get()
+    val testTask = tasks.named("testRootDebugUnitTest", Test::class).get()
     testClassesDirs = testTask.testClassesDirs
     classpath = testTask.classpath
 
@@ -364,7 +366,7 @@ tasks.register<Test>("testIntegration") {
     description = "Runs integration-tier tests (Robolectric, Compose, ViewModels)"
     group = "verification"
 
-    val testTask = tasks.named("testPlayDebugUnitTest", Test::class).get()
+    val testTask = tasks.named("testRootDebugUnitTest", Test::class).get()
     testClassesDirs = testTask.testClassesDirs
     classpath = testTask.classpath
 
@@ -379,7 +381,7 @@ tasks.register<Test>("testScreenshot") {
     description = "Runs screenshot-tier tests (Roborazzi visual regression)"
     group = "verification"
 
-    val testTask = tasks.named("testPlayDebugUnitTest", Test::class).get()
+    val testTask = tasks.named("testRootDebugUnitTest", Test::class).get()
     testClassesDirs = testTask.testClassesDirs
     classpath = testTask.classpath
 

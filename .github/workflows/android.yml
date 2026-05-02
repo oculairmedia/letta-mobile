@@ -39,20 +39,20 @@ jobs:
       - name: Compile core sequentially
         run: ./gradlew --no-daemon :core:compileDebugKotlin
 
-      - name: Compile Play app sequentially
-        run: ./gradlew --no-daemon :app:compilePlayDebugKotlin
+      - name: Compile full-featured debug app sequentially
+        run: ./gradlew --no-daemon :app:compileRootDebugKotlin
 
       - name: Compile sideload system-access boundary
         run: ./gradlew --no-daemon :app:compileSideloadDebugKotlin
 
-      - name: Compile root system-access boundary
-        run: ./gradlew --no-daemon :app:compileRootDebugKotlin
+      - name: Compile Play policy boundary
+        run: ./gradlew --no-daemon :app:compilePlayDebugKotlin
 
       - name: Run core unit tests
         run: ./gradlew --no-daemon :core:testDebugUnitTest
 
       - name: Run app unit tests
-        run: ./gradlew --no-daemon :app:testPlayDebugUnitTest
+        run: ./gradlew --no-daemon :app:testRootDebugUnitTest
 
   build-apk:
     runs-on: ubuntu-latest
@@ -61,10 +61,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - variant: play-debug
-            gradle_task: :app:assemblePlayDebug
-            artifact_name: app-play-debug-apk
-            artifact_path: android-compose/app/build/outputs/apk/play/debug/*.apk
+          - variant: root-debug
+            gradle_task: :app:assembleRootDebug
+            artifact_name: app-root-debug-apk
+            artifact_path: android-compose/app/build/outputs/apk/root/debug/*.apk
           - variant: play-release
             gradle_task: :app:assemblePlayRelease
             artifact_name: app-play-release-apk

@@ -62,10 +62,10 @@ export JAVA_HOME="/path/to/Android Studio/jbr"
 Run Gradle commands from this directory.
 
 ```bash
-./gradlew :app:compilePlayDebugKotlin
-./gradlew :app:testPlayDebugUnitTest
-./gradlew :app:assemblePlayDebug
-./gradlew installPlayDebug
+./gradlew :app:compileRootDebugKotlin
+./gradlew :app:testRootDebugUnitTest
+./gradlew :app:assembleRootDebug
+./gradlew installRootDebug
 ./gradlew detekt
 ```
 
@@ -76,9 +76,9 @@ system-access features can be kept out of Play artifacts at compile time:
 
 | Flavor | Purpose | Enabled system-access gates |
 | --- | --- | --- |
-| `play` | Google Play / conservative local default | Framework-safe APIs only; no local shell, Shizuku/Sui, or root tools |
+| `play` | Google Play policy-constrained artifact | Framework-safe APIs only; no local shell, Shizuku/Sui, or root tools |
 | `sideload` | GitHub/direct APK for power users | Local app-UID shell and Shizuku/Sui integration gates |
-| `root` | Direct APK for rooted devices | Sideload gates plus root-tool gates |
+| `root` | Full-featured local/debug and rooted-device artifact | Sideload gates plus root-tool gates |
 
 Flavor-specific manifests live under `app/src/play`, `app/src/sideload`, and
 `app/src/root`. Keep policy-sensitive permissions and services out of
@@ -87,9 +87,9 @@ Flavor-specific manifests live under `app/src/play`, `app/src/sideload`, and
 System-access smoke compile:
 
 ```bash
-./gradlew :app:compilePlayDebugKotlin
-./gradlew :app:compileSideloadDebugKotlin
 ./gradlew :app:compileRootDebugKotlin
+./gradlew :app:compileSideloadDebugKotlin
+./gradlew :app:compilePlayDebugKotlin
 ```
 
 ## Release process
@@ -210,8 +210,8 @@ Use this checklist every time:
 For normal application changes:
 
 ```bash
-./gradlew :app:compilePlayDebugKotlin
-./gradlew :app:testPlayDebugUnitTest
+./gradlew :app:compileRootDebugKotlin
+./gradlew :app:testRootDebugUnitTest
 ```
 
 For shared model / repository / serialization changes, it is safer to verify the full stack in order:
@@ -219,8 +219,8 @@ For shared model / repository / serialization changes, it is safer to verify the
 ```bash
 ./gradlew clean :core:compileDebugKotlin
 ./gradlew :designsystem:compileDebugKotlin
-./gradlew :app:compilePlayDebugKotlin
-./gradlew :app:testPlayDebugUnitTest
+./gradlew :app:compileRootDebugKotlin
+./gradlew :app:testRootDebugUnitTest
 ```
 
 Run those commands sequentially. KSP state can become unreliable if you try to overlap Gradle work.
