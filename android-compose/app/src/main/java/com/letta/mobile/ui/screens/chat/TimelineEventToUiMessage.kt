@@ -174,7 +174,7 @@ internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
             UiMessage(
                 id = ev.otid,
                 role = role,
-                content = finalContent,
+                content = displayContent,
                 timestamp = ev.sentAt.toString(),
                 isPending = ev.deliveryState == DeliveryState.SENDING,
                 isReasoning = ev.messageType == TimelineMessageType.REASONING,

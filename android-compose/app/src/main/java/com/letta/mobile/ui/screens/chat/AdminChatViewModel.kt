@@ -651,25 +651,6 @@ class AdminChatViewModel @Inject constructor(
             )
 
             try {
-                val resolution = chatRouteSessionResolver.resolve(
-                    ChatConversationResolveRequest(
-                        agentId = agentId,
-                        routeState = routeState,
-                        clientModeEnabled = shouldUseClientModeForCurrentRoute,
-                        activeConversationId = activeConversationId,
-                        savedClientModeConversationId = currentClientModeConversationId(),
-                        maxConversationAgeMs = CONVERSATION_CACHE_TTL_MS,
-                    )
-                )
-                android.util.Log.w("AdminChatVM-DEBUG", "resolveConversationAndLoad: resolution=$resolution clientMode=$shouldUseClientModeForCurrentRoute streamInFlight=$clientModeStreamInFlight")
-                android.util.Log.w(
-                    "AdminChatVM-DEBUG",
-                    "resolveConversationAndLoad: prior convId=$explicitConversationId " +
-                        "savedClientModeConvId=${currentClientModeConversationId()} " +
-                        "activeConvId=$activeConversationId " +
-                        "timelineObserverConvId=$timelineObserverConversationId " +
-                        "timelineObserverJobActive=${timelineObserverJob?.isActive}",
-                )
                 if (shouldUseClientModeForCurrentRoute) {
                     // letta-mobile-c87t (PR 2): when we have a Client Mode
                     // conversationId, route through the timeline observer so
@@ -679,15 +660,29 @@ class AdminChatViewModel @Inject constructor(
                     // ever show in-memory bubbles and history wouldn't load.
                     //
                     // Resolution order: explicit nav arg → saved-state-handle
-                    // pointer. Fresh routes that haven't sent yet have neither
-                    // and stay on the in-memory path until the gateway
-                    // provides one (see sendMessageViaClientMode migration).
-                    val clientConversationId = (resolution as? ChatConversationResolution.Ready)
-                        ?.conversationId
-                        ?.also { resolvedConversationId ->
-                            if (explicitConversationId == null && currentClientModeConversationId() == null) {
-                                setClientModeConversationId(resolvedConversationId)
+                    // pointer → most-recent server-side conversation for this
+                    // agent (Client Mode default-load behavior). Fresh routes
+                    // — when the user explicitly opened a new conversation
+                    // (freshRouteKey set, or conversationId arg was blank) —
+                    // skip the recent-conversation fallback and stay on the
+                    // in-memory path until the gateway provides one (see
+                    // sendMessageViaClientMode migration). See
+                    // letta-mobile-c87t and the Apr 26 default-load change.
+                    // letta-mobile-flk.6: same suppression rule as the
+                    // timeline branch below — only block the fallback on
+                    // the *initial* fresh-route nav entry, not on
+                    // subsequent re-resolutions.
+                    val suppressFreshRouteFallbackClient = isFreshRoute && isFirstResolve
+                    val clientConversationId = explicitConversationId
+                        ?: currentClientModeConversationId()
+                        ?: if (!suppressFreshRouteFallbackClient) {
+                            runCatching {
+                                resolveMostRecentConversation(CONVERSATION_CACHE_TTL_MS)
+                            }.getOrNull()?.also { resolved ->
+                                setClientModeConversationId(resolved)
                             }
+                        } else {
+                            null
                         }
                     currentConversationTracker.setCurrent(clientConversationId)
                     val agent = agentRepository.getCachedAgent(agentId)
@@ -708,7 +703,7 @@ class AdminChatViewModel @Inject constructor(
                             error = null,
                         )
                     } else {
-                        // Fresh route or no fallback conversation — keep the in-memory path.
+                        // Fresh route, no conv yet — keep in-memory path.
                         stopTimelineObserver()
                         _uiState.value = _uiState.value.copy(
                             agentName = agent?.name ?: _uiState.value.agentName,
@@ -730,27 +725,52 @@ class AdminChatViewModel @Inject constructor(
                     return@launch
                 }
 
-                when (resolution) {
-                    is ChatConversationResolution.Ready -> {
-                        _uiState.value = _uiState.value.copy(
-                            conversationState = ConversationState.Ready(resolution.conversationId),
-                            error = null,
-                        )
-                        loadMessagesInternal(resolution.conversationId)
-                    }
+                // letta-mobile-flk.6: on the *initial* fresh-route entry,
+                // suppress the most-recent-conversation fallback so a "New
+                // chat" tap doesn't silently hydrate the UI with the
+                // agent's previous server-side conversation. Once the VM
+                // has resolved at least once (`hasResolvedConversationOnce`),
+                // subsequent re-resolutions (e.g. a mid-session client-mode
+                // toggle, exercised by the
+                // "toggling client mode off restores timeline messages"
+                // test) are allowed to fall back to most-recent as before.
+                // This mirrors the existing guard in the Client-Mode branch
+                // above (line ~629).
+                val suppressFreshRouteFallback = isFreshRoute && isFirstResolve
+                if (
+                    !suppressFreshRouteFallback &&
+                    activeConversationId == null &&
+                    explicitConversationId == null
+                ) {
+                    resolveMostRecentConversation(CONVERSATION_CACHE_TTL_MS)
+                }
 
-                    ChatConversationResolution.FreshConversation,
-                    ChatConversationResolution.NoConversation,
-                    -> {
-                        _uiState.value = _uiState.value.copy(
-                            conversationState = ConversationState.NoConversation,
-                            messages = persistentListOf(),
-                            isLoadingMessages = false,
-                            isLoadingOlderMessages = false,
-                            hasMoreOlderMessages = false,
-                            error = null,
-                        )
-                    }
+                // letta-mobile-flk.6 / w2hx.6: a fresh-route entry must NOT
+                // inherit a prior `activeConversationId` from before this
+                // resolve. Pre-w2hx.6 we also had to guard against a
+                // process-wide singleton leaking across chats; that's gone.
+                // Once `hasResolvedConversationOnce` flips, behave normally.
+                val conversationId = if (suppressFreshRouteFallback) {
+                    explicitConversationId?.also { activeConversationId = it }
+                } else {
+                    activeConversationId ?: explicitConversationId?.also { activeConversationId = it }
+                }
+
+                if (conversationId == null) {
+                    _uiState.value = _uiState.value.copy(
+                        conversationState = ConversationState.NoConversation,
+                        messages = persistentListOf(),
+                        isLoadingMessages = false,
+                        isLoadingOlderMessages = false,
+                        hasMoreOlderMessages = false,
+                        error = null,
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        conversationState = ConversationState.Ready(conversationId),
+                        error = null,
+                    )
+                    loadMessagesInternal()
                 }
 
                 initialMessage?.let { message ->
@@ -776,9 +796,47 @@ class AdminChatViewModel @Inject constructor(
         }
     }
 
-    private suspend fun loadMessagesInternal(requestedConversationId: String) {
+    /**
+     * letta-mobile-w2hx.6: resolve the most-recent server-side conversation
+     * for this VM's agent and assign it to this VM's [activeConversationId].
+     * Replaces ConversationManager.resolveAndSetActiveConversation, which
+     * wrote into a process-wide map keyed on agentId — that map could leak
+     * one chat's resolved conv into a sibling chat's resolve. The chat row
+     * (this VM) now owns its own active id.
+     *
+     * @return the resolved conversation id, or null if there are none cached
+     *   for this agent after the refresh.
+     */
+    private suspend fun resolveMostRecentConversation(maxAgeMs: Long): String? {
+        conversationRepository.refreshConversationsIfStale(agentId, maxAgeMs)
+        val mostRecent = conversationRepository.getCachedConversations(agentId)
+            .sortedByDescending { it.lastMessageAt ?: it.createdAt ?: "" }
+            .firstOrNull()
+            ?: return null
+        activeConversationId = mostRecent.id
+        return mostRecent.id
+    }
+
+    private suspend fun loadMessagesInternal() {
         val loadTimer = Telemetry.startTimer("AdminChatVM", "loadMessages")
-        val currentConversationId = conversationId ?: explicitConversationId
+        val requestedConversationId = activeConversationId ?: explicitConversationId?.also {
+            activeConversationId = it
+        }
+        val currentConversationId = activeConversationId ?: explicitConversationId
+        if (requestedConversationId == null) {
+            if (requestedConversationId == currentConversationId) {
+                _uiState.value = _uiState.value.copy(
+                    conversationState = ConversationState.NoConversation,
+                    messages = persistentListOf(),
+                    isLoadingMessages = false,
+                    isLoadingOlderMessages = false,
+                    hasMoreOlderMessages = false,
+                    error = null,
+                )
+            }
+            loadTimer.stop("result" to "noConversation")
+            return
+        }
         val cachedAgent = agentRepository.getCachedAgent(agentId)
         // Timeline is the source of truth — legacy cache is never read here.
         val cachedMessages = emptyList<AppMessage>()
@@ -798,7 +856,7 @@ class AdminChatViewModel @Inject constructor(
         }
         try {
             val agent = agentRepository.getAgent(agentId).first()
-            if (requestedConversationId != (conversationId ?: explicitConversationId)) {
+            if (requestedConversationId != (activeConversationId ?: explicitConversationId)) {
                 loadTimer.stop("result" to "staleConversation")
                 return
             }
@@ -823,7 +881,7 @@ class AdminChatViewModel @Inject constructor(
             )
         } catch (e: Exception) {
             loadTimer.stopError(e, "conversationId" to requestedConversationId)
-            if (requestedConversationId != (conversationId ?: explicitConversationId)) {
+            if (requestedConversationId != (activeConversationId ?: explicitConversationId)) {
                 return
             }
             _uiState.value = _uiState.value.copy(
@@ -1014,9 +1072,7 @@ class AdminChatViewModel @Inject constructor(
                     hasMoreOlderMessages = false,
                     isStreaming = true,
                     isAgentTyping = true,
-                    composerError = null,
                     error = null,
-                    pendingAttachments = persistentListOf(),
                     conversationState = ConversationState.Ready(convId),
                 )
                 runCatching {
