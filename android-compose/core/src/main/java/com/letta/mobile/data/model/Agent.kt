@@ -14,6 +14,24 @@ data class AgentEnvironmentVariable(
 )
 
 @Serializable
+data class ContextWindowOverview(
+    @SerialName("context_window_size_max") val contextWindowSizeMax: Int = 0,
+    @SerialName("context_window_size_current") val contextWindowSizeCurrent: Int = 0,
+    @SerialName("num_messages") val numMessages: Int = 0,
+    @SerialName("num_archival_memory") val numArchivalMemory: Int = 0,
+    @SerialName("num_recall_memory") val numRecallMemory: Int = 0,
+    @SerialName("num_tokens_external_memory_summary") val numTokensExternalMemorySummary: Int = 0,
+    @SerialName("num_tokens_system") val numTokensSystem: Int = 0,
+    @SerialName("num_tokens_core_memory") val numTokensCoreMemory: Int = 0,
+    @SerialName("num_tokens_memory_filesystem") val numTokensMemoryFilesystem: Int = 0,
+    @SerialName("num_tokens_tool_usage_rules") val numTokensToolUsageRules: Int = 0,
+    @SerialName("num_tokens_directories") val numTokensDirectories: Int = 0,
+    @SerialName("num_tokens_summary_memory") val numTokensSummaryMemory: Int = 0,
+    @SerialName("num_tokens_functions_definitions") val numTokensFunctionsDefinitions: Int = 0,
+    @SerialName("num_tokens_messages") val numTokensMessages: Int = 0,
+)
+
+@Serializable
 data class Agent(
     val id: String,
     val name: String,

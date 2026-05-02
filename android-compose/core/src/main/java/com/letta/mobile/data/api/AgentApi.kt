@@ -43,6 +43,19 @@ open class AgentApi @Inject constructor(
         return response.body()
     }
 
+    open suspend fun getContextWindow(agentId: String, conversationId: String? = null): ContextWindowOverview {
+        val client = apiClient.getClient()
+        val baseUrl = apiClient.getBaseUrl()
+
+        val response = client.get("$baseUrl/v1/agents/$agentId/context") {
+            parameter("conversation_id", conversationId)
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
+    }
+
     open suspend fun countAgents(): Int {
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()

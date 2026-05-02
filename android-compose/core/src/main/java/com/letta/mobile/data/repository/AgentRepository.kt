@@ -99,6 +99,9 @@ class AgentRepository @Inject constructor(
         updateAgentInCache(fresh)
     }
 
+    suspend fun getContextWindow(agentId: String, conversationId: String? = null) =
+        agentApi.getContextWindow(agentId, conversationId)
+
     fun getAgentPolling(id: String): Flow<Agent> = flow {
         while (true) {
             val agent = agentApi.getAgent(id)

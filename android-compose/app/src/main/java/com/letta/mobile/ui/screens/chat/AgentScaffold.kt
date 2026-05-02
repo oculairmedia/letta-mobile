@@ -9,6 +9,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.heightIn
@@ -69,6 +70,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.verticalScroll
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -104,6 +106,7 @@ import com.letta.mobile.ui.theme.LettaTopBarDefaults
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.listItemHeadline
 import kotlinx.collections.immutable.toImmutableList
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -145,6 +148,7 @@ fun AgentScaffold(
                     agentName = agentName,
                     agentId = agentId,
                     messageCount = uiState.messages.size,
+                    contextWindow = uiState.contextWindow,
                     chatBackground = chatBackground,
                     onChatBackgroundChange = { viewModel.setChatBackground(it) },
                     onEditAgent = {
@@ -163,6 +167,7 @@ fun AgentScaffold(
                         scope.launch { drawerState.close() }
                         viewModel.resetMessages()
                     },
+                    onRefreshContextWindow = viewModel::refreshContextWindow,
                     onClose = { scope.launch { drawerState.close() } },
                 )
             }
@@ -188,7 +193,10 @@ fun AgentScaffold(
                         }
                     },
                     actions = {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                        IconButton(onClick = {
+                            viewModel.refreshContextWindow()
+                            scope.launch { drawerState.open() }
+                        }) {
                             Icon(LettaIcons.Menu, "Menu")
                         }
                     }
@@ -1234,22 +1242,158 @@ class ConversationPickerViewModel @Inject constructor(
 }
 
 @Composable
+private fun ContextWindowCard(
+    state: ContextWindowUiState,
+    onRefresh: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ),
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    LettaIcons.Database,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.screen_chat_context_window_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.weight(1f),
+                )
+                if (state.isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    IconButton(onClick = onRefresh, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            LettaIcons.Refresh,
+                            contentDescription = stringResource(R.string.action_refresh),
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (state.maxTokens > 0) {
+                val progress = (state.currentTokens.toFloat() / state.maxTokens.toFloat()).coerceIn(0f, 1f)
+                Text(
+                    text = stringResource(
+                        R.string.screen_chat_context_window_usage,
+                        formatDrawerNumber(state.currentTokens),
+                        formatDrawerNumber(state.maxTokens),
+                        state.usagePercent,
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.tertiary,
+                    trackColor = MaterialTheme.colorScheme.tertiaryContainer,
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                ContextMetricRow(
+                    label = stringResource(R.string.screen_chat_context_window_messages),
+                    value = stringResource(
+                        R.string.screen_chat_context_window_messages_value,
+                        formatDrawerNumber(state.messageTokens),
+                        state.messageCount,
+                    ),
+                )
+                ContextMetricRow(
+                    label = stringResource(R.string.screen_chat_context_window_memory),
+                    value = formatDrawerNumber(
+                        state.coreMemoryTokens + state.externalMemoryTokens + state.summaryMemoryTokens,
+                    ),
+                )
+                ContextMetricRow(
+                    label = stringResource(R.string.screen_chat_context_window_tools),
+                    value = formatDrawerNumber(state.toolTokens),
+                )
+                ContextMetricRow(
+                    label = stringResource(R.string.screen_chat_context_window_system),
+                    value = formatDrawerNumber(state.systemTokens),
+                )
+                Text(
+                    text = stringResource(
+                        R.string.screen_chat_context_window_memory_counts,
+                        state.recallMemoryCount,
+                        state.archivalMemoryCount,
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            } else if (state.error != null) {
+                Text(
+                    text = state.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            } else {
+                Text(
+                    text = stringResource(R.string.screen_chat_context_window_unavailable),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ContextMetricRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+private fun formatDrawerNumber(value: Int): String = String.format(Locale.US, "%,d", value)
+
+@Composable
 private fun DrawerContent(
     agentName: String,
     agentId: String,
     messageCount: Int,
+    contextWindow: ContextWindowUiState,
     chatBackground: ChatBackground,
     onChatBackgroundChange: (ChatBackground) -> Unit,
     onEditAgent: () -> Unit,
     onArchivalMemory: () -> Unit,
     onTools: () -> Unit = {},
     onResetMessages: () -> Unit = {},
+    onRefreshContextWindow: () -> Unit,
     onClose: () -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxHeight()
             .width(300.dp)
+            .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1274,6 +1418,11 @@ private fun DrawerContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
+        Spacer(modifier = Modifier.height(16.dp))
+        ContextWindowCard(
+            state = contextWindow,
+            onRefresh = onRefreshContextWindow,
+        )
         Spacer(modifier = Modifier.height(16.dp))
         HorizontalDivider()
         Spacer(modifier = Modifier.height(8.dp))

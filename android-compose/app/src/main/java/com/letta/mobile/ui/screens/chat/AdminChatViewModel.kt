@@ -147,6 +147,26 @@ data class ProjectAgentsUiState(
     val error: String? = null,
 )
 
+@androidx.compose.runtime.Immutable
+data class ContextWindowUiState(
+    val isLoading: Boolean = false,
+    val error: String? = null,
+    val maxTokens: Int = 0,
+    val currentTokens: Int = 0,
+    val messageCount: Int = 0,
+    val systemTokens: Int = 0,
+    val coreMemoryTokens: Int = 0,
+    val externalMemoryTokens: Int = 0,
+    val summaryMemoryTokens: Int = 0,
+    val toolTokens: Int = 0,
+    val messageTokens: Int = 0,
+    val archivalMemoryCount: Int = 0,
+    val recallMemoryCount: Int = 0,
+) {
+    val usagePercent: Int
+        get() = if (maxTokens > 0) ((currentTokens.toFloat() / maxTokens.toFloat()) * 100).toInt().coerceIn(0, 100) else 0
+}
+
 sealed interface ConversationState {
     @androidx.compose.runtime.Immutable
     data object Loading : ConversationState
@@ -182,6 +202,7 @@ data class ChatUiState(
     val projectBrief: ProjectBriefUiState = ProjectBriefUiState(),
     val bugReports: ProjectBugReportUiState = ProjectBugReportUiState(),
     val projectAgents: ProjectAgentsUiState = ProjectAgentsUiState(),
+    val contextWindow: ContextWindowUiState = ContextWindowUiState(),
     /**
      * Surfaced when the LettaBot harness substituted a fresh conversation ID for
      * the one we requested (i.e. our requested conv was unrecoverable on the
@@ -441,6 +462,49 @@ class AdminChatViewModel @Inject constructor(
                 loadProjectAgents()
                 loadProjectBrief()
                 loadRecentBugReports()
+            }
+            refreshContextWindow()
+        }
+    }
+
+    fun refreshContextWindow() {
+        if (agentId.isBlank()) return
+        viewModelScope.launch {
+            _uiState.update {
+                it.copy(contextWindow = it.contextWindow.copy(isLoading = true, error = null))
+            }
+            try {
+                val overview = agentRepository.getContextWindow(agentId, conversationId)
+                _uiState.update {
+                    it.copy(
+                        contextWindow = ContextWindowUiState(
+                            isLoading = false,
+                            maxTokens = overview.contextWindowSizeMax,
+                            currentTokens = overview.contextWindowSizeCurrent,
+                            messageCount = overview.numMessages,
+                            systemTokens = overview.numTokensSystem,
+                            coreMemoryTokens = overview.numTokensCoreMemory,
+                            externalMemoryTokens = overview.numTokensExternalMemorySummary,
+                            summaryMemoryTokens = overview.numTokensSummaryMemory,
+                            toolTokens = overview.numTokensFunctionsDefinitions +
+                                overview.numTokensToolUsageRules +
+                                overview.numTokensDirectories +
+                                overview.numTokensMemoryFilesystem,
+                            messageTokens = overview.numTokensMessages,
+                            archivalMemoryCount = overview.numArchivalMemory,
+                            recallMemoryCount = overview.numRecallMemory,
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        contextWindow = it.contextWindow.copy(
+                            isLoading = false,
+                            error = mapErrorToUserMessage(e, "Failed to load context window"),
+                        )
+                    )
+                }
             }
         }
     }
@@ -1481,6 +1545,7 @@ class AdminChatViewModel @Inject constructor(
                 )
             } finally {
                 clientModeStreamInFlight = false
+                refreshContextWindow()
                 if (clientModeStreamJob?.isCancelled != false) {
                     clientModeStreamJob = null
                 }
