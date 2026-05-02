@@ -59,7 +59,6 @@ import com.letta.mobile.R
 import androidx.compose.material3.FilterChip
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
-import com.letta.mobile.ui.common.groupMessages
 import com.letta.mobile.ui.components.DateSeparator
 import com.letta.mobile.ui.components.MessageSkeletonList
 import com.letta.mobile.ui.components.StarterPrompts
@@ -312,37 +311,10 @@ private fun ChatContent(
             }
     }
 
-    val dedupedMessages = remember(state.messages, chatMode) {
-        val result = mutableListOf<UiMessage>()
-        var lastReasoningContent: String? = null
-        for (msg in state.messages) {
-            if (msg.isReasoning) {
-                lastReasoningContent = msg.content
-                result.add(msg)
-            } else if (msg.role == "assistant" && msg.content == lastReasoningContent) {
-                // Skip assistant message that duplicates the reasoning content
-            } else {
-                lastReasoningContent = null
-                result.add(msg)
-            }
-        }
-        when (chatMode) {
-            // letta-mobile-5s1n: keep error frames visible in Simple mode so
-            // users see when a run aborts (otherwise the bubble is filtered
-            // out and the experience degrades to the silent-spinner bug
-            // we just fixed).
-            "simple" -> result.filter {
-                it.role == "user" || (it.role == "assistant" && !it.isReasoning) || it.isError
-            }
-            else -> result
-        }
-    }
-
-    val groupedMessages = remember(dedupedMessages) {
-        groupMessages(
-            messages = dedupedMessages,
-            getRole = { it.role },
-            getTimestamp = { it.timestamp },
+    val renderModel = remember(state.messages, chatMode) {
+        buildChatRenderModel(
+            messages = state.messages,
+            mode = chatMode.toChatDisplayMode(),
         )
     }
 
@@ -366,16 +338,7 @@ private fun ChatContent(
                 modifier = Modifier.weight(1f),
             )
         } else {
-            val reversed = remember(groupedMessages) {
-                // Defensive: LazyColumn crashes on duplicate item keys. mergeOlderMessages
-                // already dedupes by id, but a late streaming tick or reasoning-collapse
-                // edge case could still leak duplicates — so we guard here too.
-                val seen = HashSet<String>(groupedMessages.size)
-                groupedMessages.filter { (msg, _) -> seen.add(msg.id) }.asReversed()
-            }
-            val renderItems = remember(reversed) {
-                groupMessagesForRender(reversed)
-            }
+            val renderItems = renderModel.renderItems
 
             // Scroll to a specific message when navigating from search results
             LaunchedEffect(scrollToMessageId, renderItems.size) {
