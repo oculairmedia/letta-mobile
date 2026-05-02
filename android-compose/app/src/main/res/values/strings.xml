@@ -9,6 +9,7 @@
     <string name="common_tools">Tools</string>
     <string name="common_mcp">MCP</string>
     <string name="common_templates">Starter Agents</string>
+    <string name="common_none">None</string>
 
     <string name="screen_home_search_placeholder">Search</string>
     <string name="screen_home_chat_placeholder">Ask something\u2026</string>
@@ -45,10 +46,20 @@
     <string name="widget_desc_about">App info &amp; version</string>
     <string name="screen_nav_telemetry">Telemetry</string>
     <string name="widget_desc_telemetry">Dev latency/event log</string>
+    <string name="widget_desc_system_access">Device access registry</string>
     <string name="widget_desc_usage">Token analytics</string>
     <string name="widget_desc_favorite_agent">Quick chat</string>
     <string name="screen_nav_usage">Usage</string>
     <string name="screen_nav_favorite_agent">Favorite Agent</string>
+    <string name="screen_system_access_title">System Access</string>
+    <string name="screen_system_access_entry_description">Review Android permissions, special access, and privileged-tool exposure.</string>
+    <string name="screen_system_access_summary_headline">Capability registry</string>
+    <string name="screen_system_access_summary_body">%1$d of %2$d supported capabilities are currently tool-usable in the %3$s flavor.</string>
+    <string name="screen_system_access_tools_label">Unlocked tools</string>
+    <string name="screen_system_access_audit_label">Audit policy</string>
+    <string name="screen_system_access_risk_label">Policy risk</string>
+    <string name="screen_system_access_settings_unavailable">Android settings could not be opened for this capability.</string>
+    <string name="screen_system_access_action_future">This setup action will be wired by the capability implementation.</string>
     <string name="widget_tile_count_format">%d items</string>
     <string name="screen_home_usage_title">Usage</string>
     <string name="screen_home_usage_subtitle">Last 24 hours</string>

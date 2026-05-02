@@ -62,6 +62,7 @@ import com.letta.mobile.ui.screens.schedules.ScheduleListScreen
 import com.letta.mobile.ui.screens.templates.TemplatesScreen
 import com.letta.mobile.ui.screens.tools.AllToolsScreen
 import com.letta.mobile.ui.screens.tools.ToolDetailScreen
+import com.letta.mobile.ui.screens.systemaccess.SystemAccessDashboardScreen
 import com.letta.mobile.ui.screens.telemetry.TelemetryScreen
 import com.letta.mobile.ui.screens.usage.UsageScreen
 import androidx.lifecycle.viewModelScope
@@ -208,6 +209,7 @@ fun AppNavGraph(
                 onNavigateToMcp = { navController.navigate(McpRoute) },
                 onNavigateToAbout = { navController.navigate(AboutRoute) },
                 onNavigateToTelemetry = { navController.navigate(TelemetryRoute) },
+                onNavigateToSystemAccess = { navController.navigate(SystemAccessRoute) },
                 onNavigateToBotSettings = { navController.navigate(BotSettingsRoute) },
                 onNavigateToProjects = { navController.navigate(HomeRoute) },
                 onNavigateToModels = { navController.navigate(ModelsRoute) },
@@ -236,6 +238,15 @@ fun AppNavGraph(
             popExitTransition = drillInPopExit,
         ) {
             TelemetryScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable<SystemAccessRoute>(
+            enterTransition = drillInEnter,
+            exitTransition = drillInExit,
+            popEnterTransition = drillInPopEnter,
+            popExitTransition = drillInPopExit,
+        ) {
+            SystemAccessDashboardScreen(onNavigateBack = { navController.popBackStack() })
         }
 
         composable<ConversationsRoute>(
@@ -333,6 +344,9 @@ fun AppNavGraph(
                 },
                 onNavigateToLettaBotConnection = {
                     navController.navigate(LettaBotConnectionRoute)
+                },
+                onNavigateToSystemAccess = {
+                    navController.navigate(SystemAccessRoute)
                 },
             )
         }

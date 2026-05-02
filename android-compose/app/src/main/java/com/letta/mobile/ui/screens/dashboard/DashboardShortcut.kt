@@ -48,6 +48,12 @@ enum class DashboardShortcut(
     // --- Group UTILITY (below second divider) ---
     SETTINGS(LettaIcons.Settings, R.string.common_settings, Group.UTILITY, R.string.widget_desc_settings),
     TELEMETRY(LettaIcons.Database, R.string.screen_nav_telemetry, Group.UTILITY, R.string.widget_desc_telemetry),
+    SYSTEM_ACCESS(
+        LettaIcons.Key,
+        R.string.screen_system_access_title,
+        Group.UTILITY,
+        R.string.widget_desc_system_access,
+    ),
     ABOUT(LettaIcons.Info, R.string.screen_about_title, Group.UTILITY, R.string.widget_desc_about);
 
     enum class Group { PRIMARY, SECONDARY, UTILITY }

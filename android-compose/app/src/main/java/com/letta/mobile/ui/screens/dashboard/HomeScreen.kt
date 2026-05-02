@@ -126,6 +126,7 @@ fun HomeScreen(
     onNavigateToMcp: () -> Unit = {},
     onNavigateToAbout: () -> Unit = {},
     onNavigateToTelemetry: () -> Unit = {},
+    onNavigateToSystemAccess: () -> Unit = {},
     onNavigateToBotSettings: () -> Unit = {},
     onNavigateToProjects: () -> Unit = {},
     onNavigateToModels: () -> Unit = {},
@@ -172,6 +173,7 @@ fun HomeScreen(
         }
         DashboardShortcut.SETTINGS -> onNavigateToSettings
         DashboardShortcut.TELEMETRY -> onNavigateToTelemetry
+        DashboardShortcut.SYSTEM_ACCESS -> onNavigateToSystemAccess
         DashboardShortcut.ABOUT -> onNavigateToAbout
     }
 

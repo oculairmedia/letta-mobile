@@ -42,6 +42,7 @@ fun ConfigScreen(
     onNavigateBack: () -> Unit,
     onNavigateToConfigList: () -> Unit,
     onNavigateToLettaBotConnection: () -> Unit = {},
+    onNavigateToSystemAccess: () -> Unit = {},
     viewModel: ConfigViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -145,6 +146,7 @@ fun ConfigScreen(
                     }
                 },
                 onNavigateToLettaBotConnection = onNavigateToLettaBotConnection,
+                onNavigateToSystemAccess = onNavigateToSystemAccess,
                 onSave = {
                     viewModel.saveConfig(
                         onSuccess = { snackbar.dispatch("Configuration saved"); onNavigateBack() },
@@ -170,6 +172,7 @@ private fun ConfigContent(
     batteryOptimizationExempt: Boolean,
     onRequestBatteryOptimizationExemption: () -> Unit,
     onNavigateToLettaBotConnection: () -> Unit,
+    onNavigateToSystemAccess: () -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -371,6 +374,12 @@ private fun ConfigContent(
                     Text(stringResource(R.string.screen_lettabot_connection_entry_description))
                 },
                 leadingContent = { Icon(LettaIcons.Link, contentDescription = null) },
+            )
+            item(
+                onClick = onNavigateToSystemAccess,
+                headlineContent = { Text(stringResource(R.string.screen_system_access_title)) },
+                supportingContent = { Text(stringResource(R.string.screen_system_access_entry_description)) },
+                leadingContent = { Icon(LettaIcons.Key, contentDescription = null) },
             )
         }
 
