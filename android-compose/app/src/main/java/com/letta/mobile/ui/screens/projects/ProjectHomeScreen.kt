@@ -38,12 +38,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -66,6 +67,7 @@ import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ExpandableTitleSearch
 import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.MultiFieldInputDialog
+import com.letta.mobile.ui.components.ShimmerBox
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
@@ -86,6 +88,14 @@ fun ProjectHomeScreen(
     val snackbar = LocalSnackbarDispatcher.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
+    var isAppBarCollapsed by remember { mutableStateOf(false) }
+
+    LaunchedEffect(scrollBehavior) {
+        snapshotFlow { scrollBehavior.state.collapsedFraction }
+            .collect { fraction ->
+                isAppBarCollapsed = fraction >= 0.9f
+            }
+    }
     val missingAgentMessage = stringResource(R.string.screen_projects_missing_agent, "%s")
     val projectSettingsTitle = stringResource(R.string.screen_projects_settings_title)
     val projectSettingsPathLabel = stringResource(R.string.screen_projects_settings_path_label)
@@ -122,6 +132,8 @@ fun ProjectHomeScreen(
                         placeholder = stringResource(R.string.screen_projects_search_hint),
                         openSearchContentDescription = stringResource(R.string.action_search),
                         closeSearchContentDescription = stringResource(R.string.action_close),
+                        autoFocus = false,
+                        isAppBarCollapsed = isAppBarCollapsed,
                         titleContent = {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text(stringResource(R.string.screen_projects_title))
@@ -163,13 +175,17 @@ fun ProjectHomeScreen(
     ) { paddingValues ->
         when (val state = uiState) {
             is UiState.Loading -> {
-                EmptyState(
-                    icon = LettaIcons.Apps,
-                    message = stringResource(R.string.common_loading),
+                Column(
                     modifier = Modifier
                         .padding(paddingValues)
-                        .fillMaxSize(),
-                )
+                        .fillMaxSize()
+                        .padding(LettaSpacing.screenHorizontal),
+                    verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
+                ) {
+                    for (i in 0..5) {
+                        ShimmerBox(height = 120.dp, widthFraction = 1f)
+                    }
+                }
             }
 
             is UiState.Error -> {

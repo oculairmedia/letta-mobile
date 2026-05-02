@@ -39,11 +39,13 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -64,7 +66,8 @@ import com.letta.mobile.ui.components.DateSeparator
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ExpandableTitleSearch
 import com.letta.mobile.ui.components.LoadingIndicator
-import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.components.ShimmerConversationList
+import com.letta.mobile.ui.components.ShimmerBox
 import com.letta.mobile.ui.components.TextInputDialog
 import com.letta.mobile.ui.theme.dialogSectionHeading
 import com.letta.mobile.ui.theme.listItemHeadline
@@ -110,9 +113,17 @@ fun ConversationsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showAgentPickerDialog by remember { mutableStateOf(false) }
     var showOverflowMenu by remember { mutableStateOf(false) }
-    var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
+    var isSearchExpanded by rememberSaveable { mutableStateOf(true) }
+    var isAppBarCollapsed by remember { mutableStateOf(false) }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
+    LaunchedEffect(scrollBehavior) {
+        snapshotFlow { scrollBehavior.state.collapsedFraction }
+            .collect { fraction ->
+                isAppBarCollapsed = fraction >= 0.9f
+            }
+    }
 
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -127,6 +138,9 @@ fun ConversationsScreen(
                         expanded = isSearchExpanded,
                         onExpandedChange = { isSearchExpanded = it },
                         placeholder = stringResource(R.string.screen_conversations_search_hint),
+                        autoFocus = false,
+                        showCollapseButton = false,
+                        isAppBarCollapsed = isAppBarCollapsed,
                         titleContent = {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text(stringResource(R.string.common_conversations))
@@ -143,14 +157,8 @@ fun ConversationsScreen(
                 scrollBehavior = scrollBehavior,
                 colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.largeTopAppBarColors(),
                 actions = {
-                    IconButton(onClick = onNavigateToAgentList) {
-                        Icon(LettaIcons.AccountCircle, stringResource(R.string.common_agents))
-                    }
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(LettaIcons.Settings, stringResource(R.string.common_settings))
-                    }
-                    IconButton(onClick = { showOverflowMenu = true }) {
-                        Icon(LettaIcons.MoreVert, contentDescription = "More")
                     }
                     DropdownMenu(
                         expanded = showOverflowMenu,
@@ -242,7 +250,7 @@ fun ConversationsScreen(
         }
     ) { paddingValues ->
         when {
-            uiState.isLoading && uiState.conversations.isEmpty() -> ShimmerCard(modifier = Modifier.padding(16.dp))
+            uiState.isLoading && uiState.conversations.isEmpty() -> ShimmerConversationList(modifier = Modifier.padding(paddingValues))
             uiState.error != null && uiState.conversations.isEmpty() -> ErrorContent(
                 message = uiState.error!!,
                 onRetry = { viewModel.loadConversations() },
@@ -301,6 +309,7 @@ fun ConversationsScreen(
             onFork = { viewModel.forkConversation(display.conversation.id, display.conversation.agentId) { } },
             onCancelRuns = { viewModel.cancelConversationRuns(display) },
             inspectorMessages = uiState.inspectorMessages,
+            isInspectorLoading = uiState.isInspectorLoading,
             inspectorError = uiState.inspectorError,
             onRecompile = { viewModel.recompileConversation(display) },
             onDelete = { viewModel.deleteConversation(display.conversation.id) },
@@ -592,6 +601,7 @@ private fun ConversationAdminDialog(
     display: ConversationDisplay,
     recompilePreview: String?,
     inspectorMessages: List<ConversationInspectorMessage>,
+    isInspectorLoading: Boolean,
     inspectorError: String?,
     onDismiss: () -> Unit,
     onRename: (String) -> Unit,
@@ -654,7 +664,18 @@ private fun ConversationAdminDialog(
                     text = stringResource(R.string.screen_conversations_message_inspector_title),
                     style = MaterialTheme.typography.dialogSectionHeading,
                 )
-                if (!inspectorError.isNullOrBlank()) {
+                if (isInspectorLoading) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(260.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        for (i in 0..3) {
+                            ShimmerBox(height = 80.dp, widthFraction = 1f)
+                        }
+                    }
+                } else if (!inspectorError.isNullOrBlank()) {
                     Text(
                         text = inspectorError,
                         style = MaterialTheme.typography.listItemSupporting,
@@ -670,7 +691,7 @@ private fun ConversationAdminDialog(
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 260.dp),
+                            .height(260.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         items(inspectorMessages, key = { it.id }) { message ->

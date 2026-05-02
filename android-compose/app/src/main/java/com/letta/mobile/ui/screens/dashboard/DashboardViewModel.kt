@@ -42,15 +42,21 @@ data class DashboardUiState(
     val serverUrl: String = "",
     val isConnected: Boolean = false,
     val agentCount: Int? = null,
+    val isAgentCountLoading: Boolean = true,
     val conversationCount: Int? = null,
+    val isConversationCountLoading: Boolean = true,
     val toolCount: Int? = null,
+    val isToolCountLoading: Boolean = true,
     val blockCount: Int? = null,
+    val isBlockCountLoading: Boolean = true,
     val usageSummary: DashboardUsageSummary? = null,
     val isUsageLoading: Boolean = true,
     val favoriteAgentId: String? = null,
     val favoriteAgentName: String? = null,
     val pinnedAgents: ImmutableList<PinnedAgent> = persistentListOf(),
+    val isPinnedAgentsLoading: Boolean = true,
     val pinnedShortcuts: ImmutableList<DashboardShortcut> = persistentListOf(),
+    val isPinnedShortcutsLoading: Boolean = true,
     val searchQuery: String = "",
     val isSearching: Boolean = false,
     val isSearchActive: Boolean = false,
@@ -122,6 +128,7 @@ class DashboardViewModel @Inject constructor(
                         favoriteAgentId = favId,
                         favoriteAgentName = favName,
                         pinnedAgents = pinned.toImmutableList(),
+                        isPinnedAgentsLoading = false,
                     )
                     if (favId != null && favName == null) {
                         try {
@@ -258,6 +265,7 @@ class DashboardViewModel @Inject constructor(
                 }
                 _uiState.value = _uiState.value.copy(
                     pinnedShortcuts = shortcuts.toImmutableList(),
+                    isPinnedShortcutsLoading = false,
                 )
             }
         }
@@ -284,63 +292,63 @@ class DashboardViewModel @Inject constructor(
     fun loadProgressively() {
         viewModelScope.launch {
             try {
-                // Use the dedicated count endpoint for accurate count
                 val count = agentRepository.countAgents()
                 _uiState.value = _uiState.value.copy(
                     agentCount = count,
+                    isAgentCountLoading = false,
                     isConnected = true,
                 )
-                // Also refresh the agents list for search functionality
                 agentRepository.refreshAgents()
             } catch (e: Exception) {
                 Log.w("DashboardVM", "Agent count failed", e)
-                _uiState.value = _uiState.value.copy(error = e.message)
+                _uiState.value = _uiState.value.copy(
+                    isAgentCountLoading = false,
+                    error = e.message,
+                )
             }
         }
 
         viewModelScope.launch {
             try {
-                // Use dedicated count method for accurate count
-                // The refresh() method only loads PAGE_SIZE (50) which gives incorrect counts
                 val count = allConversationsRepository.countConversations()
                 _uiState.value = _uiState.value.copy(
                     conversationCount = count,
+                    isConversationCountLoading = false,
                 )
-                // Also refresh the conversations list for browsing
                 allConversationsRepository.refresh()
             } catch (e: Exception) {
                 Log.w("DashboardVM", "Conversation count failed", e)
+                _uiState.value = _uiState.value.copy(isConversationCountLoading = false)
             }
         }
 
         viewModelScope.launch {
             try {
-                // Use the dedicated count endpoint instead of list size
-                // The list endpoint defaults to 50 items which gives incorrect counts
                 val count = toolRepository.countTools()
                 _uiState.value = _uiState.value.copy(
                     toolCount = count,
+                    isToolCountLoading = false,
                 )
-                // Also refresh the tools list for search functionality
                 toolRepository.refreshTools()
             } catch (e: Exception) {
                 Log.w("DashboardVM", "Tool count failed", e)
+                _uiState.value = _uiState.value.copy(isToolCountLoading = false)
             }
         }
 
         viewModelScope.launch {
             try {
-                // Use the dedicated count endpoint for accurate count
-                // listAllBlocks uses limit=1000 which gives incorrect counts
                 val count = blockRepository.countBlocks()
                 _uiState.value = _uiState.value.copy(
                     blockCount = count,
+                    isBlockCountLoading = false,
                 )
                 // Also load blocks for search functionality
                 val blocks = blockRepository.listAllBlocks()
                 _cachedBlocks.value = blocks
             } catch (e: Exception) {
                 Log.w("DashboardVM", "Block count failed", e)
+                _uiState.value = _uiState.value.copy(isBlockCountLoading = false)
             }
         }
 
