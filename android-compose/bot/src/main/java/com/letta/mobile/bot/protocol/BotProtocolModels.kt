@@ -217,7 +217,22 @@ data class BotStreamChunk(
      * re-pointed at the new conversation.
      */
     @SerialName("old_conversation_id") val oldConversationId: String? = null,
-)
+) {
+    internal fun requireValidTerminalShape(context: String): BotStreamChunk {
+        if (!done) return this
+
+        require(text.isNullOrEmpty()) {
+            "$context emitted a terminal BotStreamChunk with text payload"
+        }
+        require(event == null) {
+            "$context emitted a terminal BotStreamChunk with event payload"
+        }
+        require(toolName == null && toolCallId == null && toolInput == null) {
+            "$context emitted a terminal BotStreamChunk with tool payload"
+        }
+        return this
+    }
+}
 
 @Serializable
 data class BotErrorResponse(
