@@ -1227,24 +1227,54 @@ class AdminChatViewModel @Inject constructor(
             isAgentTyping = true,
             error = null,
         )
+        val startedAt = java.time.Instant.now().toString()
+        val userMessageId = "client-user-${java.util.UUID.randomUUID()}"
+        val assistantMessageId = "client-assistant-${java.util.UUID.randomUUID()}"
+        // letta-mobile-c87t: when entering an existing-conversation route under
+        // Client Mode, prefer the route's conversationId arg so the gateway can
+        // resumeSession() into the matching Letta conversation. Fall back to
+        // the saved-state-handle pointer for cases where Client Mode set up the
+        // conversation itself (fresh-route entry continued in-place).
+        val initialPriorConversationId = explicitConversationId ?: currentClientModeConversationId()
+        // letta-mobile-vynx: a fresh Client Mode route needs an explicit
+        // empty conversation before the first send. Passing null to the
+        // gateway can resume its prior active SDK session, which hydrates
+        // old history and clobbers the optimistic first prompt. Create the
+        // Letta conversation up front, then run normal timeline-backed
+        // Client Mode against that known-empty id.
+        val bootstrapFreshConversation = isFreshRoute && initialPriorConversationId == null
+        // Fresh bootstrap must feel like an ordinary send: clear the composer
+        // and render the user's bubble immediately, not after the network-bound
+        // createConversation() preflight returns. Once the real conversation is
+        // created, the timeline Local/Confirmed row replaces this in-memory
+        // staging bubble because startTimelineObserver() makes the timeline the
+        // message-list authority for the new conversation.
+        composerController.clearAfterSend()
+        if (bootstrapFreshConversation) {
+            stopTimelineObserver()
+            val optimisticMessages = listOf(
+                UiMessage(
+                    id = userMessageId,
+                    role = "user",
+                    content = text,
+                    timestamp = startedAt,
+                ),
+            )
+            clientModeMessages = optimisticMessages
+            _uiState.value = _uiState.value.copy(
+                messages = optimisticMessages.toImmutableList(),
+                isLoadingMessages = false,
+                isLoadingOlderMessages = false,
+                hasMoreOlderMessages = false,
+                isStreaming = true,
+                isAgentTyping = true,
+                error = null,
+                conversationState = ConversationState.NoConversation,
+            )
+        }
         clientModeStreamJob = viewModelScope.launch {
             android.util.Log.w("AdminChatVM-DEBUG", "sendMessageViaClientMode: launch started")
-            val startedAt = java.time.Instant.now().toString()
-            val userMessageId = "client-user-${java.util.UUID.randomUUID()}"
-            val assistantMessageId = "client-assistant-${java.util.UUID.randomUUID()}"
-            // letta-mobile-c87t: when entering an existing-conversation route under
-            // Client Mode, prefer the route's conversationId arg so the gateway can
-            // resumeSession() into the matching Letta conversation. Fall back to
-            // the saved-state-handle pointer for cases where Client Mode set up the
-            // conversation itself (fresh-route entry continued in-place).
-            var priorConversationId = explicitConversationId ?: currentClientModeConversationId()
-            // letta-mobile-vynx: a fresh Client Mode route needs an explicit
-            // empty conversation before the first send. Passing null to the
-            // gateway can resume its prior active SDK session, which hydrates
-            // old history and clobbers the optimistic first prompt. Create the
-            // Letta conversation up front, then run normal timeline-backed
-            // Client Mode against that known-empty id.
-            val bootstrapFreshConversation = isFreshRoute && priorConversationId == null
+            var priorConversationId = initialPriorConversationId
             if (bootstrapFreshConversation) {
                 try {
                     val summary = text.take(80).let { if (text.length > 80) "$it\u2026" else it }
@@ -1285,7 +1315,6 @@ class AdminChatViewModel @Inject constructor(
             // immediately. The in-memory branch remains only as a legacy
             // fallback for callers that somehow still have no conversationId.
             currentConversationTracker.setCurrent(priorConversationId)
-            composerController.clearAfterSend()
             if (priorConversationId != null) {
                 // Stop any prior observer for a different conversation, then
                 // start one for this Client Mode conversation so the timeline

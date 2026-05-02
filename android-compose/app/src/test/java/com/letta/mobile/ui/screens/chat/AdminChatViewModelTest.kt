@@ -701,8 +701,23 @@ class AdminChatViewModelTest {
         val vm = createViewModel(conversationId = null, freshRouteKey = 4242L)
         advanceUntilIdle()
 
+        vm.updateInputText("hello fresh")
         vm.sendMessage("hello fresh")
 
+        assertEquals(
+            "Fresh bootstrap must clear the composer before createConversation returns",
+            "",
+            vm.inputText.value,
+        )
+        val optimisticUserBubbles = vm.uiState.value.messages.filter {
+            it.role == "user" && it.content == "hello fresh"
+        }
+        assertEquals(
+            "Fresh bootstrap must render one optimistic user bubble while createConversation is still pending; " +
+                "messages=${vm.uiState.value.messages.map { "${it.role}=${it.content}" }}",
+            1,
+            optimisticUserBubbles.size,
+        )
         assertTrue(
             "Fresh bootstrap must show streaming while createConversation is still pending",
             vm.uiState.value.isStreaming,
@@ -744,6 +759,19 @@ class AdminChatViewModelTest {
         chunks.send(BotStreamChunk(text = "reply", conversationId = "new-conv", done = true))
         chunks.close()
         advanceUntilIdle()
+        val finalUserBubbles = vm.uiState.value.messages.filter {
+            it.role == "user" && it.content == "hello fresh"
+        }
+        assertEquals(
+            "Optimistic user bubble must collapse to one timeline-backed user bubble after bootstrap; " +
+                "messages=${vm.uiState.value.messages.map { "${it.role}=${it.content}" }}",
+            1,
+            finalUserBubbles.size,
+        )
+        assertTrue(
+            "Assistant response should appear once after fresh bootstrap",
+            vm.uiState.value.messages.count { it.role == "assistant" && it.content.contains("reply") } == 1,
+        )
         assertFalse(vm.uiState.value.isStreaming)
     }
 
