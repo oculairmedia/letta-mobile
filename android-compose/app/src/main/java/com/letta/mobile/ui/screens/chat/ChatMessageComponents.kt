@@ -44,7 +44,9 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -769,8 +771,41 @@ internal fun MessageToolCalls(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         toolCalls.forEach { toolCall ->
-            ToolCallCard(toolCall = toolCall)
+            key(toolCall.toolCallMotionKey()) {
+                ToolCallEntrance {
+                    ToolCallCard(toolCall = toolCall)
+                }
+            }
         }
+    }
+}
+
+private fun UiToolCall.toolCallMotionKey(): String = buildString {
+    append(name)
+    append('|')
+    append(arguments.hashCode())
+}
+
+@Composable
+private fun ToolCallEntrance(content: @Composable () -> Unit) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(animationSpec = tween(durationMillis = 140)) +
+            slideInVertically(
+                animationSpec = tween(durationMillis = 180),
+                initialOffsetY = { it / 10 },
+            ) +
+            expandVertically(
+                animationSpec = tween(durationMillis = 180),
+                expandFrom = Alignment.Top,
+            ),
+        exit = fadeOut(animationSpec = tween(durationMillis = 90)) +
+            shrinkVertically(animationSpec = tween(durationMillis = 90)),
+    ) {
+        content()
     }
 }
 
