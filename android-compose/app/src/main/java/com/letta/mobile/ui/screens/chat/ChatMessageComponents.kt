@@ -745,12 +745,61 @@ private fun ApprovalChip(decision: UiToolApprovalDecision) {
 }
 
 @Composable
+private fun ToolMetaChip(text: String) {
+    Surface(
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun ToolSummaryLine(
+    label: String,
+    value: String,
+    fontScale: Float,
+    isError: Boolean = false,
+    maxLines: Int = 1,
+) {
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "$label: ",
+            style = MaterialTheme.typography.sectionTitle.scaledBy(fontScale),
+            color = if (isError) {
+                MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+            },
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.listItemSupporting.scaledBy(fontScale),
+            color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = maxLines,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
 private fun ToolCallCard(toolCall: UiToolCall) {
     val fontScale = LocalChatFontScale.current
     var expanded by remember { mutableStateOf(false) }
     val display = remember(toolCall.name, toolCall.arguments) {
         ToolDisplayRegistry.resolve(toolCall.name, toolCall.arguments)
     }
+    val argumentSummary = remember(toolCall.arguments) { summarizeToolArguments(toolCall.arguments) }
+    val executionTimeText = remember(toolCall.executionTimeMs) { toolCall.executionTimeMs?.let(::formatToolExecutionTime) }
+    val resultPreview = remember(toolCall.result) { toolCall.result?.trim()?.takeIf { it.isNotBlank() } }
     // Explicit-error-whitelist: only paint the Error icon / red color when
     // the server actually said "error". Treating `null`, "completed", or any
     // unrecognized value as error caused the long-running mis-labeling bug
@@ -784,20 +833,34 @@ private fun ToolCallCard(toolCall: UiToolCall) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(display.emoji, style = codeStyle)
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = display.label,
-                    style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = toolCall.name,
+                        style = MaterialTheme.typography.chatBubbleSender.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    if (display.label != toolCall.name) {
+                        Text(
+                            text = display.label,
+                            style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
                 // letta-mobile-23h5: folded-in approval decision. Rendered as
                 // a compact chip so the user can see "approved" / "rejected"
                 // without the old stack of redundant standalone pill bubbles.
                 toolCall.approvalDecision?.let { decision ->
                     ApprovalChip(decision = decision)
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+                executionTimeText?.let { time ->
+                    ToolMetaChip(text = time)
                     Spacer(modifier = Modifier.width(4.dp))
                 }
                 if (isError) {
@@ -825,6 +888,34 @@ private fun ToolCallCard(toolCall: UiToolCall) {
                 )
             }
 
+            argumentSummary?.let { summary ->
+                Spacer(modifier = Modifier.height(6.dp))
+                ToolSummaryLine(
+                    label = summary.label,
+                    value = summary.value,
+                    fontScale = fontScale,
+                    maxLines = 2,
+                )
+            }
+            if (resultPreview != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                ToolSummaryLine(
+                    label = if (isError) "Error" else "Result",
+                    value = resultPreview,
+                    fontScale = fontScale,
+                    isError = isError,
+                    maxLines = 2,
+                )
+            } else if (toolCall.result == null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                ToolSummaryLine(
+                    label = "Status",
+                    value = "Running",
+                    fontScale = fontScale,
+                    maxLines = 1,
+                )
+            }
+
             // Expanded content
             AnimatedVisibility(
                 visible = expanded,
@@ -832,12 +923,19 @@ private fun ToolCallCard(toolCall: UiToolCall) {
                 exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 4 }) + shrinkVertically(),
             ) {
                 Column(modifier = Modifier.padding(top = 4.dp)) {
-                    // Tool name
+                    // Tool name and timing
                     Text(
-                        text = toolCall.name,
+                        text = "Tool: ${toolCall.name}",
                         style = MaterialTheme.typography.chatBubbleSender.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     )
+                    executionTimeText?.let { time ->
+                        Text(
+                            text = "Execution time: $time",
+                            style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        )
+                    }
                     // Detail line (extracted from arguments)
                     display.detailLine?.let { detail ->
                         Text(
@@ -924,6 +1022,77 @@ private fun ToolCallCard(toolCall: UiToolCall) {
     }
 }
 
+private data class ToolArgumentSummary(val label: String, val value: String)
+
+private fun summarizeToolArguments(arguments: String): ToolArgumentSummary? {
+    if (arguments.isBlank()) return null
+    val fields = listOf(
+        "query" to "Query",
+        "search" to "Query",
+        "command" to "Args",
+        "file_path" to "Args",
+        "pattern" to "Args",
+        "content" to "Args",
+        "value" to "Args",
+    )
+    fields.forEach { (field, label) ->
+        extractJsonStringField(arguments, field)?.let { value ->
+            return ToolArgumentSummary(label = label, value = value)
+        }
+    }
+    return ToolArgumentSummary(label = "Args", value = arguments.trim())
+}
+
+private fun extractJsonStringField(json: String, field: String): String? {
+    val key = "\"$field\""
+    val keyIdx = json.indexOf(key)
+    if (keyIdx < 0) return null
+    val colonIdx = json.indexOf(':', keyIdx + key.length)
+    if (colonIdx < 0) return null
+    val quoteStart = json.indexOf('"', colonIdx + 1)
+    if (quoteStart < 0) return null
+    val sb = StringBuilder()
+    var i = quoteStart + 1
+    while (i < json.length) {
+        val c = json[i]
+        if (c == '\\' && i + 1 < json.length) {
+            val next = json[i + 1]
+            when (next) {
+                '"' -> sb.append('"')
+                '\\' -> sb.append('\\')
+                'n' -> sb.append(' ')
+                't' -> sb.append(' ')
+                else -> {
+                    sb.append('\\')
+                    sb.append(next)
+                }
+            }
+            i += 2
+        } else if (c == '"') {
+            break
+        } else {
+            sb.append(c)
+            i++
+        }
+    }
+    return sb.toString().ifBlank { null }
+}
+
+private fun formatToolExecutionTime(durationMs: Long): String {
+    return when {
+        durationMs < 1_000L -> "${durationMs}ms"
+        durationMs < 60_000L -> {
+            val seconds = durationMs / 1_000.0
+            "${String.format(java.util.Locale.US, "%.1f", seconds)}s"
+        }
+        else -> {
+            val minutes = durationMs / 60_000L
+            val seconds = (durationMs % 60_000L) / 1_000L
+            "${minutes}m ${seconds}s"
+        }
+    }
+}
+
 private fun buildMessageCopyText(message: UiMessage): String {
     return buildString {
         if (message.content.isNotBlank()) {
@@ -933,6 +1102,10 @@ private fun buildMessageCopyText(message: UiMessage): String {
             if (isNotEmpty()) append("\n\n")
             append("Tool: ")
             append(toolCall.name)
+            toolCall.executionTimeMs?.let { durationMs ->
+                append("\nExecution time: ")
+                append(formatToolExecutionTime(durationMs))
+            }
             if (toolCall.arguments.isNotBlank()) {
                 append("\nArguments:\n")
                 append(toolCall.arguments)

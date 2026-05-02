@@ -55,6 +55,12 @@ data class UiToolCall(
     val result: String?,
     val status: String? = null,
     /**
+     * Best-effort wall-clock execution duration for the tool call, measured
+     * from the tool-call message timestamp to the matching tool-return
+     * timestamp when both are available.
+     */
+    val executionTimeMs: Long? = null,
+    /**
      * Folded-in approval outcome for this specific tool call, when the mapper
      * absorbed a bare `approve=true` / `approve=false` `APPROVAL_RESPONSE`
      * into the owning tool-call bubble instead of emitting a standalone

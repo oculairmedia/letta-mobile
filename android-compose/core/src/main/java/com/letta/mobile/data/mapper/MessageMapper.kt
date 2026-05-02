@@ -25,6 +25,7 @@ import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.data.model.UiToolCall
+import java.time.Duration
 import java.time.Instant
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -302,6 +303,9 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                 val arguments = msg.content
                 val returnContent = matchedReturn?.content
                 val returnStatus = matchedReturn?.toolReturnStatus
+                val executionTimeMs = matchedReturn?.let { toolReturn ->
+                    Duration.between(msg.date, toolReturn.date).toMillis().takeIf { it >= 0L }
+                }
 
                 if (name in generatedUiToolNames && returnContent != null) {
                     val generatedUi = extractGeneratedUiFromString(returnContent)
@@ -346,6 +350,7 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                     arguments = arguments,
                     result = returnContent,
                     status = returnStatus,
+                    executionTimeMs = executionTimeMs,
                     approvalDecision = msg.toolCallId?.let { foldedApprovals[it]?.decision },
                 )
                 result.add(UiMessage(

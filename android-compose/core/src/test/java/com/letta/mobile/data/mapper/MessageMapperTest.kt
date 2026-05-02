@@ -16,6 +16,7 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldNotBeBlank
+import java.time.Instant
 import org.junit.jupiter.api.Tag
 
 @Tag("unit")
@@ -193,14 +194,16 @@ class MessageMapperTest : WordSpec({
                     messageType = MessageType.TOOL_CALL,
                     content = "{\"query\": \"cats\"}",
                     toolName = "web_search",
-                    toolCallId = "tc-1"
+                    toolCallId = "tc-1",
+                    date = Instant.parse("2024-03-15T10:00:01Z"),
                 ),
                 TestData.appMessage(
                     id = "m3",
                     messageType = MessageType.TOOL_RETURN,
                     content = "Found 10 results about cats",
                     toolName = "web_search",
-                    toolCallId = "tc-1"
+                    toolCallId = "tc-1",
+                    date = Instant.parse("2024-03-15T10:00:03Z"),
                 ),
                 TestData.appMessage(id = "m4", messageType = MessageType.ASSISTANT, content = "Here are cat results"),
             )
@@ -215,6 +218,7 @@ class MessageMapperTest : WordSpec({
             tc.name shouldBe "web_search"
             tc.arguments shouldBe "{\"query\": \"cats\"}"
             tc.result shouldBe "Found 10 results about cats"
+            tc.executionTimeMs shouldBe 2_000L
             ui[2].role shouldBe "assistant"
         }
 

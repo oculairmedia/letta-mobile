@@ -51,9 +51,10 @@ object TestData {
         localId: String? = null,
         toolName: String? = null,
         toolCallId: String? = null,
+        date: Instant = Instant.parse("2024-03-15T10:00:00Z"),
     ) = AppMessage(
         id = id,
-        date = Instant.parse("2024-03-15T10:00:00Z"),
+        date = date,
         messageType = messageType,
         content = content,
         runId = runId,

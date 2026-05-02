@@ -315,6 +315,7 @@ class AdminChatViewModel @Inject constructor(
     }
 
     private val pendingToolsMap = java.util.concurrent.ConcurrentHashMap<String, PendingToolCall>()
+    private val clientToolStartedAtMs = java.util.concurrent.ConcurrentHashMap<String, Long>()
     private var hasSummary = false
     // letta-mobile-flk.6: tracks whether the VM has already resolved its
     // conversation at least once. Used to gate the fresh-route fallback
@@ -1828,6 +1829,9 @@ class AdminChatViewModel @Inject constructor(
                 val messageId = "client-tool-$toolCallId"
                 val toolName = chunk.toolName ?: "tool"
                 val arguments = chunk.toolInput?.toString().orEmpty()
+                if (chunk.event == BotStreamEvent.TOOL_CALL) {
+                    clientToolStartedAtMs.putIfAbsent(toolCallId, System.currentTimeMillis())
+                }
                 upsertClientModeMessage(
                     messageId = messageId,
                     timestamp = timestamp,
@@ -1841,6 +1845,12 @@ class AdminChatViewModel @Inject constructor(
                         BotStreamEvent.TOOL_RESULT -> if (chunk.isError) "error" else "success"
                         else -> existingTool?.status
                     }
+                    val executionTimeMs = when (chunk.event) {
+                        BotStreamEvent.TOOL_RESULT -> clientToolStartedAtMs[toolCallId]?.let { startedAt ->
+                            (System.currentTimeMillis() - startedAt).coerceAtLeast(0L)
+                        } ?: existingTool?.executionTimeMs
+                        else -> existingTool?.executionTimeMs
+                    }
                     UiMessage(
                         id = messageId,
                         role = "assistant",
@@ -1852,6 +1862,7 @@ class AdminChatViewModel @Inject constructor(
                                 arguments = arguments.ifBlank { existingTool?.arguments.orEmpty() },
                                 result = result,
                                 status = status,
+                                executionTimeMs = executionTimeMs,
                             )
                         ),
                     )
