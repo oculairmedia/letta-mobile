@@ -21,6 +21,7 @@ const val MAX_COMPOSER_TOTAL_BYTES = 8 * 1024 * 1024
 data class ChatComposerState(
     val inputText: String = "",
     val pendingAttachments: ImmutableList<MessageContentPart.Image> = persistentListOf(),
+    val inputHistory: ImmutableList<String> = persistentListOf(),
     val error: String? = null,
 ) {
     val hasSendableContent: Boolean
@@ -150,10 +151,19 @@ class ChatComposerController(
     }
 
     fun clearAfterSend() {
-        _state.update {
-            it.copy(
+        _state.update { current ->
+            val trimmed = current.inputText.trim()
+            val nextHistory = if (trimmed.isNotBlank()) {
+                (listOf(trimmed) + current.inputHistory.filterNot { it == trimmed })
+                    .take(30)
+                    .toPersistentList()
+            } else {
+                current.inputHistory
+            }
+            current.copy(
                 inputText = "",
                 pendingAttachments = persistentListOf(),
+                inputHistory = nextHistory,
                 error = null,
             )
         }

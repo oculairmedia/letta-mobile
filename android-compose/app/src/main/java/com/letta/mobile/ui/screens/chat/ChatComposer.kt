@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -19,11 +20,16 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,6 +42,7 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.ui.components.LettaInputBar
 import com.letta.mobile.ui.icons.LettaIcons
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 
 /**
  * The chat input composer: text bar + staged attachment thumbnails + attach
@@ -46,6 +53,7 @@ import kotlinx.collections.immutable.ImmutableList
 fun ChatComposer(
     inputText: String,
     pendingAttachments: ImmutableList<MessageContentPart.Image>,
+    inputHistory: ImmutableList<String> = persistentListOf(),
     isStreaming: Boolean,
     canSendMessages: Boolean,
     onTextChange: (String) -> Unit,
@@ -58,6 +66,18 @@ fun ChatComposer(
     val hasSendableContent = inputText.isNotBlank() || pendingAttachments.isNotEmpty()
     val canSend = !isStreaming && canSendMessages && hasSendableContent
     val canSendSteeringUpdate = isStreaming && canSendMessages && inputText.isNotBlank()
+    var showHistorySheet by remember { mutableStateOf(false) }
+
+    if (showHistorySheet) {
+        InputHistorySheet(
+            history = inputHistory,
+            onSelect = { prompt ->
+                onTextChange(prompt)
+                showHistorySheet = false
+            },
+            onDismiss = { showHistorySheet = false },
+        )
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         if (pendingAttachments.isNotEmpty()) {
@@ -102,19 +122,36 @@ fun ChatComposer(
             actionContentColor = if (isStreaming) MaterialTheme.colorScheme.onErrorContainer else null,
             actionSizeFraction = if (isStreaming) 0.7f else 1f,
             leadingContent = {
-                FilledIconButton(
-                    onClick = onAttachImage,
-                    modifier = Modifier.size(48.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    ),
-                ) {
-                    Icon(
-                        LettaIcons.Add,
-                        contentDescription = stringResource(R.string.action_attach_image),
-                        modifier = Modifier.size(20.dp),
-                    )
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilledIconButton(
+                        onClick = { showHistorySheet = true },
+                        enabled = inputHistory.isNotEmpty(),
+                        modifier = Modifier.size(44.dp),
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                    ) {
+                        Icon(
+                            LettaIcons.AccessTime,
+                            contentDescription = "Input history",
+                            modifier = Modifier.size(19.dp),
+                        )
+                    }
+                    FilledIconButton(
+                        onClick = onAttachImage,
+                        modifier = Modifier.size(44.dp),
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
+                    ) {
+                        Icon(
+                            LettaIcons.Add,
+                            contentDescription = stringResource(R.string.action_attach_image),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
             },
             onSend = { text ->
@@ -125,6 +162,55 @@ fun ChatComposer(
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun InputHistorySheet(
+    history: ImmutableList<String>,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = "Input history",
+                style = MaterialTheme.typography.titleLarge,
+            )
+            if (history.isEmpty()) {
+                Text(
+                    text = "Sent prompts will appear here.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 16.dp),
+                )
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                    items(
+                        items = history,
+                        key = { it.hashCode() },
+                    ) { prompt ->
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    text = prompt,
+                                    maxLines = 3,
+                                )
+                            },
+                            leadingContent = {
+                                Icon(LettaIcons.AccessTime, contentDescription = null)
+                            },
+                            modifier = Modifier.clickable { onSelect(prompt) },
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

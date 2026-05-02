@@ -28,6 +28,12 @@ data class UiMessage(
      * letta-mobile-5s1n.
      */
     val isError: Boolean = false,
+    /**
+     * Best-effort elapsed time from the triggering user prompt to this
+     * assistant-side message. Populated at render time when server timestamps
+     * are available; null means latency should be hidden.
+     */
+    val latencyMs: Long? = null,
     val toolCalls: List<UiToolCall>? = null,
     val generatedUi: UiGeneratedComponent? = null,
     val approvalRequest: UiApprovalRequest? = null,

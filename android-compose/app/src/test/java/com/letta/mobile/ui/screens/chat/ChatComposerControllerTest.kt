@@ -63,6 +63,32 @@ class ChatComposerControllerTest {
     }
 
     @Test
+    fun `clearAfterSend records trimmed input history newest first`() {
+        val controller = ChatComposerController(telemetry = noTelemetry)
+
+        controller.updateText(" first prompt ")
+        controller.clearAfterSend()
+        controller.updateText("second prompt")
+        controller.clearAfterSend()
+
+        assertEquals(listOf("second prompt", "first prompt"), controller.state.value.inputHistory)
+    }
+
+    @Test
+    fun `clearAfterSend dedupes existing input history item`() {
+        val controller = ChatComposerController(telemetry = noTelemetry)
+
+        controller.updateText("repeat")
+        controller.clearAfterSend()
+        controller.updateText("other")
+        controller.clearAfterSend()
+        controller.updateText("repeat")
+        controller.clearAfterSend()
+
+        assertEquals(listOf("repeat", "other"), controller.state.value.inputHistory)
+    }
+
+    @Test
     fun `attachment count cap rejects fifth image`() {
         val controller = ChatComposerController(telemetry = noTelemetry)
         repeat(MAX_COMPOSER_ATTACHMENTS) { index ->

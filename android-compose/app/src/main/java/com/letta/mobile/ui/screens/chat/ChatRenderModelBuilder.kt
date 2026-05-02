@@ -3,6 +3,8 @@ package com.letta.mobile.ui.screens.chat
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.common.groupMessages
+import java.time.Duration
+import java.time.Instant
 
 /**
  * Display-level message filtering mode for chat rendering.
@@ -38,9 +40,11 @@ fun buildChatRenderModel(
     messages: List<UiMessage>,
     mode: ChatDisplayMode,
 ): ChatRenderModel {
-    val visibleMessages = filterMessagesForMode(
-        messages = dedupeReasoningAssistantEchoes(messages),
-        mode = mode,
+    val visibleMessages = attachLatencyMetadata(
+        filterMessagesForMode(
+            messages = dedupeReasoningAssistantEchoes(messages),
+            mode = mode,
+        )
     )
     val groupedMessages = groupMessages(
         messages = visibleMessages,
@@ -55,6 +59,35 @@ fun buildChatRenderModel(
         renderItems = groupMessagesForRender(reversed),
     )
 }
+
+private fun attachLatencyMetadata(messages: List<UiMessage>): List<UiMessage> {
+    var lastUserAt: Instant? = null
+    var assistantLatencyAssignedForTurn = false
+    return messages.map { message ->
+        when (message.role) {
+            "user" -> {
+                lastUserAt = message.timestamp.parseInstantOrNull()
+                assistantLatencyAssignedForTurn = false
+                message
+            }
+            "assistant" -> {
+                val promptAt = lastUserAt
+                val responseAt = message.timestamp.parseInstantOrNull()
+                val latency = message.latencyMs ?: if (!assistantLatencyAssignedForTurn && promptAt != null && responseAt != null) {
+                    Duration.between(promptAt, responseAt).toMillis()
+                        .takeIf { it in 0L..30 * 60 * 1000L }
+                } else {
+                    null
+                }
+                if (latency != null && !message.isReasoning) assistantLatencyAssignedForTurn = true
+                if (latency == message.latencyMs) message else message.copy(latencyMs = latency)
+            }
+            else -> message
+        }
+    }
+}
+
+private fun String.parseInstantOrNull(): Instant? = runCatching { Instant.parse(this) }.getOrNull()
 
 fun dedupeReasoningAssistantEchoes(messages: List<UiMessage>): List<UiMessage> {
     val result = ArrayList<UiMessage>(messages.size)

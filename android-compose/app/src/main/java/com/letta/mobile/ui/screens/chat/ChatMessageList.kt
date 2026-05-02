@@ -1,5 +1,10 @@
 package com.letta.mobile.ui.screens.chat
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -63,6 +68,7 @@ fun ChatMessageList(
     onFontScaleChange: (Float) -> Unit,
     onLoadOlderMessages: () -> Unit,
     onSendMessage: (String) -> Unit,
+    onRerunMessage: (UiMessage) -> Unit,
     onSubmitApproval: (String, List<String>, Boolean, String?) -> Unit,
     onToggleRunCollapsed: (String) -> Unit,
     onToggleReasoningExpanded: (String) -> Unit,
@@ -105,10 +111,9 @@ fun ChatMessageList(
 
     val messageCount by rememberUpdatedState(state.messages.size)
 
-    val isAtBottom by remember {
+    val isNearBottom by remember {
         derivedStateOf {
-            val firstVisible = listState.layoutInfo.visibleItemsInfo.firstOrNull()?.index ?: 0
-            firstVisible <= 1
+            listState.firstVisibleItemIndex <= 1 && listState.firstVisibleItemScrollOffset < 90
         }
     }
 
@@ -140,7 +145,7 @@ fun ChatMessageList(
         snapshotFlow { messageCount }
             .distinctUntilChanged()
             .collect {
-                if (it > 0 && isAtBottom && scrollToMessageId == null) {
+                if (it > 0 && isNearBottom && scrollToMessageId == null) {
                     listState.animateScrollToItem(0)
                 }
             }
@@ -297,8 +302,12 @@ fun ChatMessageList(
                     transformOrigin = TransformOrigin(0.5f, 0.5f)
                 },
             ) {
-                if (state.isStreaming) {
-                    item(key = "typing") {
+                item(key = "typing") {
+                    AnimatedVisibility(
+                        visible = state.isStreaming,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically(),
+                    ) {
                         TypingIndicator(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
                     }
                 }
@@ -347,6 +356,7 @@ fun ChatMessageList(
                                             chatMode = chatMode,
                                             highlightedMessageId = highlightedMessageId,
                                             onSendMessage = onSendMessage,
+                                            onRerunMessage = onRerunMessage,
                                             onSubmitApproval = onSubmitApproval,
                                             reasoningCollapsed = message.id !in state.expandedReasoningMessageIds,
                                             onToggleReasoning = { onToggleReasoningExpanded(message.id) },
@@ -361,6 +371,7 @@ fun ChatMessageList(
                                         chatMode = chatMode,
                                         highlightedMessageId = highlightedMessageId,
                                         onSendMessage = onSendMessage,
+                                        onRerunMessage = onRerunMessage,
                                         onSubmitApproval = onSubmitApproval,
                                         reasoningCollapsed = msg.id !in state.expandedReasoningMessageIds,
                                         onToggleReasoning = { onToggleReasoningExpanded(msg.id) },
@@ -391,6 +402,7 @@ fun ChatMessageList(
                                         chatMode = chatMode,
                                         highlightedMessageId = highlightedMessageId,
                                         onSendMessage = onSendMessage,
+                                        onRerunMessage = onRerunMessage,
                                         onSubmitApproval = onSubmitApproval,
                                         reasoningCollapsed = message.id !in state.expandedReasoningMessageIds,
                                         onToggleReasoning = { onToggleReasoningExpanded(message.id) },
@@ -466,7 +478,7 @@ fun calculateLazyIndexForRenderItem(
     renderItems: List<ChatRenderItem>,
     isStreaming: Boolean,
 ): Int {
-    var lazyIndex = if (isStreaming) 1 else 0
+    var lazyIndex = 1
     for (j in 0 until targetRenderIndex) {
         lazyIndex++ // message item
         val prevDate = renderItems.getOrNull(j + 1)?.boundaryTimestamp?.take(10)
@@ -484,6 +496,7 @@ private fun RenderChatMessage(
     chatMode: String,
     highlightedMessageId: String?,
     onSendMessage: (String) -> Unit,
+    onRerunMessage: (UiMessage) -> Unit,
     onSubmitApproval: (String, List<String>, Boolean, String?) -> Unit,
     reasoningCollapsed: Boolean = false,
     onToggleReasoning: (() -> Unit)? = null,
@@ -518,6 +531,8 @@ private fun RenderChatMessage(
             reasoningCollapsed = reasoningCollapsed,
             onToggleReasoning = onToggleReasoning,
             onGeneratedUiMessage = onSendMessage,
+            onRerunMessage = onRerunMessage,
+            rerunEnabled = !state.isStreaming,
             onApprovalDecision = { requestId, toolCallIds, approve, reason ->
                 onSubmitApproval(requestId, toolCallIds, approve, reason)
             },

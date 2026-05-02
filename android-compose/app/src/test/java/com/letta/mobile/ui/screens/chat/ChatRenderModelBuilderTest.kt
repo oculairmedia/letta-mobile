@@ -101,6 +101,32 @@ class ChatRenderModelBuilderTest {
     }
 
     @Test
+    fun `render model adds first assistant latency from previous user timestamp`() {
+        val model = buildChatRenderModel(
+            messages = listOf(
+                user("u1", ts = "2026-04-19T12:00:00Z"),
+                assistant("a1", ts = "2026-04-19T12:00:02.500Z"),
+                assistant("a2", ts = "2026-04-19T12:00:04Z"),
+            ),
+            mode = ChatDisplayMode.Interactive,
+        )
+
+        assertEquals(2500L, model.visibleMessages.first { it.id == "a1" }.latencyMs)
+        assertEquals(null, model.visibleMessages.first { it.id == "a2" }.latencyMs)
+    }
+
+    @Test
+    fun `render model preserves explicit latency metadata`() {
+        val explicitLatency = assistant("a1", ts = "2026-04-19T12:00:02Z").copy(latencyMs = 42L)
+        val model = buildChatRenderModel(
+            messages = listOf(user("u1", ts = "2026-04-19T12:00:00Z"), explicitLatency),
+            mode = ChatDisplayMode.Interactive,
+        )
+
+        assertEquals(42L, model.visibleMessages.first { it.id == "a1" }.latencyMs)
+    }
+
+    @Test
     fun `render items are newest first for reverse layout`() {
         val model = buildChatRenderModel(
             messages = listOf(

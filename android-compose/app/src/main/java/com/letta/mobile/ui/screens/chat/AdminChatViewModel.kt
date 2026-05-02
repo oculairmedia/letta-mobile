@@ -1315,8 +1315,19 @@ class AdminChatViewModel @Inject constructor(
         }
 
         val payload = composerController.payloadForSend(text) ?: return
-        val attachments = payload.attachments
+        sendMessagePayload(payload.text, payload.attachments)
+    }
 
+    fun rerunMessage(message: UiMessage) {
+        val text = message.content.trim()
+        if (message.role != "user" || text.isBlank()) return
+        sendMessagePayload(text, emptyList())
+    }
+
+    private fun sendMessagePayload(
+        text: String,
+        attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>,
+    ) {
         val isClientMode = shouldUseClientModeForCurrentRoute
         Telemetry.event(
             "AdminChatVM", "sendMessage.route",

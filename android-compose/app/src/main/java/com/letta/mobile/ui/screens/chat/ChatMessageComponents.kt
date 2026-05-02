@@ -9,11 +9,13 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -66,6 +68,9 @@ import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.MessageBubbleShape
+import com.letta.mobile.ui.components.ActionSheet
+import com.letta.mobile.ui.components.ActionSheetItem
+import com.letta.mobile.ui.components.LatencyText
 import com.letta.mobile.ui.components.MarkdownText
 import com.letta.mobile.ui.components.TextInputDialog
 import com.letta.mobile.ui.icons.LettaIconSizing
@@ -110,6 +115,8 @@ internal fun ChatMessageItem(
     reasoningCollapsed: Boolean = true,
     onToggleReasoning: (() -> Unit)? = null,
     onGeneratedUiMessage: ((String) -> Unit)? = null,
+    onRerunMessage: ((UiMessage) -> Unit)? = null,
+    rerunEnabled: Boolean = true,
     onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)? = null,
     approvalInFlight: Boolean = false,
     modifier: Modifier = Modifier,
@@ -119,9 +126,40 @@ internal fun ChatMessageItem(
     val context = LocalContext.current
     val copyLabel = stringResource(R.string.action_copy)
     val copyText = remember(message) { buildMessageCopyText(message) }
-    val onLongClick: (() -> Unit)? = if (copyText.isNotBlank()) {
-        { copyToClipboard(context, copyLabel, copyText) }
-    } else null
+    var showMessageActions by remember { mutableStateOf(false) }
+    val hasUserActions = isUser && onRerunMessage != null
+    val onLongClick: (() -> Unit)? = when {
+        hasUserActions -> { { showMessageActions = true } }
+        copyText.isNotBlank() -> { { copyToClipboard(context, copyLabel, copyText) } }
+        else -> null
+    }
+
+    ActionSheet(
+        show = showMessageActions,
+        onDismiss = { showMessageActions = false },
+        title = "Message actions",
+    ) {
+        if (hasUserActions && rerunEnabled) {
+            ActionSheetItem(
+                text = "Run again",
+                icon = LettaIcons.Refresh,
+                onClick = {
+                    showMessageActions = false
+                    onRerunMessage(message)
+                },
+            )
+        }
+        if (copyText.isNotBlank()) {
+            ActionSheetItem(
+                text = copyLabel,
+                icon = LettaIcons.Copy,
+                onClick = {
+                    showMessageActions = false
+                    copyToClipboard(context, copyLabel, copyText)
+                },
+            )
+        }
+    }
 
     // New layout: avatar floats ABOVE the bubble rather than occupying a
     // 40dp-wide gutter next to it. Assistant/tool/reasoning bubbles can then
@@ -345,6 +383,14 @@ private fun MessageBubbleSurface(
                     onGeneratedUiMessage = onGeneratedUiMessage,
                     isStreaming = isLastAssistant,
                 )
+            }
+            if (!isLastAssistant && message.role == "assistant" && !message.isReasoning) {
+                message.latencyMs?.let { latencyMs ->
+                    LatencyText(
+                        latencyMs = latencyMs.toFloat(),
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
             }
         }
     }
@@ -611,7 +657,11 @@ internal fun MessageReasoning(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            if (isStreaming) {
+            AnimatedVisibility(
+                visible = isStreaming,
+                enter = fadeIn() + expandHorizontally(),
+                exit = fadeOut() + shrinkHorizontally(),
+            ) {
                 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
                 LoadingIndicator(
                     modifier = Modifier.size(18.dp),

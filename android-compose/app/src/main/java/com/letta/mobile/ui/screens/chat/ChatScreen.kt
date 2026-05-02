@@ -28,8 +28,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -48,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
+import com.letta.mobile.ui.components.FloatingBanner
 import com.letta.mobile.ui.components.MessageSkeletonList
 import com.letta.mobile.ui.components.StarterPrompts
 import com.letta.mobile.ui.icons.LettaIcons
@@ -80,7 +79,7 @@ fun ChatScreen(
     }
 
     LettaChatTheme(fontScale = activeFontScale) {
-        val snackbarHostState = remember { SnackbarHostState() }
+        var floatingBannerMessage by remember { mutableStateOf("") }
         val density = LocalDensity.current
         val windowSizeClass = LocalWindowSizeClass.current
         val imeBottomPx = WindowInsets.ime.getBottom(density)
@@ -90,8 +89,15 @@ fun ChatScreen(
 
         LaunchedEffect(composerState.error) {
             val message = composerState.error ?: return@LaunchedEffect
-            snackbarHostState.showSnackbar(message)
+            floatingBannerMessage = message
             viewModel.clearComposerError()
+        }
+
+        LaunchedEffect(floatingBannerMessage) {
+            if (floatingBannerMessage.isNotBlank()) {
+                kotlinx.coroutines.delay(2600)
+                floatingBannerMessage = ""
+            }
         }
 
         Box(
@@ -154,6 +160,7 @@ fun ChatScreen(
                                 state = state,
                                 scrollToMessageId = viewModel.scrollToMessageId,
                                 onSendMessage = { viewModel.sendMessage(it) },
+                                onRerunMessage = { viewModel.rerunMessage(it) },
                                 onLoadOlderMessages = { viewModel.loadOlderMessages() },
                                 onSubmitApproval = { requestId, toolCallIds, approve, reason ->
                                     viewModel.submitApproval(requestId, toolCallIds, approve, reason)
@@ -177,6 +184,7 @@ fun ChatScreen(
                 ChatComposer(
                     inputText = composerState.inputText,
                     pendingAttachments = composerState.pendingAttachments,
+                    inputHistory = composerState.inputHistory,
                     isStreaming = state.isStreaming,
                     canSendMessages = viewModel.canSendMessages,
                     onTextChange = { newText ->
@@ -195,10 +203,11 @@ fun ChatScreen(
                 )
             }
 
-            SnackbarHost(
-                hostState = snackbarHostState,
+            FloatingBanner(
+                visible = floatingBannerMessage.isNotBlank(),
+                text = floatingBannerMessage,
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
+                    .align(Alignment.TopCenter)
                     .padding(16.dp),
             )
         }
@@ -219,6 +228,7 @@ private fun ChatContent(
     state: ChatUiState,
     scrollToMessageId: String? = null,
     onSendMessage: (String) -> Unit,
+    onRerunMessage: (com.letta.mobile.data.model.UiMessage) -> Unit,
     onLoadOlderMessages: () -> Unit,
     onSubmitApproval: (String, List<String>, Boolean, String?) -> Unit,
     onToggleRunCollapsed: (String) -> Unit,
@@ -288,6 +298,7 @@ private fun ChatContent(
                 onFontScaleChange = onFontScaleChange,
                 onLoadOlderMessages = onLoadOlderMessages,
                 onSendMessage = onSendMessage,
+                onRerunMessage = onRerunMessage,
                 onSubmitApproval = onSubmitApproval,
                 onToggleRunCollapsed = onToggleRunCollapsed,
                 onToggleReasoningExpanded = onToggleReasoningExpanded,
