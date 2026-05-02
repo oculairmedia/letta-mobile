@@ -299,7 +299,7 @@ fun ChatMessageList(
             ) {
                 if (state.isStreaming) {
                     item(key = "typing") {
-                        TypingIndicator(modifier = Modifier.padding(bottom = 4.dp))
+                        TypingIndicator(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
                     }
                 }
 

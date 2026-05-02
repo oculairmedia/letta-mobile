@@ -657,7 +657,7 @@ internal fun MessageReasoning(
             }
             Column(
                 modifier = Modifier
-                    .padding(top = 12.dp, start = 8.dp, bottom = 4.dp)
+                    .padding(top = 16.dp, start = 8.dp, bottom = 4.dp)
                     .drawBehind {
                         drawLine(
                             color = lineColor,
