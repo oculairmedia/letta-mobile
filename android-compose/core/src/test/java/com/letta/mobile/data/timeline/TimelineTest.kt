@@ -301,6 +301,39 @@ class TimelineTest {
         source = MessageSource.CLIENT_MODE_HARNESS,
     )
 
+    private fun clientModeAssistantLocal(
+        otid: String,
+        pos: Double,
+        content: String,
+        sentAt: Instant = Instant.now(),
+    ): TimelineEvent.Local = TimelineEvent.Local(
+        position = pos,
+        otid = otid,
+        content = content,
+        role = Role.ASSISTANT,
+        sentAt = sentAt,
+        deliveryState = DeliveryState.SENT,
+        source = MessageSource.CLIENT_MODE_HARNESS,
+        messageType = TimelineMessageType.ASSISTANT,
+    )
+
+    private fun confirmedAssistant(
+        otid: String,
+        pos: Double,
+        content: String,
+        date: Instant = Instant.now(),
+        serverId: String = "server-$otid",
+    ): TimelineEvent.Confirmed = TimelineEvent.Confirmed(
+        position = pos,
+        otid = otid,
+        content = content,
+        serverId = serverId,
+        messageType = TimelineMessageType.ASSISTANT,
+        date = date,
+        runId = null,
+        stepId = null,
+    )
+
     private fun confirmedUser(
         otid: String,
         pos: Double,
@@ -418,6 +451,38 @@ class TimelineTest {
         // The older Local must remain in the timeline (not collapsed by this call).
         val oldStillThere = result.timeline.events.any { it.otid == "cm-old" }
         assertTrue("Older client-mode local should not be removed", oldStillThere)
+    }
+
+    @Test
+    fun `collapseClientModeFuzzyMatch ignores assistant content mismatch`() {
+        val now = Instant.now()
+        val t = Timeline("c1").append(
+            clientModeAssistantLocal("cm-assist-1", 1.0, "first answer", sentAt = now.minusMillis(200))
+        )
+
+        val incoming = confirmedAssistant("server-assist", 99.0, "different answer", date = now)
+        val result = t.collapseClientModeFuzzyMatch(incoming)
+
+        assertNull("Assistant fuzzy matching must not be role-only", result.collapsed)
+    }
+
+    @Test
+    fun `upsertClientModeLocal drops local assistant when matching confirmed arrived first`() {
+        val now = Instant.now()
+        val t = Timeline("c1").append(
+            confirmedAssistant("server-assist", 1.0, "hello", date = now)
+        )
+
+        val updated = t.upsertClientModeLocal(
+            otid = "cm-assist-late",
+            build = {
+                clientModeAssistantLocal("cm-assist-late", 0.0, "hello", sentAt = now.plusMillis(100))
+            },
+            transform = { it.copy(content = it.content + "!") },
+        )
+
+        assertEquals("Late local duplicate should be dropped", 1, updated.events.size)
+        assertTrue(updated.events.single() is TimelineEvent.Confirmed)
     }
 
     @Test

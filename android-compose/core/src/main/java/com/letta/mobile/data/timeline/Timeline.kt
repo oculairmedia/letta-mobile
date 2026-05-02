@@ -133,7 +133,7 @@ enum class DeliveryState { SENDING, SENT, FAILED }
  * → reconcile loop and minimising the chance of false positives from the user
  * legitimately sending the same content twice in quick succession.
  */
-const val CLIENT_MODE_FUZZY_WINDOW_MS: Long = 60_000
+const val CLIENT_MODE_FUZZY_WINDOW_MS: Long = 10_000
 
 /**
  * Result of a fuzzy-collapse attempt. [collapsed] is null when no match was
@@ -360,24 +360,7 @@ data class Timeline(
         val candidate = events.asSequence()
             .filterIsInstance<TimelineEvent.Local>()
             .filter { it.source == MessageSource.CLIENT_MODE_HARNESS }
-            .filter { 
-                val confirmedRole = when (confirmed.messageType) {
-                    TimelineMessageType.USER -> Role.USER
-                    TimelineMessageType.ASSISTANT, TimelineMessageType.REASONING, TimelineMessageType.TOOL_CALL -> Role.ASSISTANT
-                    TimelineMessageType.SYSTEM, TimelineMessageType.ERROR -> Role.SYSTEM
-                    else -> null
-                }
-                confirmedRole != null && it.role == confirmedRole
-            }
-            .filter { 
-                if (confirmed.messageType == TimelineMessageType.USER) {
-                    it.content.stripEnvelopeReminders() == confirmed.content.stripEnvelopeReminders()
-                } else {
-                    // For streaming agent messages, content lengths may differ mid-stream.
-                    // We rely on role and time proximity to match the ongoing local stream.
-                    true
-                }
-            }
+            .filter { it.isCompatibleClientModeCandidateFor(confirmed) }
             .filter {
                 val deltaMs = kotlin.math.abs(
                     java.time.Duration.between(it.sentAt, confirmed.date).toMillis()
@@ -505,8 +488,31 @@ data class Timeline(
             position = nextLocalPosition(),
             source = MessageSource.CLIENT_MODE_HARNESS,
         )
+        if (seed.source == MessageSource.CLIENT_MODE_HARNESS && hasCompatibleConfirmedForClientModeLocal(seed)) {
+            Telemetry.event(
+                "Timeline", "upsertClientModeLocal.confirmedAlreadyPresent",
+                "conversationId" to conversationId,
+                "otid" to otid,
+                "messageType" to seed.messageType.name,
+                level = Telemetry.Level.INFO,
+            )
+            return this
+        }
         return append(seed)
     }
+
+    private fun hasCompatibleConfirmedForClientModeLocal(
+        local: TimelineEvent.Local,
+        windowMillis: Long = CLIENT_MODE_FUZZY_WINDOW_MS,
+    ): Boolean = events.asSequence()
+        .filterIsInstance<TimelineEvent.Confirmed>()
+        .filter { confirmed -> local.isCompatibleClientModeCandidateFor(confirmed) }
+        .any { confirmed ->
+            val deltaMs = kotlin.math.abs(
+                java.time.Duration.between(local.sentAt, confirmed.date).toMillis()
+            )
+            deltaMs <= windowMillis
+        }
 
     /** Mark a Local event as [DeliveryState.SENT]. No-op for Confirmed events. */
     fun markSent(otid: String): Timeline = updateLocal(otid) { it.copy(deliveryState = DeliveryState.SENT) }
@@ -519,6 +525,63 @@ data class Timeline(
         if (idx == -1) return this
         val local = events[idx] as TimelineEvent.Local
         return copy(events = events.toMutableList().also { it[idx] = transform(local) })
+    }
+}
+
+private fun TimelineEvent.Local.isCompatibleClientModeCandidateFor(
+    confirmed: TimelineEvent.Confirmed,
+): Boolean {
+    if (source != MessageSource.CLIENT_MODE_HARNESS) return false
+    return when (confirmed.messageType) {
+        TimelineMessageType.USER ->
+            messageType == TimelineMessageType.USER &&
+                role == Role.USER &&
+                content.stripEnvelopeReminders() == confirmed.content.stripEnvelopeReminders()
+
+        TimelineMessageType.ASSISTANT ->
+            messageType == TimelineMessageType.ASSISTANT &&
+                role == Role.ASSISTANT &&
+                clientModeStreamTextCompatible(content, confirmed.content)
+
+        TimelineMessageType.REASONING ->
+            messageType == TimelineMessageType.REASONING &&
+                role == Role.ASSISTANT &&
+                clientModeStreamTextCompatible(reasoningContent.orEmpty().ifBlank { content }, confirmed.content)
+
+        TimelineMessageType.TOOL_CALL ->
+            messageType == TimelineMessageType.TOOL_CALL &&
+                role == Role.ASSISTANT &&
+                clientModeToolCallsCompatible(toolCalls, confirmed.toolCalls)
+
+        TimelineMessageType.TOOL_RETURN,
+        TimelineMessageType.SYSTEM,
+        TimelineMessageType.ERROR,
+        TimelineMessageType.OTHER -> false
+    }
+}
+
+private fun clientModeStreamTextCompatible(localText: String, confirmedText: String): Boolean {
+    val local = localText.stripEnvelopeReminders()
+    val confirmed = confirmedText.stripEnvelopeReminders()
+    if (local.isBlank() || confirmed.isBlank()) return false
+    return local == confirmed || local.startsWith(confirmed) || confirmed.startsWith(local)
+}
+
+private fun clientModeToolCallsCompatible(
+    localCalls: List<com.letta.mobile.data.model.ToolCall>,
+    confirmedCalls: List<com.letta.mobile.data.model.ToolCall>,
+): Boolean {
+    if (localCalls.isEmpty() || confirmedCalls.isEmpty()) return false
+    return localCalls.any { local ->
+        confirmedCalls.any { confirmed ->
+            val localId = local.effectiveId
+            val confirmedId = confirmed.effectiveId
+            when {
+                localId.isNotBlank() && confirmedId.isNotBlank() -> localId == confirmedId
+                !local.name.isNullOrBlank() && !confirmed.name.isNullOrBlank() -> local.name == confirmed.name
+                else -> false
+            }
+        }
     }
 }
 

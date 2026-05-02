@@ -1490,7 +1490,7 @@ class AdminChatViewModel @Inject constructor(
     ) {
         when (chunk.event) {
             BotStreamEvent.REASONING -> {
-                val messageId = chunk.uuid ?: "client-reasoning-${java.util.UUID.randomUUID()}"
+                val messageId = chunk.uuid ?: "client-reasoning-$assistantMessageId"
                 // letta-mobile-lv3e (REVERTS letta-mobile-vu6a): legacy
                 // path also receives DELTAS — append, not replace. Same
                 // defensive snapshot-shape guard as the timeline path.
