@@ -2071,6 +2071,75 @@ class AdminChatViewModelTest {
     }
 
     @Test
+    fun `fresh route client mode skips optimistic append when bootstrap user already hydrated`() = runTest {
+        clientModeEnabledFlow.value = true
+        activeConversationIds.clear()
+        messages = emptyList()
+
+        val hydratedBootstrapTimeline = kotlinx.coroutines.flow.MutableStateFlow(
+            com.letta.mobile.data.timeline.Timeline(
+                conversationId = "new-conv",
+                events = listOf(
+                    com.letta.mobile.data.timeline.TimelineEvent.Confirmed(
+                        position = 1.0,
+                        otid = "server-bootstrap-user",
+                        content = "hello fresh",
+                        serverId = "server-bootstrap-user",
+                        messageType = com.letta.mobile.data.timeline.TimelineMessageType.USER,
+                        date = Instant.now(),
+                        runId = null,
+                        stepId = null,
+                    ),
+                ),
+            ),
+        )
+        coEvery { timelineRepository.observe("new-conv") } returns hydratedBootstrapTimeline
+
+        val chunks = Channel<BotStreamChunk>(capacity = Channel.UNLIMITED)
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
+        } returns chunks.consumeAsFlow()
+
+        val vm = createViewModel(conversationId = null, freshRouteKey = 10001L)
+        advanceUntilIdle()
+
+        vm.sendMessage("hello fresh")
+        advanceUntilIdle()
+
+        verify(exactly = 1) {
+            clientModeChatSender.streamMessage(
+                screenAgentId = "agent-1",
+                text = "hello fresh",
+                conversationId = "new-conv",
+            )
+        }
+        coVerify(exactly = 0) {
+            timelineRepository.appendClientModeLocal(
+                conversationId = "new-conv",
+                content = "hello fresh",
+                attachments = emptyList(),
+            )
+        }
+        val userBubbles = vm.uiState.value.messages.filter { it.role == "user" && it.content == "hello fresh" }
+        assertEquals(
+            "Hydrated bootstrap user message should not be duplicated; " +
+                "messages=${vm.uiState.value.messages.map { "${it.role}=${it.content}" }}",
+            1,
+            userBubbles.size,
+        )
+        assertTrue("isStreaming must remain true mid-flight", vm.uiState.value.isStreaming)
+        assertTrue("isAgentTyping must remain true mid-flight", vm.uiState.value.isAgentTyping)
+
+        chunks.send(BotStreamChunk(text = "reply", conversationId = "new-conv", done = true))
+        chunks.close()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun `fresh route initial message in client mode shows optimistic bubble before any chunk arrives`() = runTest {
         clientModeEnabledFlow.value = true
         activeConversationIds.clear()

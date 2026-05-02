@@ -1169,6 +1169,29 @@ class AdminChatViewModel @Inject constructor(
         sendMessageViaTimeline(text, attachments)
     }
 
+    private suspend fun timelineHasMatchingClientModeBootstrapUser(
+        conversationId: String,
+        text: String,
+    ): Boolean = runCatching {
+        timelineRepository.observe(conversationId).value.events.any { event ->
+            when (event) {
+                is com.letta.mobile.data.timeline.TimelineEvent.Confirmed ->
+                    event.messageType == com.letta.mobile.data.timeline.TimelineMessageType.USER &&
+                        event.content == text
+                is com.letta.mobile.data.timeline.TimelineEvent.Local ->
+                    event.role == com.letta.mobile.data.timeline.Role.USER &&
+                        event.content == text
+            }
+        }
+    }.getOrElse { e ->
+        android.util.Log.w(
+            "AdminChatViewModel",
+            "Failed to inspect bootstrap timeline before Client Mode append; appending local bubble",
+            e,
+        )
+        false
+    }
+
     private fun sendMessageViaClientMode(text: String) {
         clientModeStreamJob?.cancel()
         // letta-mobile-5s1n (regression fix): mark stream in flight BEFORE
@@ -1258,27 +1281,37 @@ class AdminChatViewModel @Inject constructor(
                     error = null,
                     conversationState = ConversationState.Ready(convId),
                 )
-                runCatching {
-                    timelineRepository.appendClientModeLocal(
-                        conversationId = convId,
-                        content = text,
+                val bootstrapUserAlreadyHydrated = bootstrapFreshConversation &&
+                    timelineHasMatchingClientModeBootstrapUser(convId, text)
+                if (bootstrapUserAlreadyHydrated) {
+                    Telemetry.event(
+                        "AdminChatVM", "clientMode.bootstrapUserAlreadyHydrated",
+                        "conversationId" to convId,
+                        "contentLength" to text.length,
                     )
-                }.onFailure { e ->
-                    android.util.Log.w(
-                        "AdminChatViewModel",
-                        "appendClientModeLocal failed; falling back to in-memory bubble",
-                        e,
-                    )
-                    // Fall back to the in-memory path so the user still sees
-                    // their bubble even if the timeline append fails.
-                    val fallback = clientModeMessages + UiMessage(
-                        id = userMessageId,
-                        role = "user",
-                        content = text,
-                        timestamp = startedAt,
-                    )
-                    clientModeMessages = fallback
-                    _uiState.value = _uiState.value.copy(messages = fallback.toImmutableList())
+                } else {
+                    runCatching {
+                        timelineRepository.appendClientModeLocal(
+                            conversationId = convId,
+                            content = text,
+                        )
+                    }.onFailure { e ->
+                        android.util.Log.w(
+                            "AdminChatViewModel",
+                            "appendClientModeLocal failed; falling back to in-memory bubble",
+                            e,
+                        )
+                        // Fall back to the in-memory path so the user still sees
+                        // their bubble even if the timeline append fails.
+                        val fallback = clientModeMessages + UiMessage(
+                            id = userMessageId,
+                            role = "user",
+                            content = text,
+                            timestamp = startedAt,
+                        )
+                        clientModeMessages = fallback
+                        _uiState.value = _uiState.value.copy(messages = fallback.toImmutableList())
+                    }
                 }
                 // Ensure observer is running so subsequent timeline state
                 // emissions (and the SSE-driven Confirmed echoes) reach the
