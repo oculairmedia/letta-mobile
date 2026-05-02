@@ -256,6 +256,7 @@
     <string name="screen_agent_edit_temperature_subtitle">Temperature: %.1f</string>
     <string name="screen_agent_edit_temperature_value">Temperature: %.2f</string>
     <string name="screen_agent_edit_context_window">Context Window: %1$d</string>
+    <string name="screen_agent_edit_context_window_unavailable">Model context window unavailable</string>
     <string name="screen_agent_edit_copy_agent_id">Copy Agent ID</string>
     <string name="screen_agent_edit_agent_id_copied">Agent ID copied</string>
     <string name="screen_agent_edit_character_limit">Character limit</string>

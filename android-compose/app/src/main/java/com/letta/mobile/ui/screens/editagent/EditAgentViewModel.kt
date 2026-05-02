@@ -246,10 +246,14 @@ class EditAgentViewModel @Inject constructor(
                     modelHandle = model.handle ?: value,
                 )
             }
+            val selectedContextWindow = selectedModel?.contextWindow?.takeIf { it > 0 }
             _uiState.value = UiState.Success(
                 currentState.copy(
                     model = selectedModel?.handle ?: value,
                     providerType = normalizedProviderType.orEmpty(),
+                    contextWindow = selectedContextWindow
+                        ?.let { maxContextWindow -> currentState.contextWindow.coerceIn(0, maxContextWindow) }
+                        ?: currentState.contextWindow,
                 )
             )
         }
@@ -387,6 +391,13 @@ class EditAgentViewModel @Inject constructor(
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
             _uiState.value = UiState.Success(currentState.copy(parallelToolCalls = value))
+        }
+    }
+
+    fun updateContextWindow(value: Int) {
+        val currentState = (_uiState.value as? UiState.Success)?.data
+        if (currentState != null) {
+            _uiState.value = UiState.Success(currentState.copy(contextWindow = value.coerceAtLeast(0)))
         }
     }
 
@@ -542,6 +553,7 @@ class EditAgentViewModel @Inject constructor(
                         system = state.systemPrompt,
                         tags = state.tags,
                         enableSleeptime = state.enableSleeptime,
+                        contextWindowLimit = state.contextWindow.takeIf { it > 0 },
                         modelSettings = com.letta.mobile.data.model.ModelSettings(
                             providerType = resolvedProviderType,
                             temperature = state.temperature.toDouble(),

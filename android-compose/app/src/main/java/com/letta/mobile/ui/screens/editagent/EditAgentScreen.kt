@@ -101,6 +101,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -181,6 +182,7 @@ fun EditAgentScreen(
                     onTemperatureChange = { viewModel.updateTemperature(it) },
                     onMaxOutputTokensChange = { viewModel.updateMaxOutputTokens(it) },
                     onParallelToolCallsChange = { viewModel.updateParallelToolCalls(it) },
+                    onContextWindowChange = { viewModel.updateContextWindow(it) },
                     onEnableSleeptimeChange = { viewModel.updateEnableSleeptime(it) },
                     onClientModeEnabledChange = { viewModel.updateClientModeEnabled(it) },
                     onClientModeBaseUrlChange = { viewModel.updateClientModeBaseUrl(it) },
@@ -334,6 +336,7 @@ private fun EditAgentContent(
     onTemperatureChange: (Float) -> Unit,
     onMaxOutputTokensChange: (Int) -> Unit,
     onParallelToolCallsChange: (Boolean) -> Unit,
+    onContextWindowChange: (Int) -> Unit,
     onEnableSleeptimeChange: (Boolean) -> Unit,
     onClientModeEnabledChange: (Boolean) -> Unit,
     onClientModeBaseUrlChange: (String) -> Unit,
@@ -372,6 +375,15 @@ private fun EditAgentContent(
             model.handle.equals(state.embedding, ignoreCase = true) ||
                 model.name.equals(state.embedding, ignoreCase = true) ||
                 model.displayName.equals(state.embedding, ignoreCase = true)
+        }
+    }
+    val maxContextWindow = selectedLlmModel?.contextWindow?.takeIf { it > 0 }
+        ?: state.agent?.llmConfig?.contextWindow?.takeIf { it > 0 }
+        ?: state.agent?.contextWindowLimit?.takeIf { it > 0 }
+
+    LaunchedEffect(maxContextWindow, state.contextWindow) {
+        if (maxContextWindow != null && state.contextWindow > maxContextWindow) {
+            onContextWindowChange(maxContextWindow)
         }
     }
 
@@ -511,18 +523,15 @@ private fun EditAgentContent(
                         }
                     },
                 )
-                if (state.contextWindow > 0) {
-                    item(
-                        headlineContent = { Text(stringResource(R.string.common_context_window)) },
-                        trailingContent = {
-                            Text(
-                                text = state.contextWindow.toString(),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                    )
-                }
+                item(
+                    headlineContent = {
+                        ContextWindowLimitSlider(
+                            value = state.contextWindow,
+                            maxValue = maxContextWindow,
+                            onValueChange = onContextWindowChange,
+                        )
+                    },
+                )
                 item(
                     headlineContent = { Text(stringResource(R.string.common_parallel_tool_calls)) },
                     trailingContent = {
@@ -781,6 +790,65 @@ private fun EditAgentContent(
         )
     }
 }
+
+@Composable
+private fun ContextWindowLimitSlider(
+    value: Int,
+    maxValue: Int?,
+    onValueChange: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.common_context_window),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+
+        if (maxValue != null && maxValue > 0) {
+            val coercedValue = value.coerceIn(0, maxValue)
+            val percentage = ((coercedValue.toFloat() / maxValue.toFloat()) * 100f).roundToInt()
+            Text(
+                text = stringResource(
+                    R.string.screen_chat_context_window_usage,
+                    formatEditAgentNumber(coercedValue),
+                    formatEditAgentNumber(maxValue),
+                    percentage,
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Slider(
+                value = coercedValue.toFloat(),
+                onValueChange = { sliderValue ->
+                    onValueChange(snapContextWindowValue(sliderValue, maxValue))
+                },
+                valueRange = 0f..maxValue.toFloat(),
+            )
+        } else {
+            Text(
+                text = if (value > 0) {
+                    stringResource(R.string.screen_agent_edit_context_window, value)
+                } else {
+                    stringResource(R.string.screen_agent_edit_context_window_unavailable)
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+private fun snapContextWindowValue(value: Float, maxValue: Int): Int {
+    if (maxValue <= 1_000) return value.roundToInt().coerceIn(0, maxValue)
+    return (value / 1_000f).roundToInt()
+        .times(1_000)
+        .coerceIn(0, maxValue)
+}
+
+private fun formatEditAgentNumber(value: Int): String = String.format(Locale.US, "%,d", value)
 
 @Composable
 private fun SearchPickerField(
