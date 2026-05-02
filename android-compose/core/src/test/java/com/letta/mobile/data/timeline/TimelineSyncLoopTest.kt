@@ -224,6 +224,12 @@ class TimelineSyncLoopTest {
                 contentRaw = JsonPrimitive("final answer"),
             )
         )
+        sync.ingestStreamEvent(
+            AssistantMessage(
+                id = "server-assist-1",
+                contentRaw = JsonPrimitive("final"),
+            )
+        )
 
         val assistant = sync.state.value.events.single() as TimelineEvent.Confirmed
         assertEquals(MessageSource.CLIENT_MODE_HARNESS, assistant.source)
@@ -232,6 +238,118 @@ class TimelineSyncLoopTest {
             "final answer",
             assistant.content,
         )
+        scope.coroutineContext.job.cancel()
+    }
+
+    @Test
+    fun `external run reconcile collapses client mode local turns before SSE replay`() = runBlocking {
+        val runId = "run-client-mode-replay"
+        val api = FakeSyncApi()
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val sync = TimelineSyncLoop(api, "conv1", scope)
+        val now = java.time.Instant.now()
+
+        val userLocalId = sync.appendClientModeLocal("hello")
+        sync.upsertClientModeLocalAssistantChunk(
+            localId = "cm-reason-1",
+            build = {
+                TimelineEvent.Local(
+                    position = sync.state.value.nextLocalPosition(),
+                    otid = "cm-reason-1",
+                    content = "thinking about it",
+                    role = Role.ASSISTANT,
+                    sentAt = now,
+                    deliveryState = DeliveryState.SENT,
+                    source = MessageSource.CLIENT_MODE_HARNESS,
+                    messageType = TimelineMessageType.REASONING,
+                    reasoningContent = "thinking about it",
+                )
+            },
+            transform = { it },
+        )
+        sync.upsertClientModeLocalAssistantChunk(
+            localId = "cm-assist-1",
+            build = {
+                TimelineEvent.Local(
+                    position = sync.state.value.nextLocalPosition(),
+                    otid = "cm-assist-1",
+                    content = "final answer",
+                    role = Role.ASSISTANT,
+                    sentAt = now,
+                    deliveryState = DeliveryState.SENT,
+                    source = MessageSource.CLIENT_MODE_HARNESS,
+                    messageType = TimelineMessageType.ASSISTANT,
+                )
+            },
+            transform = { it },
+        )
+
+        api.addStoredMessage(
+            UserMessage(
+                id = "server-user-1",
+                contentRaw = JsonPrimitive("hello"),
+                otid = "server-user-otid",
+                runId = runId,
+            )
+        )
+        api.addStoredMessage(
+            ReasoningMessage(
+                id = "server-reason-1",
+                reasoning = "thinking about it",
+                otid = "server-reason-otid",
+                runId = runId,
+            )
+        )
+        api.addStoredMessage(
+            AssistantMessage(
+                id = "server-assist-1",
+                contentRaw = JsonPrimitive("final answer"),
+                otid = "server-assist-otid",
+                runId = runId,
+            )
+        )
+
+        sync.reconcileForExternalRun(runId)
+
+        val afterReconcile = sync.state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
+        assertEquals("REST snapshot should collapse into the three existing Client Mode locals", 3, afterReconcile.size)
+        assertTrue("No duplicate local events should remain", sync.state.value.events.none { it is TimelineEvent.Local })
+        assertTrue(afterReconcile.all { it.source == MessageSource.CLIENT_MODE_HARNESS })
+        assertNotNull(sync.state.value.findByOtid(userLocalId))
+        assertNotNull(sync.state.value.findByOtid("cm-reason-1"))
+        assertNotNull(sync.state.value.findByOtid("cm-assist-1"))
+
+        // Replay the same SSE frames that triggered the external-run reconcile.
+        // They must not append already-rendered content into the collapsed
+        // harness Confirmed events.
+        sync.ingestStreamEvent(
+            ReasoningMessage(
+                id = "server-reason-1",
+                reasoning = "thinking about it",
+                otid = "server-reason-otid",
+                runId = runId,
+            )
+        )
+        sync.ingestStreamEvent(
+            ReasoningMessage(
+                id = "server-reason-1",
+                reasoning = " about it",
+                runId = runId,
+            )
+        )
+        sync.ingestStreamEvent(
+            AssistantMessage(
+                id = "server-assist-1",
+                contentRaw = JsonPrimitive("final answer"),
+                otid = "server-assist-otid",
+                runId = runId,
+            )
+        )
+
+        val finalEvents = sync.state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
+        assertEquals(3, finalEvents.size)
+        assertEquals("thinking about it", finalEvents.single { it.messageType == TimelineMessageType.REASONING }.content)
+        assertEquals("final answer", finalEvents.single { it.messageType == TimelineMessageType.ASSISTANT }.content)
         scope.coroutineContext.job.cancel()
     }
 

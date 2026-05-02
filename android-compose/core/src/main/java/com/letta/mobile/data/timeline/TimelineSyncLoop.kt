@@ -748,7 +748,7 @@ class TimelineSyncLoop(
         }
     }
 
-    private suspend fun reconcileForExternalRun(runId: String) = writeMutex.withLock {
+    internal suspend fun reconcileForExternalRun(runId: String) = writeMutex.withLock {
         val timer = Telemetry.startTimer("TimelineSync", "externalRunReconcile")
         var appended = 0
         try {
@@ -767,6 +767,28 @@ class TimelineSyncLoop(
                 val byOtid = _state.value.findByOtid(confirmed.otid)
                 val byServerId = _state.value.findByServerId(msg.id, confirmed.messageType)
                 if (byOtid == null && byServerId == null) {
+                    // Fresh Client Mode runs can finish their local WS stream before the
+                    // Letta SSE subscriber opens. The first SSE frame then triggers this
+                    // external-run reconcile, whose REST snapshot contains the same user /
+                    // reasoning / assistant turns that the Client Mode harness already
+                    // appended locally. Collapse those local harness bubbles before the
+                    // generic append path, otherwise the REST-confirmed copy is inserted
+                    // beside the local copy and later SSE deltas double-merge into it.
+                    val fuzzy = _state.value.collapseClientModeFuzzyMatch(confirmed)
+                    if (fuzzy.collapsed != null) {
+                        _state.value = fuzzy.timeline
+                        Telemetry.event(
+                            "TimelineSync", "externalRunReconcile.fuzzyCollapsed",
+                            "conversationId" to conversationId,
+                            "runId" to runId,
+                            "localOtid" to fuzzy.collapsed.localOtid,
+                            "serverId" to fuzzy.collapsed.serverId,
+                            "deltaMs" to fuzzy.collapsed.deltaMs,
+                            "contentPrefix" to fuzzy.collapsed.contentPrefix,
+                            "source" to fuzzy.collapsed.source.name,
+                        )
+                        return@forEach
+                    }
                     _state.value = _state.value.append(confirmed)
                     appended++
                 }
@@ -1263,6 +1285,7 @@ class TimelineSyncLoop(
                     newText.isEmpty() -> oldText
                     newText == oldText -> oldText
                     newText.startsWith(oldText) -> newText
+                    oldText.startsWith(newText) -> oldText
                     oldText.endsWith(newText) -> oldText
                     else -> oldText + newText
                 }
