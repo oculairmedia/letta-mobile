@@ -177,6 +177,7 @@ verify-release:
 		CONV="$(CONV)" \
 		ITERATIONS="$(ITERATIONS)" \
 		INTERVAL="$(INTERVAL)" \
+		DEVICE="$(DEVICE)" \
 		STREAM_TIMEOUT="$(STREAM_TIMEOUT)" \
 		CLI="$(CLI)" \
 		ANDROID_DIR="$(ANDROID_DIR)" \

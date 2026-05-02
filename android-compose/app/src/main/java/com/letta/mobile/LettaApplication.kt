@@ -94,6 +94,11 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
             Log.w("LettaApp", "Skipping automation auth bootstrap", error)
         }
         runCatching {
+            AutomationAuthBootstrap.importPendingConfig(this, settingsRepository.get())
+        }.onFailure { error ->
+            Log.w("LettaApp", "Skipping automation auth bootstrap", error)
+        }
+        runCatching {
             ProductionJankStatsMonitor.install(this)
         }.onFailure { error ->
             Log.w("LettaApp", "Skipping production jank monitor", error)
