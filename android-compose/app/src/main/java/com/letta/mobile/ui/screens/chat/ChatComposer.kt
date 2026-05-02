@@ -15,11 +15,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -48,12 +50,14 @@ fun ChatComposer(
     canSendMessages: Boolean,
     onTextChange: (String) -> Unit,
     onSend: (String) -> Unit,
+    onStop: () -> Unit,
     onRemoveAttachment: (Int) -> Unit,
     onAttachImage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val canSend = !isStreaming && canSendMessages &&
-        (inputText.isNotBlank() || pendingAttachments.isNotEmpty())
+    val hasSendableContent = inputText.isNotBlank() || pendingAttachments.isNotEmpty()
+    val canSend = !isStreaming && canSendMessages && hasSendableContent
+    val canSendSteeringUpdate = isStreaming && canSendMessages && inputText.isNotBlank()
 
     Column(modifier = modifier.fillMaxWidth()) {
         if (pendingAttachments.isNotEmpty()) {
@@ -63,14 +67,39 @@ fun ChatComposer(
             )
         }
 
+        if (canSendSteeringUpdate) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                FilledTonalButton(onClick = { onSend(inputText) }) {
+                    Icon(
+                        LettaIcons.Send,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text(stringResource(R.string.action_send_steering_message))
+                }
+            }
+        }
+
         LettaInputBar(
             text = inputText,
             onTextChange = onTextChange,
-            onSend = onSend,
             placeholder = stringResource(R.string.screen_chat_input_hint),
             sendContentDescription = stringResource(R.string.action_send_message),
-            enabled = !isStreaming && canSendMessages,
-            canSendOverride = canSend,
+            enabled = canSendMessages,
+            canSendOverride = if (isStreaming) true else canSend,
+            actionIcon = if (isStreaming) LettaIcons.Close else LettaIcons.Send,
+            actionContentDescription = if (isStreaming) {
+                stringResource(R.string.action_stop_run)
+            } else {
+                stringResource(R.string.action_send_message)
+            },
+            actionContainerColor = if (isStreaming) MaterialTheme.colorScheme.errorContainer else null,
+            actionContentColor = if (isStreaming) MaterialTheme.colorScheme.onErrorContainer else null,
             leadingContent = {
                 FilledIconButton(
                     onClick = onAttachImage,
@@ -85,6 +114,13 @@ fun ChatComposer(
                         contentDescription = stringResource(R.string.action_attach_image),
                         modifier = Modifier.size(20.dp),
                     )
+                }
+            },
+            onSend = { text ->
+                if (isStreaming) {
+                    onStop()
+                } else {
+                    onSend(text)
                 }
             },
         )

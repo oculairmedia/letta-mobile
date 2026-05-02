@@ -165,6 +165,8 @@
     <string name="screen_tools_create_action">Create Tool</string>
     
     <string name="action_send_message">Send message</string>
+    <string name="action_send_steering_message">Send steering update</string>
+    <string name="action_stop_run">Stop run</string>
     <string name="action_attach_image">Attach image</string>
     <string name="action_remove_attachment">Remove attachment</string>
     <string name="screen_chat_input_placeholder">Type a message...</string>

@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.icons.LettaIcons
@@ -52,6 +53,10 @@ fun LettaInputBar(
     enabled: Boolean = true,
     maxLines: Int = 4,
     canSendOverride: Boolean? = null,
+    actionIcon: ImageVector = LettaIcons.Send,
+    actionContentDescription: String = sendContentDescription,
+    actionContainerColor: Color? = null,
+    actionContentColor: Color? = null,
     leadingContent: (@Composable () -> Unit)? = null,
 ) {
     val colorScheme = MaterialTheme.colorScheme
@@ -105,15 +110,15 @@ fun LettaInputBar(
             enabled = canSend,
             modifier = Modifier.size(48.dp),
             colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = colorScheme.primary,
-                contentColor = colorScheme.onPrimary,
+                containerColor = actionContainerColor ?: colorScheme.primary,
+                contentColor = actionContentColor ?: colorScheme.onPrimary,
                 disabledContainerColor = colorScheme.surfaceContainerHigh,
                 disabledContentColor = colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
             ),
         ) {
             Icon(
-                LettaIcons.Send,
-                contentDescription = sendContentDescription,
+                actionIcon,
+                contentDescription = actionContentDescription,
                 modifier = Modifier.size(20.dp),
             )
         }

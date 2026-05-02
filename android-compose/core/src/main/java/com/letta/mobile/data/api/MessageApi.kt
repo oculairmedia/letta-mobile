@@ -158,6 +158,23 @@ open class MessageApi @Inject constructor(
         return response.body()
     }
 
+    open suspend fun sendConversationMessageNoStream(
+        conversationId: String,
+        request: MessageCreateRequest,
+    ): LettaResponse {
+        val client = apiClient.getClient()
+        val baseUrl = apiClient.getBaseUrl()
+
+        val response = client.post("$baseUrl/v1/conversations/$conversationId/messages") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
+    }
+
 
     /**
      * Subscribe to the live SSE stream of the most-recent active run in a conversation.

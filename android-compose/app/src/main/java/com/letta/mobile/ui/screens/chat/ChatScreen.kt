@@ -176,6 +176,7 @@ fun ChatScreen(
                             onBugCommand?.invoke()
                         }
                     },
+                    onStop = { viewModel.interruptRun() },
                     onRemoveAttachment = { viewModel.removeAttachment(it) },
                     onAttachImage = launchPicker,
                 )

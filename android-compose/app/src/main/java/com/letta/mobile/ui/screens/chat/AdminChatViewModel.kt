@@ -40,6 +40,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -538,7 +539,7 @@ class AdminChatViewModel @Inject constructor(
 
     fun handleComposerTextChanged(newText: String): ChatComposerEffect? {
         val composer = composerState.value
-        return if (newText.endsWith("\n") && !_uiState.value.isStreaming && composer.hasSendableContent) {
+        return if (newText.endsWith("\n") && composer.hasSendableContent) {
             submitComposer(composer.inputText)
         } else {
             updateInputText(newText)
@@ -553,11 +554,79 @@ class AdminChatViewModel @Inject constructor(
                 ChatComposerEffect.OpenBugReport
             }
             null -> {
-                sendMessage(text)
+                if (_uiState.value.isStreaming) {
+                    sendSteeringMessage(text)
+                } else {
+                    sendMessage(text)
+                }
                 null
             }
         }
     }
+
+    fun interruptRun() {
+        if (!_uiState.value.isStreaming) return
+        viewModelScope.launch {
+            val runIds = activeRunIds().takeIf { it.isNotEmpty() }
+            _uiState.update {
+                it.copy(
+                    isStreaming = false,
+                    isAgentTyping = false,
+                    error = null,
+                )
+            }
+            runCatching {
+                messageRepository.cancelMessage(agentId = agentId, runIds = runIds)
+            }.onFailure { e ->
+                _uiState.update {
+                    it.copy(error = mapErrorToUserMessage(e.asException(), "Failed to stop run"))
+                }
+            }
+            clientModeStreamJob?.cancel(CancellationException("User interrupted active run"))
+            clientModeStreamInFlight = false
+        }
+    }
+
+    private fun sendSteeringMessage(text: String) {
+        val payload = composerController.payloadForSend(text) ?: return
+        if (payload.attachments.isNotEmpty()) {
+            composerController.setError("Steering updates don't support attachments yet")
+            return
+        }
+        val convId = conversationId ?: activeConversationId ?: currentClientModeConversationId()
+        if (convId.isNullOrBlank()) {
+            composerController.setError("No active conversation to steer yet")
+            return
+        }
+        val content = payload.text.trim()
+        if (content.isBlank()) return
+        viewModelScope.launch {
+            val localId = runCatching {
+                timelineRepository.appendClientModeLocal(
+                    conversationId = convId,
+                    content = content,
+                )
+            }.getOrElse { "steer-${java.util.UUID.randomUUID()}" }
+            composerController.clearAfterSend()
+            runCatching {
+                messageRepository.sendSteeringMessage(
+                    conversationId = convId,
+                    content = content,
+                    otid = localId,
+                )
+            }.onFailure { e ->
+                composerController.setError(mapErrorToUserMessage(e.asException(), "Failed to send steering update"))
+            }
+        }
+    }
+
+    private fun Throwable.asException(): Exception = this as? Exception ?: Exception(this)
+
+    private fun activeRunIds(): List<String> = _uiState.value.messages
+        .asReversed()
+        .mapNotNull { it.runId }
+        .distinct()
+        .take(1)
 
     fun loadProjectBrief() {
         if (projectContext == null) return
@@ -1393,6 +1462,13 @@ class AdminChatViewModel @Inject constructor(
                         error = terminalError ?: _uiState.value.error,
                     )
                 }
+            } catch (cancelled: CancellationException) {
+                _uiState.value = _uiState.value.copy(
+                    conversationState = latestConversationId?.let { ConversationState.Ready(it) }
+                        ?: _uiState.value.conversationState,
+                    isStreaming = false,
+                    isAgentTyping = false,
+                )
             } catch (e: Exception) {
                 android.util.Log.e("AdminChatVM-DEBUG", "sendViaClientMode: EXCEPTION in stream", e)
                 _uiState.value = _uiState.value.copy(
