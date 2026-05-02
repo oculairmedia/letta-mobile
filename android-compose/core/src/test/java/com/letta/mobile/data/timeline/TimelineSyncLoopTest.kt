@@ -686,7 +686,7 @@ class TimelineSyncLoopTest {
             errorForGqz3,
         )
 
-        scope.coroutineContext.job.cancel()
+scope.coroutineContext.job.cancel()
     }
 
     /**
@@ -757,12 +757,6 @@ class TimelineSyncLoopTest {
     }
 }
 
-/**
- * Fake api for the qv6d regression test. Every streamConversation call
- * throws the server's "no active runs" idle pattern. Lets the subscriber
- * loop iterate as fast as the test scope's Unconfined dispatcher allows,
- * so we can observe the backoff doubling in telemetry.
- */
 private class AlwaysIdleApi : MessageApi(mockk(relaxed = true)) {
     @Volatile var streamCallCount: Int = 0
 
@@ -780,6 +774,7 @@ private class AlwaysIdleApi : MessageApi(mockk(relaxed = true)) {
         after: String?,
         order: String?,
     ): List<LettaMessage> = emptyList()
+}
 }
 
 /**
