@@ -283,7 +283,7 @@ internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
             UiMessage(
                 id = ev.serverId,
                 role = role,
-                content = ev.content.stripEnvelopeReminders(),
+                content = confirmedContent,
                 timestamp = ev.date.toString(),
                 runId = ev.runId,
                 stepId = ev.stepId,

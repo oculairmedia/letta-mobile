@@ -46,8 +46,11 @@ class StreamingDisplayTextSmoother(
                 revealedCount = 0
             }
             // else: text is a continuation — keep revealedCount as-is so
-            // the reveal continues from where it left off.
+            // the reveal continues from where it left off. Reset the frame
+            // clock to the arrival time so a long gap before a burst does not
+            // immediately reveal the whole newly-arrived tail in one frame.
             target = text
+            lastStepMs = nowMs
         }
         streaming = isStreaming
         if (lastStepMs < 0L) {
