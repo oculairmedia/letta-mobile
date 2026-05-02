@@ -40,6 +40,13 @@ class BotToolRegistryTest : WordSpec({
                 "read_clipboard",
                 "notification_status",
                 "list_launchable_apps",
+                "android_open_wifi_settings",
+                "android_show_location_on_map",
+                "android_send_email_draft",
+                "android_send_sms_draft",
+                "android_create_calendar_event_draft",
+                "android_create_contact_draft",
+                "android_set_flashlight",
                 "render_summary_card",
                 "render_metric_card",
                 "render_suggestion_chips",
@@ -57,6 +64,34 @@ class BotToolRegistryTest : WordSpec({
 
             derivedNames shouldContainAll listOf("get_current_time", "render_summary_card")
             derivedNames.size shouldBe 2
+        }
+
+        "include JSON schemas for Android host tool arguments" {
+            val registry = BotToolRegistry(
+                contextProviders = emptySet(),
+                androidExecutionBridge = FakeAndroidExecutionBridge(),
+            )
+
+            val params = registry.listToolCreateParams(
+                setOf("android_send_sms_draft", "android_set_flashlight"),
+            )
+            val smsSchema = params.first {
+                it.sourceCode.contains("android_send_sms_draft")
+            }.jsonSchema!!.jsonObject
+            val flashlightSchema = params.first {
+                it.sourceCode.contains("android_set_flashlight")
+            }.jsonSchema!!.jsonObject
+            val flashlightEnabledSchema = flashlightSchema["parameters"]
+                ?.jsonObject
+                ?.get("properties")
+                ?.jsonObject
+                ?.get("enabled")
+                ?.jsonObject
+
+            smsSchema["name"]?.jsonPrimitive?.content shouldBe "android_send_sms_draft"
+            smsSchema["parameters"]?.jsonObject?.get("required").toString() shouldContain "phone_number"
+            smsSchema["parameters"]?.jsonObject?.get("required").toString() shouldContain "body"
+            flashlightEnabledSchema?.get("type")?.jsonPrimitive?.content shouldBe "boolean"
         }
 
         "execute provider-backed tools successfully" {
@@ -131,6 +166,38 @@ class BotToolRegistryTest : WordSpec({
 
             (result is BotToolExecutionResult.Unavailable) shouldBe true
             (result as BotToolExecutionResult.Unavailable).reason shouldContain "package_name"
+        }
+
+        "execute Android host draft tools with JSON arguments" {
+            val registry = BotToolRegistry(
+                contextProviders = emptySet(),
+                androidExecutionBridge = FakeAndroidExecutionBridge(),
+            )
+
+            val result = runBlocking {
+                registry.execute(
+                    "android_send_email_draft",
+                    """{"to":"test@example.com","subject":"Hello","body":"Draft body"}""",
+                )
+            }
+
+            (result is BotToolExecutionResult.Success) shouldBe true
+            val payload = Json.parseToJsonElement((result as BotToolExecutionResult.Success).payload).jsonObject
+            payload["status"]?.jsonPrimitive?.content shouldBe "success"
+            payload["action"]?.jsonPrimitive?.content shouldBe "android_send_email_draft"
+            payload["sends_without_user"]?.jsonPrimitive?.content shouldBe "false"
+        }
+
+        "report unavailable when Android host tool arguments are missing" {
+            val registry = BotToolRegistry(
+                contextProviders = emptySet(),
+                androidExecutionBridge = FakeAndroidExecutionBridge(),
+            )
+
+            val result = runBlocking { registry.execute("android_set_flashlight", "{}") }
+
+            (result is BotToolExecutionResult.Unavailable) shouldBe true
+            (result as BotToolExecutionResult.Unavailable).reason shouldContain "enabled"
         }
 
         "return generated ui envelope for summary card tools" {
@@ -214,6 +281,58 @@ private class FakeAndroidExecutionBridge : AndroidExecutionBridge {
     override fun listLaunchableApps(limit: Int): JsonObject = buildJsonObject {
         put("status", "success")
         put("count", 1)
+    }
+
+    override fun openWifiSettings(): JsonObject = payload("android_open_wifi_settings", "success")
+
+    override fun showLocationOnMap(location: String): JsonObject = buildJsonObject {
+        put("status", "success")
+        put("action", "android_show_location_on_map")
+        put("location", location)
+    }
+
+    override fun sendEmailDraft(to: String, subject: String, body: String): JsonObject = buildJsonObject {
+        put("status", "success")
+        put("action", "android_send_email_draft")
+        put("to", to)
+        put("subject", subject)
+        put("body_chars", body.length)
+        put("sends_without_user", false)
+    }
+
+    override fun sendSmsDraft(phoneNumber: String, body: String): JsonObject = buildJsonObject {
+        put("status", "success")
+        put("action", "android_send_sms_draft")
+        put("phone_number", phoneNumber)
+        put("body_chars", body.length)
+        put("sends_without_user", false)
+    }
+
+    override fun createCalendarEventDraft(title: String, datetime: String): JsonObject = buildJsonObject {
+        put("status", "success")
+        put("action", "android_create_calendar_event_draft")
+        put("title", title)
+        put("datetime", datetime)
+    }
+
+    override fun createContactDraft(
+        firstName: String,
+        lastName: String,
+        phoneNumber: String?,
+        email: String?,
+    ): JsonObject = buildJsonObject {
+        put("status", "success")
+        put("action", "android_create_contact_draft")
+        put("first_name", firstName)
+        put("last_name", lastName)
+        put("has_phone_number", phoneNumber != null)
+        put("has_email", email != null)
+    }
+
+    override fun setFlashlight(enabled: Boolean): JsonObject = buildJsonObject {
+        put("status", "success")
+        put("action", "android_set_flashlight")
+        put("enabled", enabled)
     }
 
     private fun payload(action: String, status: String): JsonObject = buildJsonObject {

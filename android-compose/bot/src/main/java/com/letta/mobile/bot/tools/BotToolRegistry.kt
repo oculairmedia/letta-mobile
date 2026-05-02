@@ -1,3 +1,5 @@
+@file:Suppress("CyclomaticComplexMethod", "MaxLineLength", "ReturnCount", "TooGenericExceptionCaught", "TooManyFunctions")
+
 package com.letta.mobile.bot.tools
 
 import com.letta.mobile.bot.context.DeviceContextProvider
@@ -5,18 +7,32 @@ import com.letta.mobile.data.model.ToolCreateParams
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+private const val SCHEMA_TYPE_OBJECT = "object"
+private const val SCHEMA_TYPE_STRING = "string"
+private const val SCHEMA_TYPE_BOOLEAN = "boolean"
+
+data class BotToolParameter(
+    val name: String,
+    val type: String,
+    val description: String,
+    val required: Boolean = true,
+)
+
 data class BotToolDefinition(
     val name: String,
     val description: String,
     val tags: Set<String> = emptySet(),
+    val parameters: List<BotToolParameter> = emptyList(),
 )
 
 sealed interface BotToolExecutionResult {
@@ -75,11 +91,15 @@ class BotToolRegistry @Inject constructor(
             name = "launch_app",
             description = "Launch an installed Android app by package name",
             tags = setOf("android", "app", "launch"),
+            parameters = listOf(
+                BotToolParameter("package_name", SCHEMA_TYPE_STRING, "Android package name to launch, for example com.android.settings."),
+            ),
         ),
         "write_clipboard" to BotToolDefinition(
             name = "write_clipboard",
             description = "Write text to the Android clipboard",
             tags = setOf("android", "clipboard"),
+            parameters = listOf(BotToolParameter("text", SCHEMA_TYPE_STRING, "Text to place on the Android clipboard.")),
         ),
         "read_clipboard" to BotToolDefinition(
             name = "read_clipboard",
@@ -95,6 +115,64 @@ class BotToolRegistry @Inject constructor(
             name = "list_launchable_apps",
             description = "List launchable apps installed on the Android device",
             tags = setOf("android", "apps"),
+        ),
+        "android_open_wifi_settings" to BotToolDefinition(
+            name = "android_open_wifi_settings",
+            description = "Open Android Wi-Fi settings. This only opens Settings UI; it does not silently change Wi-Fi state.",
+            tags = setOf("android", "settings", "wifi", "host-tool"),
+        ),
+        "android_show_location_on_map" to BotToolDefinition(
+            name = "android_show_location_on_map",
+            description = "Open a user-selected map app for a location query, place name, business, or address.",
+            tags = setOf("android", "maps", "location", "host-tool"),
+            parameters = listOf(
+                BotToolParameter("location", SCHEMA_TYPE_STRING, "Location query, place name, business, or address to show on a map."),
+            ),
+        ),
+        "android_send_email_draft" to BotToolDefinition(
+            name = "android_send_email_draft",
+            description = "Open an email app with a draft addressed to the recipient. This does not send the email.",
+            tags = setOf("android", "email", "draft", "host-tool", "user-mediated"),
+            parameters = listOf(
+                BotToolParameter("to", SCHEMA_TYPE_STRING, "Recipient email address."),
+                BotToolParameter("subject", SCHEMA_TYPE_STRING, "Draft email subject."),
+                BotToolParameter("body", SCHEMA_TYPE_STRING, "Draft email body."),
+            ),
+        ),
+        "android_send_sms_draft" to BotToolDefinition(
+            name = "android_send_sms_draft",
+            description = "Open the SMS app with a draft message for the phone number. This does not send the SMS.",
+            tags = setOf("android", "sms", "draft", "host-tool", "user-mediated"),
+            parameters = listOf(
+                BotToolParameter("phone_number", SCHEMA_TYPE_STRING, "Recipient phone number."),
+                BotToolParameter("body", SCHEMA_TYPE_STRING, "Draft SMS body."),
+            ),
+        ),
+        "android_create_calendar_event_draft" to BotToolDefinition(
+            name = "android_create_calendar_event_draft",
+            description = "Open the calendar insert UI with a draft event. The user reviews and saves it manually.",
+            tags = setOf("android", "calendar", "draft", "host-tool", "user-mediated"),
+            parameters = listOf(
+                BotToolParameter("title", SCHEMA_TYPE_STRING, "Calendar event title."),
+                BotToolParameter("datetime", SCHEMA_TYPE_STRING, "Event start datetime as ISO-8601, for example 2026-05-02T14:30:00."),
+            ),
+        ),
+        "android_create_contact_draft" to BotToolDefinition(
+            name = "android_create_contact_draft",
+            description = "Open the contacts insert UI with a draft contact. The user reviews and saves it manually.",
+            tags = setOf("android", "contacts", "draft", "host-tool", "user-mediated"),
+            parameters = listOf(
+                BotToolParameter("first_name", SCHEMA_TYPE_STRING, "Contact first name."),
+                BotToolParameter("last_name", SCHEMA_TYPE_STRING, "Contact last name."),
+                BotToolParameter("phone_number", SCHEMA_TYPE_STRING, "Optional contact phone number.", required = false),
+                BotToolParameter("email", SCHEMA_TYPE_STRING, "Optional contact email address.", required = false),
+            ),
+        ),
+        "android_set_flashlight" to BotToolDefinition(
+            name = "android_set_flashlight",
+            description = "Turn the Android flashlight on or off when a camera flash is available. This directly changes device state and returns capability/audit metadata in the result.",
+            tags = setOf("android", "flashlight", "device-state", "host-tool"),
+            parameters = listOf(BotToolParameter("enabled", SCHEMA_TYPE_BOOLEAN, "True to turn the flashlight on, false to turn it off.")),
         ),
         "render_summary_card" to BotToolDefinition(
             name = "render_summary_card",
@@ -121,12 +199,13 @@ class BotToolRegistry @Inject constructor(
 
     fun listToolCreateParams(toolNames: Set<String>? = null): List<ToolCreateParams> =
         listDefinitions(toolNames).map { definition ->
-        ToolCreateParams(
-            sourceCode = buildStubSource(definition),
-            description = definition.description,
-            tags = definition.tags.toList(),
-        )
-    }
+            ToolCreateParams(
+                sourceCode = buildStubSource(definition),
+                jsonSchema = buildJsonSchema(definition),
+                description = definition.description,
+                tags = definition.tags.toList(),
+            )
+        }
 
     suspend fun execute(toolName: String, arguments: String?): BotToolExecutionResult {
         val definition = definitions[toolName]
@@ -143,6 +222,13 @@ class BotToolRegistry @Inject constructor(
             "read_clipboard" -> executeAndroidBridge(definition) { androidExecutionBridge.readClipboard() }
             "notification_status" -> executeAndroidBridge(definition) { androidExecutionBridge.notificationStatus() }
             "list_launchable_apps" -> executeAndroidBridge(definition) { androidExecutionBridge.listLaunchableApps() }
+            "android_open_wifi_settings" -> executeAndroidBridge(definition) { androidExecutionBridge.openWifiSettings() }
+            "android_show_location_on_map" -> executeShowLocationOnMap(definition, arguments)
+            "android_send_email_draft" -> executeSendEmailDraft(definition, arguments)
+            "android_send_sms_draft" -> executeSendSmsDraft(definition, arguments)
+            "android_create_calendar_event_draft" -> executeCreateCalendarEventDraft(definition, arguments)
+            "android_create_contact_draft" -> executeCreateContactDraft(definition, arguments)
+            "android_set_flashlight" -> executeSetFlashlight(definition, arguments)
             "render_summary_card" -> executeGeneratedUi(definition, arguments)
             "render_metric_card" -> executeGeneratedUi(definition, arguments)
             "render_suggestion_chips" -> executeGeneratedUi(definition, arguments)
@@ -212,7 +298,8 @@ class BotToolRegistry @Inject constructor(
         definition: BotToolDefinition,
         arguments: String?,
     ): BotToolExecutionResult {
-        val packageName = parseStringArg(arguments, "package_name")
+        val args = parseArguments(definition, arguments) ?: return missingArguments(definition)
+        val packageName = args.requiredString("package_name")
             ?: return BotToolExecutionResult.Unavailable(definition.name, "Missing package_name argument")
         return executeAndroidBridge(definition) { androidExecutionBridge.launchApp(packageName) }
     }
@@ -221,17 +308,102 @@ class BotToolRegistry @Inject constructor(
         definition: BotToolDefinition,
         arguments: String?,
     ): BotToolExecutionResult {
-        val text = parseStringArg(arguments, "text")
+        val args = parseArguments(definition, arguments) ?: return missingArguments(definition)
+        val text = args.requiredString("text")
             ?: return BotToolExecutionResult.Unavailable(definition.name, "Missing text argument")
         return executeAndroidBridge(definition) { androidExecutionBridge.writeClipboard(text) }
     }
 
-    private fun parseStringArg(arguments: String?, key: String): String? {
-        if (arguments.isNullOrBlank()) return null
-        return runCatching {
-            json.parseToJsonElement(arguments).jsonObject[key]?.jsonPrimitive?.contentOrNull
-        }.getOrNull()
+    private fun executeShowLocationOnMap(
+        definition: BotToolDefinition,
+        arguments: String?,
+    ): BotToolExecutionResult {
+        val args = parseArguments(definition, arguments) ?: return missingArguments(definition)
+        val location = args.requiredString("location")
+            ?: return BotToolExecutionResult.Unavailable(definition.name, "Missing location argument")
+        return executeAndroidBridge(definition) { androidExecutionBridge.showLocationOnMap(location) }
     }
+
+    private fun executeSendEmailDraft(
+        definition: BotToolDefinition,
+        arguments: String?,
+    ): BotToolExecutionResult {
+        val args = parseArguments(definition, arguments) ?: return missingArguments(definition)
+        val to = args.requiredString("to")
+            ?: return BotToolExecutionResult.Unavailable(definition.name, "Missing to argument")
+        val subject = args.requiredString("subject", allowBlank = true)
+            ?: return BotToolExecutionResult.Unavailable(definition.name, "Missing subject argument")
+        val body = args.requiredString("body", allowBlank = true)
+            ?: return BotToolExecutionResult.Unavailable(definition.name, "Missing body argument")
+        return executeAndroidBridge(definition) { androidExecutionBridge.sendEmailDraft(to, subject, body) }
+    }
+
+    private fun executeSendSmsDraft(
+        definition: BotToolDefinition,
+        arguments: String?,
+    ): BotToolExecutionResult {
+        val args = parseArguments(definition, arguments) ?: return missingArguments(definition)
+        val phoneNumber = args.requiredString("phone_number")
+            ?: return BotToolExecutionResult.Unavailable(definition.name, "Missing phone_number argument")
+        val body = args.requiredString("body", allowBlank = true)
+            ?: return BotToolExecutionResult.Unavailable(definition.name, "Missing body argument")
+        return executeAndroidBridge(definition) { androidExecutionBridge.sendSmsDraft(phoneNumber, body) }
+    }
+
+    private fun executeCreateCalendarEventDraft(
+        definition: BotToolDefinition,
+        arguments: String?,
+    ): BotToolExecutionResult {
+        val args = parseArguments(definition, arguments) ?: return missingArguments(definition)
+        val title = args.requiredString("title")
+            ?: return BotToolExecutionResult.Unavailable(definition.name, "Missing title argument")
+        val datetime = args.requiredString("datetime")
+            ?: return BotToolExecutionResult.Unavailable(definition.name, "Missing datetime argument")
+        return executeAndroidBridge(definition) { androidExecutionBridge.createCalendarEventDraft(title, datetime) }
+    }
+
+    private fun executeCreateContactDraft(
+        definition: BotToolDefinition,
+        arguments: String?,
+    ): BotToolExecutionResult {
+        val args = parseArguments(definition, arguments) ?: return missingArguments(definition)
+        val firstName = args.requiredString("first_name")
+            ?: return BotToolExecutionResult.Unavailable(definition.name, "Missing first_name argument")
+        val lastName = args.requiredString("last_name")
+            ?: return BotToolExecutionResult.Unavailable(definition.name, "Missing last_name argument")
+        val phoneNumber = args.optionalString("phone_number")
+        val email = args.optionalString("email")
+        return executeAndroidBridge(definition) {
+            androidExecutionBridge.createContactDraft(firstName, lastName, phoneNumber, email)
+        }
+    }
+
+    private fun executeSetFlashlight(
+        definition: BotToolDefinition,
+        arguments: String?,
+    ): BotToolExecutionResult {
+        val args = parseArguments(definition, arguments) ?: return missingArguments(definition)
+        val enabled = args["enabled"]?.jsonPrimitive?.booleanOrNull
+            ?: return BotToolExecutionResult.Unavailable(definition.name, "Missing enabled boolean argument")
+        return executeAndroidBridge(definition) { androidExecutionBridge.setFlashlight(enabled) }
+    }
+
+    private fun parseArguments(definition: BotToolDefinition, arguments: String?): JsonObject? {
+        if (definition.parameters.isEmpty()) return buildJsonObject { }
+        if (arguments.isNullOrBlank()) return null
+        return runCatching { json.parseToJsonElement(arguments).jsonObject }.getOrNull()
+    }
+
+    private fun JsonObject.requiredString(key: String, allowBlank: Boolean = false): String? {
+        val value = optionalString(key) ?: return null
+        return value.takeIf { allowBlank || it.isNotBlank() }
+    }
+
+    private fun JsonObject.optionalString(key: String): String? =
+        this[key]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+
+    private fun missingArguments(definition: BotToolDefinition): BotToolExecutionResult =
+        BotToolExecutionResult.Unavailable(definition.name, "Missing or invalid JSON arguments")
 
     private fun executeGeneratedUi(
         definition: BotToolDefinition,
@@ -268,10 +440,37 @@ class BotToolRegistry @Inject constructor(
         )
     }
 
-    private fun buildStubSource(definition: BotToolDefinition): String = """
-        def ${definition.name}():
-            pass
-    """.trimIndent()
+    private fun buildStubSource(definition: BotToolDefinition): String {
+        val params = definition.parameters.joinToString(", ") { parameter ->
+            val typeName = when (parameter.type) {
+                SCHEMA_TYPE_BOOLEAN -> "bool"
+                else -> "str"
+            }
+            val defaultValue = if (parameter.required) "" else " = None"
+            "${parameter.name}: $typeName$defaultValue"
+        }
+        return """
+            def ${definition.name}($params):
+                pass
+        """.trimIndent()
+    }
+
+    private fun buildJsonSchema(definition: BotToolDefinition): JsonObject = buildJsonObject {
+        put("name", definition.name)
+        put("description", definition.description)
+        put("parameters", buildJsonObject {
+            put("type", SCHEMA_TYPE_OBJECT)
+            put("properties", buildJsonObject {
+                definition.parameters.forEach { parameter ->
+                    put(parameter.name, buildJsonObject {
+                        put("type", parameter.type)
+                        put("description", parameter.description)
+                    })
+                }
+            })
+            put("required", JsonArray(definition.parameters.filter { it.required }.map { JsonPrimitive(it.name) }))
+        })
+    }
 
     private fun Collection<BotToolDefinition>.filterByRequestedNames(toolNames: Set<String>?): List<BotToolDefinition> {
         if (toolNames == null) return toList()
