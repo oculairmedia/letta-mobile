@@ -82,7 +82,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import com.letta.mobile.R
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.util.formatRelativeTime
-import com.letta.mobile.ui.components.ChatBackgroundPicker
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.ConnectionState
 import com.letta.mobile.ui.components.ConnectionStatusBanner
@@ -91,7 +90,6 @@ import com.letta.mobile.ui.components.Accordions
 import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.FormItem
-import com.letta.mobile.ui.theme.ChatBackground
 
 import com.letta.mobile.util.ConnectivityMonitor
 import com.letta.mobile.ui.navigation.agentAvatarSharedElementKey
@@ -149,8 +147,6 @@ fun AgentScaffold(
                     agentId = agentId,
                     messageCount = uiState.messages.size,
                     contextWindow = uiState.contextWindow,
-                    chatBackground = chatBackground,
-                    onChatBackgroundChange = { viewModel.setChatBackground(it) },
                     onEditAgent = {
                         scope.launch { drawerState.close() }
                         onNavigateToSettings(agentId)
@@ -1380,8 +1376,6 @@ private fun DrawerContent(
     agentId: String,
     messageCount: Int,
     contextWindow: ContextWindowUiState,
-    chatBackground: ChatBackground,
-    onChatBackgroundChange: (ChatBackground) -> Unit,
     onEditAgent: () -> Unit,
     onArchivalMemory: () -> Unit,
     onTools: () -> Unit = {},
@@ -1455,13 +1449,6 @@ private fun DrawerContent(
             label = { Text("Reset Messages") },
             selected = false,
             onClick = onResetMessages,
-        )
-
-        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-        ChatBackgroundPicker(
-            selected = chatBackground,
-            onSelect = onChatBackgroundChange,
         )
 
         Spacer(modifier = Modifier.weight(1f))
