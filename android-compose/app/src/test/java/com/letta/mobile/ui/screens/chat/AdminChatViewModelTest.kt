@@ -546,6 +546,82 @@ class AdminChatViewModelTest {
         )
     }
 
+    /**
+     * letta-mobile-5s1n regression test:
+     *
+     * Before the fix, the timeline observer's emission unconditionally
+     * derived `isStreaming` from `anyLocalPending` (Locals in SENDING).
+     * Client Mode Locals are stamped SENT at append (the WS gateway is
+     * the delivery authority), so the predicate was always false and the
+     * spinner that `sendMessageViaClientMode` set on entry got clobbered
+     * by the first observer emission.
+     *
+     * Contract under fix: while a Client Mode stream is in flight
+     * (`clientModeStreamJob.isActive`), the observer must preserve the
+     * `isStreaming` / `isAgentTyping` flags that the send coroutine set —
+     * even after the user-bubble Local lands in the timeline.
+     */
+    @Test
+    fun `client mode send keeps isStreaming true while stream in flight`() = runTest {
+        clientModeEnabledFlow.value = true
+        // Hand-rolled channel-backed flow: the test controls when chunks
+        // are delivered, so we can observe vm state mid-stream after the
+        // user-bubble Local has landed in the timeline (and thus after
+        // the observer has had a chance to emit).
+        val chunks = Channel<BotStreamChunk>(capacity = Channel.UNLIMITED)
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+                forceFreshConversation = any(),
+            )
+        } returns chunks.consumeAsFlow()
+
+        val vm = createViewModel(conversationId = "conv-1")
+        advanceUntilIdle()
+
+        vm.sendMessage("ping")
+        // Let the send coroutine: (a) appendClientModeLocal → observer
+        // re-emits with the user bubble visible, (b) suspend on the
+        // first chunks.receive() since we haven't sent any yet.
+        advanceUntilIdle()
+
+        // The user bubble should be in messages AND isStreaming/typing
+        // should still be true — proving the observer didn't clobber
+        // the flags `sendMessage` set just because the SENT Local
+        // doesn't satisfy `anyLocalPending`.
+        assertTrue(
+            "isStreaming must remain true while Client Mode stream in flight",
+            vm.uiState.value.isStreaming,
+        )
+        assertTrue(
+            "isAgentTyping must remain true before any assistant chunk arrives",
+            vm.uiState.value.isAgentTyping,
+        )
+        assertTrue(
+            "user bubble should be visible from the timeline",
+            vm.uiState.value.messages.any { it.role == "user" && it.content == "ping" },
+        )
+
+        // Drain a partial assistant chunk; spinner stays true.
+        chunks.send(BotStreamChunk(text = "Hello", conversationId = "conv-1"))
+        advanceUntilIdle()
+        assertTrue(
+            "isStreaming must remain true after partial chunk",
+            vm.uiState.value.isStreaming,
+        )
+
+        // Final chunk drops streaming.
+        chunks.send(BotStreamChunk(text = "Hello world", conversationId = "conv-1", done = true))
+        chunks.close()
+        advanceUntilIdle()
+        assertFalse(
+            "isStreaming must clear once stream completes",
+            vm.uiState.value.isStreaming,
+        )
+    }
+
     @Test
     fun `resetMessages clears client mode conversation state`() = runTest {
         clientModeEnabledFlow.value = true

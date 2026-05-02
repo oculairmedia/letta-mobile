@@ -975,7 +975,9 @@ class AdminChatViewModel @Inject constructor(
                     hasMoreOlderMessages = false,
                     isStreaming = true,
                     isAgentTyping = true,
+                    composerError = null,
                     error = null,
+                    pendingAttachments = persistentListOf(),
                     conversationState = ConversationState.Ready(convId),
                 )
                 runCatching {

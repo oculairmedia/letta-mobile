@@ -214,8 +214,13 @@ object TextMessageRenderer : MessageContentRenderer {
                 modifier = modifier,
             )
         } else {
+            val displayText = if (isStreaming) {
+                streamingDisplayText(message.content)
+            } else {
+                message.content
+            }
             MarkdownText(
-                text = message.content,
+                text = displayText,
                 textColor = textColor,
                 modifier = modifier,
             )
