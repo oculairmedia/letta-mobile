@@ -100,6 +100,7 @@ fun ChatComposer(
             },
             actionContainerColor = if (isStreaming) MaterialTheme.colorScheme.errorContainer else null,
             actionContentColor = if (isStreaming) MaterialTheme.colorScheme.onErrorContainer else null,
+            actionSizeFraction = if (isStreaming) 0.7f else 1f,
             leadingContent = {
                 FilledIconButton(
                     onClick = onAttachImage,

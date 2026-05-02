@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.components
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -57,10 +60,21 @@ fun LettaInputBar(
     actionContentDescription: String = sendContentDescription,
     actionContainerColor: Color? = null,
     actionContentColor: Color? = null,
+    actionSizeFraction: Float = 1f,
     leadingContent: (@Composable () -> Unit)? = null,
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val canSend = (canSendOverride ?: text.isNotBlank()) && enabled
+    val actionButtonSize by animateDpAsState(
+        targetValue = 48.dp * actionSizeFraction.coerceIn(0.5f, 1f),
+        animationSpec = tween(durationMillis = 220),
+        label = "inputActionButtonSize",
+    )
+    val actionIconSize by animateDpAsState(
+        targetValue = 20.dp * actionSizeFraction.coerceIn(0.5f, 1f),
+        animationSpec = tween(durationMillis = 220),
+        label = "inputActionIconSize",
+    )
 
     Row(
         modifier = modifier
@@ -108,7 +122,7 @@ fun LettaInputBar(
         FilledIconButton(
             onClick = { if (canSend) onSend(text) },
             enabled = canSend,
-            modifier = Modifier.size(48.dp),
+            modifier = Modifier.size(actionButtonSize),
             colors = IconButtonDefaults.filledIconButtonColors(
                 containerColor = actionContainerColor ?: colorScheme.primary,
                 contentColor = actionContentColor ?: colorScheme.onPrimary,
@@ -119,7 +133,7 @@ fun LettaInputBar(
             Icon(
                 actionIcon,
                 contentDescription = actionContentDescription,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(actionIconSize),
             )
         }
     }
