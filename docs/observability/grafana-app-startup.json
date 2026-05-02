@@ -1,0 +1,49 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "letta-mobile app startup observability. Queries assume a Loki datasource named 'Loki' with log lines carrying the Telemetry JSON shape {tag, name, attrs}. Tracking: letta-mobile-dzo2.",
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Cold-start duration (ms, 5m avg)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "avg_over_time({app=\"com.letta.mobile\"} | json | tag=\"App\" | name=\"onCreate.end\" | unwrap durationMs [5m])",
+          "legendFormat": "onCreate.end durationMs"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ms" } }
+    },
+    {
+      "id": 2,
+      "title": "Init failures by component (5m)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (component) (count_over_time({app=\"com.letta.mobile\"} | json | tag=\"App\" | name=\"init.failed\" [5m]))",
+          "legendFormat": "{{component}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["app", "letta-mobile", "observability", "startup"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "",
+  "title": "letta-mobile — App startup",
+  "uid": "letta-mobile-app-startup",
+  "version": 1
+}

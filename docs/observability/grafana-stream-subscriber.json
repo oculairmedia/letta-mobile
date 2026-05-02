@@ -1,0 +1,107 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "letta-mobile StreamSubscriber delivery, backoff, and error observability. Queries assume a Loki datasource named 'Loki' with log lines carrying the Telemetry JSON shape {tag, name, attrs}. Tracking: letta-mobile-mge5.6.",
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Resume-stream delivery rate (events/min, by conversation)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (conversationId) (rate({app=\"com.letta.mobile\"} | json | tag=\"TimelineSync\" | name=\"streamSubscriber.eventReceived\" [1m]))",
+          "legendFormat": "{{conversationId}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "id": 2,
+      "title": "Run duration histogram (ms)",
+      "type": "histogram",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{app=\"com.letta.mobile\"} | json | tag=\"TimelineSync\" | name=\"streamSubscriber.closed\" | unwrap durationMs",
+          "legendFormat": "closed.durationMs"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Average backoff (idle fingerprint, ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "avg_over_time({app=\"com.letta.mobile\"} | json | tag=\"TimelineSync\" | name=\"streamSubscriber.idle404\" | unwrap backoffMs [5m])",
+          "legendFormat": "backoffMs (5m avg)"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ms" } }
+    },
+    {
+      "id": 4,
+      "title": "Activity density (events / idle probes)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate({app=\"com.letta.mobile\"} | json | tag=\"TimelineSync\" | name=\"streamSubscriber.eventReceived\" [5m])) / clamp_min(sum(rate({app=\"com.letta.mobile\"} | json | tag=\"TimelineSync\" | name=\"streamSubscriber.idle404\" [5m])), 0.001)",
+          "legendFormat": "events/idle"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Dedupe rate (events/min)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (reason) (rate({app=\"com.letta.mobile\"} | json | tag=\"TimelineSync\" | name=\"streamSubscriber.eventDeduped\" [1m]))",
+          "legendFormat": "{{reason}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "id": 6,
+      "title": "Network-error rate (events/min)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "datasource": { "type": "loki", "uid": "Loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (errorClass) (rate({app=\"com.letta.mobile\"} | json | tag=\"TimelineSync\" | name=\"streamSubscriber.networkError\" [1m]))",
+          "legendFormat": "{{errorClass}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["letta-mobile", "timeline-sync", "stream-subscriber"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "",
+  "title": "letta-mobile — StreamSubscriber",
+  "uid": "letta-mobile-stream-subscriber",
+  "version": 1
+}
