@@ -9,6 +9,7 @@ import com.letta.mobile.data.model.ModelSettings
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.MessageRepository
+import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.ui.common.UiState
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -38,6 +39,8 @@ class AgentSettingsViewModelTest {
     private lateinit var agentRepository: AgentRepository
     private lateinit var blockRepository: BlockRepository
     private lateinit var messageRepository: MessageRepository
+    private lateinit var settingsRepository: SettingsRepository
+    private lateinit var clientModeConnectionTester: ClientModeConnectionTester
     private lateinit var viewModel: AgentSettingsViewModel
 
     @Before
@@ -46,6 +49,12 @@ class AgentSettingsViewModelTest {
         agentRepository = mockk(relaxed = true)
         blockRepository = mockk(relaxed = true)
         messageRepository = mockk(relaxed = true)
+        settingsRepository = mockk(relaxed = true)
+        clientModeConnectionTester = mockk(relaxed = true)
+
+        every { settingsRepository.observeClientModeEnabled() } returns flowOf(false)
+        every { settingsRepository.observeClientModeBaseUrl() } returns flowOf("")
+        every { settingsRepository.getClientModeApiKey() } returns null
 
         every { agentRepository.getAgent("a1") } returns flowOf(
             Agent(
@@ -77,6 +86,8 @@ class AgentSettingsViewModelTest {
             agentRepository = agentRepository,
             blockRepository = blockRepository,
             messageRepository = messageRepository,
+            settingsRepository = settingsRepository,
+            clientModeConnectionTester = clientModeConnectionTester,
         )
     }
 
@@ -178,6 +189,29 @@ class AgentSettingsViewModelTest {
                 stripMessages = true,
             )
         }
+    }
+
+    // Client-mode persistence and connection-testing have moved to
+    // [com.letta.mobile.ui.screens.lettabot.LettaBotConnectionViewModel] (gb57.9).
+    // See LettaBotConnectionViewModelTest for coverage of save / test flows.
+    @Test
+    fun `saveSettings does not touch global client mode settings`() = runTest {
+        val paramsSlot = slot<AgentUpdateParams>()
+        coEvery { agentRepository.updateAgent(eq("a1"), capture(paramsSlot)) } answers {
+            Agent(
+                id = "a1",
+                name = "Test Agent",
+                modelSettings = paramsSlot.captured.modelSettings,
+                system = paramsSlot.captured.system,
+                enableSleeptime = paramsSlot.captured.enableSleeptime,
+            )
+        }
+
+        viewModel.saveSettings()
+
+        coVerify(exactly = 0) { settingsRepository.setClientModeEnabled(any()) }
+        coVerify(exactly = 0) { settingsRepository.setClientModeBaseUrl(any()) }
+        coVerify(exactly = 0) { settingsRepository.setClientModeApiKey(any()) }
     }
 
     private suspend fun awaitSuccessState(): AgentSettingsUiState {

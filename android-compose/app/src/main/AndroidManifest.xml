@@ -6,7 +6,16 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!--
+      letta-mobile-50p2: switched from FOREGROUND_SERVICE_DATA_SYNC to
+      FOREGROUND_SERVICE_REMOTE_MESSAGING. The dataSync FGS type has a
+      6-hour rolling daily quota on Android 14+ — once exhausted any
+      startForeground() call throws ForegroundServiceStartNotAllowedException
+      and crashes the process loop. ChatPushService is fundamentally a chat
+      push channel (websocket + notification publisher), so remoteMessaging
+      is both the correct semantic and quota-exempt.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" />
 
     <application
         android:name=".LettaApplication"
@@ -76,7 +85,7 @@
         <service
             android:name=".channel.ChatPushService"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="remoteMessaging" />
     </application>
 
 </manifest>

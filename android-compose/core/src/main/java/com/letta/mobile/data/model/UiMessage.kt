@@ -21,6 +21,13 @@ data class UiMessage(
     val stepId: String? = null,
     val isPending: Boolean = false,
     val isReasoning: Boolean = false,
+    /**
+     * Server-emitted error frame (run aborted, tool failed, rate-limit,
+     * etc.). Renderers paint these with a destructive accent so the user
+     * sees that something went wrong instead of a silent dropped spinner.
+     * letta-mobile-5s1n.
+     */
+    val isError: Boolean = false,
     val toolCalls: List<UiToolCall>? = null,
     val generatedUi: UiGeneratedComponent? = null,
     val approvalRequest: UiApprovalRequest? = null,

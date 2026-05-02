@@ -17,6 +17,7 @@ import javax.inject.Singleton
 @Singleton
 class ConversationRepository @Inject constructor(
     private val conversationApi: ConversationApi,
+    private val agentRepository: AgentRepository,
 ) : IConversationRepository {
     private val _conversationsByAgent = MutableStateFlow<Map<String, List<Conversation>>>(emptyMap())
     private val lastRefreshAtMillisByAgent = mutableMapOf<String, Long>()
@@ -135,7 +136,15 @@ class ConversationRepository @Inject constructor(
     }
 
     override suspend fun recompileConversation(id: String, dryRun: Boolean, agentId: String?): String {
-        return conversationApi.recompileConversation(id, dryRun, agentId)
+        return if (agentId != null && !dryRun) {
+            var result = ""
+            agentRepository.checkpointAndRestoreConfig(agentId) {
+                result = conversationApi.recompileConversation(id, dryRun, agentId)
+            }
+            result
+        } else {
+            conversationApi.recompileConversation(id, dryRun, agentId)
+        }
     }
 
     override suspend fun forkConversation(id: String, agentId: String): Conversation {

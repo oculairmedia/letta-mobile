@@ -23,6 +23,8 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
+import com.letta.mobile.AppLaunchTarget
 import com.letta.mobile.NotificationNavigationTarget
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.SettingsRepository
@@ -31,6 +33,7 @@ import com.letta.mobile.ui.screens.dashboard.HomeScreen
 import com.letta.mobile.ui.screens.about.AboutScreen
 import com.letta.mobile.ui.screens.bot.BotConfigEditScreen
 import com.letta.mobile.ui.screens.bot.BotSettingsScreen
+import com.letta.mobile.ui.screens.lettabot.LettaBotConnectionScreen
 import com.letta.mobile.ui.screens.agentlist.AgentListScreen
 import com.letta.mobile.ui.screens.archives.ArchiveAdminScreen
 import com.letta.mobile.ui.screens.archival.ArchivalScreen
@@ -60,7 +63,6 @@ import com.letta.mobile.ui.screens.tools.ToolDetailScreen
 import com.letta.mobile.ui.screens.telemetry.TelemetryScreen
 import com.letta.mobile.ui.screens.usage.UsageScreen
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -116,7 +118,7 @@ class NavViewModel @Inject constructor(
 @Composable
 fun AppNavGraph(
     navController: NavHostController = rememberNavController(),
-    notificationTarget: NotificationNavigationTarget? = null,
+    notificationTarget: AppLaunchTarget? = null,
     onNotificationTargetConsumed: () -> Unit = {},
 ) {
     val navViewModel: NavViewModel = hiltViewModel()
@@ -323,7 +325,10 @@ fun AppNavGraph(
                 },
                 onNavigateToConfigList = {
                     navController.navigate(ConfigListRoute)
-                }
+                },
+                onNavigateToLettaBotConnection = {
+                    navController.navigate(LettaBotConnectionRoute)
+                },
             )
         }
 
@@ -439,6 +444,17 @@ fun AppNavGraph(
             )
         }
 
+        composable<LettaBotConnectionRoute>(
+            enterTransition = drillInEnter,
+            exitTransition = drillInExit,
+            popEnterTransition = drillInPopEnter,
+            popExitTransition = drillInPopExit,
+        ) {
+            LettaBotConnectionScreen(
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+
         composable<BotConfigEditRoute>(
             enterTransition = drillInEnter,
             exitTransition = drillInExit,
@@ -481,7 +497,8 @@ fun AppNavGraph(
             exitTransition = drillInExit,
             popEnterTransition = drillInPopEnter,
             popExitTransition = drillInPopExit,
-        ) {
+        ) { backStackEntry ->
+            val route = backStackEntry.toRoute<AgentChatRoute>()
             CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
                 AgentScaffold(
                     onNavigateBack = { navController.popBackStack() },
@@ -495,10 +512,21 @@ fun AppNavGraph(
                         navController.navigate(AllToolsRoute)
                     },
                     onSwitchConversation = { agentId, conversationId ->
-                        navController.navigate(AgentChatRoute(agentId = agentId, conversationId = conversationId)) {
-                            popUpTo<ConversationsRoute>()
+                        val normalizedConversationId = conversationId?.takeIf { it.isNotBlank() }
+                        navController.navigate(
+                            AgentChatRoute(
+                                agentId = agentId,
+                                conversationId = normalizedConversationId,
+                                freshRouteKey = if (normalizedConversationId == null) System.currentTimeMillis() else null,
+                            )
+                        ) {
+                            popUpTo<AgentChatRoute> { inclusive = true }
                         }
                     },
+                    viewModel = hiltViewModel(
+                        backStackEntry,
+                        key = route.toViewModelKey(),
+                    ),
                 )
             }
         }
@@ -568,6 +596,16 @@ fun AppNavGraph(
     }
         }
     }
+}
+
+private fun AgentChatRoute.toViewModelKey(): String = buildString {
+    append(agentId)
+    append(':')
+    append(conversationId.orEmpty())
+    append(':')
+    append(freshRouteKey?.toString().orEmpty())
+    append(':')
+    append(projectIdentifier.orEmpty())
 }
 
 private fun LettaConfig?.toBackendLabel(): String? {

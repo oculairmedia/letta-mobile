@@ -667,6 +667,7 @@ private fun messageSummary(message: LettaMessage): String {
         is com.letta.mobile.data.model.EventMessage -> message.eventType
         is com.letta.mobile.data.model.PingMessage -> message.messageType
         is com.letta.mobile.data.model.UnknownMessage -> message.messageType
+        is com.letta.mobile.data.model.ErrorMessage -> "Error: ${message.text.take(80)}"
         is com.letta.mobile.data.model.StopReason -> "Stop: ${message.reason}"
         is com.letta.mobile.data.model.UsageStatistics -> "Usage: ${message.totalTokens ?: 0} tokens"
     }

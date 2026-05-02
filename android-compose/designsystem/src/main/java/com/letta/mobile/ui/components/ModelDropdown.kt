@@ -42,7 +42,8 @@ fun ModelDropdown(
         if (filterText.isBlank()) models
         else models.filter {
             it.name.contains(filterText, ignoreCase = true) ||
-                it.providerType.contains(filterText, ignoreCase = true)
+                it.providerType.contains(filterText, ignoreCase = true) ||
+                (it.handle?.contains(filterText, ignoreCase = true) == true)
         }
     }
 
@@ -105,7 +106,7 @@ fun ModelDropdown(
                                 }
                             },
                             onClick = {
-                                onModelSelected(model.name)
+                                onModelSelected(model.handle ?: model.name)
                                 filterText = ""
                                 expanded = false
                             },

@@ -117,6 +117,46 @@ open class TimelineRepository @Inject constructor(
         getOrCreate(conversationId).retry(otid)
     }
 
+    /**
+     * letta-mobile-c87t: Append a Client-Mode optimistic Local for a user
+     * message that's being sent through the LettaBot WS gateway rather than
+     * the timeline send queue. Stamps a `cm-<uuid>` localId and tags the
+     * event as [MessageSource.CLIENT_MODE_HARNESS]. Does NOT enqueue to the
+     * outbound send queue — the gateway is responsible for delivery.
+     *
+     * Returns the generated localId so callers can correlate the event later
+     * (telemetry, retries). Subsequent reconcile / live-stream paths will
+     * fuzzy-collapse this Local against the Confirmed echo from Letta SSE
+     * via [Timeline.collapseClientModeFuzzyMatch].
+     */
+    suspend fun appendClientModeLocal(
+        conversationId: String,
+        content: String,
+        attachments: List<com.letta.mobile.data.model.MessageContentPart.Image> = emptyList(),
+    ): String = getOrCreate(conversationId).appendClientModeLocal(content, attachments)
+
+    /**
+     * letta-mobile-5s1n: upsert a Client Mode assistant-streaming Local.
+     * See [TimelineSyncLoop.upsertClientModeLocalAssistantChunk] for full
+     * contract.
+     *
+     * Caller-supplied [localId] should be stable across repeat chunks for
+     * the same logical event:
+     *  - Assistant text:  `cm-assist-<runId or stable id>`
+     *  - Reasoning:       `cm-reason-<runId or stable id>`
+     *  - Tool call:       `cm-tool-<toolCallId>`
+     */
+    suspend fun upsertClientModeLocalAssistantChunk(
+        conversationId: String,
+        localId: String,
+        build: () -> TimelineEvent.Local,
+        transform: (TimelineEvent.Local) -> TimelineEvent.Local,
+    ): String = getOrCreate(conversationId).upsertClientModeLocalAssistantChunk(
+        localId = localId,
+        build = build,
+        transform = transform,
+    )
+
     /** Force a reload — clears the cached loop for the conversation. */
     suspend fun clear(conversationId: String) = loopsMutex.withLock {
         loops.remove(conversationId)

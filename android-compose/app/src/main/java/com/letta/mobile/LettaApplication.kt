@@ -10,11 +10,15 @@ import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.crossfade
 import com.letta.mobile.channel.ChannelHeartbeatScheduler
 import com.letta.mobile.channel.ChannelNotificationPublisher
+import com.letta.mobile.clientmode.ClientModeController
+import com.letta.mobile.debug.AutomationAuthBootstrap
 import com.letta.mobile.bot.heartbeat.BotHeartbeatScheduler
 import com.letta.mobile.bot.service.BotServiceAutoStarter
 import com.letta.mobile.crash.CrashReporter
+import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.performance.DebugPerformanceMonitor
 import com.letta.mobile.performance.ProductionJankStatsMonitor
+import dagger.Lazy
 import dagger.hilt.android.HiltAndroidApp
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -42,6 +46,12 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
 
     @Inject
     lateinit var crashReporter: CrashReporter
+
+    @Inject
+    lateinit var settingsRepository: Lazy<SettingsRepository>
+
+    @Inject
+    lateinit var clientModeController: Lazy<ClientModeController>
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -76,6 +86,12 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
         channelNotificationPublisher.ensureChannel()
         if (isRobolectricRuntime()) {
             return
+        }
+        clientModeController.get().initialize()
+        runCatching {
+            AutomationAuthBootstrap.importPendingConfig(this, settingsRepository.get())
+        }.onFailure { error ->
+            Log.w("LettaApp", "Skipping automation auth bootstrap", error)
         }
         runCatching {
             ProductionJankStatsMonitor.install(this)

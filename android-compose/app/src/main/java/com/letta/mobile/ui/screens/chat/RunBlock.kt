@@ -1,11 +1,6 @@
 package com.letta.mobile.ui.screens.chat
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -95,10 +90,27 @@ fun RunBlock(
     }
 
     val gutterColor = MaterialTheme.colorScheme.outlineVariant
-    val visibleCount = if (collapsed) 1 else messages.size
-    val hiddenCount = messages.size - visibleCount
+    val hiddenCount = if (collapsed) messages.size - 1 else 0
 
-    Column(modifier = modifier.fillMaxWidth().animateContentSize()) {
+    // letta-mobile-d2z6 follow-up: kept the outer animateContentSize so
+    // stream-end (final message addition) settles smoothly instead of
+    // popping. Removing it caused a visible duplicate-flash as the prior
+    // tail's GroupPosition flipped from Last → Middle when the new tail
+    // arrived. The inner AnimatedVisibility was removed (we render the
+    // visible set uniformly now) so the previous animation stack is no
+    // longer in play.
+    //
+    // letta-mobile-5e0f.r2: suppress animateContentSize during pinch so
+    // we don't get cascading 150ms height interpolations across many
+    // bubbles per pinch frame. The animation is still useful for its
+    // intended trigger (stream-end / new-tail arrival), and that trigger
+    // is impossible during a pinch.
+    val isPinching = com.letta.mobile.ui.theme.LocalChatIsPinching.current
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (isPinching) Modifier else Modifier.animateContentSize()),
+    ) {
         RunHeader(
             messageCount = messages.size,
             collapsed = collapsed,
@@ -114,42 +126,45 @@ fun RunBlock(
                     .fillMaxWidth()
                     .padding(start = 0.dp),
             ) {
-                AnimatedVisibility(
-                    visible = !collapsed,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically(),
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        val nonTail = messages.dropLast(1)
-                        nonTail.forEachIndexed { idx, msg ->
-                            val pos = when (idx) {
-                                0 -> GroupPosition.First
-                                else -> GroupPosition.Middle
-                            }
-                            RunStepRow(
-                                message = msg,
-                                position = pos,
-                                gutterColor = gutterColor,
-                                drawLineAbove = idx > 0,
-                                drawLineBelow = true,
-                                renderRow = renderRow,
-                            )
+                // letta-mobile-d2z6: render *all* messages inside a single
+                // expand/collapse container. Previously the tail (last
+                // message) was drawn outside the AnimatedVisibility so it
+                // remained visible when collapsed. That arrangement caused
+                // a structural swap mid-stream: when a new sibling landed,
+                // the previous tail jumped from the always-visible block
+                // into the AnimatedVisibility block, triggering a fresh
+                // expandVertically animation and the visible bubble
+                // movement Emmanuel reported. Treating "the visible set"
+                // uniformly removes that swap entirely — when collapsed we
+                // simply render only `messages.last()`; when expanded we
+                // render the whole run.
+                val visibleMessages = if (collapsed) {
+                    listOf(messages.last())
+                } else {
+                    messages
+                }
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    visibleMessages.forEachIndexed { idx, msg ->
+                        val pos = when {
+                            collapsed -> GroupPosition.None
+                            visibleMessages.size == 1 -> GroupPosition.None
+                            idx == 0 -> GroupPosition.First
+                            idx == visibleMessages.lastIndex -> GroupPosition.Last
+                            else -> GroupPosition.Middle
                         }
+                        val drawLineAbove = !collapsed && idx > 0
+                        val drawLineBelow = !collapsed && idx < visibleMessages.lastIndex
+                        RunStepRow(
+                            message = msg,
+                            position = pos,
+                            gutterColor = gutterColor,
+                            drawLineAbove = drawLineAbove,
+                            drawLineBelow = drawLineBelow,
+                            renderRow = renderRow,
+                            collapsedHiddenCount = if (collapsed && idx == visibleMessages.lastIndex) hiddenCount else 0,
+                        )
                     }
                 }
-
-                // The tail (most recent step in the run) always renders so
-                // the user can see the latest output even when collapsed.
-                val tail = messages.last()
-                RunStepRow(
-                    message = tail,
-                    position = if (collapsed) GroupPosition.None else GroupPosition.Last,
-                    gutterColor = gutterColor,
-                    drawLineAbove = !collapsed,
-                    drawLineBelow = false,
-                    renderRow = renderRow,
-                    collapsedHiddenCount = if (collapsed) hiddenCount else 0,
-                )
             }
         }
     }

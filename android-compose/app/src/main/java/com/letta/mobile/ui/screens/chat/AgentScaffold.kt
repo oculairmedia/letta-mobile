@@ -52,6 +52,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -111,7 +112,7 @@ fun AgentScaffold(
     onNavigateToSettings: (String) -> Unit,
     onNavigateToArchival: ((String) -> Unit)? = null,
     onNavigateToTools: (() -> Unit)? = null,
-    onSwitchConversation: ((String, String) -> Unit)? = null,
+    onSwitchConversation: ((String, String?) -> Unit)? = null,
     viewModel: AdminChatViewModel = hiltViewModel()
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -243,13 +244,13 @@ fun AgentScaffold(
             agentId = agentId,
             currentConversationId = conversationId,
             onDismiss = { showConversationPicker = false },
-            onConversationSelected = { convId ->
+            onConversationSelected = { action ->
                 showConversationPicker = false
-                onSwitchConversation?.invoke(agentId, convId)
+                onSwitchConversation?.invoke(agentId, action.conversationId)
             },
-            onNewConversation = {
+            onNewConversation = { action ->
                 showConversationPicker = false
-                onSwitchConversation?.invoke(agentId, "")
+                onSwitchConversation?.invoke(agentId, action.conversationId)
             },
         )
     }
@@ -1000,8 +1001,8 @@ private fun ConversationPickerSheet(
     agentId: String,
     currentConversationId: String?,
     onDismiss: () -> Unit,
-    onConversationSelected: (String) -> Unit,
-    onNewConversation: () -> Unit,
+    onConversationSelected: (ConversationSwitchAction) -> Unit,
+    onNewConversation: (ConversationSwitchAction) -> Unit,
 ) {
     val viewModel = hiltViewModel<ConversationPickerViewModel>()
     val conversationRepo = viewModel.conversationRepository
@@ -1009,17 +1010,37 @@ private fun ConversationPickerSheet(
     val selectedIds by viewModel.selectedIds.collectAsStateWithLifecycle()
     val isSelectionMode = selectedIds.isNotEmpty()
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var isDismissingForAction by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
     val selectionColors = MaterialTheme.customColors
+
+    fun dismissThen(action: () -> Unit) {
+        if (isDismissingForAction) return
+        isDismissingForAction = true
+        scope.launch { sheetState.hide() }.invokeOnCompletion {
+            if (!sheetState.isVisible) {
+                action()
+                viewModel.clearSelection()
+                onDismiss()
+            } else {
+                isDismissingForAction = false
+            }
+        }
+    }
 
     LaunchedEffect(agentId) {
         conversationRepo.refreshConversations(agentId)
     }
 
-    ModalBottomSheet(onDismissRequest = {
-        viewModel.clearSelection()
-        onDismiss()
-    }) {
+    ModalBottomSheet(
+        sheetState = sheetState,
+        onDismissRequest = {
+            viewModel.clearSelection()
+            onDismiss()
+        },
+    ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1050,7 +1071,12 @@ private fun ConversationPickerSheet(
             Spacer(modifier = Modifier.height(8.dp))
 
             OutlinedButton(
-                onClick = onNewConversation,
+                onClick = {
+                    dismissThen {
+                        onNewConversation(ConversationSwitchAction.NewConversation)
+                    }
+                },
+                enabled = !isDismissingForAction,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(LettaIcons.Add, contentDescription = null, modifier = Modifier.size(LettaIconSizing.Toolbar))
@@ -1088,7 +1114,11 @@ private fun ConversationPickerSheet(
                                         if (isSelectionMode) {
                                             viewModel.toggleSelection(conversation.id)
                                         } else {
-                                            onConversationSelected(conversation.id)
+                                            dismissThen {
+                                                onConversationSelected(
+                                                    ConversationSwitchAction.ExistingConversation(conversation.id)
+                                                )
+                                            }
                                         }
                                     },
                                     onLongClick = {
@@ -1148,14 +1178,25 @@ private fun ConversationPickerSheet(
                 agentId = agentId,
                 activeConversationId = currentConversationId,
                 onActiveDeleted = {
-                    onDismiss()
-                    onNewConversation()
+                    dismissThen {
+                        onNewConversation(ConversationSwitchAction.NewConversation)
+                    }
                 },
             )
         },
         onDismiss = { showDeleteConfirm = false },
         destructive = true,
     )
+}
+
+sealed interface ConversationSwitchAction {
+    val conversationId: String?
+
+    data object NewConversation : ConversationSwitchAction {
+        override val conversationId: String? = null
+    }
+
+    data class ExistingConversation(override val conversationId: String) : ConversationSwitchAction
 }
 
 @HiltViewModel

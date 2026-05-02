@@ -25,6 +25,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object AllToolsRoute
 @Serializable data object UsageRoute
 @Serializable data object BotSettingsRoute
+@Serializable data object LettaBotConnectionRoute
 @Serializable data object ProjectsRoute
 @Serializable data object TelemetryRoute
 @Serializable data class BotConfigEditRoute(val configId: String? = null)
@@ -36,6 +37,7 @@ data class McpServerToolsRoute(val serverId: String)
 data class AgentChatRoute(
     val agentId: String,
     val conversationId: String? = null,
+    val freshRouteKey: Long? = null,
     val initialMessage: String? = null,
     val scrollToMessageId: String? = null,
     val projectIdentifier: String? = null,

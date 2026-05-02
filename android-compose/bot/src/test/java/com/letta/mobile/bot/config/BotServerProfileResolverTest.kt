@@ -12,7 +12,13 @@ class BotServerProfileResolverTest : WordSpec({
             val profileStore = FakeBotServerProfileStore(
                 storedProfiles = listOf(
                     BotServerProfile(id = "active", displayName = "Active", baseUrl = "https://active.example", isActive = true),
-                    BotServerProfile(id = "selected", displayName = "Selected", baseUrl = "https://selected.example", isActive = false),
+                    BotServerProfile(
+                        id = "selected",
+                        displayName = "Selected",
+                        baseUrl = "https://selected.example",
+                        transport = BotConfig.Transport.WS,
+                        isActive = false,
+                    ),
                 )
             )
             val resolver = BotServerProfileResolver(profileStore)
@@ -30,6 +36,7 @@ class BotServerProfileResolverTest : WordSpec({
 
             resolved!!.profileId shouldBe "selected"
             resolved.baseUrl shouldBe "https://selected.example"
+            resolved.transport shouldBe BotConfig.Transport.WS
         }
 
         "fall back to active profile when explicit profile is absent" {
@@ -52,6 +59,7 @@ class BotServerProfileResolverTest : WordSpec({
 
             resolved!!.profileId shouldBe "active"
             resolved.authToken shouldBe "token"
+            resolved.transport shouldBe BotConfig.Transport.HTTP
         }
 
         "fall back to inline remote config when no saved profile exists" {
@@ -65,6 +73,7 @@ class BotServerProfileResolverTest : WordSpec({
                         mode = BotConfig.Mode.REMOTE,
                         remoteUrl = "https://inline.example",
                         remoteToken = "inline-token",
+                        transport = BotConfig.Transport.WS,
                     )
                 )
             }
@@ -72,6 +81,7 @@ class BotServerProfileResolverTest : WordSpec({
             resolved!!.profileId shouldBe null
             resolved.baseUrl shouldBe "https://inline.example"
             resolved.authToken shouldBe "inline-token"
+            resolved.transport shouldBe BotConfig.Transport.WS
         }
     }
 })

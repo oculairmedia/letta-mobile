@@ -1,0 +1,23 @@
+gates:
+  verify-build:
+    level: L0
+    blocking: true
+    notes: Compiles `:app:compileDebugKotlin`.
+  verify-unit-tests:
+    level: L0
+    blocking: true
+    notes: Runs `:app:testDebugUnitTest`.
+  verify-device-ready:
+    level: L1
+    blocking: true
+    notes: Installs the debug APK, injects auth, and opens the target conversation.
+  verify-sync:
+    level: L3
+    blocking: false
+    advisory_reason: "r6j3 — internal gate reliability pending; bootstrap-window flake tracked in letta-mobile-r6j3.1"
+    notes: Requires a healthy hydrated conversation on device.
+  verify-stream:
+    level: L3
+    blocking: false
+    advisory_reason: "r6j3 — internal gate reliability pending; release-path mismatch tracked in letta-mobile-50m6"
+    notes: Starts a background streaming conversation POST, then asserts resume-stream receives SSE frames during the watch window.

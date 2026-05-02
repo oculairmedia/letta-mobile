@@ -686,8 +686,95 @@ class TimelineSyncLoopTest {
             errorForGqz3,
         )
 
+scope.coroutineContext.job.cancel()
+    }
+
+    /**
+     * letta-mobile-qv6d regression test.
+     *
+     * Before the fix, the streamSubscriber idle backoff capped at
+     * STREAM_BACKOFF_MAX_MS (5s). With ChatPushService warming 20
+     * conversations on app start that produced ~4 RPS of background
+     * 400 traffic against letta.oculair.ca per device — the OkHttp
+     * dispatcher saturated and starved foreground SSE sends
+     * (Emmanuel's letta-mobile-kxsv hang on 2026-04-25).
+     *
+     * The fix splits the cap: clean closes still reset to 1s and re-cap
+     * at 5s (the STREAM_BACKOFF_MAX_MS field), but the idle path uses a
+     * separate STREAM_IDLE_BACKOFF_MAX_MS (90s).
+     *
+     * This test asserts that after a sustained idle stretch — five
+     * back-to-back ApiException(idle) returns — the most recent
+     * idle404 telemetry event reports a backoffMs > 5_000 (i.e. the
+     * 5s cap is no longer active on the idle ladder).
+     */
+    @Test
+    fun `idle backoff cap is well above the prior 5s cap`() = runTest {
+        com.letta.mobile.util.Telemetry.clear()
+
+        val api = AlwaysIdleApi()
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
+
+        val sync = TimelineSyncLoop(api, "conv-qv6d", scope)
+
+        // Drive the subscriber through ≥6 idle iterations on virtual time.
+        // Backoff doubles 1_000 → 2_000 → 4_000 → 8_000 → 16_000 → 32_000.
+        // After 6 iterations the next-scheduled backoff is well over the
+        // prior 5s cap. advanceTimeBy() is virtual, so no wall-clock wait.
+        repeat(6) {
+            testScheduler.advanceTimeBy(120_000)
+            testScheduler.runCurrent()
+        }
+
+        assertTrue(
+            "expected ≥ 6 stream calls under virtual time, saw ${api.streamCallCount}",
+            api.streamCallCount >= 6,
+        )
+
+        val events = com.letta.mobile.util.Telemetry.snapshot()
+        val backoffs = events
+            .filter {
+                it.tag == "TimelineSync" &&
+                    it.name == "streamSubscriber.idle404" &&
+                    (it.attrs["conversationId"] as? String) == "conv-qv6d"
+            }
+            .mapNotNull { it.attrs["backoffMs"] as? Long }
+
+        assertTrue(
+            "expected at least 5 idle404 events for conv-qv6d, saw ${backoffs.size}",
+            backoffs.size >= 5,
+        )
+        // Telemetry ring is newest-first.
+        val latest = backoffs.first()
+        assertTrue(
+            "idle backoff stuck at the prior 5s cap (latest=$latest). " +
+                "letta-mobile-qv6d regression — idle ladder must now reach the higher cap.",
+            latest > 5_000L,
+        )
+
         scope.coroutineContext.job.cancel()
     }
+}
+
+private class AlwaysIdleApi : MessageApi(mockk(relaxed = true)) {
+    @Volatile var streamCallCount: Int = 0
+
+    override suspend fun streamConversation(conversationId: String): ByteReadChannel {
+        streamCallCount++
+        throw ApiException(
+            400,
+            """{"detail":"No active runs found for conversation."}""",
+        )
+    }
+
+    override suspend fun listConversationMessages(
+        conversationId: String,
+        limit: Int?,
+        after: String?,
+        order: String?,
+    ): List<LettaMessage> = emptyList()
+}
 }
 
 /**

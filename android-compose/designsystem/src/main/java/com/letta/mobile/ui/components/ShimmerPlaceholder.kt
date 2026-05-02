@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -129,5 +130,50 @@ fun ShimmerGrid(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun ShimmerConversationList(
+    itemCount: Int = 8,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        repeat(itemCount) {
+            ShimmerConversationCard()
+        }
+    }
+}
+
+@Composable
+fun ShimmerConversationCard(
+    modifier: Modifier = Modifier,
+) {
+    val color = shimmerColor()
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        ShimmerBox(widthFraction = 0.7f, height = 16.dp)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(16.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(color)
+            )
+            ShimmerBox(widthFraction = 0.4f, height = 12.dp)
+        }
+        ShimmerBox(widthFraction = 0.25f, height = 10.dp)
     }
 }

@@ -52,13 +52,13 @@ fun rememberImageAttachmentPicker(
         // never delivered the result to this Composable's launcher — the
         // most likely cause is composition destruction across process
         // death while DocumentsUI was foreground (see letta-mobile-jng2).
-        Log.i(
-            "ChatComposerAttach",
-            "launcher.onResult uri=${if (uri == null) "<null>" else uri}",
-        )
+            Log.i(
+                "ChatComposerAttach",
+                "launcher.onResult uri=${if (uri == null) "<null>" else uri}",
+            )
         if (uri == null) {
             Telemetry.event(
-                "ChatComposer",
+                "ChatComposerAttach",
                 "attach.pickResult",
                 "result" to "cancelled",
             )
@@ -73,7 +73,7 @@ fun rememberImageAttachmentPicker(
             }.fold(
                 onSuccess = {
                     Telemetry.event(
-                        "ChatComposer",
+                        "ChatComposerAttach",
                         "attach.pickResult",
                         "result" to "decodedOk",
                         "mediaType" to it.mediaType,
@@ -83,11 +83,11 @@ fun rememberImageAttachmentPicker(
                 },
                 onFailure = {
                     val errorMessage = it.message ?: it.javaClass.simpleName
-                    Telemetry.event(
-                        "ChatComposer",
+                    Telemetry.error(
+                        "ChatComposerAttach",
                         "attach.pickResult",
+                        it,
                         "result" to "decodeFailed",
-                        "error" to errorMessage,
                     )
                     Log.w("ChatComposerAttach", "loadAndNormalize failed", it)
                     onError(errorMessage)
@@ -103,7 +103,7 @@ fun rememberImageAttachmentPicker(
             // about even when the result callback never fires.
             Log.i("ChatComposerAttach", "launcher.launch() picker=PickVisualMedia.ImageOnly")
             Telemetry.event(
-                "ChatComposer",
+                "ChatComposerAttach",
                 "attach.launch",
                 "picker" to "PickVisualMedia.ImageOnly",
             )

@@ -12,12 +12,14 @@ import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.MessageRepository
+import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.util.mapErrorToUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,7 +42,18 @@ data class AgentSettingsUiState(
     val tools: ImmutableList<Tool> = persistentListOf(),
     val secrets: Map<String, String> = emptyMap(),
     val isCloning: Boolean = false,
+    val clientModeEnabled: Boolean = false,
+    val clientModeBaseUrl: String = "",
+    val clientModeApiKey: String = "",
+    val clientModeConnectionState: ClientModeConnectionState = ClientModeConnectionState.Idle,
 )
+
+sealed interface ClientModeConnectionState {
+    data object Idle : ClientModeConnectionState
+    data object Testing : ClientModeConnectionState
+    data class Success(val testedAtMillis: Long) : ClientModeConnectionState
+    data class Failure(val message: String, val testedAtMillis: Long) : ClientModeConnectionState
+}
 
 @HiltViewModel
 class AgentSettingsViewModel @Inject constructor(
@@ -48,6 +61,8 @@ class AgentSettingsViewModel @Inject constructor(
     private val agentRepository: AgentRepository,
     private val blockRepository: BlockRepository,
     private val messageRepository: MessageRepository,
+    private val settingsRepository: SettingsRepository,
+    private val clientModeConnectionTester: ClientModeConnectionTester,
 ) : ViewModel() {
 
     private val agentId: String = savedStateHandle.get<String>("agentId")!!
@@ -139,6 +154,88 @@ class AgentSettingsViewModel @Inject constructor(
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
             _uiState.value = UiState.Success(currentState.copy(enableSleeptime = value))
+        }
+    }
+
+    fun updateClientModeEnabled(value: Boolean) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(
+            currentState.copy(
+                clientModeEnabled = value,
+                clientModeConnectionState = ClientModeConnectionState.Idle,
+            )
+        )
+    }
+
+    fun updateClientModeBaseUrl(value: String) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(
+            currentState.copy(
+                clientModeBaseUrl = value,
+                clientModeConnectionState = ClientModeConnectionState.Idle,
+            )
+        )
+    }
+
+    fun updateClientModeApiKey(value: String) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(
+            currentState.copy(
+                clientModeApiKey = value,
+                clientModeConnectionState = ClientModeConnectionState.Idle,
+            )
+        )
+    }
+
+    fun testClientModeConnection() {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        val baseUrl = currentState.clientModeBaseUrl.trim()
+        val apiKey = currentState.clientModeApiKey.trim().ifBlank { null }
+
+        if (baseUrl.isBlank()) {
+            _uiState.value = UiState.Success(
+                currentState.copy(
+                    clientModeConnectionState = ClientModeConnectionState.Failure(
+                        message = "Enter a server URL first",
+                        testedAtMillis = System.currentTimeMillis(),
+                    )
+                )
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            val startingState = (_uiState.value as? UiState.Success)?.data ?: return@launch
+            _uiState.value = UiState.Success(
+                startingState.copy(clientModeConnectionState = ClientModeConnectionState.Testing)
+            )
+
+            val result = clientModeConnectionTester.test(baseUrl = baseUrl, apiKey = apiKey)
+            val finishedState = (_uiState.value as? UiState.Success)?.data ?: return@launch
+            val timestamp = System.currentTimeMillis()
+            _uiState.value = UiState.Success(
+                finishedState.copy(
+                    clientModeConnectionState = result.fold(
+                        onSuccess = { ClientModeConnectionState.Success(timestamp) },
+                        onFailure = {
+                            val error = it as? Exception ?: RuntimeException(it.message ?: "Connection test failed", it)
+                            ClientModeConnectionState.Failure(
+                                message = mapErrorToUserMessage(error, "Connection test failed"),
+                                testedAtMillis = timestamp,
+                            )
+                        },
+                    )
+                )
+            )
+
+            delay(5_000)
+
+            val latestState = (_uiState.value as? UiState.Success)?.data ?: return@launch
+            if (latestState.clientModeConnectionState !is ClientModeConnectionState.Testing) {
+                _uiState.value = UiState.Success(
+                    latestState.copy(clientModeConnectionState = ClientModeConnectionState.Idle)
+                )
+            }
         }
     }
 

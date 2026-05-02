@@ -1,10 +1,11 @@
 package com.letta.mobile.ui.screens.chat
 
-import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.bot.protocol.BotAgentInfo
+import com.letta.mobile.bot.protocol.BotStreamChunk
+import com.letta.mobile.bot.protocol.BotStreamEvent
 import com.letta.mobile.bot.protocol.InternalBotClient
 import com.letta.mobile.data.mapper.toUiMessages
 import com.letta.mobile.data.model.AppMessage
@@ -12,6 +13,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.model.ProjectBugReport
+import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.MessageType
 import com.letta.mobile.data.repository.AgentRepository
@@ -37,13 +39,18 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
 @androidx.compose.runtime.Immutable
@@ -183,6 +190,25 @@ data class ChatUiState(
      */
     val pendingAttachments: ImmutableList<com.letta.mobile.data.model.MessageContentPart.Image> =
         persistentListOf(),
+    /**
+     * Surfaced when the LettaBot harness substituted a fresh conversation ID for
+     * the one we requested (i.e. our requested conv was unrecoverable on the
+     * gateway/SDK side, gateway opened a new conversation and reported it back
+     * via session_init). The original Letta-server timeline rows for the prior
+     * conversation remain visible; new client-mode turns persist under the new
+     * conversation. Dismissable. See `letta-mobile-c87t`.
+     */
+    val clientModeConversationSwap: ClientModeConversationSwap? = null,
+)
+
+/**
+ * Banner state for the gateway's conversation-substitution recovery path.
+ * Emitted by `AdminChatViewModel` when `session_init.conversation_id` differs
+ * from the conversation we asked the gateway to resume.
+ */
+data class ClientModeConversationSwap(
+    val requestedConversationId: String,
+    val newConversationId: String,
 )
 
 /** Upper bound on composer image attachments per message. */
@@ -204,6 +230,8 @@ class AdminChatViewModel @Inject constructor(
     private val conversationRepository: ConversationRepository,
     private val settingsRepository: SettingsRepository,
     private val internalBotClient: InternalBotClient,
+    private val clientModeChatSender: ClientModeChatSender,
+    private val chatRouteSessionResolver: ChatRouteSessionResolver,
     private val currentConversationTracker: com.letta.mobile.channel.CurrentConversationTracker,
 ) : ViewModel() {
     companion object {
@@ -211,14 +239,38 @@ class AdminChatViewModel @Inject constructor(
         private const val MESSAGE_SYNC_INTERVAL_MS = 5_000L
         private const val COLLAPSED_RUN_IDS_KEY = "collapsedRunIds"
         private const val EXPANDED_REASONING_MESSAGE_IDS_KEY = "expandedReasoningMessageIds"
+        private const val CLIENT_MODE_CONVERSATION_ID_KEY = "clientModeConversationId"
     }
 
     val agentId: String = savedStateHandle.get<String>("agentId")!!
     private val initialMessage: String? = savedStateHandle.get<String>("initialMessage")
+    private val requestedConversationArg: String? = savedStateHandle.get<String>("conversationId")
+    private val freshRouteKey: Long? = savedStateHandle.get<Long>("freshRouteKey")
+    private val routeState = chatRouteSessionResolver.routeState(
+        requestedConversationArg = requestedConversationArg,
+        freshRouteKey = freshRouteKey,
+    )
     val scrollToMessageId: String? = savedStateHandle.get<String>("scrollToMessageId")
+    private val explicitConversationId: String?
+        get() = routeState.explicitConversationId
+    private val isFreshRoute: Boolean
+        get() = routeState.isFreshRoute
+    // letta-mobile-c87t: previously this predicate was
+    //   clientModeEnabled.value && (isFreshRoute || explicitConversationId == null)
+    // which collapsed to "client mode only fires for fresh routes" — meaning any
+    // existing conversation silently bypassed Client Mode and went direct to Letta.
+    // The Client Mode toggle is global per Emmanuel's design; if it's on, ALL
+    // conversations should engage with the LettaBot harness. Existing conversations
+    // are resumed by passing the Letta conversation ID through to the gateway,
+    // which uses Letta Code SDK's resumeSession() to switch into them.
+    private val shouldUseClientModeForCurrentRoute: Boolean
+        get() = clientModeEnabled.value
     private val activeConversationId: String?
         get() = conversationManager.getActiveConversationId(agentId)
-    val conversationId: String? get() = activeConversationId
+    private val clientModeEnabled: StateFlow<Boolean> = settingsRepository.observeClientModeEnabled()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val conversationId: String?
+        get() = if (shouldUseClientModeForCurrentRoute) currentClientModeConversationId() else activeConversationId
     val projectContext: ProjectChatContext? = savedStateHandle.get<String>("projectIdentifier")?.let { identifier ->
         val name = savedStateHandle.get<String>("projectName") ?: identifier
         ProjectChatContext(
@@ -305,6 +357,48 @@ class AdminChatViewModel @Inject constructor(
 
     private var timelineObserverJob: kotlinx.coroutines.Job? = null
     private var timelineHydrateSignalJob: kotlinx.coroutines.Job? = null
+    private var clientModeStreamJob: Job? = null
+
+    /**
+     * letta-mobile-5s1n (regression fix): explicit "Client Mode stream in
+     * flight" flag, set BEFORE any timeline mutations and cleared after the
+     * stream coroutine's `finally`. Used by the timeline observer to know
+     * whether to preserve `isStreaming` / `isAgentTyping` across emissions.
+     *
+     * We can't rely on `clientModeStreamJob?.isActive`: with
+     * `UnconfinedTestDispatcher` (and equivalently fast main-thread
+     * dispatch in production), the launched coroutine begins running
+     * synchronously inside `viewModelScope.launch { ... }` and triggers
+     * observer emissions BEFORE the `clientModeStreamJob` assignment
+     * completes — leaving the field at its old (often null) value when
+     * the observer reads it.
+     */
+    @Volatile private var clientModeStreamInFlight: Boolean = false
+    /**
+     * letta-mobile-5s1n design note (Option A — retained narrow fallback):
+     *
+     * After 5s1n landed, Client Mode assistant streaming flows through
+     * [TimelineRepository.upsertClientModeLocalAssistantChunk] whenever a
+     * conversationId is known — i.e., always for existing-route entries, and
+     * for every chunk after the gateway's first conversationId echo on
+     * fresh-route entries. The bulk of the dual-write is gone.
+     *
+     * This field is retained as a narrow belt-and-suspenders fallback for
+     * fresh-route sends in the window between "user pressed send" and "gateway
+     * echoed a conversationId". In normal operation this window contains 0
+     * chunks (the gateway echoes on chunk #1) — but if it ever doesn't, the
+     * legacy in-memory path keeps the UI rendering instead of dropping
+     * content. As soon as a conversationId arrives, the optimistic user
+     * bubble is migrated into the timeline (see `migratedToTimeline` below)
+     * and subsequent chunks go through the timeline.
+     *
+     * Tracked as a follow-up under letta-mobile-5s1n-2: if dev-build
+     * telemetry on `Client Mode timeline upsert failed` and the legacy chunk
+     * handler shows zero hits across a meaningful window of real Client Mode
+     * sessions, this field and [handleClientModeStreamChunkLegacy] can be
+     * deleted in favour of a chunk-buffer-then-replay strategy.
+     */
+    private var clientModeMessages: List<UiMessage> = emptyList()
     // Conversation id the current observer job is bound to. Needed so we can
     // detect "same conversation, already observing" vs "user switched convs
     // and we must rebind" — fixing letta-mobile-nw2e, where the previous
@@ -312,9 +406,13 @@ class AdminChatViewModel @Inject constructor(
     private var timelineObserverConversationId: String? = null
 
     init {
-        savedStateHandle.get<String>("conversationId")
+        requestedConversationArg
             ?.takeIf { it.isNotBlank() }
             ?.let { conversationManager.setActiveConversation(agentId, it) }
+        if (isFreshRoute) {
+            setClientModeConversationId(null)
+            currentConversationTracker.setCurrent(null)
+        }
         if (agentId.isBlank()) {
             _uiState.value = _uiState.value.copy(error = "No agent selected")
         } else {
@@ -322,7 +420,24 @@ class AdminChatViewModel @Inject constructor(
                 collapsedRunIds = collapsedRunIds().toImmutableSet(),
                 expandedReasoningMessageIds = expandedReasoningMessageIds().toImmutableSet(),
             )
-            resolveConversationAndLoad()
+            viewModelScope.launch {
+                settingsRepository.observeClientModeEnabled()
+                    .distinctUntilChanged()
+                    .collect { enabled ->
+                        if (!enabled) {
+                            clientModeStreamJob?.cancel()
+                            clientModeStreamInFlight = false
+                            _uiState.update {
+                                it.copy(
+                                    isStreaming = false,
+                                    isAgentTyping = false,
+                                    error = null,
+                                )
+                            }
+                        }
+                        resolveConversationAndLoad()
+                    }
+            }
             if (projectContext != null) {
                 loadProjectAgents()
                 loadProjectBrief()
@@ -497,32 +612,106 @@ class AdminChatViewModel @Inject constructor(
             )
 
             try {
-                if (activeConversationId == null) {
-                    val resolvedConversationId = conversationManager.resolveAndSetActiveConversation(
+                val resolution = chatRouteSessionResolver.resolve(
+                    ChatConversationResolveRequest(
                         agentId = agentId,
-                        maxAgeMs = CONVERSATION_CACHE_TTL_MS,
+                        routeState = routeState,
+                        clientModeEnabled = shouldUseClientModeForCurrentRoute,
+                        activeConversationId = activeConversationId,
+                        savedClientModeConversationId = currentClientModeConversationId(),
+                        maxConversationAgeMs = CONVERSATION_CACHE_TTL_MS,
                     )
-                    if (resolvedConversationId != null) {
-                        android.util.Log.d("AdminChatViewModel", "Resolved to most recent conversation: $resolvedConversationId")
+                )
+                android.util.Log.w("AdminChatVM-DEBUG", "resolveConversationAndLoad: resolution=$resolution clientMode=$shouldUseClientModeForCurrentRoute streamInFlight=$clientModeStreamInFlight")
+                android.util.Log.w(
+                    "AdminChatVM-DEBUG",
+                    "resolveConversationAndLoad: prior convId=$explicitConversationId " +
+                        "savedClientModeConvId=${currentClientModeConversationId()} " +
+                        "activeConvId=$activeConversationId " +
+                        "timelineObserverConvId=$timelineObserverConversationId " +
+                        "timelineObserverJobActive=${timelineObserverJob?.isActive}",
+                )
+                if (shouldUseClientModeForCurrentRoute) {
+                    // letta-mobile-c87t (PR 2): when we have a Client Mode
+                    // conversationId, route through the timeline observer so
+                    // SSE-side persisted messages flow into the UI alongside
+                    // the optimistic CLIENT_MODE_HARNESS Locals from
+                    // appendClientModeLocal. Without this the chat would only
+                    // ever show in-memory bubbles and history wouldn't load.
+                    //
+                    // Resolution order: explicit nav arg → saved-state-handle
+                    // pointer. Fresh routes that haven't sent yet have neither
+                    // and stay on the in-memory path until the gateway
+                    // provides one (see sendMessageViaClientMode migration).
+                    val clientConversationId = (resolution as? ChatConversationResolution.Ready)
+                        ?.conversationId
+                        ?.also { resolvedConversationId ->
+                            if (explicitConversationId == null && currentClientModeConversationId() == null) {
+                                setClientModeConversationId(resolvedConversationId)
+                            }
+                        }
+                    currentConversationTracker.setCurrent(clientConversationId)
+                    val agent = agentRepository.getCachedAgent(agentId)
+                        ?: runCatching { agentRepository.getAgent(agentId).first() }.getOrNull()
+                    if (clientConversationId != null) {
+                        // Make sure the observer is running for this conv;
+                        // it'll repopulate _uiState.messages on first emission.
+                        startTimelineObserver(clientConversationId)
+                        _uiState.value = _uiState.value.copy(
+                            agentName = agent?.name ?: _uiState.value.agentName,
+                            conversationState = ConversationState.Ready(clientConversationId),
+                            // Don't write messages here — the timeline observer
+                            // is the source of truth.
+                            isLoadingOlderMessages = false,
+                            hasMoreOlderMessages = false,
+                            isStreaming = false,
+                            isAgentTyping = false,
+                            error = null,
+                        )
+                    } else {
+                        // Fresh route or no fallback conversation — keep the in-memory path.
+                        stopTimelineObserver()
+                        _uiState.value = _uiState.value.copy(
+                            agentName = agent?.name ?: _uiState.value.agentName,
+                            conversationState = ConversationState.NoConversation,
+                            messages = clientModeMessages.toImmutableList(),
+                            isLoadingMessages = false,
+                            isLoadingOlderMessages = false,
+                            hasMoreOlderMessages = false,
+                            isStreaming = false,
+                            isAgentTyping = false,
+                            error = null,
+                        )
                     }
+                    initialMessage?.let { message ->
+                        if (message.isNotBlank()) {
+                            sendMessage(message)
+                        }
+                    }
+                    return@launch
                 }
 
-                val conversationId = activeConversationId
-                if (conversationId == null) {
-                    _uiState.value = _uiState.value.copy(
-                        conversationState = ConversationState.NoConversation,
-                        messages = persistentListOf(),
-                        isLoadingMessages = false,
-                        isLoadingOlderMessages = false,
-                        hasMoreOlderMessages = false,
-                        error = null,
-                    )
-                } else {
-                    _uiState.value = _uiState.value.copy(
-                        conversationState = ConversationState.Ready(conversationId),
-                        error = null,
-                    )
-                    loadMessagesInternal()
+                when (resolution) {
+                    is ChatConversationResolution.Ready -> {
+                        _uiState.value = _uiState.value.copy(
+                            conversationState = ConversationState.Ready(resolution.conversationId),
+                            error = null,
+                        )
+                        loadMessagesInternal(resolution.conversationId)
+                    }
+
+                    ChatConversationResolution.FreshConversation,
+                    ChatConversationResolution.NoConversation,
+                    -> {
+                        _uiState.value = _uiState.value.copy(
+                            conversationState = ConversationState.NoConversation,
+                            messages = persistentListOf(),
+                            isLoadingMessages = false,
+                            isLoadingOlderMessages = false,
+                            hasMoreOlderMessages = false,
+                            error = null,
+                        )
+                    }
                 }
 
                 initialMessage?.let { message ->
@@ -548,28 +737,14 @@ class AdminChatViewModel @Inject constructor(
         }
     }
 
-    private suspend fun loadMessagesInternal() {
+    private suspend fun loadMessagesInternal(requestedConversationId: String) {
         val loadTimer = Telemetry.startTimer("AdminChatVM", "loadMessages")
-        val requestedConversationId = activeConversationId
-        if (requestedConversationId == null) {
-            if (requestedConversationId == activeConversationId) {
-                _uiState.value = _uiState.value.copy(
-                    conversationState = ConversationState.NoConversation,
-                    messages = persistentListOf(),
-                    isLoadingMessages = false,
-                    isLoadingOlderMessages = false,
-                    hasMoreOlderMessages = false,
-                    error = null,
-                )
-            }
-            loadTimer.stop("result" to "noConversation")
-            return
-        }
+        val currentConversationId = conversationId ?: explicitConversationId
         val cachedAgent = agentRepository.getCachedAgent(agentId)
         // Timeline is the source of truth — legacy cache is never read here.
         val cachedMessages = emptyList<AppMessage>()
         if (cachedAgent != null || cachedMessages.isNotEmpty()) {
-            if (requestedConversationId == activeConversationId) {
+            if (requestedConversationId == currentConversationId) {
                 _uiState.value = _uiState.value.copy(
                     agentName = cachedAgent?.name ?: _uiState.value.agentName,
                     messages = if (cachedMessages.isNotEmpty()) cachedMessages.toUiMessages().toImmutableList() else _uiState.value.messages,
@@ -578,13 +753,13 @@ class AdminChatViewModel @Inject constructor(
                 )
             }
         } else {
-            if (requestedConversationId == activeConversationId) {
+            if (requestedConversationId == currentConversationId) {
                 _uiState.value = _uiState.value.copy(isLoadingMessages = true)
             }
         }
         try {
             val agent = agentRepository.getAgent(agentId).first()
-            if (requestedConversationId != activeConversationId) {
+            if (requestedConversationId != (conversationId ?: explicitConversationId)) {
                 loadTimer.stop("result" to "staleConversation")
                 return
             }
@@ -609,7 +784,7 @@ class AdminChatViewModel @Inject constructor(
             )
         } catch (e: Exception) {
             loadTimer.stopError(e, "conversationId" to requestedConversationId)
-            if (requestedConversationId != activeConversationId) {
+            if (requestedConversationId != (conversationId ?: explicitConversationId)) {
                 return
             }
             _uiState.value = _uiState.value.copy(
@@ -622,11 +797,12 @@ class AdminChatViewModel @Inject constructor(
     }
 
     fun loadMessages() {
-        if (activeConversationId == null) {
+        if (!shouldUseClientModeForCurrentRoute && activeConversationId == null) {
             resolveConversationAndLoad()
             return
         }
-        viewModelScope.launch { loadMessagesInternal() }
+        val requestedConversationId = conversationId ?: explicitConversationId ?: return
+        viewModelScope.launch { loadMessagesInternal(requestedConversationId) }
     }
 
     fun retryConversationLoad() {
@@ -634,6 +810,7 @@ class AdminChatViewModel @Inject constructor(
     }
 
     fun loadOlderMessages() {
+        if (clientModeEnabled.value) return
         val conversationId = activeConversationId ?: return
         val currentState = _uiState.value
         if (
@@ -713,13 +890,800 @@ class AdminChatViewModel @Inject constructor(
         val attachments = _uiState.value.pendingAttachments.toList()
         if (text.isBlank() && attachments.isEmpty()) return
 
+        val isClientMode = shouldUseClientModeForCurrentRoute
         Telemetry.event(
             "AdminChatVM", "sendMessage.route",
-            "via" to "timeline",
+            "via" to if (isClientMode) "client_mode" else "timeline",
             "length" to text.length,
             "attachments" to attachments.size,
         )
+        if (isClientMode) {
+            if (attachments.isNotEmpty()) {
+                _uiState.value = _uiState.value.copy(
+                    composerError = "Client Mode attachments are not supported yet",
+                )
+                return
+            }
+            sendMessageViaClientMode(text)
+            return
+        }
         sendMessageViaTimeline(text, attachments)
+    }
+
+    private fun sendMessageViaClientMode(text: String) {
+        clientModeStreamJob?.cancel()
+        // letta-mobile-5s1n (regression fix): mark stream in flight BEFORE
+        // launching, so observer emissions inside the launch (which run
+        // synchronously on UnconfinedTestDispatcher / immediate main) see
+        // the flag even before `clientModeStreamJob` is assigned.
+        clientModeStreamInFlight = true
+        clientModeStreamJob = viewModelScope.launch {
+            android.util.Log.w("AdminChatVM-DEBUG", "sendMessageViaClientMode: launch started")
+            val startedAt = java.time.Instant.now().toString()
+            val userMessageId = "client-user-${System.currentTimeMillis()}"
+            val assistantMessageId = "client-assistant-${System.currentTimeMillis()}"
+            // letta-mobile-c87t: when entering an existing-conversation route under
+            // Client Mode, prefer the route's conversationId arg so the gateway can
+            // resumeSession() into the matching Letta conversation. Fall back to
+            // the saved-state-handle pointer for cases where Client Mode set up the
+            // conversation itself (fresh-route entry continued in-place).
+            val priorConversationId = explicitConversationId ?: currentClientModeConversationId()
+            // Force-fresh only when the user genuinely entered a fresh-route nav
+            // (no conversation arg AND no in-flight saved-state pointer). For
+            // existing-route entries we want resume, not new.
+            val forceFreshConversation = isFreshRoute && priorConversationId == null
+            android.util.Log.w("AdminChatVM-DEBUG", "sendViaClientMode: priorConvId=$priorConversationId forceFresh=$forceFreshConversation isFreshRoute=$isFreshRoute explicitConvId=$explicitConversationId savedClientModeConvId=${currentClientModeConversationId()}")
+            // letta-mobile-c87t (PR 2): when we already know the
+            // conversationId, append the user bubble through the timeline so
+            // the SSE-side reconcile + fuzzy matcher (PR 1) can collapse it
+            // against the Letta-persisted echo. This activates the dormant
+            // CLIENT_MODE_HARNESS source path, gives 8cm8 the telemetry it
+            // needs, and removes the user-bubble dual-write that Meridian
+            // flagged.
+            //
+            // Fresh-route sends still use the in-memory path until the
+            // gateway returns a conversationId on the first chunk; at that
+            // point we migrate the user bubble into the timeline (see below).
+            currentConversationTracker.setCurrent(priorConversationId)
+            _inputText.value = ""
+            if (priorConversationId != null) {
+                // Stop any prior observer for a different conversation, then
+                // start one for this Client Mode conversation so the timeline
+                // becomes the source of truth for the message list.
+                val convId = priorConversationId
+                if (timelineObserverConversationId != convId) {
+                    stopTimelineObserver()
+                }
+                // letta-mobile-5s1n (regression fix): set the streaming flags
+                // BEFORE appending to the timeline. The observer flow re-emits
+                // synchronously on every timeline state change and reads
+                // `prev.isStreaming` to decide whether to preserve the in-flight
+                // signal (see startTimelineObserver). If we wrote `true` after
+                // the append, the observer would race ahead with the old
+                // `false`, clobber it, and the spinner would never show.
+                _uiState.value = _uiState.value.copy(
+                    isLoadingMessages = false,
+                    isLoadingOlderMessages = false,
+                    hasMoreOlderMessages = false,
+                    isStreaming = true,
+                    isAgentTyping = true,
+                    composerError = null,
+                    error = null,
+                    pendingAttachments = persistentListOf(),
+                    conversationState = ConversationState.Ready(convId),
+                )
+                runCatching {
+                    timelineRepository.appendClientModeLocal(
+                        conversationId = convId,
+                        content = text,
+                    )
+                }.onFailure { e ->
+                    android.util.Log.w(
+                        "AdminChatViewModel",
+                        "appendClientModeLocal failed; falling back to in-memory bubble",
+                        e,
+                    )
+                    // Fall back to the in-memory path so the user still sees
+                    // their bubble even if the timeline append fails.
+                    val fallback = clientModeMessages + UiMessage(
+                        id = userMessageId,
+                        role = "user",
+                        content = text,
+                        timestamp = startedAt,
+                    )
+                    clientModeMessages = fallback
+                    _uiState.value = _uiState.value.copy(messages = fallback.toImmutableList())
+                }
+                // Ensure observer is running so subsequent timeline state
+                // emissions (and the SSE-driven Confirmed echoes) reach the
+                // UI. Idempotent for the same conversationId.
+                startTimelineObserver(convId)
+            } else {
+                // Fresh-route: no conversationId yet; keep the in-memory path
+                // until the gateway echoes one, then migrate.
+                stopTimelineObserver()
+                val baseMessages = clientModeMessages
+                val nextMessages = baseMessages + UiMessage(
+                    id = userMessageId,
+                    role = "user",
+                    content = text,
+                    timestamp = startedAt,
+                )
+                clientModeMessages = nextMessages
+                _uiState.value = _uiState.value.copy(
+                    messages = nextMessages.toImmutableList(),
+                    isLoadingMessages = false,
+                    isLoadingOlderMessages = false,
+                    hasMoreOlderMessages = false,
+                    isStreaming = true,
+                    isAgentTyping = true,
+                    composerError = null,
+                    error = null,
+                    pendingAttachments = persistentListOf(),
+                    conversationState = ConversationState.NoConversation,
+                )
+            }
+
+            var latestConversationId = priorConversationId
+            // letta-mobile-c87t: track whether the gateway substituted a different
+            // conversation for the one we requested (recovery path). On the first
+            // chunk that carries a non-null conversationId, compare against
+            // priorConversationId; if it differs, emit a banner + propagate the
+            // new ID to the nav saved-state-handle so a back-then-re-enter doesn't
+            // try to resume the dead requested ID again.
+            var swapEvaluated = false
+            // letta-mobile-hf93: track whether the gateway ever sent any
+            // user-visible payload (text, reasoning, or a tool event) for
+            // this turn. If the stream terminates with no payload — e.g. a
+            // gateway/upstream-agent error that produced only a result
+            // frame — we surface an error instead of silently flashing
+            // the typing indicator.
+            var sawAssistantPayload = false
+            // letta-mobile-5s1n: one-shot guard for the fresh-route migration
+            // from in-memory clientModeMessages → timeline. Already-known-conv
+            // sends skip migration (the bubble was appended to the timeline
+            // up-front in the priorConversationId-non-null branch above).
+            var migratedToTimeline = priorConversationId != null
+            try {
+                android.util.Log.w("AdminChatVM-DEBUG", "sendViaClientMode: calling streamMessage agentId=$agentId convId=$priorConversationId forceFresh=$forceFreshConversation")
+                clientModeChatSender.streamMessage(
+                    screenAgentId = agentId,
+                    text = text,
+                    existingConversationId = priorConversationId,
+                    isFreshRoute = forceFreshConversation,
+                ).collect { chunk ->
+                    android.util.Log.w("AdminChatVM-DEBUG", "sendViaClientMode: chunk received done=${chunk.done} event=${chunk.event} textLen=${chunk.text?.length} convId=${chunk.conversationId}")
+                    chunk.conversationId?.takeIf { it.isNotBlank() }?.let { conversationId ->
+                        latestConversationId = conversationId
+                        if (!swapEvaluated) {
+                            swapEvaluated = true
+                            // Substitution detected: gateway opened a fresh conversation
+                            // because our requested one was unrecoverable. Surface the
+                            // banner and update the nav arg so subsequent renavigations
+                            // pick up the new ID.
+                            if (priorConversationId != null && priorConversationId != conversationId) {
+                                _uiState.update { state ->
+                                    state.copy(
+                                        clientModeConversationSwap = ClientModeConversationSwap(
+                                            requestedConversationId = priorConversationId,
+                                            newConversationId = conversationId,
+                                        ),
+                                    )
+                                }
+                                savedStateHandle["conversationId"] = conversationId
+                            }
+                        }
+                    }
+                    if (!latestConversationId.isNullOrBlank()) {
+                        setClientModeConversationId(latestConversationId)
+                        currentConversationTracker.setCurrent(latestConversationId)
+                        // letta-mobile-5s1n: fresh-route migration. The first
+                        // time the gateway echoes a conversationId for a fresh
+                        // send, we move the optimistic user bubble into the
+                        // timeline (where assistant streaming will also write,
+                        // via handleClientModeStreamChunkViaTimeline) and start
+                        // the timeline observer so the UI sees Local + assistant
+                        // content uniformly. Idempotent — guarded by
+                        // `migratedToTimeline`.
+                        if (priorConversationId == null && !migratedToTimeline) {
+                            android.util.Log.w("AdminChatVM-DEBUG", "sendViaClientMode: fresh-route migration triggered, newConvId=$latestConversationId")
+                            migratedToTimeline = true
+                            val newConvId = latestConversationId
+                            if (newConvId != null) {
+                                runCatching {
+                                    timelineRepository.appendClientModeLocal(
+                                        conversationId = newConvId,
+                                        content = text,
+                                    )
+                                    // Drop the in-memory user bubble; the
+                                    // observer will render it as a Local.
+                                    clientModeMessages = clientModeMessages
+                                        .filterNot { it.id == userMessageId }
+                                    startTimelineObserver(newConvId)
+                                }.onFailure { e ->
+                                    android.util.Log.w(
+                                        "AdminChatViewModel",
+                                        "Fresh-route migration to timeline failed; staying in-memory",
+                                        e,
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // letta-mobile-hf93: count any payload-bearing chunk —
+                    // text, reasoning event, tool call/result — as an
+                    // assistant payload. Empty terminal frames don't count.
+                    if (chunkCarriesAssistantPayload(chunk)) {
+                        sawAssistantPayload = true
+                    }
+
+                    if (!chunk.done) {
+                        handleClientModeStreamChunk(
+                            chunk = chunk,
+                            assistantMessageId = assistantMessageId,
+                            timestamp = startedAt,
+                            conversationId = latestConversationId?.takeIf { it.isNotBlank() },
+                        )
+                        return@collect
+                    }
+
+                    handleClientModeStreamChunk(
+                        chunk = chunk,
+                        assistantMessageId = assistantMessageId,
+                        timestamp = startedAt,
+                        replaceAssistant = true,
+                        conversationId = latestConversationId?.takeIf { it.isNotBlank() },
+                    )
+
+                    // letta-mobile-hf93: a stream that completed without
+                    // any payload would otherwise look identical to a
+                    // dropped network round-trip — typing indicator
+                    // briefly flashes, then nothing. Surface an explicit
+                    // error so the user knows the round-trip happened.
+                    val terminalError = if (!sawAssistantPayload && !chunk.aborted) {
+                        "Agent returned no content. Try again or check the agent's status."
+                    } else {
+                        null
+                    }
+                    android.util.Log.w("AdminChatVM-DEBUG", "sendViaClientMode: stream completed done=true sawPayload=$sawAssistantPayload aborted=${chunk.aborted} terminalError=$terminalError latestConvId=$latestConversationId")
+
+                    _uiState.value = _uiState.value.copy(
+                        conversationState = latestConversationId?.let { ConversationState.Ready(it) }
+                            ?: ConversationState.NoConversation,
+                        isStreaming = false,
+                        isAgentTyping = false,
+                        error = terminalError ?: _uiState.value.error,
+                    )
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("AdminChatVM-DEBUG", "sendViaClientMode: EXCEPTION in stream", e)
+                _uiState.value = _uiState.value.copy(
+                    conversationState = latestConversationId?.let { ConversationState.Ready(it) }
+                        ?: ConversationState.NoConversation,
+                    error = e.message ?: "Client Mode send failed",
+                    isStreaming = false,
+                    isAgentTyping = false,
+                )
+            } finally {
+                clientModeStreamInFlight = false
+                if (clientModeStreamJob?.isCancelled != false) {
+                    clientModeStreamJob = null
+                }
+            }
+        }
+    }
+
+    private fun handleClientModeStreamChunk(
+        chunk: BotStreamChunk,
+        assistantMessageId: String,
+        timestamp: String,
+        replaceAssistant: Boolean = false,
+        // letta-mobile-5s1n: when known, all assistant streaming flows through
+        // timelineRepository.upsertClientModeLocalAssistantChunk so the
+        // timeline is the single source of truth. Pre-conversationId chunks
+        // (rare; only the first chunk of a fresh-route send) keep the legacy
+        // in-memory path until the gateway echoes a conversationId.
+        conversationId: String? = null,
+    ) {
+        if (conversationId != null) {
+            handleClientModeStreamChunkViaTimeline(
+                chunk = chunk,
+                conversationId = conversationId,
+                assistantMessageId = assistantMessageId,
+                timestamp = timestamp,
+                replaceAssistant = replaceAssistant,
+            )
+            return
+        }
+        // letta-mobile-5s1n (Option A): Fresh-route, conversationId not yet
+        // known. Keep the in-memory path for this single chunk; the next
+        // chunk will carry conversationId (gateway always echoes by chunk #1
+        // in practice) and the migration block in sendMessageViaClientMode
+        // will move the optimistic state into the timeline. This branch is a
+        // belt-and-suspenders fallback — if it ever fires in production we
+        // want to know about it because it indicates the gateway delayed its
+        // conversationId echo, which would suggest the buffer-and-replay
+        // alternative (Option B) is needed.
+        com.letta.mobile.util.Telemetry.event(
+            "AdminChatVM", "clientMode.legacyChunkPath",
+            "event" to (chunk.event?.name ?: "null"),
+            "hasText" to (chunk.text != null),
+            level = com.letta.mobile.util.Telemetry.Level.WARN,
+        )
+        handleClientModeStreamChunkLegacy(
+            chunk = chunk,
+            assistantMessageId = assistantMessageId,
+            timestamp = timestamp,
+            replaceAssistant = replaceAssistant,
+        )
+    }
+
+    /**
+     * letta-mobile-5s1n: route a Client Mode assistant stream chunk through
+     * the timeline. Idempotent across repeat chunks for the same logical
+     * event (same localId), so calling repeatedly grows a single bubble
+     * rather than appending duplicates.
+     */
+    private fun handleClientModeStreamChunkViaTimeline(
+        chunk: BotStreamChunk,
+        conversationId: String,
+        assistantMessageId: String,
+        timestamp: String,
+        replaceAssistant: Boolean,
+    ) {
+        val sentAt = runCatching { java.time.Instant.parse(timestamp) }
+            .getOrDefault(java.time.Instant.now())
+        when (chunk.event) {
+            BotStreamEvent.REASONING -> {
+                val localId = "cm-reason-${chunk.uuid ?: assistantMessageId}"
+                // letta-mobile-lv3e (REVERTS letta-mobile-vu6a): reasoning
+                // chunks are deltas, same as assistant text. Append, don't
+                // replace. Defensive snapshot-shape detection mirrors the
+                // TimelineSyncLoop merge so we won't double-concat if the
+                // gateway ever changes shape.
+                val delta = chunk.text.orEmpty()
+                viewModelScope.launch {
+                    runCatching {
+                        timelineRepository.upsertClientModeLocalAssistantChunk(
+                            conversationId = conversationId,
+                            localId = localId,
+                            build = {
+                                com.letta.mobile.data.timeline.TimelineEvent.Local(
+                                    position = 0.0, // upsert assigns nextLocalPosition
+                                    otid = localId,
+                                    content = "",
+                                    role = com.letta.mobile.data.timeline.Role.ASSISTANT,
+                                    sentAt = sentAt,
+                                    deliveryState = com.letta.mobile.data.timeline.DeliveryState.SENT,
+                                    source = com.letta.mobile.data.timeline.MessageSource.CLIENT_MODE_HARNESS,
+                                    messageType = com.letta.mobile.data.timeline.TimelineMessageType.REASONING,
+                                    reasoningContent = delta,
+                                )
+                            },
+                            transform = { existing ->
+                                val prior = existing.reasoningContent.orEmpty()
+                                // letta-mobile-wucn (timeline reasoning port):
+                                // same near-snapshot defense as the
+                                // assistant branch. Reasoning content is
+                                // also subject to server normalization.
+                                val merged = when {
+                                    delta.isEmpty() -> prior
+                                    delta == prior -> prior
+                                    delta.startsWith(prior) -> delta
+                                    prior.startsWith(delta) -> prior
+                                    delta.length >= 32 &&
+                                        delta.length >= prior.length / 2 -> {
+                                        android.util.Log.w(
+                                            "AdminChatViewModel",
+                                            "wucn-snapshot-recovery (timeline reasoning): " +
+                                                "chunk shaped like snapshot but failed strict " +
+                                                "prefix check. prior.len=${prior.length} " +
+                                                "chunk.len=${delta.length} localId=$localId. " +
+                                                "Falling back to longer-string replacement.",
+                                        )
+                                        if (delta.length >= prior.length) delta else prior
+                                    }
+                                    else -> prior + delta
+                                }
+                                existing.copy(
+                                    reasoningContent = merged,
+                                    messageType = com.letta.mobile.data.timeline.TimelineMessageType.REASONING,
+                                )
+                            },
+                        )
+                    }.onFailure { logTimelineUpsertFailure(it, "REASONING", localId) }
+                }
+            }
+
+            BotStreamEvent.TOOL_CALL,
+            BotStreamEvent.TOOL_RESULT,
+            -> {
+                // letta-mobile-lv3e (audit): wire contract for tool_call /
+                // tool_result is SNAPSHOT-shaped (NOT delta), unlike the
+                // assistant/reasoning text streams. The lettabot WS gateway
+                // (ws-gateway.ts:330-370) accumulates tool_call argument
+                // deltas server-side and flushes ONE complete tool_call
+                // event with fully-merged `toolInput` per tool invocation.
+                // tool_result is similarly emitted as a single frame with
+                // the complete `content` payload.
+                //
+                // Replace-not-append semantics here are correct given that
+                // contract: each frame fully describes the tool call. If
+                // the gateway ever changes to stream tool_input deltas
+                // directly (without server-side accumulation), this
+                // transform would silently keep only the LAST non-blank
+                // toolInput — same shape as the vu6a bug. The
+                // `arguments.ifBlank { existing }` fallback below preserves
+                // prior args if a follow-up frame omits them, which is
+                // the only documented variation.
+                val toolCallId = chunk.toolCallId ?: chunk.uuid ?: return
+                val localId = "cm-tool-$toolCallId"
+                val toolName = chunk.toolName ?: "tool"
+                val arguments = chunk.toolInput?.toString().orEmpty()
+                val isResult = chunk.event == BotStreamEvent.TOOL_RESULT
+                val resultText: String? = if (isResult) chunk.text else null
+                val resultIsError: Boolean = isResult && chunk.isError
+                viewModelScope.launch {
+                    runCatching {
+                        timelineRepository.upsertClientModeLocalAssistantChunk(
+                            conversationId = conversationId,
+                            localId = localId,
+                            build = {
+                                com.letta.mobile.data.timeline.TimelineEvent.Local(
+                                    position = 0.0,
+                                    otid = localId,
+                                    content = "",
+                                    role = com.letta.mobile.data.timeline.Role.ASSISTANT,
+                                    sentAt = sentAt,
+                                    deliveryState = com.letta.mobile.data.timeline.DeliveryState.SENT,
+                                    source = com.letta.mobile.data.timeline.MessageSource.CLIENT_MODE_HARNESS,
+                                    messageType = com.letta.mobile.data.timeline.TimelineMessageType.TOOL_CALL,
+                                    toolCalls = listOf(
+                                        com.letta.mobile.data.model.ToolCall(
+                                            id = toolCallId,
+                                            name = toolName,
+                                            arguments = arguments,
+                                        ),
+                                    ),
+                                    toolReturnContent = resultText,
+                                    toolReturnIsError = resultIsError,
+                                )
+                            },
+                            transform = { existing ->
+                                val existingTool = existing.toolCalls.firstOrNull()
+                                val mergedTool = com.letta.mobile.data.model.ToolCall(
+                                    id = existingTool?.id ?: toolCallId,
+                                    name = existingTool?.name ?: toolName,
+                                    arguments = arguments.ifBlank { existingTool?.arguments.orEmpty() },
+                                )
+                                existing.copy(
+                                    messageType = com.letta.mobile.data.timeline.TimelineMessageType.TOOL_CALL,
+                                    toolCalls = listOf(mergedTool),
+                                    toolReturnContent = resultText ?: existing.toolReturnContent,
+                                    toolReturnIsError = if (isResult) resultIsError else existing.toolReturnIsError,
+                                )
+                            },
+                        )
+                    }.onFailure { logTimelineUpsertFailure(it, "TOOL", localId) }
+                }
+            }
+
+            else -> {
+                // letta-mobile-lv3e (REVERTS letta-mobile-vu6a):
+                // BotStreamChunk.text is a DELTA — the gateway emits only
+                // the NEW fragment per frame, not the cumulative buffer.
+                // Verified via :cli:run wsstream against the real gateway:
+                // each frame's content is a fragment that must be APPENDED
+                // to the running bubble. vu6a's "snapshot semantics" was
+                // based on a synthetic test feeding ["Hel","Hello","Hello world"]
+                // and produced the user-visible "chunks replace each other"
+                // bug Emmanuel reported 2026-04-25.
+                //
+                // We still ignore empty/null text on the terminal frame so
+                // it doesn't append a no-op (or, worse, clobber via the
+                // empty-string path).
+                val delta = chunk.text?.takeIf { it.isNotEmpty() } ?: return
+                val localId = "cm-assist-$assistantMessageId"
+                viewModelScope.launch {
+                    runCatching {
+                        timelineRepository.upsertClientModeLocalAssistantChunk(
+                            conversationId = conversationId,
+                            localId = localId,
+                            build = {
+                                com.letta.mobile.data.timeline.TimelineEvent.Local(
+                                    position = 0.0,
+                                    otid = localId,
+                                    content = delta,
+                                    role = com.letta.mobile.data.timeline.Role.ASSISTANT,
+                                    sentAt = sentAt,
+                                    deliveryState = com.letta.mobile.data.timeline.DeliveryState.SENT,
+                                    source = com.letta.mobile.data.timeline.MessageSource.CLIENT_MODE_HARNESS,
+                                    messageType = com.letta.mobile.data.timeline.TimelineMessageType.ASSISTANT,
+                                )
+                            },
+                            transform = { existing ->
+                                // letta-mobile-aie.7 (scope wucn to
+                                // timeline-sync only): the WS streaming path
+                                // sees raw delta fragments from the gateway;
+                                // it does NOT see server-normalized
+                                // near-snapshots (those originate in the
+                                // upstream Letta SSE stream, which is
+                                // processed by TimelineSyncLoop where the
+                                // wucn heuristic still lives).
+                                //
+                                // The previous wucn copy on this path was
+                                // added defensively but was never required
+                                // by any observed gateway behaviour. With
+                                // server-side stream coalescing
+                                // (LETTABOT_COALESCE_ENABLED) batching ~140-
+                                // char text deltas, those batches have NO
+                                // prefix relationship to existing content
+                                // and would trip the >=32-char heuristic on
+                                // every batch after the first — silently
+                                // dropping or overwriting text. So we drop
+                                // the heuristic from this path.
+                                //
+                                // The three explicit prefix checks below
+                                // still cover the legitimate snapshot case
+                                // (gateway emitting a full content reissue
+                                // that exactly contains or extends our
+                                // accumulator) and idempotency. Anything
+                                // else is treated as an append, which is
+                                // the correct behaviour for delta streams,
+                                // including coalesced delta streams.
+                                val merged = when {
+                                    delta == existing.content -> existing.content
+                                    delta.startsWith(existing.content) -> delta
+                                    existing.content.startsWith(delta) -> existing.content
+                                    else -> existing.content + delta
+                                }
+                                existing.copy(
+                                    content = merged,
+                                    messageType = com.letta.mobile.data.timeline.TimelineMessageType.ASSISTANT,
+                                )
+                            },
+                        )
+                    }.onFailure { logTimelineUpsertFailure(it, "ASSISTANT", localId) }
+                }
+            }
+        }
+    }
+
+    /**
+     * letta-mobile-hf93: a chunk "carries assistant payload" when it has
+     * any user-visible content — non-empty text, a tool call/result, or
+     * (eventually) a non-empty reasoning frame. The terminal `done=true`
+     * frame on its own does NOT count, since WsBotClient emits one for
+     * every stream regardless of whether the upstream agent produced
+     * output.
+     */
+    private fun chunkCarriesAssistantPayload(chunk: BotStreamChunk): Boolean {
+        if (!chunk.text.isNullOrEmpty()) return true
+        return when (chunk.event) {
+            BotStreamEvent.TOOL_CALL,
+            BotStreamEvent.TOOL_RESULT,
+            BotStreamEvent.REASONING -> true
+            BotStreamEvent.ASSISTANT, null -> false
+        }
+    }
+
+    private fun logTimelineUpsertFailure(t: Throwable, kind: String, localId: String) {
+        android.util.Log.w(
+            "AdminChatViewModel",
+            "Client Mode timeline upsert failed (kind=$kind, localId=$localId)",
+            t,
+        )
+    }
+
+    /**
+     * Pre-conversationId fallback path. Used only for chunks that arrive
+     * before the gateway echoes a conversationId (typically only the very
+     * first chunk of a fresh-route send). Once a conversationId is known
+     * the rest of the stream flows through the timeline.
+     */
+    private fun handleClientModeStreamChunkLegacy(
+        chunk: BotStreamChunk,
+        assistantMessageId: String,
+        timestamp: String,
+        replaceAssistant: Boolean,
+    ) {
+        when (chunk.event) {
+            BotStreamEvent.REASONING -> {
+                val messageId = chunk.uuid ?: "client-reasoning-${System.currentTimeMillis()}"
+                // letta-mobile-lv3e (REVERTS letta-mobile-vu6a): legacy
+                // path also receives DELTAS — append, not replace. Same
+                // defensive snapshot-shape guard as the timeline path.
+                val delta = chunk.text.orEmpty()
+                upsertClientModeMessage(
+                    messageId = messageId,
+                    timestamp = timestamp,
+                ) { existing ->
+                    val prior = existing?.content.orEmpty()
+                    val merged = when {
+                        delta.isEmpty() -> prior
+                        delta == prior -> prior
+                        delta.startsWith(prior) -> delta
+                        prior.startsWith(delta) -> prior
+                        else -> prior + delta
+                    }
+                    (existing ?: UiMessage(
+                        id = messageId,
+                        role = "assistant",
+                        content = "",
+                        timestamp = timestamp,
+                        isReasoning = true,
+                    )).copy(
+                        content = merged,
+                        isReasoning = true,
+                    )
+                }
+            }
+
+            BotStreamEvent.TOOL_CALL,
+            BotStreamEvent.TOOL_RESULT,
+            -> {
+                val toolCallId = chunk.toolCallId ?: chunk.uuid ?: return
+                val messageId = "client-tool-$toolCallId"
+                val toolName = chunk.toolName ?: "tool"
+                val arguments = chunk.toolInput?.toString().orEmpty()
+                upsertClientModeMessage(
+                    messageId = messageId,
+                    timestamp = timestamp,
+                ) { existing ->
+                    val existingTool = existing?.toolCalls?.firstOrNull()
+                    val result = when (chunk.event) {
+                        BotStreamEvent.TOOL_RESULT -> chunk.text ?: existingTool?.result
+                        else -> existingTool?.result
+                    }
+                    val status = when (chunk.event) {
+                        BotStreamEvent.TOOL_RESULT -> if (chunk.isError) "error" else "success"
+                        else -> existingTool?.status
+                    }
+                    UiMessage(
+                        id = messageId,
+                        role = "assistant",
+                        content = "",
+                        timestamp = existing?.timestamp ?: timestamp,
+                        toolCalls = listOf(
+                            UiToolCall(
+                                name = toolName,
+                                arguments = arguments.ifBlank { existingTool?.arguments.orEmpty() },
+                                result = result,
+                                status = status,
+                            )
+                        ),
+                    )
+                }
+            }
+
+            else -> {
+                // letta-mobile-lv3e (REVERTS letta-mobile-vu6a): legacy
+                // path receives DELTAS, not snapshots. Append each new
+                // fragment to the bubble. The defensive snapshot-shape
+                // guard inside upsertClientModeAssistantMessage handles
+                // any future protocol change.
+                chunk.text?.takeIf { it.isNotEmpty() }?.let { delta ->
+                    upsertClientModeAssistantMessage(
+                        messageId = assistantMessageId,
+                        timestamp = timestamp,
+                        content = delta,
+                        append = true,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun upsertClientModeAssistantMessage(
+        messageId: String,
+        timestamp: String,
+        content: String,
+        append: Boolean,
+    ) {
+        upsertClientModeMessage(
+            messageId = messageId,
+            timestamp = timestamp,
+        ) { existing ->
+            if (existing != null) {
+                // letta-mobile-lv3e: when append=true, defend against the
+                // gateway ever switching back to cumulative-snapshot shape
+                // — same heuristic TimelineSyncLoop:1132-1138 uses for the
+                // SSE merge.
+                //
+                // letta-mobile-wucn: harden the heuristic. Observed bug:
+                // bubble rendered final message twice (byte-for-byte
+                // identical content concatenated to itself in a single
+                // UiMessage). Root cause inferred: gateway emitted a
+                // closing/final assistant chunk whose content was a
+                // near-snapshot of the streamed accumulator but failed
+                // strict prefix check (e.g. server-side whitespace or
+                // quote normalization). The strict startsWith branches
+                // missed it and we fell through to existing.content +
+                // content = doubled bubble.
+                //
+                // New defensive rule: if the incoming `content`'s length
+                // is >= 50% of `existing.content` length AND >= 32 chars,
+                // treat it as a snapshot replacement candidate, not a
+                // delta. True streaming deltas are always small (single
+                // token, typically < 50 chars). A "delta" that's half
+                // the size of everything we've accumulated so far is
+                // overwhelmingly more likely a snapshot than a real
+                // append. Picking max(existing.content, content) is the
+                // safe replacement — never loses content, never doubles.
+                val merged = if (append) {
+                    when {
+                        content.isEmpty() -> existing.content
+                        content == existing.content -> existing.content
+                        content.startsWith(existing.content) -> content
+                        existing.content.startsWith(content) -> existing.content
+                        // wucn defensive: snapshot-shaped chunk with
+                        // mid-string divergence (e.g. server-normalized
+                        // punctuation). Prefer the longer string; never
+                        // concatenate a near-snapshot onto its own
+                        // accumulator.
+                        content.length >= 32 &&
+                            content.length >= existing.content.length / 2 -> {
+                            android.util.Log.w(
+                                "AdminChatViewModel",
+                                "wucn-snapshot-recovery: chunk shaped " +
+                                    "like snapshot but failed strict prefix " +
+                                    "check. existing.len=${existing.content.length} " +
+                                    "chunk.len=${content.length} " +
+                                    "messageId=$messageId. Falling back to " +
+                                    "longer-string replacement to avoid " +
+                                    "doubled-bubble.",
+                            )
+                            if (content.length >= existing.content.length) content else existing.content
+                        }
+                        else -> existing.content + content
+                    }
+                } else content
+                existing.copy(content = merged)
+            } else {
+                UiMessage(
+                    id = messageId,
+                    role = "assistant",
+                    content = content,
+                    timestamp = timestamp,
+                )
+            }
+        }
+    }
+
+    private fun upsertClientModeMessage(
+        messageId: String,
+        timestamp: String,
+        build: (UiMessage?) -> UiMessage,
+    ) {
+        val currentMessages = clientModeMessages.toMutableList()
+        val index = currentMessages.indexOfFirst { it.id == messageId }
+        val existing = currentMessages.getOrNull(index)
+        val next = build(existing)
+        if (index >= 0) {
+            currentMessages[index] = next.copy(timestamp = existing?.timestamp ?: timestamp)
+        } else {
+            currentMessages += next.copy(timestamp = next.timestamp.ifBlank { timestamp })
+        }
+        clientModeMessages = currentMessages
+        if (clientModeEnabled.value) {
+            _uiState.value = _uiState.value.copy(messages = currentMessages.toImmutableList())
+        }
+    }
+
+    private fun currentClientModeConversationId(): String? =
+        savedStateHandle.get<String>(CLIENT_MODE_CONVERSATION_ID_KEY)?.takeIf { it.isNotBlank() }
+
+    private fun setClientModeConversationId(conversationId: String?) {
+        savedStateHandle[CLIENT_MODE_CONVERSATION_ID_KEY] = conversationId?.takeIf { it.isNotBlank() }
+    }
+
+    private fun stopTimelineObserver() {
+        timelineObserverJob?.cancel()
+        timelineObserverJob = null
+        timelineHydrateSignalJob?.cancel()
+        timelineHydrateSignalJob = null
+        timelineObserverConversationId = null
     }
 
     fun reportComposerError(message: String) {
@@ -729,6 +1693,16 @@ class AdminChatViewModel @Inject constructor(
     fun clearComposerError() {
         if (_uiState.value.composerError == null) return
         _uiState.value = _uiState.value.copy(composerError = null)
+    }
+
+    /**
+     * Dismiss the conversation-substitution banner emitted when the gateway
+     * substituted a fresh conversation for the one we asked it to resume.
+     * See `letta-mobile-c87t` and [ClientModeConversationSwap].
+     */
+    fun dismissClientModeConversationSwap() {
+        if (_uiState.value.clientModeConversationSwap == null) return
+        _uiState.update { it.copy(clientModeConversationSwap = null) }
     }
 
     /**
@@ -866,11 +1840,23 @@ class AdminChatViewModel @Inject constructor(
      * left the UI locked onto the first-selected conversation's timeline.
      */
     private fun startTimelineObserver(conversationId: String) {
-        if (timelineObserverConversationId == conversationId &&
-            timelineObserverJob?.isActive == true
-        ) {
+        val convIdSame = timelineObserverConversationId == conversationId
+        val jobActive = timelineObserverJob?.isActive == true
+        if (convIdSame && jobActive) {
+            // letta-mobile-nw2e: also log why we're returning early so
+            // rotation-trigger repro has telemetry to correlate against.
+            android.util.Log.w(
+                "AdminChatVM-DEBUG",
+                "startTimelineObserver: SKIP (already observing conv=$conversationId " +
+                    "jobActive=$jobActive) timelineObserverConversationId=$timelineObserverConversationId",
+            )
             return
         }
+        android.util.Log.w(
+            "AdminChatVM-DEBUG",
+            "startTimelineObserver: START (convIdSame=$convIdSame jobActive=$jobActive) " +
+                "starting fresh observer for conv=$conversationId",
+        )
         // Conversation switch (or first bind): tear down any in-flight
         // subscriptions from the previous conversation before starting new
         // ones. Without this the hydrate-signal job would leak on every
@@ -897,7 +1883,13 @@ class AdminChatViewModel @Inject constructor(
             timelineHydrateSignalJob = viewModelScope.launch {
                 loop.events.collect { ev ->
                     when (ev) {
-                        is com.letta.mobile.data.timeline.TimelineSyncEvent.Hydrated,
+                        is com.letta.mobile.data.timeline.TimelineSyncEvent.Hydrated -> {
+                            android.util.Log.i(
+                                "AdminChatViewModel",
+                                "Timeline ready conv=$conversationId count=${ev.messageCount}",
+                            )
+                            _uiState.value = _uiState.value.copy(isLoadingMessages = false)
+                        }
                         is com.letta.mobile.data.timeline.TimelineSyncEvent.HydrateFailed -> {
                             _uiState.value = _uiState.value.copy(isLoadingMessages = false)
                         }
@@ -930,6 +1922,12 @@ class AdminChatViewModel @Inject constructor(
             try {
                 flow.collect { timeline ->
                     val live = timeline.events.mapNotNull { it.toUiMessageOrNull() }
+                    val prevMsgCount = _uiState.value.messages.size
+                    android.util.Log.w(
+                        "AdminChatVM-DEBUG",
+                        "timeline observer emit: convId=$conversationId " +
+                            "liveCount=${live.size} prevCount=$prevMsgCount",
+                    )
                     // Prepend any backfilled older pages for THIS conversation.
                     val (prefixConv, prefixList) = olderMessagesPrefix
                     val prefix = if (prefixConv == conversationId) prefixList else emptyList()
@@ -942,10 +1940,32 @@ class AdminChatViewModel @Inject constructor(
                         it is com.letta.mobile.data.timeline.TimelineEvent.Confirmed &&
                             it.messageType == com.letta.mobile.data.timeline.TimelineMessageType.ASSISTANT
                     }
-                    val anyLocalPending = timeline.events.any {
+                    // letta-mobile-5s1n (regression fix): derive streaming
+                    // flags from LETTA_SERVER Locals only. CLIENT_MODE_HARNESS
+                    // Locals are stamped SENT at append (the WS gateway is
+                    // the delivery authority — see TimelineSyncLoop.appendClientModeLocal),
+                    // so a `SENDING` predicate would always be false for
+                    // Client Mode flows and would erroneously clear the
+                    // spinner that `sendMessageViaClientMode` set.
+                    //
+                    // sendMessageViaClientMode owns isStreaming/isAgentTyping
+                    // for the Client Mode path end-to-end (sets true on
+                    // send, clears in the stream-complete `finally`). We
+                    // must NOT overwrite those flags from this observer —
+                    // we only contribute the LETTA_SERVER pending signal.
+                    val anyLettaServerLocalPending = timeline.events.any {
                         it is com.letta.mobile.data.timeline.TimelineEvent.Local &&
-                            it.deliveryState == com.letta.mobile.data.timeline.DeliveryState.SENDING
+                            it.deliveryState == com.letta.mobile.data.timeline.DeliveryState.SENDING &&
+                            it.source != com.letta.mobile.data.timeline.MessageSource.CLIENT_MODE_HARNESS
                     }
+                    // If a Client Mode stream is in flight, keep the flags
+                    // the send coroutine set; otherwise derive from server
+                    // pending (legacy optimistic-send semantics).
+                    // Prefer the explicit flag (set BEFORE the launch starts)
+                    // over `clientModeStreamJob?.isActive` because the launched
+                    // coroutine runs eagerly on Unconfined/main and triggers
+                    // observer emissions before the job assignment lands.
+                    val streamInFlight = clientModeStreamInFlight
                     // Any non-empty emission also implies hydrate succeeded.
                     val clearLoading = ui.isNotEmpty()
                     // letta-mobile-23h5 (regression fix 2026-04-19): the
@@ -964,12 +1984,17 @@ class AdminChatViewModel @Inject constructor(
                     // when fewer than PAGE_SIZE rows come back).
                     val newHasMoreOlder = if (anyConfirmed) true
                                           else _uiState.value.hasMoreOlderMessages
-                    _uiState.value = _uiState.value.copy(
+                    val prev = _uiState.value
+                    val nextIsStreaming = if (streamInFlight) prev.isStreaming
+                                          else anyLettaServerLocalPending
+                    val nextIsAgentTyping = if (streamInFlight) prev.isAgentTyping
+                                            else (anyLettaServerLocalPending && !tailIsAssistant)
+                    _uiState.value = prev.copy(
                         messages = ui,
                         isLoadingMessages = if (clearLoading) false
-                                           else _uiState.value.isLoadingMessages,
-                        isStreaming = anyLocalPending,
-                        isAgentTyping = anyLocalPending && !tailIsAssistant,
+                                           else prev.isLoadingMessages,
+                        isStreaming = nextIsStreaming,
+                        isAgentTyping = nextIsAgentTyping,
                         hasMoreOlderMessages = newHasMoreOlder,
                     )
                 }
@@ -1043,6 +2068,23 @@ class AdminChatViewModel @Inject constructor(
     }
 
     fun resetMessages() {
+        if (shouldUseClientModeForCurrentRoute) {
+            setClientModeConversationId(null)
+            clientModeMessages = emptyList()
+            currentConversationTracker.setCurrent(null)
+            stopTimelineObserver()
+            _uiState.value = _uiState.value.copy(
+                conversationState = ConversationState.NoConversation,
+                messages = persistentListOf(),
+                isLoadingMessages = false,
+                isLoadingOlderMessages = false,
+                hasMoreOlderMessages = false,
+                isStreaming = false,
+                isAgentTyping = false,
+                error = null,
+            )
+            return
+        }
         viewModelScope.launch {
             try {
                 val convId = activeConversationId ?: run {

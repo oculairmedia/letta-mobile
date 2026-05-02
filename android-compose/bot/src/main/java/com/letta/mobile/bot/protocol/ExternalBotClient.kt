@@ -70,13 +70,22 @@ class ExternalBotClient(
         when {
             response.status.value == 404 || response.status.value == 405 -> {
                 val chatResponse = sendMessage(request)
+                chatResponse.response.takeIf { it.isNotEmpty() }?.let { responseText ->
+                    emit(
+                        BotStreamChunk(
+                            text = responseText,
+                            conversationId = chatResponse.conversationId,
+                            agentId = chatResponse.agentId,
+                            event = BotStreamEvent.ASSISTANT,
+                        ).requireValidTerminalShape("ExternalBotClient fallback content frame")
+                    )
+                }
                 emit(
                     BotStreamChunk(
-                        text = chatResponse.response,
                         conversationId = chatResponse.conversationId,
                         agentId = chatResponse.agentId,
                         done = true,
-                    )
+                    ).requireValidTerminalShape("ExternalBotClient fallback terminal frame")
                 )
             }
 
@@ -85,7 +94,9 @@ class ExternalBotClient(
             }
 
             else -> {
-                BotSseParser.parse(response.bodyAsChannel()).collect { emit(it) }
+                BotSseParser.parse(response.bodyAsChannel()).collect {
+                    emit(it.requireValidTerminalShape("ExternalBotClient SSE stream"))
+                }
             }
         }
     }
@@ -95,7 +106,7 @@ class ExternalBotClient(
         if (response.status.value !in 200..299) {
             throw RuntimeException("Bot server error: ${response.status.value} ${response.bodyAsText()}")
         }
-        return response.body()
+        return BotStatusResponseParser.parse(json, json.parseToJsonElement(response.bodyAsText()))
     }
 
     override suspend fun listAgents(): List<BotAgentInfo> {

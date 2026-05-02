@@ -30,6 +30,11 @@ class InternalBotClient @Inject constructor(
                 text = chunk.text,
                 conversationId = chunk.conversationId ?: request.conversationId,
                 agentId = message.targetAgentId,
+                event = chunk.event,
+                toolName = chunk.toolName,
+                toolCallId = chunk.toolCallId,
+                toolInput = chunk.toolInput,
+                isError = chunk.isError,
                 done = chunk.isComplete,
             )
         }

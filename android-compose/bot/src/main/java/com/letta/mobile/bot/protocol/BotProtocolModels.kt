@@ -2,6 +2,25 @@ package com.letta.mobile.bot.protocol
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonEncoder
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.longOrNull
 
 @Serializable
 data class BotChatRequest(
@@ -12,6 +31,7 @@ data class BotChatRequest(
     @SerialName("sender_name") val senderName: String? = null,
     @SerialName("agent_id") val agentId: String? = null,
     @SerialName("conversation_id") val conversationId: String? = null,
+    @Transient val contentItems: List<BotMessageContentItem>? = null,
 )
 
 @Serializable
@@ -23,8 +43,9 @@ data class BotChatResponse(
 
 @Serializable
 data class BotStatusResponse(
-    val status: String,
-    val agents: List<String>,
+    val status: String = "ok",
+    @Serializable(with = BotStatusAgentsSerializer::class)
+    val agents: List<String> = emptyList(),
     @SerialName("session_count") val sessionCount: Int = 0,
     @SerialName("agent_details") val agentDetails: List<BotAgentInfo> = emptyList(),
     @SerialName("active_profile_ids") val activeProfileIds: List<String> = emptyList(),
@@ -35,6 +56,21 @@ data class BotStatusResponse(
     @SerialName("rate_limit_window_seconds") val rateLimitWindowSeconds: Long = 0,
 )
 
+fun BotStatusResponse.preferredAgent(preferredName: String = "LettaBot"): BotAgentInfo? {
+    if (agentDetails.isNotEmpty()) {
+        return agentDetails.firstOrNull { it.name == preferredName }
+            ?: agentDetails.first()
+    }
+
+    if (agents.isEmpty()) return null
+    val resolvedName = agents.firstOrNull { it == preferredName } ?: agents.first()
+    return BotAgentInfo(
+        id = resolvedName,
+        name = resolvedName,
+        status = status,
+    )
+}
+
 @Serializable
 data class BotAgentInfo(
     val id: String,
@@ -42,15 +78,228 @@ data class BotAgentInfo(
     val status: String,
 )
 
+object BotStatusAgentsSerializer : KSerializer<List<String>> {
+    private val listDelegate = ListSerializer(String.serializer())
+
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("BotStatusAgents")
+
+    override fun deserialize(decoder: Decoder): List<String> {
+        val jd = decoder as? JsonDecoder
+            ?: error("BotStatusAgentsSerializer only supports JSON")
+        val element = jd.decodeJsonElement()
+        return when (element) {
+            is JsonArray -> jd.json.decodeFromJsonElement(listDelegate, element)
+            is JsonObject -> element.keys.toList()
+            else -> emptyList()
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: List<String>) {
+        val je = encoder as? JsonEncoder
+            ?: error("BotStatusAgentsSerializer only supports JSON")
+        je.encodeSerializableValue(listDelegate, value)
+    }
+}
+
+object BotStatusResponseParser {
+    private val agentInfoListSerializer = ListSerializer(BotAgentInfo.serializer())
+
+    fun parse(json: kotlinx.serialization.json.Json, element: JsonElement): BotStatusResponse {
+        val obj = element as? JsonObject ?: return BotStatusResponse()
+        val agentsElement = obj["agents"]
+        val parsedAgents = parseAgentNames(json, agentsElement)
+        val parsedAgentDetails = parseAgentDetails(json, agentsElement)
+        val explicitAgentDetails = parseExplicitAgentDetails(json, obj["agent_details"])
+
+        return BotStatusResponse(
+            status = obj.stringValue("status") ?: "ok",
+            agents = parsedAgents,
+            sessionCount = obj.intValue("session_count") ?: 0,
+            agentDetails = explicitAgentDetails.ifEmpty { parsedAgentDetails },
+            activeProfileIds = obj.stringListValue(json, "active_profile_ids"),
+            activeModes = obj.stringListValue(json, "active_modes"),
+            apiPort = obj.intValue("api_port"),
+            authRequired = obj.booleanValue("auth_required") ?: false,
+            rateLimitRequests = obj.intValue("rate_limit_requests") ?: 0,
+            rateLimitWindowSeconds = obj.longValue("rate_limit_window_seconds") ?: 0L,
+        )
+    }
+
+    private fun parseAgentNames(
+        json: kotlinx.serialization.json.Json,
+        agentsElement: JsonElement?,
+    ): List<String> = when (agentsElement) {
+        is JsonArray -> json.decodeFromJsonElement(ListSerializer(String.serializer()), agentsElement)
+        is JsonObject -> agentsElement.keys.toList()
+        else -> emptyList()
+    }
+
+    private fun parseExplicitAgentDetails(
+        json: kotlinx.serialization.json.Json,
+        detailsElement: JsonElement?,
+    ): List<BotAgentInfo> = when (detailsElement) {
+        is JsonArray -> json.decodeFromJsonElement(agentInfoListSerializer, detailsElement)
+        else -> emptyList()
+    }
+
+    private fun parseAgentDetails(
+        json: kotlinx.serialization.json.Json,
+        agentsElement: JsonElement?,
+    ): List<BotAgentInfo> = when (agentsElement) {
+        is JsonObject -> agentsElement.mapNotNull { (name, value) ->
+            val details = value as? JsonObject ?: return@mapNotNull null
+            val id = details.stringValue("agentId")
+                ?: details.stringValue("agent_id")
+                ?: details.stringValue("id")
+                ?: return@mapNotNull null
+            BotAgentInfo(
+                id = id,
+                name = name,
+                status = details.stringValue("status") ?: "ready",
+            )
+        }
+
+        is JsonArray -> json.decodeFromJsonElement(agentInfoListSerializer, agentsElement)
+        else -> emptyList()
+    }
+
+    private fun JsonObject.stringListValue(
+        json: kotlinx.serialization.json.Json,
+        key: String,
+    ): List<String> = when (val element = this[key]) {
+        is JsonArray -> json.decodeFromJsonElement(ListSerializer(String.serializer()), element)
+        else -> emptyList()
+    }
+
+    private fun JsonObject.stringValue(key: String): String? =
+        (this[key] as? JsonPrimitive)?.contentOrNull
+
+    private fun JsonObject.intValue(key: String): Int? =
+        (this[key] as? JsonPrimitive)?.intOrNull
+
+    private fun JsonObject.longValue(key: String): Long? =
+        (this[key] as? JsonPrimitive)?.longOrNull
+
+    private fun JsonObject.booleanValue(key: String): Boolean? =
+        (this[key] as? JsonPrimitive)?.booleanOrNull
+}
+
+/**
+ * Streaming contract shared by bot protocol and app chat consumers.
+ *
+ * Event semantics:
+ * - [BotStreamEvent.ASSISTANT] and [BotStreamEvent.REASONING] emit delta-shaped
+ *   text fragments while [done] is false. Callers append or defensively merge
+ *   them into the running bubble.
+ * - [BotStreamEvent.TOOL_CALL] and [BotStreamEvent.TOOL_RESULT] are
+ *   snapshot-shaped while [done] is false. Each frame fully describes the
+ *   current tool payload/result for that event.
+ * - [done] frames are completion-only markers. They may carry terminal metadata
+ *   like [conversationId], [agentId], [requestId], and [aborted], but must not
+ *   replay user-visible content or event-specific payload.
+ */
 @Serializable
 data class BotStreamChunk(
     val text: String? = null,
     @SerialName("conversation_id") val conversationId: String? = null,
     @SerialName("agent_id") val agentId: String? = null,
+    val event: BotStreamEvent? = null,
+    @SerialName("tool_name") val toolName: String? = null,
+    @SerialName("tool_call_id") val toolCallId: String? = null,
+    @SerialName("tool_input") val toolInput: JsonElement? = null,
+    @SerialName("is_error") val isError: Boolean = false,
+    @SerialName("request_id") val requestId: String? = null,
+    val uuid: String? = null,
+    val aborted: Boolean = false,
     val done: Boolean = false,
-)
+) {
+    internal fun requireValidTerminalShape(context: String): BotStreamChunk {
+        if (!done) return this
+
+        require(text.isNullOrEmpty()) {
+            "$context emitted a terminal BotStreamChunk with text payload"
+        }
+        require(event == null) {
+            "$context emitted a terminal BotStreamChunk with event payload"
+        }
+        require(toolName == null && toolCallId == null && toolInput == null) {
+            "$context emitted a terminal BotStreamChunk with tool payload"
+        }
+        return this
+    }
+}
 
 @Serializable
 data class BotErrorResponse(
     val error: String,
+)
+
+@Serializable
+enum class BotStreamEvent {
+    /** Delta-shaped text fragment. */
+    @SerialName("assistant") ASSISTANT,
+    /** Snapshot-shaped tool invocation metadata. */
+    @SerialName("tool_call") TOOL_CALL,
+    /** Snapshot-shaped tool result payload. */
+    @SerialName("tool_result") TOOL_RESULT,
+    /** Delta-shaped reasoning fragment. */
+    @SerialName("reasoning") REASONING,
+}
+
+enum class ConnectionState {
+    CLOSED,
+    CONNECTING,
+    READY,
+    PROCESSING,
+    RECONNECTING,
+}
+
+enum class BotGatewayErrorCode {
+    AUTH_FAILED,
+    BAD_MESSAGE,
+    NO_SESSION,
+    SESSION_BUSY,
+    SESSION_INIT_FAILED,
+    STREAM_ERROR,
+}
+
+class BotGatewayException(
+    val code: BotGatewayErrorCode,
+    message: String,
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)
+
+@Serializable
+data class BotMessageContentItem(
+    val type: String,
+    val text: String? = null,
+    val source: BotMessageContentSource? = null,
+) {
+    companion object {
+        fun text(text: String): BotMessageContentItem = BotMessageContentItem(
+            type = "text",
+            text = text,
+        )
+
+        fun image(
+            base64: String,
+            mediaType: String,
+            sourceType: String = "base64",
+        ): BotMessageContentItem = BotMessageContentItem(
+            type = "image",
+            source = BotMessageContentSource(
+                type = sourceType,
+                mediaType = mediaType,
+                data = base64,
+            ),
+        )
+    }
+}
+
+@Serializable
+data class BotMessageContentSource(
+    val type: String = "base64",
+    @SerialName("media_type") val mediaType: String,
+    val data: String,
 )

@@ -13,18 +13,23 @@ import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.ModelRepository
+import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.util.mapErrorToUserMessage
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.ui.screens.settings.ClientModeConnectionState
+import com.letta.mobile.ui.screens.settings.ClientModeConnectionTester
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 import kotlinx.coroutines.flow.last
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -61,6 +66,10 @@ data class EditAgentUiState(
     val embeddingDim: Int? = null,
     val embeddingChunkSize: Int? = null,
     val isCloning: Boolean = false,
+    val clientModeEnabled: Boolean = false,
+    val clientModeBaseUrl: String = "",
+    val clientModeApiKey: String = "",
+    val clientModeConnectionState: ClientModeConnectionState = ClientModeConnectionState.Idle,
 ) {
     typealias BlockState = EditableBlock
 }
@@ -73,7 +82,44 @@ class EditAgentViewModel @Inject constructor(
     private val messageRepository: MessageRepository,
     private val modelRepository: ModelRepository,
     private val toolRepository: ToolRepository,
+    private val settingsRepository: SettingsRepository,
+    private val clientModeConnectionTester: ClientModeConnectionTester,
 ) : ViewModel() {
+
+    companion object {
+        private val supportedModelSettingsProviderTypes = setOf(
+            "openai",
+            "sglang",
+            "anthropic",
+            "google_ai",
+            "google_vertex",
+            "azure",
+            "xai",
+            "zai",
+            "groq",
+            "deepseek",
+            "together",
+            "bedrock",
+            "baseten",
+            "openrouter",
+            "chatgpt_oauth",
+        )
+
+        private fun normalizeModelSettingsProviderType(providerType: String?, modelHandle: String?): String? {
+            val normalizedProviderType = providerType?.trim()?.lowercase().orEmpty()
+            if (normalizedProviderType in supportedModelSettingsProviderTypes) {
+                return normalizedProviderType
+            }
+
+            val handleProvider = modelHandle
+                ?.substringBefore('/', missingDelimiterValue = "")
+                ?.trim()
+                ?.lowercase()
+                .orEmpty()
+
+            return handleProvider.takeIf { it in supportedModelSettingsProviderTypes }
+        }
+    }
 
     private val agentId: String = savedStateHandle.get<String>("agentId")!!
 
@@ -131,7 +177,14 @@ class EditAgentViewModel @Inject constructor(
                     ?: agent.llmConfig?.modelEndpointType
                     ?: agent.llmConfig?.providerName
                     ?: ""
-                originalProviderType = resolvedProviderType
+                val normalizedProviderType = normalizeModelSettingsProviderType(
+                    providerType = resolvedProviderType,
+                    modelHandle = agent.model ?: agent.llmConfig?.handle ?: agent.llmConfig?.model,
+                ).orEmpty()
+                val clientModeEnabled = settingsRepository.observeClientModeEnabled().first()
+                val clientModeBaseUrl = settingsRepository.observeClientModeBaseUrl().first()
+                val clientModeApiKey = settingsRepository.getClientModeApiKey().orEmpty()
+                originalProviderType = normalizedProviderType
                 _uiState.value = UiState.Success(
                     EditAgentUiState(
                         agent = agent,
@@ -145,7 +198,7 @@ class EditAgentViewModel @Inject constructor(
                         tags = agent.tags.toImmutableList(),
                         attachedTools = agent.tools.toImmutableList(),
                         availableTools = availableTools.toImmutableList(),
-                        providerType = resolvedProviderType,
+                        providerType = normalizedProviderType,
                         temperature = agent.modelSettings?.temperature?.toFloat() ?: agent.llmConfig?.temperature?.toFloat() ?: 1.0f,
                         maxOutputTokens = agent.modelSettings?.maxOutputTokens ?: agent.llmConfig?.maxTokens ?: 4096,
                         parallelToolCalls = agent.modelSettings?.parallelToolCalls ?: agent.llmConfig?.parallelToolCalls ?: true,
@@ -154,6 +207,9 @@ class EditAgentViewModel @Inject constructor(
                         agentType = agent.agentType ?: "",
                         embeddingDim = agent.embeddingConfig?.embeddingDim,
                         embeddingChunkSize = agent.embeddingConfig?.embeddingChunkSize,
+                        clientModeEnabled = clientModeEnabled,
+                        clientModeBaseUrl = clientModeBaseUrl,
+                        clientModeApiKey = clientModeApiKey,
                     )
                 )
             } catch (e: Exception) {
@@ -179,7 +235,23 @@ class EditAgentViewModel @Inject constructor(
     fun updateModel(value: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(model = value))
+            val selectedModel = llmModels.value.firstOrNull { model ->
+                model.handle.equals(value, ignoreCase = true) ||
+                    model.name.equals(value, ignoreCase = true) ||
+                    model.displayName.equals(value, ignoreCase = true)
+            }
+            val normalizedProviderType = selectedModel?.let { model ->
+                normalizeModelSettingsProviderType(
+                    providerType = model.providerType,
+                    modelHandle = model.handle ?: value,
+                )
+            }
+            _uiState.value = UiState.Success(
+                currentState.copy(
+                    model = selectedModel?.handle ?: value,
+                    providerType = normalizedProviderType.orEmpty(),
+                )
+            )
         }
     }
 
@@ -243,6 +315,17 @@ class EditAgentViewModel @Inject constructor(
                 loadAgent()
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(e.message ?: "Failed to attach block")
+            }
+        }
+    }
+
+    fun attachExistingBlocks(blockIds: List<String>) {
+        viewModelScope.launch {
+            try {
+                blockIds.forEach { blockRepository.attachBlock(agentId, it) }
+                loadAgent()
+            } catch (e: Exception) {
+                _uiState.value = UiState.Error(e.message ?: "Failed to attach blocks")
             }
         }
     }
@@ -314,6 +397,88 @@ class EditAgentViewModel @Inject constructor(
         }
     }
 
+    fun updateClientModeEnabled(value: Boolean) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(
+            currentState.copy(
+                clientModeEnabled = value,
+                clientModeConnectionState = ClientModeConnectionState.Idle,
+            )
+        )
+    }
+
+    fun updateClientModeBaseUrl(value: String) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(
+            currentState.copy(
+                clientModeBaseUrl = value,
+                clientModeConnectionState = ClientModeConnectionState.Idle,
+            )
+        )
+    }
+
+    fun updateClientModeApiKey(value: String) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(
+            currentState.copy(
+                clientModeApiKey = value,
+                clientModeConnectionState = ClientModeConnectionState.Idle,
+            )
+        )
+    }
+
+    fun testClientModeConnection() {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        val baseUrl = currentState.clientModeBaseUrl.trim()
+        val apiKey = currentState.clientModeApiKey.trim().ifBlank { null }
+
+        if (baseUrl.isBlank()) {
+            _uiState.value = UiState.Success(
+                currentState.copy(
+                    clientModeConnectionState = ClientModeConnectionState.Failure(
+                        message = "Enter a server URL first",
+                        testedAtMillis = System.currentTimeMillis(),
+                    )
+                )
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            val startingState = (_uiState.value as? UiState.Success)?.data ?: return@launch
+            _uiState.value = UiState.Success(
+                startingState.copy(clientModeConnectionState = ClientModeConnectionState.Testing)
+            )
+
+            val result = clientModeConnectionTester.test(baseUrl = baseUrl, apiKey = apiKey)
+            val finishedState = (_uiState.value as? UiState.Success)?.data ?: return@launch
+            val timestamp = System.currentTimeMillis()
+            _uiState.value = UiState.Success(
+                finishedState.copy(
+                    clientModeConnectionState = result.fold(
+                        onSuccess = { ClientModeConnectionState.Success(timestamp) },
+                        onFailure = {
+                            val error = it as? Exception ?: RuntimeException(it.message ?: "Connection test failed", it)
+                            ClientModeConnectionState.Failure(
+                                message = mapErrorToUserMessage(error, "Connection test failed"),
+                                testedAtMillis = timestamp,
+                            )
+                        },
+                    )
+                )
+            )
+
+            delay(5_000)
+
+            val latestState = (_uiState.value as? UiState.Success)?.data ?: return@launch
+            if (latestState.clientModeConnectionState !is ClientModeConnectionState.Testing) {
+                _uiState.value = UiState.Success(
+                    latestState.copy(clientModeConnectionState = ClientModeConnectionState.Idle)
+                )
+            }
+        }
+    }
+
     fun attachTool(toolId: String) {
         viewModelScope.launch {
             try {
@@ -321,6 +486,17 @@ class EditAgentViewModel @Inject constructor(
                 loadAgent()
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(e.message ?: "Failed to attach tool")
+            }
+        }
+    }
+
+    fun attachTools(toolIds: List<String>) {
+        viewModelScope.launch {
+            try {
+                toolIds.forEach { toolRepository.attachTool(agentId, it) }
+                loadAgent()
+            } catch (e: Exception) {
+                _uiState.value = UiState.Error(e.message ?: "Failed to attach tools")
             }
         }
     }
@@ -341,7 +517,21 @@ class EditAgentViewModel @Inject constructor(
             try {
                 val state = (_uiState.value as? UiState.Success)?.data ?: return@launch
                 val embeddingChanged = state.embedding != originalEmbedding
-                val providerTypeChanged = state.providerType != originalProviderType
+                val resolvedProviderType = normalizeModelSettingsProviderType(
+                    providerType = state.providerType,
+                    modelHandle = state.model,
+                )
+                    ?: normalizeModelSettingsProviderType(
+                        providerType = originalProviderType,
+                        modelHandle = state.model,
+                    )
+
+                if (resolvedProviderType == null) {
+                    _uiState.value = UiState.Error(
+                        "Couldn't determine a supported provider type for the selected model. Please re-select the model and try again."
+                    )
+                    return@launch
+                }
                 agentRepository.updateAgent(
                     agentId,
                     AgentUpdateParams(
@@ -353,7 +543,7 @@ class EditAgentViewModel @Inject constructor(
                         tags = state.tags,
                         enableSleeptime = state.enableSleeptime,
                         modelSettings = com.letta.mobile.data.model.ModelSettings(
-                            providerType = if (providerTypeChanged) state.providerType.ifBlank { null } else null,
+                            providerType = resolvedProviderType,
                             temperature = state.temperature.toDouble(),
                             maxOutputTokens = state.maxOutputTokens,
                             parallelToolCalls = state.parallelToolCalls,
@@ -379,6 +569,9 @@ class EditAgentViewModel @Inject constructor(
                         )
                     }
                 }
+                settingsRepository.setClientModeEnabled(state.clientModeEnabled)
+                settingsRepository.setClientModeBaseUrl(state.clientModeBaseUrl.trim())
+                settingsRepository.setClientModeApiKey(state.clientModeApiKey.trim().ifBlank { null })
                 onSuccess()
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(e.message ?: "Failed to save agent")

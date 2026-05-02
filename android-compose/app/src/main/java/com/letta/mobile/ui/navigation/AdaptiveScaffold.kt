@@ -1,9 +1,5 @@
 package com.letta.mobile.ui.navigation
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
@@ -30,13 +25,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -63,52 +55,23 @@ fun AdaptiveScaffold(
             content()
         }
     } else {
-        // Hide the bottom navigation while the keyboard is visible so the
-        // input field sits flush above the IME instead of floating over a
-        // dead gap where the nav used to be. The nav would otherwise stay
-        // at the bottom of the screen (windowSoftInputMode=adjustNothing +
-        // enableEdgeToEdge) while per-screen imePadding() lifts only the
-        // content, leaving a black void between the content bottom and
-        // the top of the IME.
-        val density = LocalDensity.current
-        val imeInsets = WindowInsets.ime
-        val isImeVisible by remember {
-            derivedStateOf { imeInsets.getBottom(density) > 0 }
-        }
+        val navBackStackEntry by navController.currentBackStackEntryAsState()
+        val currentDestination = navBackStackEntry?.destination
+        val isChatDestination = TopLevelDestination.CHAT.isSelected(currentDestination)
 
         Scaffold(
             modifier = modifier.fillMaxSize(),
             bottomBar = {
-                // Anchor the expand/shrink to the Bottom edge so the bar
-                // reveals by growing UPWARD from the bottom of the screen
-                // (its final resting edge) rather than appearing above
-                // its final slot and dropping down into place. On exit it
-                // shrinks back into the bottom edge.
-                AnimatedVisibility(
-                    visible = !isImeVisible,
-                    enter = expandVertically(
-                        expandFrom = Alignment.Bottom,
-                        animationSpec = tween(durationMillis = 150),
-                    ),
-                    exit = shrinkVertically(
-                        shrinkTowards = Alignment.Bottom,
-                        animationSpec = tween(durationMillis = 150),
-                    ),
-                ) {
-                    LettaBottomBar(navController = navController)
-                }
+                LettaBottomBar(navController = navController)
             },
             containerColor = MaterialTheme.colorScheme.surface,
         ) { innerPadding ->
-            // consumeWindowInsets(innerPadding) tells downstream imePadding()
-            // (used by Chat/Home screens) that the Scaffold has already
-            // accounted for the system navigationBars+bottomBar. Without this,
-            // imePadding() would also add navigationBars-worth of space on top
-            // of the Scaffold's own padding, producing a visible gap between
-            // the composer and the top of the keyboard.
             Box(
                 modifier = Modifier
-                    .padding(innerPadding)
+                    .padding(
+                        top = innerPadding.calculateTopPadding(),
+                        bottom = if (isChatDestination) 0.dp else innerPadding.calculateBottomPadding(),
+                    )
                     .consumeWindowInsets(innerPadding),
             ) {
                 content()

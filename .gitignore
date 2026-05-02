@@ -25,12 +25,15 @@ keystore.properties
 
 # Kotlin compiler error logs
 android-compose/.kotlin/
+android-compose/native/mermaid_renderer/target/
 
 # Letta local config
 .letta/
 
 # Generated reports
 LETTA_ADMIN_API_REPORT.md
+reports/*.md
+reports/*.json
 
 # Local performance traces
 scripts/perf/traces/*

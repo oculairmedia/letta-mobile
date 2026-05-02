@@ -13,6 +13,7 @@ import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.paging.AgentPagingSource
 import com.letta.mobile.data.repository.api.IAgentRepository
+import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -170,6 +171,38 @@ class AgentRepository @Inject constructor(
                 current.toMutableList().apply { this[index] = agent }
             } else {
                 current + agent
+            }
+        }
+    }
+
+    suspend fun checkpointAndRestoreConfig(
+        agentId: String,
+        operation: suspend () -> Unit
+    ) {
+        val agent = agentApi.getAgent(agentId)
+        val checkpoint = com.letta.mobile.data.model.AgentConfigCheckpoint.from(agent)
+        
+        try {
+            operation()
+        } finally {
+            val updatedAgent = agentApi.getAgent(agentId)
+            if (!checkpoint.matches(updatedAgent)) {
+                Log.w("AgentRepository", "Agent config drift detected after operation, restoring checkpoint")
+                Telemetry.event(
+                    "AgentRepository",
+                    "configDriftDetected",
+                    "agentId" to agentId,
+                    "originalModel" to checkpoint.model,
+                    "driftedModel" to updatedAgent.model,
+                    level = Telemetry.Level.WARN
+                )
+                updateAgent(agentId, checkpoint.toUpdateParams())
+                Telemetry.event(
+                    "AgentRepository",
+                    "configRestored",
+                    "agentId" to agentId,
+                    "restoredModel" to checkpoint.model
+                )
             }
         }
     }

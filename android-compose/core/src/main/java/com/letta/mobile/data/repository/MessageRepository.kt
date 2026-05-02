@@ -10,6 +10,7 @@ import com.letta.mobile.data.model.ApprovalCreate
 import com.letta.mobile.data.model.ApprovalResult
 import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.ApprovalResponseMessage
+import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.BatchMessagesResponse
 import com.letta.mobile.data.model.CreateBatchMessagesRequest
@@ -374,6 +375,22 @@ open class MessageRepository @Inject constructor(
                 summary = "Unknown message type",
                 detailLines = baseDetails,
             )
+            is ErrorMessage -> {
+                val extra = buildList<Pair<String, String>> {
+                    add("Error Text" to text)
+                    code?.let { add("Code" to it) }
+                }
+                ConversationInspectorMessage(
+                    id = id,
+                    messageType = messageType,
+                    date = date,
+                    runId = runId,
+                    stepId = stepId,
+                    otid = otid,
+                    summary = "Error: ${text.take(120)}",
+                    detailLines = baseDetails + extra,
+                )
+            }
             is StopReason -> {
                 val stopReason = this as StopReason
                 ConversationInspectorMessage(

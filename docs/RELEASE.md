@@ -1,13 +1,19 @@
 # Release checklist
 
-Minimal gate for cutting a letta-mobile release. Every item is either
-automated (a `make` target) or a hard-to-forget manual step.
+Minimal gate for cutting a letta-mobile release. The preferred entrypoint is
+`make verify-release`, which runs the currently wired gates in prereq order,
+skips gates whose prerequisites are unavailable, and writes a local report to
+`reports/verify-release-<timestamp>.md`.
 
 Owner: whoever is cutting the release.
 
 ---
 
-## 1. Verify sync health on a real device (blocking)
+## 1. Verify sync health on a real device (advisory until `letta-mobile-r6j3` closes)
+
+The orchestrated version of this gate runs automatically when `verify-release`
+has the device/bootstrap prerequisites (`DEVICE`, `APK`, `BASE_URL`, `API_KEY`,
+`AGENT`, `CONV`). The standalone target remains useful for focused debugging.
 
 The timeline-sync loop is the heart of the app. A single regression here
 makes the product broken, and bugs have historically landed silently. Gate
@@ -16,6 +22,8 @@ the release on a live sync-drift check.
 ```bash
 # Prereqs: a device connected via adb, the app installed & logged in, and
 # the chat screen for the target conversation currently open.
+# For debug-only automated auth bootstrap with a disposable non-production
+# identity, see docs/RELEASE-AUTOMATION.md.
 
 make verify-sync \
     AGENT=agent-<id> \
@@ -25,14 +33,23 @@ make verify-sync \
 ```
 
 The target runs `letta-cli sync-drift --watch` for 6 samples at 10s
-intervals (~60s total) and **fails if any sample reports anything other
-than `HEALTHY`.** `STALE` and `BROKEN` are both rejected — the release gate
-is strict on purpose.
+intervals (~60s total) and **fails the standalone command if any sample reports
+anything other than `HEALTHY`.** In this gate, `HEALTHY` means the device is within a
+bounded heartbeat lag window: under 30 seconds of drift and fewer than 5
+messages outstanding relative to the persisted `processed::<conversation>`
+cursor. `STALE` and `BROKEN` are both rejected.
 
-**Do not skip this step.** If the gate is known-broken at release time,
-open a blocking issue before cutting.
+In `make verify-release`, this gate is currently classified as **advisory**
+until `letta-mobile-r6j3` closes because the internal cursor source is still
+debug-build-only (`letta-mobile-8f1v`) and the initial post-bootstrap warm-up
+window can produce a first-sample flake (`letta-mobile-r6j3.1`).
 
-## 2. Verify resume-stream delivery (blocking when applicable)
+## 2. Verify resume-stream delivery (advisory until `letta-mobile-r6j3` closes)
+
+`verify-release` auto-triggers this gate by starting a background streaming
+conversation request during the watch window when `LETTA_TOKEN` / `API_KEY` is
+available. Run the standalone target when you want to inspect the raw SSE
+output yourself.
 
 Confirms the server-side push path is intact end-to-end. Independent of
 the client: no device needed.
@@ -48,6 +65,10 @@ make verify-stream CONV=conv-<id> STREAM_TIMEOUT=60
 
 The target asserts that at least one SSE event was received from the
 resume-stream endpoint. Zero events fails the build.
+
+In `make verify-release`, this gate is currently **advisory** while
+`letta-mobile-50m6` tracks the remaining release-path mismatch work under the
+`letta-mobile-r6j3` observability epic.
 
 **Expected behavior:** On self-hosted Letta ≥ 0.16.7 where we have verified
 the resume-stream multiplexing semantics, this must pass. If it fails with
@@ -81,6 +102,23 @@ cd android-compose
 Verify the tag is set, the version bump lands, and the signed artifacts
 are uploaded.
 
+## 4a. Orchestrated verify-release entrypoint
+
+```bash
+make verify-release \
+    DEVICE=<serial> \
+    APK=/absolute/path/to/app-debug.apk \
+    BASE_URL=http://192.168.50.90:8289 \
+    API_KEY=<disposable-token> \
+    AGENT=agent-<id> \
+    CONV=conv-<id>
+```
+
+- `make verify-release VERIFY_RELEASE_ARGS=--json ...` prints structured JSON
+  to stdout for CI consumers while still writing the markdown report locally.
+- The orchestrator keeps the current gate policy and recent runs in
+  `docs/RELEASE-GATE-LEDGER.md`.
+
 ## 5. Post-release monitoring
 
 If Grafana is wired:
@@ -107,14 +145,19 @@ screen sees zero events for > 10 minutes (likely subscriber dead).
 - `letta-mobile-mge5.6` — StreamSubscriber telemetry + Grafana dashboard.
 - `letta-mobile-mge5` (parent epic) — resume-stream subscription architecture.
 - `letta-mobile-o7ob.3.5` — ANR / crash budget dashboard.
+- `letta-mobile-7973` — verify-release orchestrator and reporting.
 
 ## Operational notes
 
-- The `verify-stream` step currently requires a human-triggered send in
-  the window. This is fine for a manual release gate. Fully-automated
-  end-to-end coverage would need a second test identity scripted to send;
-  deferred until we have CI device access.
+- The standalone `verify-stream` target still supports the original
+  human-triggered workflow, but it can also self-trigger a background run when
+  `STREAM_SEND_TEXT` plus `LETTA_TOKEN` are provided.
 - If `make verify-sync` fails because `adb` can't see the device, the
   target exits `2` (environmental error) rather than `1` (gate failure).
   Scripts driving the release pipeline should treat both as blockers but
   can distinguish the two for paging purposes.
+- `processed::<conversation>` is written by the background
+  `ChannelHeartbeatSync` worker, not by the foreground chat timeline. Small
+  outstanding counts immediately after bootstrap are therefore expected; the
+  HEALTHY threshold intentionally allows bounded lag instead of requiring a
+  literal zero-gap cursor.

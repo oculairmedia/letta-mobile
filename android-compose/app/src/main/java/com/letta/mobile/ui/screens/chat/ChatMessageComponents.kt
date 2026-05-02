@@ -7,6 +7,8 @@ import android.os.Build
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -66,6 +68,7 @@ import com.letta.mobile.ui.components.TextInputDialog
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LocalChatFontScale
+import com.letta.mobile.ui.theme.LocalChatIsPinching
 import com.letta.mobile.ui.theme.chatBubbleSender
 import com.letta.mobile.ui.theme.chatColors
 import com.letta.mobile.ui.theme.chatDimens
@@ -186,6 +189,9 @@ internal fun ChatMessageItem(
  * boundaries stay legible.
  */
 private fun UiMessage.shouldRenderBubbleLess(): Boolean {
+    // letta-mobile-5s1n: error frames must render with the error-container
+    // bubble chrome, never bubble-less.
+    if (isError) return false
     if (role != "assistant") return false
     if (!toolCalls.isNullOrEmpty()) return false
     if (generatedUi != null) return false
@@ -208,16 +214,39 @@ private fun MessageBubbleSurface(
 ) {
     val isUser = message.role == "user"
     val isLastAssistant = isStreaming && message.role == "assistant"
-    val style = bubbleStyle(role = message.role, isStreaming = isLastAssistant)
+    val style = bubbleStyle(role = message.role, isStreaming = isLastAssistant, isError = message.isError)
     val colors = MaterialTheme.chatColors
     val dimens = MaterialTheme.chatDimens
     val typo = MaterialTheme.chatTypography
     val renderer = remember(message.role, message.toolCalls, message.generatedUi) { resolveRenderer(message) }
     val bubbleLess = message.shouldRenderBubbleLess()
 
+    // letta-mobile-d2z6.s1 (Emmanuel 2026-04-26 01:28 EDT): ease bubble
+    // height growth as streaming chunks land. Short 60ms LinearEasing
+    // tween — fast enough that successive chunks (typically 80–150ms
+    // apart) don't stack into compounding wobble, but long enough that
+    // the user's eye perceives "growing" rather than "popping".
+    //
+    // Pinch suppresses the animation entirely (avoids height-interp
+    // cascades across many bubbles during the gesture, see
+    // letta-mobile-5e0f).
+    //
+    // Non-streaming, non-pinching bubbles get NO animateContentSize on
+    // the Surface itself — historically that fought with the per-bubble
+    // collapse/reasoning animations downstream. The Surface stays
+    // size-stable; only mid-stream growth is animated.
+    val isPinchingForBubble = LocalChatIsPinching.current
+    val bubbleSizeAnimation = if (isLastAssistant && !isPinchingForBubble) {
+        Modifier.animateContentSize(
+            animationSpec = tween(durationMillis = 60, easing = LinearEasing),
+        )
+    } else {
+        Modifier
+    }
+
     val contentColumn: @Composable () -> Unit = {
         Column(
-            modifier = if (bubbleLess) {
+            modifier = (if (bubbleLess) {
                 // No surface chrome → no horizontal padding; the message
                 // list's own contentPadding is the only side gutter.
                 Modifier.padding(vertical = dimens.bubblePaddingVertical)
@@ -226,7 +255,7 @@ private fun MessageBubbleSurface(
                     horizontal = dimens.bubblePaddingHorizontal,
                     vertical = dimens.bubblePaddingVertical,
                 )
-            },
+            }).then(bubbleSizeAnimation),
             verticalArrangement = Arrangement.spacedBy(dimens.messageSpacing),
         ) {
             // Suppress the role label header for bubble-less assistant prose
@@ -303,11 +332,15 @@ private fun MessageBubbleSurface(
                 colors.agentText
             }
             if (message.content.isNotBlank() || message.attachments.isEmpty()) {
+                // letta-mobile-6p4o.1: forward isStreaming to renderers so
+                // assistant prose can be clamped to word boundaries while
+                // mid-stream and decorated with a streaming cursor.
                 renderer.Render(
                     message = message,
                     textColor = textColor,
                     modifier = Modifier,
                     onGeneratedUiMessage = onGeneratedUiMessage,
+                    isStreaming = isLastAssistant,
                 )
             }
         }
@@ -529,10 +562,39 @@ internal fun MessageReasoning(
     val isCollapsed = collapsed && !isStreaming
     val clickLabel = if (isCollapsed) "Expand reasoning" else "Collapse reasoning"
 
+    // letta-mobile-d2z6: gate animateContentSize on !isStreaming. While
+    // assistant tokens are arriving the reasoning bubble grows on every
+    // frame; the default 150ms FastOutSlowIn animation produces visible
+    // wobble that compounds with the RunBlock layout. The animation is
+    // still useful for the user-initiated collapse/expand toggle, so we
+    // keep it gated rather than removing it outright.
+    //
+    // letta-mobile-5e0f.r2: also suppress during pinch-to-zoom so we
+    // don't get height-interpolation cascades across many bubbles per
+    // pinch frame.
+    //
+    // letta-mobile-d2z6.s1 (Emmanuel 2026-04-26 01:28 EDT — "add easing
+    // to the chunks coming on so it's smoother"): instead of fully
+    // suppressing the animation while streaming, swap to a SHORT linear
+    // tween (60ms) that's faster than typical token inter-arrival
+    // (~80–150ms). Each chunk's height delta interpolates briefly
+    // instead of snapping in, but the spec is short enough that
+    // successive chunks don't stack into compounding wobble — the
+    // animation always finishes (or near-finishes) before the next
+    // chunk arrives. The collapse/expand toggle keeps the default
+    // (longer, eased) spec by virtue of the !isStreaming branch.
+    val isPinching = LocalChatIsPinching.current
+    val sizeAnimation = when {
+        isPinching -> Modifier
+        isStreaming -> Modifier.animateContentSize(
+            animationSpec = tween(durationMillis = 60, easing = LinearEasing),
+        )
+        else -> Modifier.animateContentSize()
+    }
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .animateContentSize()
+            .then(sizeAnimation)
             .padding(vertical = 4.dp),
     ) {
         Row(
@@ -588,10 +650,27 @@ internal fun MessageReasoning(
                     }
                     .padding(start = 12.dp),
             ) {
-                MarkdownText(
-                    text = message.content,
-                    textColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                // letta-mobile-d2z6 (root cause): MarkdownText re-parses on
+                // every content change and re-emits a fresh subtree, which
+                // causes the bubble to visibly flicker on each streaming
+                // chunk. Use plain Text during streaming and snap to
+                // formatted markdown when the stream ends.
+                if (isStreaming) {
+                    val smoothedContent = rememberSmoothedStreamingText(
+                        rawText = message.content,
+                        isStreaming = true,
+                    )
+                    Text(
+                        text = smoothedContent,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    MarkdownText(
+                        text = message.content,
+                        textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
@@ -684,8 +763,10 @@ private fun ToolCallCard(toolCall: UiToolCall) {
     // more presence — slightly stronger surface tint and a 1.dp outline
     // so it reads as a distinct artifact in a stack of bubbles, without
     // shouting like a colored pill would.
+    // letta-mobile-5e0f.r2: gate animateContentSize on !isPinching.
+    val isPinchingForCard = LocalChatIsPinching.current
     Card(
-        modifier = Modifier.animateContentSize(),
+        modifier = if (isPinchingForCard) Modifier else Modifier.animateContentSize(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
         ),
@@ -833,7 +914,8 @@ private fun ToolCallCard(toolCall: UiToolCall) {
                             },
                             maxLines = if (resultExpanded) Int.MAX_VALUE else 2,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.animateContentSize(),
+                            // letta-mobile-5e0f.r2: gate animateContentSize on !isPinching.
+                            modifier = if (isPinchingForCard) Modifier else Modifier.animateContentSize(),
                         )
                     }
                 }

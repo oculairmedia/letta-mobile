@@ -471,8 +471,9 @@ cmd_test_sync() {
 # query the server for messages newer than that cursor, and report:
 #
 #   - Wall-clock drift (server-latest - client-processed) in seconds
-#   - Number of messages the client has NOT processed yet
-#   - A verdict: HEALTHY (< 30s, 0 unprocessed), STALE (30-120s), BROKEN (> 120s or > 5 unprocessed)
+#   - Number of messages the background heartbeat worker has NOT processed yet
+#   - A verdict: HEALTHY (< 30s, < 5 unprocessed), STALE (30-120s or moderate lag),
+#     BROKEN (> 120s or >= 10 unprocessed)
 #
 # Bonus: --watch runs it every N seconds and reports whether drift is
 # growing (sync loop stuck), shrinking (catching up), or flat.
@@ -546,9 +547,9 @@ EOF
 
         # --- Query server for latest message timestamp ---
         local server_resp
-        server_resp=$(api_get "/v1/agents/$agent_id/messages?limit=10&order=desc&conversation_id=$conversation" 2>/dev/null)
+        server_resp=$(api_get "/v1/agents/$agent_id/messages?limit=50&order=desc&conversation_id=$conversation" 2>/dev/null)
         local server_latest
-        server_latest=$(echo "$server_resp" | jq -r '.[0].date // empty' 2>/dev/null)
+        server_latest=$(echo "$server_resp" | jq -r 'map(.date // empty) | map(select(length > 0)) | sort | last // empty' 2>/dev/null)
         if [[ -z "$server_latest" ]]; then
             echo "SERVER_LATEST=MISSING (empty response or bad auth)"
             return 2
@@ -578,9 +579,9 @@ except Exception as e:
         local verdict color
         if [[ "$drift_sec" == "ERR" ]]; then
             verdict="UNKNOWN"; color="$YELLOW"
-        elif [[ "$drift_sec" -lt 30 && "$unprocessed" -eq 0 ]]; then
+        elif [[ "$drift_sec" -lt 30 && "$unprocessed" -lt 5 ]]; then
             verdict="HEALTHY"; color="$GREEN"
-        elif [[ "$drift_sec" -lt 120 && "$unprocessed" -lt 5 ]]; then
+        elif [[ "$drift_sec" -lt 120 && "$unprocessed" -lt 10 ]]; then
             verdict="STALE"; color="$YELLOW"
         else
             verdict="BROKEN"; color="$RED"

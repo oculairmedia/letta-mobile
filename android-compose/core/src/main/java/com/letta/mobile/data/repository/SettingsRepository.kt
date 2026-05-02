@@ -65,6 +65,8 @@ class SettingsRepository @Inject constructor(
         val CHAT_FONT_SCALE = floatPreferencesKey("chat_font_scale")
         val ENABLE_PROJECTS = booleanPreferencesKey("enable_projects")
         val PINNED_SHORTCUT_ORDER = stringPreferencesKey("pinned_shortcut_order")
+        val CLIENT_MODE_ENABLED = booleanPreferencesKey("client_mode_enabled")
+        val CLIENT_MODE_BASE_URL = stringPreferencesKey("client_mode_base_url")
     }
 
     init {
@@ -271,6 +273,36 @@ class SettingsRepository @Inject constructor(
         prefs[Keys.ENABLE_PROJECTS] ?: false
     }
 
+    fun observeClientModeEnabled(): Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[Keys.CLIENT_MODE_ENABLED] ?: false
+    }
+
+    suspend fun setClientModeEnabled(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[Keys.CLIENT_MODE_ENABLED] = enabled
+        }
+    }
+
+    fun observeClientModeBaseUrl(): Flow<String> = dataStore.data.map { prefs ->
+        prefs[Keys.CLIENT_MODE_BASE_URL] ?: ""
+    }
+
+    suspend fun setClientModeBaseUrl(baseUrl: String) {
+        dataStore.edit { prefs ->
+            prefs[Keys.CLIENT_MODE_BASE_URL] = baseUrl
+        }
+    }
+
+    fun getClientModeApiKey(): String? = encryptedPrefs.getString(CLIENT_MODE_API_KEY, null)
+
+    fun setClientModeApiKey(apiKey: String?) {
+        if (apiKey.isNullOrBlank()) {
+            encryptedPrefs.edit().remove(CLIENT_MODE_API_KEY).apply()
+        } else {
+            encryptedPrefs.edit().putString(CLIENT_MODE_API_KEY, apiKey).apply()
+        }
+    }
+
     suspend fun setEnableProjects(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[Keys.ENABLE_PROJECTS] = enabled
@@ -291,6 +323,7 @@ class SettingsRepository @Inject constructor(
     }
 
     companion object {
+        private const val CLIENT_MODE_API_KEY = "client_mode_api_key"
         /** Shortcuts pinned by default on first launch. */
         val DEFAULT_PINNED_SHORTCUTS = listOf(
             "CONVERSATIONS", "AGENTS", "TOOLS", "BLOCKS",
