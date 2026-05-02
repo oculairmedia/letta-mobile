@@ -25,6 +25,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object AllToolsRoute
 @Serializable data object UsageRoute
 @Serializable data object BotSettingsRoute
+@Serializable data class ShareToAgentRoute(val sharedText: String)
 @Serializable data object LettaBotConnectionRoute
 @Serializable data object ProjectsRoute
 @Serializable data object TelemetryRoute

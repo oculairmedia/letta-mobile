@@ -9,6 +9,7 @@ sealed interface AppLaunchTarget {
     companion object {
         fun fromIntent(intent: Intent?): AppLaunchTarget? {
             return NotificationNavigationTarget.fromIntent(intent)
+                ?: ShareLaunchTarget.fromIntent(intent)
                 ?: AgentListLaunchTarget.fromIntent(intent)
         }
     }

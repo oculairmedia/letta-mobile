@@ -328,6 +328,35 @@ fun AppNavGraph(
             }
         }
 
+        composable<ShareToAgentRoute>(
+            enterTransition = drillInEnter,
+            exitTransition = drillInExit,
+            popEnterTransition = drillInPopEnter,
+            popExitTransition = drillInPopExit,
+        ) { backStackEntry ->
+            val route = backStackEntry.toRoute<ShareToAgentRoute>()
+            CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+                AgentListScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToAgent = { agentId ->
+                        navController.navigate(
+                            AgentChatRoute(
+                                agentId = agentId,
+                                freshRouteKey = System.currentTimeMillis(),
+                                initialMessage = route.sharedText,
+                            ),
+                        ) {
+                            popUpTo<ShareToAgentRoute> { inclusive = true }
+                        }
+                    },
+                    onNavigateToEditAgent = { agentId ->
+                        navController.navigate(EditAgentRoute(agentId))
+                    },
+                    shareContentPreview = route.sharedText,
+                )
+            }
+        }
+
         composable<ConfigRoute> {
             ConfigScreen(
                 onNavigateBack = {

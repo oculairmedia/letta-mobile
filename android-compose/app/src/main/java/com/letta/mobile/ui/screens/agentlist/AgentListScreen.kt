@@ -117,6 +117,7 @@ fun AgentListScreen(
     onNavigateBack: () -> Unit,
     onNavigateToAgent: (String) -> Unit,
     onNavigateToEditAgent: (String) -> Unit,
+    shareContentPreview: String? = null,
     viewModel: AgentListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -130,6 +131,7 @@ fun AgentListScreen(
     var pendingImportOverrideTools by remember { mutableStateOf(true) }
     var pendingImportStripMessages by remember { mutableStateOf(false) }
     val snackbar = LocalSnackbarDispatcher.current
+    val isShareMode = shareContentPreview != null
     val context = LocalContext.current
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -191,7 +193,7 @@ fun AgentListScreen(
                             openSearchContentDescription = stringResource(R.string.action_search),
                             closeSearchContentDescription = stringResource(R.string.action_close),
                             titleContent = {
-                                Text(stringResource(R.string.common_agents))
+                                Text(if (isShareMode) "Share with agent" else stringResource(R.string.common_agents))
                             },
                         )
                     },
@@ -203,11 +205,13 @@ fun AgentListScreen(
                         }
                     },
                     actions = {
-                        IconButton(onClick = { showImportDialog = true }) {
-                            Icon(
-                                LettaIcons.FileOpen,
-                                contentDescription = stringResource(R.string.action_import_agent),
-                            )
+                        if (!isShareMode) {
+                            IconButton(onClick = { showImportDialog = true }) {
+                                Icon(
+                                    LettaIcons.FileOpen,
+                                    contentDescription = stringResource(R.string.action_import_agent),
+                                )
+                            }
                         }
                     }
                 )
@@ -232,6 +236,12 @@ fun AgentListScreen(
                 }
 
                 val allTags = remember(uiState.agents) { viewModel.getAllTags() }
+                if (shareContentPreview != null) {
+                    ShareContentPreviewCard(
+                        content = shareContentPreview,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
                 if (allTags.isNotEmpty()) {
                     LazyRow(
                         modifier = Modifier
@@ -258,8 +268,10 @@ fun AgentListScreen(
             }
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showCreateDialog = true }) {
-                Icon(LettaIcons.Add, "Create Agent")
+            if (!isShareMode) {
+                FloatingActionButton(onClick = { showCreateDialog = true }) {
+                    Icon(LettaIcons.Add, "Create Agent")
+                }
             }
         }
     ) { paddingValues ->
@@ -302,6 +314,7 @@ fun AgentListScreen(
                                             onClick = { onNavigateToAgent(favoriteAgent.id) },
                                             onEdit = { onNavigateToEditAgent(favoriteAgent.id) },
                                             onUnfavorite = { viewModel.toggleFavorite(favoriteAgent.id) },
+                                            contextualActionsEnabled = !isShareMode,
                                             onTagClick = { tag ->
                                                 tagDrillInViewModel.showTag(
                                                     tag,
@@ -322,6 +335,7 @@ fun AgentListScreen(
                                         onDelete = { viewModel.deleteAgent(agent.id) },
                                         onToggleFavorite = { viewModel.toggleFavorite(agent.id) },
                                         onTogglePinned = { viewModel.togglePinned(agent.id) },
+                                        contextualActionsEnabled = !isShareMode,
                                         onTagClick = { tag ->
                                             tagDrillInViewModel.showTag(
                                                 tag,
@@ -344,6 +358,7 @@ fun AgentListScreen(
                                             onClick = { onNavigateToAgent(favoriteAgent.id) },
                                             onEdit = { onNavigateToEditAgent(favoriteAgent.id) },
                                             onUnfavorite = { viewModel.toggleFavorite(favoriteAgent.id) },
+                                            contextualActionsEnabled = !isShareMode,
                                             onTagClick = { tag ->
                                                 tagDrillInViewModel.showTag(
                                                     tag,
@@ -364,6 +379,7 @@ fun AgentListScreen(
                                         onDelete = { viewModel.deleteAgent(agent.id) },
                                         onToggleFavorite = { viewModel.toggleFavorite(agent.id) },
                                         onTogglePinned = { viewModel.togglePinned(agent.id) },
+                                        contextualActionsEnabled = !isShareMode,
                                         onTagClick = { tag ->
                                             tagDrillInViewModel.showTag(
                                                 tag,
@@ -425,6 +441,7 @@ private fun FavoriteAgentCard(
     onUnfavorite: () -> Unit,
     onTagClick: (String) -> Unit,
     modifier: Modifier = Modifier,
+    contextualActionsEnabled: Boolean = true,
 ) {
     val contentColor = MaterialTheme.colorScheme.onPrimaryContainer
     val subtleColor = contentColor.copy(alpha = 0.6f)
@@ -454,8 +471,10 @@ private fun FavoriteAgentCard(
                     color = contentColor,
                     modifier = Modifier.weight(1f),
                 )
-                IconButton(onClick = onEdit) {
-                    Icon(LettaIcons.Agent, contentDescription = "Edit", tint = contentColor)
+                if (contextualActionsEnabled) {
+                    IconButton(onClick = onEdit) {
+                        Icon(LettaIcons.Agent, contentDescription = "Edit", tint = contentColor)
+                    }
                 }
             }
 
@@ -531,6 +550,44 @@ private fun FavoriteAgentCard(
 }
 
 @Composable
+private fun ShareContentPreviewCard(
+    content: String,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Icon(
+                imageVector = LettaIcons.Share,
+                contentDescription = null,
+                modifier = Modifier.size(LettaIconSizing.Toolbar),
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "Pick an agent to send this content",
+                    style = MaterialTheme.typography.labelLarge,
+                )
+                Text(
+                    text = content,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun InfoChip(
     label: String,
     value: String,
@@ -560,7 +617,8 @@ private fun AgentCard(
     onToggleFavorite: () -> Unit,
     onTogglePinned: () -> Unit = {},
     onTagClick: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    contextualActionsEnabled: Boolean = true,
 ) {
     val accentColors = MaterialTheme.customColors
     var showContextMenu by remember { mutableStateOf(false) }
@@ -580,9 +638,13 @@ private fun AgentCard(
             .clip(RoundedCornerShape(28.dp))
             .combinedClickable(
                 onClick = onClick,
-                onLongClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    showContextMenu = true
+                onLongClick = if (contextualActionsEnabled) {
+                    {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        showContextMenu = true
+                    }
+                } else {
+                    null
                 },
             ),
         shape = RoundedCornerShape(28.dp),
@@ -637,8 +699,10 @@ private fun AgentCard(
                             modifier = Modifier.size(LettaIconSizing.Inline),
                         )
                     }
-                    IconButton(onClick = { showContextMenu = true }) {
-                        Icon(LettaIcons.MoreVert, contentDescription = null)
+                    if (contextualActionsEnabled) {
+                        IconButton(onClick = { showContextMenu = true }) {
+                            Icon(LettaIcons.MoreVert, contentDescription = null)
+                        }
                     }
                 }
 
@@ -737,6 +801,7 @@ private fun CompactAgentCard(
     onTogglePinned: () -> Unit = {},
     onTagClick: (String) -> Unit = {},
     modifier: Modifier = Modifier,
+    contextualActionsEnabled: Boolean = true,
 ) {
     val accentColors = MaterialTheme.customColors
     var showContextMenu by remember { mutableStateOf(false) }
@@ -755,9 +820,13 @@ private fun CompactAgentCard(
             .clip(RoundedCornerShape(28.dp))
             .combinedClickable(
                 onClick = onClick,
-                onLongClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    showContextMenu = true
+                onLongClick = if (contextualActionsEnabled) {
+                    {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        showContextMenu = true
+                    }
+                } else {
+                    null
                 },
             ),
         shape = RoundedCornerShape(28.dp),
