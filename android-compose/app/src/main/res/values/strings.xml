@@ -221,6 +221,13 @@
     <string name="screen_config_features_section">Features</string>
     <string name="screen_config_enable_projects">Projects home</string>
     <string name="screen_config_enable_projects_description">Show the Projects dashboard as the home screen. Requires a project registry endpoint on your server.</string>
+    <string name="screen_config_background_delivery_section">Background delivery</string>
+    <string name="screen_config_reliable_background_delivery">Reliable background delivery</string>
+    <string name="screen_config_battery_optimization_exempt_description">Status: unrestricted. Android is currently allowing Letta to run without battery optimization limits for more reliable locked-screen chat delivery.</string>
+    <string name="screen_config_battery_optimization_restricted_description">Status: optimized. Allow unrestricted background delivery to improve locked-screen chat updates. This may use more battery, and some device makers may still limit background work.</string>
+    <string name="screen_config_battery_optimization_status_unrestricted">Unrestricted</string>
+    <string name="screen_config_battery_optimization_allow_action">Allow</string>
+    <string name="screen_config_battery_optimization_request_failed">Unable to open Android battery optimization settings.</string>
     <string name="screen_agent_edit_title">Edit Agent</string>
     <string name="common_name">Name</string>
     <string name="common_id">ID</string>

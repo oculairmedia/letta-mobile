@@ -1,12 +1,16 @@
 package com.letta.mobile.ui.screens.config
 
+import android.content.ActivityNotFoundException
 import android.os.Build
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
@@ -15,10 +19,14 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
+import com.letta.mobile.platform.BatteryOptimizationHelper
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.CardGroup
@@ -26,6 +34,7 @@ import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
+import com.letta.mobile.util.Telemetry
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,6 +46,43 @@ fun ConfigScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbar = LocalSnackbarDispatcher.current
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var batteryOptimizationExempt by remember {
+        mutableStateOf(BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context))
+    }
+
+    fun refreshBatteryOptimizationStatus(source: String) {
+        val exempt = BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)
+        batteryOptimizationExempt = exempt
+        Telemetry.event(
+            "BatteryOptimization",
+            "status",
+            "source" to source,
+            "exempt" to exempt,
+        )
+    }
+
+    val batteryOptimizationLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) {
+        refreshBatteryOptimizationStatus("requestReturned")
+        Telemetry.event(
+            "BatteryOptimization",
+            "requestReturned",
+            "exempt" to BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context),
+        )
+    }
+
+    DisposableEffect(context, lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                refreshBatteryOptimizationStatus("resume")
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Scaffold(
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
@@ -73,6 +119,31 @@ fun ConfigScreen(
                 onThemePresetChange = { viewModel.updateThemePreset(it) },
                 onDynamicColorChange = { viewModel.updateDynamicColor(it) },
                 onEnableProjectsChange = { viewModel.updateEnableProjects(it) },
+                batteryOptimizationExempt = batteryOptimizationExempt,
+                onRequestBatteryOptimizationExemption = {
+                    Telemetry.event(
+                        "BatteryOptimization",
+                        "requestTapped",
+                        "exemptBefore" to batteryOptimizationExempt,
+                    )
+                    try {
+                        batteryOptimizationLauncher.launch(BatteryOptimizationHelper.requestExemptionIntent(context))
+                        Telemetry.event("BatteryOptimization", "requestLaunched", "target" to "requestExemption")
+                    } catch (primaryError: ActivityNotFoundException) {
+                        try {
+                            batteryOptimizationLauncher.launch(BatteryOptimizationHelper.batteryOptimizationSettingsIntent())
+                            Telemetry.event("BatteryOptimization", "requestLaunched", "target" to "settingsFallback")
+                        } catch (fallbackError: ActivityNotFoundException) {
+                            Telemetry.error(
+                                "BatteryOptimization",
+                                "requestFailed",
+                                fallbackError,
+                                "primaryError" to primaryError.javaClass.simpleName,
+                            )
+                            snackbar.dispatch(context.getString(R.string.screen_config_battery_optimization_request_failed))
+                        }
+                    }
+                },
                 onNavigateToLettaBotConnection = onNavigateToLettaBotConnection,
                 onSave = {
                     viewModel.saveConfig(
@@ -96,6 +167,8 @@ private fun ConfigContent(
     onThemePresetChange: (ThemePreset) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
     onEnableProjectsChange: (Boolean) -> Unit,
+    batteryOptimizationExempt: Boolean,
+    onRequestBatteryOptimizationExemption: () -> Unit,
     onNavigateToLettaBotConnection: () -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier
@@ -254,6 +327,38 @@ private fun ConfigContent(
                         checked = state.enableProjects,
                         onCheckedChange = onEnableProjectsChange,
                     )
+                },
+            )
+        }
+
+        CardGroup(title = { Text(stringResource(R.string.screen_config_background_delivery_section)) }) {
+            item(
+                headlineContent = { Text(stringResource(R.string.screen_config_reliable_background_delivery)) },
+                supportingContent = {
+                    Text(
+                        stringResource(
+                            if (batteryOptimizationExempt) {
+                                R.string.screen_config_battery_optimization_exempt_description
+                            } else {
+                                R.string.screen_config_battery_optimization_restricted_description
+                            }
+                        )
+                    )
+                },
+                leadingContent = { Icon(LettaIcons.Settings, contentDescription = null) },
+                trailingContent = {
+                    if (batteryOptimizationExempt) {
+                        AssistChip(
+                            onClick = {},
+                            enabled = false,
+                            label = { Text(stringResource(R.string.screen_config_battery_optimization_status_unrestricted)) },
+                            leadingIcon = { Icon(LettaIcons.CheckCircle, contentDescription = null) },
+                        )
+                    } else {
+                        TextButton(onClick = onRequestBatteryOptimizationExemption) {
+                            Text(stringResource(R.string.screen_config_battery_optimization_allow_action))
+                        }
+                    }
                 },
             )
         }
