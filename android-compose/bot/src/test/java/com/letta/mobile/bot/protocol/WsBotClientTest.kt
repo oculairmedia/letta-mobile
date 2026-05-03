@@ -521,6 +521,144 @@ class WsBotClientTest : WordSpec({
         //      the route from conv-A to conv-B)
         //   3. error frames carrying only a request_id still route to
         //      the right in-flight stream
+        "fresh force_new reinitializes after prior active conversation" {
+            val sessionStarts = mutableListOf<kotlinx.serialization.json.JsonObject>()
+            var sawSessionClose = false
+            var messageCount = 0
+            val server = websocketServer { socket, text ->
+                val payload = json.parseToJsonElement(text).jsonObject
+                when (payload["type"]!!.jsonPrimitive.content) {
+                    "session_start" -> {
+                        sessionStarts += payload
+                        val requestedConv = payload["conversation_id"]?.jsonPrimitive?.contentOrNull
+                        val forceNew = payload["force_new"]?.jsonPrimitive?.content == "true"
+                        val initConv = when {
+                            forceNew -> "conv-new"
+                            requestedConv != null -> requestedConv
+                            else -> "conv-old"
+                        }
+                        socket.send(
+                            """
+                            {"type":"session_init","agent_id":"agent-fresh","conversation_id":"$initConv","session_id":"sess-${sessionStarts.size}"}
+                            """.trimIndent()
+                        )
+                    }
+
+                    "session_close" -> sawSessionClose = true
+
+                    "message" -> {
+                        messageCount += 1
+                        val requestId = payload["request_id"]!!.jsonPrimitive.content
+                        val conv = if (messageCount == 1) "conv-old" else "conv-new"
+                        socket.send(
+                            """
+                            {"type":"stream","event":"assistant","content":"ok$messageCount","conversation_id":"$conv","request_id":"$requestId"}
+                            """.trimIndent()
+                        )
+                        socket.send(
+                            """
+                            {"type":"result","success":true,"conversation_id":"$conv","request_id":"$requestId","duration_ms":4}
+                            """.trimIndent()
+                        )
+                    }
+                }
+            }
+
+            server.use {
+                val client = WsBotClient(gatewayUrl(server), "secret")
+                val first = runBlocking {
+                    withTimeout(5_000) {
+                        client.streamMessage(
+                            BotChatRequest(
+                                message = "resume old",
+                                agentId = "agent-fresh",
+                                chatId = "chat-old",
+                                conversationId = "conv-old",
+                            )
+                        ).toList()
+                    }
+                }
+                first.last().conversationId shouldBe "conv-old"
+
+                val second = runBlocking {
+                    withTimeout(5_000) {
+                        client.streamMessage(
+                            BotChatRequest(
+                                message = "fresh",
+                                agentId = "agent-fresh",
+                                chatId = "chat-fresh",
+                                conversationId = null,
+                                forceNew = true,
+                            )
+                        ).toList()
+                    }
+                }
+
+                sawSessionClose shouldBe true
+                sessionStarts shouldHaveSize 2
+                sessionStarts[0]["conversation_id"]!!.jsonPrimitive.content shouldBe "conv-old"
+                sessionStarts[0]["force_new"]?.jsonPrimitive?.content shouldBe "false"
+                sessionStarts[1]["conversation_id"]?.jsonPrimitive?.contentOrNull shouldBe null
+                sessionStarts[1]["force_new"]?.jsonPrimitive?.content shouldBe "true"
+                second.last().conversationId shouldBe "conv-new"
+                client.close()
+            }
+        }
+
+        "send force_new on explicit fresh conversation session_start" {
+            var observedForceNew: Boolean? = null
+            var observedConversationId: String? = "not-read"
+            val server = websocketServer { socket, text ->
+                val payload = json.parseToJsonElement(text).jsonObject
+                when (payload["type"]!!.jsonPrimitive.content) {
+                    "session_start" -> {
+                        observedForceNew = payload["force_new"]?.jsonPrimitive?.content == "true"
+                        observedConversationId = payload["conversation_id"]?.jsonPrimitive?.contentOrNull
+                        socket.send(
+                            """
+                            {"type":"session_init","agent_id":"agent-fresh","conversation_id":"conv-new","session_id":"sess-fresh"}
+                            """.trimIndent()
+                        )
+                    }
+
+                    "message" -> {
+                        val requestId = payload["request_id"]!!.jsonPrimitive.content
+                        socket.send(
+                            """
+                            {"type":"stream","event":"assistant","content":"ok","conversation_id":"conv-new","request_id":"$requestId"}
+                            """.trimIndent()
+                        )
+                        socket.send(
+                            """
+                            {"type":"result","success":true,"conversation_id":"conv-new","request_id":"$requestId","duration_ms":4}
+                            """.trimIndent()
+                        )
+                    }
+                }
+            }
+
+            server.use {
+                val client = WsBotClient(gatewayUrl(server), "secret")
+                val chunks = runBlocking {
+                    withTimeout(5_000) {
+                        client.streamMessage(
+                            BotChatRequest(
+                                message = "hi",
+                                agentId = "agent-fresh",
+                                chatId = "chat-fresh",
+                                conversationId = null,
+                                forceNew = true,
+                            )
+                        ).toList()
+                    }
+                }
+                observedForceNew shouldBe true
+                observedConversationId shouldBe null
+                chunks.last().conversationId shouldBe "conv-new"
+                client.close()
+            }
+        }
+
         "promote pending route into activeRoutes on the first conv-id chunk" {
             val server = websocketServer { socket, text ->
                 val payload = json.parseToJsonElement(text).jsonObject

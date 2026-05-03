@@ -377,10 +377,10 @@ class WsBotClient(
         reconnectJob?.cancel()
         reconnectJob = null
         runCatching {
-            socket?.send(json.encodeToString(WsSessionCloseMessage.serializer(), WsSessionCloseMessage))
+            socket?.close(1000, "client closing")
         }
         runCatching {
-            socket?.close(1000, "client closing")
+            socket?.cancel()
         }
         socket = null
         socketOpen = false
@@ -411,17 +411,15 @@ class WsBotClient(
                 )
 
             val requestedConversationId = request.conversationId
-            // letta-mobile-w2hx.7: re-init when (a) the socket isn't open,
-            // (b) the agent is different, or (c) the requested conversation
-            // differs from the active one. Freshness no longer needs a
-            // dedicated flag: a "New chat" tap surfaces here as
-            // `requestedConversationId == null` while `activeConversationId`
-            // holds the previous chat's conv id, which trips this same
-            // branch and we re-init with no conv id (the gateway then
-            // creates a fresh Letta conversation).
+            // Re-init when the socket is absent, the target agent changes,
+            // the requested conversation changes, or the caller explicitly
+            // requests a fresh conversation. The forceNew branch is critical:
+            // null conversation_id alone can be interpreted by the gateway/SDK
+            // as "resume the active session".
             val needsNewSession = !socketOpen ||
                 activeAgentId != requestedAgentId ||
-                requestedConversationId != activeConversationId
+                requestedConversationId != activeConversationId ||
+                request.forceNew
 
             if (!needsNewSession) {
                 return
@@ -433,7 +431,7 @@ class WsBotClient(
                 // can suppress its handleUnexpectedDisconnect. Cleared in
                 // openSocketLocked alongside isUserClosing.
                 isSwitchingAgent = true
-                sendWebSocketMessage(WsSessionCloseMessage)
+                sendWebSocketMessage(WsSessionCloseMessage())
                 socket?.let { retiredSockets += it }
                 socket?.close(1000, "switching agent")
                 socket = null
@@ -441,10 +439,10 @@ class WsBotClient(
                 activeConversationId = null
                 activeSessionId = null
             } else if (socketOpen && activeAgentId == requestedAgentId) {
-                // Same agent but a different (or absent) conv: close the
-                // active session frame and start a new one in-place. The
-                // socket itself stays up.
-                sendWebSocketMessage(WsSessionCloseMessage)
+                // Same agent but a different/fresh conv: close the active
+                // session frame and start a new one in-place. The socket
+                // itself stays up; force_new rides on the next session_start.
+                sendWebSocketMessage(WsSessionCloseMessage())
                 activeConversationId = null
                 activeSessionId = null
             }
@@ -453,6 +451,7 @@ class WsBotClient(
             initializeSessionLocked(
                 agentId = requestedAgentId,
                 conversationId = requestedConversationId,
+                forceNew = request.forceNew,
             )
         }
     }
@@ -481,6 +480,7 @@ class WsBotClient(
     private suspend fun initializeSessionLocked(
         agentId: String,
         conversationId: String?,
+        forceNew: Boolean,
     ) {
         _connectionState.value = ConnectionState.CONNECTING
         val deferred = CompletableDeferred<WsSessionInit>()
@@ -490,6 +490,7 @@ class WsBotClient(
             WsSessionStart(
                 agentId = agentId,
                 conversationId = conversationId,
+                forceNew = forceNew,
             )
         )
 
@@ -565,6 +566,7 @@ class WsBotClient(
                             message = "WsBotClient requires request.agentId for reconnect",
                         ),
                     conversationId = request.conversationId ?: activeConversationId,
+                    forceNew = false,
                 )
             }
 
@@ -748,6 +750,7 @@ class WsBotClient(
                         initializeSessionLocked(
                             agentId = agentId,
                             conversationId = activeConversationId,
+                            forceNew = false,
                         )
                     }
                 }
@@ -955,6 +958,7 @@ class WsBotClient(
         val type: String = "session_start",
         @SerialName("agent_id") val agentId: String,
         @SerialName("conversation_id") val conversationId: String? = null,
+        @SerialName("force_new") val forceNew: Boolean = false,
     )
 
     @Serializable
@@ -978,9 +982,9 @@ class WsBotClient(
     )
 
     @Serializable
-    private data object WsSessionCloseMessage {
-        const val type: String = "session_close"
-    }
+    private data class WsSessionCloseMessage(
+        val type: String = "session_close",
+    )
 
     @Serializable
     private data class WsSessionInit(

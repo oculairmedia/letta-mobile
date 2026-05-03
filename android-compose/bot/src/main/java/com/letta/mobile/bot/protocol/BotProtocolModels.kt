@@ -31,14 +31,18 @@ data class BotChatRequest(
     @SerialName("sender_name") val senderName: String? = null,
     @SerialName("agent_id") val agentId: String? = null,
     /**
-     * letta-mobile-w2hx.7: routing key. When null, the gateway opens a
-     * fresh Letta conversation; when non-null, the gateway resolves it
-     * directly. The pre-w2hx `force_new` flag is gone — freshness is
-     * now expressed purely by passing a null `conversationId` (which in
-     * practice means a freshly-minted chatId on the client carries no
-     * conversation_id mapping yet). See bead letta-mobile-w2hx.7.
+     * Routing key. When non-null, the gateway resumes that Letta conversation
+     * directly. A null id by itself is ambiguous on older/long-lived gateway
+     * sessions because it may resume the server's active SDK conversation; use
+     * [forceNew] when the user explicitly opened a fresh chat.
      */
     @SerialName("conversation_id") val conversationId: String? = null,
+    /**
+     * Explicit fresh-chat transport contract. When true, WS transports include
+     * `force_new=true` in `session_start` so the gateway must ignore any prior
+     * active SDK/session conversation and allocate a brand-new Letta thread.
+     */
+    @SerialName("force_new") val forceNew: Boolean = false,
     @Transient val contentItems: List<BotMessageContentItem>? = null,
 )
 

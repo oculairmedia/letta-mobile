@@ -176,15 +176,17 @@ class LocalBotSession @AssistedInject constructor(
     override fun streamToAgent(
         message: ChannelMessage,
         conversationId: String?,
+        forceNew: Boolean,
     ): Flow<BotResponseChunk> = flow {
-        // letta-mobile-w2hx.7: LocalBotSession resolves conversations
-        // entirely client-side via resolveConversation(); freshness is
-        // expressed by passing `conversationId = null`.
         val agentId = requireAgent(message)
         ensureToolsSynced(agentId)
         _status.value = BotStatus.PROCESSING
         try {
-            val resolvedConversationId = conversationId ?: resolveConversation(message)
+            val resolvedConversationId = conversationId ?: if (forceNew) {
+                createConversation(agentId)
+            } else {
+                resolveConversation(message)
+            }
             val formattedText = envelopeFormatter.format(
                 message = message,
                 contextProviders = activeProviders,

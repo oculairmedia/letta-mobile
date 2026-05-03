@@ -106,14 +106,12 @@ class BotGateway @Inject constructor(
     fun streamMessage(
         message: ChannelMessage,
         conversationId: String? = null,
+        forceNew: Boolean = false,
     ): Flow<BotResponseChunk> {
         val session = getDefaultSession()
             ?: throw IllegalStateException("No active bot sessions")
 
-        // letta-mobile-w2hx.7: freshness comes from a null conversationId,
-        // not from a force_new flag. The chat row's conv_id (or its
-        // absence) is the routing key end-to-end.
-        return session.streamToAgent(message, conversationId)
+        return session.streamToAgent(message, conversationId, forceNew)
     }
 
     /**

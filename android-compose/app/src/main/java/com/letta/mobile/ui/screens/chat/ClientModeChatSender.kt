@@ -17,12 +17,11 @@ class ClientModeChatSender @Inject constructor(
     private val clientModeController: ClientModeController,
 ) {
     /**
-     * letta-mobile-w2hx.7: the prior `forceFreshConversation` parameter
-     * is gone. A "New chat" tap surfaces here as `conversationId == null`,
-     * which the gateway reads as "open a fresh Letta conversation". There
-     * is no longer a transport-level flag, and we no longer need to
-     * restart the WS session to invalidate a per-agent server-side conv
-     * map (it was deleted in w2hx.6).
+     * In Client Mode, `conversationId == null` means the user is on an
+     * explicit fresh chat route. Do not rely on null alone: live gateway/SDK
+     * sessions can interpret null as "resume the active conversation". Send
+     * `force_new` as the fresh-chat transport contract while still letting the
+     * gateway allocate the real conversation id.
      */
     fun streamMessage(
         screenAgentId: String,
@@ -43,6 +42,7 @@ class ClientModeChatSender @Inject constructor(
                 senderId = "letta-mobile-user",
                 agentId = screenAgentId,
                 conversationId = conversationId,
+                forceNew = conversationId == null,
             )
         ).collect { emit(it) }
     }
