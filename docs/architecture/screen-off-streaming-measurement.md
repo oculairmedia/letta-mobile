@@ -293,6 +293,15 @@ No formal measurements have been recorded in-repo yet. Add completed rows here o
 
 **Regression test:** `ClientModeControllerTest` asserts `botGateway.stop()` is not called from `onStop`.
 
+### 2026-05-02 — Sleep/wake follow-up: terminal snapshot duplication
+
+**Symptom:** after the gateway-lifetime fix, a field retest showed the Client Mode run survived screen-off and continued tool execution, but returning to the chat could duplicate assistant content and, in the same run, appear to miss the final assistant response.
+
+**Finding:** the timeline-backed Client Mode ASSISTANT merge path computed an idempotent `merged` value for snapshot-shaped frames but did not use it, so a text-bearing terminal/snapshot frame could append the current assistant accumulator again. A first fix applied the prefix collapse to all ASSISTANT frames, but review caught that this would violate the WS gateway's pure-delta contract and could reintroduce the old prefix-collision text-loss bug.
+
+**Fix:** normal ASSISTANT frames remain byte-for-byte delta appends. Prefix/idempotency collapse is limited to defensive text-bearing `done=true` terminal frames, which should normally be empty but can surface as snapshot-shaped around reconnect/sleep-wake edges. A regression test covers terminal-snapshot dedup without weakening the existing byte-perfect delta tests.
+
+**Field result:** the user retested the installed build and reported the issue appears fixed; continue to watch for separate missing-terminal-frame evidence before reopening.
 
 ---
 

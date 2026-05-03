@@ -2249,31 +2249,27 @@ class AdminChatViewModel @Inject constructor(
                                 // dropping or overwriting text. So we drop
                                 // the heuristic from this path.
                                 //
-                                // The three explicit prefix checks below
-                                // still cover the legitimate snapshot case
-                                // (gateway emitting a full content reissue
-                                // that exactly contains or extends our
-                                // accumulator) and idempotency. Anything
-                                // else is treated as an append, which is
-                                // the correct behaviour for delta streams,
-                                // including coalesced delta streams.
-                                val merged = when {
-                                    delta == existing.content -> existing.content
-                                    delta.startsWith(existing.content) -> delta
-                                    existing.content.startsWith(delta) -> existing.content
-                                    else -> existing.content + delta
+                                // Normal WS assistant frames are pure deltas;
+                                // append them byte-for-byte. The only safe
+                                // place to apply prefix/idempotency collapse is
+                                // a defensive text-bearing terminal frame: a
+                                // terminal frame should normally be empty, but
+                                // a reconnect/sleep-wake edge can surface a
+                                // final snapshot-shaped frame. Collapsing only
+                                // that terminal snapshot avoids reintroducing
+                                // the old wucn bug where legitimate repeated
+                                // prefix deltas were silently dropped.
+                                val merged = if (chunk.done) {
+                                    when {
+                                        delta == existing.content -> existing.content
+                                        delta.startsWith(existing.content) -> delta
+                                        existing.content.startsWith(delta) -> existing.content
+                                        else -> existing.content + delta
+                                    }
+                                } else {
+                                    existing.content + delta
                                 }
                                 existing.copy(
-                                    // letta-mobile-etc1 (follow-up): use the
-                                    // computed `merged` value here. Previously
-                                    // this site computed the dedup heuristic
-                                    // but unconditionally appended `delta`,
-                                    // which doubled the assistant bubble any
-                                    // time the gateway re-emitted an
-                                    // identical or prefix-related delta
-                                    // — e.g. when a long WS stream survived a
-                                    // screen-off / wake cycle and chunks
-                                    // replayed after the run resumed.
                                     content = merged,
                                     messageType = com.letta.mobile.data.timeline.TimelineMessageType.ASSISTANT,
                                 )

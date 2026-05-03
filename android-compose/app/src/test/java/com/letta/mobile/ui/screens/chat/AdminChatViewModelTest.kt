@@ -1056,6 +1056,38 @@ class AdminChatViewModelTest {
         assertFalse(vm.uiState.value.isStreaming)
     }
 
+    @Test
+    fun `client mode terminal snapshot does not duplicate assistant bubble`() = runTest {
+        clientModeEnabledFlow.value = true
+        every {
+            clientModeChatSender.streamMessage(any(), any(), any())
+        } returns flow {
+            emit(BotStreamChunk(text = "Hello", conversationId = "client-conv", event = BotStreamEvent.ASSISTANT))
+            // Defensive shape seen around reconnect/sleep-wake edges: the
+            // terminal frame should normally be empty, but if it repeats the
+            // current accumulator as a final snapshot it must not double the
+            // bubble.
+            emit(
+                BotStreamChunk(
+                    text = "Hello",
+                    conversationId = "client-conv",
+                    event = BotStreamEvent.ASSISTANT,
+                    done = true,
+                )
+            )
+        }
+
+        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
+        advanceUntilIdle()
+        vm.sendMessage("hi")
+        advanceUntilIdle()
+
+        val assistant = vm.uiState.value.messages.lastOrNull { it.role == "assistant" }
+        assertNotNull(assistant)
+        assertEquals("Hello", assistant!!.content)
+        assertFalse(vm.uiState.value.isStreaming)
+    }
+
     // letta-mobile (lettabot-uww.11): the prior test
     // `client mode chunks survive accidental cumulative-snapshot frames`
     // intentionally codified the wucn-snapshot-recovery client-side defense
