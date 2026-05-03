@@ -2387,6 +2387,59 @@ class AdminChatViewModelTest {
     }
 
     @Test
+    fun `duplicate fresh client mode initial route shows prompt immediately while following in-flight send`() = runTest {
+        clientModeEnabledFlow.value = true
+        activeConversationIds.clear()
+        messages = emptyList()
+
+        val chunks = Channel<BotStreamChunk>(capacity = Channel.UNLIMITED)
+        every {
+            clientModeChatSender.streamMessage(
+                screenAgentId = any(),
+                text = any(),
+                conversationId = any(),
+            )
+        } returns chunks.consumeAsFlow()
+
+        createViewModel(
+            conversationId = null,
+            freshRouteKey = 1111L,
+            initialMessage = "hello duplicate initial",
+        )
+        advanceUntilIdle()
+
+        val visibleDuplicateVm = createViewModel(
+            conversationId = null,
+            freshRouteKey = 2222L,
+            initialMessage = "hello duplicate initial",
+        )
+        advanceUntilIdle()
+
+        verify(exactly = 1) {
+            clientModeChatSender.streamMessage(
+                screenAgentId = "agent-1",
+                text = "hello duplicate initial",
+                conversationId = null,
+            )
+        }
+        val userBubbles = visibleDuplicateVm.uiState.value.messages.filter {
+            it.role == "user" && it.content == "hello duplicate initial"
+        }
+        assertEquals(
+            "Visible duplicate route must stage the initial prompt immediately while following the in-flight send; " +
+                "messages=${visibleDuplicateVm.uiState.value.messages.map { "${it.role}=${it.content}" }}",
+            1,
+            userBubbles.size,
+        )
+        assertTrue(visibleDuplicateVm.uiState.value.isStreaming)
+        assertTrue(visibleDuplicateVm.uiState.value.isAgentTyping)
+
+        chunks.send(BotStreamChunk(text = "reply", conversationId = "client-conv", done = true))
+        chunks.close()
+        advanceUntilIdle()
+    }
+
+    @Test
     fun `duplicate share route view models only deliver initial message once`() = runTest {
         clientModeEnabledFlow.value = false
         activeConversationIds["agent-1"] = "conv-1"

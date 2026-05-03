@@ -1340,11 +1340,42 @@ class AdminChatViewModel @Inject constructor(
             // observer for the resolved conversation will clear these flags
             // when the assistant response lands.
             followingDuplicateInitialMessageInFlight = true
-            _uiState.value = _uiState.value.copy(
-                isLoadingMessages = false,
-                isStreaming = true,
-                isAgentTyping = true,
-            )
+
+            // letta-mobile-1yk0: for fresh Client Mode routes, also stage the
+            // initial prompt itself. Without this, the visible duplicate route
+            // only showed the thinking indicator until the gateway-created
+            // conversation migrated into the timeline; then the prompt and
+            // response appeared together. That looked like the app ignored the
+            // initial message. We do NOT send again here — this is a local
+            // mirror of the already in-flight route message.
+            if (clientModeEnabled.value && isFreshRoute) {
+                val alreadyVisible = clientModeMessages.any {
+                    it.role == "user" && it.content == message
+                } || _uiState.value.messages.any {
+                    it.role == "user" && it.content == message
+                }
+                if (!alreadyVisible) {
+                    clientModeMessages = clientModeMessages + UiMessage(
+                        id = "client-user-initial-duplicate-${message.hashCode()}",
+                        role = "user",
+                        content = message,
+                        timestamp = java.time.Instant.now().toString(),
+                    )
+                }
+                _uiState.value = _uiState.value.copy(
+                    conversationState = ConversationState.NoConversation,
+                    messages = clientModeMessages.toImmutableList(),
+                    isLoadingMessages = false,
+                    isStreaming = true,
+                    isAgentTyping = true,
+                )
+            } else {
+                _uiState.value = _uiState.value.copy(
+                    isLoadingMessages = false,
+                    isStreaming = true,
+                    isAgentTyping = true,
+                )
+            }
             null
         }
     }

@@ -313,6 +313,16 @@ No formal measurements have been recorded in-repo yet. Add completed rows here o
 
 **Regression coverage:** `AdminChatViewModelTest` fresh-route cases now assert no app-side `createConversation` preflight, `streamMessage(..., conversationId = null)`, optimistic bubble visibility before the first gateway chunk, migration to the gateway-created conversation, and persistence of that new conversation when Client Mode is toggled off.
 
+### 2026-05-02 — Duplicate fresh initial-message route did not stage prompt (`letta-mobile-1yk0`)
+
+**Symptom:** opening a fresh Client Mode conversation with an `initialMessage` could appear to do nothing until the agent response arrived; then the prompt and response appeared together.
+
+**Root cause:** Android can briefly create duplicate equivalent chat route ViewModels carrying the same route-provided initial message. The process-local `InitialRouteMessageDeliveryGuard` correctly suppresses the second send, but the suppressed/visible fresh Client Mode route only set `isStreaming`/`isAgentTyping`; it did not locally stage the user prompt. The first route's gateway response later migrated the prompt into the timeline, making the prompt appear late.
+
+**Fix:** when a duplicate initial route is suppressed for a fresh Client Mode chat, mirror the initial prompt into `clientModeMessages` without sending again. The visible route now shows the prompt and thinking indicator immediately while following the already in-flight send.
+
+**Regression coverage:** `duplicate fresh client mode initial route shows prompt immediately while following in-flight send` asserts only one gateway send happens, but the visible duplicate route still renders the initial user bubble before any gateway chunk.
+
 ---
 
 ## Follow-up issue rules
