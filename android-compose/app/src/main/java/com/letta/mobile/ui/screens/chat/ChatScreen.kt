@@ -129,22 +129,37 @@ fun ChatScreen(
                         )
                     }
                     ConversationState.NoConversation -> {
-                        // letta-mobile: empty-state parity between
-                        // "New Conversation" entry points. Both the chat-
-                        // list FAB (eager server-side create -> lands in
-                        // ConversationState.Ready with empty messages) and
-                        // the in-chat switcher's "New Conversation" button
-                        // (lazy-create on first send -> lands in
-                        // ConversationState.NoConversation) should show the
-                        // same starter prompts. AdminChatViewModel.sendMessage
-                        // already lazy-creates the conversation server-side
-                        // when convId is null (fresh-route branch), so
-                        // tapping a chip here transparently creates the
-                        // Letta conversation and sends the prompt.
-                        com.letta.mobile.ui.components.StarterPrompts(
-                            onPromptClick = { prompt -> viewModel.sendMessage(prompt) },
-                            modifier = Modifier.weight(1f),
-                        )
+                        // letta-mobile-qkct: a fresh Client Mode send remains
+                        // in NoConversation until the gateway returns the
+                        // newly-created conversation id. During that pending
+                        // window the VM already owns optimistic messages and
+                        // streaming flags; render the chat body instead of the
+                        // empty starter prompts so the user's bubble is visible
+                        // immediately.
+                        if (shouldShowStarterPromptsForNoConversation(state)) {
+                            StarterPrompts(
+                                onPromptClick = { prompt -> viewModel.sendMessage(prompt) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        } else {
+                            ChatContent(
+                                state = state,
+                                scrollToMessageId = viewModel.scrollToMessageId,
+                                onSendMessage = { viewModel.sendMessage(it) },
+                                onRerunMessage = { viewModel.rerunMessage(it) },
+                                onLoadOlderMessages = { viewModel.loadOlderMessages() },
+                                onSubmitApproval = { requestId, toolCallIds, approve, reason ->
+                                    viewModel.submitApproval(requestId, toolCallIds, approve, reason)
+                                },
+                                onToggleRunCollapsed = viewModel::toggleRunCollapsed,
+                                onToggleReasoningExpanded = viewModel::toggleReasoningExpanded,
+                                onOpenLocationPicker = viewModel::openClientModeLocationPicker,
+                                activeFontScale = activeFontScale,
+                                onActiveFontScaleChange = { activeFontScale = it },
+                                onFontScaleChange = { viewModel.setChatFontScale(it) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                     }
                     is ConversationState.Ready -> {
                         if (state.isLoadingMessages && state.messages.isEmpty()) {
@@ -222,6 +237,9 @@ fun ChatScreen(
         }
     }
 }
+
+internal fun shouldShowStarterPromptsForNoConversation(state: ChatUiState): Boolean =
+    state.messages.isEmpty() && !state.isStreaming
 
 @Composable
 private fun ChatContent(
