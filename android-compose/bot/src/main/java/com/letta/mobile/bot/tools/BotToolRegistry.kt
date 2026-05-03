@@ -33,6 +33,7 @@ data class BotToolDefinition(
     val description: String,
     val tags: Set<String> = emptySet(),
     val parameters: List<BotToolParameter> = emptyList(),
+    val hostApproval: HostToolApprovalMetadata = HostToolApprovalMetadata.None,
 )
 
 sealed interface BotToolExecutionResult {
@@ -48,6 +49,12 @@ sealed interface BotToolExecutionResult {
         val reason: String,
     ) : BotToolExecutionResult
 
+    data class Denied(
+        override val toolName: String,
+        val reason: String,
+        val payload: String,
+    ) : BotToolExecutionResult
+
     data class Failure(
         override val toolName: String,
         val error: String,
@@ -58,6 +65,7 @@ sealed interface BotToolExecutionResult {
 class BotToolRegistry @Inject constructor(
     private val contextProviders: @JvmSuppressWildcards Set<DeviceContextProvider>,
     private val androidExecutionBridge: AndroidExecutionBridge,
+    private val hostToolApprovalEngine: HostToolApprovalEngine = DefaultHostToolApprovalEngine(),
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -86,6 +94,7 @@ class BotToolRegistry @Inject constructor(
             name = "launch_main_app",
             description = "Bring the Letta Mobile app to the foreground",
             tags = setOf("android", "app", "launch"),
+            hostApproval = HostToolApprovalMetadata(auditEnabled = true, operation = "launch_self"),
         ),
         "launch_app" to BotToolDefinition(
             name = "launch_app",
@@ -94,32 +103,53 @@ class BotToolRegistry @Inject constructor(
             parameters = listOf(
                 BotToolParameter("package_name", SCHEMA_TYPE_STRING, "Android package name to launch, for example com.android.settings."),
             ),
+            hostApproval = HostToolApprovalMetadata(
+                riskLevel = HostToolRiskLevel.Low,
+                operation = "launch_app",
+                scopeArgumentNames = setOf("package_name"),
+                auditEnabled = true,
+            ),
         ),
         "write_clipboard" to BotToolDefinition(
             name = "write_clipboard",
             description = "Write text to the Android clipboard",
             tags = setOf("android", "clipboard"),
             parameters = listOf(BotToolParameter("text", SCHEMA_TYPE_STRING, "Text to place on the Android clipboard.")),
+            hostApproval = HostToolApprovalMetadata(
+                riskLevel = HostToolRiskLevel.Medium,
+                operation = "write_clipboard",
+                redactedArgumentNames = setOf("text"),
+                auditEnabled = true,
+            ),
         ),
         "read_clipboard" to BotToolDefinition(
             name = "read_clipboard",
             description = "Read the current Android clipboard text",
             tags = setOf("android", "clipboard"),
+            hostApproval = HostToolApprovalMetadata(
+                riskLevel = HostToolRiskLevel.Medium,
+                operation = "read_clipboard",
+                redactedArgumentNames = setOf("text"),
+                auditEnabled = true,
+            ),
         ),
         "notification_status" to BotToolDefinition(
             name = "notification_status",
             description = "Get notification permission and active notification status for the Android device",
             tags = setOf("android", "notifications"),
+            hostApproval = HostToolApprovalMetadata(auditEnabled = true, operation = "notification_status"),
         ),
         "list_launchable_apps" to BotToolDefinition(
             name = "list_launchable_apps",
             description = "List launchable apps installed on the Android device",
             tags = setOf("android", "apps"),
+            hostApproval = HostToolApprovalMetadata(auditEnabled = true, operation = "list_launchable_apps"),
         ),
         "android_open_wifi_settings" to BotToolDefinition(
             name = "android_open_wifi_settings",
             description = "Open Android Wi-Fi settings. This only opens Settings UI; it does not silently change Wi-Fi state.",
             tags = setOf("android", "settings", "wifi", "host-tool"),
+            hostApproval = HostToolApprovalMetadata(auditEnabled = true, operation = "open_wifi_settings"),
         ),
         "android_show_location_on_map" to BotToolDefinition(
             name = "android_show_location_on_map",
@@ -127,6 +157,12 @@ class BotToolRegistry @Inject constructor(
             tags = setOf("android", "maps", "location", "host-tool"),
             parameters = listOf(
                 BotToolParameter("location", SCHEMA_TYPE_STRING, "Location query, place name, business, or address to show on a map."),
+            ),
+            hostApproval = HostToolApprovalMetadata(
+                riskLevel = HostToolRiskLevel.Low,
+                operation = "show_location_on_map",
+                redactedArgumentNames = setOf("location"),
+                auditEnabled = true,
             ),
         ),
         "android_send_email_draft" to BotToolDefinition(
@@ -138,6 +174,12 @@ class BotToolRegistry @Inject constructor(
                 BotToolParameter("subject", SCHEMA_TYPE_STRING, "Draft email subject."),
                 BotToolParameter("body", SCHEMA_TYPE_STRING, "Draft email body."),
             ),
+            hostApproval = HostToolApprovalMetadata(
+                riskLevel = HostToolRiskLevel.Low,
+                operation = "send_email_draft",
+                redactedArgumentNames = setOf("to", "subject", "body"),
+                auditEnabled = true,
+            ),
         ),
         "android_send_sms_draft" to BotToolDefinition(
             name = "android_send_sms_draft",
@@ -147,6 +189,12 @@ class BotToolRegistry @Inject constructor(
                 BotToolParameter("phone_number", SCHEMA_TYPE_STRING, "Recipient phone number."),
                 BotToolParameter("body", SCHEMA_TYPE_STRING, "Draft SMS body."),
             ),
+            hostApproval = HostToolApprovalMetadata(
+                riskLevel = HostToolRiskLevel.Low,
+                operation = "send_sms_draft",
+                redactedArgumentNames = setOf("phone_number", "body"),
+                auditEnabled = true,
+            ),
         ),
         "android_create_calendar_event_draft" to BotToolDefinition(
             name = "android_create_calendar_event_draft",
@@ -155,6 +203,12 @@ class BotToolRegistry @Inject constructor(
             parameters = listOf(
                 BotToolParameter("title", SCHEMA_TYPE_STRING, "Calendar event title."),
                 BotToolParameter("datetime", SCHEMA_TYPE_STRING, "Event start datetime as ISO-8601, for example 2026-05-02T14:30:00."),
+            ),
+            hostApproval = HostToolApprovalMetadata(
+                riskLevel = HostToolRiskLevel.Low,
+                operation = "create_calendar_event_draft",
+                redactedArgumentNames = setOf("title"),
+                auditEnabled = true,
             ),
         ),
         "android_create_contact_draft" to BotToolDefinition(
@@ -167,12 +221,24 @@ class BotToolRegistry @Inject constructor(
                 BotToolParameter("phone_number", SCHEMA_TYPE_STRING, "Optional contact phone number.", required = false),
                 BotToolParameter("email", SCHEMA_TYPE_STRING, "Optional contact email address.", required = false),
             ),
+            hostApproval = HostToolApprovalMetadata(
+                riskLevel = HostToolRiskLevel.Low,
+                operation = "create_contact_draft",
+                redactedArgumentNames = setOf("first_name", "last_name", "phone_number", "email"),
+                auditEnabled = true,
+            ),
         ),
         "android_set_flashlight" to BotToolDefinition(
             name = "android_set_flashlight",
             description = "Turn the Android flashlight on or off when a camera flash is available. This directly changes device state and returns capability/audit metadata in the result.",
             tags = setOf("android", "flashlight", "device-state", "host-tool"),
             parameters = listOf(BotToolParameter("enabled", SCHEMA_TYPE_BOOLEAN, "True to turn the flashlight on, false to turn it off.")),
+            hostApproval = HostToolApprovalMetadata(
+                riskLevel = HostToolRiskLevel.Low,
+                capabilityId = "android.flashlight",
+                operation = "set_torch_mode",
+                auditEnabled = true,
+            ),
         ),
         "render_summary_card" to BotToolDefinition(
             name = "render_summary_card",
@@ -210,8 +276,10 @@ class BotToolRegistry @Inject constructor(
     suspend fun execute(toolName: String, arguments: String?): BotToolExecutionResult {
         val definition = definitions[toolName]
             ?: return BotToolExecutionResult.Unavailable(toolName, "Unsupported local bot tool")
+        val approvalRequest = definition.hostApproval.toRequest(definition.name, parseArgumentsForApproval(arguments))
+        evaluateHostToolApproval(approvalRequest)?.let { return it }
 
-        return when (toolName) {
+        val result = when (toolName) {
             "get_battery_status" -> executeProviderTool(definition, providerId = "battery")
             "get_connectivity_status" -> executeProviderTool(definition, providerId = "connectivity")
             "get_current_time" -> executeProviderTool(definition, providerId = "time")
@@ -234,7 +302,77 @@ class BotToolRegistry @Inject constructor(
             "render_suggestion_chips" -> executeGeneratedUi(definition, arguments)
             else -> BotToolExecutionResult.Unavailable(toolName, "Unsupported local bot tool")
         }
+        recordHostToolAudit(approvalRequest, result)
+        return result
     }
+
+    private suspend fun evaluateHostToolApproval(
+        request: HostToolApprovalRequest,
+    ): BotToolExecutionResult? {
+        if (request.policy == HostToolApprovalPolicy.None && !request.auditEnabled) return null
+
+        return when (val decision = hostToolApprovalEngine.evaluate(request)) {
+            is HostToolApprovalDecision.Allowed -> null
+            is HostToolApprovalDecision.RequiresApproval,
+            is HostToolApprovalDecision.Denied,
+            -> {
+                val payload = HostToolStructuredResults.denied(request, decision).toString()
+                val result = BotToolExecutionResult.Denied(
+                    toolName = request.toolName,
+                    reason = decision.reason,
+                    payload = payload,
+                )
+                recordHostToolAudit(request, result)
+                result
+            }
+            is HostToolApprovalDecision.Unavailable -> {
+                val result = BotToolExecutionResult.Unavailable(request.toolName, decision.reason)
+                recordHostToolAudit(request, result)
+                result
+            }
+        }
+    }
+
+    private suspend fun recordHostToolAudit(
+        request: HostToolApprovalRequest,
+        result: BotToolExecutionResult,
+    ) {
+        if (!request.auditEnabled) return
+
+        hostToolApprovalEngine.recordAudit(
+            HostToolAuditEvent(
+                toolName = request.toolName,
+                capabilityId = request.capabilityId,
+                operation = request.operation,
+                riskLevel = request.riskLevel,
+                disposition = result.toDisposition(),
+                arguments = request.arguments,
+                result = result.auditPayload(),
+                redactedFieldNames = request.redactedArgumentNames,
+            ),
+        )
+    }
+
+    private fun BotToolExecutionResult.toDisposition(): HostToolExecutionDisposition = when (this) {
+        is BotToolExecutionResult.Success -> HostToolExecutionDisposition.Allowed
+        is BotToolExecutionResult.Unavailable -> HostToolExecutionDisposition.Unavailable
+        is BotToolExecutionResult.Denied -> HostToolExecutionDisposition.Denied
+        is BotToolExecutionResult.Failure -> HostToolExecutionDisposition.Failed
+    }
+
+    private fun BotToolExecutionResult.auditPayload(): JsonObject = when (this) {
+        is BotToolExecutionResult.Success -> runCatching { json.parseToJsonElement(payload).jsonObject }.getOrElse {
+            buildJsonObject { put("payload", payload) }
+        }
+        is BotToolExecutionResult.Unavailable -> buildJsonObject { put("reason", reason) }
+        is BotToolExecutionResult.Denied -> runCatching { json.parseToJsonElement(payload).jsonObject }.getOrElse {
+            buildJsonObject { put("reason", reason) }
+        }
+        is BotToolExecutionResult.Failure -> buildJsonObject { put("error", error) }
+    }
+
+    private fun parseArgumentsForApproval(arguments: String?): JsonObject =
+        runCatching { json.parseToJsonElement(arguments.orEmpty()).jsonObject }.getOrDefault(buildJsonObject { })
 
     private suspend fun executeProviderTool(
         definition: BotToolDefinition,

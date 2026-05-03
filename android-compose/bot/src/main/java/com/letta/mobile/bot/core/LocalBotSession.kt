@@ -360,6 +360,18 @@ class LocalBotSession @AssistedInject constructor(
                     "Unavailable: $toolName"
                 }
 
+                is BotToolExecutionResult.Denied -> {
+                    val toolCallId = toolCall.effectiveId
+                    if (toolCallId.isNotBlank()) {
+                        runtimeClient.submitToolResult(
+                            conversationId = event.conversationId,
+                            toolCallId = toolCallId,
+                            toolReturn = result.payload,
+                        )
+                    }
+                    "Denied: $toolName"
+                }
+
                 is BotToolExecutionResult.Failure -> {
                     val toolCallId = toolCall.effectiveId
                     if (toolCallId.isNotBlank()) {

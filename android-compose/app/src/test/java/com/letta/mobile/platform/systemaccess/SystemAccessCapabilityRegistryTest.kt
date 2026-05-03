@@ -4,6 +4,8 @@ package com.letta.mobile.platform.systemaccess
 
 import android.Manifest
 import android.os.Build
+import com.letta.mobile.bot.tools.HostToolApprovalPolicy
+import com.letta.mobile.bot.tools.HostToolRiskLevel
 import com.letta.mobile.platform.SystemAccessFlavor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -114,6 +116,24 @@ class SystemAccessCapabilityRegistryTest {
 
         assertEquals(SystemAccessCapabilityStatus.Granted, capability?.status)
         assertTrue(registry.canExposeTool("notifications.post_status"))
+    }
+
+    @Test
+    fun `capability policy maps to host tool approval metadata`() {
+        val registry = DefaultSystemAccessCapabilityRegistry(
+            FakeSystemAccessEnvironment(
+                flavor = SystemAccessFlavor.Root,
+                rootToolsBuildEnabled = true,
+            ),
+        )
+
+        val capability = registry.getCapability(SystemAccessCapabilityIds.ROOT_SHELL)!!
+        val metadata = capability.toHostToolApprovalMetadata("shell.root.run")
+
+        assertEquals(HostToolApprovalPolicy.AskEveryTime, metadata?.policy)
+        assertEquals(HostToolRiskLevel.Root, metadata?.riskLevel)
+        assertEquals(SystemAccessCapabilityIds.ROOT_SHELL, metadata?.capabilityId)
+        assertEquals(setOf("environment", "stdout", "stderr"), metadata?.redactedArgumentNames)
     }
 
     private class FakeSystemAccessEnvironment(

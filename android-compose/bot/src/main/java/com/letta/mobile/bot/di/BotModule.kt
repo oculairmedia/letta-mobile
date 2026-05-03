@@ -10,6 +10,8 @@ import com.letta.mobile.bot.runtime.DefaultLettaRuntimeClient
 import com.letta.mobile.bot.runtime.LettaRuntimeClient
 import com.letta.mobile.bot.tools.AndroidExecutionBridge
 import com.letta.mobile.bot.tools.DefaultAndroidExecutionBridge
+import com.letta.mobile.bot.tools.DefaultHostToolApprovalEngine
+import com.letta.mobile.bot.tools.HostToolApprovalEngine
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -33,6 +35,9 @@ abstract class BotModule {
 
     @Binds
     abstract fun bindAndroidExecutionBridge(impl: DefaultAndroidExecutionBridge): AndroidExecutionBridge
+
+    @Binds
+    abstract fun bindHostToolApprovalEngine(impl: DefaultHostToolApprovalEngine): HostToolApprovalEngine
 
     @Binds
     abstract fun bindBotServerProfileStore(impl: BotServerProfileStore): IBotServerProfileStore
