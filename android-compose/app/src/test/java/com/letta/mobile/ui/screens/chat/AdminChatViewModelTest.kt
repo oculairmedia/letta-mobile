@@ -471,14 +471,14 @@ class AdminChatViewModelTest {
         vm.sendMessage("Hello from client mode")
         advanceUntilIdle()
 
-        coVerify(exactly = 1) {
-            conversationRepository.createConversation("agent-1", "Hello from client mode")
+        coVerify(exactly = 0) {
+            conversationRepository.createConversation(any(), any())
         }
         verify(exactly = 1) {
             clientModeChatSender.streamMessage(
                 screenAgentId = "agent-1",
                 text = "Hello from client mode",
-                conversationId = "new-conv",
+                conversationId = null,
             )
         }
         assertEquals(2, vm.uiState.value.messages.size)
@@ -710,18 +710,10 @@ class AdminChatViewModelTest {
     }
 
     @Test
-    fun `fresh client mode bootstrap shows streaming before conversation create completes and blocks duplicate submit`() = runTest {
+    fun `fresh client mode bootstrap shows streaming before first gateway chunk and blocks duplicate submit`() = runTest {
         clientModeEnabledFlow.value = true
         activeConversationIds.clear()
         messages = emptyList()
-
-        val createGate = kotlinx.coroutines.CompletableDeferred<Unit>()
-        var createCalls = 0
-        coEvery { conversationRepository.createConversation("agent-1", "hello fresh") } coAnswers {
-            createCalls += 1
-            createGate.await()
-            TestData.conversation(id = "new-conv", agentId = "agent-1", summary = "hello fresh")
-        }
 
         val chunks = Channel<BotStreamChunk>(capacity = Channel.UNLIMITED)
         every {
@@ -739,7 +731,7 @@ class AdminChatViewModelTest {
         vm.sendMessage("hello fresh")
 
         assertEquals(
-            "Fresh bootstrap must clear the composer before createConversation returns",
+            "Fresh bootstrap must clear the composer before the first gateway chunk",
             "",
             vm.inputText.value,
         )
@@ -747,13 +739,13 @@ class AdminChatViewModelTest {
             it.role == "user" && it.content == "hello fresh"
         }
         assertEquals(
-            "Fresh bootstrap must render one optimistic user bubble while createConversation is still pending; " +
+            "Fresh bootstrap must render one optimistic user bubble while the gateway has not returned a conversation yet; " +
                 "messages=${vm.uiState.value.messages.map { "${it.role}=${it.content}" }}",
             1,
             optimisticUserBubbles.size,
         )
         assertTrue(
-            "Fresh bootstrap must show streaming while createConversation is still pending",
+            "Fresh bootstrap must show streaming before the first gateway chunk",
             vm.uiState.value.isStreaming,
         )
         assertTrue(
@@ -765,12 +757,10 @@ class AdminChatViewModelTest {
         vm.submitComposer("second tap")
         advanceUntilIdle()
 
-        assertEquals(
-            "Second composer submit during bootstrap must not start another create/send",
-            1,
-            createCalls,
+        assertTrue(
+            "Second composer submit during bootstrap must keep the original stream active",
+            vm.uiState.value.isStreaming,
         )
-        assertTrue(vm.uiState.value.isStreaming)
         verify(exactly = 0) {
             clientModeChatSender.streamMessage(
                 screenAgentId = any(),
@@ -779,14 +769,14 @@ class AdminChatViewModelTest {
             )
         }
 
-        createGate.complete(Unit)
-        advanceUntilIdle()
-
+        coVerify(exactly = 0) {
+            conversationRepository.createConversation(any(), any())
+        }
         verify(exactly = 1) {
             clientModeChatSender.streamMessage(
                 screenAgentId = "agent-1",
                 text = "hello fresh",
-                conversationId = "new-conv",
+                conversationId = null,
             )
         }
 
@@ -1427,7 +1417,7 @@ class AdminChatViewModelTest {
     }
 
     @Test
-    fun `toggling client mode off keeps precreated fresh client conversation`() = runTest {
+    fun `toggling client mode off keeps gateway-created fresh client conversation`() = runTest {
         clientModeEnabledFlow.value = true
         messages = listOf(
             TestData.appMessage(id = "timeline-user", messageType = MessageType.USER, content = "Timeline hello"),
@@ -1439,9 +1429,10 @@ class AdminChatViewModelTest {
             emit(BotStreamChunk(text = "Client reply", conversationId = "new-conv", done = true))
         }
 
-        // letta-mobile-vynx: fresh Client Mode routes now pre-create a blank
-        // Letta conversation before sending so toggling Client Mode off should
-        // stay on that newly-created conversation, not restore old conv-1.
+        // letta-mobile-w4pp: fresh Client Mode routes let the gateway create
+        // the conversation, then pin that returned id locally so toggling
+        // Client Mode off stays on the new conversation instead of restoring
+        // old conv-1.
         val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
         advanceUntilIdle()
 
@@ -1497,14 +1488,14 @@ class AdminChatViewModelTest {
         vm.sendMessage("hello")
         advanceUntilIdle()
 
-        coVerify(exactly = 1) {
-            conversationRepository.createConversation("agent-1", "hello")
+        coVerify(exactly = 0) {
+            conversationRepository.createConversation(any(), any())
         }
         verify(exactly = 1) {
             clientModeChatSender.streamMessage(
                 screenAgentId = "agent-1",
                 text = "hello",
-                conversationId = "new-conv",
+                conversationId = null,
             )
         }
         coVerify(exactly = 0) { timelineRepository.sendMessage(any(), any()) }
@@ -1546,14 +1537,14 @@ class AdminChatViewModelTest {
         vm.sendMessage("hello")
         advanceUntilIdle()
 
-        coVerify(exactly = 1) {
-            conversationRepository.createConversation("agent-1", "hello")
+        coVerify(exactly = 0) {
+            conversationRepository.createConversation(any(), any())
         }
         verify(exactly = 1) {
             clientModeChatSender.streamMessage(
                 screenAgentId = "agent-1",
                 text = "hello",
-                conversationId = "new-conv",
+                conversationId = null,
             )
         }
         coVerify(exactly = 0) { timelineRepository.sendMessage(any(), any()) }
@@ -2292,29 +2283,10 @@ class AdminChatViewModelTest {
     }
 
     @Test
-    fun `fresh route client mode skips optimistic append when bootstrap user already hydrated`() = runTest {
+    fun `fresh route client mode migrates optimistic user to gateway-created conversation`() = runTest {
         clientModeEnabledFlow.value = true
         activeConversationIds.clear()
         messages = emptyList()
-
-        val hydratedBootstrapTimeline = kotlinx.coroutines.flow.MutableStateFlow(
-            com.letta.mobile.data.timeline.Timeline(
-                conversationId = "new-conv",
-                events = listOf(
-                    com.letta.mobile.data.timeline.TimelineEvent.Confirmed(
-                        position = 1.0,
-                        otid = "server-bootstrap-user",
-                        content = "hello fresh",
-                        serverId = "server-bootstrap-user",
-                        messageType = com.letta.mobile.data.timeline.TimelineMessageType.USER,
-                        date = Instant.now(),
-                        runId = null,
-                        stepId = null,
-                    ),
-                ),
-            ),
-        )
-        coEvery { timelineRepository.observe("new-conv") } returns hydratedBootstrapTimeline
 
         val chunks = Channel<BotStreamChunk>(capacity = Channel.UNLIMITED)
         every {
@@ -2335,10 +2307,18 @@ class AdminChatViewModelTest {
             clientModeChatSender.streamMessage(
                 screenAgentId = "agent-1",
                 text = "hello fresh",
-                conversationId = "new-conv",
+                conversationId = null,
             )
         }
         coVerify(exactly = 0) {
+            conversationRepository.createConversation(any(), any())
+        }
+
+        chunks.send(BotStreamChunk(text = "reply", conversationId = "new-conv", done = true))
+        chunks.close()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) {
             timelineRepository.appendClientModeLocal(
                 conversationId = "new-conv",
                 content = "hello fresh",
@@ -2347,17 +2327,11 @@ class AdminChatViewModelTest {
         }
         val userBubbles = vm.uiState.value.messages.filter { it.role == "user" && it.content == "hello fresh" }
         assertEquals(
-            "Hydrated bootstrap user message should not be duplicated; " +
+            "Migrated fresh-route user message should not be duplicated; " +
                 "messages=${vm.uiState.value.messages.map { "${it.role}=${it.content}" }}",
             1,
             userBubbles.size,
         )
-        assertTrue("isStreaming must remain true mid-flight", vm.uiState.value.isStreaming)
-        assertTrue("isAgentTyping must remain true mid-flight", vm.uiState.value.isAgentTyping)
-
-        chunks.send(BotStreamChunk(text = "reply", conversationId = "new-conv", done = true))
-        chunks.close()
-        advanceUntilIdle()
     }
 
     @Test
@@ -2382,14 +2356,14 @@ class AdminChatViewModelTest {
         )
         advanceUntilIdle()
 
-        coVerify(exactly = 1) {
-            conversationRepository.createConversation("agent-1", "hello initial")
+        coVerify(exactly = 0) {
+            conversationRepository.createConversation(any(), any())
         }
         verify(exactly = 1) {
             clientModeChatSender.streamMessage(
                 screenAgentId = "agent-1",
                 text = "hello initial",
-                conversationId = "new-conv",
+                conversationId = null,
             )
         }
         coVerify(exactly = 0) {
@@ -2470,14 +2444,14 @@ class AdminChatViewModelTest {
         clientModeEnabledFlow.value = true
         advanceUntilIdle()
 
-        coVerify(exactly = 1) {
-            conversationRepository.createConversation("agent-1", "send me once")
+        coVerify(exactly = 0) {
+            conversationRepository.createConversation(any(), any())
         }
         verify(exactly = 1) {
             clientModeChatSender.streamMessage(
                 screenAgentId = "agent-1",
                 text = "send me once",
-                conversationId = "new-conv",
+                conversationId = null,
             )
         }
         coVerify(exactly = 0) {

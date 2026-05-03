@@ -1537,19 +1537,20 @@ class AdminChatViewModel @Inject constructor(
         // the saved-state-handle pointer for cases where Client Mode set up the
         // conversation itself (fresh-route entry continued in-place).
         val initialPriorConversationId = explicitConversationId ?: currentClientModeConversationId()
-        // letta-mobile-vynx: a fresh Client Mode route needs an explicit
-        // empty conversation before the first send. Passing null to the
-        // gateway can resume its prior active SDK session, which hydrates
-        // old history and clobbers the optimistic first prompt. Create the
-        // Letta conversation up front, then run normal timeline-backed
-        // Client Mode against that known-empty id.
-        val bootstrapFreshConversation = isFreshRoute && initialPriorConversationId == null
-        // Fresh bootstrap must feel like an ordinary send: clear the composer
-        // and render the user's bubble immediately, not after the network-bound
-        // createConversation() preflight returns. Once the real conversation is
-        // created, the timeline Local/Confirmed row replaces this in-memory
-        // staging bubble because startTimelineObserver() makes the timeline the
-        // message-list authority for the new conversation.
+        // letta-mobile-w4pp: do NOT pre-create an empty Letta conversation
+        // for fresh Client Mode routes. Field logs from Pixel 9 Pro showed
+        // the gateway rejecting sends into those app-created empty
+        // conversations with BAD_MESSAGE / `Missing "type" field`, producing
+        // the user-visible "thinking indicator flashes then disappears"
+        // regression. Fresh routes instead use the legacy transport shape:
+        // pass conversationId=null, let the gateway allocate the real
+        // conversation, then migrate the local user/assistant bubbles to the
+        // timeline when the first chunk/result echoes that conversation id.
+        val bootstrapFreshConversation = false
+        // Clear the composer before the network send. Fresh routes without a
+        // prior conversation render their optimistic user bubble in the legacy
+        // in-memory branch below, then migrate it to the timeline once the
+        // gateway announces the new conversation.
         composerController.clearAfterSend()
         if (bootstrapFreshConversation) {
             stopTimelineObserver()
@@ -1805,6 +1806,7 @@ class AdminChatViewModel @Inject constructor(
                     }
                     if (!latestConversationId.isNullOrBlank()) {
                         setClientModeConversationId(latestConversationId)
+                        activeConversationId = latestConversationId
                         clientModeBootstrapState = ClientModeBootstrapState.Ready(latestConversationId)
                         currentConversationTracker.setCurrent(latestConversationId)
                         // letta-mobile-5s1n: fresh-route migration. The first

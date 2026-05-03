@@ -303,6 +303,16 @@ No formal measurements have been recorded in-repo yet. Add completed rows here o
 
 **Field result:** the user retested the installed build and reported the issue appears fixed; continue to watch for separate missing-terminal-frame evidence before reopening.
 
+### 2026-05-02 — Fresh Client Mode route rejected pre-created conversation (`letta-mobile-w4pp`)
+
+**Symptom:** existing Client Mode conversations persisted after the screen-off fix, but starting a new conversation showed the thinking indicator briefly and then it disappeared with no assistant response.
+
+**Device logs:** fresh-route sends created an app-side empty conversation first, appended the optimistic user Local, then called the WS gateway with that pre-created conversation id. The gateway immediately returned `BotGatewayException: Missing "type" field` before emitting any assistant chunks.
+
+**Fix:** fresh Client Mode routes no longer pre-create the Letta conversation for the WS send path. They pass `conversationId=null`, let the gateway allocate the real conversation, and migrate the optimistic user/assistant locals to the timeline once the gateway echoes the new conversation id. The VM also pins that returned id into `activeConversationId` so toggling Client Mode off stays on the newly-created conversation instead of falling back to the agent's previous chat.
+
+**Regression coverage:** `AdminChatViewModelTest` fresh-route cases now assert no app-side `createConversation` preflight, `streamMessage(..., conversationId = null)`, optimistic bubble visibility before the first gateway chunk, migration to the gateway-created conversation, and persistence of that new conversation when Client Mode is toggled off.
+
 ---
 
 ## Follow-up issue rules
