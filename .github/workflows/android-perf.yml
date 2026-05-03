@@ -35,6 +35,7 @@ jobs:
         com.letta.mobile.macrobenchmark.StartupBenchmark#warmStartup
       PERF_OUTPUT_DIR: macrobenchmark/build/outputs/connected_android_test_additional_output
       PERF_REPORT_DIR: macrobenchmark/build/reports/androidTests
+      PERF_SUMMARY_DIR: build/perf-summary
       PR_TITLE: ${{ github.event.pull_request.title || '' }}
       WORKFLOW_REBASELINE: ${{ inputs.rebaseline || false }}
 
@@ -56,7 +57,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Run macrobenchmarks on API 33 emulator
+      - name: Run macrobenchmarks on API 33 emulator (attempt 1)
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 33
@@ -71,16 +72,54 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
           working-directory: android-compose
           script: |
+            rm -rf "$PERF_SUMMARY_DIR"; mkdir -p "$PERF_SUMMARY_DIR/attempt-1"
             FILTER=$(printf '%s\n' "$PERF_BENCHMARK_FILTER" | awk 'NF { printf "%s,", $0 } END { print "" }' | sed 's/,$//'); ./gradlew --no-daemon :macrobenchmark:connectedBenchmarkAndroidTest -Pandroid.testInstrumentationRunnerArguments.class="$FILTER"
 
-      - name: Check perf baselines
+      - name: Check perf baselines (attempt 1)
+        id: check_perf_attempt_1
         run: |
           set -euo pipefail
           if [[ "$WORKFLOW_REBASELINE" == "true" ]] || [[ "$PR_TITLE" == *"[perf:rebaseline]"* ]]; then
-            python3 perf/check_baselines.py "$PERF_OUTPUT_DIR" --rebaseline
+            python3 perf/check_baselines.py "$PERF_OUTPUT_DIR" --rebaseline --summary-json "$PERF_SUMMARY_DIR/attempt-1/perf-summary.json" --summary-md "$PERF_SUMMARY_DIR/attempt-1/perf-summary.md"
+            echo "retry=false" >> "$GITHUB_OUTPUT"
           else
-            python3 perf/check_baselines.py "$PERF_OUTPUT_DIR"
+            set +e
+            python3 perf/check_baselines.py "$PERF_OUTPUT_DIR" --retryable-single-cold-start-exit-code 3 --summary-json "$PERF_SUMMARY_DIR/attempt-1/perf-summary.json" --summary-md "$PERF_SUMMARY_DIR/attempt-1/perf-summary.md"
+            status=$?
+            set -e
+            if [[ "$status" -eq 3 ]]; then
+              echo "retry=true" >> "$GITHUB_OUTPUT"
+              echo "::warning::Cold startup exceeded the perf ceiling on attempt 1; rerunning once to distinguish emulator noise from a repeatable regression."
+              exit 0
+            fi
+            echo "retry=false" >> "$GITHUB_OUTPUT"
+            exit "$status"
           fi
+
+      - name: Rerun macrobenchmarks after retryable cold-start failure (attempt 2)
+        if: steps.check_perf_attempt_1.outputs.retry == 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          cores: 4
+          ram-size: 4096M
+          heap-size: 512M
+          emulator-boot-timeout: 900
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          working-directory: android-compose
+          script: |
+            rm -rf "$PERF_OUTPUT_DIR" "$PERF_REPORT_DIR"; mkdir -p "$PERF_SUMMARY_DIR/attempt-2"
+            FILTER=$(printf '%s\n' "$PERF_BENCHMARK_FILTER" | awk 'NF { printf "%s,", $0 } END { print "" }' | sed 's/,$//'); ./gradlew --no-daemon :macrobenchmark:connectedBenchmarkAndroidTest -Pandroid.testInstrumentationRunnerArguments.class="$FILTER"
+
+      - name: Check perf baselines after retry (attempt 2)
+        if: steps.check_perf_attempt_1.outputs.retry == 'true'
+        run: |
+          set -euo pipefail
+          python3 perf/check_baselines.py "$PERF_OUTPUT_DIR" --summary-json "$PERF_SUMMARY_DIR/attempt-2/perf-summary.json" --summary-md "$PERF_SUMMARY_DIR/attempt-2/perf-summary.md"
 
       - name: Upload perf benchmark results
         if: always()
@@ -90,6 +129,8 @@ jobs:
           path: |
             android-compose/${{ env.PERF_OUTPUT_DIR }}
             android-compose/${{ env.PERF_REPORT_DIR }}
+            android-compose/${{ env.PERF_SUMMARY_DIR }}
+            android-compose/perf/baselines.json
           if-no-files-found: warn
 
       - name: Upload rebaselined perf baselines

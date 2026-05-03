@@ -48,11 +48,13 @@ local macrobench run shows `startup.cold.p95_ms` above the
    failing metric is `StartupBenchmark#coldStartupCompilationPartial` and not
    noise from a different benchmark. See
    [`perf-gate.md` → Investigating flakes](perf-gate.md#investigating-flakes).
-3. **Rerun the workflow once.** First-run cold-start variance on the shared
-   GitHub Actions emulator is a known characteristic of the gate; a clean
-   second run is the documented first response.
-4. If the second run also fails on `startup.cold.p95_ms`, treat it as a real
-   regression. Do **not** widen tolerances reactively.
+3. Check whether the workflow already took the automatic cold-start retry path.
+   A single first-attempt `startup.cold.p95_ms` spike now triggers one bounded
+   rerun inside the same job; both attempts upload `build/perf-summary/attempt-*`
+   summaries.
+4. If the retry attempt also fails on `startup.cold.p95_ms`, treat it as a real
+   regression. Do **not** widen tolerances reactively or manually rerun to hide
+   the repeat failure.
 5. Reproduce locally if you have the canonical emulator available — see
    [Tool: Run macrobench locally](#run-macrobench-locally).
 6. If the regression is intentional and accepted (for example, a deliberate
@@ -225,6 +227,9 @@ explicitly. See
 
 Every `Android Perf Gate` run uploads `android-perf-results-*`. Inside:
 
+- `build/perf-summary/attempt-*/perf-summary.md` and `.json` — compact gate
+  summaries with observed value, baseline, ceiling, delta, benchmark source,
+  metric, JSON path, and gating/informational mode
 - `*-benchmarkData.json` — the AndroidX benchmark JSON the gate parses
 - HTML reports — human-readable per-iteration timings
 - The exact `baselines.json` the gate compared against
@@ -234,8 +239,9 @@ The parser reads from
 so the artifact mirrors that path. Match the failing metric in the JSON to
 a specific benchmark method before deciding the failure is real.
 
-If the failure looks like emulator startup noise (one bad iteration, others
-healthy), rerun the workflow once before assuming a regression. See
+If the failure looks like emulator startup noise, confirm whether attempt 2
+already ran. A clean retry means the job passes; a second cold-start failure is
+repeatable enough to investigate as a regression. See
 [`perf-gate.md` → Investigating flakes](perf-gate.md#investigating-flakes).
 
 ### Read the Sentry ANR / crash dashboard

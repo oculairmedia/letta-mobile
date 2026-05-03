@@ -48,6 +48,13 @@ The parser reads AndroidX benchmark JSON output from:
 
 `android-compose/macrobenchmark/build/outputs/connected_android_test_additional_output/`
 
+Each CI run also writes compact summaries under `android-compose/build/perf-summary/`:
+
+- `attempt-1/perf-summary.json` and `.md` for the first benchmark sample
+- `attempt-2/perf-summary.json` and `.md` only when the cold-start retry path runs
+
+The summaries include observed value, baseline, ceiling, percent delta, benchmark source, AndroidX metric name, source JSON path, and whether the metric is gating or informational.
+
 ## Tolerances
 
 Tolerances are stored in `android-compose/perf/baselines.json`, not hard-coded
@@ -69,6 +76,29 @@ Warm startup is non-gating because later PR runs on the same healthy emulator
 showed one-sided warm spikes (for example `434.843 ms` against a `285.988 ms`
 seed) while cold startup simultaneously improved, which is a strong signal of
 shared-runner noise rather than a trustworthy per-PR regression detector.
+
+## Retry behavior
+
+The workflow automatically performs **one bounded retry** when, and only when,
+the first baseline check finds a regression limited to
+`startup.cold.p95_ms`. The first check exits through a dedicated retryable
+status, the job reruns the macrobenchmark suite on a fresh emulator action
+invocation, clears the first attempt's AndroidX output, and then runs the
+baseline check again without the retryable exit code.
+
+Outcomes:
+
+- attempt 1 passes: job passes, no retry
+- attempt 1 has only `startup.cold.p95_ms` above ceiling and attempt 2 passes:
+  job passes and both attempt summaries are uploaded
+- attempt 2 also has `startup.cold.p95_ms` above ceiling: job fails and should
+  be treated as a repeatable startup regression
+- any non-retryable failure, malformed input, unseeded gating baseline, or
+  benchmark task failure: job fails immediately
+
+This retry does **not** raise the `+20%` ceiling and does not make warm startup
+or future informational metrics gating. It exists only to separate a single
+shared-emulator cold-start spike from a repeatable regression.
 
 ## Re-baselining
 
@@ -151,10 +181,14 @@ here rather than hard-coded in the repo.
 If the job fails unexpectedly:
 
 1. download the `android-perf-results-*` artifact
-2. inspect the `*-benchmarkData.json` files and HTML reports
-3. verify the failing metric is from the expected benchmark method
-4. rerun the workflow once to rule out emulator startup noise
-5. if the change is legitimate and repeatable, rebaseline deliberately
+2. inspect `build/perf-summary/attempt-*/perf-summary.md` first for the compact
+   observed/baseline/ceiling/delta/source/path view
+3. inspect the underlying `*-benchmarkData.json` files and HTML reports for the
+   failing attempt
+4. verify the failing metric is from the expected benchmark method
+5. if the workflow already used attempt 2 and cold startup failed again, treat
+   it as repeatable rather than manually rerunning to hide the failure
+6. if the change is legitimate and repeatable, rebaseline deliberately
 
 ## Regression simulation
 
