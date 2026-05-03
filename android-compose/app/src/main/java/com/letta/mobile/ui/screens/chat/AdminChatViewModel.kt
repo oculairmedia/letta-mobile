@@ -2264,7 +2264,17 @@ class AdminChatViewModel @Inject constructor(
                                     else -> existing.content + delta
                                 }
                                 existing.copy(
-                                    content = existing.content + delta,
+                                    // letta-mobile-etc1 (follow-up): use the
+                                    // computed `merged` value here. Previously
+                                    // this site computed the dedup heuristic
+                                    // but unconditionally appended `delta`,
+                                    // which doubled the assistant bubble any
+                                    // time the gateway re-emitted an
+                                    // identical or prefix-related delta
+                                    // — e.g. when a long WS stream survived a
+                                    // screen-off / wake cycle and chunks
+                                    // replayed after the run resumed.
+                                    content = merged,
                                     messageType = com.letta.mobile.data.timeline.TimelineMessageType.ASSISTANT,
                                 )
                             },
