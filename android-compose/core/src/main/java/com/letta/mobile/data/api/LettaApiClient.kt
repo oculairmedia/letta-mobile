@@ -74,8 +74,8 @@ open class LettaApiClient @Inject constructor(
         // letta-mobile-kxsv: dedicated dispatcher with a higher
         // per-host concurrency limit. Default OkHttp Dispatcher caps
         // maxRequestsPerHost = 5, but this client routinely runs:
-        //   - up to WARMUP_CONVERSATION_COUNT (5) long-running idle
-        //     stream pollers against letta.oculair.ca, and
+        //   - up to ChatPushService.MAX_BACKGROUND_PERSISTENT_STREAMS (5)
+        //     long-running idle stream pollers against letta.oculair.ca, and
         //   - the user's interactive send-stream against the same host,
         //     which must NOT queue behind the pollers.
         //

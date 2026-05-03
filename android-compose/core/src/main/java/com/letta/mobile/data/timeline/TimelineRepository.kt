@@ -94,6 +94,15 @@ open class TimelineRepository @Inject constructor(
         return loop
     }
 
+    /**
+     * Number of cached sync loops currently owned by the singleton registry.
+     *
+     * Used for persistent-stream budget telemetry only. The repository does
+     * not evict loops as part of budget enforcement; foreground conversations
+     * still create on demand and remain cached for the process lifetime.
+     */
+    suspend fun cachedLoopCount(): Int = loopsMutex.withLock { loops.size }
+
     /** Observe a conversation's timeline state. */
     suspend fun observe(conversationId: String): StateFlow<Timeline> =
         getOrCreate(conversationId).state

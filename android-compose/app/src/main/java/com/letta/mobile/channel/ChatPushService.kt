@@ -224,33 +224,54 @@ class ChatPushService : Service() {
         // Pre-create subscribers for the agent's top conversations so streaming
         // kicks in before the user opens any chat screen.
         //
-        // letta-mobile-qv6d: limit reduced from 20 → WARMUP_CONVERSATION_COUNT
-        // (5). Each warmed conversation runs a permanent runStreamSubscriber
-        // coroutine that polls /v1/conversations/{id}/stream on the idle
-        // backoff ladder forever. At 20 convs and the prior 5s cap that
-        // produced ~4 RPS of background 400 traffic against
-        // letta.oculair.ca per device — saturating the OkHttp dispatcher
-        // (default maxRequestsPerHost = 5) and starving foreground SSE
-        // sends (Emmanuel's letta-mobile-kxsv hang).
+        // letta-mobile-qv6d/jmzq.4: limit reduced from 20 →
+        // MAX_BACKGROUND_PERSISTENT_STREAMS (5) and made explicit. Each
+        // warmed conversation runs a permanent runStreamSubscriber coroutine
+        // that polls /v1/conversations/{id}/stream on the idle backoff ladder
+        // forever. At 20 convs and the prior 5s cap that produced ~4 RPS of
+        // background 400 traffic against letta.oculair.ca per device —
+        // saturating the OkHttp dispatcher (default maxRequestsPerHost = 5)
+        // and starving foreground SSE sends (Emmanuel's letta-mobile-kxsv
+        // hang).
         //
-        // 5 conversations covers the realistic "I might tap any of these
-        // recents next" window. Anything older incurs a one-shot getOrCreate
+        // 5 proactively-created streams covers the realistic "I might tap any
+        // of these recents next" window. The currently visible conversation,
+        // when known, consumes the first warmup slot so it is never displaced
+        // by recency ordering. Anything older incurs a one-shot getOrCreate
         // hydrate on first open (~500ms — imperceptible if the user just
-        // tapped) and starts its own subscriber from there.
+        // tapped) and starts its own subscriber from there. Foreground UI
+        // getOrCreate remains on-demand and is not evicted by this budget.
         warmupJob?.cancel()
         warmupJob = scope.launch {
             val warmupTimer = Telemetry.startTimer("ChatPushService", "warmup")
+            val currentConversationId = currentConversationTracker.current
             try {
                 // letta-mobile-jmzq.5: emit warmup.start so we can measure
                 // time-to-first-hydrate and detect warmup that never starts.
                 Telemetry.event(
                     "ChatPushService", "warmup.start",
-                    "budget" to WARMUP_CONVERSATION_COUNT,
+                    "budget" to MAX_BACKGROUND_PERSISTENT_STREAMS,
+                    "currentConversationId" to (currentConversationId ?: "<none>"),
+                    "activeLoopCountBefore" to timelineRepository.cachedLoopCount(),
                 )
-                val conversations = conversationApi.listConversations(
-                    limit = WARMUP_CONVERSATION_COUNT,
+                val recentConversations = conversationApi.listConversations(
+                    limit = MAX_BACKGROUND_PERSISTENT_STREAMS,
                     order = "desc",
                     orderBy = "last_message_at",
+                )
+                val warmupConversationIds = buildList {
+                    currentConversationId?.let { add(it) }
+                    recentConversations.forEach { conversation ->
+                        if (conversation.id !in this) add(conversation.id)
+                    }
+                }.take(MAX_BACKGROUND_PERSISTENT_STREAMS)
+                Telemetry.event(
+                    "ChatPushService", "warmup.plan",
+                    "budget" to MAX_BACKGROUND_PERSISTENT_STREAMS,
+                    "requestedConversationCount" to warmupConversationIds.size,
+                    "recentConversationCount" to recentConversations.size,
+                    "currentPrioritized" to (currentConversationId != null && warmupConversationIds.firstOrNull() == currentConversationId),
+                    "currentIncluded" to (currentConversationId != null && currentConversationId in warmupConversationIds),
                 )
                 // Parallelize getOrCreate — each call blocks on an HTTP
                 // hydrate (~500ms). Sequential iteration was taking 10+ seconds
@@ -260,25 +281,33 @@ class ChatPushService : Service() {
                 // starts every hydrate simultaneously. loopsMutex inside
                 // TimelineRepository still serializes the critical sections.
                 // letta-mobile-mge5.
-                coroutineScope {
-                    conversations.map { c ->
+                val results = coroutineScope {
+                    warmupConversationIds.map { conversationId ->
                         async {
                             try {
-                                timelineRepository.getOrCreate(c.id)
+                                timelineRepository.getOrCreate(conversationId)
+                                WarmupResult.Success
                             } catch (t: Throwable) {
-                                Log.w(TAG, "warmup getOrCreate failed for ${c.id}", t)
+                                Log.w(TAG, "warmup getOrCreate failed for $conversationId", t)
+                                WarmupResult.Failure
                             }
                         }
                     }.awaitAll()
                 }
+                val successCount = results.count { it == WarmupResult.Success }
+                val failureCount = results.size - successCount
                 warmupTimer.stop(
-                    "conversationCount" to conversations.size,
-                    "budget" to WARMUP_CONVERSATION_COUNT,
+                    "conversationCount" to warmupConversationIds.size,
+                    "budget" to MAX_BACKGROUND_PERSISTENT_STREAMS,
+                    "successCount" to successCount,
+                    "failureCount" to failureCount,
+                    "activeLoopCountAfter" to timelineRepository.cachedLoopCount(),
                 )
             } catch (t: Throwable) {
                 warmupTimer.stopError(
                     t,
-                    "budget" to WARMUP_CONVERSATION_COUNT,
+                    "budget" to MAX_BACKGROUND_PERSISTENT_STREAMS,
+                    "activeLoopCountAfter" to timelineRepository.cachedLoopCount(),
                 )
             }
         }
@@ -289,8 +318,20 @@ class ChatPushService : Service() {
         private const val SERVICE_CHANNEL_ID = "letta-chat-push-service"
         private const val FOREGROUND_NOTIFICATION_ID = 7531
 
-        // letta-mobile-qv6d: see warmupSubscribers() for rationale.
-        private const val WARMUP_CONVERSATION_COUNT = 5
+        /**
+         * Maximum number of persistent stream loops this foreground service
+         * proactively creates during startup warmup.
+         *
+         * Keep this conservative: every warmed conversation owns a long-lived
+         * resume-stream subscriber. The OkHttp dispatcher is currently tuned
+         * in LettaApiClient with maxRequestsPerHost = 16, leaving headroom for
+         * these 5 background streams plus foreground sends/fetches. Do not
+         * raise this without telemetry showing foreground requests are not
+         * starved.
+         */
+        private const val MAX_BACKGROUND_PERSISTENT_STREAMS = 5
+
+        private enum class WarmupResult { Success, Failure }
 
         fun start(context: Context, scheduleRecoveryAlarm: Boolean = true): Boolean {
             // On Android 13+, POST_NOTIFICATIONS is runtime-granted. We still

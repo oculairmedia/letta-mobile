@@ -31,6 +31,7 @@ import com.letta.mobile.data.stream.SseParser
 import java.time.Instant
 import java.util.UUID
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.random.Random
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -886,6 +887,8 @@ class TimelineSyncLoop(
         private const val STREAM_SILENCE_TIMEOUT_MS = STREAM_HEARTBEAT_EXPECTED_MS * 3
         private const val HEARTBEAT_TELEMETRY_MIN_INTERVAL_MS = 5 * 60 * 1000L
 
+        private val ACTIVE_STREAM_COUNT = AtomicInteger(0)
+
         private const val REQUEST_PREVIEW_MAX_CHARS = 2_048
 
         // Most sends produce 1-3 server messages (user echo + assistant + maybe
@@ -939,23 +942,29 @@ class TimelineSyncLoop(
         while (currentCoroutineContext().isActive) {
             try {
                 val channel = messageApi.streamConversation(conversationId)
-                runOpenedAtMs = System.currentTimeMillis()
-                runEventsCount = 0
-                runHeartbeatCount = 0
-                var lastHeartbeatTelemetryAtMs = 0L
-                _events.emit(TimelineSyncEvent.StreamSubscriberOpened)
-                // letta-mobile-mge5.6: per-phase telemetry for observability.
-                Telemetry.event(
-                    "TimelineSync", "streamSubscriber.opened",
-                    "conversationId" to conversationId,
-                )
-                var lastLivenessAtMs = runOpenedAtMs
+                val activeStreamCountOnOpen = ACTIVE_STREAM_COUNT.incrementAndGet()
+                var activeStreamCountAfterClose = activeStreamCountOnOpen
                 var streamTimedOut = false
                 var timedOutSilenceMs = 0L
-                coroutineScope {
-                    val frames = SseParser.parseFrames(channel).produceIn(this)
-                    try {
-                        while (currentCoroutineContext().isActive) {
+                try {
+                    runOpenedAtMs = System.currentTimeMillis()
+                    runEventsCount = 0
+                    runHeartbeatCount = 0
+                    var lastHeartbeatTelemetryAtMs = 0L
+                    _events.emit(TimelineSyncEvent.StreamSubscriberOpened)
+                    // letta-mobile-mge5.6/jmzq.4: per-phase telemetry for
+                    // observability, including active persistent stream count
+                    // so budget/dispatcher starvation can be verified.
+                    Telemetry.event(
+                        "TimelineSync", "streamSubscriber.opened",
+                        "conversationId" to conversationId,
+                        "activeStreamCount" to activeStreamCountOnOpen,
+                    )
+                    var lastLivenessAtMs = runOpenedAtMs
+                    coroutineScope {
+                        val frames = SseParser.parseFrames(channel).produceIn(this)
+                        try {
+                            while (currentCoroutineContext().isActive) {
                             val result = withTimeoutOrNull(streamSilenceTimeoutMs) {
                                 frames.receiveCatching()
                             }
@@ -1046,9 +1055,12 @@ class TimelineSyncLoop(
                                 SseFrame.Done -> Unit
                             }
                         }
-                    } finally {
-                        frames.cancel()
+                        } finally {
+                            frames.cancel()
+                        }
                     }
+                } finally {
+                    activeStreamCountAfterClose = ACTIVE_STREAM_COUNT.decrementAndGet()
                 }
                 if (streamTimedOut) {
                     val reconnectDelayMs = STREAM_BACKOFF_START_MS + Random.nextLong(STREAM_BACKOFF_START_MS)
@@ -1058,6 +1070,7 @@ class TimelineSyncLoop(
                         "reason" to "silenceTimeout",
                         "silenceMs" to timedOutSilenceMs,
                         "delayMs" to reconnectDelayMs,
+                        "activeStreamCount" to activeStreamCountAfterClose,
                     )
                     delay(reconnectDelayMs)
                     continue
@@ -1073,6 +1086,7 @@ class TimelineSyncLoop(
                     "durationMs" to (System.currentTimeMillis() - runOpenedAtMs),
                     "eventsReceived" to runEventsCount,
                     "heartbeatsReceived" to runHeartbeatCount,
+                    "activeStreamCount" to activeStreamCountAfterClose,
                 )
                 backoffMs = STREAM_BACKOFF_START_MS
             } catch (e: CancellationException) {
