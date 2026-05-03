@@ -129,37 +129,23 @@ fun ChatScreen(
                         )
                     }
                     ConversationState.NoConversation -> {
-                        // letta-mobile-qkct: a fresh Client Mode send remains
-                        // in NoConversation until the gateway returns the
-                        // newly-created conversation id. During that pending
-                        // window the VM already owns optimistic messages and
-                        // streaming flags; render the chat body instead of the
-                        // empty starter prompts so the user's bubble is visible
-                        // immediately.
-                        if (shouldShowStarterPromptsForNoConversation(state)) {
-                            StarterPrompts(
-                                onPromptClick = { prompt -> viewModel.sendMessage(prompt) },
-                                modifier = Modifier.weight(1f),
-                            )
-                        } else {
-                            ChatContent(
-                                state = state,
-                                scrollToMessageId = viewModel.scrollToMessageId,
-                                onSendMessage = { viewModel.sendMessage(it) },
-                                onRerunMessage = { viewModel.rerunMessage(it) },
-                                onLoadOlderMessages = { viewModel.loadOlderMessages() },
-                                onSubmitApproval = { requestId, toolCallIds, approve, reason ->
-                                    viewModel.submitApproval(requestId, toolCallIds, approve, reason)
-                                },
-                                onToggleRunCollapsed = viewModel::toggleRunCollapsed,
-                                onToggleReasoningExpanded = viewModel::toggleReasoningExpanded,
-                                onOpenLocationPicker = viewModel::openClientModeLocationPicker,
-                                activeFontScale = activeFontScale,
-                                onActiveFontScaleChange = { activeFontScale = it },
-                                onFontScaleChange = { viewModel.setChatFontScale(it) },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
+                        NoConversationChatContent(
+                            state = state,
+                            scrollToMessageId = viewModel.scrollToMessageId,
+                            onSendMessage = { viewModel.sendMessage(it) },
+                            onRerunMessage = { viewModel.rerunMessage(it) },
+                            onLoadOlderMessages = { viewModel.loadOlderMessages() },
+                            onSubmitApproval = { requestId, toolCallIds, approve, reason ->
+                                viewModel.submitApproval(requestId, toolCallIds, approve, reason)
+                            },
+                            onToggleRunCollapsed = viewModel::toggleRunCollapsed,
+                            onToggleReasoningExpanded = viewModel::toggleReasoningExpanded,
+                            onOpenLocationPicker = viewModel::openClientModeLocationPicker,
+                            activeFontScale = activeFontScale,
+                            onActiveFontScaleChange = { activeFontScale = it },
+                            onFontScaleChange = { viewModel.setChatFontScale(it) },
+                            modifier = Modifier.weight(1f),
+                        )
                     }
                     is ConversationState.Ready -> {
                         if (state.isLoadingMessages && state.messages.isEmpty()) {
@@ -240,6 +226,52 @@ fun ChatScreen(
 
 internal fun shouldShowStarterPromptsForNoConversation(state: ChatUiState): Boolean =
     state.messages.isEmpty() && !state.isStreaming
+
+@Composable
+internal fun NoConversationChatContent(
+    state: ChatUiState,
+    scrollToMessageId: String? = null,
+    onSendMessage: (String) -> Unit,
+    onRerunMessage: (com.letta.mobile.data.model.UiMessage) -> Unit,
+    onLoadOlderMessages: () -> Unit,
+    onSubmitApproval: (String, List<String>, Boolean, String?) -> Unit,
+    onToggleRunCollapsed: (String) -> Unit,
+    onToggleReasoningExpanded: (String) -> Unit,
+    onOpenLocationPicker: () -> Unit,
+    activeFontScale: Float = 1f,
+    onActiveFontScaleChange: (Float) -> Unit = {},
+    onFontScaleChange: (Float) -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
+    // letta-mobile-qkct: a fresh Client Mode send remains in
+    // NoConversation until the gateway returns the newly-created
+    // conversation id. During that pending window the VM already owns
+    // optimistic messages and streaming flags; render the chat body instead
+    // of the empty starter prompts so the user's bubble is visible
+    // immediately.
+    if (shouldShowStarterPromptsForNoConversation(state)) {
+        StarterPrompts(
+            onPromptClick = onSendMessage,
+            modifier = modifier,
+        )
+    } else {
+        ChatContent(
+            state = state,
+            scrollToMessageId = scrollToMessageId,
+            onSendMessage = onSendMessage,
+            onRerunMessage = onRerunMessage,
+            onLoadOlderMessages = onLoadOlderMessages,
+            onSubmitApproval = onSubmitApproval,
+            onToggleRunCollapsed = onToggleRunCollapsed,
+            onToggleReasoningExpanded = onToggleReasoningExpanded,
+            onOpenLocationPicker = onOpenLocationPicker,
+            activeFontScale = activeFontScale,
+            onActiveFontScaleChange = onActiveFontScaleChange,
+            onFontScaleChange = onFontScaleChange,
+            modifier = modifier,
+        )
+    }
+}
 
 @Composable
 private fun ChatContent(
