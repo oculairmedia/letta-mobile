@@ -12,6 +12,10 @@ android {
         targetSdk = 36
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         testInstrumentationRunnerArguments["androidx.benchmark.suppressErrors"] = "EMULATOR"
+        // :app has a distribution flavor dimension. The perf gate should keep
+        // measuring the conservative Play-policy app variant unless the
+        // canonical benchmark target is deliberately redefined and rebaselined.
+        missingDimensionStrategy("distribution", "play")
     }
 
     compileOptions {

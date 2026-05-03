@@ -5,9 +5,11 @@ This document describes the CI performance gate introduced for
 
 ## Canonical benchmark device
 
-The required perf gate runs on a **GitHub Actions API 33 emulator** with
-the following configuration:
+The required perf gate runs the `playBenchmark` app variant on a
+**GitHub Actions API 33 emulator** with the following configuration:
 
+- app distribution flavor: `play`
+- app build type: `benchmark`
 - API level: `33`
 - target: `google_apis`
 - profile: `pixel_6`
