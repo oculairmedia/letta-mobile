@@ -7,6 +7,7 @@ import com.letta.mobile.bot.config.BotConfig
 import com.letta.mobile.bot.core.BotGateway
 import com.letta.mobile.bot.core.GatewayStatus
 import com.letta.mobile.data.repository.SettingsRepository
+import com.letta.mobile.util.Telemetry
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -38,6 +39,24 @@ class ClientModeController @Inject constructor(
     @Volatile
     private var activeConfigSignature: String? = null
 
+    /**
+     * letta-mobile-etc1: previously the controller tore down the WS bot
+     * gateway in [onStop] (i.e. whenever the screen turned off / app left
+     * the foreground). That cancelled any in-flight Client Mode run
+     * mid-stream because the per-agent WS session was destroyed under
+     * the active `streamMessage` collector — the user lost the run
+     * simply by locking their phone.
+     *
+     * The gateway is now treated as a process-scoped transport whose
+     * lifecycle follows the Client Mode settings (enabled + base URL),
+     * NOT the UI lifecycle. Process lifetime is already extended by
+     * `ChatPushService` (foreground service), so leaving the WS open
+     * across screen-off is consistent with how SSE timeline subscribers
+     * behave (`TimelineSyncLoop.runStreamSubscriber`, see
+     * docs/architecture/screen-off-streaming-findings.md).
+     */
+    private val stopGatewayOnAppBackground: Boolean = false
+
     fun initialize() {
         if (initialized) return
         initialized = true
@@ -62,8 +81,18 @@ class ClientModeController @Inject constructor(
 
     override fun onStop(owner: LifecycleOwner) {
         appInForeground = false
-        scope.launch {
-            stopGateway()
+        // letta-mobile-etc1: do NOT tear down the WS bot gateway here.
+        // Stopping the gateway on app background cancels any in-flight
+        // Client Mode run because the WS session is destroyed under the
+        // active streamMessage collector. The gateway is now
+        // process-scoped and only stops when Client Mode is disabled in
+        // settings (handled by the settings observer in initialize()).
+        Telemetry.event(
+            "ClientModeController", "appBackgrounded",
+            "gatewayKeptAlive" to (!stopGatewayOnAppBackground).toString(),
+        )
+        if (stopGatewayOnAppBackground) {
+            scope.launch { stopGateway() }
         }
     }
 
@@ -97,7 +126,16 @@ class ClientModeController @Inject constructor(
             val enabled = settingsRepository.observeClientModeEnabled().first()
             val baseUrl = settingsRepository.observeClientModeBaseUrl().first().trim()
             val apiKey = settingsRepository.getClientModeApiKey()?.trim().orEmpty()
-            val shouldRun = enabled && baseUrl.isNotBlank() && (appInForeground || forceForeground)
+            // letta-mobile-etc1: gateway lifecycle is settings-driven, not
+            // UI-foreground-driven. Once Client Mode is enabled + has a
+            // base URL, the WS transport stays up across screen-off so
+            // long-running agent runs are not torn down mid-stream.
+            // `forceForeground` is preserved so callers like
+            // `ensureReady()` / `restartSession()` can demand the
+            // transport even before the first lifecycle tick.
+            val shouldRun = enabled && baseUrl.isNotBlank() && (
+                !stopGatewayOnAppBackground || appInForeground || forceForeground
+            )
 
             if (!shouldRun) {
                 stopGatewayLocked()

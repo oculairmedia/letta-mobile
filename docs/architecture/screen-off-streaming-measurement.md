@@ -275,6 +275,27 @@ No formal measurements have been recorded in-repo yet. Add completed rows here o
 
 ---
 
+## Observed behaviors
+
+### 2026-05-02 — Client Mode WS torn down on screen-off (`letta-mobile-etc1`)
+
+**Symptom:** users reported that an in-flight Client Mode (LettaBot WS gateway) run was cancelled the moment the phone screen turned off / the app left the foreground. Timeline-mode runs were not affected — they continued via the singleton `TimelineSyncLoop` kept alive by `ChatPushService`.
+
+**Root cause:** `ClientModeController` was registered as a `ProcessLifecycleOwner` observer and called `botGateway.stop()` from `onStop`. That destroyed the per-agent WS session under the active `ClientModeChatSender.streamMessage(...)` collector inside `AdminChatViewModel.sendMessageViaClientMode`, terminating the run mid-stream.
+
+**Fix:** the bot gateway is now process-scoped. Its lifecycle follows the Client Mode settings (enabled + base URL), not the UI lifecycle. `onStop` no longer tears the gateway down (`ClientModeController.stopGatewayOnAppBackground = false`); the WS transport stays alive across screen-off, consistent with how the SSE timeline subscribers behave.
+
+**Telemetry to confirm in the field:**
+
+- `ClientModeController.appBackgrounded gatewayKeptAlive=true` fires on screen-off / app background.
+- No `WsBotClient` / `RemoteBotSession` close events fire purely due to backgrounding.
+- `TimelineSync.streamSubscriber.eventReceived` continues to ingest assistant chunks while the screen is off for the same conversation.
+
+**Regression test:** `ClientModeControllerTest` asserts `botGateway.stop()` is not called from `onStop`.
+
+
+---
+
 ## Follow-up issue rules
 
 File a bead for each reproducible failure pattern:
