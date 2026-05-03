@@ -22,6 +22,8 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 import org.junit.jupiter.api.Tag
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 @Tag("unit")
 class WsBotClientTest : WordSpec({
@@ -847,8 +849,8 @@ class WsBotClientTest : WordSpec({
         "two concurrent streams on different agents do not bleed across clients" {
             // Coordinated barriers so the two servers actually interleave
             // their chunks on the wire rather than running back-to-back.
-            val aFirstChunkSent = kotlinx.coroutines.CompletableDeferred<Unit>()
-            val bFirstChunkSent = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val aFirstChunkSent = CountDownLatch(1)
+            val bFirstChunkSent = CountDownLatch(1)
 
             val serverA = websocketServer { socket, text ->
                 val payload = json.parseToJsonElement(text).jsonObject
@@ -867,10 +869,21 @@ class WsBotClientTest : WordSpec({
                             {"type":"stream","event":"assistant","content":"A1","conversation_id":"conv-A","request_id":"$requestId"}
                             """.trimIndent()
                         )
-                        aFirstChunkSent.complete(Unit)
+                        aFirstChunkSent.countDown()
                         // Wait for B's first chunk before continuing — guarantees
-                        // the two streams are actually interleaved in time.
-                        runBlocking { bFirstChunkSent.await() }
+                        // the two streams are actually interleaved in time. Use
+                        // a bounded wait because this callback runs on OkHttp's
+                        // websocket thread; an unbounded block can prevent
+                        // MockWebServer from shutting down and make unrelated
+                        // reruns look flaky.
+                        if (!bFirstChunkSent.await(2, TimeUnit.SECONDS)) {
+                            socket.send(
+                                """
+                                {"type":"error","code":"STREAM_ERROR","message":"Timed out waiting for B's first chunk","request_id":"$requestId"}
+                                """.trimIndent()
+                            )
+                            return@websocketServer
+                        }
                         socket.send(
                             """
                             {"type":"stream","event":"assistant","content":"A2","conversation_id":"conv-A"}
@@ -896,13 +909,20 @@ class WsBotClientTest : WordSpec({
                     "message" -> {
                         val requestId = payload["request_id"]!!.jsonPrimitive.content
                         // Wait for A to send its first chunk first, then B's.
-                        runBlocking { aFirstChunkSent.await() }
+                        if (!aFirstChunkSent.await(2, TimeUnit.SECONDS)) {
+                            socket.send(
+                                """
+                                {"type":"error","code":"STREAM_ERROR","message":"Timed out waiting for A's first chunk","request_id":"$requestId"}
+                                """.trimIndent()
+                            )
+                            return@websocketServer
+                        }
                         socket.send(
                             """
                             {"type":"stream","event":"assistant","content":"B1","conversation_id":"conv-B","request_id":"$requestId"}
                             """.trimIndent()
                         )
-                        bFirstChunkSent.complete(Unit)
+                        bFirstChunkSent.countDown()
                         socket.send(
                             """
                             {"type":"stream","event":"assistant","content":"B2","conversation_id":"conv-B"}
@@ -995,6 +1015,14 @@ private fun websocketServer(onFrame: (WebSocket, String) -> Unit): MockWebServer
 
                         override fun onMessage(webSocket: WebSocket, text: String) {
                             onFrame(webSocket, text)
+                        }
+
+                        override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                            webSocket.close(code, reason)
+                        }
+
+                        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                            webSocket.cancel()
                         }
                     }
                 )
