@@ -167,9 +167,8 @@ pub extern "system" fn Java_com_letta_mobile_ui_components_MermaidNativeBridge_n
     theme.git_tag_label_border = line_color.clone();
 
     let options = RenderOptions::modern()
-        .with_node_spacing(50.0)
-        .with_rank_spacing(60.0)
-        .preferred_aspect_ratio("9:16");  // Optimize for mobile portrait
+        .with_node_spacing(80.0)
+        .with_rank_spacing(100.0);  // Optimize for mobile portrait
     let options = RenderOptions {
         theme,
         layout: options.layout,
