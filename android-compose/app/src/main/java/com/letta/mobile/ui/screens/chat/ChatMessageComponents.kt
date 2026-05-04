@@ -22,6 +22,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
@@ -403,10 +405,11 @@ private fun MessageBubbleSurface(
         // content width. Keep the long-press affordance for copy.
         Box(
             modifier = if (onLongClick != null) {
-                Modifier.combinedClickable(
-                    onClick = {},
-                    onLongClick = onLongClick,
-                )
+                Modifier.pointerInput(Unit) {
+                    detectTapGestures(
+                        onLongPress = { onLongClick() },
+                    )
+                }
             } else Modifier,
         ) {
             contentColumn()
@@ -420,10 +423,11 @@ private fun MessageBubbleSurface(
             modifier = if (onLongClick != null) {
                 Modifier
                     .clip(bubbleShape)
-                    .combinedClickable(
-                        onClick = {},
-                        onLongClick = onLongClick,
-                    )
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onLongPress = { onLongClick() },
+                        )
+                    }
             } else Modifier,
         ) {
             contentColumn()
