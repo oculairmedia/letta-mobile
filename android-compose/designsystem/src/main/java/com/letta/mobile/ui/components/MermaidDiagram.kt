@@ -1,9 +1,10 @@
 package com.letta.mobile.ui.components
 
 import android.util.Log
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
@@ -31,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
@@ -60,6 +62,7 @@ fun MermaidDiagram(
 ) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
+    var showFullscreen by rememberSaveable { mutableStateOf(false) }
 
     val isDark = isSystemInDarkTheme()
     val textColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -103,6 +106,8 @@ fun MermaidDiagram(
                 modifier = modifier,
                 onCopy = { clipboard.setText(AnnotatedString(source)) },
                 context = context,
+                showFullscreen = showFullscreen,
+                onFullscreenChange = { showFullscreen = it },
             )
             return
         }
@@ -130,8 +135,9 @@ private fun MermaidSvgDiagram(
     modifier: Modifier,
     onCopy: () -> Unit,
     context: android.content.Context,
+    showFullscreen: Boolean,
+    onFullscreenChange: (Boolean) -> Unit,
 ) {
-    var showFullscreen by mutableStateOf(false)
     val request = remember(svg, context) {
         ImageRequest.Builder(context)
             .data(svg.toByteArray(Charsets.UTF_8))
@@ -152,10 +158,24 @@ private fun MermaidSvgDiagram(
                 modifier = Modifier
                     .fillMaxWidth()
                     .defaultMinSize(minHeight = 120.dp)
-                    .combinedClickable(
-                        onClick = { showFullscreen = true },
-                        onLongClick = onCopy,
-                    ),
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            val upBeforeTimeout = withTimeoutOrNull(
+                                viewConfiguration.longPressTimeoutMillis,
+                            ) {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    if (event.changes.any { !it.pressed }) break
+                                }
+                            }
+                            if (upBeforeTimeout != null) {
+                                onFullscreenChange(true)
+                            } else {
+                                onCopy()
+                            }
+                        }
+                    },
                 contentScale = ContentScale.Fit,
             )
         }
@@ -164,7 +184,7 @@ private fun MermaidSvgDiagram(
     if (showFullscreen) {
         MermaidFullscreenDialog(
             request = request,
-            onDismiss = { showFullscreen = false },
+            onDismiss = { onFullscreenChange(false) },
             onCopy = onCopy,
         )
     }

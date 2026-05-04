@@ -22,7 +22,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -246,6 +247,40 @@ private fun UiMessage.shouldRenderBubbleLess(): Boolean {
     return true
 }
 
+/**
+ * A modifier that detects long-press gestures without consuming short taps.
+ *
+ * Unlike [Modifier.combinedClickable] or [detectTapGestures], this handler uses
+ * [awaitFirstDown] with `requireUnconsumed = false` and never consumes the down
+ * event for short taps. This allows child composables (e.g., mermaid diagram's
+ * tap-to-fullscreen) to receive their own tap events, while the parent still
+ * gets long-press-to-copy behavior.
+ */
+private fun Modifier.longPressPassthrough(
+    onLongPress: (() -> Unit)?,
+): Modifier {
+    if (onLongPress == null) return this
+    return pointerInput(Unit) {
+        awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false)
+            val upBeforeTimeout = withTimeoutOrNull(
+                viewConfiguration.longPressTimeoutMillis,
+            ) {
+                // Spin until the pointer lifts (short tap) — do not consume.
+                while (true) {
+                    val event = awaitPointerEvent()
+                    if (event.changes.any { !it.pressed }) break
+                }
+            }
+            if (upBeforeTimeout == null) {
+                // Timeout expired before lift → long press.
+                onLongPress()
+            }
+            // Short tap: nothing consumed → child composables handle normally.
+        }
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MessageBubbleSurface(
@@ -405,11 +440,7 @@ private fun MessageBubbleSurface(
         // content width. Keep the long-press affordance for copy.
         Box(
             modifier = if (onLongClick != null) {
-                Modifier.pointerInput(Unit) {
-                    detectTapGestures(
-                        onLongPress = { onLongClick() },
-                    )
-                }
+                Modifier.longPressPassthrough(onLongClick)
             } else Modifier,
         ) {
             contentColumn()
@@ -423,11 +454,7 @@ private fun MessageBubbleSurface(
             modifier = if (onLongClick != null) {
                 Modifier
                     .clip(bubbleShape)
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onLongPress = { onLongClick() },
-                        )
-                    }
+                    .longPressPassthrough(onLongClick)
             } else Modifier,
         ) {
             contentColumn()
