@@ -145,7 +145,7 @@ pub extern "system" fn Java_com_letta_mobile_ui_components_MermaidNativeBridge_n
     let foreground = contrast_adjusted_text_hex(text_argb, surface_argb);
     let line_color = line_color_adjusted(border_argb, surface_argb, dark_theme != 0);
 
-    theme.primary_text_color = foreground.clone();
+    theme.primary_text_color = contrast_adjusted_text_hex(text_argb, primary_argb);
     theme.text_color = foreground.clone();
     theme.line_color = line_color.clone();
     theme.primary_border_color = line_color.clone();
