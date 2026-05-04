@@ -138,12 +138,33 @@ internal fun streamingDisplayText(raw: String): String {
     // StreamingMarkdownText short-circuit to no render at all
     // (the typing indicator already covers the pre-content state).
     if (raw.isEmpty()) return ""
-    if (insideOpenCodeFence(raw)) {
+    val insideFence = insideOpenCodeFence(raw)
+    if (insideFence) {
         // Inside an open ``` fence — leave content alone, no cursor
         // (would render as literal text inside the code block).
         return raw
     }
     val safe = clampToStableMarkdown(raw)
+
+    // letta-mobile-y3j9: streamingDisplayText content-level duplication probe
+    // Capture raw vs clamped lengths to detect holdback behavior
+    val rawLen = raw.length
+    val clampedLen = safe.length
+    val heldBack = rawLen - clampedLen
+
+    android.util.Log.w(
+        "StreamingDisplay-DEBUG",
+        "streamingDisplayText: rawLen=$rawLen clampedLen=$clampedLen heldBack=$heldBack",
+    )
+
+    // Detect if holdback is growing unexpectedly (potential duplication source)
+    if (heldBack > 50) {
+        android.util.Log.w(
+            "StreamingDisplay-DEBUG",
+            "STREAMING_DISPLAY_HOLDBACK: largeHoldback=$heldBack rawLen=$rawLen",
+        )
+    }
+
     return safe + STREAMING_CURSOR
 }
 

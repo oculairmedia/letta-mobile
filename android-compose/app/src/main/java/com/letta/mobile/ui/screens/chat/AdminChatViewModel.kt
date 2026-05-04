@@ -2738,6 +2738,46 @@ class AdminChatViewModel @Inject constructor(
                     val combined = ArrayList<UiMessage>(live.size + prefix.size)
                     for (m in prefix) if (seenIds.add(m.id)) combined.add(m)
                     for (m in live) if (seenIds.add(m.id)) combined.add(m)
+
+                    // letta-mobile-2vza: timeline observer dedup telemetry
+                    // Detect prefix/live ID overlap and stale content (same ID, different content)
+                    val prefixIds = prefix.map { it.id }.toSet()
+                    val liveIds = live.map { it.id }.toSet()
+                    val overlapCount = prefixIds.intersect(liveIds).size
+
+                    if (overlapCount > 0) {
+                        android.util.Log.w(
+                            "AdminChatVM-DEBUG",
+                            "TIMELINE_OBS_DEDUP: prefixLiveOverlap=$overlapCount prefixCount=${prefix.size} liveCount=${live.size}",
+                        )
+                    }
+
+                    // Detect stale content: same ID appears with different content between emissions
+                    val prevMessages = _uiState.value.messages
+                    val prevById = prevMessages.associateBy { it.id }
+                    var staleCount = 0
+                    for (msg in combined) {
+                        val prev = prevById[msg.id]
+                        if (prev != null && prev.content != msg.content) {
+                            staleCount++
+                            android.util.Log.w(
+                                "AdminChatVM-DEBUG",
+                                "TIMELINE_OBS_STALE: id=${msg.id} prevLen=${prev.content.length} currLen=${msg.content.length}",
+                            )
+                        }
+                    }
+
+                    // Per-emission dedup rate
+                    val rawTotal = prefix.size + live.size
+                    val dedupRate = if (rawTotal > 0) {
+                        ((rawTotal - combined.size).toFloat() / rawTotal * 100).toInt()
+                    } else 0
+
+                    android.util.Log.w(
+                        "AdminChatVM-DEBUG",
+                        "TIMELINE_OBS_DEDUP_RATE: rawTotal=$rawTotal deduped=${combined.size} dedupRate=$dedupRate% staleContent=$staleCount",
+                    )
+
                     val ui = combined.toImmutableList()
                     val tailIsAssistant = timeline.events.lastOrNull().let {
                         it is com.letta.mobile.data.timeline.TimelineEvent.Confirmed &&

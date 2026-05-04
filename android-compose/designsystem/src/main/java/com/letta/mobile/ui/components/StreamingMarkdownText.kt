@@ -158,6 +158,38 @@ fun StreamingMarkdownText(
         tailTransform(partition.activeTail)
     }
 
+    // letta-mobile-o9kr: partition boundary telemetry for duplication investigation
+    // Log per-paint-tick state to detect boundary over-count or duplicate commits
+    if (partition.committedBlocks.isNotEmpty()) {
+        val committedTotalLen = partition.committedBlocks.sumOf { it.text.length }
+        val activeTailLen = partition.activeTail.length
+        val textLen = displayed.length
+        val valid = committedTotalLen + activeTailLen == textLen
+
+        android.util.Log.w(
+            "StreamingMd-DEBUG",
+            "partition: committedBlocks=${partition.committedBlocks.size} " +
+                "committedTotalLen=$committedTotalLen activeTailLen=$activeTailLen " +
+                "textLen=$textLen valid=$valid",
+        )
+
+        // Detect potential duplication: committed total exceeds original text
+        if (committedTotalLen > textLen) {
+            android.util.Log.w(
+                "StreamingMd-DEBUG",
+                "PARTITION_BUG: committedTotalLen ($committedTotalLen) > textLen ($textLen) — boundary over-count!",
+            )
+        }
+
+        // Log each block key for deduplication verification
+        partition.committedBlocks.forEachIndexed { idx, block ->
+            android.util.Log.v(
+                "StreamingMd-DEBUG",
+                "block[$idx]: key=${block.key} len=${block.text.length}",
+            )
+        }
+    }
+
     Column(modifier = modifier) {
         // Committed blocks: each rendered through MarkdownText, keyed
         // by content hash. Compose elides recomposition for blocks
