@@ -52,6 +52,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
+import coil3.size.Size
 import coil3.svg.SvgDecoder
 import com.letta.mobile.ui.icons.LettaIcons
 
@@ -145,6 +146,14 @@ private fun MermaidSvgDiagram(
             .build()
     }
 
+    val fullscreenRequest = remember(svg, context) {
+        ImageRequest.Builder(context)
+            .data(svg.toByteArray(Charsets.UTF_8))
+            .decoderFactory(SvgDecoder.Factory())
+            .size(coil3.size.Size(2000, 2000))
+            .build()
+    }
+
     Surface(
         shape = RoundedCornerShape(8.dp),
         color = Color.Transparent,
@@ -170,9 +179,9 @@ private fun MermaidSvgDiagram(
                                 }
                             }
                             if (upBeforeTimeout != null) {
-                                onFullscreenChange(true)
-                            } else {
                                 onCopy()
+                            } else {
+                                onFullscreenChange(true)
                             }
                         }
                     },
@@ -183,7 +192,7 @@ private fun MermaidSvgDiagram(
 
     if (showFullscreen) {
         MermaidFullscreenDialog(
-            request = request,
+            request = fullscreenRequest,
             onDismiss = { onFullscreenChange(false) },
             onCopy = onCopy,
         )
