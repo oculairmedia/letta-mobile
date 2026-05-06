@@ -582,7 +582,12 @@ object LettaMessageSerializer : JsonContentPolymorphicSerializer<LettaMessage>(L
         // uses both forms across versions; tolerate both like elsewhere.
         "error_message",
         "error" -> ErrorMessage.serializer()
-        else -> UnknownMessage.serializer() // fallback for unknown types
+        // letta-mobile-7qxw: stream_event carries incremental token deltas;
+        // deserializes as AssistantMessage so the existing replaceByServerId
+        // delta-accumulation path handles it. The terminal assistant_message
+        // frame overwrites with complete content, firing notifications.
+        "stream_event" -> AssistantMessage.serializer()
+        else -> UnknownMessage.serializer()
     }
 }
 
