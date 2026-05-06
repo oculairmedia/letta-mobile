@@ -323,12 +323,26 @@ private fun MessageBubbleSurface(
     // collapse/reasoning animations downstream. The Surface stays
     // size-stable; only mid-stream growth is animated.
     //
-    // letta-mobile-lbur: streaming growth animation also suppressed.
-    // The 60ms animateContentSize on the bubble surface collides with
-    // LazyColumn fling measurement when content is settling from
-    // streaming size changes, causing a double-measure crash.
+    // letta-mobile-lbur follow-up (flk2): the double-measure crash was
+    // from nested animateContentSize (reasoning inside main bubble).
+    // Since the reasoning Column now has its own 60ms tween, we keep
+    // the bubble Surface animateContentSize off during streaming but
+    // apply a gentle 60ms linear tween directly on the content Column.
+    // This is the exact same animation the reasoning bubble uses and
+    // has been proven stable at 60ms.
     val isPinchingForBubble = LocalChatIsPinching.current
     val bubbleSizeAnimation = if (!isStreaming && isLastAssistant && !isPinchingForBubble) {
+        Modifier.animateContentSize(
+            animationSpec = tween(durationMillis = 60, easing = LinearEasing),
+        )
+    } else {
+        Modifier
+    }
+    // letta-mobile-flk2: apply the same 60ms linear tween to the
+    // content Column that the reasoning bubble uses. Without this,
+    // the Column height snaps on every paint tick (24ms), causing
+    // LazyColumn layout recalculation and visible flicker.
+    val contentColumnAnimation = if (isStreaming && !isPinchingForBubble) {
         Modifier.animateContentSize(
             animationSpec = tween(durationMillis = 60, easing = LinearEasing),
         )
@@ -347,7 +361,7 @@ private fun MessageBubbleSurface(
                     horizontal = dimens.bubblePaddingHorizontal,
                     vertical = dimens.bubblePaddingVertical,
                 )
-            }).then(bubbleSizeAnimation),
+            }).then(bubbleSizeAnimation).then(contentColumnAnimation),
             verticalArrangement = Arrangement.spacedBy(dimens.messageSpacing),
         ) {
             // Suppress the role label header for bubble-less assistant prose
