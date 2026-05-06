@@ -16,6 +16,7 @@ import com.letta.mobile.data.repository.RunRepository
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
+import com.letta.mobile.util.Telemetry
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -134,7 +135,9 @@ class DashboardViewModel @Inject constructor(
                         try {
                             val fetched = agentRepository.getAgent(favId).first()
                             _uiState.value = _uiState.value.copy(favoriteAgentName = fetched.name)
-                        } catch (_: Exception) { }
+                        } catch (e: Exception) {
+                            Telemetry.error("DashboardVM", "failed to fetch agent name for $favId", e)
+                        }
                     }
                 }
         }

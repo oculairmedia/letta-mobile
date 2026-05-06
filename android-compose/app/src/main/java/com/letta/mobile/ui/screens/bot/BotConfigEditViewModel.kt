@@ -18,6 +18,7 @@ import com.letta.mobile.bot.skills.BotSkill
 import com.letta.mobile.bot.skills.BotSkillRegistry
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.repository.AgentRepository
+import com.letta.mobile.util.Telemetry
 import com.letta.mobile.domain.AgentSearch
 import com.letta.mobile.ui.navigation.BotConfigEditRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -88,7 +89,9 @@ class BotConfigEditViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            try { agentRepository.refreshAgentsIfStale(60_000) } catch (_: Exception) {}
+            try { agentRepository.refreshAgentsIfStale(60_000) } catch (e: Exception) {
+                Telemetry.error("BotConfigEditVM", "agent refresh failed", e)
+            }
         }
         if (route.configId != null) {
             viewModelScope.launch { loadConfig(route.configId) }
