@@ -362,33 +362,18 @@ object TextMessageRenderer : MessageContentRenderer {
             // advances, which happens at PARAGRAPH cadence (~once per second) rather than
             // chunk cadence (~10/sec).
             //
-            // letta-mobile-flk2: height-lock streaming. Render full
-            // message invisible to reserve layout height, then overlay
-            // the same content with word-by-word reveal. LazyColumn
-            // sees stable layout — no recalculation, no flicker.
-            val smoothedText = rememberSmoothedStreamingText(
-                rawText = message.content,
-                isStreaming = true,
+            // letta-mobile-flk2: single-layer streaming.
+            // StreamingMarkdownText's internal 50ms paint coalescer handles
+            // pacing. No external smoother, no double-layer, no double-coalescing.
+            // LazyColumn sees stable layout as boundary advances commit blocks.
+            StreamingMarkdownText(
+                text = message.content,
+                textColor = textColor,
+                tailStyle = MaterialTheme.chatTypography.messageBody,
+                tailTransform = ::streamingDisplayText,
+                cursorText = STREAMING_CURSOR,
+                modifier = modifier,
             )
-            Box(modifier = modifier) {
-                // Invisible spacer: same renderer, same text, locks layout
-                StreamingMarkdownText(
-                    text = message.content,
-                    textColor = textColor,
-                    tailStyle = MaterialTheme.chatTypography.messageBody,
-                    tailTransform = ::streamingDisplayText,
-                    cursorText = STREAMING_CURSOR,
-                    modifier = Modifier.alpha(0f),
-                )
-                // Visible overlay: word-by-word revealed text
-                StreamingMarkdownText(
-                    text = smoothedText,
-                    textColor = textColor,
-                    tailStyle = MaterialTheme.chatTypography.messageBody,
-                    tailTransform = ::streamingDisplayText,
-                    cursorText = STREAMING_CURSOR,
-                )
-            }
         } else {
             val displayText = if (isStreaming) {
                 streamingDisplayText(message.content)
