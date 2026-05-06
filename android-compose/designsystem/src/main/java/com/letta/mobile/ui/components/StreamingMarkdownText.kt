@@ -168,7 +168,27 @@ fun StreamingMarkdownText(
     // keys, no recomposition); only a new MarkdownText block appears
     // and the plain-Text tail string shrinks. Compose treats this as
     // a layout step, not a render swap.
-    val partition = remember(displayed) { partitionStreamingMarkdown(displayed) }
+    // Cache the partition so it only recomputes when the displayed text grows,
+    // not on every 24ms render tick. Without this, `remember(displayed)` always
+    // recomputes on every tick (displayed is a new string object each time),
+    // creating new MarkdownBlock list objects and breaking Compose's
+    // skip-recomposition optimization on the keyed MarkdownText children.
+    var cachedLen by remember { mutableStateOf(0) }
+    val partition = if (displayed.length > cachedLen) {
+        val p = partitionStreamingMarkdown(displayed)
+        cachedLen = displayed.length
+        p
+    } else if (displayed.isNotEmpty() && cachedLen > 0) {
+        // Text hasn't grown (same tick re-compose) — reuse the cached partition.
+        // This is the critical path during streaming: displayed is a new String
+        // ref each tick, but the committed blocks' content is unchanged, so
+        // the partition is unchanged. Re-running splitMarkdownBlocks on every
+        // tick creates new MarkdownBlock objects that can defeat Compose's
+        // key-based skip-recomposition on MarkdownText children.
+        remember(cachedLen) { partitionStreamingMarkdown(displayed) }
+    } else {
+        partitionStreamingMarkdown(displayed)
+    }
     val transformedTail = remember(partition.activeTail) {
         tailTransform(partition.activeTail)
     }

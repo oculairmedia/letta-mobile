@@ -1,5 +1,8 @@
 package com.letta.mobile.ui.screens.chat
 
+import android.text.SpannableString
+import android.text.style.ForegroundColorSpan
+import android.widget.TextView
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,7 +13,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.components.MarkdownText
 import com.letta.mobile.ui.components.StreamingMarkdownText
@@ -362,17 +369,38 @@ object TextMessageRenderer : MessageContentRenderer {
             // advances, which happens at PARAGRAPH cadence (~once per second) rather than
             // chunk cadence (~10/sec).
             //
-            // letta-mobile-flk2: single-layer streaming.
-            // StreamingMarkdownText's internal 50ms paint coalescer handles
-            // pacing. No external smoother, no double-layer, no double-coalescing.
-            // LazyColumn sees stable layout as boundary advances commit blocks.
-            StreamingMarkdownText(
-                text = message.content,
-                textColor = textColor,
-                tailStyle = MaterialTheme.chatTypography.messageBody,
-                tailTransform = ::streamingDisplayText,
-                cursorText = STREAMING_CURSOR,
+            // letta-mobile-flk2: AndroidView-isolated streaming.
+            // AndroidView(TextView) owns its layout internally — no
+            // LazyColumn recalc, no Compose churn. clampToStableMarkdown
+            // strips unclosed formatting tokens (same as article's
+            // MarkdownBuffer). Cursor appended after stable prefix.
+            // When streaming settles, snap to full MarkdownText.
+            val safeText = clampToStableMarkdown(message.content)
+            val displayText = if (safeText.isNotEmpty()) safeText + STREAMING_CURSOR else STREAMING_CURSOR
+            val textArgb = textColor.toArgb()
+            val fontSizeSp = MaterialTheme.chatTypography.messageBody.fontSize
+            AndroidView(
                 modifier = modifier,
+                factory = { ctx ->
+                    TextView(ctx).apply {
+                        setTextColor(textArgb)
+                        if (fontSizeSp != null) textSize = fontSizeSp.value
+                        setLineSpacing(0f, 1.2f)
+                    }
+                },
+                update = { tv ->
+                    val spannable = SpannableString("$displayText\u200B") // zero-width space for layout stability
+                    val cursorIdx = displayText.indexOf(STREAMING_CURSOR)
+                    if (cursorIdx >= 0) {
+                        spannable.setSpan(
+                            ForegroundColorSpan(textArgb),
+                            cursorIdx,
+                            cursorIdx + 1,
+                            android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+                        )
+                    }
+                    tv.text = spannable
+                },
             )
         } else {
             val displayText = if (isStreaming) {
