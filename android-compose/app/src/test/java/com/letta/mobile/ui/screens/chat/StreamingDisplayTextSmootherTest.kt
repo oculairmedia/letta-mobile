@@ -12,20 +12,22 @@ class StreamingDisplayTextSmootherTest {
 
         smoother.updateTarget("Hello world", isStreaming = true, nowMs = 0L)
         val first = smoother.step(16L)
-        // Word-by-word reveal: first step reveals "Hello" (5 chars)
-        assertEquals("Hello", first)
+        // Character-by-character at 10 ms/char: 16 ms reveals 2 chars (0 ms + 10 ms)
+        assertEquals("He", first)
 
-        smoother.updateTarget("Hello world from Letta", isStreaming = true, nowMs = 400L)
-        val second = smoother.step(416L)
-        // After text extension, clock resets at 400ms, so elapsed = 16ms
-        // steps = (16/30).toInt() = 0, coerceAtLeast(1) = 1
-        // revealedWordCount = 1 + 1 = 2
-        // tokens = ["Hello", " ", "world", " ", "from", " ", "Letta"]
-        // prefix = "Hello "
-        assertEquals("Hello ", second)
+        val second = smoother.step(26L)
+        // 26 ms reveals 3 chars (0, 10, 20 ms)
+        assertEquals("Hel", second)
+
+        // Burst arrival at 30 ms — clock is NOT reset, so cadence stays independent
+        smoother.updateTarget("Hello world from Letta", isStreaming = true, nowMs = 30L)
+
+        val third = smoother.step(36L)
+        // Only 1 more char revealed at 30 ms mark — burst does not jump to full text
+        assertEquals("Hell", third)
         assertTrue(
-            "second step should grow progressively instead of jumping to full burst",
-            second.length < "Hello world from Letta".length,
+            "burst arrival should not instantly reveal all new text",
+            third.length < "Hello world from Letta".length,
         )
     }
 
@@ -45,6 +47,7 @@ class StreamingDisplayTextSmootherTest {
         }
 
         assertEquals("Hello world from Letta", text)
+        assertTrue(smoother.isFullyRevealed)
     }
 
     @Test
@@ -52,9 +55,11 @@ class StreamingDisplayTextSmootherTest {
         val smoother = StreamingDisplayTextSmoother()
 
         smoother.updateTarget("Hello world", isStreaming = true, nowMs = 0L)
+        // Reveal 2 chars at 16 ms
         smoother.step(16L)
-        smoother.updateTarget("Hi there", isStreaming = true, nowMs = 32L)
 
+        // Abruptly rewrite to a different target
+        smoother.updateTarget("Hi there", isStreaming = true, nowMs = 32L)
         val text = smoother.step(48L)
         assertTrue(text.length <= "Hi there".length)
     }

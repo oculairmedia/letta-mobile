@@ -189,6 +189,8 @@ class AdminChatViewModelTest {
         clientModeEnabledFlow = MutableStateFlow(false)
         activeConversationIds.clear()
 
+        every { notificationReplyHandler.activeReplyStreams } returns MutableStateFlow(emptySet())
+
         every { settingsRepository.getChatBackgroundKey() } returns flowOf("default")
         every { settingsRepository.getChatFontScale() } returns flowOf(1f)
         every { settingsRepository.observeClientModeEnabled() } returns clientModeEnabledFlow
