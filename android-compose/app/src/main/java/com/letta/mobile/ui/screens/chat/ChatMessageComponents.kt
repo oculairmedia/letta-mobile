@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -55,6 +56,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.input.pointer.pointerInput
@@ -323,29 +325,18 @@ private fun MessageBubbleSurface(
     // collapse/reasoning animations downstream. The Surface stays
     // size-stable; only mid-stream growth is animated.
     //
-    // letta-mobile-lbur follow-up (flk2): the double-measure crash was
-    // from nested animateContentSize (reasoning inside main bubble).
-    // Since the reasoning Column now has its own 60ms tween, we keep
-    // the bubble Surface animateContentSize off during streaming but
-    // apply a gentle 60ms linear tween directly on the content Column.
-    // This is the exact same animation the reasoning bubble uses and
-    // has been proven stable at 60ms.
+    // letta-mobile-flk2: additive sizing. Track the maximum height
+    // the content Column has ever reached, and set heightIn(min = max).
+    // Height only grows, never regresses — no jitter, no repaint
+    // thrashing. The same approach that makes reasoning smooth.
     val isPinchingForBubble = LocalChatIsPinching.current
+    var contentMinHeight by remember { mutableStateOf(0) }
     val bubbleSizeAnimation = if (!isStreaming && isLastAssistant && !isPinchingForBubble) {
         Modifier.animateContentSize(
             animationSpec = tween(durationMillis = 60, easing = LinearEasing),
         )
-    } else {
-        Modifier
-    }
-    // letta-mobile-flk2: apply the same 60ms linear tween to the
-    // content Column that the reasoning bubble uses. Without this,
-    // the Column height snaps on every paint tick (24ms), causing
-    // LazyColumn layout recalculation and visible flicker.
-    val contentColumnAnimation = if (isStreaming && !isPinchingForBubble) {
-        Modifier.animateContentSize(
-            animationSpec = tween(durationMillis = 60, easing = LinearEasing),
-        )
+    } else if (isStreaming && !isPinchingForBubble && contentMinHeight > 0) {
+        Modifier.heightIn(min = contentMinHeight.dp)
     } else {
         Modifier
     }
@@ -361,7 +352,12 @@ private fun MessageBubbleSurface(
                     horizontal = dimens.bubblePaddingHorizontal,
                     vertical = dimens.bubblePaddingVertical,
                 )
-            }).then(bubbleSizeAnimation).then(contentColumnAnimation),
+            }).then(bubbleSizeAnimation).then(
+                if (isStreaming && !isPinchingForBubble) Modifier.onGloballyPositioned { coords ->
+                    val h = coords.size.height
+                    if (h > contentMinHeight) contentMinHeight = h
+                } else Modifier
+            ),
             verticalArrangement = Arrangement.spacedBy(dimens.messageSpacing),
         ) {
             // Suppress the role label header for bubble-less assistant prose
