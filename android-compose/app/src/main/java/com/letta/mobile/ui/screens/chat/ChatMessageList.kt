@@ -417,9 +417,9 @@ fun ChatMessageList(
                                         onToggleReasoning = { onToggleReasoningExpanded(message.id) },
                                         modifier = rowModifier,
                                     )
-                                }
-                            }
                         }
+                        }
+                    }
                     }
 
                     if (showDate) {

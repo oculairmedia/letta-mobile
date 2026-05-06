@@ -44,13 +44,15 @@ class StreamingDisplayTextSmoother(
             if (!text.startsWith(target)) {
                 // Text was rewritten (not extended) — reset reveal.
                 revealedCount = 0
+                lastStepMs = nowMs
             }
-            // else: text is a continuation — keep revealedCount as-is so
-            // the reveal continues from where it left off. Reset the frame
-            // clock to the arrival time so a long gap before a burst does not
-            // immediately reveal the whole newly-arrived tail in one frame.
+            // else: text is a continuation — keep revealedCount AND lastStepMs
+            // as-is so the reveal continues from where it left off. The clock
+            // MUST NOT be reset here — resetting causes step() to see
+            // elapsed ≈ 0 and advance = 1 char per frame, producing visible
+            // flicker (letta-mobile-flk2).
             target = text
-            lastStepMs = nowMs
+            // letta-mobile-flk2: do NOT reset lastStepMs here for continuations
         }
         streaming = isStreaming
         if (lastStepMs < 0L) {
