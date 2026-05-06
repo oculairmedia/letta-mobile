@@ -283,10 +283,11 @@ fun AgentListScreen(
             }
         }
     ) { paddingValues ->
+        val agentError = uiState.error
         when {
             uiState.isLoading -> ShimmerGrid(modifier = Modifier.padding(paddingValues))
-            uiState.error != null && uiState.agents.isEmpty() -> ErrorContent(
-                message = uiState.error!!,
+            agentError != null && uiState.agents.isEmpty() -> ErrorContent(
+                message = agentError,
                 onRetry = { viewModel.loadAgents() },
                 modifier = Modifier.padding(paddingValues),
             )

@@ -65,7 +65,8 @@ fun MathBlock(
     var renderError by rememberSaveable(source) { mutableStateOf<String?>(null) }
 
     if (renderError != null) {
-        MathErrorFallback(source = source, errorMessage = renderError!!, modifier = modifier)
+        val error = renderError ?: return
+        MathErrorFallback(source = source, errorMessage = error, modifier = modifier)
         return
     }
 

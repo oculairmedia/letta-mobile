@@ -349,7 +349,9 @@ class AdminChatViewModel @Inject constructor(
         private const val CLIENT_MODE_CONVERSATION_ID_KEY = "clientModeConversationId"
     }
 
-    val agentId: String = savedStateHandle.get<String>("agentId")!!
+    val agentId: String = requireNotNull(savedStateHandle.get<String>("agentId")) {
+        "Missing agentId in AdminChatViewModel navigation arguments"
+    }
     private val initialMessage: String? = savedStateHandle.get<String>("initialMessage")
     private val requestedConversationArg: String? = savedStateHandle.get<String>("conversationId")
     private val freshRouteKey: Long? = savedStateHandle.get<Long>("freshRouteKey")

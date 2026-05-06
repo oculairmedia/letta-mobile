@@ -774,8 +774,8 @@ private fun ReorderableWidgetGrid(
                                             }?.key
 
                                         if (targetIndex != null && targetIndex != index) {
-                                            val oldRect = itemRects[index]!!
-                                            val newRect = itemRects[targetIndex]!!
+                                            val oldRect = itemRects.getValue(index)
+                                            val newRect = itemRects.getValue(targetIndex)
 
                                             currentList = currentList.toMutableList().apply {
                                                 val item = removeAt(index)

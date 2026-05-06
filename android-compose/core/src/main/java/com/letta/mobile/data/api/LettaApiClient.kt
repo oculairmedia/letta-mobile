@@ -45,13 +45,13 @@ open class LettaApiClient @Inject constructor(
 
         mutex.withLock {
             if (cachedClient != null && cachedBaseUrl == url && cachedToken == token) {
-                return cachedClient!!
+                return cachedClient ?: error("cachedClient null after null check")
             }
             cachedClient?.close()
             cachedClient = createClient(token, if (url.endsWith("/")) url else "$url/")
             cachedBaseUrl = url
             cachedToken = token
-            return cachedClient!!
+            return cachedClient ?: error("cachedClient null after initialization")
         }
     }
 

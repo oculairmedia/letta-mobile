@@ -65,7 +65,9 @@ class AgentSettingsViewModel @Inject constructor(
     private val clientModeConnectionTester: ClientModeConnectionTester,
 ) : ViewModel() {
 
-    private val agentId: String = savedStateHandle.get<String>("agentId")!!
+    private val agentId: String = requireNotNull(savedStateHandle.get<String>("agentId")) {
+        "Missing agentId in AgentSettingsViewModel navigation arguments"
+    }
 
     private val _uiState = MutableStateFlow<UiState<AgentSettingsUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<AgentSettingsUiState>> = _uiState.asStateFlow()

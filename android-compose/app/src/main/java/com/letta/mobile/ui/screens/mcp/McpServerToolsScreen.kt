@@ -145,12 +145,13 @@ fun McpServerToolsScreen(
     }
 
     val successState = (uiState as? UiState.Success)?.data
-    if (pendingRunTool != null) {
+    val runTool = pendingRunTool
+    if (runTool != null) {
         ToolRunDialog(
-            tool = pendingRunTool!!,
+            tool = runTool,
             onDismiss = { pendingRunTool = null },
             onRun = { rawArgs ->
-                viewModel.runTool(pendingRunTool!!.id, rawArgs)
+                viewModel.runTool(runTool.id, rawArgs)
                 pendingRunTool = null
             },
         )

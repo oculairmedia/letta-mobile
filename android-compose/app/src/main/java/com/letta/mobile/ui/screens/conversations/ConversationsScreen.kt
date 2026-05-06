@@ -249,10 +249,11 @@ fun ConversationsScreen(
             }
         }
     ) { paddingValues ->
+        val convError = uiState.error
         when {
             uiState.isLoading && uiState.conversations.isEmpty() -> ShimmerConversationList(modifier = Modifier.padding(paddingValues))
-            uiState.error != null && uiState.conversations.isEmpty() -> ErrorContent(
-                message = uiState.error!!,
+            convError != null && uiState.conversations.isEmpty() -> ErrorContent(
+                message = convError,
                 onRetry = { viewModel.loadConversations() },
                 modifier = Modifier.padding(paddingValues)
             )
