@@ -8,6 +8,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -15,7 +17,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -197,26 +198,38 @@ fun StreamingMarkdownText(
         tailTransform(activeTailForText)
     }
     val density = LocalDensity.current
-    // letta-mobile-mmnn fix: height discipline during streaming.
+    // letta-mobile-mmnn fix: stable height floor that only updates at committed-block boundaries.
     //
-    // Previous approach (heightIn(min=settledPx)): forced the tail text to wrap more
-    // aggressively within a fixed container as chars accumulated every ~50ms tick,
-    // causing the cursor to jump unpredictably — the "vibrating" flicker.
+    // The original heightIn(min=settledPx) caused flicker because settledHeightPx changed on
+    // every text tick (40→106→148→194...) — each change propagated as a new heightIn(min=N)
+    // modifier, triggering LazyColumn re-measure at 50ms cadence.
     //
-    // New approach:
-    // 1. First-measured height becomes a FIXED floor (height()) while streaming —
-    //    prevents the outer Column from shrinking when the active tail shrinks
-    //    between paragraph-boundary recompositions. Committed blocks stay stable.
-    // 2. No heightIn: the Column grows freely to fit the tail as it accumulates.
-    //    Tail text wrapping is consistent — no unpredictable cursor jumps.
-    // 3. animateContentSize suppressed during streaming; re-applied post-stream so
-    //    the final height settle is smooth.
+    // The fixed-height(height()) approach clipped the Column at the first-measured height
+    // (e.g. 43px) and nothing rendered until scrolling forced a re-measure.
     //
-    // Key invariant: committedBlocks stay at their natural, stable layout positions.
-    // Only the tail grows downward, pushing settledHeight up monotonically.
-    var firstMeasuredHeightPx by remember { mutableStateOf(0) }
-    val fixedHeightFloor = if (firstMeasuredHeightPx > 0) {
-        with(density) { Modifier.height(firstMeasuredHeightPx.toDp()) }
+    // This approach: heightIn(min=stableFloor) where stableFloor only updates when the
+    // committed block list changes (paragraph boundary advance). Between boundary changes,
+    // the floor is constant so the heightIn modifier is stable — no re-measure cascade.
+    // The tail grows freely within the stable floor via natural layout.
+    // Track committed block count so we snapshot the measured height exactly once per
+    // paragraph-boundary advance. The floor only updates when committed blocks structurally
+    // gain a block — never on tail-tick churn. Between boundaries the heightIn modifier
+    // is referentially stable so Compose doesn't trigger a LazyColumn re-measure.
+    var settledFloorHeightPx by remember { mutableStateOf(0) }
+    var prevCommittedCount by remember { mutableStateOf(-1) }
+    val stableFloorHeightPx by derivedStateOf {
+        if (committedBlocksForRender.size != prevCommittedCount) {
+            // Committed blocks changed (new block at paragraph boundary) — snapshot the
+            // current measured height as the new stable floor.
+            prevCommittedCount = committedBlocksForRender.size
+            settledFloorHeightPx
+        } else {
+            // No structural change — return the last stable floor without mutation.
+            settledFloorHeightPx
+        }
+    }
+    val heightFloorModifier = if (stableFloorHeightPx > 0) {
+        with(density) { Modifier.heightIn(min = stableFloorHeightPx.toDp()) }
     } else {
         Modifier
     }
@@ -233,13 +246,12 @@ fun StreamingMarkdownText(
 
     Column(
         modifier = modifier
-            .then(fixedHeightFloor)
+            .then(heightFloorModifier)
             .then(heightAnimation)
             .onSizeChanged { size ->
-                // Capture first measured height as floor. After that, height() ensures
-                // the Column never shrinks — committed blocks stay at their rendered positions.
-                if (firstMeasuredHeightPx == 0 && size.height > 0) {
-                    firstMeasuredHeightPx = size.height
+                // Only grow the floor upward. Never shrink it.
+                if (size.height > settledFloorHeightPx) {
+                    settledFloorHeightPx = size.height
                 }
             },
     ) {
