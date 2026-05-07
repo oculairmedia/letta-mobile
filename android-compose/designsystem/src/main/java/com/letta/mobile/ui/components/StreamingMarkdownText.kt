@@ -190,77 +190,89 @@ fun StreamingMarkdownText(
     val transformedTail = remember(activeTailForText) {
         tailTransform(activeTailForText)
     }
-    val density = LocalDensity.current
-    var maxMeasuredHeightPx by remember { mutableStateOf(0) }
-    val monotonicHeightModifier = if (maxMeasuredHeightPx > 0) {
-        with(density) { Modifier.heightIn(min = maxMeasuredHeightPx.toDp()) }
-    } else {
-        Modifier
-    }
+    // ── Render ──
+    //
+    // The outer Column is stable (no animateContentSize, no height
+    // tracking). The committed-blocks subtree is wrapped in key()
+    // keyed by block content so Compose skips the entire subtree
+    // when only the tail changes. This is the inner/outer separation
+    // pattern that reasoning bubbles already use (RunBlock.kt).
+    //
+    // Only the tail Column carries animateContentSize + monotonic
+    // height so growth animation runs local to the in-progress
+    // paragraph and never drags committed blocks through re-measure.
+    Column(modifier = modifier) {
+        // ── Stable committed area ──
+        // Compose reuses the entire subtree when this key is unchanged.
+        val committedStabilityKey = remember(committedBlocksForRender) {
+            committedBlocksForRender.joinToString("|") { "${it.key}:${it.text.length}" }
+        }
+        key(committedStabilityKey) {
+            committedBlocksForRender.forEach { block ->
+                key(block.key) {
+                    if (stabilizeTables && block.text.looksLikeMarkdownTable()) {
+                        StableStyledMarkdownBlock(
+                            text = block.text,
+                            textColor = textColor,
+                        )
+                    } else {
+                        MarkdownText(
+                            text = block.text,
+                            textColor = textColor,
+                        )
+                    }
+                }
+            }
 
-    Column(
-        modifier = modifier
-            .then(monotonicHeightModifier)
-            .animateContentSize(
-                animationSpec = tween(
-                    durationMillis = 260,
-                    easing = FastOutSlowInEasing,
-                ),
-            )
-            .onSizeChanged { size ->
-                if (size.height > maxMeasuredHeightPx) {
-                    maxMeasuredHeightPx = size.height
-                }
-            },
-    ) {
-        // Committed blocks: each rendered through MarkdownText, keyed
-        // by content hash. Compose elides recomposition for blocks
-        // whose key is unchanged across ticks. mikepenz sees each
-        // block exactly once.
-        committedBlocksForRender.forEach { block ->
-            key(block.key) {
-                if (stabilizeTables && block.text.looksLikeMarkdownTable()) {
-                    StableStyledMarkdownBlock(
-                        text = block.text,
-                        textColor = textColor,
-                    )
-                } else {
-                    MarkdownText(
-                        text = block.text,
-                        textColor = textColor,
-                    )
-                }
+            activeTableText?.let { tableText ->
+                StableStyledMarkdownBlock(
+                    text = tableText,
+                    textColor = textColor,
+                )
             }
         }
 
-        activeTableText?.let { tableText ->
-            StableStyledMarkdownBlock(
-                text = tableText,
-                textColor = textColor,
-            )
+        // ── Animated tail area ──
+        // Monotonic height + tween only apply to the in-progress paragraph.
+        val density = LocalDensity.current
+        var tailMaxHeightPx by remember { mutableStateOf(0) }
+        val tailMonotonicModifier = if (tailMaxHeightPx > 0) {
+            with(density) { Modifier.heightIn(min = tailMaxHeightPx.toDp()) }
+        } else {
+            Modifier
         }
 
-        // Active tail: plain Text. mikepenz NEVER sees this string.
-        // The tailTransform decorator handles cursor injection
-        // (▎) and the markdown-stability clamp
-        // (clampToStableMarkdown) so any unmatched span openers are
-        // clipped from the rendered text.
-        if (transformedTail.isNotEmpty()) {
-            Text(
-                text = transformedTail,
-                style = tailStyle,
-                color = textColor,
-            )
-        } else if (cursorText != null && committedBlocksForRender.isNotEmpty()) {
-            // Edge case: text ends exactly at a committed boundary
-            // (e.g. just after a paragraph break with no chars typed
-            // yet). Show a standalone cursor so streaming still feels
-            // live.
-            Text(
-                text = cursorText,
-                style = tailStyle,
-                color = textColor,
-            )
+        Column(
+            modifier = tailMonotonicModifier
+                .animateContentSize(
+                    animationSpec = tween(
+                        durationMillis = 260,
+                        easing = FastOutSlowInEasing,
+                    ),
+                )
+                .onSizeChanged { size ->
+                    if (size.height > tailMaxHeightPx) {
+                        tailMaxHeightPx = size.height
+                    }
+                },
+        ) {
+            if (transformedTail.isNotEmpty()) {
+                Text(
+                    text = transformedTail,
+                    style = tailStyle,
+                    color = textColor,
+                )
+            } else if (cursorText != null && committedBlocksForRender.isNotEmpty()) {
+                // Edge case: text ends exactly at a committed boundary
+                // (e.g. just after a paragraph break with no chars typed
+                // yet). Show a standalone cursor so streaming still feels
+                // live.
+                Text(
+                    text = cursorText,
+                    style = tailStyle,
+                    color = textColor,
+                )
+            }
         }
     }
 }
