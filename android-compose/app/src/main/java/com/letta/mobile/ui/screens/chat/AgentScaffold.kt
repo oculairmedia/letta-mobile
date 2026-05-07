@@ -266,6 +266,7 @@ fun AgentScaffold(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     chatBackground = chatBackground,
                     onBugCommand = { showBugReportSheet = true },
+                    viewModel = viewModel,
                 )
             }
         }

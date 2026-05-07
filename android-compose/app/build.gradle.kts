@@ -337,6 +337,10 @@ dependencies {
     testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.10.0")
     testImplementation("androidx.test:core-ktx:1.7.0")
     testImplementation("androidx.test.ext:junit-ktx:1.3.0")
+
+    // Hilt testing
+    testImplementation("com.google.dagger:hilt-android-testing:2.58")
+    kspTest("com.google.dagger:hilt-compiler:2.58")
     testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.10.5")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
