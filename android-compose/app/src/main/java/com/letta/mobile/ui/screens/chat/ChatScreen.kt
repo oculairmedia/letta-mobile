@@ -186,7 +186,6 @@ fun ChatScreen(
                 ChatComposer(
                     inputText = composerState.inputText,
                     pendingAttachments = composerState.pendingAttachments,
-                    inputHistory = composerState.inputHistory,
                     isStreaming = state.isStreaming,
                     canSendMessages = viewModel.canSendMessages,
                     onTextChange = { newText ->
