@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.SideEffect
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.Modifier
@@ -192,6 +193,17 @@ fun StreamingMarkdownText(
     }
     val density = LocalDensity.current
     var maxMeasuredHeightPx by remember { mutableStateOf(0) }
+    // letta-mobile-mmnn probe: fires when maxMeasuredHeightPx changes, proving whether the
+    // outer Column height is actually jumping (causing LazyColumn re-measure flicker) or if
+    // the flicker source lives elsewhere in the remember(partition) cascade.
+    // "outerHeight=N px" in logcat; compare against tick cadence (~50ms).
+    var prevOuterHeight by remember { mutableStateOf(0) }
+    SideEffect {
+        if (maxMeasuredHeightPx != prevOuterHeight) {
+            prevOuterHeight = maxMeasuredHeightPx
+            android.util.Log.d("StreamingMarkdown", "outerHeight=${maxMeasuredHeightPx} px")
+        }
+    }
     val monotonicHeightModifier = if (maxMeasuredHeightPx > 0) {
         with(density) { Modifier.heightIn(min = maxMeasuredHeightPx.toDp()) }
     } else {
