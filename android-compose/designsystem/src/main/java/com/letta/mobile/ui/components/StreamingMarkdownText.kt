@@ -3,7 +3,14 @@ package com.letta.mobile.ui.components
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -14,13 +21,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
 /**
@@ -190,20 +197,37 @@ fun StreamingMarkdownText(
     val transformedTail = remember(activeTailForText) {
         tailTransform(activeTailForText)
     }
-    // ── Render ──
-    //
-    // The outer Column is stable (no animateContentSize, no height
-    // tracking). Per-block key() lets Compose elide unchanged blocks.
-    //
-    // Only the tail Column carries animateContentSize + monotonic
-    // height so growth animation runs local to the in-progress
-    // paragraph and never drags committed blocks through re-measure.
-    Column(modifier = modifier) {
-        // ── Stable committed area ──
+    val density = LocalDensity.current
+    var maxMeasuredHeightPx by remember { mutableStateOf(0) }
+    val monotonicHeightModifier = if (maxMeasuredHeightPx > 0) {
+        with(density) { Modifier.heightIn(min = maxMeasuredHeightPx.toDp()) }
+    } else {
+        Modifier
+    }
+
+    Column(
+        modifier = modifier
+            .then(monotonicHeightModifier)
+            .animateContentSize(
+                animationSpec = tween(
+                    durationMillis = 260,
+                    easing = FastOutSlowInEasing,
+                ),
+            )
+            .onSizeChanged { size ->
+                if (size.height > maxMeasuredHeightPx) {
+                    maxMeasuredHeightPx = size.height
+                }
+            },
+    ) {
+        // Committed blocks: each rendered through MarkdownText, keyed
+        // by content hash. Compose elides recomposition for blocks
+        // whose key is unchanged across ticks. mikepenz sees each
+        // block exactly once.
         committedBlocksForRender.forEach { block ->
             key(block.key) {
                 if (stabilizeTables && block.text.looksLikeMarkdownTable()) {
-                    StableStyledMarkdownBlock(
+                    StableMarkdownTable(
                         text = block.text,
                         textColor = textColor,
                     )
@@ -217,53 +241,33 @@ fun StreamingMarkdownText(
         }
 
         activeTableText?.let { tableText ->
-            StableStyledMarkdownBlock(
+            StableMarkdownTable(
                 text = tableText,
                 textColor = textColor,
             )
         }
 
-        // ── Animated tail area ──
-        // Monotonic height + tween only apply to the in-progress paragraph.
-        val density = LocalDensity.current
-        var tailMaxHeightPx by remember { mutableStateOf(0) }
-        val tailMonotonicModifier = if (tailMaxHeightPx > 0) {
-            with(density) { Modifier.heightIn(min = tailMaxHeightPx.toDp()) }
-        } else {
-            Modifier
-        }
-
-        Column(
-            modifier = tailMonotonicModifier
-                .animateContentSize(
-                    animationSpec = tween(
-                        durationMillis = 260,
-                        easing = FastOutSlowInEasing,
-                    ),
-                )
-                .onSizeChanged { size ->
-                    if (size.height > tailMaxHeightPx) {
-                        tailMaxHeightPx = size.height
-                    }
-                },
-        ) {
-            if (transformedTail.isNotEmpty()) {
-                Text(
-                    text = transformedTail,
-                    style = tailStyle,
-                    color = textColor,
-                )
-            } else if (cursorText != null && committedBlocksForRender.isNotEmpty()) {
-                // Edge case: text ends exactly at a committed boundary
-                // (e.g. just after a paragraph break with no chars typed
-                // yet). Show a standalone cursor so streaming still feels
-                // live.
-                Text(
-                    text = cursorText,
-                    style = tailStyle,
-                    color = textColor,
-                )
-            }
+        // Active tail: plain Text. mikepenz NEVER sees this string.
+        // The tailTransform decorator handles cursor injection
+        // (▎) and the markdown-stability clamp
+        // (clampToStableMarkdown) so any unmatched span openers are
+        // clipped from the rendered text.
+        if (transformedTail.isNotEmpty()) {
+            Text(
+                text = transformedTail,
+                style = tailStyle,
+                color = textColor,
+            )
+        } else if (cursorText != null && committedBlocksForRender.isNotEmpty()) {
+            // Edge case: text ends exactly at a committed boundary
+            // (e.g. just after a paragraph break with no chars typed
+            // yet). Show a standalone cursor so streaming still feels
+            // live.
+            Text(
+                text = cursorText,
+                style = tailStyle,
+                color = textColor,
+            )
         }
     }
 }
@@ -279,60 +283,141 @@ private fun StreamingMarkdownPartition.deferTrailingBoundaryCommit(displayed: St
     )
 }
 
+/**
+ * Streaming-stable markdown table renderer.
+ *
+ * Parses GFM table text into rows and renders each row with a stable
+ * [key] so Compose only appends new rows during streaming — existing
+ * rows are never torn down. Each cell content goes through
+ * [MarkdownText] so bold, italic, inline code, and links render with
+ * the same full styling as settled tables.
+ */
 @Composable
-private fun StableStyledMarkdownBlock(
+private fun StableMarkdownTable(
     text: String,
     textColor: Color,
 ) {
-    var renderedText by remember { mutableStateOf(text) }
-    var previousText by remember { mutableStateOf<String?>(null) }
-    var currentReady by remember { mutableStateOf(true) }
-    var currentMeasured by remember { mutableStateOf(true) }
-
-    LaunchedEffect(text) {
-        if (text != renderedText) {
-            previousText = renderedText
-            renderedText = text
-            currentMeasured = false
-            currentReady = false
-        }
+    val parsed = remember(text) { parseMarkdownTable(text) }
+    if (parsed == null) {
+        MarkdownText(text = text, textColor = textColor)
+        return
     }
 
-    LaunchedEffect(renderedText, currentMeasured) {
-        if (!currentReady && currentMeasured) {
-            // Keep the previous styled table visible through the first measured frame of the new
-            // MarkdownText subtree. This avoids exposing the transient blank/empty table state that
-            // can happen while mikepenz/Compose replaces the table block during streaming.
-            delay(16L)
-            currentReady = true
-            previousText = null
-        }
-    }
+    val outlineColor = MaterialTheme.colorScheme.outlineVariant
 
-    Box {
-        previousText?.takeIf { !currentReady }?.let { staleText ->
-            MarkdownText(
-                text = staleText,
-                textColor = textColor,
-            )
+    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+        // Header
+        key("header") {
+            Row(modifier = Modifier.drawTableSeparator(outlineColor)) {
+                parsed.header.forEachIndexed { col, cell ->
+                    MarkdownText(
+                        text = cell,
+                        textColor = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier
+                            .weight(parsed.weights.getOrElse(col) { 1f })
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                    )
+                }
+            }
         }
 
-        key(renderedText) {
-            MarkdownText(
-                text = renderedText,
-                textColor = textColor,
-                modifier = Modifier
-                    .alpha(if (currentReady) 1f else 0f)
-                    .onSizeChanged { size ->
-                        if (!currentMeasured && size.height > 0) {
-                            currentMeasured = true
-                        }
-                    },
-            )
+        // Separator border after header
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(outlineColor),
+        )
+
+        // Data rows — stable per-row key so existing rows survive new-row arrivals
+        parsed.rows.forEachIndexed { rowIdx, cells ->
+            key("row-$rowIdx") {
+                Row(modifier = Modifier.drawTableSeparator(outlineColor)) {
+                    cells.forEachIndexed { col, cell ->
+                        MarkdownText(
+                            text = cell,
+                            textColor = textColor,
+                            modifier = Modifier
+                                .weight(parsed.weights.getOrElse(col) { 1f })
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
+private data class ParsedTable(
+    val header: List<String>,
+    val rows: List<List<String>>,
+    val weights: Map<Int, Float>,
+)
+
+private fun parseMarkdownTable(text: String): ParsedTable? {
+    val lines = text.lineSequence()
+        .filter { it.isNotBlank() }
+        .toList()
+    if (lines.size < 3) return null
+    if (!lines[0].contains('|')) return null
+    if (!lineLooksLikeTableSeparator(lines[1], 0, lines[1].length)) return null
+
+    val header = splitTableCells(lines[0])
+    if (header.isEmpty()) return null
+
+    val alignments = parseSeparatorAlignments(lines[1])
+    val colCount = header.size
+    val weights = alignments.mapValues { 1f }
+
+    val rows = lines.drop(2).mapNotNull { line ->
+        val cells = splitTableCells(line)
+        if (cells.isEmpty()) return@mapNotNull null
+        // Pad or trim to match header column count
+        cells.toMutableList().also {
+            while (it.size < colCount) it.add("")
+        }.take(colCount)
+    }
+
+    return ParsedTable(header = header, rows = rows, weights = weights)
+}
+
+private fun splitTableCells(line: String): List<String> {
+    val trimmed = line.trim()
+    val withoutEnds = if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+        trimmed.substring(1, trimmed.length - 1)
+    } else if (trimmed.startsWith('|')) {
+        trimmed.substring(1)
+    } else if (trimmed.endsWith('|')) {
+        trimmed.substring(0, trimmed.length - 1)
+    } else {
+        trimmed
+    }
+    return withoutEnds.split('|').map { it.trim() }
+}
+
+private fun parseSeparatorAlignments(separatorLine: String): Map<Int, String> {
+    val cells = splitTableCells(separatorLine)
+    return cells.mapIndexedNotNull { idx, cell ->
+        val left = cell.startsWith(':')
+        val right = cell.endsWith(':')
+        val align = when {
+            left && right -> "center"
+            right -> "right"
+            else -> "left"
+        }
+        idx to align
+    }.toMap()
+}
+
+private fun Modifier.drawTableSeparator(color: Color): Modifier = this
+    .drawBehind {
+        drawLine(
+            color = color,
+            start = Offset(0f, size.height),
+            end = Offset(size.width, size.height),
+            strokeWidth = 1f,
+        )
+    }
 private fun String.looksLikeMarkdownTable(): Boolean {
     val lines = lineSequence().filter { it.isNotBlank() }.toList()
     if (lines.size < 2) return false
