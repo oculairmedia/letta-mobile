@@ -59,6 +59,7 @@ class ChatPushService : Service() {
     @Inject lateinit var conversationApi: ConversationApi
     @Inject lateinit var agentRepository: AgentRepository
     @Inject lateinit var notificationPublisher: ChannelNotificationPublisher
+    @Inject lateinit var notificationReplyHandler: NotificationReplyHandler
     @Inject lateinit var currentConversationTracker: CurrentConversationTracker
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -193,6 +194,13 @@ class ChatPushService : Service() {
                 if (currentConversationTracker.current == conversationId) {
                     Telemetry.event(
                         "ChatPushService", "suppressedForegroundConv",
+                        "conversationId" to conversationId,
+                    )
+                    return
+                }
+                if (conversationId in notificationReplyHandler.activeReplyStreams.value) {
+                    Telemetry.event(
+                        "ChatPushService", "suppressedNotificationReplyStream",
                         "conversationId" to conversationId,
                     )
                     return

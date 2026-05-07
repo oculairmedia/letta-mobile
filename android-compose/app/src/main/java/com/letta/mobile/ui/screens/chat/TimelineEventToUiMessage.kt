@@ -285,11 +285,17 @@ internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                 // in a single step (observed Client Mode replay: reasoning_message
                 // and assistant_message both arrived with message-05b...). The
                 // ViewModel and render model dedupe by UiMessage.id to protect
-                // LazyColumn keys, so using bare serverId drops the final
-                // assistant bubble whenever a reasoning bubble with the same id
-                // is present. Scope the render-key suffix to Client Mode
-                // harness-collapsed events so legacy/history IDs remain stable.
-                id = if (ev.source == com.letta.mobile.data.timeline.MessageSource.CLIENT_MODE_HARNESS) {
+                // LazyColumn keys, so using bare serverId can drop reasoning or
+                // the final assistant bubble whenever both shapes share one
+                // server id. Scope the render-key suffix to Client Mode
+                // harness-collapsed events, plus REASONING events from server
+                // history/live streams, so notification-reply thinking bubbles
+                // survive same-id assistant responses while legacy assistant
+                // message IDs remain stable.
+                id = if (
+                    ev.source == com.letta.mobile.data.timeline.MessageSource.CLIENT_MODE_HARNESS ||
+                    ev.messageType == TimelineMessageType.REASONING
+                ) {
                     "${ev.serverId}:${ev.messageType.name}"
                 } else {
                     ev.serverId

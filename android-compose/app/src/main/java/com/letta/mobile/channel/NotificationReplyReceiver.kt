@@ -17,16 +17,21 @@ class NotificationReplyReceiver : BroadcastReceiver() {
         Log.w(TAG, "onReceive action=${intent.action}")
         val conversationId = intent.getStringExtra(EXTRA_CONVERSATION_ID)
         val agentId = intent.getStringExtra(EXTRA_AGENT_ID)
-        val notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, 0)
 
         if (conversationId == null || agentId == null) {
             Log.w(TAG, "missing required extras, aborting")
             return
         }
 
+        val notificationId = intent.getIntExtra(
+            EXTRA_NOTIFICATION_ID,
+            ChannelNotificationPublisher.notificationIdForConversation(conversationId),
+        )
         val replyText = RemoteInput.getResultsFromIntent(intent)
             ?.getCharSequence(KEY_TEXT_REPLY)?.toString()?.trim()
         if (replyText.isNullOrEmpty()) return
+
+        dismissConversationNotification(context, conversationId, notificationId)
 
         val pendingResult = goAsync()
         try {
@@ -37,11 +42,26 @@ class NotificationReplyReceiver : BroadcastReceiver() {
             entryPoint.replyHandler()
                 .sendReply(agentId, conversationId, replyText)
                 .invokeOnCompletion { pendingResult.finish() }
-            NotificationManagerCompat.from(context).cancel(notificationId)
         } catch (e: Exception) {
             Log.w(TAG, "failed to start reply work", e)
             pendingResult.finish()
         }
+    }
+
+    private fun dismissConversationNotification(
+        context: Context,
+        conversationId: String,
+        notificationId: Int,
+    ) {
+        val manager = NotificationManagerCompat.from(context)
+        manager.cancel(
+            ChannelNotificationPublisher.notificationTagForConversation(conversationId),
+            notificationId,
+        )
+        // Also cancel the legacy untagged notification form so replies to
+        // notifications posted before tagged delivery was introduced still
+        // remove the visible notification.
+        manager.cancel(notificationId)
     }
 
     companion object {

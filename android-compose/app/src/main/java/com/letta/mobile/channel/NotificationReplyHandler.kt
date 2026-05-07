@@ -50,10 +50,14 @@ class NotificationReplyHandler @Inject constructor(
                 Log.w(TAG, "user reply written to timeline for $conversationId")
 
                 val assistantMessageId = "cm-assist-notif-${UUID.randomUUID()}"
-                val startedAt = Instant.now()
 
                 clientModeChatSender.streamMessage(agentId, text, conversationId).collect { chunk ->
                     val convId = chunk.conversationId ?: conversationId
+                    // Match AdminChatViewModel's Client Mode timeline path:
+                    // stamp assistant/reasoning locals at chunk arrival time so
+                    // fuzzy collapse compares against the relevant server event
+                    // time instead of the notification reply start time.
+                    val chunkReceivedAt = Instant.now()
 
                     when (chunk.event) {
                         BotStreamEvent.REASONING -> {
@@ -68,7 +72,7 @@ class NotificationReplyHandler @Inject constructor(
                                         otid = localId,
                                         content = "",
                                         role = Role.ASSISTANT,
-                                        sentAt = startedAt,
+                                        sentAt = chunkReceivedAt,
                                         deliveryState = DeliveryState.SENT,
                                         source = MessageSource.CLIENT_MODE_HARNESS,
                                         messageType = TimelineMessageType.REASONING,
@@ -96,7 +100,7 @@ class NotificationReplyHandler @Inject constructor(
                                         otid = localId,
                                         content = delta,
                                         role = Role.ASSISTANT,
-                                        sentAt = startedAt,
+                                        sentAt = chunkReceivedAt,
                                         deliveryState = DeliveryState.SENT,
                                         source = MessageSource.CLIENT_MODE_HARNESS,
                                         messageType = TimelineMessageType.ASSISTANT,

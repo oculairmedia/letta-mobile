@@ -214,6 +214,31 @@ class TimelineEventToUiMessageTest {
     }
 
     @Test
+    fun `server reasoning and assistant with same server id produce unique ui ids`() {
+        val reasoning = timelineEventToUiMessage(
+            confirmed(
+                TimelineMessageType.REASONING,
+                content = "thinking",
+                serverId = "shared-server-id",
+            )
+        )!!
+        val assistant = timelineEventToUiMessage(
+            confirmed(
+                TimelineMessageType.ASSISTANT,
+                content = "answer",
+                serverId = "shared-server-id",
+            )
+        )!!
+
+        assertTrue(
+            "Server reasoning must not be dropped by UI/render dedupe when the assistant response reuses its id",
+            reasoning.id != assistant.id,
+        )
+        assertEquals("shared-server-id:REASONING", reasoning.id)
+        assertEquals("shared-server-id", assistant.id)
+    }
+
+    @Test
     fun `confirmed events thread run id and step id onto ui message`() {
         val ev = TimelineEvent.Confirmed(
             position = 1.0,

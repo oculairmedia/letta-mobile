@@ -73,7 +73,8 @@ class ChannelNotificationPublisher @Inject constructor(
         val messageText = notification.messagePreview.ifBlank {
             context.getString(R.string.channel_notifications_fallback_text)
         }
-        val notificationId = notification.conversationId.hashCode()
+        val notificationId = notificationIdForConversation(notification.conversationId)
+        val notificationTag = notificationTagForConversation(notification.conversationId)
 
         val replyIntent = Intent(context, NotificationReplyReceiver::class.java).apply {
             action = NotificationReplyReceiver.ACTION_REPLY
@@ -107,10 +108,16 @@ class ChannelNotificationPublisher @Inject constructor(
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .addAction(replyAction)
 
-        NotificationManagerCompat.from(context).notify(notificationId, builder.build())
+        NotificationManagerCompat.from(context).notify(notificationTag, notificationId, builder.build())
     }
 
     companion object {
         private const val CHANNEL_ID = "letta-agent-updates"
+        private const val NOTIFICATION_TAG_PREFIX = "conversation:"
+
+        fun notificationIdForConversation(conversationId: String): Int = conversationId.hashCode()
+
+        fun notificationTagForConversation(conversationId: String): String =
+            "$NOTIFICATION_TAG_PREFIX$conversationId"
     }
 }
