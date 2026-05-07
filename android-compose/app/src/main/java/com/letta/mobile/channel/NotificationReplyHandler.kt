@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 @Singleton
@@ -38,8 +39,8 @@ class NotificationReplyHandler @Inject constructor(
     private val _activeReplyStreams = MutableStateFlow<Set<String>>(emptySet())
     val activeReplyStreams: StateFlow<Set<String>> = _activeReplyStreams.asStateFlow()
 
-    fun sendReply(agentId: String, conversationId: String, text: String) {
-        scope.launch {
+    fun sendReply(agentId: String, conversationId: String, text: String): Job {
+        return scope.launch {
             try {
                 _activeReplyStreams.update { it + conversationId }
                 timelineRepository.appendClientModeLocal(

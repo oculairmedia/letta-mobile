@@ -348,7 +348,6 @@ private fun LlmModelDetailDialog(
         show = true,
         title = model.displayName,
         confirmText = stringResource(R.string.action_close),
-        dismissText = stringResource(R.string.action_close),
         onConfirm = onDismiss,
         onDismiss = onDismiss,
     ) {
@@ -382,7 +381,7 @@ private fun LlmModelDetailDialog(
                 DetailRow(stringResource(R.string.screen_models_detail_max_tokens, it))
             }
             model.parallelToolCalls?.let {
-                DetailRow(stringResource(R.string.screen_models_detail_parallel_tool_calls, if (it) "Yes" else "No"))
+                DetailRow(stringResource(R.string.screen_models_detail_parallel_tool_calls, stringResource(if (it) R.string.screen_models_detail_yes else R.string.screen_models_detail_no)))
             }
             model.frequencyPenalty?.let {
                 DetailRow(stringResource(R.string.screen_models_detail_frequency_penalty, it))
@@ -391,7 +390,7 @@ private fun LlmModelDetailDialog(
             if (model.enableReasoner == true || model.reasoningEffort != null || model.maxReasoningTokens != null) {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                 model.enableReasoner?.let {
-                    DetailRow(stringResource(R.string.screen_models_detail_reasoning, if (it) "Enabled" else "Disabled"))
+                    DetailRow(stringResource(R.string.screen_models_detail_reasoning, stringResource(if (it) R.string.screen_models_detail_enabled else R.string.screen_models_detail_disabled)))
                 }
                 model.reasoningEffort?.let {
                     DetailRow(stringResource(R.string.screen_models_detail_reasoning_effort, it))
@@ -439,7 +438,6 @@ private fun EmbeddingModelDetailDialog(
         show = true,
         title = model.displayName,
         confirmText = stringResource(R.string.action_close),
-        dismissText = stringResource(R.string.action_close),
         onConfirm = onDismiss,
         onDismiss = onDismiss,
     ) {
@@ -486,13 +484,13 @@ private fun EmbeddingModelDetailDialog(
             if (model.azureEndpoint != null || model.azureVersion != null || model.azureDeployment != null) {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                 model.azureEndpoint?.let {
-                    DetailRow("Azure Endpoint: $it")
+                    DetailRow(stringResource(R.string.screen_models_detail_azure_endpoint, it))
                 }
                 model.azureVersion?.let {
-                    DetailRow("Azure Version: $it")
+                    DetailRow(stringResource(R.string.screen_models_detail_azure_version, it))
                 }
                 model.azureDeployment?.let {
-                    DetailRow("Azure Deployment: $it")
+                    DetailRow(stringResource(R.string.screen_models_detail_azure_deployment, it))
                 }
             }
         }

@@ -3,9 +3,17 @@ use jni::sys::{jboolean, jint, jstring};
 use jni::JNIEnv;
 use mermaid_rs_renderer::{RenderOptions, Theme, render_with_options};
 use std::ptr::null_mut;
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 
 static LAST_ERROR: Mutex<Option<String>> = Mutex::new(None);
+static STYLE_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+    regex::Regex::new(
+        r"(?m)^(\s*)style\s+(\S+)\s+((?:fill|stroke|color|stroke-width|stroke-dasharray)[^,]*(?:,\s*(?:fill|stroke|color|stroke-width|stroke-dasharray)[^,]*)*)",
+    ).unwrap()
+});
+static FILL_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+    regex::Regex::new(r"fill:\s*(#[0-9a-fA-F]{6})").unwrap()
+});
 
 fn set_last_error(message: impl Into<String>) {
     if let Ok(mut slot) = LAST_ERROR.lock() {
@@ -123,9 +131,7 @@ fn inject_contrast_colors(source: &str, text_argb: jint) -> String {
     
     // Match style commands: "style NodeName fill:#xxxxxx,stroke:..."
     // Pattern: style <nodename> <style-options>
-    let style_re = regex::Regex::new(r"(?m)^(\s*)style\s+(\S+)\s+((?:fill|stroke|color|stroke-width|stroke-dasharray)[^,]*(?:,\s*(?:fill|stroke|color|stroke-width|stroke-dasharray)[^,]*)*)").unwrap();
-    
-    result = style_re.replace_all(&result, |caps: &regex::Captures| {
+    result = STYLE_RE.replace_all(&result, |caps: &regex::Captures| {
         let _indent = caps.get(1).map_or("", |m| m.as_str());
         let _node_name = caps.get(2).map_or("", |m| m.as_str());
         let style_part = caps.get(3).map_or("", |m| m.as_str());
@@ -139,8 +145,7 @@ fn inject_contrast_colors(source: &str, text_argb: jint) -> String {
         }
         
         // Extract fill color to calculate appropriate text color
-        let fill_re = regex::Regex::new(r"fill:\s*(#[0-9a-fA-F]{6})").unwrap();
-        let text_color = if let Some(cap) = fill_re.captures(style_part) {
+        let text_color = if let Some(cap) = FILL_RE.captures(style_part) {
             if let Some(fill) = cap.get(1) {
                 let fill_str = fill.as_str().to_lowercase();
                 // Use Material theme text color for light backgrounds, white for dark
@@ -162,12 +167,12 @@ fn inject_contrast_colors(source: &str, text_argb: jint) -> String {
         }
         
         // Inject color parameter
-        let separator = if style_part.trim().ends_with(',') { "" } else { "," };
-        format!("style {} {}{}color:{}", 
-            _node_name, 
-            style_part.trim_end_matches(','),
-            separator,
-            text_color)
+        format!(
+            "style {} {},color:{}",
+            _node_name,
+            style_part.trim().trim_end_matches(','),
+            text_color,
+        )
     }).to_string();
     
     result

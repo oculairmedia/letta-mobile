@@ -129,7 +129,7 @@ fun RunBlock(
             // arrival so animation finishes before next chunk. Matches
             // ChatMessageComponents behavior for consistent height tween.
             .then(
-                if (isPinching) Modifier
+                if (isPinching || isStreaming) Modifier
                 else Modifier.animateContentSize(
                     animationSpec = tween(durationMillis = 60, easing = LinearEasing),
                 )

@@ -28,14 +28,20 @@ class NotificationReplyReceiver : BroadcastReceiver() {
             ?.getCharSequence(KEY_TEXT_REPLY)?.toString()?.trim()
         if (replyText.isNullOrEmpty()) return
 
-        goAsync().finish()
-
-        val entryPoint = EntryPointAccessors.fromApplication(
-            context.applicationContext,
-            ReplyEntryPoint::class.java,
-        )
-        entryPoint.replyHandler().sendReply(agentId, conversationId, replyText)
-        NotificationManagerCompat.from(context).cancel(notificationId)
+        val pendingResult = goAsync()
+        try {
+            val entryPoint = EntryPointAccessors.fromApplication(
+                context.applicationContext,
+                ReplyEntryPoint::class.java,
+            )
+            entryPoint.replyHandler()
+                .sendReply(agentId, conversationId, replyText)
+                .invokeOnCompletion { pendingResult.finish() }
+            NotificationManagerCompat.from(context).cancel(notificationId)
+        } catch (e: Exception) {
+            Log.w(TAG, "failed to start reply work", e)
+            pendingResult.finish()
+        }
     }
 
     companion object {

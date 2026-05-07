@@ -774,8 +774,8 @@ private fun ReorderableWidgetGrid(
                                             }?.key
 
                                         if (targetIndex != null && targetIndex != index) {
-                                            val oldRect = itemRects.getValue(index)
-                                            val newRect = itemRects.getValue(targetIndex)
+                                            val oldRect = itemRects[index] ?: return@detectDragGesturesAfterLongPress
+                                            val newRect = itemRects[targetIndex] ?: return@detectDragGesturesAfterLongPress
 
                                             currentList = currentList.toMutableList().apply {
                                                 val item = removeAt(index)

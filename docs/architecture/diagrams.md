@@ -192,20 +192,20 @@ flowchart TB
     IN["Inbound Frame"] --> PARSE["Parse conv_id + request_id"]
 
     PARSE --> T1{"activeRoutes[convId]<br/>exact match?"}
-    T1 --> |"Hit| OK1["Route to channel"]
-    T1 --> |"Miss| T2
+    T1 --> |"Hit"| OK1["Route to channel"]
+    T1 --> |"Miss"| T2A
 
-    T2 --> T2A{"request_id match<br/>activeRoutes?"}
-    T2A --> |"Hit| OK2["Route to channel"]
-    T2A --> |"Miss| T2B
+    T2A{"request_id match<br/>activeRoutes?"}
+    T2A --> |"Hit"| OK2["Route to channel"]
+    T2A --> |"Miss"| T2B
 
-    T2B --> T2B{"request_id match<br/>pendingRoutes?"}
-    T2B --> |"Hit| OK3["Route to channel"]
-    T2B --> |"Miss| T3
+    T2B{"request_id match<br/>pendingRoutes?"}
+    T2B --> |"Hit"| OK3["Route to channel"]
+    T2B --> |"Miss"| T3
 
     T3{"Sole in-flight<br/>route?"}
-    T3 --> |"Yes| OK4["Route to channel"]
-    T3 --> |"No| DROP["Drop frame"]
+    T3 --> |"Yes"| OK4["Route to channel"]
+    T3 --> |"No"| DROP["Drop frame"]
 ```
 
 ## 9. Session Initiation
@@ -214,11 +214,11 @@ flowchart TB
 flowchart TB
     A["ensureSession()"] --> B{"needsNewSession?"}
     B --> |"No"| DONE["return"]
-    B --> |"Yes| C{"Agent switch?"}
-    C --> |"Yes| H1["send session_close"]
+    B --> |"Yes"| C{"Agent switch?"}
+    C --> |"Yes"| H1["send session_close"]
     H1 --> H2["close socket"]
     H2 --> H3["openSocketLocked()"]
-    C --> |"No| I1["send session_close"]
+    C --> |"No"| I1["send session_close"]
     I1 --> I2["openSocketLocked()"]
     H3 --> J["initializeSessionLocked()"]
     I2 --> J
@@ -234,14 +234,14 @@ flowchart TB
 flowchart TB
     DISCONNECT["Unexpected disconnect"] --> G1{"isUserClosing?"}
     G1 --> |"Yes"| STOP["CLOSED"]
-    G1 --> |"No| START["RECONNECTING"]
+    G1 --> |"No"| START["RECONNECTING"]
 
     START --> LOOP["Retry loop"]
     LOOP --> DELAY["delay backoff"]
     DELAY --> CONNECT["openSocket + init"]
     CONNECT --> SUCCESS{"Success?"}
     SUCCESS --> |"Yes"| DONE["READY"]
-    SUCCESS --> |"No| INC["attempt++"]
+    SUCCESS --> |"No"| INC["attempt++"]
     INC --> LOOP
 
     DELAY_LABELS["1s → 2s → 5s → 10s → 30s (capped)"]

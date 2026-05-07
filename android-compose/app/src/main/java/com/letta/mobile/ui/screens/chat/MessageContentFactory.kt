@@ -1,10 +1,5 @@
 package com.letta.mobile.ui.screens.chat
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -153,23 +148,24 @@ internal fun streamingDisplayText(raw: String): String {
     }
     val safe = clampToStableMarkdown(raw)
 
-    // letta-mobile-y3j9: streamingDisplayText content-level duplication probe
-    // Capture raw vs clamped lengths to detect holdback behavior
-    val rawLen = raw.length
-    val clampedLen = safe.length
-    val heldBack = rawLen - clampedLen
-
-    android.util.Log.w(
-        "StreamingDisplay-DEBUG",
-        "streamingDisplayText: rawLen=$rawLen clampedLen=$clampedLen heldBack=$heldBack",
-    )
-
-    // Detect if holdback is growing unexpectedly (potential duplication source)
-    if (heldBack > 50) {
-        android.util.Log.w(
+    // letta-mobile-y3j9: streamingDisplayText content-level duplication probe.
+    // Keep it debug-only because this path runs on every streaming recomposition.
+    if (com.letta.mobile.core.BuildConfig.DEBUG) {
+        val rawLen = raw.length
+        val clampedLen = safe.length
+        val heldBack = rawLen - clampedLen
+        android.util.Log.d(
             "StreamingDisplay-DEBUG",
-            "STREAMING_DISPLAY_HOLDBACK: largeHoldback=$heldBack rawLen=$rawLen",
+            "streamingDisplayText: rawLen=$rawLen clampedLen=$clampedLen heldBack=$heldBack",
         )
+
+        // Detect if holdback is growing unexpectedly (potential duplication source)
+        if (heldBack > 50) {
+            android.util.Log.d(
+                "StreamingDisplay-DEBUG",
+                "STREAMING_DISPLAY_HOLDBACK: largeHoldback=$heldBack rawLen=$rawLen",
+            )
+        }
     }
 
     return safe + STREAMING_CURSOR
@@ -343,33 +339,14 @@ object TextMessageRenderer : MessageContentRenderer {
                 modifier = modifier,
             )
         } else {
-            val transitionKey = isStreaming
-            AnimatedContent(
-                targetState = transitionKey,
-                transitionSpec = {
-                    fadeIn(tween(80)) togetherWith fadeOut(tween(80))
-                },
-                label = "stream-end-transition",
-            ) { streaming ->
-                if (streaming) {
-                    val smoothed = rememberSmoothedStreamingText(
-                        rawText = message.content,
-                        isStreaming = true,
-                    )
-                    Text(
-                        text = smoothed,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = textColor,
-                        modifier = modifier,
-                    )
-                } else {
-                    MarkdownText(
-                        text = message.content,
-                        textColor = textColor,
-                        modifier = modifier,
-                    )
-                }
-            }
+            StreamingMarkdownText(
+                text = message.content,
+                textColor = textColor,
+                tailStyle = MaterialTheme.chatTypography.messageBody,
+                tailTransform = ::streamingDisplayText,
+                cursorText = STREAMING_CURSOR,
+                modifier = modifier,
+            )
         }
     }
 }

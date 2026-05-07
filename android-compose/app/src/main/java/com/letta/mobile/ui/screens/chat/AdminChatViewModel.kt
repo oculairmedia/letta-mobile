@@ -527,8 +527,6 @@ class AdminChatViewModel @Inject constructor(
     private var timelineObserverJob: kotlinx.coroutines.Job? = null
     private var timelineHydrateSignalJob: kotlinx.coroutines.Job? = null
     private var clientModeStreamJob: Job? = null
-    @Volatile
-    private var clientModeConversationToNotify: String? = null
 
     /**
      * letta-mobile-5s1n (regression fix): explicit "Client Mode stream in
@@ -1546,7 +1544,6 @@ class AdminChatViewModel @Inject constructor(
         attachments: List<MessageContentPart.Image> = emptyList(),
     ) {
         clientModeStreamJob?.cancel()
-        clientModeConversationToNotify = null
         // letta-mobile-5s1n (regression fix): mark stream in flight BEFORE
         // launching, so observer emissions inside the launch (which run
         // synchronously on UnconfinedTestDispatcher / immediate main) see
@@ -1756,6 +1753,7 @@ class AdminChatViewModel @Inject constructor(
             // try to resume the dead requested ID again.
             var swapEvaluated = false
             var lastAssistantPreview: String? = null
+            var lastNotifiedPreview: String? = null
             // letta-mobile-hf93: track whether the gateway ever sent any
             // user-visible payload (text, reasoning, or a tool event) for
             // this turn. If the stream terminates with no payload — e.g. a
@@ -1775,7 +1773,7 @@ class AdminChatViewModel @Inject constructor(
                     text = outboundText,
                     conversationId = priorConversationId,
                 ).collect { chunk ->
-                    android.util.Log.w("AdminChatVM-DEBUG", "sendViaClientMode: chunk received done=${chunk.done} event=${chunk.event} textLen=${chunk.text?.length} convId=${chunk.conversationId} tracker=${currentConversationTracker.current} notify=$clientModeConversationToNotify")
+                    android.util.Log.w("AdminChatVM-DEBUG", "sendViaClientMode: chunk received done=${chunk.done} event=${chunk.event} textLen=${chunk.text?.length} convId=${chunk.conversationId} tracker=${currentConversationTracker.current}")
                     chunk.conversationId?.takeIf { it.isNotBlank() }?.let { conversationId ->
                         latestConversationId = conversationId
 
@@ -1788,12 +1786,12 @@ class AdminChatViewModel @Inject constructor(
                             lastAssistantPreview = chunk.text?.takeIf { it.isNotBlank() }
                         }
 
-                        val shouldNotify = clientModeConversationToNotify != conversationId &&
-                            lastAssistantPreview != null &&
+                        val shouldNotify = lastAssistantPreview != null &&
+                            lastAssistantPreview != lastNotifiedPreview &&
                             currentConversationTracker.current == null
 
                         if (shouldNotify) {
-                            clientModeConversationToNotify = conversationId
+                            lastNotifiedPreview = lastAssistantPreview
                             android.util.Log.w("AdminChatVM-NOTIFY", "publishing conv=$conversationId tracker=${currentConversationTracker.current} done=${chunk.done}")
                             channelNotificationPublisher.publish(
                                 ChannelNotification(

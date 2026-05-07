@@ -22,8 +22,10 @@ import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,6 +34,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Local bot session — runs entirely on-device using the Letta SDK API.
@@ -66,6 +69,7 @@ class LocalBotSession @AssistedInject constructor(
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val messageQueue = MessageQueue<QueuedMessage>()
+    private val activeStreamJob = AtomicReference<Job?>(null)
     private val conversationCache = mutableMapOf<String, String>() // routeKey -> conversationId
     private val conversationMutex = Mutex()
     private val activeSkills by lazy { skillRegistry.resolveEnabledSkills(config.enabledSkills) }
@@ -142,7 +146,7 @@ class LocalBotSession @AssistedInject constructor(
     }
 
     override suspend fun abortStream() {
-        scope.coroutineContext.cancel()
+        activeStreamJob.getAndSet(null)?.cancel()
     }
 
     /**
@@ -184,6 +188,9 @@ class LocalBotSession @AssistedInject constructor(
     ): Flow<BotResponseChunk> = flow {
         val agentId = requireAgent(message)
         ensureToolsSynced(agentId)
+        val currentJob = currentCoroutineContext()[Job]
+            ?: error("streamToAgent must run in a coroutine Job")
+        activeStreamJob.set(currentJob)
         _status.value = BotStatus.PROCESSING
         try {
             val resolvedConversationId = conversationId ?: if (forceNew) {
@@ -245,6 +252,8 @@ class LocalBotSession @AssistedInject constructor(
             _status.value = BotStatus.RUNNING
             Log.e(TAG, "Error streaming message for agent $agentId on config $configId", e)
             throw e
+        } finally {
+            activeStreamJob.compareAndSet(currentJob, null)
         }
     }
 

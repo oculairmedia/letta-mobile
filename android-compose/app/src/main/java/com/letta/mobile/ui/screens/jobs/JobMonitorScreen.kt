@@ -214,7 +214,6 @@ fun JobMonitorScreen(
             title = stringResource(R.string.common_error),
             message = operationError,
             confirmText = stringResource(R.string.action_dismiss),
-            dismissText = stringResource(R.string.action_dismiss),
             onConfirm = { viewModel.clearOperationError() },
             onDismiss = { viewModel.clearOperationError() },
         )

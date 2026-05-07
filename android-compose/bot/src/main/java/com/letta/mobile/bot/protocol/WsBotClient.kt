@@ -163,6 +163,7 @@ class WsBotClient(
         val requestId: String,
         val channel: SendChannel<RequestSignal>,
         @Volatile var conversationId: String?,
+        @Volatile var firstFrameSent: Boolean = false,
     )
 
     @Volatile
@@ -236,6 +237,7 @@ class WsBotClient(
                         ),
                     ),
                 )
+                activeRoute.firstFrameSent = true
 
                 var finished = false
                 var sessionRetries = 0
@@ -738,12 +740,15 @@ class WsBotClient(
     }
 
     private fun soleInFlightRouteOrNull(): RequestRoute? {
-        val activeCount = activeRoutes.size
-        val pendingCount = pendingRoutes.size
+        // Only consider routes whose first frame has been sent — routes that
+        // are registered but haven't sent their initial WsClientMessage would
+        // cause abort() to fire for a requestId the gateway hasn't seen yet.
+        val active = activeRoutes.values.singleOrNull()?.takeIf { it.firstFrameSent }
+        val pending = pendingRoutes.values.singleOrNull()?.takeIf { it.firstFrameSent }
         return when {
-            activeCount + pendingCount != 1 -> null
-            activeCount == 1 -> activeRoutes.values.firstOrNull()
-            else -> pendingRoutes.values.firstOrNull()
+            active != null && pending == null -> active
+            pending != null && activeRoutes.isEmpty() -> pending
+            else -> null
         }
     }
 

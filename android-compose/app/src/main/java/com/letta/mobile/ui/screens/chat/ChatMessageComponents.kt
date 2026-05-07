@@ -314,29 +314,11 @@ private fun MessageBubbleSurface(
     val renderer = remember(message.role, message.toolCalls, message.generatedUi) { resolveRenderer(message) }
     val bubbleLess = message.shouldRenderBubbleLess()
 
-    // letta-mobile-d2z6.s1 (Emmanuel 2026-04-26 01:28 EDT): ease bubble
-    // height growth as streaming chunks land. Short 60ms LinearEasing
-    // tween — fast enough that successive chunks (typically 80–150ms
-    // apart) don't stack into compounding wobble, but long enough that
-    // the user's eye perceives "growing" rather than "popping".
-    //
-    // Pinch suppresses the animation entirely (avoids height-interp
-    // cascades across many bubbles during the gesture, see
-    // letta-mobile-5e0f).
-    //
-    // Non-streaming, non-pinching bubbles get NO animateContentSize on
-    // the Surface itself — historically that fought with the per-bubble
-    // collapse/reasoning animations downstream. The Surface stays
-    // size-stable; only mid-stream growth is animated.
-    //
-    val isPinchingForBubble = LocalChatIsPinching.current
-    val bubbleSizeAnimation = if (!isStreaming && isLastAssistant && !isPinchingForBubble) {
-        Modifier.animateContentSize(
-            animationSpec = tween(durationMillis = 60, easing = LinearEasing),
-        )
-    } else {
-        Modifier
-    }
+    // animateContentSize on the Surface itself caused a LazyColumn double-measure
+    // crash when stacked with reasoning/collapse animations downstream. Bubble
+    // height is intentionally non-animated; per-region animation lives in
+    // MessageReasoning / ToolCallCard.
+    val bubbleSizeAnimation: Modifier = Modifier
 
     val contentColumn: @Composable () -> Unit = {
         Column(
