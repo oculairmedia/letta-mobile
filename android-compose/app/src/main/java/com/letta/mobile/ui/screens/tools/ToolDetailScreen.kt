@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.LargeFlexibleTopAppBar
@@ -220,15 +219,13 @@ fun ToolDetailScreen(
 
     val deleteError = (deleteState as? UiState.Error)?.message
     if (deleteError != null) {
-        AlertDialog(
-            onDismissRequest = { viewModel.clearDeleteState() },
-            title = { Text(stringResource(R.string.common_error)) },
-            text = { Text(deleteError) },
-            confirmButton = {
-                TextButton(onClick = { viewModel.clearDeleteState() }) {
-                    Text(stringResource(R.string.action_dismiss))
-                }
-            },
+        ConfirmDialog(
+            show = true,
+            title = stringResource(R.string.common_error),
+            message = deleteError,
+            confirmText = stringResource(R.string.action_dismiss),
+            onConfirm = { viewModel.clearDeleteState() },
+            onDismiss = { viewModel.clearDeleteState() },
         )
     }
 }

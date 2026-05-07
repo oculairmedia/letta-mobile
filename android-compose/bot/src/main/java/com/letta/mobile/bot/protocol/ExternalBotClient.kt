@@ -120,4 +120,12 @@ class ExternalBotClient(
     override fun close() {
         client.close()
     }
+
+    override suspend fun abort() {
+        // HTTP-based client has no mechanism to cancel an in-flight SSE
+        // stream. The server must finish on its own. This is not a bug —
+        // it's an inherent limitation of the HTTP transport. UI should
+        // hide the stop affordance when using this client.
+        throw UnsupportedOperationException("abort() not supported for HTTP transport")
+    }
 }

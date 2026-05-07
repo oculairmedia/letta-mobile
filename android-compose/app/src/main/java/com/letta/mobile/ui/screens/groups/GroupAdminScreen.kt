@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
@@ -37,7 +36,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -53,6 +51,7 @@ import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
@@ -245,28 +244,26 @@ fun GroupAdminScreen(
     }
 
     state?.operationError?.let { operationError ->
-        AlertDialog(
-            onDismissRequest = viewModel::clearOperationError,
-            title = { Text(stringResource(R.string.common_error)) },
-            text = { Text(operationError) },
-            confirmButton = {
-                TextButton(onClick = viewModel::clearOperationError) {
-                    Text(stringResource(R.string.action_dismiss))
-                }
-            },
+        ConfirmDialog(
+            show = true,
+            title = stringResource(R.string.common_error),
+            message = operationError,
+            confirmText = stringResource(R.string.action_dismiss),
+            dismissText = stringResource(R.string.action_dismiss),
+            onConfirm = viewModel::clearOperationError,
+            onDismiss = viewModel::clearOperationError,
         )
     }
 
     state?.operationMessage?.let { operationMessage ->
-        AlertDialog(
-            onDismissRequest = viewModel::clearOperationMessage,
-            title = { Text(stringResource(R.string.common_conversations)) },
-            text = { Text(operationMessage) },
-            confirmButton = {
-                TextButton(onClick = viewModel::clearOperationMessage) {
-                    Text(stringResource(R.string.action_dismiss))
-                }
-            },
+        ConfirmDialog(
+            show = true,
+            title = stringResource(R.string.common_conversations),
+            message = operationMessage,
+            confirmText = stringResource(R.string.action_dismiss),
+            dismissText = stringResource(R.string.action_dismiss),
+            onConfirm = viewModel::clearOperationMessage,
+            onDismiss = viewModel::clearOperationMessage,
         )
     }
 }
@@ -325,59 +322,57 @@ private fun GroupDetailDialog(
     onSendMessage: () -> Unit,
     onResetMessages: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(group.id, fontFamily = FontFamily.Monospace) },
-        text = {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                item { Text(group.description.ifBlank { stringResource(R.string.common_description) }, style = MaterialTheme.typography.titleSmall) }
-                item { Text(stringResource(R.string.screen_groups_manager_type_label, group.managerType), style = MaterialTheme.typography.bodySmall) }
-                item { Text(stringResource(R.string.screen_groups_agents_label, group.agentIds.joinToString()), style = MaterialTheme.typography.bodySmall) }
-                group.projectId?.let { item { Text(stringResource(R.string.screen_groups_project_label, it), style = MaterialTheme.typography.bodySmall) } }
-                if (group.sharedBlockIds.isNotEmpty()) {
-                    item { Text(stringResource(R.string.screen_groups_shared_blocks_label, group.sharedBlockIds.joinToString()), style = MaterialTheme.typography.bodySmall) }
+    ConfirmDialog(
+        show = true,
+        title = group.id,
+        confirmText = stringResource(R.string.action_close),
+        dismissText = stringResource(R.string.action_close),
+        onConfirm = onDismiss,
+        onDismiss = onDismiss,
+    ) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item { Text(group.description.ifBlank { stringResource(R.string.common_description) }, style = MaterialTheme.typography.titleSmall) }
+            item { Text(stringResource(R.string.screen_groups_manager_type_label, group.managerType), style = MaterialTheme.typography.bodySmall) }
+            item { Text(stringResource(R.string.screen_groups_agents_label, group.agentIds.joinToString()), style = MaterialTheme.typography.bodySmall) }
+            group.projectId?.let { item { Text(stringResource(R.string.screen_groups_project_label, it), style = MaterialTheme.typography.bodySmall) } }
+            if (group.sharedBlockIds.isNotEmpty()) {
+                item { Text(stringResource(R.string.screen_groups_shared_blocks_label, group.sharedBlockIds.joinToString()), style = MaterialTheme.typography.bodySmall) }
+            }
+            group.managerAgentId?.let { item { Text(stringResource(R.string.screen_groups_manager_agent_label, it), style = MaterialTheme.typography.bodySmall) } }
+            group.templateId?.let { item { Text(stringResource(R.string.screen_groups_template_label, it), style = MaterialTheme.typography.bodySmall) } }
+            group.baseTemplateId?.let { item { Text(stringResource(R.string.screen_groups_base_template_label, it), style = MaterialTheme.typography.bodySmall) } }
+            group.deploymentId?.let { item { Text(stringResource(R.string.screen_groups_deployment_label, it), style = MaterialTheme.typography.bodySmall) } }
+            group.terminationToken?.let { item { Text(stringResource(R.string.screen_groups_termination_label, it), style = MaterialTheme.typography.bodySmall) } }
+            group.maxTurns?.let { item { Text(stringResource(R.string.screen_groups_max_turns_label, it), style = MaterialTheme.typography.bodySmall) } }
+            group.turnsCounter?.let { item { Text(stringResource(R.string.screen_groups_turns_counter_label, it), style = MaterialTheme.typography.bodySmall) } }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onEdit) { Text(stringResource(R.string.screen_groups_edit_title)) }
+                    TextButton(onClick = onSendMessage) { Text(stringResource(R.string.action_send_message)) }
+                    TextButton(onClick = onResetMessages) { Text(stringResource(R.string.action_reset_messages), color = MaterialTheme.colorScheme.error) }
                 }
-                group.managerAgentId?.let { item { Text(stringResource(R.string.screen_groups_manager_agent_label, it), style = MaterialTheme.typography.bodySmall) } }
-                group.templateId?.let { item { Text(stringResource(R.string.screen_groups_template_label, it), style = MaterialTheme.typography.bodySmall) } }
-                group.baseTemplateId?.let { item { Text(stringResource(R.string.screen_groups_base_template_label, it), style = MaterialTheme.typography.bodySmall) } }
-                group.deploymentId?.let { item { Text(stringResource(R.string.screen_groups_deployment_label, it), style = MaterialTheme.typography.bodySmall) } }
-                group.terminationToken?.let { item { Text(stringResource(R.string.screen_groups_termination_label, it), style = MaterialTheme.typography.bodySmall) } }
-                group.maxTurns?.let { item { Text(stringResource(R.string.screen_groups_max_turns_label, it), style = MaterialTheme.typography.bodySmall) } }
-                group.turnsCounter?.let { item { Text(stringResource(R.string.screen_groups_turns_counter_label, it), style = MaterialTheme.typography.bodySmall) } }
-                item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = onEdit) { Text(stringResource(R.string.screen_groups_edit_title)) }
-                        TextButton(onClick = onSendMessage) { Text(stringResource(R.string.action_send_message)) }
-                        TextButton(onClick = onResetMessages) { Text(stringResource(R.string.action_reset_messages), color = MaterialTheme.colorScheme.error) }
-                    }
-                }
+            }
+            item {
+                Text(
+                    text = stringResource(R.string.screen_groups_messages_title),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+            }
+            if (messages.isEmpty()) {
                 item {
                     Text(
-                        text = stringResource(R.string.screen_groups_messages_title),
-                        style = MaterialTheme.typography.labelLarge,
+                        text = stringResource(R.string.screen_groups_messages_empty),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (messages.isEmpty()) {
-                    item {
-                        Text(
-                            text = stringResource(R.string.screen_groups_messages_empty),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                } else {
-                    items(messages, key = { it.id }) { message ->
-                        GroupMessageCard(message = message)
-                    }
+            } else {
+                items(messages, key = { it.id }) { message ->
+                    GroupMessageCard(message = message)
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_close))
-            }
-        },
-    )
+        }
+    }
 }
 
 @Composable
@@ -416,57 +411,48 @@ private fun GroupEditorDialog(
     var sharedBlockIds by remember(initialSharedBlockIds) { mutableStateOf(initialSharedBlockIds) }
     var hidden by remember(initialHidden) { mutableStateOf(initialHidden) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text(stringResource(R.string.common_description)) },
-                    minLines = 2,
-                )
-                OutlinedTextField(
-                    value = agentIds,
-                    onValueChange = { agentIds = it },
-                    label = { Text(stringResource(R.string.screen_groups_agent_ids_input)) },
-                    supportingText = { Text(stringResource(R.string.screen_groups_csv_helper)) },
-                )
-                OutlinedTextField(
-                    value = projectId,
-                    onValueChange = { projectId = it },
-                    label = { Text(stringResource(R.string.screen_groups_project_id_input)) },
-                    singleLine = true,
-                )
-                OutlinedTextField(
-                    value = sharedBlockIds,
-                    onValueChange = { sharedBlockIds = it },
-                    label = { Text(stringResource(R.string.screen_groups_shared_block_ids_input)) },
-                    supportingText = { Text(stringResource(R.string.screen_groups_csv_helper)) },
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = hidden, onCheckedChange = { hidden = it })
-                    Text(stringResource(R.string.screen_groups_hidden_input))
-                }
-            }
+    MultiFieldInputDialog(
+        show = true,
+        title = title,
+        confirmText = confirmLabel,
+        dismissText = stringResource(R.string.action_cancel),
+        onDismiss = onDismiss,
+        confirmEnabled = description.isNotBlank() && agentIds.split(',').any { it.trim().isNotEmpty() },
+        onConfirm = {
+            onConfirm(description.trim(), agentIds.trim(), projectId.trim(), sharedBlockIds.trim(), hidden)
         },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    onConfirm(description.trim(), agentIds.trim(), projectId.trim(), sharedBlockIds.trim(), hidden)
-                },
-                enabled = description.isNotBlank() && agentIds.split(',').any { it.trim().isNotEmpty() },
-            ) {
-                Text(confirmLabel)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = description,
+                onValueChange = { description = it },
+                label = { Text(stringResource(R.string.common_description)) },
+                minLines = 2,
+            )
+            OutlinedTextField(
+                value = agentIds,
+                onValueChange = { agentIds = it },
+                label = { Text(stringResource(R.string.screen_groups_agent_ids_input)) },
+                supportingText = { Text(stringResource(R.string.screen_groups_csv_helper)) },
+            )
+            OutlinedTextField(
+                value = projectId,
+                onValueChange = { projectId = it },
+                label = { Text(stringResource(R.string.screen_groups_project_id_input)) },
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = sharedBlockIds,
+                onValueChange = { sharedBlockIds = it },
+                label = { Text(stringResource(R.string.screen_groups_shared_block_ids_input)) },
+                supportingText = { Text(stringResource(R.string.screen_groups_csv_helper)) },
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = hidden, onCheckedChange = { hidden = it })
+                Text(stringResource(R.string.screen_groups_hidden_input))
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
-            }
-        },
-    )
+        }
+    }
 }
 
 private fun LettaMessage.toSummary(): String = when (this) {

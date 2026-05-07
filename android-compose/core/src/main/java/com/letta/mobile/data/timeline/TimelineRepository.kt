@@ -166,6 +166,15 @@ open class TimelineRepository @Inject constructor(
         transform = transform,
     )
 
+    /**
+     * letta-mobile-iuh6: Re-run fuzzy collapse across existing events after
+     * a notification reply handler's WS stream completes. Absorbs any
+     * CLIENT_MODE_HARNESS Locals that arrived after the initial SSE reconcile.
+     */
+    suspend fun postHandlerCollapse(conversationId: String) {
+        loops[conversationId]?.postHandlerCollapse()
+    }
+
     /** Force a reload — clears the cached loop for the conversation. */
     suspend fun clear(conversationId: String) = loopsMutex.withLock {
         loops.remove(conversationId)

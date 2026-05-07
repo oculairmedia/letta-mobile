@@ -93,6 +93,11 @@
             android:enabled="true"
             android:exported="false" />
 
+        <receiver
+            android:name=".channel.NotificationReplyReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
         <service
             android:name=".channel.ChatPushService"
             android:exported="false"

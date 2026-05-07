@@ -73,6 +73,9 @@ interface BotSession {
 
     /** Stop the bot session and release resources. */
     suspend fun stop()
+
+    /** Abort the in-flight stream for the active agent. No-op if idle. */
+    suspend fun abortStream()
 }
 
 /** Status of a bot session. */

@@ -34,6 +34,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -67,6 +69,7 @@ fun ChatComposer(
     val canSend = !isStreaming && canSendMessages && hasSendableContent
     val canSendSteeringUpdate = isStreaming && canSendMessages && inputText.isNotBlank()
     var showHistorySheet by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
 
     if (showHistorySheet) {
         InputHistorySheet(
@@ -94,7 +97,10 @@ fun ChatComposer(
                     .padding(horizontal = 12.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.End,
             ) {
-                FilledTonalButton(onClick = { onSend(inputText) }) {
+                FilledTonalButton(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                    onSend(inputText)
+                }) {
                     Icon(
                         LettaIcons.Send,
                         contentDescription = null,

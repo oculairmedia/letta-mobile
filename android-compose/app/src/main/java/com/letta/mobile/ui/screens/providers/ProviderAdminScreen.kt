@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,7 +35,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -45,6 +43,7 @@ import com.letta.mobile.R
 import com.letta.mobile.data.model.Provider
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
@@ -210,28 +209,26 @@ fun ProviderAdminScreen(
     }
 
     state?.operationError?.let { operationError ->
-        AlertDialog(
-            onDismissRequest = viewModel::clearOperationError,
-            title = { Text(stringResource(R.string.common_error)) },
-            text = { Text(operationError) },
-            confirmButton = {
-                TextButton(onClick = viewModel::clearOperationError) {
-                    Text(stringResource(R.string.action_dismiss))
-                }
-            },
+        ConfirmDialog(
+            show = true,
+            title = stringResource(R.string.common_error),
+            message = operationError,
+            confirmText = stringResource(R.string.action_dismiss),
+            dismissText = stringResource(R.string.action_dismiss),
+            onConfirm = viewModel::clearOperationError,
+            onDismiss = viewModel::clearOperationError,
         )
     }
 
     state?.operationMessage?.let { operationMessage ->
-        AlertDialog(
-            onDismissRequest = viewModel::clearOperationMessage,
-            title = { Text(stringResource(R.string.common_provider)) },
-            text = { Text(operationMessage) },
-            confirmButton = {
-                TextButton(onClick = viewModel::clearOperationMessage) {
-                    Text(stringResource(R.string.action_dismiss))
-                }
-            },
+        ConfirmDialog(
+            show = true,
+            title = stringResource(R.string.common_provider),
+            message = operationMessage,
+            confirmText = stringResource(R.string.action_dismiss),
+            dismissText = stringResource(R.string.action_dismiss),
+            onConfirm = viewModel::clearOperationMessage,
+            onDismiss = viewModel::clearOperationMessage,
         )
     }
 }
@@ -282,34 +279,32 @@ private fun ProviderDetailDialog(
     onEdit: () -> Unit,
     onCheck: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(provider.name, fontFamily = FontFamily.Monospace) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                provider.id?.let { Text(stringResource(R.string.screen_providers_id_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                Text(stringResource(R.string.screen_providers_type_label, provider.providerType), style = MaterialTheme.typography.listItemSupporting)
-                provider.providerCategory?.let { Text(stringResource(R.string.screen_providers_category_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                provider.baseUrl?.let { Text(stringResource(R.string.screen_providers_base_url_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                provider.region?.let { Text(stringResource(R.string.screen_providers_region_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                provider.organizationId?.let { Text(stringResource(R.string.screen_providers_organization_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                provider.updatedAt?.let { Text(stringResource(R.string.screen_providers_updated_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                Text(stringResource(R.string.screen_providers_secret_present_label, provider.apiKey.isNullOrBlank().not()), style = MaterialTheme.typography.listItemSupporting)
-                provider.accessKey?.takeIf { it.isNotBlank() }?.let {
-                    Text(stringResource(R.string.screen_providers_access_key_present_label, true), style = MaterialTheme.typography.listItemSupporting)
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = onEdit) { Text(stringResource(R.string.screen_providers_edit_title)) }
-                    TextButton(onClick = onCheck) { Text(stringResource(R.string.action_check)) }
-                }
+    ConfirmDialog(
+        show = true,
+        title = provider.name,
+        confirmText = stringResource(R.string.action_close),
+        dismissText = stringResource(R.string.action_close),
+        onConfirm = onDismiss,
+        onDismiss = onDismiss,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            provider.id?.let { Text(stringResource(R.string.screen_providers_id_label, it), style = MaterialTheme.typography.listItemSupporting) }
+            Text(stringResource(R.string.screen_providers_type_label, provider.providerType), style = MaterialTheme.typography.listItemSupporting)
+            provider.providerCategory?.let { Text(stringResource(R.string.screen_providers_category_label, it), style = MaterialTheme.typography.listItemSupporting) }
+            provider.baseUrl?.let { Text(stringResource(R.string.screen_providers_base_url_label, it), style = MaterialTheme.typography.listItemSupporting) }
+            provider.region?.let { Text(stringResource(R.string.screen_providers_region_label, it), style = MaterialTheme.typography.listItemSupporting) }
+            provider.organizationId?.let { Text(stringResource(R.string.screen_providers_organization_label, it), style = MaterialTheme.typography.listItemSupporting) }
+            provider.updatedAt?.let { Text(stringResource(R.string.screen_providers_updated_label, it), style = MaterialTheme.typography.listItemSupporting) }
+            Text(stringResource(R.string.screen_providers_secret_present_label, provider.apiKey.isNullOrBlank().not()), style = MaterialTheme.typography.listItemSupporting)
+            provider.accessKey?.takeIf { it.isNotBlank() }?.let {
+                Text(stringResource(R.string.screen_providers_access_key_present_label, true), style = MaterialTheme.typography.listItemSupporting)
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_close))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onEdit) { Text(stringResource(R.string.screen_providers_edit_title)) }
+                TextButton(onClick = onCheck) { Text(stringResource(R.string.action_check)) }
             }
-        },
-    )
+        }
+    }
 }
 
 @Composable
@@ -333,65 +328,56 @@ private fun ProviderEditorDialog(
     var accessKey by remember(initialAccessKey) { mutableStateOf(initialAccessKey) }
     var region by remember(initialRegion) { mutableStateOf(initialRegion) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text(stringResource(R.string.common_name)) },
-                    singleLine = true,
-                    enabled = isCreate,
-                )
-                OutlinedTextField(
-                    value = providerType,
-                    onValueChange = { providerType = it },
-                    label = { Text(stringResource(R.string.screen_providers_type_input)) },
-                    singleLine = true,
-                    enabled = isCreate,
-                )
-                OutlinedTextField(
-                    value = apiKey,
-                    onValueChange = { apiKey = it },
-                    label = { Text(stringResource(R.string.screen_providers_api_key_input)) },
-                    singleLine = true,
-                )
-                OutlinedTextField(
-                    value = baseUrl,
-                    onValueChange = { baseUrl = it },
-                    label = { Text(stringResource(R.string.screen_providers_base_url_input)) },
-                    singleLine = true,
-                )
-                OutlinedTextField(
-                    value = accessKey,
-                    onValueChange = { accessKey = it },
-                    label = { Text(stringResource(R.string.screen_providers_access_key_input)) },
-                    singleLine = true,
-                )
-                OutlinedTextField(
-                    value = region,
-                    onValueChange = { region = it },
-                    label = { Text(stringResource(R.string.screen_providers_region_input)) },
-                    singleLine = true,
-                )
-            }
+    MultiFieldInputDialog(
+        show = true,
+        title = title,
+        confirmText = confirmLabel,
+        dismissText = stringResource(R.string.action_cancel),
+        onDismiss = onDismiss,
+        confirmEnabled = apiKey.isNotBlank() && (!isCreate || (name.isNotBlank() && providerType.isNotBlank())),
+        onConfirm = {
+            onConfirm(name.trim(), providerType.trim(), apiKey.trim(), baseUrl.trim(), accessKey.trim(), region.trim())
         },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    onConfirm(name.trim(), providerType.trim(), apiKey.trim(), baseUrl.trim(), accessKey.trim(), region.trim())
-                },
-                enabled = apiKey.isNotBlank() && (!isCreate || (name.isNotBlank() && providerType.isNotBlank())),
-            ) {
-                Text(confirmLabel)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
-            }
-        },
-    )
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text(stringResource(R.string.common_name)) },
+                singleLine = true,
+                enabled = isCreate,
+            )
+            OutlinedTextField(
+                value = providerType,
+                onValueChange = { providerType = it },
+                label = { Text(stringResource(R.string.screen_providers_type_input)) },
+                singleLine = true,
+                enabled = isCreate,
+            )
+            OutlinedTextField(
+                value = apiKey,
+                onValueChange = { apiKey = it },
+                label = { Text(stringResource(R.string.screen_providers_api_key_input)) },
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = baseUrl,
+                onValueChange = { baseUrl = it },
+                label = { Text(stringResource(R.string.screen_providers_base_url_input)) },
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = accessKey,
+                onValueChange = { accessKey = it },
+                label = { Text(stringResource(R.string.screen_providers_access_key_input)) },
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = region,
+                onValueChange = { region = it },
+                label = { Text(stringResource(R.string.screen_providers_region_input)) },
+                singleLine = true,
+            )
+        }
+    }
 }

@@ -14,7 +14,7 @@ fun ConfirmDialog(
     title: String,
     message: String,
     confirmText: String,
-    dismissText: String,
+    dismissText: String? = null,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     destructive: Boolean = false,
@@ -33,10 +33,10 @@ fun ConfirmDialog(
                 )
             }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(dismissText)
-            }
+        dismissButton = if (!dismissText.isNullOrBlank()) {
+            { TextButton(onClick = onDismiss) { Text(dismissText) } }
+        } else {
+            null
         },
     )
 }
@@ -47,7 +47,7 @@ fun ConfirmDialog(
     show: Boolean,
     title: String,
     confirmText: String,
-    dismissText: String,
+    dismissText: String? = null,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     destructive: Boolean = false,
@@ -67,10 +67,10 @@ fun ConfirmDialog(
                 )
             }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(dismissText)
-            }
+        dismissButton = if (!dismissText.isNullOrBlank()) {
+            { TextButton(onClick = onDismiss) { Text(dismissText) } }
+        } else {
+            null
         },
     )
 }

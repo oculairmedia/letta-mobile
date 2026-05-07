@@ -10,6 +10,7 @@ import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.mapErrorToUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
@@ -236,7 +237,9 @@ class BlockLibraryViewModel @Inject constructor(
         _selectedIds.value = emptySet()
         viewModelScope.launch {
             for (id in ids) {
-                try { blockRepository.deleteBlock(id) } catch (_: Exception) {}
+                try { blockRepository.deleteBlock(id) } catch (e: Exception) {
+                    Telemetry.error("BlockLibraryVM", "deleteBlock($id) failed", e)
+                }
             }
             loadBlocks()
             onComplete()

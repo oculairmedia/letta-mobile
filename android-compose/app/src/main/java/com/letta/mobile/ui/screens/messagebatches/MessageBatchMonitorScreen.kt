@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -200,15 +199,14 @@ fun MessageBatchMonitorScreen(
 
     val operationError = (uiState as? UiState.Success)?.data?.operationError
     if (operationError != null) {
-        AlertDialog(
-            onDismissRequest = { viewModel.clearOperationError() },
-            title = { Text(stringResource(R.string.common_error)) },
-            text = { Text(operationError) },
-            confirmButton = {
-                TextButton(onClick = { viewModel.clearOperationError() }) {
-                    Text(stringResource(R.string.action_dismiss))
-                }
-            },
+        ConfirmDialog(
+            show = true,
+            title = stringResource(R.string.common_error),
+            message = operationError,
+            confirmText = stringResource(R.string.action_dismiss),
+            dismissText = stringResource(R.string.action_dismiss),
+            onConfirm = { viewModel.clearOperationError() },
+            onDismiss = { viewModel.clearOperationError() },
         )
     }
 }
@@ -273,75 +271,71 @@ private fun MessageBatchDetailDialog(
     onDismiss: () -> Unit,
     onCancel: (() -> Unit)?,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(batch.id, style = MaterialTheme.typography.listItemHeadline.copy(fontFamily = FontFamily.Monospace)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                batch.status?.let { Text(stringResource(R.string.screen_message_batches_status_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                batch.jobType?.let { Text(stringResource(R.string.screen_message_batches_type_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                batch.stopReason?.let { Text(stringResource(R.string.screen_message_batches_stop_reason_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                batch.agentId?.let { Text(stringResource(R.string.screen_message_batches_agent_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                batch.userId?.let { Text(stringResource(R.string.screen_message_batches_user_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                batch.createdAt?.let { Text(stringResource(R.string.screen_message_batches_created_exact_label, it), style = MaterialTheme.typography.listItemMetadata) }
-                batch.completedAt?.let { Text(stringResource(R.string.screen_message_batches_completed_label, it), style = MaterialTheme.typography.listItemMetadata) }
-                batch.callbackUrl?.let { Text(stringResource(R.string.screen_message_batches_callback_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                batch.callbackSentAt?.let { Text(stringResource(R.string.screen_message_batches_callback_sent_at_label, it), style = MaterialTheme.typography.listItemMetadata) }
-                batch.callbackStatusCode?.let { Text(stringResource(R.string.screen_message_batches_callback_status_label, it), style = MaterialTheme.typography.listItemMetadata) }
-                batch.callbackError?.let { Text(stringResource(R.string.screen_message_batches_callback_error_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                batch.totalDurationNs?.let { Text(stringResource(R.string.screen_message_batches_total_duration_label, it), style = MaterialTheme.typography.listItemMetadata) }
-                batch.ttftNs?.let { Text(stringResource(R.string.screen_message_batches_ttft_label, it), style = MaterialTheme.typography.listItemMetadata) }
-                if (batch.metadata.isNotEmpty()) {
-                    Text(
-                        stringResource(R.string.screen_message_batches_metadata_title),
-                        style = MaterialTheme.typography.dialogSectionHeading,
-                    )
-                    batch.metadata.entries.sortedBy { it.key }.forEach { (key, value) ->
-                        Text(
-                            text = "$key: ${value.toDisplayString()}",
-                            style = MaterialTheme.typography.listItemSupporting,
-                            maxLines = 4,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
+    ConfirmDialog(
+        show = true,
+        title = batch.id,
+        confirmText = stringResource(R.string.action_close),
+        dismissText = stringResource(R.string.action_close),
+        onConfirm = onDismiss,
+        onDismiss = onDismiss,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            batch.status?.let { Text(stringResource(R.string.screen_message_batches_status_label, it), style = MaterialTheme.typography.listItemSupporting) }
+            batch.jobType?.let { Text(stringResource(R.string.screen_message_batches_type_label, it), style = MaterialTheme.typography.listItemSupporting) }
+            batch.stopReason?.let { Text(stringResource(R.string.screen_message_batches_stop_reason_label, it), style = MaterialTheme.typography.listItemSupporting) }
+            batch.agentId?.let { Text(stringResource(R.string.screen_message_batches_agent_label, it), style = MaterialTheme.typography.listItemSupporting) }
+            batch.userId?.let { Text(stringResource(R.string.screen_message_batches_user_label, it), style = MaterialTheme.typography.listItemSupporting) }
+            batch.createdAt?.let { Text(stringResource(R.string.screen_message_batches_created_exact_label, it), style = MaterialTheme.typography.listItemMetadata) }
+            batch.completedAt?.let { Text(stringResource(R.string.screen_message_batches_completed_label, it), style = MaterialTheme.typography.listItemMetadata) }
+            batch.callbackUrl?.let { Text(stringResource(R.string.screen_message_batches_callback_label, it), style = MaterialTheme.typography.listItemSupporting) }
+            batch.callbackSentAt?.let { Text(stringResource(R.string.screen_message_batches_callback_sent_at_label, it), style = MaterialTheme.typography.listItemMetadata) }
+            batch.callbackStatusCode?.let { Text(stringResource(R.string.screen_message_batches_callback_status_label, it), style = MaterialTheme.typography.listItemMetadata) }
+            batch.callbackError?.let { Text(stringResource(R.string.screen_message_batches_callback_error_label, it), style = MaterialTheme.typography.listItemSupporting) }
+            batch.totalDurationNs?.let { Text(stringResource(R.string.screen_message_batches_total_duration_label, it), style = MaterialTheme.typography.listItemMetadata) }
+            batch.ttftNs?.let { Text(stringResource(R.string.screen_message_batches_ttft_label, it), style = MaterialTheme.typography.listItemMetadata) }
+            if (batch.metadata.isNotEmpty()) {
                 Text(
-                    stringResource(R.string.screen_message_batches_messages_title),
+                    stringResource(R.string.screen_message_batches_metadata_title),
                     style = MaterialTheme.typography.dialogSectionHeading,
                 )
-                if (messages.isEmpty()) {
+                batch.metadata.entries.sortedBy { it.key }.forEach { (key, value) ->
                     Text(
-                        text = stringResource(R.string.screen_message_batches_messages_empty),
+                        text = "$key: ${value.toDisplayString()}",
                         style = MaterialTheme.typography.listItemSupporting,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 240.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        items(messages, key = { it.id }) { message ->
-                            BatchMessageCard(message = message)
-                        }
-                    }
                 }
             }
-        },
-        confirmButton = {
             if (onCancel != null) {
                 TextButton(onClick = onCancel) {
                     Text(stringResource(R.string.action_cancel_batch), color = MaterialTheme.colorScheme.error)
                 }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_close))
+            Text(
+                stringResource(R.string.screen_message_batches_messages_title),
+                style = MaterialTheme.typography.dialogSectionHeading,
+            )
+            if (messages.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.screen_message_batches_messages_empty),
+                    style = MaterialTheme.typography.listItemSupporting,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 240.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(messages, key = { it.id }) { message ->
+                        BatchMessageCard(message = message)
+                    }
+                }
             }
-        },
-    )
+        }
+    }
 }
 
 @Composable

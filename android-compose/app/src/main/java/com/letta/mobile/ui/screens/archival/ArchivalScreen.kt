@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -22,7 +21,6 @@ import androidx.compose.material3.MaterialTheme
 import com.letta.mobile.ui.components.ExpandableTitleSearch
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.LargeFlexibleTopAppBar
@@ -247,38 +245,36 @@ private fun PassageDetailDialog(
     passage: Passage,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.screen_archival_detail_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                passage.sourceId?.let {
-                    Text(stringResource(R.string.screen_archival_source_id_label, it), style = MaterialTheme.typography.bodySmall)
-                }
-                passage.createdAt?.let {
-                    Text(stringResource(R.string.screen_archival_created_label, it), style = MaterialTheme.typography.bodySmall)
-                }
-                val meta = passage.metadata
-                if (!meta.isNullOrEmpty()) {
-                    Text(stringResource(R.string.screen_archival_metadata_title), style = MaterialTheme.typography.labelLarge)
-                    meta.entries.forEach { (key, value) ->
-                        Text(
-                            text = "$key: $value",
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-                Text(passage.text, style = MaterialTheme.typography.bodyMedium)
+    ConfirmDialog(
+        show = true,
+        title = stringResource(R.string.screen_archival_detail_title),
+        confirmText = stringResource(R.string.action_close),
+        dismissText = stringResource(R.string.action_close),
+        onConfirm = onDismiss,
+        onDismiss = onDismiss,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            passage.sourceId?.let {
+                Text(stringResource(R.string.screen_archival_source_id_label, it), style = MaterialTheme.typography.bodySmall)
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_close))
+            passage.createdAt?.let {
+                Text(stringResource(R.string.screen_archival_created_label, it), style = MaterialTheme.typography.bodySmall)
             }
-        },
-    )
+            val meta = passage.metadata
+            if (!meta.isNullOrEmpty()) {
+                Text(stringResource(R.string.screen_archival_metadata_title), style = MaterialTheme.typography.labelLarge)
+                meta.entries.forEach { (key, value) ->
+                    Text(
+                        text = "$key: $value",
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Text(passage.text, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
 }
 
 @Composable

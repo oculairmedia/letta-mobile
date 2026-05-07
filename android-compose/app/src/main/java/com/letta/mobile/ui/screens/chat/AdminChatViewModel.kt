@@ -9,6 +9,9 @@ import com.letta.mobile.bot.protocol.BotStreamEvent
 import com.letta.mobile.bot.protocol.InternalBotClient
 import com.letta.mobile.data.mapper.toUiMessages
 import com.letta.mobile.data.model.AppMessage
+import com.letta.mobile.channel.ChannelNotification
+import com.letta.mobile.channel.ChannelNotificationPublisher
+import com.letta.mobile.channel.NotificationReplyHandler
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockUpdateParams
@@ -334,6 +337,8 @@ class AdminChatViewModel @Inject constructor(
     private val clientModeChatSender: ClientModeChatSender,
     private val clientModeAgentLocationRepository: ClientModeAgentLocationRepository,
     private val currentConversationTracker: com.letta.mobile.channel.CurrentConversationTracker,
+    private val channelNotificationPublisher: ChannelNotificationPublisher,
+    private val notificationReplyHandler: NotificationReplyHandler,
 ) : ViewModel() {
     companion object {
         private const val CONVERSATION_CACHE_TTL_MS = 30_000L
@@ -344,7 +349,9 @@ class AdminChatViewModel @Inject constructor(
         private const val CLIENT_MODE_CONVERSATION_ID_KEY = "clientModeConversationId"
     }
 
-    val agentId: String = savedStateHandle.get<String>("agentId")!!
+    val agentId: String = requireNotNull(savedStateHandle.get<String>("agentId")) {
+        "Missing agentId in AdminChatViewModel navigation arguments"
+    }
     private val initialMessage: String? = savedStateHandle.get<String>("initialMessage")
     private val requestedConversationArg: String? = savedStateHandle.get<String>("conversationId")
     private val freshRouteKey: Long? = savedStateHandle.get<Long>("freshRouteKey")
@@ -935,6 +942,7 @@ class AdminChatViewModel @Inject constructor(
                     it.copy(error = mapErrorToUserMessage(e.asException(), "Failed to stop run"))
                 }
             }
+            runCatching { internalBotClient.abort() }
             clientModeStreamJob?.cancel(CancellationException("User interrupted active run"))
             clientModeStreamInFlight = false
             clientModeStreamStartedAtElapsedMs = 0L
@@ -1744,6 +1752,8 @@ class AdminChatViewModel @Inject constructor(
             // new ID to the nav saved-state-handle so a back-then-re-enter doesn't
             // try to resume the dead requested ID again.
             var swapEvaluated = false
+            var lastAssistantPreview: String? = null
+            var lastNotifiedPreview: String? = null
             // letta-mobile-hf93: track whether the gateway ever sent any
             // user-visible payload (text, reasoning, or a tool event) for
             // this turn. If the stream terminates with no payload — e.g. a
@@ -1763,9 +1773,37 @@ class AdminChatViewModel @Inject constructor(
                     text = outboundText,
                     conversationId = priorConversationId,
                 ).collect { chunk ->
-                    android.util.Log.w("AdminChatVM-DEBUG", "sendViaClientMode: chunk received done=${chunk.done} event=${chunk.event} textLen=${chunk.text?.length} convId=${chunk.conversationId}")
+                    android.util.Log.w("AdminChatVM-DEBUG", "sendViaClientMode: chunk received done=${chunk.done} event=${chunk.event} textLen=${chunk.text?.length} convId=${chunk.conversationId} tracker=${currentConversationTracker.current}")
                     chunk.conversationId?.takeIf { it.isNotBlank() }?.let { conversationId ->
                         latestConversationId = conversationId
+
+                        val isTextPayload = !chunk.text.isNullOrEmpty() &&
+                            chunk.event != BotStreamEvent.REASONING &&
+                            chunk.event != BotStreamEvent.TOOL_CALL &&
+                            chunk.event != BotStreamEvent.TOOL_RESULT
+
+                        if (isTextPayload) {
+                            lastAssistantPreview = chunk.text?.takeIf { it.isNotBlank() }
+                        }
+
+                        val shouldNotify = lastAssistantPreview != null &&
+                            lastAssistantPreview != lastNotifiedPreview &&
+                            currentConversationTracker.current == null
+
+                        if (shouldNotify) {
+                            lastNotifiedPreview = lastAssistantPreview
+                            android.util.Log.w("AdminChatVM-NOTIFY", "publishing conv=$conversationId tracker=${currentConversationTracker.current} done=${chunk.done}")
+                            channelNotificationPublisher.publish(
+                                ChannelNotification(
+                                    agentId = agentId,
+                                    agentName = _uiState.value.agentName,
+                                    conversationId = conversationId,
+                                    conversationSummary = null,
+                                    messageId = chunk.uuid ?: conversationId,
+                                    messagePreview = lastAssistantPreview ?: "",
+                                )
+                            )
+                        }
                         if (!swapEvaluated) {
                             swapEvaluated = true
                             // Substitution detected: gateway opened a fresh conversation
@@ -2738,6 +2776,46 @@ class AdminChatViewModel @Inject constructor(
                     val combined = ArrayList<UiMessage>(live.size + prefix.size)
                     for (m in prefix) if (seenIds.add(m.id)) combined.add(m)
                     for (m in live) if (seenIds.add(m.id)) combined.add(m)
+
+                    // letta-mobile-2vza: timeline observer dedup telemetry
+                    // Detect prefix/live ID overlap and stale content (same ID, different content)
+                    val prefixIds = prefix.map { it.id }.toSet()
+                    val liveIds = live.map { it.id }.toSet()
+                    val overlapCount = prefixIds.intersect(liveIds).size
+
+                    if (overlapCount > 0) {
+                        android.util.Log.w(
+                            "AdminChatVM-DEBUG",
+                            "TIMELINE_OBS_DEDUP: prefixLiveOverlap=$overlapCount prefixCount=${prefix.size} liveCount=${live.size}",
+                        )
+                    }
+
+                    // Detect stale content: same ID appears with different content between emissions
+                    val prevMessages = _uiState.value.messages
+                    val prevById = prevMessages.associateBy { it.id }
+                    var staleCount = 0
+                    for (msg in combined) {
+                        val prev = prevById[msg.id]
+                        if (prev != null && prev.content != msg.content) {
+                            staleCount++
+                            android.util.Log.w(
+                                "AdminChatVM-DEBUG",
+                                "TIMELINE_OBS_STALE: id=${msg.id} prevLen=${prev.content.length} currLen=${msg.content.length}",
+                            )
+                        }
+                    }
+
+                    // Per-emission dedup rate
+                    val rawTotal = prefix.size + live.size
+                    val dedupRate = if (rawTotal > 0) {
+                        ((rawTotal - combined.size).toFloat() / rawTotal * 100).toInt()
+                    } else 0
+
+                    android.util.Log.w(
+                        "AdminChatVM-DEBUG",
+                        "TIMELINE_OBS_DEDUP_RATE: rawTotal=$rawTotal deduped=${combined.size} dedupRate=$dedupRate% staleContent=$staleCount",
+                    )
+
                     val ui = combined.toImmutableList()
                     val tailIsAssistant = timeline.events.lastOrNull().let {
                         it is com.letta.mobile.data.timeline.TimelineEvent.Confirmed &&
@@ -2792,10 +2870,13 @@ class AdminChatViewModel @Inject constructor(
                     }
                     val duplicateInitialMessageInFlight = followingDuplicateInitialMessageInFlight
                     val prev = _uiState.value
+                    val isReplyStreaming = notificationReplyHandler.activeReplyStreams.value.contains(conversationId)
                     val nextIsStreaming = if (streamInFlight) prev.isStreaming
+                                          else if (isReplyStreaming) true
                                           else if (duplicateInitialMessageInFlight) true
                                           else anyLettaServerLocalPending
                     val nextIsAgentTyping = if (streamInFlight) prev.isAgentTyping
+                                            else if (isReplyStreaming) true
                                             else if (duplicateInitialMessageInFlight) true
                                             else (anyLettaServerLocalPending && !tailIsAssistant)
                     _uiState.value = collapseCompletedRunsIfStreamingFinished(
@@ -2980,6 +3061,26 @@ class AdminChatViewModel @Inject constructor(
             model = agent?.model,
             lastActivity = agent?.updatedAt ?: agent?.createdAt,
         )
+    }
+
+    fun onScreenPaused() {
+        android.util.Log.w("AdminChatVM-LIFECYCLE", "onScreenPaused clearing tracker prev=${currentConversationTracker.current}")
+        currentConversationTracker.setCurrent(null)
+    }
+
+    // letta-mobile-ik3u: debounce rapid duplicate onScreenResumed calls
+    // (observed 73ms apart) caused by DisposableEffect re-creation when
+    // the lifecycleOwner identity changes during composition.
+    // Sentinel ensures the very first onScreenResumed is never debounced,
+    // including in JVM unit tests where SystemClock.elapsedRealtime() returns 0.
+    private var lastScreenResumedAtMs = Long.MIN_VALUE / 2
+
+    fun onScreenResumed() {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastScreenResumedAtMs < 200) return
+        lastScreenResumedAtMs = now
+        android.util.Log.w("AdminChatVM-LIFECYCLE", "onScreenResumed restoring tracker to convId=$conversationId")
+        conversationId?.let { currentConversationTracker.setCurrent(it) }
     }
 
     override fun onCleared() {

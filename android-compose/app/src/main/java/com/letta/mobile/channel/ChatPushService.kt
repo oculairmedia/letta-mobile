@@ -198,17 +198,17 @@ class ChatPushService : Service() {
                     return
                 }
 
-                val agentName = try {
+                val (agentId, agentName) = try {
                     // Best-effort: look up the conversation's agent for a nice title.
                     val conv = conversationApi.getConversation(conversationId)
-                    agentRepository.agents.value.firstOrNull { it.id == conv.agentId }?.name.orEmpty()
+                    conv.agentId to agentRepository.agents.value.firstOrNull { it.id == conv.agentId }?.name.orEmpty()
                 } catch (_: Exception) {
-                    ""
+                    "" to ""
                 }
 
                 notificationPublisher.publish(
                     ChannelNotification(
-                        agentId = "",
+                        agentId = agentId,
                         agentName = agentName,
                         conversationId = conversationId,
                         conversationSummary = null,

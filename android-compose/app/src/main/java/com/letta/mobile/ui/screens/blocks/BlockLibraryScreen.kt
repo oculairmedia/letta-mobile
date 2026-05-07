@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
@@ -58,6 +57,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
@@ -148,15 +148,14 @@ fun BlockLibraryScreen(
             )
             is UiState.Success -> {
                 state.data.operationError?.let { message ->
-                    AlertDialog(
-                        onDismissRequest = viewModel::clearOperationError,
-                        title = { Text(stringResource(R.string.common_error)) },
-                        text = { Text(message) },
-                        confirmButton = {
-                            TextButton(onClick = viewModel::clearOperationError) {
-                                Text(stringResource(R.string.action_close))
-                            }
-                        },
+                    ConfirmDialog(
+                        show = true,
+                        title = stringResource(R.string.common_error),
+                        message = message,
+                        confirmText = stringResource(R.string.action_close),
+                        dismissText = stringResource(R.string.action_close),
+                        onConfirm = viewModel::clearOperationError,
+                        onDismiss = viewModel::clearOperationError,
                     )
                 }
 
@@ -403,10 +402,14 @@ private fun BlockDetailDialog(
     onManageAgents: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(block.label ?: stringResource(R.string.common_unknown)) },
-        text = {
+    ConfirmDialog(
+        show = true,
+        title = block.label ?: stringResource(R.string.common_unknown),
+        confirmText = stringResource(R.string.action_close),
+        dismissText = stringResource(R.string.action_close),
+        onConfirm = onDismiss,
+        onDismiss = onDismiss,
+    ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 block.description?.takeIf { it.isNotBlank() }?.let { description ->
                     Text(description, style = MaterialTheme.typography.bodyMedium)
@@ -449,25 +452,19 @@ private fun BlockDetailDialog(
                         )
                     }
                 }
-            }
-        },
-        confirmButton = {
-            Row {
-                onEdit?.let {
-                    TextButton(onClick = it) {
-                        Text(stringResource(R.string.action_edit))
+                Row {
+                    onEdit?.let {
+                        TextButton(onClick = it) {
+                            Text(stringResource(R.string.action_edit))
+                        }
+                    }
+                    TextButton(onClick = onManageAgents) {
+                        Text(stringResource(R.string.screen_blocks_manage_agents))
                     }
                 }
-                TextButton(onClick = onManageAgents) {
-                    Text(stringResource(R.string.screen_blocks_manage_agents))
-                }
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.action_close))
-                }
             }
-        },
-    )
-}
+        }
+    }
 
 @Composable
 private fun BlockEditorDialog(
@@ -486,67 +483,58 @@ private fun BlockEditorDialog(
     var description by remember(initialDescription) { mutableStateOf(initialDescription) }
     var limit by remember(initialLimit) { mutableStateOf(initialLimit) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (!labelEnabled) {
-                    Text(
-                        text = stringResource(R.string.screen_blocks_global_edit_notice),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                OutlinedTextField(
-                    value = label,
-                    onValueChange = { label = it },
-                    label = { Text(stringResource(R.string.common_name)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = labelEnabled,
-                    singleLine = true,
-                )
-                OutlinedTextField(
-                    value = value,
-                    onValueChange = { value = it },
-                    label = { Text(stringResource(R.string.common_value)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3,
-                )
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text(stringResource(R.string.common_description)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 2,
-                )
-                OutlinedTextField(
-                    value = limit,
-                    onValueChange = { next ->
-                        if (next.isBlank() || next.toIntOrNull() != null) {
-                            limit = next
-                        }
-                    },
-                    label = { Text(stringResource(R.string.screen_blocks_limit_input_label)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
+    MultiFieldInputDialog(
+        show = true,
+        title = title,
+        confirmText = confirmLabel,
+        dismissText = stringResource(R.string.action_cancel),
+        onDismiss = onDismiss,
+        confirmEnabled = value.isNotBlank() && (!labelEnabled || label.isNotBlank()),
+        onConfirm = { onConfirm(label.trim(), value, description, limit.toIntOrNull()) },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (!labelEnabled) {
+                Text(
+                    text = stringResource(R.string.screen_blocks_global_edit_notice),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onConfirm(label.trim(), value, description, limit.toIntOrNull()) },
-                enabled = value.isNotBlank() && (!labelEnabled || label.isNotBlank()),
-            ) {
-                Text(confirmLabel)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
-            }
-        },
-    )
+            OutlinedTextField(
+                value = label,
+                onValueChange = { label = it },
+                label = { Text(stringResource(R.string.common_name)) },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = labelEnabled,
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = value,
+                onValueChange = { value = it },
+                label = { Text(stringResource(R.string.common_value)) },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3,
+            )
+            OutlinedTextField(
+                value = description,
+                onValueChange = { description = it },
+                label = { Text(stringResource(R.string.common_description)) },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+            )
+            OutlinedTextField(
+                value = limit,
+                onValueChange = { next ->
+                    if (next.isBlank() || next.toIntOrNull() != null) {
+                        limit = next
+                    }
+                },
+                label = { Text(stringResource(R.string.screen_blocks_limit_input_label)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+        }
+    }
 }
 
 @Composable
@@ -558,58 +546,51 @@ private fun AgentMultiSelectDialog(
 ) {
     var selection by remember(selectedAgentIds) { mutableStateOf(selectedAgentIds) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.screen_blocks_manage_agents)) },
-        text = {
-            if (agents.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.screen_blocks_no_available_agents),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.heightIn(max = 360.dp),
-                ) {
-                    items(agents, key = { it.id }) { agent ->
-                        val isChecked = agent.id in selection
-                        TextButton(
-                            onClick = {
-                                selection = if (isChecked) selection - agent.id else selection + agent.id
-                            },
+    MultiFieldInputDialog(
+        show = true,
+        title = stringResource(R.string.screen_blocks_manage_agents),
+        confirmText = stringResource(R.string.action_save),
+        dismissText = stringResource(R.string.action_cancel),
+        onDismiss = onDismiss,
+        onConfirm = { onConfirm(selection) },
+    ) {
+        if (agents.isEmpty()) {
+            Text(
+                text = stringResource(R.string.screen_blocks_no_available_agents),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.heightIn(max = 360.dp),
+            ) {
+                items(agents, key = { it.id }) { agent ->
+                    val isChecked = agent.id in selection
+                    TextButton(
+                        onClick = {
+                            selection = if (isChecked) selection - agent.id else selection + agent.id
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Checkbox(
-                                    checked = isChecked,
-                                    onCheckedChange = null,
-                                )
-                                Spacer(modifier = Modifier.size(8.dp))
-                                Text(
-                                    text = agent.name,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
+                            Checkbox(
+                                checked = isChecked,
+                                onCheckedChange = null,
+                            )
+                            Spacer(modifier = Modifier.size(8.dp))
+                            Text(
+                                text = agent.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
                     }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(selection) }) {
-                Text(stringResource(R.string.action_save))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
-            }
-        },
-    )
+        }
+    }
 }

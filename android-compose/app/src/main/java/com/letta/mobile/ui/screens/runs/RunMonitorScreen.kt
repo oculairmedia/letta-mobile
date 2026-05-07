@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -256,15 +255,14 @@ fun RunMonitorScreen(
 
     val operationError = (uiState as? UiState.Success)?.data?.operationError
     if (operationError != null) {
-        AlertDialog(
-            onDismissRequest = { viewModel.clearOperationError() },
-            title = { Text(stringResource(R.string.common_error)) },
-            text = { Text(operationError) },
-            confirmButton = {
-                TextButton(onClick = { viewModel.clearOperationError() }) {
-                    Text(stringResource(R.string.action_dismiss))
-                }
-            },
+        ConfirmDialog(
+            show = true,
+            title = stringResource(R.string.common_error),
+            message = operationError,
+            confirmText = stringResource(R.string.action_dismiss),
+            dismissText = stringResource(R.string.action_dismiss),
+            onConfirm = { viewModel.clearOperationError() },
+            onDismiss = { viewModel.clearOperationError() },
         )
     }
 }
@@ -340,10 +338,14 @@ private fun RunDetailDialog(
     onCancel: (() -> Unit)?,
     onDelete: (() -> Unit)?,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(run.id, style = MaterialTheme.typography.listItemHeadline.copy(fontFamily = FontFamily.Monospace)) },
-        text = {
+    ConfirmDialog(
+        show = true,
+        title = run.id,
+        confirmText = stringResource(R.string.action_close),
+        dismissText = stringResource(R.string.action_close),
+        onConfirm = onDismiss,
+        onDismiss = onDismiss,
+    ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 run.status?.let { Text(stringResource(R.string.screen_runs_status_label, it), style = MaterialTheme.typography.listItemSupporting) }
                 run.stopReason?.let { Text(stringResource(R.string.screen_runs_stop_reason_label, it), style = MaterialTheme.typography.listItemSupporting) }
@@ -496,8 +498,6 @@ private fun RunDetailDialog(
                     }
                 }
             }
-        },
-        confirmButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (onCancel != null) {
                     TextButton(onClick = onCancel) {
@@ -510,14 +510,8 @@ private fun RunDetailDialog(
                     }
                 }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_close))
-            }
-        },
-    )
-}
+        }
+    }
 
 @Composable
 private fun StepDetailDialog(
@@ -531,10 +525,14 @@ private fun StepDetailDialog(
     onSetNegativeFeedback: () -> Unit,
     onClearFeedback: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(step.id, fontFamily = FontFamily.Monospace) },
-        text = {
+    ConfirmDialog(
+        show = true,
+        title = step.id,
+        confirmText = stringResource(R.string.action_close),
+        dismissText = stringResource(R.string.action_close),
+        onConfirm = onDismiss,
+        onDismiss = onDismiss,
+    ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 step.status?.let { Text(stringResource(R.string.screen_runs_status_label, it)) }
                 step.feedback?.let { Text(stringResource(R.string.screen_runs_step_feedback_label, it)) }
@@ -598,8 +596,6 @@ private fun StepDetailDialog(
                     }
                 }
             }
-        },
-        confirmButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = onSetPositiveFeedback) {
                     Text(stringResource(R.string.screen_runs_step_feedback_positive_action))
@@ -613,14 +609,8 @@ private fun StepDetailDialog(
                     }
                 }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_close))
-            }
-        },
-    )
-}
+        }
+    }
 
 @Composable
 private fun StepTagRow(

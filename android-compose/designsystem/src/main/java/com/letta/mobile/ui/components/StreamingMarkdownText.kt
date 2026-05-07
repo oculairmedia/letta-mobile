@@ -99,23 +99,38 @@ fun StreamingMarkdownText(
     val latestText by rememberUpdatedState(text)
 
     var displayed by remember { mutableStateOf("") }
+    // Track shown prefix for continuation detection
+    var shown by remember { mutableStateOf("") }
+    // Track last tick time for pacing
+    var lastTickMs by remember { mutableStateOf(0L) }
+
     LaunchedEffect(Unit) {
-        // Tick at fixed cadence. Push displayed = latest whenever
-        // they differ. When text stops changing (stream end),
-        // `displayed` catches up within one PAINT_INTERVAL_MS window
-        // and the loop idles cheaply (no MarkdownText re-render
-        // when value is unchanged — Compose elides via structural
-        // equality).
-        //
-        // First push happens within one tick (≤50ms), which is
-        // imperceptible. We don't special-case first-paint anymore
-        // because the cancel/restart logic that needed special-casing
-        // is gone.
+        // letta-mobile-flk2: adaptive pacing matching OpenCode's createPacedValue.
+        // TEXT_RENDER_PACE_MS = 24ms, adaptive chunk 2-24 chars, snap to
+        // natural boundaries (space, punctuation). Continuation detection:
+        // if text starts with what we've already shown, advance by chunk
+        // instead of jumping to full text.
         while (true) {
-            if (displayed != latestText) {
-                displayed = latestText
+            val now = System.nanoTime() / 1_000_000L
+            val elapsed = now - lastTickMs
+            if (elapsed >= PAINT_INTERVAL_MS) {
+                val target = latestText
+                if (target != shown) {
+                    if (target.startsWith(shown) && target.length > shown.length) {
+                        // Continuation: advance by adaptive chunk
+                        val remaining = target.length - shown.length
+                        val chunk = chunkSize(remaining)
+                        val end = snapToBoundary(target, shown.length + chunk)
+                        shown = target.substring(0, end)
+                    } else {
+                        // New text or shorter — sync immediately
+                        shown = target
+                    }
+                    displayed = shown
+                    lastTickMs = now
+                }
             }
-            delay(PAINT_INTERVAL_MS)
+            delay(PAINT_DELAY_MS)
         }
     }
 
@@ -153,10 +168,18 @@ fun StreamingMarkdownText(
     // keys, no recomposition); only a new MarkdownText block appears
     // and the plain-Text tail string shrinks. Compose treats this as
     // a layout step, not a render swap.
-    val partition = remember(displayed) { partitionStreamingMarkdown(displayed) }
+    // Cache the partition keyed on displayed text so it only recomputes
+    // when the displayed text grows, not on every render tick. Keying on
+    // length is safe here because the streaming pipeline only ever appends.
+    val partition = remember(displayed.length) {
+        partitionStreamingMarkdown(displayed)
+    }
     val transformedTail = remember(partition.activeTail) {
         tailTransform(partition.activeTail)
     }
+
+    // letta-mobile-flk2: removed debug logging (was causing GC pressure
+    // and potential flash during high-frequency paint ticks).
 
     Column(modifier = modifier) {
         // Committed blocks: each rendered through MarkdownText, keyed
@@ -199,21 +222,48 @@ fun StreamingMarkdownText(
 
 /**
  * letta-mobile-flk2: maximum cadence for live markdown re-parse during
- * streaming. 50ms ≈ 20Hz — slow enough that mikepenz + Compose can
- * absorb the re-emit without visible flicker, fast enough that the
- * tail cursor still feels live.
+ * streaming. 24ms ≈ 42fps — matches OpenCode's TEXT_RENDER_PACE_MS.
+ * Fast enough to feel smooth, slow enough for Compose to absorb re-emits.
  */
-// letta-mobile-flk2 (revision 15): paint coalescer at 50ms (20Hz).
-// With the split-render architecture this rate now drives only the
-// plain-Text active tail update — mikepenz update rate is governed by
-// paragraph/block-boundary commits (~1-3Hz natural). 20Hz on plain
-// Text is cheap (no parse, no subtree allocation), and the cursor
-// feels live without bursting.
+// letta-mobile-flk2: adaptive pacing paint interval at 24ms (42fps).
+// Matches OpenCode's createPacedValue pacing. Previous 50ms (20Hz) was
+// too slow — blocks felt like they "dropped in" rather than streaming
+// smoothly.
 //
-// The 100ms experiment (revision 14) reduced flicker but did not
-// eliminate it because single-pass MarkdownText still re-emitted the
-// subtree on every recomp. Split-render breaks that link entirely.
-private const val PAINT_INTERVAL_MS = 50L
+// With the split-render architecture this rate now drives the active
+// tail plain Text update. MarkdownText update rate is governed by
+// paragraph/block-boundary commits (~1-3Hz natural). 24ms on plain
+// Text is cheap and creates smooth visual flow.
+private const val PAINT_INTERVAL_MS = 24L
+/** Short sleep between loop iterations to avoid busy-waiting. */
+private const val PAINT_DELAY_MS = 4L
+
+/** Snap-to-boundary regex — matches OpenCode's TEXT_RENDER_SNAP. */
+private val SNAP_CHARS = Regex("[\\s.,!?;:)\\]\u201C-\u201D\u2018-\u2019]")
+
+/**
+ * Adaptive chunk size matching OpenCode's step() function.
+ * Small remaining text → small chunks (2 chars). Large remaining → bigger chunks (up to 24).
+ */
+private fun chunkSize(remaining: Int): Int = when {
+    remaining <= 12 -> 2
+    remaining <= 48 -> 4
+    remaining <= 96 -> 8
+    else -> minOf(24, (remaining / 8).coerceAtLeast(8))
+}
+
+/**
+ * Find a natural snap point within [maxLookahead=8] chars after [end].
+ * Matches OpenCode's next() function.
+ */
+private fun snapToBoundary(text: String, end: Int): Int {
+    val clamped = minOf(end, text.length)
+    val max = minOf(text.length, clamped + 8)
+    for (i in clamped until max) {
+        if (SNAP_CHARS.matches(text[i].toString())) return i + 1
+    }
+    return clamped
+}
 
 internal data class StreamingMarkdownPartition(
     val committedBlocks: List<MarkdownBlock>,
@@ -468,6 +518,16 @@ internal fun findLastSafeBoundary(text: String): Int {
             // in that case (correct).
             lastSafe = lineStart
         }
+    }
+
+    // When all block-level fences are closed at end-of-text, commit the
+    // entire remainder. Without this, a code fence at the very end of a
+    // message (e.g. a mermaid block with no trailing \n\n) stays in the
+    // active plain-text tail forever — the diagram never renders, and the
+    // dual plain-text/rendered state during stream→complete transition
+    // creates a visible duplicate bubble. letta-mobile-lbur / 3fnm.
+    if (fenceParity == 0 && displayMathParity == 0 && n > 0 && lastSafe < n) {
+        lastSafe = n
     }
 
     return lastSafe

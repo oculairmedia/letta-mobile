@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -61,6 +60,7 @@ import com.letta.mobile.bot.core.ConversationMode
 import com.letta.mobile.bot.skills.BotSkill
 import com.letta.mobile.bot.skills.BotSkillActivationRule
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
+import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.Accordions
 import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.LettaSearchBar
@@ -133,13 +133,14 @@ private fun HelpDialog(
     onDismiss: () -> Unit,
 ) {
     if (!show) return
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = { Text(description) },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Got it") }
-        },
+    ConfirmDialog(
+        show = true,
+        title = title,
+        message = description,
+        confirmText = "Got it",
+        dismissText = "Got it",
+        onConfirm = onDismiss,
+        onDismiss = onDismiss,
     )
 }
 

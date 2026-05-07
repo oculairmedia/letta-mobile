@@ -29,7 +29,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -90,6 +89,7 @@ import com.letta.mobile.data.model.Tool
 import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.ModelDropdown
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
@@ -283,10 +283,11 @@ fun AgentListScreen(
             }
         }
     ) { paddingValues ->
+        val agentError = uiState.error
         when {
             uiState.isLoading -> ShimmerGrid(modifier = Modifier.padding(paddingValues))
-            uiState.error != null && uiState.agents.isEmpty() -> ErrorContent(
-                message = uiState.error!!,
+            agentError != null && uiState.agents.isEmpty() -> ErrorContent(
+                message = agentError,
                 onRetry = { viewModel.loadAgents() },
                 modifier = Modifier.padding(paddingValues),
             )
@@ -993,159 +994,152 @@ private fun CreateAgentDialog(
         }
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.screen_agents_dialog_create_title)) },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text(stringResource(R.string.common_name)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text(stringResource(R.string.common_description)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                ModelDropdown(
-                    selectedModel = model,
-                    models = llmModels,
-                    onModelSelected = { model = it },
-                    onLoadModels = onLoadModels,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = stringResource(R.string.common_model),
-                )
-                ModelDropdown(
-                    selectedModel = embedding,
-                    models = embeddingDropdownModels,
-                    onModelSelected = { embedding = it },
-                    onLoadModels = onLoadModels,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = stringResource(R.string.screen_agent_edit_embedding_model),
-                )
-                Text(
-                    text = stringResource(R.string.screen_agents_create_advanced_model_section),
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                OutlinedTextField(
-                    value = providerType,
-                    onValueChange = { providerType = it },
-                    label = { Text(stringResource(R.string.common_provider)) },
-                    placeholder = { Text(stringResource(R.string.screen_agents_create_provider_placeholder)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = temperature,
-                    onValueChange = { value ->
-                        if (value.isBlank() || value.toDoubleOrNull() != null) {
-                            temperature = value
-                        }
-                    },
-                    label = { Text(stringResource(R.string.screen_agent_edit_temperature_value, temperature.toFloatOrNull() ?: 0f)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                )
-                OutlinedTextField(
-                    value = maxOutputTokens,
-                    onValueChange = { value ->
-                        if (value.isBlank() || value.toIntOrNull() != null) {
-                            maxOutputTokens = value
-                        }
-                    },
-                    label = { Text(stringResource(R.string.common_max_output_tokens)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                )
-                FormItem(
-                    label = { Text(stringResource(R.string.common_parallel_tool_calls)) },
-                    tail = {
-                        Switch(checked = parallelToolCalls, onCheckedChange = { parallelToolCalls = it })
-                    },
-                )
-                OutlinedTextField(
-                    value = systemPrompt,
-                    onValueChange = { systemPrompt = it },
-                    label = { Text(stringResource(R.string.common_system_prompt)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3,
-                    maxLines = 5,
-                )
-                FormItem(
-                    label = { Text(stringResource(R.string.common_enable_sleeptime)) },
-                    tail = {
-                        Switch(checked = enableSleeptime, onCheckedChange = { enableSleeptime = it })
-                    },
-                )
-                FormItem(
-                    label = { Text(stringResource(R.string.screen_agents_create_include_base_tools)) },
-                    tail = {
-                        Switch(checked = includeBaseTools, onCheckedChange = { includeBaseTools = it })
-                    },
-                )
-                Text(
-                    text = stringResource(R.string.common_tools),
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                if (selectedToolIds.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.screen_tools_empty_attached),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    Text(
-                        text = stringResource(R.string.screen_agents_create_selected_tools_count, selectedToolIds.size),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-                OutlinedButton(
-                    onClick = { showToolPicker = true },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(LettaIcons.Add, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(R.string.screen_agents_create_select_tools))
-                }
-            }
+    MultiFieldInputDialog(
+        show = true,
+        title = stringResource(R.string.screen_agents_dialog_create_title),
+        confirmText = stringResource(R.string.action_create),
+        dismissText = stringResource(R.string.action_cancel),
+        onDismiss = onDismiss,
+        confirmEnabled = name.isNotBlank() && model.isNotBlank() && embedding.isNotBlank(),
+        onConfirm = {
+            onCreate(AgentCreateParams(
+                name = name,
+                description = description.ifBlank { null },
+                model = model,
+                embedding = embedding,
+                modelSettings = ModelSettings(
+                    providerType = providerType.ifBlank { null },
+                    temperature = temperature.toDoubleOrNull(),
+                    maxOutputTokens = maxOutputTokens.toIntOrNull(),
+                    parallelToolCalls = parallelToolCalls,
+                ),
+                toolIds = selectedToolIds.ifEmpty { null },
+                system = systemPrompt.ifBlank { null },
+                enableSleeptime = enableSleeptime,
+                includeBaseTools = includeBaseTools,
+            ))
         },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (name.isNotBlank() && model.isNotBlank() && embedding.isNotBlank()) {
-                        onCreate(AgentCreateParams(
-                            name = name,
-                            description = description.ifBlank { null },
-                            model = model,
-                            embedding = embedding,
-                            modelSettings = ModelSettings(
-                                providerType = providerType.ifBlank { null },
-                                temperature = temperature.toDoubleOrNull(),
-                                maxOutputTokens = maxOutputTokens.toIntOrNull(),
-                                parallelToolCalls = parallelToolCalls,
-                            ),
-                            toolIds = selectedToolIds.ifEmpty { null },
-                            system = systemPrompt.ifBlank { null },
-                            enableSleeptime = enableSleeptime,
-                            includeBaseTools = includeBaseTools,
-                        ))
+    ) {
+        Column(
+            modifier = Modifier.verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text(stringResource(R.string.common_name)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = description,
+                onValueChange = { description = it },
+                label = { Text(stringResource(R.string.common_description)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            ModelDropdown(
+                selectedModel = model,
+                models = llmModels,
+                onModelSelected = { model = it },
+                onLoadModels = onLoadModels,
+                modifier = Modifier.fillMaxWidth(),
+                label = stringResource(R.string.common_model),
+            )
+            ModelDropdown(
+                selectedModel = embedding,
+                models = embeddingDropdownModels,
+                onModelSelected = { embedding = it },
+                onLoadModels = onLoadModels,
+                modifier = Modifier.fillMaxWidth(),
+                label = stringResource(R.string.screen_agent_edit_embedding_model),
+            )
+            Text(
+                text = stringResource(R.string.screen_agents_create_advanced_model_section),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            OutlinedTextField(
+                value = providerType,
+                onValueChange = { providerType = it },
+                label = { Text(stringResource(R.string.common_provider)) },
+                placeholder = { Text(stringResource(R.string.screen_agents_create_provider_placeholder)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = temperature,
+                onValueChange = { value ->
+                    if (value.isBlank() || value.toDoubleOrNull() != null) {
+                        temperature = value
                     }
                 },
-                enabled = name.isNotBlank() && model.isNotBlank() && embedding.isNotBlank(),
-            ) { Text(stringResource(R.string.action_create)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-        },
-    )
+                label = { Text(stringResource(R.string.screen_agent_edit_temperature_value, temperature.toFloatOrNull() ?: 0f)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = maxOutputTokens,
+                onValueChange = { value ->
+                    if (value.isBlank() || value.toIntOrNull() != null) {
+                        maxOutputTokens = value
+                    }
+                },
+                label = { Text(stringResource(R.string.common_max_output_tokens)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+            FormItem(
+                label = { Text(stringResource(R.string.common_parallel_tool_calls)) },
+                tail = {
+                    Switch(checked = parallelToolCalls, onCheckedChange = { parallelToolCalls = it })
+                },
+            )
+            OutlinedTextField(
+                value = systemPrompt,
+                onValueChange = { systemPrompt = it },
+                label = { Text(stringResource(R.string.common_system_prompt)) },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3,
+                maxLines = 5,
+            )
+            FormItem(
+                label = { Text(stringResource(R.string.common_enable_sleeptime)) },
+                tail = {
+                    Switch(checked = enableSleeptime, onCheckedChange = { enableSleeptime = it })
+                },
+            )
+            FormItem(
+                label = { Text(stringResource(R.string.screen_agents_create_include_base_tools)) },
+                tail = {
+                    Switch(checked = includeBaseTools, onCheckedChange = { includeBaseTools = it })
+                },
+            )
+            Text(
+                text = stringResource(R.string.common_tools),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            if (selectedToolIds.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.screen_tools_empty_attached),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Text(
+                    text = stringResource(R.string.screen_agents_create_selected_tools_count, selectedToolIds.size),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            OutlinedButton(
+                onClick = { showToolPicker = true },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(LettaIcons.Add, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(stringResource(R.string.screen_agents_create_select_tools))
+            }
+        }
+    }
 
     if (showToolPicker) {
         ToolPickerDialog(
@@ -1171,57 +1165,48 @@ private fun ImportAgentDialog(
     var overrideExistingTools by remember { mutableStateOf(true) }
     var stripMessages by remember { mutableStateOf(false) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.screen_agents_import_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    text = stringResource(R.string.screen_agents_import_helper),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                OutlinedTextField(
-                    value = overrideName,
-                    onValueChange = { overrideName = it },
-                    label = { Text(stringResource(R.string.screen_agents_import_override_name)) },
-                    placeholder = { Text(stringResource(R.string.screen_agents_import_override_name_placeholder)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                )
-                FormItem(
-                    label = { Text(stringResource(R.string.screen_agents_import_override_tools_title)) },
-                    description = {
-                        Text(stringResource(R.string.screen_agents_import_override_tools_helper))
-                    },
-                    tail = {
-                        Switch(checked = overrideExistingTools, onCheckedChange = { overrideExistingTools = it })
-                    },
-                )
-                FormItem(
-                    label = { Text(stringResource(R.string.screen_agents_import_strip_messages_title)) },
-                    description = {
-                        Text(stringResource(R.string.screen_agents_import_strip_messages_helper))
-                    },
-                    tail = {
-                        Switch(checked = stripMessages, onCheckedChange = { stripMessages = it })
-                    },
-                )
-            }
+    MultiFieldInputDialog(
+        show = true,
+        title = stringResource(R.string.screen_agents_import_title),
+        confirmText = stringResource(R.string.action_choose_file),
+        dismissText = stringResource(R.string.action_cancel),
+        onDismiss = onDismiss,
+        confirmEnabled = !isImporting,
+        onConfirm = {
+            onImport(overrideName.ifBlank { null }, overrideExistingTools, stripMessages)
         },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    onImport(overrideName.ifBlank { null }, overrideExistingTools, stripMessages)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = stringResource(R.string.screen_agents_import_helper),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            OutlinedTextField(
+                value = overrideName,
+                onValueChange = { overrideName = it },
+                label = { Text(stringResource(R.string.screen_agents_import_override_name)) },
+                placeholder = { Text(stringResource(R.string.screen_agents_import_override_name_placeholder)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+            FormItem(
+                label = { Text(stringResource(R.string.screen_agents_import_override_tools_title)) },
+                description = {
+                    Text(stringResource(R.string.screen_agents_import_override_tools_helper))
                 },
-                enabled = !isImporting,
-            ) {
-                Text(stringResource(R.string.action_choose_file))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isImporting) {
-                Text(stringResource(R.string.action_cancel))
-            }
-        },
-    )
+                tail = {
+                    Switch(checked = overrideExistingTools, onCheckedChange = { overrideExistingTools = it })
+                },
+            )
+            FormItem(
+                label = { Text(stringResource(R.string.screen_agents_import_strip_messages_title)) },
+                description = {
+                    Text(stringResource(R.string.screen_agents_import_strip_messages_helper))
+                },
+                tail = {
+                    Switch(checked = stripMessages, onCheckedChange = { stripMessages = it })
+                },
+            )
+        }
+    }
 }

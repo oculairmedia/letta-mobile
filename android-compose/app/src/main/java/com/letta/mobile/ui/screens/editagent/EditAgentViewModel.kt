@@ -121,7 +121,9 @@ class EditAgentViewModel @Inject constructor(
         }
     }
 
-    private val agentId: String = savedStateHandle.get<String>("agentId")!!
+    private val agentId: String = requireNotNull(savedStateHandle.get<String>("agentId")) {
+        "Missing agentId in EditAgentViewModel navigation arguments"
+    }
 
     private val _uiState = MutableStateFlow<UiState<EditAgentUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<EditAgentUiState>> = _uiState.asStateFlow()

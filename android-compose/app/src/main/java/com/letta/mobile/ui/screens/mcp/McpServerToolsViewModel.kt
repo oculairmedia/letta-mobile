@@ -47,7 +47,9 @@ class McpServerToolsViewModel @Inject constructor(
     private val mcpServerRepository: McpServerRepository,
 ) : ViewModel() {
 
-    private val serverId: String = savedStateHandle.get<String>("serverId")!!
+    private val serverId: String = requireNotNull(savedStateHandle.get<String>("serverId")) {
+        "Missing serverId in McpServerToolsViewModel navigation arguments"
+    }
 
     private val _uiState = MutableStateFlow<UiState<McpServerToolsUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<McpServerToolsUiState>> = _uiState.asStateFlow()

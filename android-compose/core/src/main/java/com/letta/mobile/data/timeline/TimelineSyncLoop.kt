@@ -422,6 +422,49 @@ class TimelineSyncLoop(
         return localId
     }
 
+    /**
+     * letta-mobile-iuh6: Post-handler collapse — re-runs fuzzy matching
+     * across all existing Confirmed events to absorb any CLIENT_MODE_HARNESS
+     * Locals that were written AFTER the initial SSE reconcile already ran.
+     *
+     * Race condition: the notification reply handler's WS stream and the
+     * SSE subscriber race to write to the timeline. When SSE wins,
+     * [reconcileForExternalRun] inserts Confirmed events with no matching
+     * Local to collapse into. The handler's stream then writes Locals that
+     * coexist as duplicates. Re-running fuzzy collapse here absorbs them.
+     *
+     * Idempotent and safe to call at any time.
+     */
+    suspend fun postHandlerCollapse() = writeMutex.withLock {
+        var collapsed = 0
+        val confirmedEvents = _state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
+        var tl = _state.value
+        for (confirmed in confirmedEvents) {
+            val fuzzy = tl.collapseClientModeFuzzyMatch(confirmed)
+            if (fuzzy.collapsed != null) {
+                // collapseClientModeFuzzyMatch inserts a stabilized copy
+                // but does NOT remove the original Confirmed that triggered
+                // the match. Remove it here so only the stabilized copy remains.
+                val cleaned = fuzzy.timeline.events.filter { it.otid != confirmed.otid }
+                tl = fuzzy.timeline.copy(events = cleaned)
+                collapsed++
+                Telemetry.event(
+                    "TimelineSync", "postHandlerCollapse.fuzzyCollapsed",
+                    "conversationId" to conversationId,
+                    "localOtid" to fuzzy.collapsed.localOtid,
+                    "serverId" to fuzzy.collapsed.serverId,
+                    "deltaMs" to fuzzy.collapsed.deltaMs,
+                    "contentPrefix" to fuzzy.collapsed.contentPrefix,
+                    "source" to fuzzy.collapsed.source.name,
+                )
+            }
+        }
+        if (collapsed > 0) {
+            _state.value = tl
+            Log.w(TAG, "postHandlerCollapse: collapsed $collapsed Local(s) into Confirmed events for $conversationId")
+        }
+    }
+
     /** Retry a failed send by re-enqueueing it. */
     suspend fun retry(otid: String) = writeMutex.withLock {
         val existing = _state.value.findByOtid(otid)
@@ -857,6 +900,7 @@ class TimelineSyncLoop(
     }
 
     companion object {
+        private const val TAG = "TimelineSync"
         private const val DATA_URL_PREVIEW_CHARS = 32
 
         // Resume-stream subscriber (letta-mobile-mge5).

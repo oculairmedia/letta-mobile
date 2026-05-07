@@ -17,10 +17,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+import androidx.annotation.VisibleForTesting
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
 
-private data class PresetThemeColors(
+@VisibleForTesting
+internal data class PresetThemeColors(
     val lightScheme: ColorScheme,
     val darkScheme: ColorScheme,
 )
@@ -188,7 +190,8 @@ private fun buildDarkScheme(
     surfaceContainerHighest = primaryContainer.copy(alpha = 0.85f),
 )
 
-private fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
+@VisibleForTesting
+internal fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
     val complementary = colorScheme.primary.complementary()
     val complementaryHsl = complementary.toHslColor()
     val isLightTheme = colorScheme.background.luminance() > 0.5f
@@ -384,7 +387,8 @@ private val SpringThemeColors = PresetThemeColors(
     ),
 )
 
-private fun presetThemeColors(themePreset: ThemePreset): PresetThemeColors = when (themePreset) {
+@VisibleForTesting
+internal fun presetThemeColors(themePreset: ThemePreset): PresetThemeColors = when (themePreset) {
     ThemePreset.DEFAULT -> DefaultThemeColors
     ThemePreset.OCEAN -> OceanThemeColors
     ThemePreset.AMOLED_BLACK -> AmoledBlackThemeColors

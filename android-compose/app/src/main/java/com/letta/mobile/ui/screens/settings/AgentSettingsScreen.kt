@@ -21,6 +21,7 @@ import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.ShimmerCard
@@ -541,66 +542,63 @@ private fun ToolDetailDialog(
     onDismiss: () -> Unit,
     onTagClick: (String) -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
+    ConfirmDialog(
+        show = true,
+        title = tool.name,
+        confirmText = stringResource(R.string.action_close),
+        dismissText = stringResource(R.string.action_close),
+        onConfirm = onDismiss,
+        onDismiss = onDismiss,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Icon(LettaIcons.Tool, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(tool.name)
+                Text(tool.name, style = MaterialTheme.typography.titleMedium)
             }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                tool.description?.let { desc ->
+            tool.description?.let { desc ->
+                Text(
+                    text = desc,
+                    style = MaterialTheme.typography.listItemSupporting,
+                )
+            }
+            tool.toolType?.let { type ->
+                Row {
                     Text(
-                        text = desc,
+                        text = stringResource(R.string.common_type) + ": ",
+                        style = MaterialTheme.typography.listItemMetadata,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = type,
                         style = MaterialTheme.typography.listItemSupporting,
                     )
                 }
-                tool.toolType?.let { type ->
-                    Row {
-                        Text(
-                            text = stringResource(R.string.common_type) + ": ",
-                            style = MaterialTheme.typography.listItemMetadata,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            text = type,
-                            style = MaterialTheme.typography.listItemSupporting,
-                        )
-                    }
-                }
-                if (tool.tags.isNotEmpty()) {
-                    Column {
-                        Text(
-                            text = stringResource(R.string.common_tags),
-                            style = MaterialTheme.typography.listItemMetadata,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        @OptIn(ExperimentalLayoutApi::class)
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            tool.tags.forEach { tag ->
-                                AssistChip(
-                                    onClick = { onTagClick(tag) },
-                                    label = { Text(tag, style = MaterialTheme.typography.labelSmall) },
-                                )
-                            }
+            }
+            if (tool.tags.isNotEmpty()) {
+                Column {
+                    Text(
+                        text = stringResource(R.string.common_tags),
+                        style = MaterialTheme.typography.listItemMetadata,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    @OptIn(ExperimentalLayoutApi::class)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        tool.tags.forEach { tag ->
+                            AssistChip(
+                                onClick = { onTagClick(tag) },
+                                label = { Text(tag, style = MaterialTheme.typography.labelSmall) },
+                            )
                         }
                     }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_close))
-            }
-        },
-    )
+        }
+    }
 }
 
 private fun shareAgentExport(context: Context, exportData: String): Boolean {
@@ -632,10 +630,17 @@ private fun CloneAgentDialog(
     var overrideExistingTools by remember { mutableStateOf(true) }
     var stripMessages by remember { mutableStateOf(true) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.screen_settings_clone_title)) },
-        text = {
+    MultiFieldInputDialog(
+        show = true,
+        title = stringResource(R.string.screen_settings_clone_title),
+        confirmText = stringResource(R.string.action_clone_agent),
+        dismissText = stringResource(R.string.action_cancel),
+        onDismiss = onDismiss,
+        confirmEnabled = !isCloning,
+        onConfirm = {
+            onClone(cloneName.ifBlank { null }, overrideExistingTools, stripMessages)
+        },
+    ) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
                     text = stringResource(R.string.screen_settings_clone_dialog_helper),
@@ -679,21 +684,5 @@ private fun CloneAgentDialog(
                     Switch(checked = stripMessages, onCheckedChange = { stripMessages = it })
                 }
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    onClone(cloneName.ifBlank { null }, overrideExistingTools, stripMessages)
-                },
-                enabled = !isCloning,
-            ) {
-                Text(stringResource(R.string.action_clone_agent))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isCloning) {
-                Text(stringResource(R.string.action_cancel))
-            }
-        },
-    )
-}
+        }
+    }

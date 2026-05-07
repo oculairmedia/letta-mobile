@@ -3,9 +3,17 @@ use jni::sys::{jboolean, jint, jstring};
 use jni::JNIEnv;
 use mermaid_rs_renderer::{RenderOptions, Theme, render_with_options};
 use std::ptr::null_mut;
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 
 static LAST_ERROR: Mutex<Option<String>> = Mutex::new(None);
+static STYLE_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+    regex::Regex::new(
+        r"(?m)^(\s*)style\s+(\S+)\s+((?:fill|stroke|color|stroke-width|stroke-dasharray)[^,]*(?:,\s*(?:fill|stroke|color|stroke-width|stroke-dasharray)[^,]*)*)",
+    ).unwrap()
+});
+static FILL_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+    regex::Regex::new(r"fill:\s*(#[0-9a-fA-F]{6})").unwrap()
+});
 
 fn set_last_error(message: impl Into<String>) {
     if let Ok(mut slot) = LAST_ERROR.lock() {
@@ -110,6 +118,84 @@ fn line_color_adjusted(border_argb: jint, bg_argb: jint, dark_theme: bool) -> St
     format!("#{:02x}{:02x}{:02x}", r, g, b)
 }
 
+/// Pre-process Mermaid source to inject color parameter into style commands.
+/// The mermaid-rs-renderer already supports the `color` parameter in style commands,
+/// which sets the text color for styled nodes. This function automatically calculates
+/// and injects the appropriate text color based on the fill color for contrast,
+/// using the Material Design theme text color.
+fn inject_contrast_colors(source: &str, text_argb: jint) -> String {
+    let mut result = source.to_string();
+    
+    // Use Material Design text color for light backgrounds
+    let theme_text_color = rgb_hex_from_argb(text_argb);
+    
+    // Match style commands: "style NodeName fill:#xxxxxx,stroke:..."
+    // Pattern: style <nodename> <style-options>
+    result = STYLE_RE.replace_all(&result, |caps: &regex::Captures| {
+        let _indent = caps.get(1).map_or("", |m| m.as_str());
+        let _node_name = caps.get(2).map_or("", |m| m.as_str());
+        let style_part = caps.get(3).map_or("", |m| m.as_str());
+        
+        // Check if color is already specified
+        let has_color = style_part.contains("color:");
+        
+        if has_color {
+            // Already has color, keep as-is
+            return caps.get(0).map_or("", |m| m.as_str()).to_string();
+        }
+        
+        // Extract fill color to calculate appropriate text color
+        let text_color = if let Some(cap) = FILL_RE.captures(style_part) {
+            if let Some(fill) = cap.get(1) {
+                let fill_str = fill.as_str().to_lowercase();
+                // Use Material theme text color for light backgrounds, white for dark
+                if is_light_color(&fill_str) {
+                    theme_text_color.clone()  // Material theme text color
+                } else {
+                    "#ffffff".to_string()  // White text for dark backgrounds
+                }
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        };
+        
+        if text_color.is_empty() {
+            // No fill color found, keep as-is
+            return caps.get(0).map_or("", |m| m.as_str()).to_string();
+        }
+        
+        // Inject color parameter
+        format!(
+            "style {} {},color:{}",
+            _node_name,
+            style_part.trim().trim_end_matches(','),
+            text_color,
+        )
+    }).to_string();
+    
+    result
+}
+
+fn is_light_color(hex: &str) -> bool {
+    if hex.len() != 7 || !hex.starts_with('#') {
+        return false;
+    }
+    
+    let r = u8::from_str_radix(&hex[1..3], 16).ok();
+    let g = u8::from_str_radix(&hex[3..5], 16).ok();
+    let b = u8::from_str_radix(&hex[5..7], 16).ok();
+    
+    match (r, g, b) {
+        (Some(r), Some(g), Some(b)) => {
+            let lum = 0.299 * r as f32 + 0.587 * g as f32 + 0.114 * b as f32;
+            lum > 150.0
+        }
+        _ => false,
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_letta_mobile_ui_components_MermaidNativeBridge_nativeRenderToSvg(
     mut env: JNIEnv,
@@ -174,7 +260,10 @@ pub extern "system" fn Java_com_letta_mobile_ui_components_MermaidNativeBridge_n
         layout: options.layout,
     };
 
-    let svg = match render_with_options(&source, options) {
+    // Pre-process Mermaid source to inject contrast-aware text colors into style commands
+    let processed_source = inject_contrast_colors(&source, text_argb);
+
+    let svg = match render_with_options(&processed_source, options) {
         Ok(svg) => svg,
         Err(error) => {
             set_last_error(format!("native Mermaid render failed: {error}"));

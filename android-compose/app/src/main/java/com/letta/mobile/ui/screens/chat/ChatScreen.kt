@@ -148,11 +148,12 @@ fun ChatScreen(
                         )
                     }
                     is ConversationState.Ready -> {
+                        val chatError = state.error
                         if (state.isLoadingMessages && state.messages.isEmpty()) {
                             MessageSkeletonList(modifier = Modifier.weight(1f))
-                        } else if (state.error != null && state.messages.isEmpty()) {
+                        } else if (chatError != null && state.messages.isEmpty()) {
                             ErrorContent(
-                                message = state.error!!,
+                                message = chatError,
                                 onRetry = { viewModel.loadMessages() },
                                 modifier = Modifier.weight(1f),
                             )

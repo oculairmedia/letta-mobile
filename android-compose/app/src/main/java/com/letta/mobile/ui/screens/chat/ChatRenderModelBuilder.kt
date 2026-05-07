@@ -40,23 +40,70 @@ fun buildChatRenderModel(
     messages: List<UiMessage>,
     mode: ChatDisplayMode,
 ): ChatRenderModel {
+    // letta-mobile-thhz: render model dedup telemetry - capture per-stage counts
+    val inputCount = messages.size
+
+    val afterReasoningDedup = dedupeReasoningAssistantEchoes(messages)
+    val reasoningDedupCount = afterReasoningDedup.size
+
     val visibleMessages = attachLatencyMetadata(
         filterMessagesForMode(
-            messages = dedupeReasoningAssistantEchoes(messages),
+            messages = afterReasoningDedup,
             mode = mode,
         )
     )
+    val visibleCount = visibleMessages.size
+
     val groupedMessages = groupMessages(
         messages = visibleMessages,
         getRole = { it.role },
         getTimestamp = { it.timestamp },
     )
+    val groupedCount = groupedMessages.size
+
     val reversed = dedupeGroupedMessagesForLazyKeys(groupedMessages).asReversed()
+    val keyDedupCount = reversed.size
+
+    val renderItems = groupMessagesForRender(reversed)
+    val renderItemCount = renderItems.size
+
+    // letta-mobile-lbur follow-up: detect duplicate render item keys
+    val seenKeys = HashSet<String>(renderItems.size)
+    val dupKeys = renderItems.filterNot { seenKeys.add(it.key) }.map { it.key }
+    if (dupKeys.isNotEmpty()) {
+        android.util.Log.w(
+            "ChatRenderModel-DEBUG",
+            "DUP_RENDER_KEYS: ${dupKeys.size} duplicates: ${dupKeys.take(5)} renderItems=$renderItemCount",
+        )
+    }
+
+    // Capture assistant message count for comparison with timeline live count
+    val assistantCount = messages.count { it.role == "assistant" }
+
+    // Log per-stage message counts to detect where dedup drops messages
+    android.util.Log.w(
+        "ChatRenderModel-DEBUG",
+        "RENDER_MODEL_STAGES: input=$inputCount reasoningDedup=$reasoningDedupCount " +
+            "visible=$visibleCount grouped=$groupedCount keyDedup=$keyDedupCount " +
+            "renderItems=$renderItemCount assistantCount=$assistantCount",
+    )
+
+    // Detect significant dedup drops (>20% from input to renderItems)
+    val dedupDropPercent = if (inputCount > 0) {
+        ((inputCount - renderItemCount).toFloat() / inputCount * 100).toInt()
+    } else 0
+
+    if (dedupDropPercent > 20) {
+        android.util.Log.w(
+            "ChatRenderModel-DEBUG",
+            "RENDER_MODEL_DEDUP_DROP: input=$inputCount renderItems=$renderItemCount drop=$dedupDropPercent%",
+        )
+    }
 
     return ChatRenderModel(
         visibleMessages = visibleMessages,
         groupedMessages = groupedMessages,
-        renderItems = groupMessagesForRender(reversed),
+        renderItems = renderItems,
     )
 }
 
@@ -126,5 +173,13 @@ fun dedupeGroupedMessagesForLazyKeys(
     // already dedupes by id, but a late streaming tick or reasoning-collapse
     // edge case could still leak duplicates — so guard in the pure pipeline too.
     val seen = HashSet<String>(groupedMessages.size)
-    return groupedMessages.filter { (msg, _) -> seen.add(msg.id) }
+    val result = groupedMessages.filter { (msg, _) -> seen.add(msg.id) }
+    val dropped = groupedMessages.size - result.size
+    if (dropped > 0) {
+        android.util.Log.w(
+            "ChatRenderModel-DEBUG",
+            "KEY_DEDUP_DROPPED: $dropped duplicate message IDs detected in grouped messages",
+        )
+    }
+    return result
 }

@@ -21,9 +21,12 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.icons.LettaIcons
@@ -46,6 +49,7 @@ import com.letta.mobile.ui.icons.LettaIcons
  * @param leadingContent Optional slot rendered to the left of the text field,
  *   typically an attach button.
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun LettaInputBar(
     text: String,
@@ -65,6 +69,7 @@ fun LettaInputBar(
     leadingContent: (@Composable () -> Unit)? = null,
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val haptic = LocalHapticFeedback.current
     val canSend = (canSendOverride ?: text.isNotBlank()) && enabled
     val actionButtonSize by animateDpAsState(
         targetValue = 48.dp * actionSizeFraction.coerceIn(0.5f, 1f),
@@ -118,6 +123,7 @@ fun LettaInputBar(
             keyboardActions = KeyboardActions(
                 onSend = {
                     if (canSend) {
+                        haptic.performHapticFeedback(HapticFeedbackType.Confirm)
                         onSend(text)
                     }
                 },
@@ -125,7 +131,12 @@ fun LettaInputBar(
         )
 
         FilledIconButton(
-            onClick = { if (canSend) onSend(text) },
+            onClick = {
+                if (canSend) {
+                    haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                    onSend(text)
+                }
+            },
             enabled = canSend,
             modifier = Modifier
                 .align(Alignment.CenterVertically)

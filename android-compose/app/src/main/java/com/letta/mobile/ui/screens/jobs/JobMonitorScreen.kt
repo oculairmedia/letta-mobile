@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -210,15 +209,13 @@ fun JobMonitorScreen(
 
     val operationError = (uiState as? UiState.Success)?.data?.operationError
     if (operationError != null) {
-        AlertDialog(
-            onDismissRequest = { viewModel.clearOperationError() },
-            title = { Text(stringResource(R.string.common_error)) },
-            text = { Text(operationError) },
-            confirmButton = {
-                TextButton(onClick = { viewModel.clearOperationError() }) {
-                    Text(stringResource(R.string.action_dismiss))
-                }
-            },
+        ConfirmDialog(
+            show = true,
+            title = stringResource(R.string.common_error),
+            message = operationError,
+            confirmText = stringResource(R.string.action_dismiss),
+            onConfirm = { viewModel.clearOperationError() },
+            onDismiss = { viewModel.clearOperationError() },
         )
     }
 }
@@ -297,38 +294,39 @@ private fun JobDetailDialog(
     onCancel: (() -> Unit)?,
     onDelete: (() -> Unit)?,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(job.id, style = MaterialTheme.typography.listItemHeadline.copy(fontFamily = FontFamily.Monospace)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                job.status?.let { Text(stringResource(R.string.screen_jobs_status_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                job.jobType?.let { Text(stringResource(R.string.screen_jobs_type_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                job.stopReason?.let { Text(stringResource(R.string.screen_jobs_stop_reason_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                job.agentId?.let { Text(stringResource(R.string.screen_jobs_agent_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                job.userId?.let { Text(stringResource(R.string.screen_jobs_user_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                job.createdAt?.let { Text(stringResource(R.string.screen_jobs_created_exact_label, it), style = MaterialTheme.typography.listItemMetadata) }
-                job.completedAt?.let { Text(stringResource(R.string.screen_jobs_completed_label, it), style = MaterialTheme.typography.listItemMetadata) }
-                job.callbackUrl?.let { Text(stringResource(R.string.screen_jobs_callback_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                job.callbackSentAt?.let { Text(stringResource(R.string.screen_jobs_callback_sent_at_label, it), style = MaterialTheme.typography.listItemMetadata) }
-                job.callbackStatusCode?.let { Text(stringResource(R.string.screen_jobs_callback_status_label, it), style = MaterialTheme.typography.listItemMetadata) }
-                job.callbackError?.let { Text(stringResource(R.string.screen_jobs_callback_error_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                job.totalDurationNs?.let { Text(stringResource(R.string.screen_jobs_total_duration_label, it), style = MaterialTheme.typography.listItemMetadata) }
-                job.ttftNs?.let { Text(stringResource(R.string.screen_jobs_ttft_label, it), style = MaterialTheme.typography.listItemMetadata) }
-                if (job.metadata.isNotEmpty()) {
-                    Text(stringResource(R.string.screen_jobs_metadata_title), style = MaterialTheme.typography.dialogSectionHeading)
-                    job.metadata.entries.sortedBy { it.key }.forEach { (key, value) ->
-                        Text(
-                            text = "$key: $value",
-                            style = MaterialTheme.typography.listItemSupporting,
-                            maxLines = 4,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+    ConfirmDialog(
+        show = true,
+        title = job.id,
+        confirmText = stringResource(R.string.action_close),
+        dismissText = stringResource(R.string.action_close),
+        onConfirm = onDismiss,
+        onDismiss = onDismiss,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            job.status?.let { Text(stringResource(R.string.screen_jobs_status_label, it), style = MaterialTheme.typography.listItemSupporting) }
+            job.jobType?.let { Text(stringResource(R.string.screen_jobs_type_label, it), style = MaterialTheme.typography.listItemSupporting) }
+            job.stopReason?.let { Text(stringResource(R.string.screen_jobs_stop_reason_label, it), style = MaterialTheme.typography.listItemSupporting) }
+            job.agentId?.let { Text(stringResource(R.string.screen_jobs_agent_label, it), style = MaterialTheme.typography.listItemSupporting) }
+            job.userId?.let { Text(stringResource(R.string.screen_jobs_user_label, it), style = MaterialTheme.typography.listItemSupporting) }
+            job.createdAt?.let { Text(stringResource(R.string.screen_jobs_created_exact_label, it), style = MaterialTheme.typography.listItemMetadata) }
+            job.completedAt?.let { Text(stringResource(R.string.screen_jobs_completed_label, it), style = MaterialTheme.typography.listItemMetadata) }
+            job.callbackUrl?.let { Text(stringResource(R.string.screen_jobs_callback_label, it), style = MaterialTheme.typography.listItemSupporting) }
+            job.callbackSentAt?.let { Text(stringResource(R.string.screen_jobs_callback_sent_at_label, it), style = MaterialTheme.typography.listItemMetadata) }
+            job.callbackStatusCode?.let { Text(stringResource(R.string.screen_jobs_callback_status_label, it), style = MaterialTheme.typography.listItemMetadata) }
+            job.callbackError?.let { Text(stringResource(R.string.screen_jobs_callback_error_label, it), style = MaterialTheme.typography.listItemSupporting) }
+            job.totalDurationNs?.let { Text(stringResource(R.string.screen_jobs_total_duration_label, it), style = MaterialTheme.typography.listItemMetadata) }
+            job.ttftNs?.let { Text(stringResource(R.string.screen_jobs_ttft_label, it), style = MaterialTheme.typography.listItemMetadata) }
+            if (job.metadata.isNotEmpty()) {
+                Text(stringResource(R.string.screen_jobs_metadata_title), style = MaterialTheme.typography.dialogSectionHeading)
+                job.metadata.entries.sortedBy { it.key }.forEach { (key, value) ->
+                    Text(
+                        text = "$key: $value",
+                        style = MaterialTheme.typography.listItemSupporting,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
-        },
-        confirmButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (onCancel != null) {
                     TextButton(onClick = onCancel) {
@@ -341,13 +339,8 @@ private fun JobDetailDialog(
                     }
                 }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_close))
-            }
-        },
-    )
+        }
+    }
 }
 
 private fun Job.isTerminalStatus(): Boolean {

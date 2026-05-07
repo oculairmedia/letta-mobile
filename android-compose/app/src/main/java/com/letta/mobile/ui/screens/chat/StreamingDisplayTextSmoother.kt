@@ -1,103 +1,69 @@
 package com.letta.mobile.ui.screens.chat
 
 /**
- * Meters out bursty streaming-text arrivals at a steady per-character
- * cadence so the chat bubble grows at a readable pace instead of jumping
- * in visible chunks.
+ * Meters bursty streaming-text arrivals into a smooth reveal by advancing a
+ * visible character prefix at a steady cadence.
  *
- * Pure Kotlin — no Compose dependency — so it is unit-testable.
- *
- * Usage:
- *  1. Call [updateTarget] every time the ViewModel pushes new accumulated
- *     text (or flips `isStreaming` off).
- *  2. Call [step] once per frame (driven by the composable wrapper's
- *     `LaunchedEffect` frame loop) to get the substring to render.
- *
- * Design rationale (letta-mobile-d2z6.s1 follow-up):
- *  - The lettabot WS gateway emits assistant deltas at 80–150 ms
- *    intervals with variable sizes (1–140 chars, larger with server-side
- *    coalescing). Rendering them immediately causes visible jumps.
- *  - This smoother reveals characters at a steady rate
- *    ([charsPerMs] ≈ 0.12 → ~2 chars per 16 ms frame → ~120 chars/sec)
- *    absorbing burst variance.
- *  - When the stream ends ([isStreaming] = false) a faster drain rate
- *    ([DRAIN_MULTIPLIER]) ensures the tail completes promptly.
+ * Compared to the flk2 word-token version:
+ * - Character-based (no regex token rebuild on every content change)
+ * - Clock is NOT reset on target updates — pacing stays independent of
+ *   delta arrival frequency, preventing the "speed-up on every chunk" bug
+ * - Faster default cadence: 10 ms/char when streaming (was 30 ms/word)
+ * - Monotonic char index eliminates token-rebuild race conditions
  */
 class StreamingDisplayTextSmoother(
-    private val charsPerMs: Float = DEFAULT_CHARS_PER_MS,
+    private val intervalMs: Long = DEFAULT_INTERVAL_MS,
 ) {
     private var target: String = ""
-    private var revealedCount: Int = 0
-    private var lastStepMs: Long = -1L
+    private var revealedLength: Int = 0
+    private var nextRevealAfterMs: Long = -1L
     private var streaming: Boolean = false
 
-    /**
-     * Push the latest accumulated text from the ViewModel.
-     *
-     * @param text       full accumulated assistant text so far.
-     * @param isStreaming true while the stream is still open.
-     * @param nowMs      current monotonic time (e.g. `System.nanoTime() / 1_000_000`
-     *                   or a test-supplied clock).
-     */
     fun updateTarget(text: String, isStreaming: Boolean, nowMs: Long) {
         if (text != target) {
-            if (!text.startsWith(target)) {
-                // Text was rewritten (not extended) — reset reveal.
-                revealedCount = 0
-            }
-            // else: text is a continuation — keep revealedCount as-is so
-            // the reveal continues from where it left off. Reset the frame
-            // clock to the arrival time so a long gap before a burst does not
-            // immediately reveal the whole newly-arrived tail in one frame.
             target = text
-            lastStepMs = nowMs
+            // If text shrank (e.g. dedup) clamp the revealed prefix
+            if (revealedLength > text.length) {
+                revealedLength = text.length
+            }
         }
         streaming = isStreaming
-        if (lastStepMs < 0L) {
-            lastStepMs = nowMs
+        if (nextRevealAfterMs < 0L) {
+            nextRevealAfterMs = nowMs
         }
     }
 
     /**
-     * Advance the reveal cursor and return the substring to render.
-     *
-     * Should be called once per frame. When the reveal is fully caught up
-     * and the stream is closed, returns the full target and the caller can
-     * suspend the frame loop.
-     *
-     * @param nowMs current monotonic time.
-     * @return the prefix of [target] to display this frame.
+     * Advance the visible prefix by one character if enough time has
+     * elapsed, then return the substring to display.
      */
     fun step(nowMs: Long): String {
         if (target.isEmpty()) return ""
 
-        val elapsed = if (lastStepMs >= 0L) (nowMs - lastStepMs).coerceAtLeast(0L) else 0L
-        lastStepMs = nowMs
+        val interval = if (streaming) intervalMs else intervalMs / DRAIN_DIVISOR
 
-        val rate = if (streaming) charsPerMs else charsPerMs * DRAIN_MULTIPLIER
-        val advance = (elapsed * rate).toInt().coerceAtLeast(1)
-        revealedCount = (revealedCount + advance).coerceAtMost(target.length)
+        // Advance one char per interval. Catch up in bursts if we fell
+        // behind (sleep/wake / slow frame).
+        while (nowMs >= nextRevealAfterMs && revealedLength < target.length) {
+            revealedLength++
+            nextRevealAfterMs += interval
+        }
 
-        return target.substring(0, revealedCount)
+        // Clamp — first call or clock skew
+        if (revealedLength > target.length) {
+            revealedLength = target.length
+        }
+        return target.substring(0, revealedLength)
     }
 
-    /** True when the full target has been revealed. */
     val isFullyRevealed: Boolean
-        get() = revealedCount >= target.length
+        get() = revealedLength >= target.length
 
     companion object {
-        /**
-         * Default reveal rate. ~0.12 chars/ms → ~2 chars per 16 ms frame
-         * → ~120 chars/sec sustained. Matches typical assistant throughput
-         * of ~40 tokens/sec × ~4 chars/token ≈ 160 chars/sec, with enough
-         * headroom that the reveal never lags far behind the stream.
-         */
-        const val DEFAULT_CHARS_PER_MS = 0.12f
+        /** 10 ms per char — ~100 chars/sec, ahead of typical LLM output. */
+        const val DEFAULT_INTERVAL_MS = 10L
 
-        /**
-         * After the stream ends, drain the remaining tail at this multiple
-         * of the normal rate so the user sees the full response quickly.
-         */
-        private const val DRAIN_MULTIPLIER = 3f
+        /** Drain 3× faster when stream ends. */
+        private const val DRAIN_DIVISOR = 3L
     }
 }

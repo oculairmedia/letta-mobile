@@ -491,6 +491,66 @@ class TimelineTest {
     }
 
     @Test
+    fun `collapseClientModeFuzzyMatch collapses matching assistant local within window`() {
+        val now = Instant.now()
+        val t = Timeline("c1").append(
+            clientModeAssistantLocal("cm-assist-1", 1.0, "Hello world", sentAt = now.minusMillis(200))
+        )
+
+        val incoming = confirmedAssistant("server-assist", 99.0, "Hello world", date = now)
+        val result = t.collapseClientModeFuzzyMatch(incoming)
+
+        assertNotNull("Expected collapse of assistant Local into Confirmed", result.collapsed)
+        assertEquals(1, result.timeline.events.size)
+        val swapped = result.timeline.events[0]
+        assertTrue("Collapsed event must be Confirmed", swapped is TimelineEvent.Confirmed)
+        assertEquals("Hello world", swapped.content)
+        assertEquals(
+            "Collapsed Confirmed must retain harness source for later dedup",
+            MessageSource.CLIENT_MODE_HARNESS,
+            swapped.source,
+        )
+        assertEquals(1.0, swapped.position, 0.0001)
+    }
+
+    /**
+     * letta-mobile-iuh6 regression: simulate the race condition where SSE
+     * arrived first (Confirmed is in the timeline) and the handler's WS
+     * stream wrote a matching CLIENT_MODE_HARNESS Local later. After running
+     * fuzzy collapse and removing the original triggering Confirmed, exactly
+     * one event should remain.
+     */
+    @Test
+    fun `collapseClientModeFuzzyMatch absorbs late local into pre existing confirmed`() {
+        val now = Instant.now()
+        // Confirmed arrived first (SSE won the race), Local arrived later (handler)
+        val t = Timeline("c1").append(
+            confirmedUser("server-1", 1.0, "hello", date = now)
+        ).append(
+            clientModeLocal("cm-late", 2.0, "hello", sentAt = now.plusMillis(500))
+        )
+
+        // Re-run fuzzy collapse (as postHandlerCollapse would): finds the late Local and absorbs it
+        val confirmed = t.events.filterIsInstance<TimelineEvent.Confirmed>().first()
+        val result = t.collapseClientModeFuzzyMatch(confirmed)
+        assertNotNull("Late local must be collapsed", result.collapsed)
+        assertEquals("cm-late", result.collapsed!!.localOtid)
+
+        // Remove the original Confirmed that triggered the match, as postHandlerCollapse does.
+        // collapseClientModeFuzzyMatch inserts a stabilized copy but keeps the original.
+        val cleaned = result.timeline.events.filter { it.otid != confirmed.otid }
+        val final = result.timeline.copy(events = cleaned)
+
+        assertEquals("Only one event should remain after removing original confirmed", 1, final.events.size)
+        assertTrue("Remaining event must be Confirmed", final.events[0] is TimelineEvent.Confirmed)
+        assertEquals(
+            "Collapsed Confirmed must retain harness source",
+            MessageSource.CLIENT_MODE_HARNESS,
+            final.events[0].source,
+        )
+    }
+
+    @Test
     fun `collapseClientModeFuzzyMatch trace contains content prefix`() {
         val now = Instant.now()
         val longContent = "a".repeat(200)

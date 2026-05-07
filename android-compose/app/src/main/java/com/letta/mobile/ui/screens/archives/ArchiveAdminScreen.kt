@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
@@ -39,7 +38,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -49,6 +47,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Archive
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
@@ -243,15 +242,14 @@ fun ArchiveAdminScreen(
 
     val operationError = (uiState as? UiState.Success)?.data?.operationError
     if (operationError != null) {
-        AlertDialog(
-            onDismissRequest = viewModel::clearOperationError,
-            title = { Text(stringResource(R.string.common_error)) },
-            text = { Text(operationError) },
-            confirmButton = {
-                TextButton(onClick = viewModel::clearOperationError) {
-                    Text(stringResource(R.string.action_dismiss))
-                }
-            },
+        ConfirmDialog(
+            show = true,
+            title = stringResource(R.string.common_error),
+            message = operationError,
+            confirmText = stringResource(R.string.action_dismiss),
+            dismissText = stringResource(R.string.action_dismiss),
+            onConfirm = viewModel::clearOperationError,
+            onDismiss = viewModel::clearOperationError,
         )
     }
 }
@@ -304,68 +302,64 @@ private fun ArchiveDetailDialog(
     onAttachAgent: () -> Unit,
     onDetachAgent: (Agent) -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(archive.name, fontFamily = FontFamily.Monospace) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.screen_archives_id_label, archive.id), style = MaterialTheme.typography.bodySmall)
-                archive.description?.let { Text(stringResource(R.string.screen_archives_description_label, it), style = MaterialTheme.typography.bodySmall) }
-                archive.organizationId?.let { Text(stringResource(R.string.screen_archives_organization_label, it), style = MaterialTheme.typography.bodySmall) }
-                archive.vectorDbProvider?.let { Text(stringResource(R.string.screen_archives_vector_provider_label, it), style = MaterialTheme.typography.bodySmall) }
-                archive.embeddingConfig?.embeddingModel?.let { Text(stringResource(R.string.screen_archives_embedding_model_label, it), style = MaterialTheme.typography.bodySmall) }
-                archive.createdAt?.let { Text(stringResource(R.string.screen_archives_created_label, it), style = MaterialTheme.typography.bodySmall) }
-                if (attachedAgents.isNotEmpty()) {
-                    Text(stringResource(R.string.screen_archives_agents_title), style = MaterialTheme.typography.labelLarge)
-                    attachedAgents.forEach { agent ->
-                        AssistChip(
-                            onClick = { onDetachAgent(agent) },
-                            label = { Text(agent.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            leadingIcon = {
-                                Icon(
-                                    LettaIcons.People,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(AssistChipDefaults.IconSize),
-                                )
-                            },
-                            trailingIcon = {
-                                Icon(
-                                    LettaIcons.LinkOff,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(AssistChipDefaults.IconSize),
-                                )
-                            },
-                        )
-                    }
-                } else {
-                    Text(
-                        text = stringResource(R.string.screen_archives_no_agents),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    ConfirmDialog(
+        show = true,
+        title = archive.name,
+        confirmText = stringResource(R.string.action_close),
+        dismissText = stringResource(R.string.action_close),
+        onConfirm = onDismiss,
+        onDismiss = onDismiss,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.screen_archives_id_label, archive.id), style = MaterialTheme.typography.bodySmall)
+            archive.description?.let { Text(stringResource(R.string.screen_archives_description_label, it), style = MaterialTheme.typography.bodySmall) }
+            archive.organizationId?.let { Text(stringResource(R.string.screen_archives_organization_label, it), style = MaterialTheme.typography.bodySmall) }
+            archive.vectorDbProvider?.let { Text(stringResource(R.string.screen_archives_vector_provider_label, it), style = MaterialTheme.typography.bodySmall) }
+            archive.embeddingConfig?.embeddingModel?.let { Text(stringResource(R.string.screen_archives_embedding_model_label, it), style = MaterialTheme.typography.bodySmall) }
+            archive.createdAt?.let { Text(stringResource(R.string.screen_archives_created_label, it), style = MaterialTheme.typography.bodySmall) }
+            if (attachedAgents.isNotEmpty()) {
+                Text(stringResource(R.string.screen_archives_agents_title), style = MaterialTheme.typography.labelLarge)
+                attachedAgents.forEach { agent ->
+                    AssistChip(
+                        onClick = { onDetachAgent(agent) },
+                        label = { Text(agent.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        leadingIcon = {
+                            Icon(
+                                LettaIcons.People,
+                                contentDescription = null,
+                                modifier = Modifier.size(AssistChipDefaults.IconSize),
+                            )
+                        },
+                        trailingIcon = {
+                            Icon(
+                                LettaIcons.LinkOff,
+                                contentDescription = null,
+                                modifier = Modifier.size(AssistChipDefaults.IconSize),
+                            )
+                        },
                     )
                 }
-                TextButton(onClick = onAttachAgent, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 0.dp, vertical = 0.dp)) {
-                    Text(stringResource(R.string.screen_archives_attach_action))
-                }
-                if (archive.metadata.isNotEmpty()) {
-                    Text(stringResource(R.string.screen_archival_metadata_title), style = MaterialTheme.typography.labelLarge)
-                    archive.metadata.entries.sortedBy { it.key }.forEach { (key, value) ->
-                        Text("$key: ${value.toString().trim('"')}", style = MaterialTheme.typography.bodySmall)
-                    }
-                }
+            } else {
+                Text(
+                    text = stringResource(R.string.screen_archives_no_agents),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onEdit) {
+            TextButton(onClick = onAttachAgent, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 0.dp, vertical = 0.dp)) {
+                Text(stringResource(R.string.screen_archives_attach_action))
+            }
+            TextButton(onClick = onEdit, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 0.dp, vertical = 0.dp)) {
                 Text(stringResource(R.string.screen_archives_edit_title))
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_close))
+            if (archive.metadata.isNotEmpty()) {
+                Text(stringResource(R.string.screen_archival_metadata_title), style = MaterialTheme.typography.labelLarge)
+                archive.metadata.entries.sortedBy { it.key }.forEach { (key, value) ->
+                    Text("$key: ${value.toString().trim('"')}", style = MaterialTheme.typography.bodySmall)
+                }
             }
-        },
-    )
+        }
+    }
 }
 
 @Composable
@@ -378,48 +372,39 @@ private fun AgentPickerDialog(
 ) {
     var selected by remember { mutableStateOf<Agent?>(null) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            if (agents.isEmpty()) {
-                Text(text = emptyMessage, style = MaterialTheme.typography.bodyMedium)
-            } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    items(agents, key = { it.id }) { agent ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(
-                                selected = selected?.id == agent.id,
-                                onClick = { selected = agent },
-                            )
-                            Text(
-                                text = agent.name,
-                                style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
+    MultiFieldInputDialog(
+        show = true,
+        title = title,
+        confirmText = stringResource(R.string.action_attach),
+        dismissText = stringResource(R.string.action_cancel),
+        onDismiss = onDismiss,
+        confirmEnabled = selected != null,
+        onConfirm = { selected?.let(onSelect) },
+    ) {
+        if (agents.isEmpty()) {
+            Text(text = emptyMessage, style = MaterialTheme.typography.bodyMedium)
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                items(agents, key = { it.id }) { agent ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = selected?.id == agent.id,
+                            onClick = { selected = agent },
+                        )
+                        Text(
+                            text = agent.name,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { selected?.let(onSelect) },
-                enabled = selected != null,
-            ) {
-                Text(stringResource(R.string.action_attach))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
-            }
-        },
-    )
+        }
+    }
 }
 
 @Composable
@@ -436,25 +421,19 @@ private fun ArchiveEditorDialog(
     var description by remember(initialDescription) { mutableStateOf(initialDescription) }
     var embeddingModel by remember(initialEmbeddingModel) { mutableStateOf(initialEmbeddingModel) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.common_name)) }, singleLine = true)
-                OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text(stringResource(R.string.common_description)) }, minLines = 2)
-                OutlinedTextField(value = embeddingModel, onValueChange = { embeddingModel = it }, label = { Text(stringResource(R.string.screen_archives_embedding_model_input)) }, singleLine = true)
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(name.trim(), description.trim(), embeddingModel.trim()) }, enabled = name.isNotBlank()) {
-                Text(confirmLabel)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
-            }
-        },
-    )
+    MultiFieldInputDialog(
+        show = true,
+        title = title,
+        confirmText = confirmLabel,
+        dismissText = stringResource(R.string.action_cancel),
+        onDismiss = onDismiss,
+        confirmEnabled = name.isNotBlank(),
+        onConfirm = { onConfirm(name.trim(), description.trim(), embeddingModel.trim()) },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.common_name)) }, singleLine = true)
+            OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text(stringResource(R.string.common_description)) }, minLines = 2)
+            OutlinedTextField(value = embeddingModel, onValueChange = { embeddingModel = it }, label = { Text(stringResource(R.string.screen_archives_embedding_model_input)) }, singleLine = true)
+        }
+    }
 }

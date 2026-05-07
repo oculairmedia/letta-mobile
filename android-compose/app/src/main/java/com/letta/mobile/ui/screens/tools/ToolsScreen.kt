@@ -168,45 +168,42 @@ private fun ToolDetailDialog(
     tool: Tool,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
+    ConfirmDialog(
+        show = true,
+        title = tool.name,
+        confirmText = stringResource(R.string.action_close),
+        dismissText = stringResource(R.string.action_close),
+        onConfirm = onDismiss,
+        onDismiss = onDismiss,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(LettaIcons.Tool, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(tool.name)
+                Text(tool.name, style = MaterialTheme.typography.titleMedium)
             }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                tool.description?.let { desc ->
-                    Text(text = desc, style = MaterialTheme.typography.bodyMedium)
-                }
-                tool.toolType?.let { type ->
-                    Row {
-                        Text(
-                            text = stringResource(R.string.common_type) + ": ",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(text = type, style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-                if (tool.tags.isNotEmpty()) {
+            tool.description?.let { desc ->
+                Text(text = desc, style = MaterialTheme.typography.bodyMedium)
+            }
+            tool.toolType?.let { type ->
+                Row {
                     Text(
-                        text = stringResource(R.string.common_tags) + ": " + tool.tags.joinToString(", "),
-                        style = MaterialTheme.typography.bodySmall,
+                        text = stringResource(R.string.common_type) + ": ",
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Text(text = type, style = MaterialTheme.typography.bodyMedium)
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_close))
+            if (tool.tags.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.common_tags) + ": " + tool.tags.joinToString(", "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-        },
-    )
+        }
+    }
 }
 
 @Composable

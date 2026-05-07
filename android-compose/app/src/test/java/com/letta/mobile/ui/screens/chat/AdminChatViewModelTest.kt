@@ -76,6 +76,8 @@ class AdminChatViewModelTest {
 
     private lateinit var internalBotClient: InternalBotClient
     private lateinit var clientModeChatSender: ClientModeChatSender
+    private lateinit var channelNotificationPublisher: com.letta.mobile.channel.ChannelNotificationPublisher
+    private lateinit var notificationReplyHandler: com.letta.mobile.channel.NotificationReplyHandler
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var clientModeEnabledFlow: MutableStateFlow<Boolean>
     private var messages: List<AppMessage> = emptyList()
@@ -182,8 +184,12 @@ class AdminChatViewModelTest {
         clientModeAgentLocationRepository = mockk(relaxed = true)
         internalBotClient = mockk(relaxed = true)
         clientModeChatSender = mockk(relaxed = true)
+        channelNotificationPublisher = mockk(relaxed = true)
+        notificationReplyHandler = mockk(relaxed = true)
         clientModeEnabledFlow = MutableStateFlow(false)
         activeConversationIds.clear()
+
+        every { notificationReplyHandler.activeReplyStreams } returns MutableStateFlow(emptySet())
 
         every { settingsRepository.getChatBackgroundKey() } returns flowOf("default")
         every { settingsRepository.getChatFontScale() } returns flowOf(1f)
@@ -263,6 +269,8 @@ class AdminChatViewModelTest {
             clientModeChatSender,
             clientModeAgentLocationRepository,
             com.letta.mobile.channel.CurrentConversationTracker(),
+            channelNotificationPublisher,
+            notificationReplyHandler,
         )
     }
 
@@ -1482,6 +1490,8 @@ class AdminChatViewModelTest {
             clientModeChatSender,
             clientModeAgentLocationRepository,
             com.letta.mobile.channel.CurrentConversationTracker(),
+            channelNotificationPublisher,
+            notificationReplyHandler,
         )
         advanceUntilIdle()
 
@@ -1616,6 +1626,8 @@ class AdminChatViewModelTest {
             clientModeChatSender,
             clientModeAgentLocationRepository,
             com.letta.mobile.channel.CurrentConversationTracker(),
+            channelNotificationPublisher,
+            notificationReplyHandler,
         )
 
         val project = vm.projectContext
@@ -1718,6 +1730,8 @@ class AdminChatViewModelTest {
             clientModeChatSender,
             clientModeAgentLocationRepository,
             com.letta.mobile.channel.CurrentConversationTracker(),
+            channelNotificationPublisher,
+            notificationReplyHandler,
         )
         advanceUntilIdle()
 
@@ -1758,6 +1772,8 @@ class AdminChatViewModelTest {
             clientModeChatSender,
             clientModeAgentLocationRepository,
             com.letta.mobile.channel.CurrentConversationTracker(),
+            channelNotificationPublisher,
+            notificationReplyHandler,
         )
         advanceUntilIdle()
 
@@ -1808,6 +1824,8 @@ class AdminChatViewModelTest {
             clientModeChatSender,
             clientModeAgentLocationRepository,
             com.letta.mobile.channel.CurrentConversationTracker(),
+            channelNotificationPublisher,
+            notificationReplyHandler,
         )
         advanceUntilIdle()
 
@@ -1842,6 +1860,8 @@ class AdminChatViewModelTest {
             clientModeChatSender,
             clientModeAgentLocationRepository,
             com.letta.mobile.channel.CurrentConversationTracker(),
+            channelNotificationPublisher,
+            notificationReplyHandler,
         )
 
         assertTrue(vm.tryHandleSlashCommand("/bug"))
@@ -1871,6 +1891,8 @@ class AdminChatViewModelTest {
             clientModeChatSender,
             clientModeAgentLocationRepository,
             com.letta.mobile.channel.CurrentConversationTracker(),
+            channelNotificationPublisher,
+            notificationReplyHandler,
         )
         advanceUntilIdle()
 
@@ -2510,6 +2532,167 @@ class AdminChatViewModelTest {
         coVerify(exactly = 0) {
             timelineRepository.sendMessage(any(), "send me once")
         }
+    }
+
+    // ────────────────────────────────────────────────
+    // letta-mobile-ob3e — regression tests for notification-reply bugs
+    // ────────────────────────────────────────────────
+
+    /**
+     * letta-mobile-9bs1 regression: when the user is actively viewing a
+     * conversation (tracker is set to its ID), no notification should be
+     * published during Client Mode streaming, even when done=true.
+     */
+    @Test
+    fun `client mode does not publish notification when user is viewing conversation`() = runTest {
+        clientModeEnabledFlow.value = true
+        every { notificationReplyHandler.activeReplyStreams } returns MutableStateFlow(emptySet())
+        val tracker = com.letta.mobile.channel.CurrentConversationTracker()
+        tracker.setCurrent("conv-1")
+
+        every {
+            clientModeChatSender.streamMessage(any(), any(), any())
+        } returns flow {
+            emit(BotStreamChunk(text = "Hello", conversationId = "conv-1", event = BotStreamEvent.ASSISTANT))
+            emit(BotStreamChunk(conversationId = "conv-1", done = true))
+        }
+
+        val vm = AdminChatViewModel(
+            SavedStateHandle().apply {
+                set("agentId", "agent-1")
+                set("conversationId", "conv-1")
+            },
+            messageRepository, timelineRepository, agentRepository, blockRepository,
+            bugReportRepository, folderRepository, conversationRepository,
+            settingsRepository, internalBotClient, clientModeChatSender,
+            clientModeAgentLocationRepository,
+            tracker,
+            channelNotificationPublisher,
+            notificationReplyHandler,
+        )
+        advanceUntilIdle()
+        vm.sendMessage("hi")
+        advanceUntilIdle()
+
+        verify(exactly = 0) {
+            channelNotificationPublisher.publish(any())
+        }
+    }
+
+    /**
+     * letta-mobile-9bs1 regression: the notification condition
+     * `currentConversationTracker.current == null` must gate publishing.
+     * When the tracker IS set (user viewing), `publish()` must not be called.
+     * (Already verified by the test above.)
+     *
+     * The reverse scenario — tracker is null, notification fires — is
+     * exercised at the TimelineSyncLoop level via the IngestedMessageListener
+     * which is the primary notification path for externally-arriving messages.
+     * The sendMessageViaClientMode path always sets the tracker before
+     * streaming, so a null-tracker send is not reachable through the public
+     * sendMessage API.
+     */
+    @Test
+    fun `onScreenPaused clears tracker and onScreenResumed restores it`() = runTest {
+        clientModeEnabledFlow.value = true
+        every { notificationReplyHandler.activeReplyStreams } returns MutableStateFlow(emptySet())
+        val tracker = com.letta.mobile.channel.CurrentConversationTracker()
+
+        val vm = AdminChatViewModel(
+            SavedStateHandle().apply {
+                set("agentId", "agent-1")
+                set("conversationId", "conv-1")
+                // In Client Mode, conversationId reads from savedStateHandle
+                // via currentClientModeConversationId(); explicit nav arg
+                // does not auto-populate this key, so we set it explicitly.
+                set("clientModeConversationId", "conv-1")
+            },
+            messageRepository, timelineRepository, agentRepository, blockRepository,
+            bugReportRepository, folderRepository, conversationRepository,
+            settingsRepository, internalBotClient, clientModeChatSender,
+            clientModeAgentLocationRepository,
+            tracker,
+            channelNotificationPublisher,
+            notificationReplyHandler,
+        )
+        advanceUntilIdle()
+        // Second advance to flush any lingering scoped coroutines
+        advanceUntilIdle()
+
+        // After loadMessages, the tracker should be set to the conversation
+        assertEquals("conv-1", tracker.current)
+        assertEquals(
+            "After resolution conversation state must be Ready",
+            ConversationState.Ready("conv-1"),
+            vm.uiState.value.conversationState,
+        )
+
+        vm.onScreenPaused()
+        assertNull("onScreenPaused must clear tracker", tracker.current)
+
+        vm.onScreenResumed()
+        assertEquals(
+            "onScreenResumed must restore tracker for resume-in-place",
+            "conv-1",
+            tracker.current,
+        )
+    }
+
+    /**
+     * letta-mobile-vf7i regression: when the notification reply handler
+     * is actively streaming for the current conversation, the observer
+     * must force isStreaming=true even when prev.isStreaming was false
+     * and streamInFlight is false (the VM itself is not streaming).
+     */
+    @Test
+    fun `isReplyStreaming keeps isStreaming true during handler stream`() = runTest {
+        val replyStreams = MutableStateFlow(setOf("conv-1"))
+        every { notificationReplyHandler.activeReplyStreams } returns replyStreams
+
+        clientModeEnabledFlow.value = false
+        messages = listOf(
+            TestData.appMessage(id = "1", messageType = MessageType.USER, content = "Hello"),
+        )
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        // Trigger a timeline emission so the observer re-evaluates the
+        // streaming flags. The observer checks notificationReplyHandler
+        // which now returns conv-1 → isReplyStreaming=true → isStreaming=true.
+        timelineRepository.appendClientModeLocal("conv-1", "handler reply trigger")
+        advanceUntilIdle()
+
+        assertTrue(
+            "isStreaming must be true when notificationReplyHandler has active stream for this conv",
+            vm.uiState.value.isStreaming,
+        )
+    }
+
+    /**
+     * letta-mobile-vf7i regression: same as above but asserting isAgentTyping
+     * specifically, since it has the same dual-condition logic.
+     */
+    @Test
+    fun `isReplyStreaming keeps isAgentTyping true during handler stream`() = runTest {
+        val replyStreams = MutableStateFlow(setOf("conv-1"))
+        every { notificationReplyHandler.activeReplyStreams } returns replyStreams
+
+        clientModeEnabledFlow.value = false
+        messages = listOf(
+            TestData.appMessage(id = "1", messageType = MessageType.USER, content = "Hello"),
+        )
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        timelineRepository.appendClientModeLocal("conv-1", "handler reply trigger")
+        advanceUntilIdle()
+
+        assertTrue(
+            "isAgentTyping must be true when notificationReplyHandler has active stream for this conv",
+            vm.uiState.value.isAgentTyping,
+        )
     }
 }
 

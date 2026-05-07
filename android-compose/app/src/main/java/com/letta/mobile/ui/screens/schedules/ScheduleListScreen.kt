@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -49,6 +48,7 @@ import com.letta.mobile.data.model.ScheduleMessage
 import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.FormItem
@@ -284,75 +284,66 @@ private fun CreateScheduleDialog(
     var scheduledAt by remember { mutableStateOf("") }
     var cronExpression by remember { mutableStateOf("") }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.screen_schedules_add_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                AgentSelector(
-                    agents = agents,
-                    selectedAgentId = selectedAgent,
-                    onAgentSelected = { selectedAgent = it },
-                )
-                OutlinedTextField(
-                    value = content,
-                    onValueChange = { content = it },
-                    label = { Text(stringResource(R.string.screen_schedules_message_label)) },
-                    minLines = 3,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                FormItem(
-                    label = { Text(stringResource(R.string.screen_schedules_recurring_toggle)) },
-                    tail = {
-                        androidx.compose.material3.Switch(checked = isRecurring, onCheckedChange = { isRecurring = it })
-                    },
-                )
-                if (isRecurring) {
-                    OutlinedTextField(
-                        value = cronExpression,
-                        onValueChange = { cronExpression = it },
-                        label = { Text(stringResource(R.string.screen_schedules_cron_label)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                    )
-                } else {
-                    OutlinedTextField(
-                        value = scheduledAt,
-                        onValueChange = { scheduledAt = it },
-                        label = { Text(stringResource(R.string.screen_schedules_scheduled_at_label)) },
-                        placeholder = { Text(stringResource(R.string.screen_schedules_scheduled_at_placeholder)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                    )
-                }
+    MultiFieldInputDialog(
+        show = true,
+        title = stringResource(R.string.screen_schedules_add_title),
+        confirmText = stringResource(R.string.action_create),
+        dismissText = stringResource(R.string.action_cancel),
+        onDismiss = onDismiss,
+        confirmEnabled = selectedAgent.isNotBlank() && content.isNotBlank() &&
+            ((isRecurring && cronExpression.isNotBlank()) || (!isRecurring && scheduledAt.toDoubleOrNull() != null)),
+        onConfirm = {
+            val schedule = if (isRecurring) {
+                ScheduleDefinition(type = "recurring", cronExpression = cronExpression)
+            } else {
+                ScheduleDefinition(type = "one-time", scheduledAt = scheduledAt.toDoubleOrNull())
             }
+            onCreate(
+                selectedAgent,
+                ScheduleCreateParams(
+                    messages = listOf(ScheduleMessage(content = content, role = "user")),
+                    schedule = schedule,
+                )
+            )
         },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    val schedule = if (isRecurring) {
-                        ScheduleDefinition(type = "recurring", cronExpression = cronExpression)
-                    } else {
-                        ScheduleDefinition(type = "one-time", scheduledAt = scheduledAt.toDoubleOrNull())
-                    }
-                    onCreate(
-                        selectedAgent,
-                        ScheduleCreateParams(
-                            messages = listOf(ScheduleMessage(content = content, role = "user")),
-                            schedule = schedule,
-                        )
-                    )
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            AgentSelector(
+                agents = agents,
+                selectedAgentId = selectedAgent,
+                onAgentSelected = { selectedAgent = it },
+            )
+            OutlinedTextField(
+                value = content,
+                onValueChange = { content = it },
+                label = { Text(stringResource(R.string.screen_schedules_message_label)) },
+                minLines = 3,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            FormItem(
+                label = { Text(stringResource(R.string.screen_schedules_recurring_toggle)) },
+                tail = {
+                    androidx.compose.material3.Switch(checked = isRecurring, onCheckedChange = { isRecurring = it })
                 },
-                enabled = selectedAgent.isNotBlank() && content.isNotBlank() &&
-                    ((isRecurring && cronExpression.isNotBlank()) || (!isRecurring && scheduledAt.toDoubleOrNull() != null)),
-            ) {
-                Text(stringResource(R.string.action_create))
+            )
+            if (isRecurring) {
+                OutlinedTextField(
+                    value = cronExpression,
+                    onValueChange = { cronExpression = it },
+                    label = { Text(stringResource(R.string.screen_schedules_cron_label)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+            } else {
+                OutlinedTextField(
+                    value = scheduledAt,
+                    onValueChange = { scheduledAt = it },
+                    label = { Text(stringResource(R.string.screen_schedules_scheduled_at_label)) },
+                    placeholder = { Text(stringResource(R.string.screen_schedules_scheduled_at_placeholder)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
-            }
-        },
-    )
+        }
+    }
 }

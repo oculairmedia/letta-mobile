@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -62,6 +61,7 @@ import com.letta.mobile.data.repository.ConversationInspectorMessage
 import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.DateSeparator
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ExpandableTitleSearch
@@ -249,10 +249,11 @@ fun ConversationsScreen(
             }
         }
     ) { paddingValues ->
+        val convError = uiState.error
         when {
             uiState.isLoading && uiState.conversations.isEmpty() -> ShimmerConversationList(modifier = Modifier.padding(paddingValues))
-            uiState.error != null && uiState.conversations.isEmpty() -> ErrorContent(
-                message = uiState.error!!,
+            convError != null && uiState.conversations.isEmpty() -> ErrorContent(
+                message = convError,
                 onRetry = { viewModel.loadConversations() },
                 modifier = Modifier.padding(paddingValues)
             )
@@ -614,106 +615,104 @@ private fun ConversationAdminDialog(
     var renameText by remember(display.conversation.id) { mutableStateOf(display.conversation.summary ?: "") }
     val conversation = display.conversation
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.screen_conversations_admin_details)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    ConfirmDialog(
+        show = true,
+        title = stringResource(R.string.screen_conversations_admin_details),
+        confirmText = stringResource(R.string.action_close),
+        dismissText = stringResource(R.string.action_close),
+        onConfirm = onDismiss,
+        onDismiss = onDismiss,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                conversation.id,
+                style = MaterialTheme.typography.listItemMetadataMonospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                display.agentName,
+                style = MaterialTheme.typography.listItemSupporting,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = if (conversation.archived == true) stringResource(R.string.screen_conversations_archived_label)
+                else stringResource(R.string.screen_conversations_active_label),
+                style = MaterialTheme.typography.listItemMetadata,
+            )
+            conversation.createdAt?.let {
+                Text(stringResource(R.string.screen_conversations_created_label, formatRelativeTime(it)))
+            }
+            OutlinedTextField(
+                value = renameText,
+                onValueChange = { renameText = it },
+                label = { Text(stringResource(R.string.common_name)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { if (renameText.isNotBlank()) onRename(renameText) }) {
+                    Text(stringResource(R.string.action_save))
+                }
+                TextButton(onClick = { onToggleArchived(conversation.archived != true) }) {
+                    Text(
+                        if (conversation.archived == true) stringResource(R.string.screen_conversations_unarchive_action)
+                        else stringResource(R.string.screen_conversations_archive_action)
+                    )
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onFork) { Text(stringResource(R.string.action_fork)) }
+                TextButton(onClick = onCancelRuns) { Text(stringResource(R.string.screen_conversations_cancel_runs_action)) }
+                TextButton(onClick = onRecompile) { Text(stringResource(R.string.screen_conversations_recompile_action)) }
+            }
+            Text(
+                text = stringResource(R.string.screen_conversations_message_inspector_title),
+                style = MaterialTheme.typography.dialogSectionHeading,
+            )
+            if (isInspectorLoading) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(260.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    for (i in 0..3) {
+                        ShimmerBox(height = 80.dp, widthFraction = 1f)
+                    }
+                }
+            } else if (!inspectorError.isNullOrBlank()) {
                 Text(
-                    conversation.id,
-                    style = MaterialTheme.typography.listItemMetadataMonospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = inspectorError,
+                    style = MaterialTheme.typography.listItemSupporting,
+                    color = MaterialTheme.colorScheme.error,
                 )
+            } else if (inspectorMessages.isEmpty()) {
                 Text(
-                    display.agentName,
+                    text = stringResource(R.string.screen_conversations_message_inspector_empty),
                     style = MaterialTheme.typography.listItemSupporting,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(
-                    text = if (conversation.archived == true) stringResource(R.string.screen_conversations_archived_label)
-                    else stringResource(R.string.screen_conversations_active_label),
-                    style = MaterialTheme.typography.listItemMetadata,
-                )
-                conversation.createdAt?.let {
-                    Text(stringResource(R.string.screen_conversations_created_label, formatRelativeTime(it)))
-                }
-                OutlinedTextField(
-                    value = renameText,
-                    onValueChange = { renameText = it },
-                    label = { Text(stringResource(R.string.common_name)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { if (renameText.isNotBlank()) onRename(renameText) }) {
-                        Text(stringResource(R.string.action_save))
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(260.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(inspectorMessages, key = { it.id }) { message ->
+                        ConversationInspectorCard(message = message)
                     }
-                    TextButton(onClick = { onToggleArchived(conversation.archived != true) }) {
-                        Text(
-                            if (conversation.archived == true) stringResource(R.string.screen_conversations_unarchive_action)
-                            else stringResource(R.string.screen_conversations_archive_action)
-                        )
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = onFork) { Text(stringResource(R.string.action_fork)) }
-                    TextButton(onClick = onCancelRuns) { Text(stringResource(R.string.screen_conversations_cancel_runs_action)) }
-                    TextButton(onClick = onRecompile) { Text(stringResource(R.string.screen_conversations_recompile_action)) }
-                }
-                Text(
-                    text = stringResource(R.string.screen_conversations_message_inspector_title),
-                    style = MaterialTheme.typography.dialogSectionHeading,
-                )
-                if (isInspectorLoading) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(260.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        for (i in 0..3) {
-                            ShimmerBox(height = 80.dp, widthFraction = 1f)
-                        }
-                    }
-                } else if (!inspectorError.isNullOrBlank()) {
-                    Text(
-                        text = inspectorError,
-                        style = MaterialTheme.typography.listItemSupporting,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                } else if (inspectorMessages.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.screen_conversations_message_inspector_empty),
-                        style = MaterialTheme.typography.listItemSupporting,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(260.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        items(inspectorMessages, key = { it.id }) { message ->
-                            ConversationInspectorCard(message = message)
-                        }
-                    }
-                }
-                if (!recompilePreview.isNullOrBlank()) {
-                    Text(stringResource(R.string.screen_conversations_recompile_preview_title), style = MaterialTheme.typography.dialogSectionHeading)
-                    Text(recompilePreview, style = MaterialTheme.typography.listItemSupporting)
-                }
-                TextButton(onClick = onDelete) {
-                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_close))
+            if (!recompilePreview.isNullOrBlank()) {
+                Text(stringResource(R.string.screen_conversations_recompile_preview_title), style = MaterialTheme.typography.dialogSectionHeading)
+                Text(recompilePreview, style = MaterialTheme.typography.listItemSupporting)
             }
-        },
-    )
+            TextButton(onClick = onDelete) {
+                Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
 }
 
 @Composable
@@ -791,44 +790,42 @@ private fun AgentPickerDialog(
     onDismiss: () -> Unit,
     onAgentSelected: (String) -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.screen_conversations_dialog_select_agent_title)) },
-        text = {
-            if (agents.isEmpty()) {
-                Text(stringResource(R.string.screen_conversations_dialog_no_agents))
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.height(300.dp),
-                ) {
-                    items(agents, key = { it.id }) { agent ->
-                        Card(
-                            onClick = { onAgentSelected(agent.id) },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
+    MultiFieldInputDialog(
+        show = true,
+        title = stringResource(R.string.screen_conversations_dialog_select_agent_title),
+        confirmText = stringResource(R.string.action_cancel),
+        dismissText = stringResource(R.string.action_cancel),
+        onDismiss = onDismiss,
+        onConfirm = onDismiss,
+    ) {
+        if (agents.isEmpty()) {
+            Text(stringResource(R.string.screen_conversations_dialog_no_agents))
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.height(300.dp),
+            ) {
+                items(agents, key = { it.id }) { agent ->
+                    Card(
+                        onClick = { onAgentSelected(agent.id) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = agent.name,
+                                style = MaterialTheme.typography.listItemHeadline,
+                            )
+                            agent.model?.let { model ->
                                 Text(
-                                    text = agent.name,
-                                    style = MaterialTheme.typography.listItemHeadline,
+                                    text = model,
+                                    style = MaterialTheme.typography.listItemSupporting,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                                agent.model?.let { model ->
-                                    Text(
-                                        text = model,
-                                        style = MaterialTheme.typography.listItemSupporting,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
                             }
                         }
                     }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
-            }
-        },
-    )
+        }
+    }
 }

@@ -10,6 +10,9 @@ interface BotClient {
     suspend fun getStatus(): BotStatusResponse
 
     suspend fun listAgents(): List<BotAgentInfo>
+
+    /** Abort the in-flight stream. No-op when idle. */
+    suspend fun abort()
 }
 
 interface GatewayReadyClient {

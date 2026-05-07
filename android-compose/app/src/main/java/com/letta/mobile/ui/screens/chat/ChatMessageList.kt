@@ -315,6 +315,16 @@ fun ChatMessageList(
                     val showDate = prevDate != null && prevDate != currentDate
 
                     item(key = renderItem.key) {
+                        // letta-mobile-lbur follow-up: log render item keys for dedup analysis
+                        if (com.letta.mobile.core.BuildConfig.DEBUG) {
+                            androidx.compose.runtime.SideEffect {
+                                val ids = when (renderItem) {
+                                    is ChatRenderItem.Single -> renderItem.message.id.take(24)
+                                    is ChatRenderItem.RunBlock -> renderItem.messages.map { it.first.id.take(16) }.joinToString()
+                                }
+                                android.util.Log.w("ItemKey-DEBUG", "KEY=${renderItem.key} type=${renderItem::class.simpleName} ids=$ids")
+                            }
+                        }
                         when (renderItem) {
                             is ChatRenderItem.Single -> {
                                 // letta-mobile-m772.4 follow-up: reasoning bubbles that
@@ -345,6 +355,7 @@ fun ChatMessageList(
                                         collapsed = runId in state.collapsedRunIds,
                                         onToggleCollapsed = { onToggleRunCollapsed(runId) },
                                         modifier = Modifier.padding(top = 6.dp, bottom = 0.dp),
+                                        isStreaming = state.isStreaming,
                                     ) { message, position, rowModifier ->
                                         RenderChatMessage(
                                             message = message,
@@ -391,6 +402,7 @@ fun ChatMessageList(
                                     collapsed = renderItem.runId in state.collapsedRunIds,
                                     onToggleCollapsed = { onToggleRunCollapsed(renderItem.runId) },
                                     modifier = highlightModifier.padding(top = 6.dp, bottom = 0.dp),
+                                    isStreaming = state.isStreaming,
                                 ) { message, position, rowModifier ->
                                     RenderChatMessage(
                                         message = message,
@@ -405,9 +417,9 @@ fun ChatMessageList(
                                         onToggleReasoning = { onToggleReasoningExpanded(message.id) },
                                         modifier = rowModifier,
                                     )
-                                }
-                            }
                         }
+                        }
+                    }
                     }
 
                     if (showDate) {

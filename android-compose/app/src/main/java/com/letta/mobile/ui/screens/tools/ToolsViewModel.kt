@@ -28,7 +28,9 @@ class ToolsViewModel @Inject constructor(
     private val toolRepository: ToolRepository,
 ) : ViewModel() {
 
-    private val agentId: String = savedStateHandle.get<String>("agentId")!!
+    private val agentId: String = requireNotNull(savedStateHandle.get<String>("agentId")) {
+        "Missing agentId in ToolsViewModel navigation arguments"
+    }
 
     private val _uiState = MutableStateFlow<UiState<ToolsUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<ToolsUiState>> = _uiState.asStateFlow()

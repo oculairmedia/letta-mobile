@@ -27,7 +27,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -86,6 +85,7 @@ import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.Accordions
 import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ExpandableTitleSearch
@@ -1680,55 +1680,50 @@ private fun AddBlockDialog(
     var newDescription by remember { mutableStateOf("") }
     var newLimit by remember { mutableStateOf("") }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.screen_agent_edit_add_memory_block)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = newLabel,
-                    onValueChange = { newLabel = it },
-                    label = { Text(stringResource(R.string.common_name)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = newValue,
-                    onValueChange = { newValue = it },
-                    label = { Text(stringResource(R.string.common_value)) },
-                    minLines = 3,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = newDescription,
-                    onValueChange = { newDescription = it },
-                    label = { Text(stringResource(R.string.common_description)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 2,
-                )
-                OutlinedTextField(
-                    value = newLimit,
-                    onValueChange = { value ->
-                        if (value.isBlank() || value.toIntOrNull() != null) {
-                            newLimit = value
-                        }
-                    },
-                    label = { Text(stringResource(R.string.screen_agent_edit_character_limit)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onAdd(newLabel, newValue, newDescription, newLimit.toIntOrNull()) },
-                enabled = newLabel.isNotBlank(),
-            ) { Text(stringResource(R.string.action_create)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-        },
-    )
+    MultiFieldInputDialog(
+        show = true,
+        title = stringResource(R.string.screen_agent_edit_add_memory_block),
+        confirmText = stringResource(R.string.action_create),
+        dismissText = stringResource(R.string.action_cancel),
+        onDismiss = onDismiss,
+        confirmEnabled = newLabel.isNotBlank(),
+        onConfirm = { onAdd(newLabel, newValue, newDescription, newLimit.toIntOrNull()) },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = newLabel,
+                onValueChange = { newLabel = it },
+                label = { Text(stringResource(R.string.common_name)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = newValue,
+                onValueChange = { newValue = it },
+                label = { Text(stringResource(R.string.common_value)) },
+                minLines = 3,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = newDescription,
+                onValueChange = { newDescription = it },
+                label = { Text(stringResource(R.string.common_description)) },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+            )
+            OutlinedTextField(
+                value = newLimit,
+                onValueChange = { value ->
+                    if (value.isBlank() || value.toIntOrNull() != null) {
+                        newLimit = value
+                    }
+                },
+                label = { Text(stringResource(R.string.screen_agent_edit_character_limit)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1746,71 +1741,62 @@ private fun CloneAgentDialog(
     var overrideExistingTools by remember { mutableStateOf(true) }
     var stripMessages by remember { mutableStateOf(true) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.screen_settings_clone_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    text = stringResource(R.string.screen_settings_clone_dialog_helper),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                OutlinedTextField(
-                    value = cloneName,
-                    onValueChange = { cloneName = it },
-                    label = { Text(stringResource(R.string.screen_settings_clone_name_label)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.screen_agents_import_override_tools_title), style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            stringResource(R.string.screen_agents_import_override_tools_helper),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Switch(checked = overrideExistingTools, onCheckedChange = { overrideExistingTools = it })
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.screen_agents_import_strip_messages_title), style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            stringResource(R.string.screen_agents_import_strip_messages_helper),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Switch(checked = stripMessages, onCheckedChange = { stripMessages = it })
-                }
-            }
+    MultiFieldInputDialog(
+        show = true,
+        title = stringResource(R.string.screen_settings_clone_title),
+        confirmText = stringResource(R.string.action_clone_agent),
+        dismissText = stringResource(R.string.action_cancel),
+        onDismiss = onDismiss,
+        confirmEnabled = !isCloning,
+        onConfirm = {
+            onClone(cloneName.ifBlank { null }, overrideExistingTools, stripMessages)
         },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    onClone(cloneName.ifBlank { null }, overrideExistingTools, stripMessages)
-                },
-                enabled = !isCloning,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                text = stringResource(R.string.screen_settings_clone_dialog_helper),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+                value = cloneName,
+                onValueChange = { cloneName = it },
+                label = { Text(stringResource(R.string.screen_settings_clone_name_label)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(stringResource(R.string.action_clone_agent))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.screen_agents_import_override_tools_title), style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        stringResource(R.string.screen_agents_import_override_tools_helper),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = overrideExistingTools, onCheckedChange = { overrideExistingTools = it })
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isCloning) {
-                Text(stringResource(R.string.action_cancel))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.screen_agents_import_strip_messages_title), style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        stringResource(R.string.screen_agents_import_strip_messages_helper),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = stripMessages, onCheckedChange = { stripMessages = it })
             }
-        },
-    )
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1822,45 +1808,42 @@ private fun ToolDetailDialog(
     tool: Tool,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
+    ConfirmDialog(
+        show = true,
+        title = tool.name,
+        confirmText = stringResource(R.string.action_close),
+        dismissText = stringResource(R.string.action_close),
+        onConfirm = onDismiss,
+        onDismiss = onDismiss,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(LettaIcons.Tool, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(tool.name)
+                Text(tool.name, style = MaterialTheme.typography.titleMedium)
             }
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                tool.description?.let { desc ->
-                    Text(text = desc, style = MaterialTheme.typography.bodyMedium)
-                }
-                tool.toolType?.let { type ->
-                    Row {
-                        Text(
-                            text = stringResource(R.string.common_type) + ": ",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(text = type, style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-                if (tool.tags.isNotEmpty()) {
+            tool.description?.let { desc ->
+                Text(text = desc, style = MaterialTheme.typography.bodyMedium)
+            }
+            tool.toolType?.let { type ->
+                Row {
                     Text(
-                        text = stringResource(R.string.common_tags) + ": " + tool.tags.joinToString(", "),
-                        style = MaterialTheme.typography.bodySmall,
+                        text = stringResource(R.string.common_type) + ": ",
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Text(text = type, style = MaterialTheme.typography.bodyMedium)
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_close))
+            if (tool.tags.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.common_tags) + ": " + tool.tags.joinToString(", "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-        },
-    )
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -5,8 +5,10 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
 import android.widget.Toast
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
@@ -32,6 +34,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -55,6 +58,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.input.pointer.pointerInput
@@ -62,6 +66,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -118,6 +123,7 @@ internal fun ChatMessageItem(
     groupPosition: GroupPosition,
     isStreaming: Boolean,
     reasoningCollapsed: Boolean = true,
+    reasoningStable: Boolean = false,
     onToggleReasoning: (() -> Unit)? = null,
     onGeneratedUiMessage: ((String) -> Unit)? = null,
     onRerunMessage: ((UiMessage) -> Unit)? = null,
@@ -126,6 +132,13 @@ internal fun ChatMessageItem(
     approvalInFlight: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
+    // letta-mobile-1fa2: render telemetry for duplication investigation
+    if (com.letta.mobile.core.BuildConfig.DEBUG) {
+        androidx.compose.runtime.SideEffect {
+            android.util.Log.w("ChatMsgItem-DEBUG", "RENDER id=${message.id.take(24)} role=${message.role} reason=${message.isReasoning} cLen=${message.content.length} cHash=${message.content.hashCode()}")
+        }
+    }
+
     val isUser = message.role == "user"
     val showAvatar = groupPosition == GroupPosition.First || groupPosition == GroupPosition.None
     val context = LocalContext.current
@@ -185,7 +198,7 @@ internal fun ChatMessageItem(
             }
             MessageReasoning(
                 message = message,
-                isStreaming = isStreaming,
+                isStreaming = isStreaming && !reasoningStable,
                 collapsed = reasoningCollapsed,
                 onToggleCollapsed = onToggleReasoning,
             )
@@ -301,28 +314,11 @@ private fun MessageBubbleSurface(
     val renderer = remember(message.role, message.toolCalls, message.generatedUi) { resolveRenderer(message) }
     val bubbleLess = message.shouldRenderBubbleLess()
 
-    // letta-mobile-d2z6.s1 (Emmanuel 2026-04-26 01:28 EDT): ease bubble
-    // height growth as streaming chunks land. Short 60ms LinearEasing
-    // tween — fast enough that successive chunks (typically 80–150ms
-    // apart) don't stack into compounding wobble, but long enough that
-    // the user's eye perceives "growing" rather than "popping".
-    //
-    // Pinch suppresses the animation entirely (avoids height-interp
-    // cascades across many bubbles during the gesture, see
-    // letta-mobile-5e0f).
-    //
-    // Non-streaming, non-pinching bubbles get NO animateContentSize on
-    // the Surface itself — historically that fought with the per-bubble
-    // collapse/reasoning animations downstream. The Surface stays
-    // size-stable; only mid-stream growth is animated.
-    val isPinchingForBubble = LocalChatIsPinching.current
-    val bubbleSizeAnimation = if (isLastAssistant && !isPinchingForBubble) {
-        Modifier.animateContentSize(
-            animationSpec = tween(durationMillis = 60, easing = LinearEasing),
-        )
-    } else {
-        Modifier
-    }
+    // animateContentSize on the Surface itself caused a LazyColumn double-measure
+    // crash when stacked with reasoning/collapse animations downstream. Bubble
+    // height is intentionally non-animated; per-region animation lives in
+    // MessageReasoning / ToolCallCard.
+    val bubbleSizeAnimation: Modifier = Modifier
 
     val contentColumn: @Composable () -> Unit = {
         Column(
@@ -730,8 +726,8 @@ internal fun MessageReasoning(
 
         AnimatedVisibility(
             visible = !isCollapsed,
-            enter = fadeIn() + slideInVertically(initialOffsetY = { it / 4 }) + expandVertically(),
-            exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 4 }) + shrinkVertically(),
+            enter = fadeIn(tween(200)) + slideInVertically(tween(200)) { it / 4 },
+            exit = fadeOut(tween(300)) + slideOutVertically(tween(300)) { it },
         ) {
             val lineColor = if (isStreaming) {
                 MaterialTheme.colorScheme.primary.copy(alpha = 0.72f)
@@ -751,22 +747,21 @@ internal fun MessageReasoning(
                     }
                     .padding(start = 14.dp),
             ) {
-                // letta-mobile-d2z6 (root cause): MarkdownText re-parses on
-                // every content change and re-emits a fresh subtree, which
-                // causes the bubble to visibly flicker on each streaming
-                // chunk. Use plain Text during streaming and snap to
-                // formatted markdown when the stream ends.
+                // letta-mobile-mmnn: during streaming use smoother + Text.
+                // When streaming ends and we're about to collapse, skip
+                // content rendering — the outer AnimatedVisibility exit
+                // animation handles the visual transition.
                 if (isStreaming) {
-                    val smoothedContent = rememberSmoothedStreamingText(
+                    val smoothed = rememberSmoothedStreamingText(
                         rawText = message.content,
                         isStreaming = true,
                     )
                     Text(
-                        text = smoothedContent,
+                        text = smoothed,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                } else {
+                } else if (!isCollapsed) {
                     MarkdownText(
                         text = message.content,
                         textColor = MaterialTheme.colorScheme.onSurfaceVariant,

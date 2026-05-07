@@ -82,7 +82,7 @@ class RemoteBotSession @AssistedInject constructor(
         }
 
         try {
-            client!!.getStatus()
+            requireNotNull(client) { "Client not initialized before getStatus()" }.getStatus()
             // letta-mobile-w2hx.4: was ensureGatewayReady(agentId) here.
             // Sessions are now agent-agnostic transports — the per-agent
             // WS pool (w2hx.3) opens sessions lazily on first message, so
@@ -101,6 +101,10 @@ class RemoteBotSession @AssistedInject constructor(
         (client as? AutoCloseable)?.close()
         client = null
         _status.value = BotStatus.STOPPED
+    }
+
+    override suspend fun abortStream() {
+        client?.abort()
     }
 
     override suspend fun sendToAgent(message: ChannelMessage, conversationId: String?): BotResponse {

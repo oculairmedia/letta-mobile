@@ -139,7 +139,8 @@ internal fun BotConfig.toHeartbeatMessage(timestampMillis: Long): ChannelMessage
     // there is no "active chat" when WorkManager fires offline. Schedules
     // without `heartbeatAgentId` are filtered upstream in
     // [shouldRunHeartbeatNow] so the !! is safe by contract.
-    targetAgentId = heartbeatAgentId!!,
+    targetAgentId = heartbeatAgentId
+        ?: error("heartbeatAgentId is null — upstream filtering should prevent this"),
     timestamp = timestampMillis,
     metadata = mapOf(
         "source" to "heartbeat",
@@ -157,7 +158,9 @@ internal fun DueScheduledJob.toChannelMessage(): ChannelMessage = ChannelMessage
     // letta-mobile-w2hx.4: scheduled jobs route through the same
     // deterministic `heartbeatAgentId` channel as heartbeats — schedules
     // without it are filtered upstream.
-    targetAgentId = config.heartbeatAgentId!!,
+    targetAgentId = requireNotNull(config.heartbeatAgentId) {
+        "config.heartbeatAgentId is null for scheduled job — upstream filtering should prevent this"
+    },
     timestamp = runAtMillis,
     metadata = mapOf(
         "source" to "scheduled_job",

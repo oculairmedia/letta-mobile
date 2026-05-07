@@ -15,7 +15,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -24,6 +23,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.ExpandableTitleSearch
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
@@ -344,92 +344,89 @@ private fun LlmModelDetailDialog(
     model: LlmModel,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(model.displayName) },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                model.handle?.let {
-                    DetailRow(stringResource(R.string.screen_models_detail_handle, it))
-                }
-                DetailRow(stringResource(R.string.screen_models_detail_provider, model.providerType))
-                model.providerName?.let {
-                    DetailRow(stringResource(R.string.screen_models_detail_provider_name, it))
-                }
-                model.providerCategory?.let {
-                    DetailRow(stringResource(R.string.screen_models_detail_provider_category, it))
-                }
+    ConfirmDialog(
+        show = true,
+        title = model.displayName,
+        confirmText = stringResource(R.string.action_close),
+        onConfirm = onDismiss,
+        onDismiss = onDismiss,
+    ) {
+        Column(
+            modifier = Modifier.verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            model.handle?.let {
+                DetailRow(stringResource(R.string.screen_models_detail_handle, it))
+            }
+            DetailRow(stringResource(R.string.screen_models_detail_provider, model.providerType))
+            model.providerName?.let {
+                DetailRow(stringResource(R.string.screen_models_detail_provider_name, it))
+            }
+            model.providerCategory?.let {
+                DetailRow(stringResource(R.string.screen_models_detail_provider_category, it))
+            }
 
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+            model.contextWindow?.let {
+                DetailRow(stringResource(R.string.screen_models_detail_context_window, formatNumber(it)))
+            }
+            model.maxOutputTokens?.let {
+                DetailRow(stringResource(R.string.screen_models_detail_max_output, it))
+            }
+            model.temperature?.let {
+                DetailRow(stringResource(R.string.screen_models_detail_temperature, it))
+            }
+            model.maxTokens?.let {
+                DetailRow(stringResource(R.string.screen_models_detail_max_tokens, it))
+            }
+            model.parallelToolCalls?.let {
+                DetailRow(stringResource(R.string.screen_models_detail_parallel_tool_calls, stringResource(if (it) R.string.screen_models_detail_yes else R.string.screen_models_detail_no)))
+            }
+            model.frequencyPenalty?.let {
+                DetailRow(stringResource(R.string.screen_models_detail_frequency_penalty, it))
+            }
+
+            if (model.enableReasoner == true || model.reasoningEffort != null || model.maxReasoningTokens != null) {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-                model.contextWindow?.let {
-                    DetailRow(stringResource(R.string.screen_models_detail_context_window, formatNumber(it)))
+                model.enableReasoner?.let {
+                    DetailRow(stringResource(R.string.screen_models_detail_reasoning, stringResource(if (it) R.string.screen_models_detail_enabled else R.string.screen_models_detail_disabled)))
                 }
-                model.maxOutputTokens?.let {
-                    DetailRow(stringResource(R.string.screen_models_detail_max_output, it))
+                model.reasoningEffort?.let {
+                    DetailRow(stringResource(R.string.screen_models_detail_reasoning_effort, it))
                 }
-                model.temperature?.let {
-                    DetailRow(stringResource(R.string.screen_models_detail_temperature, it))
-                }
-                model.maxTokens?.let {
-                    DetailRow(stringResource(R.string.screen_models_detail_max_tokens, it))
-                }
-                model.parallelToolCalls?.let {
-                    DetailRow(stringResource(R.string.screen_models_detail_parallel_tool_calls, if (it) "Yes" else "No"))
-                }
-                model.frequencyPenalty?.let {
-                    DetailRow(stringResource(R.string.screen_models_detail_frequency_penalty, it))
-                }
-
-                if (model.enableReasoner == true || model.reasoningEffort != null || model.maxReasoningTokens != null) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                    model.enableReasoner?.let {
-                        DetailRow(stringResource(R.string.screen_models_detail_reasoning, if (it) "Enabled" else "Disabled"))
-                    }
-                    model.reasoningEffort?.let {
-                        DetailRow(stringResource(R.string.screen_models_detail_reasoning_effort, it))
-                    }
-                    model.maxReasoningTokens?.let {
-                        DetailRow(stringResource(R.string.screen_models_detail_max_reasoning, it))
-                    }
-                }
-
-                if (model.modelEndpointType != null || model.modelEndpoint != null || model.modelWrapper != null) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                    model.modelEndpointType?.let {
-                        DetailRow(stringResource(R.string.screen_models_detail_endpoint_type, it))
-                    }
-                    model.modelEndpoint?.let {
-                        DetailRow(stringResource(R.string.screen_models_detail_endpoint, it))
-                    }
-                    model.modelWrapper?.let {
-                        DetailRow(stringResource(R.string.screen_models_detail_wrapper, it))
-                    }
-                }
-
-                if (model.compatibilityType != null || model.verbosity != null || model.tier != null) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                    model.compatibilityType?.let {
-                        DetailRow(stringResource(R.string.screen_models_detail_compatibility, it))
-                    }
-                    model.verbosity?.let {
-                        DetailRow(stringResource(R.string.screen_models_detail_verbosity, it))
-                    }
-                    model.tier?.let {
-                        DetailRow(stringResource(R.string.screen_models_detail_tier, it))
-                    }
+                model.maxReasoningTokens?.let {
+                    DetailRow(stringResource(R.string.screen_models_detail_max_reasoning, it))
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_close))
+
+            if (model.modelEndpointType != null || model.modelEndpoint != null || model.modelWrapper != null) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                model.modelEndpointType?.let {
+                    DetailRow(stringResource(R.string.screen_models_detail_endpoint_type, it))
+                }
+                model.modelEndpoint?.let {
+                    DetailRow(stringResource(R.string.screen_models_detail_endpoint, it))
+                }
+                model.modelWrapper?.let {
+                    DetailRow(stringResource(R.string.screen_models_detail_wrapper, it))
+                }
             }
-        },
-    )
+
+            if (model.compatibilityType != null || model.verbosity != null || model.tier != null) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                model.compatibilityType?.let {
+                    DetailRow(stringResource(R.string.screen_models_detail_compatibility, it))
+                }
+                model.verbosity?.let {
+                    DetailRow(stringResource(R.string.screen_models_detail_verbosity, it))
+                }
+                model.tier?.let {
+                    DetailRow(stringResource(R.string.screen_models_detail_tier, it))
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -437,70 +434,67 @@ private fun EmbeddingModelDetailDialog(
     model: EmbeddingModel,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(model.displayName) },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                model.handle?.let {
-                    DetailRow(stringResource(R.string.screen_models_detail_handle, it))
-                }
-                DetailRow(stringResource(R.string.screen_models_detail_provider, model.providerType))
-                model.providerName?.let {
-                    DetailRow(stringResource(R.string.screen_models_detail_provider_name, it))
-                }
-                model.providerCategory?.let {
-                    DetailRow(stringResource(R.string.screen_models_detail_provider_category, it))
-                }
+    ConfirmDialog(
+        show = true,
+        title = model.displayName,
+        confirmText = stringResource(R.string.action_close),
+        onConfirm = onDismiss,
+        onDismiss = onDismiss,
+    ) {
+        Column(
+            modifier = Modifier.verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            model.handle?.let {
+                DetailRow(stringResource(R.string.screen_models_detail_handle, it))
+            }
+            DetailRow(stringResource(R.string.screen_models_detail_provider, model.providerType))
+            model.providerName?.let {
+                DetailRow(stringResource(R.string.screen_models_detail_provider_name, it))
+            }
+            model.providerCategory?.let {
+                DetailRow(stringResource(R.string.screen_models_detail_provider_category, it))
+            }
 
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+            model.embeddingModel?.let {
+                DetailRow(stringResource(R.string.screen_models_embedding_model, it))
+            }
+            model.embeddingDim?.let {
+                DetailRow(stringResource(R.string.screen_models_embedding_dim, it))
+            }
+            model.embeddingChunkSize?.let {
+                DetailRow(stringResource(R.string.screen_models_embedding_chunk_size, it))
+            }
+            model.batchSize?.let {
+                DetailRow(stringResource(R.string.screen_models_embedding_batch_size, it))
+            }
+
+            if (model.embeddingEndpointType != null || model.embeddingEndpoint != null) {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-                model.embeddingModel?.let {
-                    DetailRow(stringResource(R.string.screen_models_embedding_model, it))
+                model.embeddingEndpointType?.let {
+                    DetailRow(stringResource(R.string.screen_models_detail_endpoint_type, it))
                 }
-                model.embeddingDim?.let {
-                    DetailRow(stringResource(R.string.screen_models_embedding_dim, it))
-                }
-                model.embeddingChunkSize?.let {
-                    DetailRow(stringResource(R.string.screen_models_embedding_chunk_size, it))
-                }
-                model.batchSize?.let {
-                    DetailRow(stringResource(R.string.screen_models_embedding_batch_size, it))
-                }
-
-                if (model.embeddingEndpointType != null || model.embeddingEndpoint != null) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                    model.embeddingEndpointType?.let {
-                        DetailRow(stringResource(R.string.screen_models_detail_endpoint_type, it))
-                    }
-                    model.embeddingEndpoint?.let {
-                        DetailRow(stringResource(R.string.screen_models_detail_endpoint, it))
-                    }
-                }
-
-                if (model.azureEndpoint != null || model.azureVersion != null || model.azureDeployment != null) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                    model.azureEndpoint?.let {
-                        DetailRow("Azure Endpoint: $it")
-                    }
-                    model.azureVersion?.let {
-                        DetailRow("Azure Version: $it")
-                    }
-                    model.azureDeployment?.let {
-                        DetailRow("Azure Deployment: $it")
-                    }
+                model.embeddingEndpoint?.let {
+                    DetailRow(stringResource(R.string.screen_models_detail_endpoint, it))
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_close))
+
+            if (model.azureEndpoint != null || model.azureVersion != null || model.azureDeployment != null) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                model.azureEndpoint?.let {
+                    DetailRow(stringResource(R.string.screen_models_detail_azure_endpoint, it))
+                }
+                model.azureVersion?.let {
+                    DetailRow(stringResource(R.string.screen_models_detail_azure_version, it))
+                }
+                model.azureDeployment?.let {
+                    DetailRow(stringResource(R.string.screen_models_detail_azure_deployment, it))
+                }
             }
-        },
-    )
+        }
+    }
 }
 
 @Composable

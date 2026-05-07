@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -48,6 +47,7 @@ import com.letta.mobile.data.model.IdentityCreateParams
 import com.letta.mobile.data.model.IdentityUpdateParams
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
@@ -246,15 +246,13 @@ fun IdentityListScreen(
 
     val operationError = (uiState as? UiState.Success)?.data?.operationError
     if (operationError != null) {
-        AlertDialog(
-            onDismissRequest = { viewModel.clearOperationError() },
-            title = { Text(stringResource(R.string.common_error)) },
-            text = { Text(operationError) },
-            confirmButton = {
-                TextButton(onClick = { viewModel.clearOperationError() }) {
-                    Text(stringResource(R.string.action_dismiss))
-                }
-            },
+        ConfirmDialog(
+            show = true,
+            title = stringResource(R.string.common_error),
+            message = operationError,
+            confirmText = stringResource(R.string.action_dismiss),
+            onConfirm = { viewModel.clearOperationError() },
+            onDismiss = { viewModel.clearOperationError() },
         )
     }
 }
@@ -325,10 +323,14 @@ private fun IdentityDetailDialog(
         identity.agentIds.filterNot(attachedAgentsById::containsKey)
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(identity.name) },
-        text = {
+    ConfirmDialog(
+        show = true,
+        title = identity.name,
+        confirmText = stringResource(R.string.action_close),
+        dismissText = stringResource(R.string.action_close),
+        onConfirm = onDismiss,
+        onDismiss = onDismiss,
+    ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.screen_identities_identifier_label, identity.identifierKey), style = MaterialTheme.typography.listItemMetadataMonospace)
                 Text(stringResource(R.string.screen_identities_type_label, identity.identityType), style = MaterialTheme.typography.listItemSupporting)
@@ -406,8 +408,6 @@ private fun IdentityDetailDialog(
                     }
                 }
             }
-        },
-        confirmButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = onAttachAgent) {
                     Text(stringResource(R.string.screen_identities_attach_agent_action))
@@ -416,14 +416,8 @@ private fun IdentityDetailDialog(
                     Text(stringResource(R.string.action_edit))
                 }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_close))
-            }
-        },
-    )
-}
+        }
+    }
 
 @Composable
 private fun IdentityEditorDialog(
@@ -441,10 +435,22 @@ private fun IdentityEditorDialog(
     var identityType by remember(initialIdentityType) { mutableStateOf(initialIdentityType) }
     var blockIdsText by remember(initialBlockIds) { mutableStateOf(initialBlockIds.joinToString(", ")) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
+    MultiFieldInputDialog(
+        show = true,
+        title = title,
+        confirmText = confirmLabel,
+        dismissText = stringResource(R.string.action_cancel),
+        onDismiss = onDismiss,
+        confirmEnabled = identifierKey.isNotBlank() && name.isNotBlank() && identityType.isNotBlank(),
+        onConfirm = {
+            onConfirm(
+                identifierKey.trim(),
+                name.trim(),
+                identityType.trim(),
+                blockIdsText.parseCommaSeparatedValues(),
+            )
+        },
+    ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = identifierKey,
@@ -475,29 +481,8 @@ private fun IdentityEditorDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    onConfirm(
-                        identifierKey.trim(),
-                        name.trim(),
-                        identityType.trim(),
-                        blockIdsText.parseCommaSeparatedValues(),
-                    )
-                },
-                enabled = identifierKey.isNotBlank() && name.isNotBlank() && identityType.isNotBlank(),
-            ) {
-                Text(confirmLabel)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
-            }
-        },
-    )
-}
+        }
+    }
 
 @Composable
 private fun AgentAttachDialog(
@@ -507,10 +492,15 @@ private fun AgentAttachDialog(
 ) {
     var selection by remember(agents) { mutableStateOf<String?>(null) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.screen_identities_attach_agent_action)) },
-        text = {
+    MultiFieldInputDialog(
+        show = true,
+        title = stringResource(R.string.screen_identities_attach_agent_action),
+        confirmText = stringResource(R.string.action_attach),
+        dismissText = stringResource(R.string.action_cancel),
+        onDismiss = onDismiss,
+        confirmEnabled = selection != null,
+        onConfirm = { selection?.let(onAttach) },
+    ) {
             if (agents.isEmpty()) {
                 Text(
                     text = stringResource(R.string.screen_identities_no_available_agents),
@@ -556,22 +546,8 @@ private fun AgentAttachDialog(
                     }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { selection?.let(onAttach) },
-                enabled = selection != null,
-            ) {
-                Text(stringResource(R.string.action_attach))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
-            }
-        },
-    )
-}
+        }
+    }
 
 private fun String.parseCommaSeparatedValues(): List<String> {
     return split(',')

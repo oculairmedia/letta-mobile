@@ -125,6 +125,10 @@ class BotGateway @Inject constructor(
         return session.deliverToChannel(response, message)
     }
 
+    suspend fun abortStream() {
+        getDefaultSession()?.abortStream()
+    }
+
     companion object {
         private const val TAG = "BotGateway"
     }

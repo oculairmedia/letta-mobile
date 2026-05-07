@@ -5,10 +5,12 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.app.PendingIntent
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.RemoteInput
 import androidx.core.content.ContextCompat
 import com.letta.mobile.NotificationNavigationTarget
 import com.letta.mobile.R
@@ -71,6 +73,29 @@ class ChannelNotificationPublisher @Inject constructor(
         val messageText = notification.messagePreview.ifBlank {
             context.getString(R.string.channel_notifications_fallback_text)
         }
+        val notificationId = notification.conversationId.hashCode()
+
+        val replyIntent = Intent(context, NotificationReplyReceiver::class.java).apply {
+            action = NotificationReplyReceiver.ACTION_REPLY
+            putExtra(NotificationReplyReceiver.EXTRA_CONVERSATION_ID, notification.conversationId)
+            putExtra(NotificationReplyReceiver.EXTRA_AGENT_ID, notification.agentId)
+            putExtra(NotificationReplyReceiver.EXTRA_NOTIFICATION_ID, notificationId)
+        }
+        val replyPendingIntent = PendingIntent.getBroadcast(
+            context,
+            notificationId,
+            replyIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
+        )
+        val remoteInput = RemoteInput.Builder(NotificationReplyReceiver.KEY_TEXT_REPLY)
+            .setLabel("Reply")
+            .build()
+        val replyAction = NotificationCompat.Action.Builder(
+            android.R.drawable.ic_menu_send,
+            "Reply",
+            replyPendingIntent,
+        ).addRemoteInput(remoteInput).build()
+
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_notify_chat)
             .setContentTitle(title)
@@ -80,8 +105,9 @@ class ChannelNotificationPublisher @Inject constructor(
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .addAction(replyAction)
 
-        NotificationManagerCompat.from(context).notify(notification.conversationId.hashCode(), builder.build())
+        NotificationManagerCompat.from(context).notify(notificationId, builder.build())
     }
 
     companion object {

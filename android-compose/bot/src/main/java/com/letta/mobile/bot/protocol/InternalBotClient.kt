@@ -77,6 +77,10 @@ class InternalBotClient @Inject constructor(
         )
     }
 
+    override suspend fun abort() {
+        gateway.abortStream()
+    }
+
     private fun BotChatRequest.toChannelMessage(): ChannelMessage = ChannelMessage(
         messageId = "bot-client-${System.currentTimeMillis()}",
         channelId = channelId ?: "api",

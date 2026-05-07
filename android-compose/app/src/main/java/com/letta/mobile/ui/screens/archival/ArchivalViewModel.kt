@@ -32,7 +32,9 @@ class ArchivalViewModel @Inject constructor(
     private val passageRepository: PassageRepository,
 ) : ViewModel() {
 
-    private val agentId: String = savedStateHandle.get<String>("agentId")!!
+    private val agentId: String = requireNotNull(savedStateHandle.get<String>("agentId")) {
+        "Missing agentId in ArchivalViewModel navigation arguments"
+    }
 
     private val _uiState = MutableStateFlow<UiState<ArchivalUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<ArchivalUiState>> = _uiState.asStateFlow()

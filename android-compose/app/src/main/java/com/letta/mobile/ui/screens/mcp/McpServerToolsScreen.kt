@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -52,6 +51,8 @@ import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.effectiveServerType
 import com.letta.mobile.data.model.effectiveServerUrl
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
@@ -145,12 +146,13 @@ fun McpServerToolsScreen(
     }
 
     val successState = (uiState as? UiState.Success)?.data
-    if (pendingRunTool != null) {
+    val runTool = pendingRunTool
+    if (runTool != null) {
         ToolRunDialog(
-            tool = pendingRunTool!!,
+            tool = runTool,
             onDismiss = { pendingRunTool = null },
             onRun = { rawArgs ->
-                viewModel.runTool(pendingRunTool!!.id, rawArgs)
+                viewModel.runTool(runTool.id, rawArgs)
                 pendingRunTool = null
             },
         )
@@ -162,15 +164,14 @@ fun McpServerToolsScreen(
         )
     }
     successState?.toolRunState?.errorMessage?.let { message ->
-        AlertDialog(
-            onDismissRequest = { viewModel.clearToolRunState() },
-            title = { Text(stringResource(R.string.common_error)) },
-            text = { Text(message) },
-            confirmButton = {
-                TextButton(onClick = { viewModel.clearToolRunState() }) {
-                    Text(stringResource(R.string.action_dismiss))
-                }
-            },
+        ConfirmDialog(
+            show = true,
+            title = stringResource(R.string.common_error),
+            message = message,
+            confirmText = stringResource(R.string.action_dismiss),
+            dismissText = stringResource(R.string.action_dismiss),
+            onConfirm = { viewModel.clearToolRunState() },
+            onDismiss = { viewModel.clearToolRunState() },
         )
     }
 }
@@ -267,40 +268,33 @@ private fun ToolRunDialog(
 ) {
     var rawArgs by remember(tool.id) { mutableStateOf("{}") }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.screen_mcp_tool_run_dialog_title, tool.name)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                tool.description?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                OutlinedTextField(
-                    value = rawArgs,
-                    onValueChange = { rawArgs = it },
-                    label = { Text(stringResource(R.string.screen_mcp_tool_run_args_label)) },
-                    supportingText = { Text(stringResource(R.string.screen_mcp_tool_run_args_helper)) },
-                    minLines = 6,
-                    modifier = Modifier.fillMaxWidth(),
-                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+    MultiFieldInputDialog(
+        show = true,
+        title = stringResource(R.string.screen_mcp_tool_run_dialog_title, tool.name),
+        confirmText = stringResource(R.string.screen_mcp_tool_run_action),
+        dismissText = stringResource(R.string.action_cancel),
+        onDismiss = onDismiss,
+        onConfirm = { onRun(rawArgs) },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            tool.description?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        },
-        confirmButton = {
-            TextButton(onClick = { onRun(rawArgs) }) {
-                Text(stringResource(R.string.screen_mcp_tool_run_action))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
-            }
-        },
-    )
+            OutlinedTextField(
+                value = rawArgs,
+                onValueChange = { rawArgs = it },
+                label = { Text(stringResource(R.string.screen_mcp_tool_run_args_label)) },
+                supportingText = { Text(stringResource(R.string.screen_mcp_tool_run_args_helper)) },
+                minLines = 6,
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            )
+        }
+    }
 }
 
 @Composable
@@ -308,62 +302,60 @@ private fun ToolExecutionResultDialog(
     result: McpToolExecutionResult,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.screen_mcp_tool_execution_dialog_title)) },
-        text = {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    ConfirmDialog(
+        show = true,
+        title = stringResource(R.string.screen_mcp_tool_execution_dialog_title),
+        confirmText = stringResource(R.string.action_close),
+        dismissText = stringResource(R.string.action_close),
+        onConfirm = onDismiss,
+        onDismiss = onDismiss,
+    ) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item {
+                Text(
+                    text = stringResource(R.string.screen_mcp_tool_execution_status, result.status),
+                    style = MaterialTheme.typography.labelLarge,
+                )
+            }
+            result.funcReturn?.let {
                 item {
+                    Text(stringResource(R.string.screen_mcp_tool_execution_result_label), style = MaterialTheme.typography.labelMedium)
                     Text(
-                        text = stringResource(R.string.screen_mcp_tool_execution_status, result.status),
-                        style = MaterialTheme.typography.labelLarge,
+                        text = it.toString(),
+                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                     )
                 }
-                result.funcReturn?.let {
-                    item {
-                        Text(stringResource(R.string.screen_mcp_tool_execution_result_label), style = MaterialTheme.typography.labelMedium)
-                        Text(
-                            text = it.toString(),
-                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                        )
-                    }
-                }
-                result.stdout?.takeIf { it.isNotEmpty() }?.let { stdout ->
-                    item {
-                        Text(stringResource(R.string.screen_mcp_tool_execution_stdout_label), style = MaterialTheme.typography.labelMedium)
-                        Text(
-                            text = stdout.joinToString("\n"),
-                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                        )
-                    }
-                }
-                result.stderr?.takeIf { it.isNotEmpty() }?.let { stderr ->
-                    item {
-                        Text(stringResource(R.string.screen_mcp_tool_execution_stderr_label), style = MaterialTheme.typography.labelMedium)
-                        Text(
-                            text = stderr.joinToString("\n"),
-                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                }
-                result.sandboxConfigFingerprint?.let {
-                    item {
-                        Text(
-                            text = stringResource(R.string.screen_mcp_tool_execution_fingerprint, it),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+            }
+            result.stdout?.takeIf { it.isNotEmpty() }?.let { stdout ->
+                item {
+                    Text(stringResource(R.string.screen_mcp_tool_execution_stdout_label), style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        text = stdout.joinToString("\n"),
+                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    )
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_close))
+            result.stderr?.takeIf { it.isNotEmpty() }?.let { stderr ->
+                item {
+                    Text(stringResource(R.string.screen_mcp_tool_execution_stderr_label), style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        text = stderr.joinToString("\n"),
+                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
-        },
-    )
+            result.sandboxConfigFingerprint?.let {
+                item {
+                    Text(
+                        text = stringResource(R.string.screen_mcp_tool_execution_fingerprint, it),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
 }
 
 private fun buildRefreshSummary(summary: McpServerResyncResult): String? {

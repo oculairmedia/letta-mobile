@@ -130,7 +130,7 @@ fun BotSettingsScreen(
                                 val heartbeatLabel = if (config.heartbeatEnabled &&
                                     !config.heartbeatAgentId.isNullOrBlank()
                                 ) {
-                                    " \u00B7 \u23F1 ${config.heartbeatAgentId!!.take(8)}\u2026"
+                                    " \u00B7 \u23F1 ${config.heartbeatAgentId?.take(8) ?: ""}\u2026"
                                 } else ""
                                 Text(
                                     "${config.mode.name} \u00B7 ${config.transport.name}$heartbeatLabel",

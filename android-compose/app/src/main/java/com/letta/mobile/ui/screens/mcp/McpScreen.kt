@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -66,6 +65,7 @@ import com.letta.mobile.data.model.effectiveServerType
 import com.letta.mobile.data.model.effectiveServerUrl
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
@@ -707,176 +707,161 @@ private fun ServerFormDialog(
     }
     val validationMessage = validateForm(formState)
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                if (initialServer == null) {
-                    stringResource(R.string.screen_mcp_dialog_add_title)
-                } else {
-                    stringResource(R.string.screen_mcp_dialog_edit_title)
-                }
-            )
+    MultiFieldInputDialog(
+        show = true,
+        title = if (initialServer == null) {
+            stringResource(R.string.screen_mcp_dialog_add_title)
+        } else {
+            stringResource(R.string.screen_mcp_dialog_edit_title)
         },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-            ) {
+        confirmText = if (initialServer == null) {
+            stringResource(R.string.action_add)
+        } else {
+            stringResource(R.string.action_save)
+        },
+        dismissText = stringResource(R.string.action_cancel),
+        onDismiss = onDismiss,
+        confirmEnabled = validationMessage == null,
+        onConfirm = {
+            val config = buildConfig(formState).getOrNull() ?: return@MultiFieldInputDialog
+            if (initialServer == null) {
+                onCreate(
+                    McpServerCreateParams(
+                        serverName = formState.serverName.trim(),
+                        config = config,
+                    )
+                )
+            } else {
+                onUpdate(
+                    initialServer.id,
+                    McpServerUpdateParams(
+                        serverName = formState.serverName.trim(),
+                        config = config,
+                    )
+                )
+            }
+        },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+        ) {
+            OutlinedTextField(
+                value = formState.serverName,
+                onValueChange = { formState = formState.copy(serverName = it) },
+                label = { Text(stringResource(R.string.screen_mcp_server_name_label)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = stringResource(R.string.screen_mcp_transport_type),
+                style = MaterialTheme.typography.labelLarge,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = formState.transportType == MCP_TYPE_STREAMABLE_HTTP,
+                    onClick = { formState = formState.copy(transportType = MCP_TYPE_STREAMABLE_HTTP) },
+                    label = { Text(stringResource(R.string.screen_mcp_transport_streamable_http)) },
+                )
+                FilterChip(
+                    selected = formState.transportType == MCP_TYPE_SSE,
+                    onClick = { formState = formState.copy(transportType = MCP_TYPE_SSE) },
+                    label = { Text(stringResource(R.string.screen_mcp_transport_sse)) },
+                )
+                FilterChip(
+                    selected = formState.transportType == MCP_TYPE_STDIO,
+                    onClick = { formState = formState.copy(transportType = MCP_TYPE_STDIO) },
+                    label = { Text(stringResource(R.string.screen_mcp_transport_stdio)) },
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (formState.transportType == MCP_TYPE_STDIO) {
                 OutlinedTextField(
-                    value = formState.serverName,
-                    onValueChange = { formState = formState.copy(serverName = it) },
-                    label = { Text(stringResource(R.string.screen_mcp_server_name_label)) },
+                    value = formState.command,
+                    onValueChange = { formState = formState.copy(command = it) },
+                    label = { Text(stringResource(R.string.screen_mcp_command_label)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = stringResource(R.string.screen_mcp_transport_type),
-                    style = MaterialTheme.typography.labelLarge,
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = formState.transportType == MCP_TYPE_STREAMABLE_HTTP,
-                        onClick = { formState = formState.copy(transportType = MCP_TYPE_STREAMABLE_HTTP) },
-                        label = { Text(stringResource(R.string.screen_mcp_transport_streamable_http)) },
-                    )
-                    FilterChip(
-                        selected = formState.transportType == MCP_TYPE_SSE,
-                        onClick = { formState = formState.copy(transportType = MCP_TYPE_SSE) },
-                        label = { Text(stringResource(R.string.screen_mcp_transport_sse)) },
-                    )
-                    FilterChip(
-                        selected = formState.transportType == MCP_TYPE_STDIO,
-                        onClick = { formState = formState.copy(transportType = MCP_TYPE_STDIO) },
-                        label = { Text(stringResource(R.string.screen_mcp_transport_stdio)) },
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                if (formState.transportType == MCP_TYPE_STDIO) {
-                    OutlinedTextField(
-                        value = formState.command,
-                        onValueChange = { formState = formState.copy(command = it) },
-                        label = { Text(stringResource(R.string.screen_mcp_command_label)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = formState.argsText,
-                        onValueChange = { formState = formState.copy(argsText = it) },
-                        label = { Text(stringResource(R.string.screen_mcp_args_label)) },
-                        placeholder = { Text(stringResource(R.string.screen_mcp_args_placeholder)) },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = formState.envText,
-                        onValueChange = { formState = formState.copy(envText = it) },
-                        label = { Text(stringResource(R.string.screen_mcp_env_label)) },
-                        placeholder = { Text(stringResource(R.string.screen_mcp_key_value_placeholder)) },
-                        minLines = 3,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                } else {
-                    OutlinedTextField(
-                        value = formState.serverUrl,
-                        onValueChange = { formState = formState.copy(serverUrl = it) },
-                        label = { Text(stringResource(R.string.common_server_url)) },
-                        placeholder = { Text(stringResource(R.string.screen_mcp_url_placeholder)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = formState.authHeader,
-                        onValueChange = { formState = formState.copy(authHeader = it) },
-                        label = { Text(stringResource(R.string.screen_mcp_auth_header_label)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = formState.authToken,
-                        onValueChange = { formState = formState.copy(authToken = it) },
-                        label = { Text(stringResource(R.string.screen_mcp_auth_token_label)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = formState.customHeadersText,
-                        onValueChange = { formState = formState.copy(customHeadersText = it) },
-                        label = { Text(stringResource(R.string.screen_mcp_custom_headers_label)) },
-                        placeholder = { Text(stringResource(R.string.screen_mcp_key_value_placeholder)) },
-                        minLines = 3,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
-                    value = formState.rawConfigText,
-                    onValueChange = { formState = formState.copy(rawConfigText = it) },
-                    label = { Text(stringResource(R.string.screen_mcp_raw_config_label)) },
-                    placeholder = { Text(stringResource(R.string.screen_mcp_raw_config_placeholder)) },
-                    minLines = 4,
+                    value = formState.argsText,
+                    onValueChange = { formState = formState.copy(argsText = it) },
+                    label = { Text(stringResource(R.string.screen_mcp_args_label)) },
+                    placeholder = { Text(stringResource(R.string.screen_mcp_args_placeholder)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
-
-                validationMessage?.let { message ->
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = message,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    val config = buildConfig(formState).getOrNull() ?: return@TextButton
-                    if (initialServer == null) {
-                        onCreate(
-                            McpServerCreateParams(
-                                serverName = formState.serverName.trim(),
-                                config = config,
-                            )
-                        )
-                    } else {
-                        onUpdate(
-                            initialServer.id,
-                            McpServerUpdateParams(
-                                serverName = formState.serverName.trim(),
-                                config = config,
-                            )
-                        )
-                    }
-                },
-                enabled = validationMessage == null,
-            ) {
-                Text(
-                    if (initialServer == null) {
-                        stringResource(R.string.action_add)
-                    } else {
-                        stringResource(R.string.action_save)
-                    }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = formState.envText,
+                    onValueChange = { formState = formState.copy(envText = it) },
+                    label = { Text(stringResource(R.string.screen_mcp_env_label)) },
+                    placeholder = { Text(stringResource(R.string.screen_mcp_key_value_placeholder)) },
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                OutlinedTextField(
+                    value = formState.serverUrl,
+                    onValueChange = { formState = formState.copy(serverUrl = it) },
+                    label = { Text(stringResource(R.string.common_server_url)) },
+                    placeholder = { Text(stringResource(R.string.screen_mcp_url_placeholder)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = formState.authHeader,
+                    onValueChange = { formState = formState.copy(authHeader = it) },
+                    label = { Text(stringResource(R.string.screen_mcp_auth_header_label)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = formState.authToken,
+                    onValueChange = { formState = formState.copy(authToken = it) },
+                    label = { Text(stringResource(R.string.screen_mcp_auth_token_label)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = formState.customHeadersText,
+                    onValueChange = { formState = formState.copy(customHeadersText = it) },
+                    label = { Text(stringResource(R.string.screen_mcp_custom_headers_label)) },
+                    placeholder = { Text(stringResource(R.string.screen_mcp_key_value_placeholder)) },
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
+
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = formState.rawConfigText,
+                onValueChange = { formState = formState.copy(rawConfigText = it) },
+                label = { Text(stringResource(R.string.screen_mcp_raw_config_label)) },
+                placeholder = { Text(stringResource(R.string.screen_mcp_raw_config_placeholder)) },
+                minLines = 4,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            validationMessage?.let { message ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
-        },
-    )
+        }
+    }
 }
 
 private fun initialFormState(server: McpServer?): McpServerFormState {

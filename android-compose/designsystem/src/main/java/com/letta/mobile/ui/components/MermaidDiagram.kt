@@ -122,9 +122,10 @@ fun MermaidDiagram(
     }
 
     if (renderError != null) {
+        val error = renderError ?: return
         MermaidErrorFallback(
             source = source,
-            errorMessage = renderError!!,
+            errorMessage = error,
             modifier = modifier,
         )
     }
