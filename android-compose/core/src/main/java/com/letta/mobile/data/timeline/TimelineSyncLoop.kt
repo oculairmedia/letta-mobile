@@ -181,11 +181,13 @@ class TimelineSyncLoop(
             // with long history, the screen would show ancient messages with
             // recent deltas appended on top, making the timeline look years
             // out of date. letta-mobile-mge5.
-            val response = messageApi.listConversationMessages(
-                conversationId = conversationId,
-                limit = limit,
-                order = "desc",
-            ).reversed()
+            val response = normalizeHydratedMessageOrder(
+                messageApi.listConversationMessages(
+                    conversationId = conversationId,
+                    limit = limit,
+                    order = "desc",
+                ).reversed()
+            )
             val rawConverted = response.mapIndexedNotNull { idx, msg ->
                 msg.toTimelineEvent(position = (idx + 1).toDouble())
             }
@@ -1496,6 +1498,46 @@ sealed class TimelineSyncEvent {
  * letta-mobile-mge5: previously only the tool name was preserved, so streaming
  * argument deltas were never visible and ApprovalRequestMessages were dropped.
  */
+internal fun normalizeHydratedMessageOrder(messages: List<LettaMessage>): List<LettaMessage> {
+    if (messages.size < 2) return messages
+    val indexed = messages.withIndex()
+    return indexed.sortedWith { left, right ->
+        val l = left.value
+        val r = right.value
+
+        val seqCompare = compareNullableInts(l.seqId, r.seqId)
+        if (seqCompare != 0) return@sortedWith seqCompare
+
+        val leftDate = l.date?.let { runCatching { Instant.parse(it) }.getOrNull() }
+        val rightDate = r.date?.let { runCatching { Instant.parse(it) }.getOrNull() }
+        if (leftDate != null && rightDate != null) {
+            val dateCompare = leftDate.compareTo(rightDate)
+            if (dateCompare != 0) return@sortedWith dateCompare
+        }
+
+        if (!l.runId.isNullOrBlank() && l.runId == r.runId) {
+            val typeCompare = hydratedMessageTypePriority(l).compareTo(hydratedMessageTypePriority(r))
+            if (typeCompare != 0) return@sortedWith typeCompare
+        }
+
+        left.index.compareTo(right.index)
+    }.map { it.value }
+}
+
+private fun compareNullableInts(left: Int?, right: Int?): Int = when {
+    left != null && right != null && left != right -> left.compareTo(right)
+    else -> 0
+}
+
+private fun hydratedMessageTypePriority(message: LettaMessage): Int = when (message) {
+    is UserMessage -> 0
+    is ReasoningMessage, is HiddenReasoningMessage -> 1
+    is ToolCallMessage, is ApprovalRequestMessage -> 2
+    is ToolReturnMessage, is ApprovalResponseMessage -> 3
+    is AssistantMessage -> 4
+    else -> 5
+}
+
 internal fun renderToolCallContent(calls: List<com.letta.mobile.data.model.ToolCall>): String {
     if (calls.isEmpty()) return "tool_call"
     return calls.joinToString("\n") { tc ->

@@ -129,7 +129,7 @@ tasks.register<Test>("testIntegration") {
 }
 
 tasks.register<Test>("testScreenshot") {
-    description = "Runs screenshot-tier tests (Paparazzi visual regression)"
+    description = "Runs screenshot-tier tests (Paparazzi/Roborazzi visual regression)"
     group = "verification"
     
     val testTask = tasks.named("testDebugUnitTest", Test::class).get()

@@ -64,6 +64,47 @@ class TimelineSyncLoopTest {
     }
 
     @Test
+    fun `hydrate orders reasoning before final assistant response`() = runBlocking {
+        val api = FakeSyncApi()
+        val runId = "run-order"
+        api.addStoredMessage(
+            UserMessage(
+                id = "user-1",
+                contentRaw = JsonPrimitive("prompt"),
+                date = "2026-05-07T10:00:00Z",
+            )
+        )
+        // Simulate REST history returning/persisting the final assistant before its reasoning
+        // sibling. Hydrate must still render prompt → thinking → answer.
+        api.addStoredMessage(
+            AssistantMessage(
+                id = "assistant-1",
+                contentRaw = JsonPrimitive("final answer"),
+                date = "2026-05-07T10:00:02Z",
+                runId = runId,
+            )
+        )
+        api.addStoredMessage(
+            ReasoningMessage(
+                id = "reasoning-1",
+                reasoning = "thinking",
+                date = "2026-05-07T10:00:01Z",
+                runId = runId,
+            )
+        )
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val sync = TimelineSyncLoop(api, "conv1", scope)
+
+        sync.hydrate()
+
+        val events = sync.state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
+        assertEquals(listOf("user-1", "reasoning-1", "assistant-1"), events.map { it.serverId })
+        assertEquals(TimelineMessageType.REASONING, events[1].messageType)
+        assertEquals(TimelineMessageType.ASSISTANT, events[2].messageType)
+        scope.coroutineContext.job.cancel()
+    }
+
+    @Test
     fun `send optimistically appends local event`() = runTest {
         // Uses StandardTestDispatcher (not Unconfined) so the background
         // processSendQueue coroutine is only resumed when we explicitly

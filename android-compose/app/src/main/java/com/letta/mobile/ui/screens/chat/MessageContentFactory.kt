@@ -1,18 +1,18 @@
 package com.letta.mobile.ui.screens.chat
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.components.MarkdownText
 import com.letta.mobile.ui.components.StreamingMarkdownText
@@ -35,14 +35,16 @@ object GeneratedUiRenderer : MessageContentRenderer {
         val generatedUi = message.generatedUi ?: return
         Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (message.content.isNotBlank()) {
-                val displayText = if (isStreaming && message.role == "assistant") {
-                    // letta-mobile-flk2: removed buggy rememberSmoothedStreamingText
-                    // StreamingMarkdownText's 20Hz paint coalescer provides sufficient pacing
-                    streamingDisplayText(message.content)
+                if (message.role == "assistant") {
+                    AssistantResponseText(
+                        messageId = message.id,
+                        text = message.content,
+                        textColor = textColor,
+                        isStreaming = isStreaming,
+                    )
                 } else {
-                    message.content
+                    MarkdownText(text = message.content, textColor = textColor)
                 }
-                MarkdownText(text = displayText, textColor = textColor)
             }
 
             val renderer = GeneratedUiRegistry.resolve(generatedUi.name)
@@ -68,6 +70,50 @@ interface MessageContentRenderer {
         modifier: Modifier,
         onGeneratedUiMessage: ((String) -> Unit)? = null,
         isStreaming: Boolean = false,
+    )
+}
+
+@Composable
+private fun AssistantResponseText(
+    messageId: String,
+    text: String,
+    textColor: Color,
+    modifier: Modifier = Modifier,
+    isStreaming: Boolean,
+) {
+    var hasStreamed by remember(messageId) { mutableStateOf(false) }
+    LaunchedEffect(isStreaming) {
+        if (isStreaming) hasStreamed = true
+    }
+
+    if (!isStreaming && !hasStreamed) {
+        MarkdownText(
+            text = text,
+            textColor = textColor,
+            modifier = modifier,
+        )
+        return
+    }
+
+    val smoothedText = rememberSmoothedStreamingText(
+        rawText = text,
+        isStreaming = isStreaming,
+    )
+    val showCursor = isStreaming || smoothedText != text
+    // Keep the same streaming renderer for messages that streamed in this composition even after
+    // the smoother catches up. Swapping to settled MarkdownText at stream termination causes a
+    // final parsed-subtree/spacing handoff flash; hydrated messages still use MarkdownText because
+    // hasStreamed is false for them. Once caught up after stream end, hide the cursor while keeping
+    // the stable streaming layout.
+    StreamingMarkdownText(
+        text = smoothedText,
+        textColor = textColor,
+        tailStyle = MaterialTheme.chatTypography.messageBody,
+        tailTransform = if (showCursor) ::streamingDisplayText else { value -> value },
+        cursorText = if (showCursor) STREAMING_CURSOR else null,
+        deferUnstableMarkdown = showCursor,
+        stabilizeTables = hasStreamed,
+        modifier = modifier,
     )
 }
 
@@ -140,34 +186,12 @@ internal fun streamingDisplayText(raw: String): String {
     // StreamingMarkdownText short-circuit to no render at all
     // (the typing indicator already covers the pre-content state).
     if (raw.isEmpty()) return ""
-    val insideFence = insideOpenCodeFence(raw)
-    if (insideFence) {
+    if (insideOpenCodeFence(raw)) {
         // Inside an open ``` fence — leave content alone, no cursor
         // (would render as literal text inside the code block).
         return raw
     }
     val safe = clampToStableMarkdown(raw)
-
-    // letta-mobile-y3j9: streamingDisplayText content-level duplication probe.
-    // Keep it debug-only because this path runs on every streaming recomposition.
-    if (com.letta.mobile.core.BuildConfig.DEBUG) {
-        val rawLen = raw.length
-        val clampedLen = safe.length
-        val heldBack = rawLen - clampedLen
-        android.util.Log.d(
-            "StreamingDisplay-DEBUG",
-            "streamingDisplayText: rawLen=$rawLen clampedLen=$clampedLen heldBack=$heldBack",
-        )
-
-        // Detect if holdback is growing unexpectedly (potential duplication source)
-        if (heldBack > 50) {
-            android.util.Log.d(
-                "StreamingDisplay-DEBUG",
-                "STREAMING_DISPLAY_HOLDBACK: largeHoldback=$heldBack rawLen=$rawLen",
-            )
-        }
-    }
-
     return safe + STREAMING_CURSOR
 }
 
@@ -339,13 +363,12 @@ object TextMessageRenderer : MessageContentRenderer {
                 modifier = modifier,
             )
         } else {
-            StreamingMarkdownText(
+            AssistantResponseText(
+                messageId = message.id,
                 text = message.content,
                 textColor = textColor,
-                tailStyle = MaterialTheme.chatTypography.messageBody,
-                tailTransform = ::streamingDisplayText,
-                cursorText = STREAMING_CURSOR,
                 modifier = modifier,
+                isStreaming = isStreaming,
             )
         }
     }
@@ -365,13 +388,16 @@ object ToolCallRenderer : MessageContentRenderer {
     ) {
         Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (message.content.isNotBlank()) {
-                // letta-mobile-flk2: removed buggy rememberSmoothedStreamingText
-                val displayText = if (isStreaming && message.role == "assistant") {
-                    streamingDisplayText(message.content)
+                if (message.role == "assistant") {
+                    AssistantResponseText(
+                        messageId = message.id,
+                        text = message.content,
+                        textColor = textColor,
+                        isStreaming = isStreaming,
+                    )
                 } else {
-                    message.content
+                    MarkdownText(text = message.content, textColor = textColor)
                 }
-                MarkdownText(text = displayText, textColor = textColor)
             }
             message.toolCalls?.takeIf { it.isNotEmpty() }?.let { toolCalls ->
                 // Wrap at the call-site so MessageToolCalls receives a stable

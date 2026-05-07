@@ -12,19 +12,19 @@ class StreamingDisplayTextSmootherTest {
 
         smoother.updateTarget("Hello world", isStreaming = true, nowMs = 0L)
         val first = smoother.step(16L)
-        // Character-by-character at 10 ms/char: 16 ms reveals 2 chars (0 ms + 10 ms)
-        assertEquals("He", first)
+        // Slower readable baseline: 16 ms reveals the first char.
+        assertEquals("H", first)
 
         val second = smoother.step(26L)
-        // 26 ms reveals 3 chars (0, 10, 20 ms)
-        assertEquals("Hel", second)
+        // Continued frames advance steadily rather than jumping to the full chunk.
+        assertEquals("He", second)
 
         // Burst arrival at 30 ms — clock is NOT reset, so cadence stays independent
         smoother.updateTarget("Hello world from Letta", isStreaming = true, nowMs = 30L)
 
         val third = smoother.step(36L)
-        // Only 1 more char revealed at 30 ms mark — burst does not jump to full text
-        assertEquals("Hell", third)
+        // Only one more char revealed after the burst — velocity tweens toward the new rate.
+        assertEquals("Hel", third)
         assertTrue(
             "burst arrival should not instantly reveal all new text",
             third.length < "Hello world from Letta".length,
