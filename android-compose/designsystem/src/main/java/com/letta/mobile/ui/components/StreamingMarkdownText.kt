@@ -14,8 +14,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.SideEffect
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -197,16 +197,26 @@ fun StreamingMarkdownText(
         tailTransform(activeTailForText)
     }
     val density = LocalDensity.current
-    // Track the settled height: only updates (never decreases) via onSizeChanged, so the
-    // outer container sees a monotonically non-decreasing height and LazyColumn re-measures
-    // only when the content actually grows, not when it shrinks between ticks.
-    // During streaming, animateContentSize is suppressed — FastOutSlowInEasing cannot catch
-    // 50ms-increment jumps (confirmed by probe: height logs at every tick). The column
-    // height snaps via heightIn(min=settledPx) without fighting an animation.
-    // Post-stream, animateContentSize is re-applied so the final snap-in is smooth.
-    var settledHeightPx by remember { mutableStateOf(0) }
-    val settledHeightModifier = if (settledHeightPx > 0) {
-        with(density) { Modifier.heightIn(min = settledHeightPx.toDp()) }
+    // letta-mobile-mmnn fix: height discipline during streaming.
+    //
+    // Previous approach (heightIn(min=settledPx)): forced the tail text to wrap more
+    // aggressively within a fixed container as chars accumulated every ~50ms tick,
+    // causing the cursor to jump unpredictably — the "vibrating" flicker.
+    //
+    // New approach:
+    // 1. First-measured height becomes a FIXED floor (height()) while streaming —
+    //    prevents the outer Column from shrinking when the active tail shrinks
+    //    between paragraph-boundary recompositions. Committed blocks stay stable.
+    // 2. No heightIn: the Column grows freely to fit the tail as it accumulates.
+    //    Tail text wrapping is consistent — no unpredictable cursor jumps.
+    // 3. animateContentSize suppressed during streaming; re-applied post-stream so
+    //    the final height settle is smooth.
+    //
+    // Key invariant: committedBlocks stay at their natural, stable layout positions.
+    // Only the tail grows downward, pushing settledHeight up monotonically.
+    var firstMeasuredHeightPx by remember { mutableStateOf(0) }
+    val fixedHeightFloor = if (firstMeasuredHeightPx > 0) {
+        with(density) { Modifier.height(firstMeasuredHeightPx.toDp()) }
     } else {
         Modifier
     }
@@ -223,11 +233,13 @@ fun StreamingMarkdownText(
 
     Column(
         modifier = modifier
-            .then(settledHeightModifier)
+            .then(fixedHeightFloor)
             .then(heightAnimation)
             .onSizeChanged { size ->
-                if (size.height > settledHeightPx) {
-                    settledHeightPx = size.height
+                // Capture first measured height as floor. After that, height() ensures
+                // the Column never shrinks — committed blocks stay at their rendered positions.
+                if (firstMeasuredHeightPx == 0 && size.height > 0) {
+                    firstMeasuredHeightPx = size.height
                 }
             },
     ) {
