@@ -54,6 +54,10 @@ import kotlinx.coroutines.delay
  * @param tailTransform optional decorator applied to the active tail only —
  *   e.g. word-boundary holdback + streaming cursor (`streamingDisplayText`
  *   from MessageContentFactory).
+ * @param isStreaming true while the stream is still open and chunks are arriving.
+ *   When false, animateContentSize is applied so the bubble smoothly reaches its
+ *   final height in one animation rather than fighting ~50ms-increment jumps that
+ *   FastOutSlowInEasing cannot catch.
  * @param cursorText optional standalone cursor glyph rendered when the text
  *   currently ends exactly on a committed boundary.
  */
@@ -67,6 +71,7 @@ fun StreamingMarkdownText(
     cursorText: String? = null,
     deferUnstableMarkdown: Boolean = true,
     stabilizeTables: Boolean = false,
+    isStreaming: Boolean = true,
 ) {
     if (text.isEmpty()) return
 
@@ -192,36 +197,37 @@ fun StreamingMarkdownText(
         tailTransform(activeTailForText)
     }
     val density = LocalDensity.current
-    var maxMeasuredHeightPx by remember { mutableStateOf(0) }
-    // letta-mobile-mmnn probe: fires when maxMeasuredHeightPx changes, proving whether the
-    // outer Column height is actually jumping (causing LazyColumn re-measure flicker) or if
-    // the flicker source lives elsewhere in the remember(partition) cascade.
-    // "outerHeight=N px" in logcat; compare against tick cadence (~50ms).
-    var prevOuterHeight by remember { mutableStateOf(0) }
-    SideEffect {
-        if (maxMeasuredHeightPx != prevOuterHeight) {
-            prevOuterHeight = maxMeasuredHeightPx
-            android.util.Log.d("StreamingMarkdown", "outerHeight=${maxMeasuredHeightPx} px")
-        }
-    }
-    val monotonicHeightModifier = if (maxMeasuredHeightPx > 0) {
-        with(density) { Modifier.heightIn(min = maxMeasuredHeightPx.toDp()) }
+    // Track the settled height: only updates (never decreases) via onSizeChanged, so the
+    // outer container sees a monotonically non-decreasing height and LazyColumn re-measures
+    // only when the content actually grows, not when it shrinks between ticks.
+    // During streaming, animateContentSize is suppressed — FastOutSlowInEasing cannot catch
+    // 50ms-increment jumps (confirmed by probe: height logs at every tick). The column
+    // height snaps via heightIn(min=settledPx) without fighting an animation.
+    // Post-stream, animateContentSize is re-applied so the final snap-in is smooth.
+    var settledHeightPx by remember { mutableStateOf(0) }
+    val settledHeightModifier = if (settledHeightPx > 0) {
+        with(density) { Modifier.heightIn(min = settledHeightPx.toDp()) }
     } else {
         Modifier
+    }
+    val heightAnimation = if (isStreaming) {
+        Modifier
+    } else {
+        Modifier.animateContentSize(
+            animationSpec = tween(
+                durationMillis = 260,
+                easing = FastOutSlowInEasing,
+            ),
+        )
     }
 
     Column(
         modifier = modifier
-            .then(monotonicHeightModifier)
-            .animateContentSize(
-                animationSpec = tween(
-                    durationMillis = 260,
-                    easing = FastOutSlowInEasing,
-                ),
-            )
+            .then(settledHeightModifier)
+            .then(heightAnimation)
             .onSizeChanged { size ->
-                if (size.height > maxMeasuredHeightPx) {
-                    maxMeasuredHeightPx = size.height
+                if (size.height > settledHeightPx) {
+                    settledHeightPx = size.height
                 }
             },
     ) {

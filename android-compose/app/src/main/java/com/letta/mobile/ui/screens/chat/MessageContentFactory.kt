@@ -113,6 +113,7 @@ private fun AssistantResponseText(
         cursorText = if (showCursor) STREAMING_CURSOR else null,
         deferUnstableMarkdown = showCursor,
         stabilizeTables = hasStreamed,
+        isStreaming = isStreaming,
         modifier = modifier,
     )
 }
