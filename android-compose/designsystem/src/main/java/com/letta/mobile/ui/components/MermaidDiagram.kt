@@ -1,13 +1,13 @@
 package com.letta.mobile.ui.components
 
 import android.util.Log
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -131,6 +131,7 @@ fun MermaidDiagram(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MermaidSvgDiagram(
     svg: String,
@@ -155,38 +156,24 @@ private fun MermaidSvgDiagram(
             .build()
     }
 
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = Color.Transparent,
-        modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
-    ) {
-        Column {
-            MermaidHeader(onCopy = onCopy)
-            AsyncImage(
-                model = request,
-                contentDescription = "Mermaid diagram rendered natively",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .defaultMinSize(minHeight = 120.dp)
-                    .pointerInput(Unit) {
-                        awaitEachGesture {
-                            awaitFirstDown(requireUnconsumed = false)
-                            val upBeforeTimeout = withTimeoutOrNull(
-                                viewConfiguration.longPressTimeoutMillis,
-                            ) {
-                                while (true) {
-                                    val event = awaitPointerEvent()
-                                    if (event.changes.any { !it.pressed }) break
-                                }
-                            }
-                            if (upBeforeTimeout != null) {
-                                onCopy()
-                            } else {
-                                onFullscreenChange(true)
-                            }
-                        }
-                    },
-                contentScale = ContentScale.Fit,
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = Color.Transparent,
+            modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
+        ) {
+            Column {
+                MermaidHeader(onCopy = onCopy)
+                AsyncImage(
+                    model = request,
+                    contentDescription = "Mermaid diagram rendered natively",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = 120.dp)
+                        .combinedClickable(
+                            onClick = {},
+                            onLongClick = { onFullscreenChange(true) },
+                        ),
+                    contentScale = ContentScale.Fit,
             )
         }
     }
