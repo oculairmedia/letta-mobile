@@ -238,6 +238,15 @@ private fun UiMessage.shouldRenderBubbleLess(): Boolean {
     // letta-mobile-5s1n: error frames must render with the error-container
     // bubble chrome, never bubble-less.
     if (isError) return false
+    if (
+        !toolCalls.isNullOrEmpty() &&
+        generatedUi == null &&
+        approvalRequest == null &&
+        approvalResponse == null &&
+        attachments.isEmpty()
+    ) {
+        return true
+    }
     if (role != "assistant") return false
     if (!toolCalls.isNullOrEmpty()) return false
     if (generatedUi != null) return false
@@ -487,7 +496,8 @@ private fun ApprovalRequestCard(
                     name = toolCall.name,
                     arguments = toolCall.arguments,
                     result = null,
-                )
+                ),
+                keepExpanded = true,
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -850,7 +860,7 @@ private fun ToolCallEntrance(content: @Composable () -> Unit) {
  * pre-tool approval decision was folded onto the call (letta-mobile-23h5).
  *
  * Keeps the visual footprint tiny (one word + a translucent pill) so it
- * doesn't fight with the tool label or the expand chevron.
+ * doesn't fight with the tool label.
  */
 @Composable
 private fun ApprovalChip(decision: UiToolApprovalDecision) {
@@ -930,7 +940,10 @@ private fun ToolSummaryLine(
 }
 
 @Composable
-private fun ToolCallCard(toolCall: UiToolCall) {
+private fun ToolCallCard(
+    toolCall: UiToolCall,
+    keepExpanded: Boolean = false,
+) {
     val fontScale = LocalChatFontScale.current
     var expanded by remember { mutableStateOf(false) }
     val display = remember(toolCall.name, toolCall.arguments) {
@@ -946,6 +959,27 @@ private fun ToolCallCard(toolCall: UiToolCall) {
     // empirical justification.
     val isError = ToolReturnStatus.isError(toolCall.status)
     val codeStyle = MaterialTheme.chatTypography.codeBlock
+    val showDetails = keepExpanded || expanded
+    val compactDetail = remember(
+        display.label,
+        display.detailLine,
+        toolCall.name,
+        argumentSummary,
+        resultPreview,
+        toolCall.result,
+        isError,
+    ) {
+        when {
+            resultPreview != null -> "${if (isError) "Error" else "Result"}: $resultPreview"
+            argumentSummary != null -> "${argumentSummary.label}: ${argumentSummary.value}"
+            toolCall.result == null -> "Running"
+            display.label != toolCall.name -> display.label
+            else -> display.detailLine
+        }
+    }
+    val compactTitle = remember(toolCall.name, compactDetail) {
+        compactDetail?.let { "${toolCall.name} - $it" } ?: toolCall.name
+    }
 
     // letta-mobile-23h5 (polish 2026-04-19): give the tool card a touch
     // more presence — slightly stronger surface tint and a 1.dp outline
@@ -968,29 +1002,19 @@ private fun ToolCallCard(toolCall: UiToolCall) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { expanded = !expanded },
+                    .clickable(enabled = !keepExpanded) { expanded = !expanded },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(display.emoji, style = codeStyle)
                 Spacer(modifier = Modifier.width(6.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = toolCall.name,
-                        style = MaterialTheme.typography.chatBubbleSender.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    if (display.label != toolCall.name) {
-                        Text(
-                            text = display.label,
-                            style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
+                Text(
+                    text = compactTitle,
+                    style = MaterialTheme.typography.chatBubbleSender.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
                 // letta-mobile-23h5: folded-in approval decision. Rendered as
                 // a compact chip so the user can see "approved" / "rejected"
                 // without the old stack of redundant standalone pill bubbles.
@@ -1017,47 +1041,41 @@ private fun ToolCallCard(toolCall: UiToolCall) {
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 }
-                Icon(
-                    imageVector = LettaIcons.ExpandMore,
-                    contentDescription = if (expanded) "Collapse" else "Expand",
-                    modifier = Modifier
-                        .size(16.dp)
-                        .rotate(if (expanded) 180f else 0f),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                )
             }
 
-            argumentSummary?.let { summary ->
-                Spacer(modifier = Modifier.height(6.dp))
-                ToolSummaryLine(
-                    label = summary.label,
-                    value = summary.value,
-                    fontScale = fontScale,
-                    maxLines = 2,
-                )
-            }
-            if (resultPreview != null) {
-                Spacer(modifier = Modifier.height(4.dp))
-                ToolSummaryLine(
-                    label = if (isError) "Error" else "Result",
-                    value = resultPreview,
-                    fontScale = fontScale,
-                    isError = isError,
-                    maxLines = 2,
-                )
-            } else if (toolCall.result == null) {
-                Spacer(modifier = Modifier.height(4.dp))
-                ToolSummaryLine(
-                    label = "Status",
-                    value = "Running",
-                    fontScale = fontScale,
-                    maxLines = 1,
-                )
+            if (showDetails) {
+                argumentSummary?.let { summary ->
+                    Spacer(modifier = Modifier.height(6.dp))
+                    ToolSummaryLine(
+                        label = summary.label,
+                        value = summary.value,
+                        fontScale = fontScale,
+                        maxLines = 2,
+                    )
+                }
+                if (resultPreview != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    ToolSummaryLine(
+                        label = if (isError) "Error" else "Result",
+                        value = resultPreview,
+                        fontScale = fontScale,
+                        isError = isError,
+                        maxLines = 2,
+                    )
+                } else if (toolCall.result == null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    ToolSummaryLine(
+                        label = "Status",
+                        value = "Running",
+                        fontScale = fontScale,
+                        maxLines = 1,
+                    )
+                }
             }
 
             // Expanded content
             AnimatedVisibility(
-                visible = expanded,
+                visible = showDetails,
                 enter = fadeIn() + slideInVertically(initialOffsetY = { it / 4 }) + expandVertically(),
                 exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 4 }) + shrinkVertically(),
             ) {
