@@ -438,14 +438,16 @@ object ToolCallRenderer : MessageContentRenderer {
                 val stableToolCalls = remember(toolCalls) {
                     toolCalls.toImmutableList()
                 }
-            MessageToolCalls(
-                toolCalls = stableToolCalls,
-                animateEntrance = true,
-            )
+                MessageToolCalls(
+                    toolCalls = stableToolCalls,
+                    animateEntrance = shouldAnimateToolCallEntrance(isStreaming),
+                )
+            }
         }
     }
 }
-}
+
+internal fun shouldAnimateToolCallEntrance(isStreaming: Boolean): Boolean = isStreaming
 
 @Composable
 private fun GeneratedUiFallbackCard(component: com.letta.mobile.data.model.UiGeneratedComponent) {
