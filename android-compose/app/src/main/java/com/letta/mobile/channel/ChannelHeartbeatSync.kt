@@ -7,6 +7,7 @@ import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.ConversationInspectorMessage
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.SettingsRepository
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,7 +21,7 @@ class ChannelHeartbeatSync @Inject constructor(
     private val notificationPublisher: ChannelNotificationPublisher,
 ) {
     suspend fun run(): ListenableWorker.Result {
-        if (settingsRepository.activeConfig.value == null) {
+        if (settingsRepository.getActiveConfig().first() == null) {
             return ListenableWorker.Result.success()
         }
 

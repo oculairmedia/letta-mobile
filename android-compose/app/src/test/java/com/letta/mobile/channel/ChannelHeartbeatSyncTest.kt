@@ -86,14 +86,12 @@ class ChannelHeartbeatSyncTest {
     }
 
     private fun createFixture(): Fixture {
-        val settingsRepository = mockk<SettingsRepository>()
-        every { settingsRepository.activeConfig } returns MutableStateFlow(mockk(relaxed = true))
-
         val conversationApi = mockk<ConversationApi>()
         val messageRepository = mockk<MessageRepository>()
         val agentRepository = mockk<AgentRepository>()
         val stateStore = mockk<ChannelSyncStateStore>()
         val publisher = mockk<ChannelNotificationPublisher>()
+        val settingsRepository = mockk<SettingsRepository>()
 
         val conversations = mutableListOf(
             Conversation(
@@ -111,6 +109,7 @@ class ChannelHeartbeatSyncTest {
         val processed = mutableMapOf<String, String>()
         val notified = mutableMapOf<String, String>()
 
+        every { settingsRepository.getActiveConfig() } returns MutableStateFlow(mockk(relaxed = true))
         coEvery {
             conversationApi.listConversations(limit = 100, order = "desc", orderBy = "last_message_at")
         } answers { conversations.toList() }
