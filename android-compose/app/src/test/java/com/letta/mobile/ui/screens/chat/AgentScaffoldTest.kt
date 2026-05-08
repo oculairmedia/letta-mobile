@@ -5,9 +5,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import com.letta.mobile.data.model.AppTheme
-import com.letta.mobile.data.model.ThemePreset
-import com.letta.mobile.ui.theme.LettaTheme
+import com.letta.mobile.ui.test.setLettaTestContent
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -28,25 +26,19 @@ class AgentScaffoldTest {
 
     @Test
     fun drawerContentRendersAgentNameAndMessageCount() {
-        composeRule.setContent {
-            LettaTheme(
-                appTheme = AppTheme.LIGHT,
-                themePreset = ThemePreset.DEFAULT,
-                dynamicColor = false,
-            ) {
-                DrawerContent(
-                    agentName = "DrawerBot 42",
-                    agentId = "agent-drawer-42",
-                    messageCount = 99,
-                    contextWindow = emptyContextWindow(),
-                    onEditAgent = {},
-                    onArchivalMemory = {},
-                    onTools = {},
-                    onResetMessages = {},
-                    onRefreshContextWindow = {},
-                    onClose = {},
-                )
-            }
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            DrawerContent(
+                agentName = "DrawerBot 42",
+                agentId = "agent-drawer-42",
+                messageCount = 99,
+                contextWindow = emptyContextWindow(),
+                onEditAgent = {},
+                onArchivalMemory = {},
+                onTools = {},
+                onResetMessages = {},
+                onRefreshContextWindow = {},
+                onClose = {},
+            )
         }
 
         composeRule.onNodeWithText("DrawerBot 42").assertIsDisplayed()
@@ -56,25 +48,19 @@ class AgentScaffoldTest {
     @Test
     fun drawerEditAgentFiresCallback() {
         var fired = false
-        composeRule.setContent {
-            LettaTheme(
-                appTheme = AppTheme.LIGHT,
-                themePreset = ThemePreset.DEFAULT,
-                dynamicColor = false,
-            ) {
-                DrawerContent(
-                    agentName = "EditBot",
-                    agentId = "agent-edit-1",
-                    messageCount = 1,
-                    contextWindow = emptyContextWindow(),
-                    onEditAgent = { fired = true },
-                    onArchivalMemory = {},
-                    onTools = {},
-                    onResetMessages = {},
-                    onRefreshContextWindow = {},
-                    onClose = {},
-                )
-            }
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            DrawerContent(
+                agentName = "EditBot",
+                agentId = "agent-edit-1",
+                messageCount = 1,
+                contextWindow = emptyContextWindow(),
+                onEditAgent = { fired = true },
+                onArchivalMemory = {},
+                onTools = {},
+                onResetMessages = {},
+                onRefreshContextWindow = {},
+                onClose = {},
+            )
         }
 
         composeRule.onNodeWithText("Edit Agent").performClick()
@@ -84,25 +70,19 @@ class AgentScaffoldTest {
     @Test
     fun drawerArchivalMemoryFiresCallback() {
         var fired = false
-        composeRule.setContent {
-            LettaTheme(
-                appTheme = AppTheme.LIGHT,
-                themePreset = ThemePreset.DEFAULT,
-                dynamicColor = false,
-            ) {
-                DrawerContent(
-                    agentName = "ArchBot",
-                    agentId = "agent-arch-1",
-                    messageCount = 1,
-                    contextWindow = emptyContextWindow(),
-                    onEditAgent = {},
-                    onArchivalMemory = { fired = true },
-                    onTools = {},
-                    onResetMessages = {},
-                    onRefreshContextWindow = {},
-                    onClose = {},
-                )
-            }
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            DrawerContent(
+                agentName = "ArchBot",
+                agentId = "agent-arch-1",
+                messageCount = 1,
+                contextWindow = emptyContextWindow(),
+                onEditAgent = {},
+                onArchivalMemory = { fired = true },
+                onTools = {},
+                onResetMessages = {},
+                onRefreshContextWindow = {},
+                onClose = {},
+            )
         }
 
         composeRule.onNodeWithText("Archival Memory").performClick()
@@ -112,25 +92,19 @@ class AgentScaffoldTest {
     @Test
     fun drawerToolsFiresCallback() {
         var fired = false
-        composeRule.setContent {
-            LettaTheme(
-                appTheme = AppTheme.LIGHT,
-                themePreset = ThemePreset.DEFAULT,
-                dynamicColor = false,
-            ) {
-                DrawerContent(
-                    agentName = "ToolBot",
-                    agentId = "agent-tool-1",
-                    messageCount = 1,
-                    contextWindow = emptyContextWindow(),
-                    onEditAgent = {},
-                    onArchivalMemory = {},
-                    onTools = { fired = true },
-                    onResetMessages = {},
-                    onRefreshContextWindow = {},
-                    onClose = {},
-                )
-            }
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            DrawerContent(
+                agentName = "ToolBot",
+                agentId = "agent-tool-1",
+                messageCount = 1,
+                contextWindow = emptyContextWindow(),
+                onEditAgent = {},
+                onArchivalMemory = {},
+                onTools = { fired = true },
+                onResetMessages = {},
+                onRefreshContextWindow = {},
+                onClose = {},
+            )
         }
 
         composeRule.onNodeWithText("Tools").performClick()
@@ -140,25 +114,19 @@ class AgentScaffoldTest {
     @Test
     fun drawerResetMessagesFiresCallback() {
         var fired = false
-        composeRule.setContent {
-            LettaTheme(
-                appTheme = AppTheme.LIGHT,
-                themePreset = ThemePreset.DEFAULT,
-                dynamicColor = false,
-            ) {
-                DrawerContent(
-                    agentName = "ResetBot",
-                    agentId = "agent-reset-1",
-                    messageCount = 1,
-                    contextWindow = emptyContextWindow(),
-                    onEditAgent = {},
-                    onArchivalMemory = {},
-                    onTools = {},
-                    onResetMessages = { fired = true },
-                    onRefreshContextWindow = {},
-                    onClose = {},
-                )
-            }
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            DrawerContent(
+                agentName = "ResetBot",
+                agentId = "agent-reset-1",
+                messageCount = 1,
+                contextWindow = emptyContextWindow(),
+                onEditAgent = {},
+                onArchivalMemory = {},
+                onTools = {},
+                onResetMessages = { fired = true },
+                onRefreshContextWindow = {},
+                onClose = {},
+            )
         }
 
         composeRule.onNodeWithText("Reset Messages").performClick()
@@ -168,25 +136,19 @@ class AgentScaffoldTest {
     @Test
     fun drawerContextWindowRefreshFiresCallback() {
         var fired = false
-        composeRule.setContent {
-            LettaTheme(
-                appTheme = AppTheme.LIGHT,
-                themePreset = ThemePreset.DEFAULT,
-                dynamicColor = false,
-            ) {
-                DrawerContent(
-                    agentName = "CtxBot",
-                    agentId = "agent-ctx-1",
-                    messageCount = 1,
-                    contextWindow = ContextWindowUiState(maxTokens = 1000, currentTokens = 300),
-                    onEditAgent = {},
-                    onArchivalMemory = {},
-                    onTools = {},
-                    onResetMessages = {},
-                    onRefreshContextWindow = { fired = true },
-                    onClose = {},
-                )
-            }
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            DrawerContent(
+                agentName = "CtxBot",
+                agentId = "agent-ctx-1",
+                messageCount = 1,
+                contextWindow = ContextWindowUiState(maxTokens = 1000, currentTokens = 300),
+                onEditAgent = {},
+                onArchivalMemory = {},
+                onTools = {},
+                onResetMessages = {},
+                onRefreshContextWindow = { fired = true },
+                onClose = {},
+            )
         }
 
         composeRule.onNodeWithContentDescription("Refresh").performClick()
@@ -195,29 +157,23 @@ class AgentScaffoldTest {
 
     @Test
     fun drawerContextWindowShowsUsageWhenTokensAvailable() {
-        composeRule.setContent {
-            LettaTheme(
-                appTheme = AppTheme.LIGHT,
-                themePreset = ThemePreset.DEFAULT,
-                dynamicColor = false,
-            ) {
-                DrawerContent(
-                    agentName = "CtxDisplay",
-                    agentId = "agent-ctx-display",
-                    messageCount = 0,
-                    contextWindow = ContextWindowUiState(
-                        maxTokens = 1000,
-                        currentTokens = 300,
-                        messageCount = 5,
-                    ),
-                    onEditAgent = {},
-                    onArchivalMemory = {},
-                    onTools = {},
-                    onResetMessages = {},
-                    onRefreshContextWindow = {},
-                    onClose = {},
-                )
-            }
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            DrawerContent(
+                agentName = "CtxDisplay",
+                agentId = "agent-ctx-display",
+                messageCount = 0,
+                contextWindow = ContextWindowUiState(
+                    maxTokens = 1000,
+                    currentTokens = 300,
+                    messageCount = 5,
+                ),
+                onEditAgent = {},
+                onArchivalMemory = {},
+                onTools = {},
+                onResetMessages = {},
+                onRefreshContextWindow = {},
+                onClose = {},
+            )
         }
 
         composeRule.onNodeWithText("Context utilization").assertIsDisplayed()
@@ -225,28 +181,21 @@ class AgentScaffoldTest {
 
     @Test
     fun drawerContextWindowShowsUnavailableWhenNoTokens() {
-        composeRule.setContent {
-            LettaTheme(
-                appTheme = AppTheme.LIGHT,
-                themePreset = ThemePreset.DEFAULT,
-                dynamicColor = false,
-            ) {
-                DrawerContent(
-                    agentName = "NoCtxBot",
-                    agentId = "agent-noctx",
-                    messageCount = 0,
-                    contextWindow = ContextWindowUiState(),
-                    onEditAgent = {},
-                    onArchivalMemory = {},
-                    onTools = {},
-                    onResetMessages = {},
-                    onRefreshContextWindow = {},
-                    onClose = {},
-                )
-            }
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            DrawerContent(
+                agentName = "NoCtxBot",
+                agentId = "agent-noctx",
+                messageCount = 0,
+                contextWindow = ContextWindowUiState(),
+                onEditAgent = {},
+                onArchivalMemory = {},
+                onTools = {},
+                onResetMessages = {},
+                onRefreshContextWindow = {},
+                onClose = {},
+            )
         }
 
         composeRule.onNodeWithText("Context usage is not available yet.").assertIsDisplayed()
     }
 }
-

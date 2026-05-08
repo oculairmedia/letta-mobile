@@ -67,6 +67,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -105,6 +106,20 @@ import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.listItemHeadline
 import kotlinx.collections.immutable.toImmutableList
 import java.util.Locale
+
+object AgentScaffoldTestTags {
+    const val MENU_BUTTON = "agent_scaffold_menu_button"
+    const val DRAWER_CONTENT = "agent_scaffold_drawer_content"
+    const val CONVERSATION_PICKER_TRIGGER = "agent_scaffold_conversation_picker_trigger"
+    const val CONVERSATION_PICKER_SHEET = "agent_scaffold_conversation_picker_sheet"
+    const val PROJECT_BUG_FAB = "agent_scaffold_project_bug_fab"
+    const val PROJECT_BUG_REPORT_SHEET = "agent_scaffold_project_bug_report_sheet"
+    const val CHAT_SCREEN_CONTENT = "agent_scaffold_chat_screen_content"
+    const val PROJECT_CONTEXT_CARD = "agent_scaffold_project_context_card"
+    const val PROJECT_AGENTS_CARD = "agent_scaffold_project_agents_card"
+    const val PROJECT_BRIEF_CARD = "agent_scaffold_project_brief_card"
+    const val PROJECT_BUG_SUMMARY_CARD = "agent_scaffold_project_bug_summary_card"
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -184,6 +199,7 @@ fun AgentScaffold(
                     },
                     onRefreshContextWindow = viewModel::refreshContextWindow,
                     onClose = { scope.launch { drawerState.close() } },
+                    modifier = Modifier.testTag(AgentScaffoldTestTags.DRAWER_CONTENT),
                 )
             }
         }
@@ -197,6 +213,7 @@ fun AgentScaffold(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .testTag(AgentScaffoldTestTags.CONVERSATION_PICKER_TRIGGER)
                                 .clickable { showConversationPicker = true }
                                 .padding(end = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -227,7 +244,7 @@ fun AgentScaffold(
                         IconButton(onClick = {
                             viewModel.refreshContextWindow()
                             scope.launch { drawerState.open() }
-                        }) {
+                        }, modifier = Modifier.testTag(AgentScaffoldTestTags.MENU_BUTTON)) {
                             Icon(LettaIcons.Menu, "Menu")
                         }
                     }
@@ -235,7 +252,10 @@ fun AgentScaffold(
             },
             floatingActionButton = {
                 if (projectContext != null) {
-                    FloatingActionButton(onClick = { showBugReportSheet = true }) {
+                    FloatingActionButton(
+                        onClick = { showBugReportSheet = true },
+                        modifier = Modifier.testTag(AgentScaffoldTestTags.PROJECT_BUG_FAB),
+                    ) {
                         Icon(LettaIcons.Error, contentDescription = stringResource(R.string.screen_project_bug_report_open))
                     }
                 }
@@ -247,23 +267,26 @@ fun AgentScaffold(
                     .fillMaxSize(),
             ) {
                 projectContext?.let { project ->
-                    ProjectContextCard(project = project)
+                    ProjectContextCard(project = project, modifier = Modifier.testTag(AgentScaffoldTestTags.PROJECT_CONTEXT_CARD))
                     ProjectAgentsCard(
                         state = uiState.projectAgents,
                         onRetry = viewModel::loadProjectAgents,
+                        modifier = Modifier.testTag(AgentScaffoldTestTags.PROJECT_AGENTS_CARD),
                     )
                     ProjectBriefCard(
                         brief = uiState.projectBrief,
                         onRetry = viewModel::loadProjectBrief,
                         onSaveSection = viewModel::saveProjectBriefSection,
+                        modifier = Modifier.testTag(AgentScaffoldTestTags.PROJECT_BRIEF_CARD),
                     )
                     ProjectBugReportSummaryCard(
                         state = uiState.bugReports,
                         onCreateReport = { showBugReportSheet = true },
+                        modifier = Modifier.testTag(AgentScaffoldTestTags.PROJECT_BUG_SUMMARY_CARD),
                     )
                 }
                 ChatScreen(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    modifier = Modifier.fillMaxWidth().weight(1f).testTag(AgentScaffoldTestTags.CHAT_SCREEN_CONTENT),
                     chatBackground = chatBackground,
                     onBugCommand = { showBugReportSheet = true },
                     viewModel = viewModel,
@@ -526,6 +549,7 @@ private fun ProjectBugReportSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .testTag(AgentScaffoldTestTags.PROJECT_BUG_REPORT_SHEET)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -964,14 +988,15 @@ private fun ProjectInfoLine(
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-private fun ConversationPickerSheet(
+@androidx.annotation.VisibleForTesting
+internal fun ConversationPickerSheet(
     agentId: String,
     currentConversationId: String?,
     onDismiss: () -> Unit,
     onConversationSelected: (ConversationSwitchAction) -> Unit,
     onNewConversation: (ConversationSwitchAction) -> Unit,
+    viewModel: ConversationPickerViewModel = hiltViewModel(),
 ) {
-    val viewModel = hiltViewModel<ConversationPickerViewModel>()
     val conversationRepo = viewModel.conversationRepository
     val conversations by conversationRepo.getConversations(agentId).collectAsStateWithLifecycle(emptyList())
     val selectedIds by viewModel.selectedIds.collectAsStateWithLifecycle()
@@ -1008,7 +1033,7 @@ private fun ConversationPickerSheet(
             onDismiss()
         },
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(16.dp).testTag(AgentScaffoldTestTags.CONVERSATION_PICKER_SHEET)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1346,9 +1371,10 @@ internal fun DrawerContent(
     onResetMessages: () -> Unit = {},
     onRefreshContextWindow: () -> Unit,
     onClose: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxHeight()
             .width(300.dp)
             .verticalScroll(rememberScrollState())

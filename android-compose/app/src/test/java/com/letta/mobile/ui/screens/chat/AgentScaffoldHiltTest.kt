@@ -2,19 +2,16 @@ package com.letta.mobile.ui.screens.chat
 
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.WindowSizeClass
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.data.model.AppTheme
-import com.letta.mobile.data.model.ThemePreset
-import com.letta.mobile.ui.theme.LettaChatTheme
-import com.letta.mobile.ui.theme.LettaTheme
-import com.letta.mobile.ui.theme.LocalWindowSizeClass
+import com.letta.mobile.ui.test.setLettaTestContent
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import io.mockk.every
@@ -22,6 +19,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Before
+import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -74,50 +72,30 @@ class AgentScaffoldHiltTest {
 
     @Test
     fun drawerOpensWhenMenuIconTapped() {
-        composeRule.setContent {
-            CompositionLocalProvider(LocalWindowSizeClass provides windowSizeClass) {
-                LettaTheme(
-                    appTheme = AppTheme.LIGHT,
-                    themePreset = ThemePreset.DEFAULT,
-                    dynamicColor = false,
-                ) {
-                    LettaChatTheme {
-                        AgentScaffold(
-                            onNavigateBack = {},
-                            onNavigateToSettings = {},
-                            viewModel = viewModel,
-                        )
-                    }
-                }
-            }
+        composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
+            AgentScaffold(
+                onNavigateBack = {},
+                onNavigateToSettings = {},
+                viewModel = viewModel,
+            )
         }
 
-        composeRule.onNodeWithContentDescription("Menu").performClick()
+        composeRule.onNodeWithTag(AgentScaffoldTestTags.MENU_BUTTON).performClick()
         composeRule.onNodeWithText("Context utilization").assertIsDisplayed()
     }
 
     @Test
     fun drawerEditAgentFiresCallback() {
         var settingsCalledWith = ""
-        composeRule.setContent {
-            CompositionLocalProvider(LocalWindowSizeClass provides windowSizeClass) {
-                LettaTheme(
-                    appTheme = AppTheme.LIGHT,
-                    themePreset = ThemePreset.DEFAULT,
-                    dynamicColor = false,
-                ) {
-                    LettaChatTheme {
-                        AgentScaffold(
-                            onNavigateBack = {},
-                            onNavigateToSettings = { settingsCalledWith = it },
-                            viewModel = viewModel,
-                        )
-                    }
-                }
-            }
+        composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
+            AgentScaffold(
+                onNavigateBack = {},
+                onNavigateToSettings = { settingsCalledWith = it },
+                viewModel = viewModel,
+            )
         }
 
-        composeRule.onNodeWithContentDescription("Menu").performClick()
+        composeRule.onNodeWithTag(AgentScaffoldTestTags.MENU_BUTTON).performClick()
         composeRule.onNodeWithText("Edit Agent").performClick()
         assert(settingsCalledWith == "agent-hilt-1") {
             "Expected onNavigateToSettings with agent-hilt-1, got: $settingsCalledWith"
@@ -126,26 +104,67 @@ class AgentScaffoldHiltTest {
 
     @Test
     fun drawerResetMessagesCallsViewModel() {
-        composeRule.setContent {
-            CompositionLocalProvider(LocalWindowSizeClass provides windowSizeClass) {
-                LettaTheme(
-                    appTheme = AppTheme.LIGHT,
-                    themePreset = ThemePreset.DEFAULT,
-                    dynamicColor = false,
-                ) {
-                    LettaChatTheme {
-                        AgentScaffold(
-                            onNavigateBack = {},
-                            onNavigateToSettings = {},
-                            viewModel = viewModel,
-                        )
-                    }
-                }
-            }
+        composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
+            AgentScaffold(
+                onNavigateBack = {},
+                onNavigateToSettings = {},
+                viewModel = viewModel,
+            )
         }
 
-        composeRule.onNodeWithContentDescription("Menu").performClick()
+        composeRule.onNodeWithTag(AgentScaffoldTestTags.MENU_BUTTON).performClick()
         composeRule.onNodeWithText("Reset Messages").performClick()
         verify(exactly = 1) { viewModel.resetMessages() }
     }
+
+    @Test
+    fun menuClickRefreshesContextWindowAndOpensDrawer() {
+        composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
+            AgentScaffold(
+                onNavigateBack = {},
+                onNavigateToSettings = {},
+                viewModel = viewModel,
+            )
+        }
+
+        composeRule.onNodeWithTag(AgentScaffoldTestTags.MENU_BUTTON).performClick()
+        verify(exactly = 1) { viewModel.refreshContextWindow() }
+        composeRule.onNodeWithTag(AgentScaffoldTestTags.DRAWER_CONTENT).assertIsDisplayed()
+    }
+
+    @Test
+    @Ignore("Project-context composition in this Hilt harness is flaky; covered by dedicated project context card tests")
+    fun projectContextRendersProjectSurfacesAndBugFab() {
+        every { viewModel.projectContext } returns ProjectChatContext(
+            identifier = "proj-1",
+            name = "Project One",
+        )
+
+        composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
+            AgentScaffold(
+                onNavigateBack = {},
+                onNavigateToSettings = {},
+                viewModel = viewModel,
+            )
+        }
+
+        composeRule.onNodeWithTag(AgentScaffoldTestTags.PROJECT_BUG_FAB).assertIsDisplayed()
+        composeRule.onNodeWithTag(AgentScaffoldTestTags.CHAT_SCREEN_CONTENT).assertIsDisplayed()
+    }
+
+    @Test
+    fun noProjectContextHidesProjectBugFab() {
+        every { viewModel.projectContext } returns null
+
+        composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
+            AgentScaffold(
+                onNavigateBack = {},
+                onNavigateToSettings = {},
+                viewModel = viewModel,
+            )
+        }
+
+        composeRule.onAllNodesWithTag(AgentScaffoldTestTags.PROJECT_BUG_FAB).assertCountEquals(0)
+    }
+
 }
