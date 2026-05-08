@@ -159,8 +159,14 @@ fun filterMessagesForMode(
 ): List<UiMessage> = when (mode) {
     // letta-mobile-5s1n: keep error frames visible in Simple mode so users
     // see when a run aborts instead of watching a silent spinner.
+    // Timeline-backed tool calls intentionally use role="assistant" so they
+    // can stay grouped inside assistant run blocks in Interactive/Debug mode;
+    // Simple mode must still hide those operational cards just like hydrated
+    // history tool messages (role="tool").
     ChatDisplayMode.Simple -> messages.filter {
-        it.role == "user" || (it.role == "assistant" && !it.isReasoning) || it.isError
+        it.role == "user" ||
+            (it.role == "assistant" && !it.isReasoning && it.toolCalls.isNullOrEmpty()) ||
+            it.isError
     }
     ChatDisplayMode.Interactive,
     ChatDisplayMode.Debug -> messages

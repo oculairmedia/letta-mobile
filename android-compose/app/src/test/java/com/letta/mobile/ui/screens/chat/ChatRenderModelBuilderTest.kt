@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.screens.chat
 
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -63,6 +64,19 @@ class ChatRenderModelBuilderTest {
         val visible = filterMessagesForMode(messages, ChatDisplayMode.Simple)
 
         assertEquals(listOf("u1", "a1", "e1"), visible.map { it.id })
+    }
+
+    @Test
+    fun `simple mode filters assistant-scoped tool calls`() {
+        val messages = listOf(
+            user("u1"),
+            assistantToolCall("tc1"),
+            assistant("a1", content = "final answer"),
+        )
+
+        val visible = filterMessagesForMode(messages, ChatDisplayMode.Simple)
+
+        assertEquals(listOf("u1", "a1"), visible.map { it.id })
     }
 
     @Test
@@ -209,6 +223,23 @@ class ChatRenderModelBuilderTest {
         content = content,
         timestamp = ts,
         runId = runId,
+    )
+
+    private fun assistantToolCall(
+        id: String,
+        ts: String = "2026-04-19T12:00:00Z",
+    ) = UiMessage(
+        id = id,
+        role = "assistant",
+        content = "",
+        timestamp = ts,
+        toolCalls = listOf(
+            UiToolCall(
+                name = "Bash",
+                arguments = "{\"command\":\"pwd\"}",
+                result = "/tmp\n",
+            )
+        ),
     )
 
     private fun reasoning(
