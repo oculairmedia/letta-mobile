@@ -44,6 +44,7 @@ import com.letta.mobile.R
 import com.letta.mobile.data.model.BatchMessage
 import com.letta.mobile.data.model.Job
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
@@ -279,59 +280,132 @@ private fun MessageBatchDetailDialog(
         onConfirm = onDismiss,
         onDismiss = onDismiss,
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            batch.status?.let { Text(stringResource(R.string.screen_message_batches_status_label, it), style = MaterialTheme.typography.listItemSupporting) }
-            batch.jobType?.let { Text(stringResource(R.string.screen_message_batches_type_label, it), style = MaterialTheme.typography.listItemSupporting) }
-            batch.stopReason?.let { Text(stringResource(R.string.screen_message_batches_stop_reason_label, it), style = MaterialTheme.typography.listItemSupporting) }
-            batch.agentId?.let { Text(stringResource(R.string.screen_message_batches_agent_label, it), style = MaterialTheme.typography.listItemSupporting) }
-            batch.userId?.let { Text(stringResource(R.string.screen_message_batches_user_label, it), style = MaterialTheme.typography.listItemSupporting) }
-            batch.createdAt?.let { Text(stringResource(R.string.screen_message_batches_created_exact_label, it), style = MaterialTheme.typography.listItemMetadata) }
-            batch.completedAt?.let { Text(stringResource(R.string.screen_message_batches_completed_label, it), style = MaterialTheme.typography.listItemMetadata) }
-            batch.callbackUrl?.let { Text(stringResource(R.string.screen_message_batches_callback_label, it), style = MaterialTheme.typography.listItemSupporting) }
-            batch.callbackSentAt?.let { Text(stringResource(R.string.screen_message_batches_callback_sent_at_label, it), style = MaterialTheme.typography.listItemMetadata) }
-            batch.callbackStatusCode?.let { Text(stringResource(R.string.screen_message_batches_callback_status_label, it), style = MaterialTheme.typography.listItemMetadata) }
-            batch.callbackError?.let { Text(stringResource(R.string.screen_message_batches_callback_error_label, it), style = MaterialTheme.typography.listItemSupporting) }
-            batch.totalDurationNs?.let { Text(stringResource(R.string.screen_message_batches_total_duration_label, it), style = MaterialTheme.typography.listItemMetadata) }
-            batch.ttftNs?.let { Text(stringResource(R.string.screen_message_batches_ttft_label, it), style = MaterialTheme.typography.listItemMetadata) }
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            item {
+                CardGroup {
+                    batch.status?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_message_batches_status_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemSupporting) },
+                        )
+                    }
+                    batch.jobType?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_message_batches_type_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemSupporting) },
+                        )
+                    }
+                    batch.stopReason?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_message_batches_stop_reason_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemSupporting) },
+                        )
+                    }
+                    batch.agentId?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_message_batches_agent_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemSupporting) },
+                        )
+                    }
+                    batch.userId?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_message_batches_user_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemSupporting) },
+                        )
+                    }
+                    batch.createdAt?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_message_batches_created_exact_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemMetadata) },
+                        )
+                    }
+                    batch.completedAt?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_message_batches_completed_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemMetadata) },
+                        )
+                    }
+                    batch.callbackUrl?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_message_batches_callback_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemSupporting) },
+                        )
+                    }
+                    batch.callbackSentAt?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_message_batches_callback_sent_at_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemMetadata) },
+                        )
+                    }
+                    batch.callbackStatusCode?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_message_batches_callback_status_label, "")) },
+                            supportingContent = { Text(it.toString(), style = MaterialTheme.typography.listItemMetadata) },
+                        )
+                    }
+                    batch.callbackError?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_message_batches_callback_error_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemSupporting) },
+                        )
+                    }
+                    batch.totalDurationNs?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_message_batches_total_duration_label, "")) },
+                            supportingContent = { Text(it.toString(), style = MaterialTheme.typography.listItemMetadata) },
+                        )
+                    }
+                    batch.ttftNs?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_message_batches_ttft_label, "")) },
+                            supportingContent = { Text(it.toString(), style = MaterialTheme.typography.listItemMetadata) },
+                        )
+                    }
+                }
+            }
             if (batch.metadata.isNotEmpty()) {
-                Text(
-                    stringResource(R.string.screen_message_batches_metadata_title),
-                    style = MaterialTheme.typography.dialogSectionHeading,
-                )
-                batch.metadata.entries.sortedBy { it.key }.forEach { (key, value) ->
-                    Text(
-                        text = "$key: ${value.toDisplayString()}",
-                        style = MaterialTheme.typography.listItemSupporting,
-                        maxLines = 4,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                item {
+                    CardGroup(title = { Text(stringResource(R.string.screen_message_batches_metadata_title)) }) {
+                        batch.metadata.entries.sortedBy { it.key }.forEach { (key, value) ->
+                            item(
+                                headlineContent = { Text(key, style = MaterialTheme.typography.listItemSupporting) },
+                                supportingContent = {
+                                    Text(
+                                        text = value.toDisplayString(),
+                                        style = MaterialTheme.typography.listItemSupporting,
+                                        maxLines = 4,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                },
+                            )
+                        }
+                    }
                 }
             }
             if (onCancel != null) {
-                TextButton(onClick = onCancel) {
-                    Text(stringResource(R.string.action_cancel_batch), color = MaterialTheme.colorScheme.error)
+                item {
+                    TextButton(onClick = onCancel) {
+                        Text(stringResource(R.string.action_cancel_batch), color = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
-            Text(
-                stringResource(R.string.screen_message_batches_messages_title),
-                style = MaterialTheme.typography.dialogSectionHeading,
-            )
-            if (messages.isEmpty()) {
+            item {
                 Text(
-                    text = stringResource(R.string.screen_message_batches_messages_empty),
-                    style = MaterialTheme.typography.listItemSupporting,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    stringResource(R.string.screen_message_batches_messages_title),
+                    style = MaterialTheme.typography.labelLarge,
                 )
+            }
+            if (messages.isEmpty()) {
+                item {
+                    Text(
+                        text = stringResource(R.string.screen_message_batches_messages_empty),
+                        style = MaterialTheme.typography.listItemSupporting,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 240.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(messages, key = { it.id }) { message ->
-                        BatchMessageCard(message = message)
-                    }
+                items(messages, key = { it.id }) { message ->
+                    BatchMessageCard(message = message)
                 }
             }
         }

@@ -50,6 +50,7 @@ import com.letta.mobile.data.model.Step
 import com.letta.mobile.data.model.StepMetrics
 import com.letta.mobile.data.model.UsageStatistics
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
@@ -346,84 +347,217 @@ private fun RunDetailDialog(
         onConfirm = onDismiss,
         onDismiss = onDismiss,
     ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                run.status?.let { Text(stringResource(R.string.screen_runs_status_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                run.stopReason?.let { Text(stringResource(R.string.screen_runs_stop_reason_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                Text(stringResource(R.string.screen_runs_agent_label, run.agentId), style = MaterialTheme.typography.listItemSupporting)
-                run.conversationId?.let { Text(stringResource(R.string.screen_runs_conversation_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                run.createdAt?.let { Text(stringResource(R.string.screen_runs_created_exact_label, it), style = MaterialTheme.typography.listItemMetadata) }
-                run.completedAt?.let { Text(stringResource(R.string.screen_runs_completed_label, it), style = MaterialTheme.typography.listItemMetadata) }
-                run.callbackUrl?.let { Text(stringResource(R.string.screen_runs_callback_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                run.callbackSentAt?.let { Text(stringResource(R.string.screen_runs_callback_sent_label, it), style = MaterialTheme.typography.listItemMetadata) }
-                run.callbackStatusCode?.let { Text(stringResource(R.string.screen_runs_callback_status_label, it), style = MaterialTheme.typography.listItemMetadata) }
-                run.callbackError?.let { Text(stringResource(R.string.screen_runs_callback_error_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                run.totalDurationNs?.let { Text(stringResource(R.string.screen_runs_total_duration_label, it), style = MaterialTheme.typography.listItemMetadata) }
-                run.ttftNs?.let { Text(stringResource(R.string.screen_runs_ttft_label, it), style = MaterialTheme.typography.listItemMetadata) }
-                if (run.metadata.isNotEmpty()) {
-                    Text(stringResource(R.string.screen_runs_metadata_title), style = MaterialTheme.typography.dialogSectionHeading)
-                    run.metadata.entries.sortedBy { it.key }.forEach { (key, value) ->
-                        Text(
-                            text = "$key: ${value.toDisplayString()}",
-                            style = MaterialTheme.typography.listItemSupporting,
-                            maxLines = 4,
-                            overflow = TextOverflow.Ellipsis,
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            item {
+                CardGroup {
+                    run.status?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_runs_status_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemSupporting) },
+                        )
+                    }
+                    run.stopReason?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_runs_stop_reason_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemSupporting) },
+                        )
+                    }
+                    item(
+                        headlineContent = { Text(stringResource(R.string.screen_runs_agent_label, "")) },
+                        supportingContent = { Text(run.agentId, style = MaterialTheme.typography.listItemSupporting) },
+                    )
+                    run.conversationId?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_runs_conversation_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemSupporting) },
+                        )
+                    }
+                    run.createdAt?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_runs_created_exact_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemMetadata) },
+                        )
+                    }
+                    run.completedAt?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_runs_completed_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemMetadata) },
+                        )
+                    }
+                    run.callbackUrl?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_runs_callback_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemSupporting) },
+                        )
+                    }
+                    run.callbackSentAt?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_runs_callback_sent_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemMetadata) },
+                        )
+                    }
+                    run.callbackStatusCode?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_runs_callback_status_label, "")) },
+                            supportingContent = { Text(it.toString(), style = MaterialTheme.typography.listItemMetadata) },
+                        )
+                    }
+                    run.callbackError?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_runs_callback_error_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemSupporting) },
+                        )
+                    }
+                    run.totalDurationNs?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_runs_total_duration_label, "")) },
+                            supportingContent = { Text(it.toString(), style = MaterialTheme.typography.listItemMetadata) },
+                        )
+                    }
+                    run.ttftNs?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_runs_ttft_label, "")) },
+                            supportingContent = { Text(it.toString(), style = MaterialTheme.typography.listItemMetadata) },
                         )
                     }
                 }
-                run.requestConfig?.let { config ->
-                    Text(stringResource(R.string.screen_runs_request_config_title), style = MaterialTheme.typography.dialogSectionHeading)
-                    config.assistantMessageToolName?.let {
-                        Text(stringResource(R.string.screen_runs_request_config_assistant_tool_name_label, it))
-                    }
-                    config.assistantMessageToolKwarg?.let {
-                        Text(stringResource(R.string.screen_runs_request_config_assistant_tool_kwarg_label, it))
-                    }
-                    config.includeReturnMessageTypes?.takeIf { it.isNotEmpty() }?.let {
-                        Text(stringResource(R.string.screen_runs_request_config_include_return_types_label, it.joinToString(", ")))
-                    }
-                    config.useAssistantMessage?.let {
-                        Text(stringResource(R.string.screen_runs_request_config_use_assistant_message_label, it.toString()))
-                    }
-                }
-                usage?.let {
-                    Text(stringResource(R.string.screen_runs_usage_title), style = MaterialTheme.typography.dialogSectionHeading)
-                    Text(stringResource(R.string.screen_runs_usage_prompt_tokens_label, it.promptTokens ?: 0), style = MaterialTheme.typography.listItemSupporting)
-                    Text(stringResource(R.string.screen_runs_usage_completion_tokens_label, it.completionTokens ?: 0), style = MaterialTheme.typography.listItemSupporting)
-                    Text(stringResource(R.string.screen_runs_usage_total_tokens_label, it.totalTokens ?: 0), style = MaterialTheme.typography.listItemSupporting)
-                }
-                metrics?.let {
-                    Text(stringResource(R.string.screen_runs_metrics_title), style = MaterialTheme.typography.dialogSectionHeading)
-                    it.organizationId?.let { organizationId ->
-                        Text(stringResource(R.string.screen_runs_metrics_organization_label, organizationId))
-                    }
-                    it.projectId?.let { projectId ->
-                        Text(stringResource(R.string.screen_runs_metrics_project_label, projectId))
-                    }
-                    it.runStartNs?.let { runStartNs ->
-                        Text(stringResource(R.string.screen_runs_metrics_run_start_ns_label, runStartNs))
-                    }
-                    it.templateId?.let { templateId ->
-                        Text(stringResource(R.string.screen_runs_metrics_template_label, templateId))
-                    }
-                    it.baseTemplateId?.let { baseTemplateId ->
-                        Text(stringResource(R.string.screen_runs_metrics_base_template_label, baseTemplateId))
-                    }
-                    it.numSteps?.let { numSteps -> Text(stringResource(R.string.screen_runs_metrics_num_steps_label, numSteps)) }
-                    it.runNs?.let { runNs -> Text(stringResource(R.string.screen_runs_metrics_run_ns_label, runNs)) }
-                    if (it.toolsUsed.isNotEmpty()) {
-                        Text(stringResource(R.string.screen_runs_metrics_tools_used_label, it.toolsUsed.joinToString(", ")))
+            }
+            if (run.metadata.isNotEmpty()) {
+                item {
+                    CardGroup(title = { Text(stringResource(R.string.screen_runs_metadata_title)) }) {
+                        run.metadata.entries.sortedBy { it.key }.forEach { (key, value) ->
+                            item(
+                                headlineContent = { Text(key, style = MaterialTheme.typography.listItemSupporting) },
+                                supportingContent = {
+                                    Text(
+                                        text = value.toDisplayString(),
+                                        style = MaterialTheme.typography.listItemSupporting,
+                                        maxLines = 4,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                },
+                            )
+                        }
                     }
                 }
-                if (steps.isNotEmpty()) {
-                    Text(stringResource(R.string.screen_runs_steps_title), style = MaterialTheme.typography.dialogSectionHeading)
-                    steps.take(5).forEach { step ->
-                        Card(onClick = { onInspectStep(step.id) }) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(2.dp),
-                            ) {
+            }
+            run.requestConfig?.let { config ->
+                item {
+                    CardGroup(title = { Text(stringResource(R.string.screen_runs_request_config_title)) }) {
+                        config.assistantMessageToolName?.let {
+                            item(
+                                headlineContent = { Text(stringResource(R.string.screen_runs_request_config_assistant_tool_name_label, "")) },
+                                supportingContent = { Text(it, style = MaterialTheme.typography.listItemSupporting) },
+                            )
+                        }
+                        config.assistantMessageToolKwarg?.let {
+                            item(
+                                headlineContent = { Text(stringResource(R.string.screen_runs_request_config_assistant_tool_kwarg_label, "")) },
+                                supportingContent = { Text(it, style = MaterialTheme.typography.listItemSupporting) },
+                            )
+                        }
+                        config.includeReturnMessageTypes?.takeIf { it.isNotEmpty() }?.let {
+                            item(
+                                headlineContent = { Text(stringResource(R.string.screen_runs_request_config_include_return_types_label, "")) },
+                                supportingContent = { Text(it.joinToString(", "), style = MaterialTheme.typography.listItemSupporting) },
+                            )
+                        }
+                        config.useAssistantMessage?.let {
+                            item(
+                                headlineContent = { Text(stringResource(R.string.screen_runs_request_config_use_assistant_message_label, "")) },
+                                supportingContent = { Text(it.toString(), style = MaterialTheme.typography.listItemSupporting) },
+                            )
+                        }
+                    }
+                }
+            }
+            usage?.let {
+                item {
+                    CardGroup(title = { Text(stringResource(R.string.screen_runs_usage_title)) }) {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_runs_usage_prompt_tokens_label, "")) },
+                            supportingContent = { Text((it.promptTokens ?: 0).toString(), style = MaterialTheme.typography.listItemSupporting) },
+                        )
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_runs_usage_completion_tokens_label, "")) },
+                            supportingContent = { Text((it.completionTokens ?: 0).toString(), style = MaterialTheme.typography.listItemSupporting) },
+                        )
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_runs_usage_total_tokens_label, "")) },
+                            supportingContent = { Text((it.totalTokens ?: 0).toString(), style = MaterialTheme.typography.listItemSupporting) },
+                        )
+                    }
+                }
+            }
+            metrics?.let {
+                item {
+                    CardGroup(title = { Text(stringResource(R.string.screen_runs_metrics_title)) }) {
+                        it.organizationId?.let { organizationId ->
+                            item(
+                                headlineContent = { Text(stringResource(R.string.screen_runs_metrics_organization_label, "")) },
+                                supportingContent = { Text(organizationId, style = MaterialTheme.typography.listItemSupporting) },
+                            )
+                        }
+                        it.projectId?.let { projectId ->
+                            item(
+                                headlineContent = { Text(stringResource(R.string.screen_runs_metrics_project_label, "")) },
+                                supportingContent = { Text(projectId, style = MaterialTheme.typography.listItemSupporting) },
+                            )
+                        }
+                        it.runStartNs?.let { runStartNs ->
+                            item(
+                                headlineContent = { Text(stringResource(R.string.screen_runs_metrics_run_start_ns_label, "")) },
+                                supportingContent = { Text(runStartNs.toString(), style = MaterialTheme.typography.listItemSupporting) },
+                            )
+                        }
+                        it.templateId?.let { templateId ->
+                            item(
+                                headlineContent = { Text(stringResource(R.string.screen_runs_metrics_template_label, "")) },
+                                supportingContent = { Text(templateId, style = MaterialTheme.typography.listItemSupporting) },
+                            )
+                        }
+                        it.baseTemplateId?.let { baseTemplateId ->
+                            item(
+                                headlineContent = { Text(stringResource(R.string.screen_runs_metrics_base_template_label, "")) },
+                                supportingContent = { Text(baseTemplateId, style = MaterialTheme.typography.listItemSupporting) },
+                            )
+                        }
+                        it.numSteps?.let { numSteps ->
+                            item(
+                                headlineContent = { Text(stringResource(R.string.screen_runs_metrics_num_steps_label, "")) },
+                                supportingContent = { Text(numSteps.toString(), style = MaterialTheme.typography.listItemSupporting) },
+                            )
+                        }
+                        it.runNs?.let { runNs ->
+                            item(
+                                headlineContent = { Text(stringResource(R.string.screen_runs_metrics_run_ns_label, "")) },
+                                supportingContent = { Text(runNs.toString(), style = MaterialTheme.typography.listItemSupporting) },
+                            )
+                        }
+                        if (it.toolsUsed.isNotEmpty()) {
+                            item(
+                                headlineContent = { Text(stringResource(R.string.screen_runs_metrics_tools_used_label, "")) },
+                                supportingContent = { Text(it.toolsUsed.joinToString(", "), style = MaterialTheme.typography.listItemSupporting) },
+                            )
+                        }
+                    }
+                }
+            }
+            if (steps.isNotEmpty()) {
+                item {
+                    Text(
+                        stringResource(R.string.screen_runs_steps_title),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+                items(steps.take(5), key = { it.id }) { step ->
+                    Card(onClick = { onInspectStep(step.id) }) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
                             Text(
                                 text = buildString {
                                     append(step.id)
@@ -478,40 +612,47 @@ private fun RunDetailDialog(
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }
-                            }
                         }
                     }
                 }
-                if (messages.isNotEmpty()) {
-                    Text(stringResource(R.string.screen_runs_messages_title), style = MaterialTheme.typography.dialogSectionHeading)
-                    messages.takeLast(5).forEach { message ->
-                        Text(
-                            text = stringResource(
-                                R.string.screen_runs_message_entry,
-                                message.messageType,
-                                messageSummary(message),
-                            ),
-                            style = MaterialTheme.typography.listItemSupporting,
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+            }
+            if (messages.isNotEmpty()) {
+                item {
+                    Text(
+                        stringResource(R.string.screen_runs_messages_title),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+                items(messages.takeLast(5), key = { it.id }) { message ->
+                    Text(
+                        text = stringResource(
+                            R.string.screen_runs_message_entry,
+                            message.messageType,
+                            messageSummary(message),
+                        ),
+                        style = MaterialTheme.typography.listItemSupporting,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (onCancel != null) {
-                    TextButton(onClick = onCancel) {
-                        Text(stringResource(R.string.action_cancel_run), color = MaterialTheme.colorScheme.error)
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (onCancel != null) {
+                        TextButton(onClick = onCancel) {
+                            Text(stringResource(R.string.action_cancel_run), color = MaterialTheme.colorScheme.error)
+                        }
                     }
-                }
-                if (onDelete != null) {
-                    TextButton(onClick = onDelete) {
-                        Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
+                    if (onDelete != null) {
+                        TextButton(onClick = onDelete) {
+                            Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
+                        }
                     }
                 }
             }
         }
     }
+}
 
 @Composable
 private fun StepDetailDialog(

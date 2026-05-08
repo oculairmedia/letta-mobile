@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Job
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
@@ -302,40 +303,119 @@ private fun JobDetailDialog(
         onConfirm = onDismiss,
         onDismiss = onDismiss,
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            job.status?.let { Text(stringResource(R.string.screen_jobs_status_label, it), style = MaterialTheme.typography.listItemSupporting) }
-            job.jobType?.let { Text(stringResource(R.string.screen_jobs_type_label, it), style = MaterialTheme.typography.listItemSupporting) }
-            job.stopReason?.let { Text(stringResource(R.string.screen_jobs_stop_reason_label, it), style = MaterialTheme.typography.listItemSupporting) }
-            job.agentId?.let { Text(stringResource(R.string.screen_jobs_agent_label, it), style = MaterialTheme.typography.listItemSupporting) }
-            job.userId?.let { Text(stringResource(R.string.screen_jobs_user_label, it), style = MaterialTheme.typography.listItemSupporting) }
-            job.createdAt?.let { Text(stringResource(R.string.screen_jobs_created_exact_label, it), style = MaterialTheme.typography.listItemMetadata) }
-            job.completedAt?.let { Text(stringResource(R.string.screen_jobs_completed_label, it), style = MaterialTheme.typography.listItemMetadata) }
-            job.callbackUrl?.let { Text(stringResource(R.string.screen_jobs_callback_label, it), style = MaterialTheme.typography.listItemSupporting) }
-            job.callbackSentAt?.let { Text(stringResource(R.string.screen_jobs_callback_sent_at_label, it), style = MaterialTheme.typography.listItemMetadata) }
-            job.callbackStatusCode?.let { Text(stringResource(R.string.screen_jobs_callback_status_label, it), style = MaterialTheme.typography.listItemMetadata) }
-            job.callbackError?.let { Text(stringResource(R.string.screen_jobs_callback_error_label, it), style = MaterialTheme.typography.listItemSupporting) }
-            job.totalDurationNs?.let { Text(stringResource(R.string.screen_jobs_total_duration_label, it), style = MaterialTheme.typography.listItemMetadata) }
-            job.ttftNs?.let { Text(stringResource(R.string.screen_jobs_ttft_label, it), style = MaterialTheme.typography.listItemMetadata) }
-            if (job.metadata.isNotEmpty()) {
-                Text(stringResource(R.string.screen_jobs_metadata_title), style = MaterialTheme.typography.dialogSectionHeading)
-                job.metadata.entries.sortedBy { it.key }.forEach { (key, value) ->
-                    Text(
-                        text = "$key: $value",
-                        style = MaterialTheme.typography.listItemSupporting,
-                        maxLines = 4,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (onCancel != null) {
-                    TextButton(onClick = onCancel) {
-                        Text(stringResource(R.string.action_cancel_job), color = MaterialTheme.colorScheme.error)
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            item {
+                CardGroup {
+                    job.status?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_jobs_status_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemSupporting) },
+                        )
+                    }
+                    job.jobType?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_jobs_type_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemSupporting) },
+                        )
+                    }
+                    job.stopReason?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_jobs_stop_reason_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemSupporting) },
+                        )
+                    }
+                    job.agentId?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_jobs_agent_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemSupporting) },
+                        )
+                    }
+                    job.userId?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_jobs_user_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemSupporting) },
+                        )
+                    }
+                    job.createdAt?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_jobs_created_exact_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemMetadata) },
+                        )
+                    }
+                    job.completedAt?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_jobs_completed_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemMetadata) },
+                        )
+                    }
+                    job.callbackUrl?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_jobs_callback_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemSupporting) },
+                        )
+                    }
+                    job.callbackSentAt?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_jobs_callback_sent_at_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemMetadata) },
+                        )
+                    }
+                    job.callbackStatusCode?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_jobs_callback_status_label, "")) },
+                            supportingContent = { Text(it.toString(), style = MaterialTheme.typography.listItemMetadata) },
+                        )
+                    }
+                    job.callbackError?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_jobs_callback_error_label, "")) },
+                            supportingContent = { Text(it, style = MaterialTheme.typography.listItemSupporting) },
+                        )
+                    }
+                    job.totalDurationNs?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_jobs_total_duration_label, "")) },
+                            supportingContent = { Text(it.toString(), style = MaterialTheme.typography.listItemMetadata) },
+                        )
+                    }
+                    job.ttftNs?.let {
+                        item(
+                            headlineContent = { Text(stringResource(R.string.screen_jobs_ttft_label, "")) },
+                            supportingContent = { Text(it.toString(), style = MaterialTheme.typography.listItemMetadata) },
+                        )
                     }
                 }
-                if (onDelete != null) {
-                    TextButton(onClick = onDelete) {
-                        Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
+            }
+            if (job.metadata.isNotEmpty()) {
+                item {
+                    CardGroup(title = { Text(stringResource(R.string.screen_jobs_metadata_title)) }) {
+                        job.metadata.entries.sortedBy { it.key }.forEach { (key, value) ->
+                            item(
+                                headlineContent = { Text(key, style = MaterialTheme.typography.listItemSupporting) },
+                                supportingContent = {
+                                    Text(
+                                        text = value.toString(),
+                                        style = MaterialTheme.typography.listItemSupporting,
+                                        maxLines = 4,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (onCancel != null) {
+                        TextButton(onClick = onCancel) {
+                            Text(stringResource(R.string.action_cancel_job), color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                    if (onDelete != null) {
+                        TextButton(onClick = onDelete) {
+                            Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
+                        }
                     }
                 }
             }
