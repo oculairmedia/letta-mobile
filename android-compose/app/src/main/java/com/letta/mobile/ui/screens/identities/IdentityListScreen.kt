@@ -46,6 +46,9 @@ import com.letta.mobile.data.model.Identity
 import com.letta.mobile.data.model.IdentityCreateParams
 import com.letta.mobile.data.model.IdentityUpdateParams
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.ui.components.ActionSheet
+import com.letta.mobile.ui.components.ActionSheetItem
+import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.EmptyState
@@ -264,6 +267,8 @@ private fun IdentityCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    var showContextMenu by remember { mutableStateOf(false) }
+
     Card(
         onClick = onInspect,
         modifier = Modifier.fillMaxWidth(),
@@ -283,13 +288,8 @@ private fun IdentityCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Row {
-                    IconButton(onClick = onEdit) {
-                        Icon(LettaIcons.Edit, stringResource(R.string.action_edit))
-                    }
-                    IconButton(onClick = onDelete) {
-                        Icon(LettaIcons.Delete, stringResource(R.string.action_delete))
-                    }
+                IconButton(onClick = { showContextMenu = true }) {
+                    Icon(LettaIcons.MoreVert, contentDescription = stringResource(R.string.action_more))
                 }
             }
 
@@ -301,6 +301,30 @@ private fun IdentityCard(
                 }
             }
         }
+    }
+
+    ActionSheet(
+        show = showContextMenu,
+        onDismiss = { showContextMenu = false },
+        title = identity.name,
+    ) {
+        ActionSheetItem(
+            text = stringResource(R.string.action_edit),
+            icon = LettaIcons.Edit,
+            onClick = {
+                showContextMenu = false
+                onEdit()
+            },
+        )
+        ActionSheetItem(
+            text = stringResource(R.string.action_delete),
+            icon = LettaIcons.Delete,
+            onClick = {
+                showContextMenu = false
+                onDelete()
+            },
+            destructive = true,
+        )
     }
 }
 
@@ -331,83 +355,111 @@ private fun IdentityDetailDialog(
         onConfirm = onDismiss,
         onDismiss = onDismiss,
     ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.screen_identities_identifier_label, identity.identifierKey), style = MaterialTheme.typography.listItemMetadataMonospace)
-                Text(stringResource(R.string.screen_identities_type_label, identity.identityType), style = MaterialTheme.typography.listItemSupporting)
-                identity.projectId?.let { Text(stringResource(R.string.screen_identities_project_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                identity.organizationId?.let { Text(stringResource(R.string.screen_identities_organization_label, it), style = MaterialTheme.typography.listItemSupporting) }
-                Text(stringResource(R.string.screen_identities_agent_count_label, identity.agentIds.size), style = MaterialTheme.typography.listItemMetadata)
-                Text(stringResource(R.string.screen_identities_block_count_label, identity.blockIds.size), style = MaterialTheme.typography.listItemMetadata)
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(stringResource(R.string.common_agents), style = MaterialTheme.typography.dialogSectionHeading)
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            CardGroup {
+                item(
+                    headlineContent = { Text(stringResource(R.string.screen_identities_identifier_label, "")) },
+                    supportingContent = { Text(identity.identifierKey, style = MaterialTheme.typography.listItemMetadataMonospace) },
+                )
+                item(
+                    headlineContent = { Text(stringResource(R.string.screen_identities_type_label, "")) },
+                    supportingContent = { Text(identity.identityType, style = MaterialTheme.typography.listItemSupporting) },
+                )
+                identity.projectId?.let { projectId ->
+                    item(
+                        headlineContent = { Text(stringResource(R.string.screen_identities_project_label, "")) },
+                        supportingContent = { Text(projectId, style = MaterialTheme.typography.listItemSupporting) },
+                    )
+                }
+                identity.organizationId?.let { orgId ->
+                    item(
+                        headlineContent = { Text(stringResource(R.string.screen_identities_organization_label, "")) },
+                        supportingContent = { Text(orgId, style = MaterialTheme.typography.listItemSupporting) },
+                    )
+                }
+                item(
+                    headlineContent = { Text(stringResource(R.string.screen_identities_agent_count_label, "")) },
+                    supportingContent = { Text(identity.agentIds.size.toString(), style = MaterialTheme.typography.listItemMetadata) },
+                )
+                item(
+                    headlineContent = { Text(stringResource(R.string.screen_identities_block_count_label, "")) },
+                    supportingContent = { Text(identity.blockIds.size.toString(), style = MaterialTheme.typography.listItemMetadata) },
+                )
+            }
+
+            CardGroup(title = { Text(stringResource(R.string.common_agents)) }) {
                 if (identity.agentIds.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.screen_identities_no_linked_agents),
-                        style = MaterialTheme.typography.listItemSupporting,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    item(
+                        headlineContent = {
+                            Text(
+                                text = stringResource(R.string.screen_identities_no_linked_agents),
+                                style = MaterialTheme.typography.listItemSupporting,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
                     )
                 } else {
                     attachedAgents.forEach { agent ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(agent.name, style = MaterialTheme.typography.listItemSupporting)
-                            TextButton(onClick = { onDetachAgent(agent.id) }) {
-                                Text(stringResource(R.string.action_remove), color = MaterialTheme.colorScheme.error)
-                            }
-                        }
-                    }
-                    unresolvedAgentIds.forEach { agentId ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(agentId, style = MaterialTheme.typography.listItemMetadataMonospace)
-                            TextButton(onClick = { onDetachAgent(agentId) }) {
-                                Text(stringResource(R.string.action_remove), color = MaterialTheme.colorScheme.error)
-                            }
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(stringResource(R.string.screen_identities_blocks_title), style = MaterialTheme.typography.dialogSectionHeading)
-                if (identity.blockIds.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.screen_identities_no_linked_blocks),
-                        style = MaterialTheme.typography.listItemSupporting,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    identity.blockIds.forEach { blockId ->
-                        Text(
-                            text = blockId,
-                            style = MaterialTheme.typography.listItemMetadataMonospace,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                        item(
+                            headlineContent = { Text(agent.name, style = MaterialTheme.typography.listItemSupporting) },
+                            trailingContent = {
+                                TextButton(onClick = { onDetachAgent(agent.id) }) {
+                                    Text(stringResource(R.string.action_remove), color = MaterialTheme.colorScheme.error)
+                                }
+                            },
                         )
                     }
-                    Text(
-                        text = stringResource(R.string.screen_identities_blocks_manage_hint),
-                        style = MaterialTheme.typography.listItemSupporting,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (identity.properties.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(stringResource(R.string.screen_identities_properties_title), style = MaterialTheme.typography.dialogSectionHeading)
-                    identity.properties.forEach { property ->
-                        Text(
-                            text = "${property.key}: ${property.value}",
-                            style = MaterialTheme.typography.listItemSupporting,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
+                    unresolvedAgentIds.forEach { agentId ->
+                        item(
+                            headlineContent = { Text(agentId, style = MaterialTheme.typography.listItemMetadataMonospace) },
+                            trailingContent = {
+                                TextButton(onClick = { onDetachAgent(agentId) }) {
+                                    Text(stringResource(R.string.action_remove), color = MaterialTheme.colorScheme.error)
+                                }
+                            },
                         )
                     }
                 }
             }
+
+            CardGroup(title = { Text(stringResource(R.string.screen_identities_blocks_title)) }) {
+                if (identity.blockIds.isEmpty()) {
+                    item(
+                        headlineContent = {
+                            Text(
+                                text = stringResource(R.string.screen_identities_no_linked_blocks),
+                                style = MaterialTheme.typography.listItemSupporting,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
+                    )
+                } else {
+                    identity.blockIds.forEach { blockId ->
+                        item(
+                            headlineContent = {
+                                Text(
+                                    text = blockId,
+                                    style = MaterialTheme.typography.listItemMetadataMonospace,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            },
+                        )
+                    }
+                }
+            }
+
+            if (identity.properties.isNotEmpty()) {
+                CardGroup(title = { Text(stringResource(R.string.screen_identities_properties_title)) }) {
+                    identity.properties.forEach { property ->
+                        item(
+                            headlineContent = { Text(property.key, style = MaterialTheme.typography.listItemSupporting) },
+                            supportingContent = { Text(property.value.toString(), style = MaterialTheme.typography.listItemSupporting, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                        )
+                    }
+                }
+            }
+
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = onAttachAgent) {
                     Text(stringResource(R.string.screen_identities_attach_agent_action))
@@ -418,6 +470,7 @@ private fun IdentityDetailDialog(
             }
         }
     }
+}
 
 @Composable
 private fun IdentityEditorDialog(

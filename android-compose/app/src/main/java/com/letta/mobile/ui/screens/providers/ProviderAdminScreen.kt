@@ -42,7 +42,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Provider
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.ui.components.ActionSheet
+import com.letta.mobile.ui.components.ActionSheetItem
+import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
@@ -240,6 +244,8 @@ private fun ProviderCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    var showContextMenu by remember { mutableStateOf(false) }
+
     Card(onClick = onInspect, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -254,13 +260,8 @@ private fun ProviderCard(
                         Text(it, style = MaterialTheme.typography.listItemSupporting, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
-                Row {
-                    IconButton(onClick = onEdit) {
-                        Icon(LettaIcons.Edit, contentDescription = stringResource(R.string.screen_providers_edit_title))
-                    }
-                    IconButton(onClick = onDelete) {
-                        Icon(LettaIcons.Delete, contentDescription = stringResource(R.string.action_delete))
-                    }
+                IconButton(onClick = { showContextMenu = true }) {
+                    Icon(LettaIcons.MoreVert, contentDescription = stringResource(R.string.action_more))
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -269,6 +270,30 @@ private fun ProviderCard(
                 provider.region?.let { AssistChip(onClick = {}, label = { Text(it) }) }
             }
         }
+    }
+
+    ActionSheet(
+        show = showContextMenu,
+        onDismiss = { showContextMenu = false },
+        title = provider.name,
+    ) {
+        ActionSheetItem(
+            text = stringResource(R.string.screen_providers_edit_title),
+            icon = LettaIcons.Edit,
+            onClick = {
+                showContextMenu = false
+                onEdit()
+            },
+        )
+        ActionSheetItem(
+            text = stringResource(R.string.action_delete),
+            icon = LettaIcons.Delete,
+            onClick = {
+                showContextMenu = false
+                onDelete()
+            },
+            destructive = true,
+        )
     }
 }
 
@@ -287,18 +312,60 @@ private fun ProviderDetailDialog(
         onConfirm = onDismiss,
         onDismiss = onDismiss,
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            provider.id?.let { Text(stringResource(R.string.screen_providers_id_label, it), style = MaterialTheme.typography.listItemSupporting) }
-            Text(stringResource(R.string.screen_providers_type_label, provider.providerType), style = MaterialTheme.typography.listItemSupporting)
-            provider.providerCategory?.let { Text(stringResource(R.string.screen_providers_category_label, it), style = MaterialTheme.typography.listItemSupporting) }
-            provider.baseUrl?.let { Text(stringResource(R.string.screen_providers_base_url_label, it), style = MaterialTheme.typography.listItemSupporting) }
-            provider.region?.let { Text(stringResource(R.string.screen_providers_region_label, it), style = MaterialTheme.typography.listItemSupporting) }
-            provider.organizationId?.let { Text(stringResource(R.string.screen_providers_organization_label, it), style = MaterialTheme.typography.listItemSupporting) }
-            provider.updatedAt?.let { Text(stringResource(R.string.screen_providers_updated_label, it), style = MaterialTheme.typography.listItemSupporting) }
-            Text(stringResource(R.string.screen_providers_secret_present_label, provider.apiKey.isNullOrBlank().not()), style = MaterialTheme.typography.listItemSupporting)
-            provider.accessKey?.takeIf { it.isNotBlank() }?.let {
-                Text(stringResource(R.string.screen_providers_access_key_present_label, true), style = MaterialTheme.typography.listItemSupporting)
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            CardGroup {
+                provider.id?.let { id ->
+                    item(
+                        headlineContent = { Text(stringResource(R.string.screen_providers_id_label, "")) },
+                        supportingContent = { Text(id, style = MaterialTheme.typography.listItemSupporting) },
+                    )
+                }
+                item(
+                    headlineContent = { Text(stringResource(R.string.screen_providers_type_label, "")) },
+                    supportingContent = { Text(provider.providerType, style = MaterialTheme.typography.listItemSupporting) },
+                )
+                provider.providerCategory?.let { category ->
+                    item(
+                        headlineContent = { Text(stringResource(R.string.screen_providers_category_label, "")) },
+                        supportingContent = { Text(category, style = MaterialTheme.typography.listItemSupporting) },
+                    )
+                }
+                provider.baseUrl?.let { url ->
+                    item(
+                        headlineContent = { Text(stringResource(R.string.screen_providers_base_url_label, "")) },
+                        supportingContent = { Text(url, style = MaterialTheme.typography.listItemSupporting) },
+                    )
+                }
+                provider.region?.let { region ->
+                    item(
+                        headlineContent = { Text(stringResource(R.string.screen_providers_region_label, "")) },
+                        supportingContent = { Text(region, style = MaterialTheme.typography.listItemSupporting) },
+                    )
+                }
+                provider.organizationId?.let { orgId ->
+                    item(
+                        headlineContent = { Text(stringResource(R.string.screen_providers_organization_label, "")) },
+                        supportingContent = { Text(orgId, style = MaterialTheme.typography.listItemSupporting) },
+                    )
+                }
+                provider.updatedAt?.let { updated ->
+                    item(
+                        headlineContent = { Text(stringResource(R.string.screen_providers_updated_label, "")) },
+                        supportingContent = { Text(updated, style = MaterialTheme.typography.listItemSupporting) },
+                    )
+                }
+                item(
+                    headlineContent = { Text(stringResource(R.string.screen_providers_secret_present_label, "")) },
+                    supportingContent = { Text(provider.apiKey.isNullOrBlank().not().toString(), style = MaterialTheme.typography.listItemSupporting) },
+                )
+                provider.accessKey?.takeIf { it.isNotBlank() }?.let {
+                    item(
+                        headlineContent = { Text(stringResource(R.string.screen_providers_access_key_present_label, "")) },
+                        supportingContent = { Text(true.toString(), style = MaterialTheme.typography.listItemSupporting) },
+                    )
+                }
             }
+
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = onEdit) { Text(stringResource(R.string.screen_providers_edit_title)) }
                 TextButton(onClick = onCheck) { Text(stringResource(R.string.action_check)) }
@@ -339,44 +406,80 @@ private fun ProviderEditorDialog(
             onConfirm(name.trim(), providerType.trim(), apiKey.trim(), baseUrl.trim(), accessKey.trim(), region.trim())
         },
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text(stringResource(R.string.common_name)) },
-                singleLine = true,
-                enabled = isCreate,
+        CardGroup {
+            item(
+                headlineContent = {
+                    FormItem(label = { Text(stringResource(R.string.common_name)) }) {
+                        OutlinedTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            singleLine = true,
+                            enabled = isCreate,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                },
             )
-            OutlinedTextField(
-                value = providerType,
-                onValueChange = { providerType = it },
-                label = { Text(stringResource(R.string.screen_providers_type_input)) },
-                singleLine = true,
-                enabled = isCreate,
+            item(
+                headlineContent = {
+                    FormItem(label = { Text(stringResource(R.string.screen_providers_type_input)) }) {
+                        OutlinedTextField(
+                            value = providerType,
+                            onValueChange = { providerType = it },
+                            singleLine = true,
+                            enabled = isCreate,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                },
             )
-            OutlinedTextField(
-                value = apiKey,
-                onValueChange = { apiKey = it },
-                label = { Text(stringResource(R.string.screen_providers_api_key_input)) },
-                singleLine = true,
+            item(
+                headlineContent = {
+                    FormItem(label = { Text(stringResource(R.string.screen_providers_api_key_input)) }) {
+                        OutlinedTextField(
+                            value = apiKey,
+                            onValueChange = { apiKey = it },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                },
             )
-            OutlinedTextField(
-                value = baseUrl,
-                onValueChange = { baseUrl = it },
-                label = { Text(stringResource(R.string.screen_providers_base_url_input)) },
-                singleLine = true,
+            item(
+                headlineContent = {
+                    FormItem(label = { Text(stringResource(R.string.screen_providers_base_url_input)) }) {
+                        OutlinedTextField(
+                            value = baseUrl,
+                            onValueChange = { baseUrl = it },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                },
             )
-            OutlinedTextField(
-                value = accessKey,
-                onValueChange = { accessKey = it },
-                label = { Text(stringResource(R.string.screen_providers_access_key_input)) },
-                singleLine = true,
+            item(
+                headlineContent = {
+                    FormItem(label = { Text(stringResource(R.string.screen_providers_access_key_input)) }) {
+                        OutlinedTextField(
+                            value = accessKey,
+                            onValueChange = { accessKey = it },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                },
             )
-            OutlinedTextField(
-                value = region,
-                onValueChange = { region = it },
-                label = { Text(stringResource(R.string.screen_providers_region_input)) },
-                singleLine = true,
+            item(
+                headlineContent = {
+                    FormItem(label = { Text(stringResource(R.string.screen_providers_region_input)) }) {
+                        OutlinedTextField(
+                            value = region,
+                            onValueChange = { region = it },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                },
             )
         }
     }

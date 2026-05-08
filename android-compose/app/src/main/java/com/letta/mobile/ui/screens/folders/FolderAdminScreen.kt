@@ -43,7 +43,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Folder
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.ui.components.ActionSheet
+import com.letta.mobile.ui.components.ActionSheetItem
+import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
@@ -228,6 +232,8 @@ private fun FolderCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    var showContextMenu by remember { mutableStateOf(false) }
+
     Card(onClick = onInspect, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -242,13 +248,8 @@ private fun FolderCard(
                         Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
-                Row {
-                    IconButton(onClick = onEdit) {
-                        Icon(LettaIcons.Edit, contentDescription = stringResource(R.string.screen_folders_edit_title))
-                    }
-                    IconButton(onClick = onDelete) {
-                        Icon(LettaIcons.Delete, contentDescription = stringResource(R.string.action_delete))
-                    }
+                IconButton(onClick = { showContextMenu = true }) {
+                    Icon(LettaIcons.MoreVert, contentDescription = stringResource(R.string.action_more))
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -257,6 +258,30 @@ private fun FolderCard(
                 folder.createdAt?.let { AssistChip(onClick = {}, label = { Text(it.take(10)) }) }
             }
         }
+    }
+
+    ActionSheet(
+        show = showContextMenu,
+        onDismiss = { showContextMenu = false },
+        title = folder.name,
+    ) {
+        ActionSheetItem(
+            text = stringResource(R.string.screen_folders_edit_title),
+            icon = LettaIcons.Edit,
+            onClick = {
+                showContextMenu = false
+                onEdit()
+            },
+        )
+        ActionSheetItem(
+            text = stringResource(R.string.action_delete),
+            icon = LettaIcons.Delete,
+            onClick = {
+                showContextMenu = false
+                onDelete()
+            },
+            destructive = true,
+        )
     }
 }
 
@@ -277,36 +302,91 @@ private fun FolderDetailDialog(
         onConfirm = onDismiss,
         onDismiss = onDismiss,
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.screen_folders_id_label, folder.id), style = MaterialTheme.typography.bodySmall)
-            folder.description?.let { Text(stringResource(R.string.screen_folders_description_label, it), style = MaterialTheme.typography.bodySmall) }
-            folder.instructions?.let { Text(stringResource(R.string.screen_folders_instructions_label, it), style = MaterialTheme.typography.bodySmall) }
-            folder.organizationId?.let { Text(stringResource(R.string.screen_folders_organization_label, it), style = MaterialTheme.typography.bodySmall) }
-            folder.vectorDbProvider?.let { Text(stringResource(R.string.screen_folders_vector_provider_label, it), style = MaterialTheme.typography.bodySmall) }
-            folder.createdAt?.let { Text(stringResource(R.string.screen_folders_created_label, it), style = MaterialTheme.typography.bodySmall) }
-            folder.updatedAt?.let { Text(stringResource(R.string.screen_folders_updated_label, it), style = MaterialTheme.typography.bodySmall) }
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            CardGroup {
+                item(
+                    headlineContent = { Text(stringResource(R.string.screen_folders_id_label, "")) },
+                    supportingContent = { Text(folder.id, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace) },
+                )
+                folder.description?.let { description ->
+                    item(
+                        headlineContent = { Text(stringResource(R.string.common_description)) },
+                        supportingContent = { Text(description, style = MaterialTheme.typography.bodySmall) },
+                    )
+                }
+                folder.instructions?.let { instructions ->
+                    item(
+                        headlineContent = { Text(stringResource(R.string.screen_folders_instructions_label, "")) },
+                        supportingContent = { Text(instructions, style = MaterialTheme.typography.bodySmall) },
+                    )
+                }
+                folder.organizationId?.let { orgId ->
+                    item(
+                        headlineContent = { Text(stringResource(R.string.screen_folders_organization_label, "")) },
+                        supportingContent = { Text(orgId, style = MaterialTheme.typography.bodySmall) },
+                    )
+                }
+                folder.vectorDbProvider?.let { provider ->
+                    item(
+                        headlineContent = { Text(stringResource(R.string.screen_folders_vector_provider_label, "")) },
+                        supportingContent = { Text(provider, style = MaterialTheme.typography.bodySmall) },
+                    )
+                }
+                folder.createdAt?.let { created ->
+                    item(
+                        headlineContent = { Text(stringResource(R.string.screen_folders_created_label, "")) },
+                        supportingContent = { Text(created, style = MaterialTheme.typography.bodySmall) },
+                    )
+                }
+                folder.updatedAt?.let { updated ->
+                    item(
+                        headlineContent = { Text(stringResource(R.string.screen_folders_updated_label, "")) },
+                        supportingContent = { Text(updated, style = MaterialTheme.typography.bodySmall) },
+                    )
+                }
+            }
+
             if (attachedAgents.isNotEmpty()) {
-                Text(stringResource(R.string.screen_folders_agents_title), style = MaterialTheme.typography.labelLarge)
-                attachedAgents.forEach { agentId -> Text(agentId, style = MaterialTheme.typography.bodySmall) }
+                CardGroup(title = { Text(stringResource(R.string.screen_folders_agents_title)) }) {
+                    attachedAgents.forEach { agentId ->
+                        item(
+                            headlineContent = { Text(agentId, style = MaterialTheme.typography.bodySmall) },
+                        )
+                    }
+                }
             }
+
             if (files.isNotEmpty()) {
-                Text(stringResource(R.string.screen_folders_files_title), style = MaterialTheme.typography.labelLarge)
-                files.take(5).forEach { file ->
-                    Text(file.fileName ?: file.id, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                CardGroup(title = { Text(stringResource(R.string.screen_folders_files_title)) }) {
+                    files.take(5).forEach { file ->
+                        item(
+                            headlineContent = { Text(file.fileName ?: file.id, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                        )
+                    }
                 }
             }
+
             if (passages.isNotEmpty()) {
-                Text(stringResource(R.string.screen_folders_passages_title), style = MaterialTheme.typography.labelLarge)
-                passages.take(5).forEach { passage ->
-                    Text(passage.text, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                CardGroup(title = { Text(stringResource(R.string.screen_folders_passages_title)) }) {
+                    passages.take(5).forEach { passage ->
+                        item(
+                            headlineContent = { Text(passage.text, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                        )
+                    }
                 }
             }
+
             if (folder.metadata.isNotEmpty()) {
-                Text(stringResource(R.string.screen_archival_metadata_title), style = MaterialTheme.typography.labelLarge)
-                folder.metadata.entries.sortedBy { it.key }.forEach { (key, value) ->
-                    Text("$key: ${value.toString().trim('"')}", style = MaterialTheme.typography.bodySmall)
+                CardGroup(title = { Text(stringResource(R.string.screen_archival_metadata_title)) }) {
+                    folder.metadata.entries.sortedBy { it.key }.forEach { (key, value) ->
+                        item(
+                            headlineContent = { Text(key, style = MaterialTheme.typography.bodySmall) },
+                            supportingContent = { Text(value.toString().trim('"'), style = MaterialTheme.typography.bodySmall) },
+                        )
+                    }
                 }
             }
+
             TextButton(onClick = onEdit) {
                 Text(stringResource(R.string.screen_folders_edit_title))
             }
@@ -337,10 +417,43 @@ private fun FolderEditorDialog(
         confirmEnabled = name.isNotBlank(),
         onConfirm = { onConfirm(name.trim(), description.trim(), instructions.trim()) },
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.common_name)) }, singleLine = true)
-            OutlinedTextField(value = description, onValueChange = { description = it }, label = { Text(stringResource(R.string.common_description)) }, minLines = 2)
-            OutlinedTextField(value = instructions, onValueChange = { instructions = it }, label = { Text(stringResource(R.string.screen_folders_instructions_input)) }, minLines = 3)
+        CardGroup {
+            item(
+                headlineContent = {
+                    FormItem(label = { Text(stringResource(R.string.common_name)) }) {
+                        OutlinedTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                },
+            )
+            item(
+                headlineContent = {
+                    FormItem(label = { Text(stringResource(R.string.common_description)) }) {
+                        OutlinedTextField(
+                            value = description,
+                            onValueChange = { description = it },
+                            minLines = 2,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                },
+            )
+            item(
+                headlineContent = {
+                    FormItem(label = { Text(stringResource(R.string.screen_folders_instructions_input)) }) {
+                        OutlinedTextField(
+                            value = instructions,
+                            onValueChange = { instructions = it },
+                            minLines = 3,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                },
+            )
         }
     }
 }
