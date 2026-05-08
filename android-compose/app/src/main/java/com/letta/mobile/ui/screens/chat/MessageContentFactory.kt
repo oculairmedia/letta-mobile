@@ -440,7 +440,7 @@ object ToolCallRenderer : MessageContentRenderer {
                 }
             MessageToolCalls(
                 toolCalls = stableToolCalls,
-                animateEntrance = isStreaming,
+                animateEntrance = true,
             )
         }
     }
