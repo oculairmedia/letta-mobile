@@ -68,6 +68,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
@@ -193,6 +194,14 @@ fun EditAgentScreen(
                     onAttachTool = { viewModel.attachTool(it) },
                     onAttachTools = { viewModel.attachTools(it) },
                     onDetachTool = { viewModel.detachTool(it) },
+                    onAddAgentSecret = { viewModel.addAgentSecret() },
+                    onAgentSecretKeyChange = { index, value -> viewModel.updateAgentSecretKey(index, value) },
+                    onAgentSecretValueChange = { index, value -> viewModel.updateAgentSecretValue(index, value) },
+                    onRemoveAgentSecret = { viewModel.removeAgentSecret(it) },
+                    onAddToolEnvironmentVariable = { viewModel.addToolEnvironmentVariable() },
+                    onToolEnvironmentVariableKeyChange = { index, value -> viewModel.updateToolEnvironmentVariableKey(index, value) },
+                    onToolEnvironmentVariableValueChange = { index, value -> viewModel.updateToolEnvironmentVariableValue(index, value) },
+                    onRemoveToolEnvironmentVariable = { viewModel.removeToolEnvironmentVariable(it) },
                     onSystemPromptChange = { viewModel.updateSystemPrompt(it) },
                     onProviderTypeChange = { viewModel.updateProviderType(it) },
                     onTemperatureChange = { viewModel.updateTemperature(it) },
@@ -354,6 +363,14 @@ private fun EditAgentContent(
     onAttachTool: (String) -> Unit,
     onAttachTools: (List<String>) -> Unit,
     onDetachTool: (String) -> Unit,
+    onAddAgentSecret: () -> Unit,
+    onAgentSecretKeyChange: (Int, String) -> Unit,
+    onAgentSecretValueChange: (Int, String) -> Unit,
+    onRemoveAgentSecret: (Int) -> Unit,
+    onAddToolEnvironmentVariable: () -> Unit,
+    onToolEnvironmentVariableKeyChange: (Int, String) -> Unit,
+    onToolEnvironmentVariableValueChange: (Int, String) -> Unit,
+    onRemoveToolEnvironmentVariable: (Int) -> Unit,
     onSystemPromptChange: (String) -> Unit,
     onProviderTypeChange: (String) -> Unit,
     onTemperatureChange: (Float) -> Unit,
@@ -623,7 +640,21 @@ private fun EditAgentContent(
             )
         }
 
-        // ── Memory Blocks ──
+        item(key = "tool_environment") {
+            ToolEnvironmentSection(
+                state = state,
+                onAddAgentSecret = onAddAgentSecret,
+                onAgentSecretKeyChange = onAgentSecretKeyChange,
+                onAgentSecretValueChange = onAgentSecretValueChange,
+                onRemoveAgentSecret = onRemoveAgentSecret,
+                onAddToolEnvironmentVariable = onAddToolEnvironmentVariable,
+                onToolEnvironmentVariableKeyChange = onToolEnvironmentVariableKeyChange,
+                onToolEnvironmentVariableValueChange = onToolEnvironmentVariableValueChange,
+                onRemoveToolEnvironmentVariable = onRemoveToolEnvironmentVariable,
+            )
+        }
+
+        // Memory Blocks
         item(key = "memory_blocks") {
             CardGroup(title = { Text("${stringResource(R.string.screen_agent_memory_blocks_section)} (${state.blocks.size})") }) {
                 state.blocks.forEach { block ->
@@ -856,6 +887,141 @@ private fun EditAgentContent(
                 onCompactionModelChange(it)
                 showCompactionModelPicker = false
             },
+        )
+    }
+}
+
+@Composable
+private fun ToolEnvironmentSection(
+    state: EditAgentUiState,
+    onAddAgentSecret: () -> Unit,
+    onAgentSecretKeyChange: (Int, String) -> Unit,
+    onAgentSecretValueChange: (Int, String) -> Unit,
+    onRemoveAgentSecret: (Int) -> Unit,
+    onAddToolEnvironmentVariable: () -> Unit,
+    onToolEnvironmentVariableKeyChange: (Int, String) -> Unit,
+    onToolEnvironmentVariableValueChange: (Int, String) -> Unit,
+    onRemoveToolEnvironmentVariable: (Int) -> Unit,
+) {
+    CardGroup(title = { Text(stringResource(R.string.screen_agent_edit_tool_environment)) }) {
+        item(
+            headlineContent = { Text(stringResource(R.string.screen_agent_edit_secrets)) },
+            supportingContent = { Text(stringResource(R.string.screen_agent_edit_secrets_helper)) },
+        )
+        state.agentSecrets.forEachIndexed { index, variable ->
+            item(
+                headlineContent = {
+                    EnvironmentVariableEditorRow(
+                        variable = variable,
+                        valueLabel = stringResource(R.string.screen_agent_edit_secret_value),
+                        maskValue = true,
+                        onKeyChange = { onAgentSecretKeyChange(index, it) },
+                        onValueChange = { onAgentSecretValueChange(index, it) },
+                        onRemove = { onRemoveAgentSecret(index) },
+                    )
+                },
+            )
+        }
+        item(
+            onClick = onAddAgentSecret,
+            headlineContent = { Text(stringResource(R.string.screen_agent_edit_add_secret)) },
+            leadingContent = {
+                Icon(
+                    LettaIcons.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(LettaIconSizing.Toolbar),
+                )
+            },
+        )
+        item(
+            headlineContent = { Text(stringResource(R.string.screen_agent_edit_tool_environment_variables)) },
+            supportingContent = { Text(stringResource(R.string.screen_agent_edit_tool_environment_variables_helper)) },
+        )
+        state.toolEnvironmentVariables.forEachIndexed { index, variable ->
+            item(
+                headlineContent = {
+                    EnvironmentVariableEditorRow(
+                        variable = variable,
+                        valueLabel = stringResource(R.string.screen_agent_edit_environment_value),
+                        maskValue = false,
+                        onKeyChange = { onToolEnvironmentVariableKeyChange(index, it) },
+                        onValueChange = { onToolEnvironmentVariableValueChange(index, it) },
+                        onRemove = { onRemoveToolEnvironmentVariable(index) },
+                    )
+                },
+            )
+        }
+        item(
+            onClick = onAddToolEnvironmentVariable,
+            headlineContent = { Text(stringResource(R.string.screen_agent_edit_add_tool_environment_variable)) },
+            leadingContent = {
+                Icon(
+                    LettaIcons.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(LettaIconSizing.Toolbar),
+                )
+            },
+        )
+    }
+}
+
+@Composable
+private fun EnvironmentVariableEditorRow(
+    variable: EditableAgentEnvironmentVariable,
+    valueLabel: String,
+    maskValue: Boolean,
+    onKeyChange: (String) -> Unit,
+    onValueChange: (String) -> Unit,
+    onRemove: () -> Unit,
+) {
+    val hasHiddenStoredValue = variable.hasStoredValue && variable.originalValue == null && variable.value.isBlank()
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = variable.key.ifBlank { stringResource(R.string.screen_agent_edit_environment_variable) },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (hasHiddenStoredValue) {
+                AssistChip(
+                    onClick = {},
+                    label = { Text(stringResource(R.string.screen_agent_edit_value_stored)) },
+                    enabled = false,
+                )
+            }
+            IconButton(onClick = onRemove) {
+                Icon(
+                    LettaIcons.Close,
+                    contentDescription = stringResource(R.string.action_remove),
+                )
+            }
+        }
+        OutlinedTextField(
+            value = variable.key,
+            onValueChange = onKeyChange,
+            label = { Text(stringResource(R.string.screen_agent_edit_environment_key)) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = variable.value,
+            onValueChange = onValueChange,
+            label = { Text(valueLabel) },
+            placeholder = {
+                if (hasHiddenStoredValue) {
+                    Text(stringResource(R.string.screen_agent_edit_environment_value_hidden_placeholder))
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            visualTransformation = if (maskValue) PasswordVisualTransformation() else VisualTransformation.None,
         )
     }
 }

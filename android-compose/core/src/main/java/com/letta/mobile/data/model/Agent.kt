@@ -11,6 +11,7 @@ data class AgentEnvironmentVariable(
     val key: String,
     val value: String? = null,
     val description: String? = null,
+    @SerialName("value_enc") val valueEnc: String? = null,
 )
 
 @Serializable

@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentEnvironmentVariable
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.model.CompactionSettings
@@ -48,6 +49,15 @@ data class EditableBlock(
     val readOnly: Boolean = false,
 )
 
+@androidx.compose.runtime.Immutable
+data class EditableAgentEnvironmentVariable(
+    val key: String = "",
+    val value: String = "",
+    val originalKey: String? = null,
+    val originalValue: String? = null,
+    val hasStoredValue: Boolean = false,
+)
+
 data class EditAgentUiState(
     val agent: Agent? = null,
     val agentId: String = "",
@@ -60,6 +70,8 @@ data class EditAgentUiState(
     val tags: ImmutableList<String> = persistentListOf(),
     val attachedTools: ImmutableList<Tool> = persistentListOf(),
     val availableTools: ImmutableList<Tool> = persistentListOf(),
+    val agentSecrets: ImmutableList<EditableAgentEnvironmentVariable> = persistentListOf(),
+    val toolEnvironmentVariables: ImmutableList<EditableAgentEnvironmentVariable> = persistentListOf(),
     val providerType: String = "",
     val temperature: Float = 1.0f,
     val maxOutputTokens: Int = 4096,
@@ -217,6 +229,8 @@ class EditAgentViewModel @Inject constructor(
                         tags = agent.tags.toImmutableList(),
                         attachedTools = agent.tools.toImmutableList(),
                         availableTools = availableTools.toImmutableList(),
+                        agentSecrets = agent.secrets.toEditableEnvironmentVariables(),
+                        toolEnvironmentVariables = agent.toolExecEnvironmentVariables.toEditableEnvironmentVariables(),
                         providerType = normalizedProviderType,
                         temperature = agent.modelSettings?.temperature?.toFloat() ?: agent.llmConfig?.temperature?.toFloat() ?: 1.0f,
                         maxOutputTokens = agent.modelSettings?.maxOutputTokens ?: agent.llmConfig?.maxTokens ?: 4096,
@@ -427,6 +441,76 @@ class EditAgentViewModel @Inject constructor(
         }
     }
 
+    fun addAgentSecret() {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(
+            currentState.copy(agentSecrets = (currentState.agentSecrets + EditableAgentEnvironmentVariable()).toImmutableList())
+        )
+    }
+
+    fun updateAgentSecretKey(index: Int, value: String) {
+        updateAgentSecret(index) { it.copy(key = value) }
+    }
+
+    fun updateAgentSecretValue(index: Int, value: String) {
+        updateAgentSecret(index) { it.copy(value = value) }
+    }
+
+    fun removeAgentSecret(index: Int) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        if (index !in currentState.agentSecrets.indices) return
+        _uiState.value = UiState.Success(
+            currentState.copy(agentSecrets = currentState.agentSecrets.filterIndexed { i, _ -> i != index }.toImmutableList())
+        )
+    }
+
+    private fun updateAgentSecret(index: Int, transform: (EditableAgentEnvironmentVariable) -> EditableAgentEnvironmentVariable) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        if (index !in currentState.agentSecrets.indices) return
+        _uiState.value = UiState.Success(
+            currentState.copy(
+                agentSecrets = currentState.agentSecrets
+                    .mapIndexed { i, variable -> if (i == index) transform(variable) else variable }
+                    .toImmutableList()
+            )
+        )
+    }
+
+    fun addToolEnvironmentVariable() {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(
+            currentState.copy(toolEnvironmentVariables = (currentState.toolEnvironmentVariables + EditableAgentEnvironmentVariable()).toImmutableList())
+        )
+    }
+
+    fun updateToolEnvironmentVariableKey(index: Int, value: String) {
+        updateToolEnvironmentVariable(index) { it.copy(key = value) }
+    }
+
+    fun updateToolEnvironmentVariableValue(index: Int, value: String) {
+        updateToolEnvironmentVariable(index) { it.copy(value = value) }
+    }
+
+    fun removeToolEnvironmentVariable(index: Int) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        if (index !in currentState.toolEnvironmentVariables.indices) return
+        _uiState.value = UiState.Success(
+            currentState.copy(toolEnvironmentVariables = currentState.toolEnvironmentVariables.filterIndexed { i, _ -> i != index }.toImmutableList())
+        )
+    }
+
+    private fun updateToolEnvironmentVariable(index: Int, transform: (EditableAgentEnvironmentVariable) -> EditableAgentEnvironmentVariable) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        if (index !in currentState.toolEnvironmentVariables.indices) return
+        _uiState.value = UiState.Success(
+            currentState.copy(
+                toolEnvironmentVariables = currentState.toolEnvironmentVariables
+                    .mapIndexed { i, variable -> if (i == index) transform(variable) else variable }
+                    .toImmutableList()
+            )
+        )
+    }
+
     fun updateContextWindow(value: Int) {
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
@@ -628,6 +712,8 @@ class EditAgentViewModel @Inject constructor(
                             maxOutputTokens = state.maxOutputTokens,
                             parallelToolCalls = state.parallelToolCalls,
                         ),
+                        secrets = state.toAgentSecretsMap(),
+                        toolExecEnvironmentVariables = state.toToolEnvironmentVariablesMap(),
                         compactionSettings = state.toCompactionSettings(),
                     )
                 )
@@ -660,6 +746,22 @@ class EditAgentViewModel @Inject constructor(
         }
     }
 
+    private fun EditAgentUiState.toAgentSecretsMap(): Map<String, String>? {
+        return buildEnvironmentVariableMap(
+            label = "Secrets",
+            current = agentSecrets,
+            original = agent?.secrets.orEmpty(),
+        )
+    }
+
+    private fun EditAgentUiState.toToolEnvironmentVariablesMap(): Map<String, String>? {
+        return buildEnvironmentVariableMap(
+            label = "Tool environment variables",
+            current = toolEnvironmentVariables,
+            original = agent?.toolExecEnvironmentVariables.orEmpty(),
+        )
+    }
+
     private fun EditAgentUiState.toCompactionSettings(): CompactionSettings {
         return CompactionSettings(
             model = compactionModel.trim().ifBlank { null },
@@ -680,6 +782,62 @@ class EditAgentViewModel @Inject constructor(
             compactionSettingsJson.parseToJsonElement(trimmed).jsonObject
         } catch (e: Exception) {
             throw IllegalArgumentException("Compaction model settings must be a valid JSON object.", e)
+        }
+    }
+
+    private fun buildEnvironmentVariableMap(
+        label: String,
+        current: List<EditableAgentEnvironmentVariable>,
+        original: List<AgentEnvironmentVariable>,
+    ): Map<String, String>? {
+        if (!environmentVariablesChanged(current, original)) return null
+
+        val normalized = current.map { variable ->
+            variable.copy(key = variable.key.trim())
+        }
+        val blankKey = normalized.firstOrNull { it.key.isBlank() }
+        if (blankKey != null) {
+            throw IllegalArgumentException("$label cannot contain blank keys.")
+        }
+
+        val duplicateKey = normalized
+            .groupBy { it.key }
+            .entries
+            .firstOrNull { it.value.size > 1 }
+            ?.key
+        if (duplicateKey != null) {
+            throw IllegalArgumentException("$label contains a duplicate key: $duplicateKey.")
+        }
+
+        val hiddenValue = normalized.firstOrNull {
+            it.value.isBlank() && it.hasStoredValue && it.originalValue == null
+        }
+        if (hiddenValue != null) {
+            throw IllegalArgumentException(
+                "$label includes hidden existing values. Re-enter those values before changing this section so they are not overwritten."
+            )
+        }
+
+        val blankValue = normalized.firstOrNull { it.value.isBlank() }
+        if (blankValue != null) {
+            throw IllegalArgumentException("$label values cannot be blank. Remove the row instead.")
+        }
+
+        return normalized.associate { it.key to it.value }
+    }
+
+    private fun environmentVariablesChanged(
+        current: List<EditableAgentEnvironmentVariable>,
+        original: List<AgentEnvironmentVariable>,
+    ): Boolean {
+        val originalKeys = original.map { it.key }
+        val retainedOriginalKeys = current.mapNotNull { it.originalKey }
+        if (originalKeys.any { it !in retainedOriginalKeys }) return true
+
+        return current.any { variable ->
+            variable.originalKey == null ||
+                variable.key.trim() != variable.originalKey ||
+                variable.value != variable.originalValue.orEmpty()
         }
     }
 
@@ -741,4 +899,16 @@ class EditAgentViewModel @Inject constructor(
             }
         }
     }
+}
+
+private fun List<AgentEnvironmentVariable>.toEditableEnvironmentVariables(): ImmutableList<EditableAgentEnvironmentVariable> {
+    return map { variable ->
+        EditableAgentEnvironmentVariable(
+            key = variable.key,
+            value = variable.value.orEmpty(),
+            originalKey = variable.key,
+            originalValue = variable.value,
+            hasStoredValue = variable.value != null || variable.valueEnc != null || variable.id != null,
+        )
+    }.toImmutableList()
 }

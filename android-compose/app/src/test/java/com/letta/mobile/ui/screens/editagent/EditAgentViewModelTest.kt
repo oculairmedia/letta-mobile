@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
+import com.letta.mobile.data.model.AgentEnvironmentVariable
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockCreateParams
@@ -45,6 +46,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -354,6 +356,123 @@ class EditAgentViewModelTest {
     }
 
     @Test
+    fun `loadAgent includes secrets and tool environment variables`() = runTest {
+        fakeAgentRepo.loadedSecrets = listOf(
+            AgentEnvironmentVariable(key = "VISIBLE_SECRET", value = "visible-value"),
+            AgentEnvironmentVariable(id = "secret-2", key = "HIDDEN_SECRET", valueEnc = "encrypted"),
+        )
+        fakeAgentRepo.loadedToolEnvironmentVariables = listOf(
+            AgentEnvironmentVariable(key = "TOOL_HOME", value = "/tools"),
+        )
+
+        viewModel.loadAgent()
+
+        viewModel.uiState.test {
+            val state = awaitItem() as UiState.Success
+            assertEquals("VISIBLE_SECRET", state.data.agentSecrets[0].key)
+            assertEquals("visible-value", state.data.agentSecrets[0].value)
+            assertTrue(state.data.agentSecrets[0].hasStoredValue)
+            assertEquals("HIDDEN_SECRET", state.data.agentSecrets[1].key)
+            assertEquals("", state.data.agentSecrets[1].value)
+            assertTrue(state.data.agentSecrets[1].hasStoredValue)
+            assertEquals("TOOL_HOME", state.data.toolEnvironmentVariables[0].key)
+            assertEquals("/tools", state.data.toolEnvironmentVariables[0].value)
+        }
+    }
+
+    @Test
+    fun `saveAgent persists edited secrets and tool environment variables`() = runTest {
+        fakeAgentRepo.loadedSecrets = listOf(
+            AgentEnvironmentVariable(key = "EXISTING_SECRET", value = "old-secret"),
+        )
+        fakeAgentRepo.loadedToolEnvironmentVariables = listOf(
+            AgentEnvironmentVariable(key = "TOOL_HOME", value = "/tools"),
+        )
+
+        viewModel.loadAgent()
+        viewModel.updateAgentSecretValue(0, "new-secret")
+        viewModel.addAgentSecret()
+        viewModel.updateAgentSecretKey(1, "NEW_SECRET")
+        viewModel.updateAgentSecretValue(1, "created-secret")
+        viewModel.updateToolEnvironmentVariableValue(0, "/usr/local/tools")
+        viewModel.addToolEnvironmentVariable()
+        viewModel.updateToolEnvironmentVariableKey(1, "DEBUG_TOOLS")
+        viewModel.updateToolEnvironmentVariableValue(1, "true")
+
+        viewModel.saveAgent {}
+
+        assertEquals(
+            mapOf(
+                "EXISTING_SECRET" to "new-secret",
+                "NEW_SECRET" to "created-secret",
+            ),
+            fakeAgentRepo.lastUpdateParams?.secrets,
+        )
+        assertEquals(
+            mapOf(
+                "TOOL_HOME" to "/usr/local/tools",
+                "DEBUG_TOOLS" to "true",
+            ),
+            fakeAgentRepo.lastUpdateParams?.toolExecEnvironmentVariables,
+        )
+    }
+
+    @Test
+    fun `saveAgent omits unchanged hidden secrets and tool environment variables`() = runTest {
+        fakeAgentRepo.loadedSecrets = listOf(
+            AgentEnvironmentVariable(id = "secret-1", key = "HIDDEN_SECRET", valueEnc = "encrypted"),
+        )
+        fakeAgentRepo.loadedToolEnvironmentVariables = listOf(
+            AgentEnvironmentVariable(id = "tool-env-1", key = "HIDDEN_TOOL_ENV", valueEnc = "encrypted"),
+        )
+
+        viewModel.loadAgent()
+        viewModel.saveAgent {}
+
+        assertNull(fakeAgentRepo.lastUpdateParams?.secrets)
+        assertNull(fakeAgentRepo.lastUpdateParams?.toolExecEnvironmentVariables)
+    }
+
+    @Test
+    fun `saveAgent rejects section changes that would overwrite hidden secrets`() = runTest {
+        fakeAgentRepo.loadedSecrets = listOf(
+            AgentEnvironmentVariable(id = "secret-1", key = "HIDDEN_SECRET", valueEnc = "encrypted"),
+        )
+
+        viewModel.loadAgent()
+        viewModel.addAgentSecret()
+        viewModel.updateAgentSecretKey(1, "NEW_SECRET")
+        viewModel.updateAgentSecretValue(1, "created-secret")
+
+        viewModel.saveAgent {}
+
+        viewModel.uiState.test {
+            val state = awaitItem() as UiState.Error
+            assertTrue(state.message.contains("hidden existing values"))
+        }
+        assertNull(fakeAgentRepo.lastUpdateParams)
+    }
+
+    @Test
+    fun `saveAgent rejects duplicate secret keys`() = runTest {
+        viewModel.loadAgent()
+        viewModel.addAgentSecret()
+        viewModel.updateAgentSecretKey(0, "DUPLICATE_KEY")
+        viewModel.updateAgentSecretValue(0, "first")
+        viewModel.addAgentSecret()
+        viewModel.updateAgentSecretKey(1, "DUPLICATE_KEY")
+        viewModel.updateAgentSecretValue(1, "second")
+
+        viewModel.saveAgent {}
+
+        viewModel.uiState.test {
+            val state = awaitItem() as UiState.Error
+            assertTrue(state.message.contains("duplicate key"))
+        }
+        assertNull(fakeAgentRepo.lastUpdateParams)
+    }
+
+    @Test
     fun `saveAgent persists client mode settings`() = runTest {
         viewModel.loadAgent()
         viewModel.updateClientModeEnabled(true)
@@ -449,6 +568,8 @@ class EditAgentViewModelTest {
         var loadedModel: String = "letta/letta-free"
         var loadedProviderType: String? = "openai"
         var loadedCompactionSettings: CompactionSettings? = null
+        var loadedSecrets: List<AgentEnvironmentVariable> = emptyList()
+        var loadedToolEnvironmentVariables: List<AgentEnvironmentVariable> = emptyList()
 
         override fun getAgent(id: String): Flow<Agent> = flow {
             if (shouldFail) throw Exception("Load failed")
@@ -463,6 +584,8 @@ class EditAgentViewModelTest {
                 agentType = "stateful",
                 enableSleeptime = true,
                 compactionSettings = loadedCompactionSettings,
+                secrets = loadedSecrets,
+                toolExecEnvironmentVariables = loadedToolEnvironmentVariables,
                 tools = listOf(TestData.tool(id = "t1", name = "attached_tool")),
                 modelSettings = com.letta.mobile.data.model.ModelSettings(
                     providerType = loadedProviderType,
@@ -491,6 +614,12 @@ class EditAgentViewModelTest {
                 tags = params.tags ?: emptyList(),
                 enableSleeptime = params.enableSleeptime,
                 compactionSettings = params.compactionSettings,
+                secrets = params.secrets?.map { (key, value) ->
+                    AgentEnvironmentVariable(key = key, value = value)
+                }.orEmpty(),
+                toolExecEnvironmentVariables = params.toolExecEnvironmentVariables?.map { (key, value) ->
+                    AgentEnvironmentVariable(key = key, value = value)
+                }.orEmpty(),
                 agentType = "stateful",
                 modelSettings = params.modelSettings,
             )
