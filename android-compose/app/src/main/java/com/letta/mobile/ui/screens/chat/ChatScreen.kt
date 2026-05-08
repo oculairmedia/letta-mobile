@@ -1,17 +1,6 @@
 package com.letta.mobile.ui.screens.chat
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,11 +36,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -67,9 +51,7 @@ import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.isExpandedWidth
-import kotlin.math.PI
 import kotlin.math.max
-import kotlin.math.sin
 
 @Composable
 fun ChatScreen(
@@ -201,10 +183,6 @@ fun ChatScreen(
                     onPicked = { viewModel.addAttachment(it) },
                     onError = { viewModel.reportComposerError(it) },
                 )
-                PromptThinkingLine(
-                    visible = state.isStreaming,
-                    modifier = Modifier.fillMaxWidth(),
-                )
                 ChatComposer(
                     inputText = composerState.inputText,
                     pendingAttachments = composerState.pendingAttachments,
@@ -248,65 +226,6 @@ fun ChatScreen(
 
 internal fun shouldShowStarterPromptsForNoConversation(state: ChatUiState): Boolean =
     state.messages.isEmpty() && !state.isStreaming
-
-@Composable
-private fun PromptThinkingLine(
-    visible: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(animationSpec = tween(durationMillis = 220)) + expandVertically(),
-        exit = fadeOut(animationSpec = tween(durationMillis = 180)) + shrinkVertically(),
-        modifier = modifier,
-    ) {
-        val colorScheme = MaterialTheme.colorScheme
-        val transition = rememberInfiniteTransition(label = "prompt-thinking-line")
-        val phase by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 3600, easing = LinearEasing),
-            ),
-            label = "prompt-thinking-line-phase",
-        )
-        val color = when {
-            phase < 1f / 3f -> lerp(colorScheme.primary, colorScheme.secondary, phase * 3f)
-            phase < 2f / 3f -> lerp(colorScheme.secondary, colorScheme.tertiary, (phase - 1f / 3f) * 3f)
-            else -> lerp(colorScheme.tertiary, colorScheme.primary, (phase - 2f / 3f) * 3f)
-        }
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(10.dp)
-                .padding(horizontal = 18.dp),
-        ) {
-            val path = Path()
-            val centerY = size.height / 2f
-            val morph = (sin((phase * 2f * PI).toFloat()) + 1f) / 2f
-            val amplitude = size.height * (0.22f + 0.18f * morph)
-            val wavelength = size.width / (2.2f + morph * 0.7f)
-            val phasePx = phase * wavelength
-            var x = 0f
-            path.moveTo(0f, centerY)
-            while (x <= size.width) {
-                val y = centerY + sin(((x + phasePx) / wavelength) * 2f * PI.toFloat()) * amplitude
-                path.lineTo(x, y)
-                x += 4.dp.toPx()
-            }
-            drawPath(
-                path = path,
-                color = color,
-                style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round),
-            )
-            drawCircle(
-                color = color.copy(alpha = 0.28f),
-                radius = 3.dp.toPx(),
-                center = Offset((phase * size.width), centerY),
-            )
-        }
-    }
-}
 
 @Composable
 internal fun NoConversationChatContent(
