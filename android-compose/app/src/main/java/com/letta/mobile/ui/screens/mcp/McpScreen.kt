@@ -64,7 +64,11 @@ import com.letta.mobile.data.model.effectiveEnv
 import com.letta.mobile.data.model.effectiveServerType
 import com.letta.mobile.data.model.effectiveServerUrl
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.ui.components.ActionSheet
+import com.letta.mobile.ui.components.ActionSheetItem
+import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
@@ -430,6 +434,7 @@ private fun ServerCard(
 ) {
     var expanded by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showContextMenu by remember { mutableStateOf(false) }
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -632,16 +637,8 @@ private fun ServerCard(
                     }
                 }
 
-                Row {
-                    IconButton(onClick = onCheck) {
-                        Icon(LettaIcons.Refresh, stringResource(R.string.screen_mcp_server_resync_action))
-                    }
-                    IconButton(onClick = onEdit) {
-                        Icon(LettaIcons.Edit, stringResource(R.string.action_edit))
-                    }
-                    IconButton(onClick = { showDeleteDialog = true }) {
-                        Icon(LettaIcons.Delete, stringResource(R.string.action_delete))
-                    }
+                IconButton(onClick = { showContextMenu = true }) {
+                    Icon(LettaIcons.MoreVert, contentDescription = stringResource(R.string.action_more))
                 }
             }
 
@@ -676,6 +673,38 @@ private fun ServerCard(
                 }
             }
         }
+    }
+
+    ActionSheet(
+        show = showContextMenu,
+        onDismiss = { showContextMenu = false },
+        title = server.serverName,
+    ) {
+        ActionSheetItem(
+            text = stringResource(R.string.screen_mcp_server_resync_action),
+            icon = LettaIcons.Refresh,
+            onClick = {
+                showContextMenu = false
+                onCheck()
+            },
+        )
+        ActionSheetItem(
+            text = stringResource(R.string.action_edit),
+            icon = LettaIcons.Edit,
+            onClick = {
+                showContextMenu = false
+                onEdit()
+            },
+        )
+        ActionSheetItem(
+            text = stringResource(R.string.action_delete),
+            icon = LettaIcons.Delete,
+            onClick = {
+                showContextMenu = false
+                showDeleteDialog = true
+            },
+            destructive = true,
+        )
     }
 
     ConfirmDialog(
@@ -746,114 +775,158 @@ private fun ServerFormDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            OutlinedTextField(
-                value = formState.serverName,
-                onValueChange = { formState = formState.copy(serverName = it) },
-                label = { Text(stringResource(R.string.screen_mcp_server_name_label)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = stringResource(R.string.screen_mcp_transport_type),
-                style = MaterialTheme.typography.labelLarge,
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = formState.transportType == MCP_TYPE_STREAMABLE_HTTP,
-                    onClick = { formState = formState.copy(transportType = MCP_TYPE_STREAMABLE_HTTP) },
-                    label = { Text(stringResource(R.string.screen_mcp_transport_streamable_http)) },
+            CardGroup {
+                item(
+                    headlineContent = {
+                        FormItem(label = { Text(stringResource(R.string.screen_mcp_server_name_label)) }) {
+                            OutlinedTextField(
+                                value = formState.serverName,
+                                onValueChange = { formState = formState.copy(serverName = it) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    },
                 )
-                FilterChip(
-                    selected = formState.transportType == MCP_TYPE_SSE,
-                    onClick = { formState = formState.copy(transportType = MCP_TYPE_SSE) },
-                    label = { Text(stringResource(R.string.screen_mcp_transport_sse)) },
-                )
-                FilterChip(
-                    selected = formState.transportType == MCP_TYPE_STDIO,
-                    onClick = { formState = formState.copy(transportType = MCP_TYPE_STDIO) },
-                    label = { Text(stringResource(R.string.screen_mcp_transport_stdio)) },
+                item(
+                    headlineContent = {
+                        FormItem(label = { Text(stringResource(R.string.screen_mcp_transport_type)) }) {
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterChip(
+                                    selected = formState.transportType == MCP_TYPE_STREAMABLE_HTTP,
+                                    onClick = { formState = formState.copy(transportType = MCP_TYPE_STREAMABLE_HTTP) },
+                                    label = { Text(stringResource(R.string.screen_mcp_transport_streamable_http)) },
+                                )
+                                FilterChip(
+                                    selected = formState.transportType == MCP_TYPE_SSE,
+                                    onClick = { formState = formState.copy(transportType = MCP_TYPE_SSE) },
+                                    label = { Text(stringResource(R.string.screen_mcp_transport_sse)) },
+                                )
+                                FilterChip(
+                                    selected = formState.transportType == MCP_TYPE_STDIO,
+                                    onClick = { formState = formState.copy(transportType = MCP_TYPE_STDIO) },
+                                    label = { Text(stringResource(R.string.screen_mcp_transport_stdio)) },
+                                )
+                            }
+                        }
+                    },
                 )
             }
-
-            Spacer(modifier = Modifier.height(12.dp))
 
             if (formState.transportType == MCP_TYPE_STDIO) {
-                OutlinedTextField(
-                    value = formState.command,
-                    onValueChange = { formState = formState.copy(command = it) },
-                    label = { Text(stringResource(R.string.screen_mcp_command_label)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = formState.argsText,
-                    onValueChange = { formState = formState.copy(argsText = it) },
-                    label = { Text(stringResource(R.string.screen_mcp_args_label)) },
-                    placeholder = { Text(stringResource(R.string.screen_mcp_args_placeholder)) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = formState.envText,
-                    onValueChange = { formState = formState.copy(envText = it) },
-                    label = { Text(stringResource(R.string.screen_mcp_env_label)) },
-                    placeholder = { Text(stringResource(R.string.screen_mcp_key_value_placeholder)) },
-                    minLines = 3,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                CardGroup {
+                    item(
+                        headlineContent = {
+                            FormItem(label = { Text(stringResource(R.string.screen_mcp_command_label)) }) {
+                                OutlinedTextField(
+                                    value = formState.command,
+                                    onValueChange = { formState = formState.copy(command = it) },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        },
+                    )
+                    item(
+                        headlineContent = {
+                            FormItem(label = { Text(stringResource(R.string.screen_mcp_args_label)) }) {
+                                OutlinedTextField(
+                                    value = formState.argsText,
+                                    onValueChange = { formState = formState.copy(argsText = it) },
+                                    placeholder = { Text(stringResource(R.string.screen_mcp_args_placeholder)) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        },
+                    )
+                    item(
+                        headlineContent = {
+                            FormItem(label = { Text(stringResource(R.string.screen_mcp_env_label)) }) {
+                                OutlinedTextField(
+                                    value = formState.envText,
+                                    onValueChange = { formState = formState.copy(envText = it) },
+                                    placeholder = { Text(stringResource(R.string.screen_mcp_key_value_placeholder)) },
+                                    minLines = 3,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        },
+                    )
+                }
             } else {
-                OutlinedTextField(
-                    value = formState.serverUrl,
-                    onValueChange = { formState = formState.copy(serverUrl = it) },
-                    label = { Text(stringResource(R.string.common_server_url)) },
-                    placeholder = { Text(stringResource(R.string.screen_mcp_url_placeholder)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = formState.authHeader,
-                    onValueChange = { formState = formState.copy(authHeader = it) },
-                    label = { Text(stringResource(R.string.screen_mcp_auth_header_label)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = formState.authToken,
-                    onValueChange = { formState = formState.copy(authToken = it) },
-                    label = { Text(stringResource(R.string.screen_mcp_auth_token_label)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = formState.customHeadersText,
-                    onValueChange = { formState = formState.copy(customHeadersText = it) },
-                    label = { Text(stringResource(R.string.screen_mcp_custom_headers_label)) },
-                    placeholder = { Text(stringResource(R.string.screen_mcp_key_value_placeholder)) },
-                    minLines = 3,
-                    modifier = Modifier.fillMaxWidth(),
+                CardGroup {
+                    item(
+                        headlineContent = {
+                            FormItem(label = { Text(stringResource(R.string.common_server_url)) }) {
+                                OutlinedTextField(
+                                    value = formState.serverUrl,
+                                    onValueChange = { formState = formState.copy(serverUrl = it) },
+                                    placeholder = { Text(stringResource(R.string.screen_mcp_url_placeholder)) },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        },
+                    )
+                    item(
+                        headlineContent = {
+                            FormItem(label = { Text(stringResource(R.string.screen_mcp_auth_header_label)) }) {
+                                OutlinedTextField(
+                                    value = formState.authHeader,
+                                    onValueChange = { formState = formState.copy(authHeader = it) },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        },
+                    )
+                    item(
+                        headlineContent = {
+                            FormItem(label = { Text(stringResource(R.string.screen_mcp_auth_token_label)) }) {
+                                OutlinedTextField(
+                                    value = formState.authToken,
+                                    onValueChange = { formState = formState.copy(authToken = it) },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        },
+                    )
+                    item(
+                        headlineContent = {
+                            FormItem(label = { Text(stringResource(R.string.screen_mcp_custom_headers_label)) }) {
+                                OutlinedTextField(
+                                    value = formState.customHeadersText,
+                                    onValueChange = { formState = formState.copy(customHeadersText = it) },
+                                    placeholder = { Text(stringResource(R.string.screen_mcp_key_value_placeholder)) },
+                                    minLines = 3,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        },
+                    )
+                }
+            }
+
+            CardGroup {
+                item(
+                    headlineContent = {
+                        FormItem(label = { Text(stringResource(R.string.screen_mcp_raw_config_label)) }) {
+                            OutlinedTextField(
+                                value = formState.rawConfigText,
+                                onValueChange = { formState = formState.copy(rawConfigText = it) },
+                                placeholder = { Text(stringResource(R.string.screen_mcp_raw_config_placeholder)) },
+                                minLines = 4,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    },
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(
-                value = formState.rawConfigText,
-                onValueChange = { formState = formState.copy(rawConfigText = it) },
-                label = { Text(stringResource(R.string.screen_mcp_raw_config_label)) },
-                placeholder = { Text(stringResource(R.string.screen_mcp_raw_config_placeholder)) },
-                minLines = 4,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
             validationMessage?.let { message ->
-                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = message,
                     style = MaterialTheme.typography.bodySmall,

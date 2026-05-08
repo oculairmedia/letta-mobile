@@ -51,13 +51,16 @@ import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.effectiveServerType
 import com.letta.mobile.data.model.effectiveServerUrl
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
+import com.letta.mobile.ui.theme.listItemSupporting
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -276,22 +279,33 @@ private fun ToolRunDialog(
         onDismiss = onDismiss,
         onConfirm = { onRun(rawArgs) },
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            tool.description?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+        CardGroup {
+            tool.description?.let { desc ->
+                item(
+                    headlineContent = {
+                        Text(
+                            text = desc,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
                 )
             }
-            OutlinedTextField(
-                value = rawArgs,
-                onValueChange = { rawArgs = it },
-                label = { Text(stringResource(R.string.screen_mcp_tool_run_args_label)) },
-                supportingText = { Text(stringResource(R.string.screen_mcp_tool_run_args_helper)) },
-                minLines = 6,
-                modifier = Modifier.fillMaxWidth(),
-                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+            item(
+                headlineContent = {
+                    FormItem(
+                        label = { Text(stringResource(R.string.screen_mcp_tool_run_args_label)) },
+                        description = { Text(stringResource(R.string.screen_mcp_tool_run_args_helper)) },
+                    ) {
+                        OutlinedTextField(
+                            value = rawArgs,
+                            onValueChange = { rawArgs = it },
+                            minLines = 6,
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                        )
+                    }
+                },
             )
         }
     }
@@ -310,39 +324,56 @@ private fun ToolExecutionResultDialog(
         onConfirm = onDismiss,
         onDismiss = onDismiss,
     ) {
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item {
-                Text(
-                    text = stringResource(R.string.screen_mcp_tool_execution_status, result.status),
-                    style = MaterialTheme.typography.labelLarge,
-                )
+                CardGroup {
+                    item(
+                        headlineContent = { Text(stringResource(R.string.screen_mcp_tool_execution_status, "")) },
+                        supportingContent = { Text(result.status, style = MaterialTheme.typography.listItemSupporting) },
+                    )
+                }
             }
             result.funcReturn?.let {
                 item {
-                    Text(stringResource(R.string.screen_mcp_tool_execution_result_label), style = MaterialTheme.typography.labelMedium)
-                    Text(
-                        text = it.toString(),
-                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                    )
+                    CardGroup(title = { Text(stringResource(R.string.screen_mcp_tool_execution_result_label)) }) {
+                        item(
+                            headlineContent = {
+                                Text(
+                                    text = it.toString(),
+                                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                )
+                            },
+                        )
+                    }
                 }
             }
             result.stdout?.takeIf { it.isNotEmpty() }?.let { stdout ->
                 item {
-                    Text(stringResource(R.string.screen_mcp_tool_execution_stdout_label), style = MaterialTheme.typography.labelMedium)
-                    Text(
-                        text = stdout.joinToString("\n"),
-                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                    )
+                    CardGroup(title = { Text(stringResource(R.string.screen_mcp_tool_execution_stdout_label)) }) {
+                        item(
+                            headlineContent = {
+                                Text(
+                                    text = stdout.joinToString("\n"),
+                                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                )
+                            },
+                        )
+                    }
                 }
             }
             result.stderr?.takeIf { it.isNotEmpty() }?.let { stderr ->
                 item {
-                    Text(stringResource(R.string.screen_mcp_tool_execution_stderr_label), style = MaterialTheme.typography.labelMedium)
-                    Text(
-                        text = stderr.joinToString("\n"),
-                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                        color = MaterialTheme.colorScheme.error,
-                    )
+                    CardGroup(title = { Text(stringResource(R.string.screen_mcp_tool_execution_stderr_label)) }) {
+                        item(
+                            headlineContent = {
+                                Text(
+                                    text = stderr.joinToString("\n"),
+                                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            },
+                        )
+                    }
                 }
             }
             result.sandboxConfigFingerprint?.let {
