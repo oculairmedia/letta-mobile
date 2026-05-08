@@ -429,6 +429,15 @@ class AdminChatViewModel @Inject constructor(
     val chatFontScale: StateFlow<Float> = settingsRepository.getChatFontScale()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1f)
 
+    val availableAgents: StateFlow<List<Agent>> = agentRepository.agents
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun refreshAvailableAgents() {
+        viewModelScope.launch {
+            runCatching { agentRepository.refreshAgentsIfStale(maxAgeMs = 60_000) }
+        }
+    }
+
     fun setChatBackground(background: ChatBackground) {
         viewModelScope.launch {
             settingsRepository.setChatBackgroundKey(background.key)

@@ -83,11 +83,13 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.letta.mobile.R
+import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.util.formatRelativeTime
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.ConnectionState
+import com.letta.mobile.ui.components.ExpandableTitleSearch
 import com.letta.mobile.ui.components.ConnectionStatusBanner
 import com.letta.mobile.ui.components.MarkdownText
 import com.letta.mobile.ui.components.Accordions
@@ -130,17 +132,19 @@ fun AgentScaffold(
     onNavigateToArchival: ((String) -> Unit)? = null,
     onNavigateToTools: (() -> Unit)? = null,
     onSwitchConversation: ((String, String?) -> Unit)? = null,
+    conversationRepository: ConversationRepository? = null,
     viewModel: AdminChatViewModel = hiltViewModel()
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var showConversationPicker by remember { mutableStateOf(false) }
     var showBugReportSheet by remember { mutableStateOf(false) }
+    var showAgentSwitcher by remember { mutableStateOf(false) }
     val chatBackground by viewModel.chatBackground.collectAsStateWithLifecycle()
+    val availableAgents by viewModel.availableAgents.collectAsStateWithLifecycle()
     var chatMode by rememberSaveable { mutableStateOf("interactive") }
-    val drawerConversationViewModel: ConversationPickerViewModel = hiltViewModel()
-    val drawerConversationRepo = drawerConversationViewModel.conversationRepository
+    val drawerConversationRepo = conversationRepository
+        ?: hiltViewModel<ConversationPickerViewModel>().conversationRepository
     val drawerConversations by drawerConversationRepo.getConversations(viewModel.agentId)
         .collectAsStateWithLifecycle(emptyList())
 
@@ -149,6 +153,13 @@ fun AgentScaffold(
     val conversationId = viewModel.conversationId
     val projectContext = viewModel.projectContext
     val screenTitle = projectContext?.name ?: agentName.ifBlank { stringResource(R.string.screen_chat_title) }
+    val switchableAgents = remember(availableAgents, agentId, agentName) {
+        if (availableAgents.any { it.id == agentId }) {
+            availableAgents
+        } else {
+            listOf(Agent(id = agentId, name = agentName.ifBlank { "Agent" })) + availableAgents
+        }
+    }
     // Compact top bar — was LargeFlexibleTopAppBar (~152dp expanded), now a
     // standard TopAppBar at ~64dp. The chat surface is content-dense and
     // doesn't benefit from a big collapsing hero header; the agent name fits
@@ -161,6 +172,7 @@ fun AgentScaffold(
 
     LaunchedEffect(agentId) {
         drawerConversationRepo.refreshConversations(agentId)
+        viewModel.refreshAvailableAgents()
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -230,27 +242,67 @@ fun AgentScaffold(
             topBar = {
                 TopAppBar(
                     title = {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag(AgentScaffoldTestTags.CONVERSATION_PICKER_TRIGGER)
-                                .clickable { showConversationPicker = true }
-                                .padding(end = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        ) {
-                            Text(
-                                text = screenTitle,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false),
-                            )
-                            Icon(
-                                LettaIcons.ArrowDropDown,
-                                contentDescription = "Switch conversation",
-                                modifier = Modifier.size(LettaIconSizing.Inline),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                        Box {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag(AgentScaffoldTestTags.CONVERSATION_PICKER_TRIGGER)
+                                    .clickable { showAgentSwitcher = true }
+                                    .padding(end = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Text(
+                                    text = agentName.ifBlank { screenTitle },
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false),
+                                )
+                                Icon(
+                                    LettaIcons.ArrowDropDown,
+                                    contentDescription = "Switch agent",
+                                    modifier = Modifier.size(LettaIconSizing.Inline),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showAgentSwitcher,
+                                onDismissRequest = { showAgentSwitcher = false },
+                            ) {
+                                switchableAgents.forEach { agent ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Column {
+                                                Text(
+                                                    text = agent.name.ifBlank { "Agent" },
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                                Text(
+                                                    text = agent.id.take(12),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                            }
+                                        },
+                                        leadingIcon = {
+                                            if (agent.id == agentId) {
+                                                Icon(LettaIcons.Check, contentDescription = null)
+                                            } else {
+                                                Spacer(modifier = Modifier.size(LettaIconSizing.Toolbar))
+                                            }
+                                        },
+                                        onClick = {
+                                            showAgentSwitcher = false
+                                            if (agent.id != agentId) {
+                                                onSwitchConversation?.invoke(agent.id, null)
+                                            }
+                                        },
+                                    )
+                                }
+                            }
                         }
                     },
                     colors = LettaTopBarDefaults.topAppBarColors(),
@@ -314,22 +366,6 @@ fun AgentScaffold(
                 )
             }
         }
-    }
-
-    if (showConversationPicker) {
-        ConversationPickerSheet(
-            agentId = agentId,
-            currentConversationId = conversationId,
-            onDismiss = { showConversationPicker = false },
-            onConversationSelected = { action ->
-                showConversationPicker = false
-                onSwitchConversation?.invoke(agentId, action.conversationId)
-            },
-            onNewConversation = { action ->
-                showConversationPicker = false
-                onSwitchConversation?.invoke(agentId, action.conversationId)
-            },
-        )
     }
 
     if (showBugReportSheet && projectContext != null) {
@@ -1406,6 +1442,19 @@ internal fun DrawerContent(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var conversationSearchExpanded by rememberSaveable { mutableStateOf(false) }
+    var conversationSearchQuery by rememberSaveable(agentId) { mutableStateOf("") }
+    val filteredConversations = remember(conversations, conversationSearchQuery) {
+        if (conversationSearchQuery.isBlank()) {
+            conversations
+        } else {
+            val query = conversationSearchQuery.trim()
+            conversations.filter { conversation ->
+                conversation.summary?.contains(query, ignoreCase = true) == true ||
+                    conversation.id.contains(query, ignoreCase = true)
+            }
+        }
+    }
     Column(
         modifier = modifier
             .fillMaxHeight()
@@ -1433,6 +1482,14 @@ internal fun DrawerContent(
             text = "$messageCount messages",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+        NavigationDrawerItem(
+            icon = { Icon(LettaIcons.Edit, contentDescription = "Edit") },
+            label = { Text(stringResource(R.string.screen_drawer_edit_agent)) },
+            selected = false,
+            onClick = onEditAgent,
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -1483,11 +1540,24 @@ internal fun DrawerContent(
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-        Text(
-            text = stringResource(R.string.common_conversations),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+        ExpandableTitleSearch(
+            query = conversationSearchQuery,
+            onQueryChange = { conversationSearchQuery = it },
+            onClear = { conversationSearchQuery = "" },
+            expanded = conversationSearchExpanded,
+            onExpandedChange = { conversationSearchExpanded = it },
+            placeholder = stringResource(R.string.screen_conversations_search_hint),
+            collapsedHint = "",
+            openSearchContentDescription = stringResource(R.string.action_search),
+            closeSearchContentDescription = stringResource(R.string.action_close),
+            titleContent = {
+                Text(
+                    text = stringResource(R.string.common_conversations),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+            },
         )
         NavigationDrawerItem(
             icon = { Icon(LettaIcons.Add, contentDescription = null) },
@@ -1495,15 +1565,19 @@ internal fun DrawerContent(
             selected = currentConversationId == null,
             onClick = onNewConversation,
         )
-        if (conversations.isEmpty()) {
+        if (filteredConversations.isEmpty()) {
             Text(
-                text = "No conversations yet",
+                text = if (conversationSearchQuery.isBlank()) {
+                    "No conversations yet"
+                } else {
+                    "No conversations matching \"$conversationSearchQuery\""
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             )
         } else {
-            conversations.forEach { conversation ->
+            filteredConversations.forEach { conversation ->
                 val isActive = conversation.id == currentConversationId
                 NavigationDrawerItem(
                     icon = {
@@ -1541,20 +1615,13 @@ internal fun DrawerContent(
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
         NavigationDrawerItem(
-            icon = { Icon(LettaIcons.Edit, contentDescription = "Edit") },
-            label = { Text(stringResource(R.string.screen_drawer_edit_agent)) },
-            selected = false,
-            onClick = onEditAgent,
-        )
-
-        NavigationDrawerItem(
             icon = { Icon(LettaIcons.Delete, contentDescription = "Reset") },
             label = { Text("Reset Messages") },
             selected = false,
             onClick = onResetMessages,
         )
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(12.dp))
 
         Text(
             text = agentId.take(12) + "\u2026",

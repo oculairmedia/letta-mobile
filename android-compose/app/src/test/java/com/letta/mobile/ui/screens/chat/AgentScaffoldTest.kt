@@ -1,11 +1,13 @@
 package com.letta.mobile.ui.screens.chat
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.letta.mobile.ui.test.setLettaTestContent
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -97,8 +99,8 @@ class AgentScaffoldTest {
             )
         }
 
-        composeRule.onNodeWithText("Archival Memory").assertDoesNotExist()
-        composeRule.onNodeWithText("Tools").assertDoesNotExist()
+        composeRule.onAllNodesWithText("Archival Memory").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Tools").assertCountEquals(0)
     }
 
     @Test
@@ -149,7 +151,7 @@ class AgentScaffoldTest {
             )
         }
 
-        composeRule.onNodeWithText("Reset Messages").performClick()
+        composeRule.onNodeWithText("Reset Messages").performScrollTo().performClick()
         assertTrue("Reset callback should fire", fired)
     }
 
