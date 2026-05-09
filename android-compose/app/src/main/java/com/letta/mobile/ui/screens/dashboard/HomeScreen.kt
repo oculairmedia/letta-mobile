@@ -64,7 +64,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -75,11 +74,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -94,6 +89,9 @@ import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.ExpandableTitleSearch
 import com.letta.mobile.ui.components.LettaInputBar
 import com.letta.mobile.ui.components.ShimmerBox
+import com.letta.mobile.ui.components.highlightSearchMatches
+import com.letta.mobile.ui.components.rememberSearchHighlightColors
+import com.letta.mobile.ui.components.searchResultSnippet
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.customColors
@@ -903,8 +901,7 @@ private fun SearchResultsContent(
     onBlockClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val highlightColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
-    val highlightTextColor = MaterialTheme.colorScheme.primary
+    val highlightColors = rememberSearchHighlightColors()
 
     var agentsExpanded by rememberSaveable { mutableStateOf(true) }
     var toolsExpanded by rememberSaveable { mutableStateOf(true) }
@@ -944,14 +941,14 @@ private fun SearchResultsContent(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = highlightMatches(agent.name, searchQuery, highlightColor, highlightTextColor),
+                                    text = highlightSearchMatches(agent.name, searchQuery, highlightColors),
                                     style = MaterialTheme.typography.bodyMedium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                                 agent.description?.let { desc ->
                                     Text(
-                                        text = highlightMatches(desc, searchQuery, highlightColor, highlightTextColor),
+                                        text = highlightSearchMatches(desc, searchQuery, highlightColors),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
@@ -994,14 +991,14 @@ private fun SearchResultsContent(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = highlightMatches(tool.name, searchQuery, highlightColor, highlightTextColor),
+                                    text = highlightSearchMatches(tool.name, searchQuery, highlightColors),
                                     style = MaterialTheme.typography.bodyMedium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                                 tool.description?.let { desc ->
                                     Text(
-                                        text = highlightMatches(desc, searchQuery, highlightColor, highlightTextColor),
+                                        text = highlightSearchMatches(desc, searchQuery, highlightColors),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
@@ -1044,14 +1041,14 @@ private fun SearchResultsContent(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = highlightMatches(block.label ?: "Unnamed", searchQuery, highlightColor, highlightTextColor),
+                                    text = highlightSearchMatches(block.label ?: "Unnamed", searchQuery, highlightColors),
                                     style = MaterialTheme.typography.bodyMedium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
                                 block.description?.let { desc ->
                                     Text(
-                                        text = highlightMatches(desc, searchQuery, highlightColor, highlightTextColor),
+                                        text = highlightSearchMatches(desc, searchQuery, highlightColors),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
@@ -1099,7 +1096,11 @@ private fun SearchResultsContent(
                             }
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = highlightMatches(msg.content ?: "", searchQuery, highlightColor, highlightTextColor),
+                                text = highlightSearchMatches(
+                                    searchResultSnippet(msg.content.orEmpty(), searchQuery),
+                                    searchQuery,
+                                    highlightColors,
+                                ),
                                 style = MaterialTheme.typography.bodySmall,
                                 maxLines = 3,
                                 overflow = TextOverflow.Ellipsis,
@@ -1142,41 +1143,6 @@ private fun SearchResultsContent(
                 )
             }
         }
-    }
-}
-
-private fun highlightMatches(
-    text: String,
-    query: String,
-    highlightColor: Color,
-    matchTextColor: Color = Color.Unspecified,
-) = buildAnnotatedString {
-    if (query.isBlank()) {
-        append(text)
-        return@buildAnnotatedString
-    }
-    val lowerText = text.lowercase()
-    val lowerQuery = query.trim().lowercase()
-    var cursor = 0
-    var matched = false
-    while (cursor < text.length) {
-        val matchIndex = lowerText.indexOf(lowerQuery, cursor)
-        if (matchIndex < 0) {
-            append(text.substring(cursor))
-            break
-        }
-        matched = true
-        append(text.substring(cursor, matchIndex))
-        withStyle(
-            SpanStyle(
-                background = highlightColor,
-                fontWeight = FontWeight.Bold,
-                color = if (matchTextColor != Color.Unspecified) matchTextColor else Color.Unspecified,
-            )
-        ) {
-            append(text.substring(matchIndex, matchIndex + lowerQuery.length))
-        }
-        cursor = matchIndex + lowerQuery.length
     }
 }
 

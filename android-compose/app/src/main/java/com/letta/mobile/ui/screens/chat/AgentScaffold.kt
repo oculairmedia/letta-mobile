@@ -2,10 +2,6 @@ package com.letta.mobile.ui.screens.chat
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -1180,8 +1176,8 @@ internal fun ProjectContextCard(
 
             AnimatedVisibility(
                 visible = expanded,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically(),
+                enter = ChatMotion.expandEnter(),
+                exit = ChatMotion.expandExit(),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     ProjectInfoLine(

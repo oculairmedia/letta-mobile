@@ -25,14 +25,13 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -68,7 +67,6 @@ data class DashboardUiState(
     val error: String? = null,
 )
 
-@OptIn(FlowPreview::class)
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val agentRepository: AgentRepository,
@@ -174,7 +172,6 @@ class DashboardViewModel @Inject constructor(
             ) { query, agents, tools, blocks ->
                 SearchSnapshot(query = query, agents = agents, tools = tools, blocks = blocks)
             }
-                .debounce(300L)
                 .distinctUntilChanged()
                 .collect { snapshot ->
                     // Cancel any in-flight message search from the previous query.
@@ -222,6 +219,7 @@ class DashboardViewModel @Inject constructor(
                     // Remote message search runs in a separate job so it doesn't
                     // block the collect loop from processing the next query.
                     messageSearchJob = viewModelScope.launch {
+                        delay(REMOTE_MESSAGE_SEARCH_DEBOUNCE_MS)
                         try {
                             val results = messageRepository.searchMessages(
                                 MessageSearchRequest(
@@ -399,5 +397,6 @@ class DashboardViewModel @Inject constructor(
          * starving everything else.
          */
         private const val DASHBOARD_STEPS_CONCURRENCY = 5
+        private const val REMOTE_MESSAGE_SEARCH_DEBOUNCE_MS = 180L
     }
 }

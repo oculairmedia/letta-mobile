@@ -61,16 +61,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -98,6 +94,8 @@ import com.letta.mobile.ui.components.ExpandableTitleSearch
 import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.LettaSearchBar
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.components.highlightSearchMatches
+import com.letta.mobile.ui.components.rememberSearchHighlightColors
 import com.letta.mobile.ui.screens.settings.ClientModeConnectionState
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
@@ -2087,8 +2085,7 @@ private fun SelectableToolCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val highlightColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
-    val highlightTextColor = MaterialTheme.colorScheme.primary
+    val highlightColors = rememberSearchHighlightColors()
     Card(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
@@ -2104,14 +2101,14 @@ private fun SelectableToolCard(
             Checkbox(checked = selected, onCheckedChange = null)
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = highlightMatches(tool.name, query, highlightColor, highlightTextColor),
+                    text = highlightSearchMatches(tool.name, query, highlightColors),
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 tool.description?.let { description ->
                     Text(
-                        text = highlightMatches(description, query, highlightColor, highlightTextColor),
+                        text = highlightSearchMatches(description, query, highlightColors),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
@@ -2131,8 +2128,7 @@ private fun SelectableBlockCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val highlightColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
-    val highlightTextColor = MaterialTheme.colorScheme.primary
+    val highlightColors = rememberSearchHighlightColors()
     Card(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
@@ -2149,7 +2145,7 @@ private fun SelectableBlockCard(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        text = highlightMatches(block.label ?: stringResource(R.string.common_unknown), query, highlightColor, highlightTextColor),
+                        text = highlightSearchMatches(block.label ?: stringResource(R.string.common_unknown), query, highlightColors),
                         style = MaterialTheme.typography.titleSmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -2164,7 +2160,7 @@ private fun SelectableBlockCard(
                 }
                 block.description?.takeIf { it.isNotBlank() }?.let { description ->
                     Text(
-                        text = highlightMatches(description, query, highlightColor, highlightTextColor),
+                        text = highlightSearchMatches(description, query, highlightColors),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
@@ -2173,7 +2169,7 @@ private fun SelectableBlockCard(
                 }
                 if (block.value.isNotBlank()) {
                     Text(
-                        text = highlightMatches(block.value, query, highlightColor, highlightTextColor),
+                        text = highlightSearchMatches(block.value, query, highlightColors),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
@@ -2182,42 +2178,6 @@ private fun SelectableBlockCard(
                 }
             }
         }
-    }
-}
-
-private fun highlightMatches(
-    text: String,
-    query: String,
-    highlightColor: Color,
-    matchTextColor: Color = Color.Unspecified,
-) = buildAnnotatedString {
-    if (query.isBlank()) {
-        append(text)
-        return@buildAnnotatedString
-    }
-    val lowerText = text.lowercase()
-    val lowerQuery = query.trim().lowercase()
-    if (lowerQuery.isBlank()) {
-        append(text)
-        return@buildAnnotatedString
-    }
-    var cursor = 0
-    while (cursor < text.length) {
-        val matchIndex = lowerText.indexOf(lowerQuery, cursor)
-        if (matchIndex < 0) {
-            append(text.substring(cursor))
-            break
-        }
-        append(text.substring(cursor, matchIndex))
-        withStyle(
-            SpanStyle(
-                background = highlightColor,
-                color = matchTextColor,
-            )
-        ) {
-            append(text.substring(matchIndex, matchIndex + lowerQuery.length))
-        }
-        cursor = matchIndex + lowerQuery.length
     }
 }
 
