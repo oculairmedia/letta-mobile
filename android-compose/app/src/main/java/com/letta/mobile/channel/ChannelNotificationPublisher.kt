@@ -8,12 +8,14 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.RemoteInput
 import androidx.core.content.ContextCompat
 import com.letta.mobile.NotificationNavigationTarget
 import com.letta.mobile.R
+import com.letta.mobile.util.Telemetry
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -53,6 +55,23 @@ class ChannelNotificationPublisher @Inject constructor(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
+            Log.w(TAG, "POST_NOTIFICATIONS not granted; skipping notification for ${notification.conversationId}")
+            Telemetry.event(
+                "ChannelNotificationPublisher", "publishBlocked",
+                "reason" to "POST_NOTIFICATIONS_DENIED",
+                "conversationId" to notification.conversationId,
+            )
+            return
+        }
+
+        val manager = NotificationManagerCompat.from(context)
+        if (!manager.areNotificationsEnabled()) {
+            Log.w(TAG, "Notifications disabled for app; skipping notification for ${notification.conversationId}")
+            Telemetry.event(
+                "ChannelNotificationPublisher", "publishBlocked",
+                "reason" to "NOTIFICATIONS_DISABLED",
+                "conversationId" to notification.conversationId,
+            )
             return
         }
 
@@ -108,10 +127,16 @@ class ChannelNotificationPublisher @Inject constructor(
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .addAction(replyAction)
 
-        NotificationManagerCompat.from(context).notify(notificationTag, notificationId, builder.build())
+        manager.notify(notificationTag, notificationId, builder.build())
+        Telemetry.event(
+            "ChannelNotificationPublisher", "published",
+            "conversationId" to notification.conversationId,
+            "messageId" to notification.messageId,
+        )
     }
 
     companion object {
+        private const val TAG = "ChannelNotificationPublisher"
         private const val CHANNEL_ID = "letta-agent-updates"
         private const val NOTIFICATION_TAG_PREFIX = "conversation:"
 

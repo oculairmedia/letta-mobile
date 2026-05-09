@@ -44,9 +44,9 @@ import javax.inject.Inject
  *   1. On start, iterate every conversation the current agent has and call
  *      [TimelineRepository.getOrCreate] — this spawns a subscriber coroutine
  *      for each that lives as long as the repository (a @Singleton).
- *   2. Install an [IngestedMessageListener] that posts a system notification
- *      via [ChannelNotificationPublisher] whenever a new assistant/tool
- *      message arrives and we're not currently showing that conversation.
+ *   2. Install an [IngestedMessageListener] that submits settled timeline
+ *      candidates to [NotificationDeliveryCoordinator], the single owner for
+ *      publishing, duplicate suppression, and foreground suppression policy.
  *   3. Hold a persistent low-priority foreground notification so Android
  *      won't kill the process.
  *
@@ -58,8 +58,8 @@ class ChatPushService : Service() {
     @Inject lateinit var timelineRepository: TimelineRepository
     @Inject lateinit var conversationApi: ConversationApi
     @Inject lateinit var agentRepository: AgentRepository
-    @Inject lateinit var notificationPublisher: ChannelNotificationPublisher
-    @Inject lateinit var notificationReplyHandler: NotificationReplyHandler
+    @Inject lateinit var notificationDeliveryCoordinator: NotificationDeliveryCoordinator
+    @Inject lateinit var channelNotificationPublisher: ChannelNotificationPublisher
     @Inject lateinit var currentConversationTracker: CurrentConversationTracker
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -74,6 +74,7 @@ class ChatPushService : Service() {
         // BG-restriction states). Swallow the failure — the service still
         // runs in the background until Android kills it, which is far
         // better than crashing the entire app process at launch.
+        channelNotificationPublisher.ensureChannel()
         val foregrounded = ensureForegroundNotification()
         if (!foregrounded) {
             Log.w(TAG, "Foreground promotion failed; running as background service")
@@ -94,6 +95,8 @@ class ChatPushService : Service() {
             "startId" to startId,
             "intentAction" to (intent?.action ?: "<null>"),
         )
+        channelNotificationPublisher.ensureChannel()
+        installListener()
         ensureForegroundNotification()
         return START_STICKY
     }
@@ -189,23 +192,6 @@ class ChatPushService : Service() {
                 messageType: String?,
                 contentPreview: String?,
             ) {
-                // Suppress notification if the user is currently looking at
-                // this conversation.
-                if (currentConversationTracker.current == conversationId) {
-                    Telemetry.event(
-                        "ChatPushService", "suppressedForegroundConv",
-                        "conversationId" to conversationId,
-                    )
-                    return
-                }
-                if (conversationId in notificationReplyHandler.activeReplyStreams.value) {
-                    Telemetry.event(
-                        "ChatPushService", "suppressedNotificationReplyStream",
-                        "conversationId" to conversationId,
-                    )
-                    return
-                }
-
                 val (agentId, agentName) = try {
                     // Best-effort: look up the conversation's agent for a nice title.
                     val conv = conversationApi.getConversation(conversationId)
@@ -214,14 +200,18 @@ class ChatPushService : Service() {
                     "" to ""
                 }
 
-                notificationPublisher.publish(
-                    ChannelNotification(
+                notificationDeliveryCoordinator.submit(
+                    NotificationDeliveryCandidate(
+                        conversationId = conversationId,
                         agentId = agentId,
                         agentName = agentName,
-                        conversationId = conversationId,
                         conversationSummary = null,
                         messageId = serverId,
-                        messagePreview = contentPreview.orEmpty(),
+                        runId = null,
+                        source = NotificationCandidateSource.TimelineIngestion,
+                        phase = NotificationCandidatePhase.Settled,
+                        previewText = contentPreview.orEmpty(),
+                        isFinal = true,
                     ),
                 )
             }

@@ -13,6 +13,7 @@ import com.letta.mobile.ui.screens.chat.ClientModeChatSender
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
+import javax.inject.Provider
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +30,7 @@ class NotificationReplyHandler @Inject constructor(
     private val clientModeChatSender: ClientModeChatSender,
     private val timelineRepository: TimelineRepository,
     private val agentRepository: AgentRepository,
+    private val notificationDeliveryCoordinatorProvider: Provider<NotificationDeliveryCoordinator>,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -50,6 +52,7 @@ class NotificationReplyHandler @Inject constructor(
                 Log.w(TAG, "user reply written to timeline for $conversationId")
 
                 val assistantMessageId = "cm-assist-notif-${UUID.randomUUID()}"
+                var accumulatedAssistantPreview = ""
 
                 clientModeChatSender.streamMessage(agentId, text, conversationId).collect { chunk ->
                     val convId = chunk.conversationId ?: conversationId
@@ -88,7 +91,27 @@ class NotificationReplyHandler @Inject constructor(
 
                         else -> {
                             val delta = chunk.text?.takeIf { it.isNotEmpty() }
-                            if (delta == null || chunk.done) return@collect
+                            if (chunk.done) {
+                                if (accumulatedAssistantPreview.isNotBlank()) {
+                                    notificationDeliveryCoordinatorProvider.get().submit(
+                                        NotificationDeliveryCandidate(
+                                            conversationId = convId,
+                                            agentId = agentId,
+                                            agentName = agentRepository.getCachedAgent(agentId)?.name.orEmpty(),
+                                            conversationSummary = null,
+                                            messageId = assistantMessageId,
+                                            runId = null,
+                                            source = NotificationCandidateSource.NotificationReplyStream,
+                                            phase = NotificationCandidatePhase.Final,
+                                            previewText = accumulatedAssistantPreview,
+                                            isFinal = true,
+                                        ),
+                                    )
+                                }
+                                return@collect
+                            }
+                            if (delta == null) return@collect
+                            accumulatedAssistantPreview += delta
 
                             val localId = "cm-assist-${chunk.uuid ?: assistantMessageId}"
                             timelineRepository.upsertClientModeLocalAssistantChunk(

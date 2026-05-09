@@ -18,7 +18,7 @@ class ChannelHeartbeatSync @Inject constructor(
     private val messageRepository: MessageRepository,
     private val agentRepository: AgentRepository,
     private val syncStateStore: ChannelSyncStateStore,
-    private val notificationPublisher: ChannelNotificationPublisher,
+    private val notificationDeliveryCoordinator: NotificationDeliveryCoordinator,
 ) {
     suspend fun run(): ListenableWorker.Result {
         if (settingsRepository.getActiveConfig().first() == null) {
@@ -62,26 +62,27 @@ class ChannelHeartbeatSync @Inject constructor(
         }
 
         val latestNotifiable = messages.lastOrNull { it.isNotifiable() }
-        val previousNotifiedId = syncStateStore.getLastNotifiedMessageId(conversation.id)
-
         if (previousProcessedAt == null) {
             syncStateStore.setProcessedLastActivityAt(conversation.id, lastActivityAt)
             latestNotifiable?.id?.let { syncStateStore.setLastNotifiedMessageId(conversation.id, it) }
             return
         }
 
-        if (latestNotifiable != null && latestNotifiable.id != previousNotifiedId) {
-            notificationPublisher.publish(
-                ChannelNotification(
+        if (latestNotifiable != null) {
+            notificationDeliveryCoordinator.submit(
+                NotificationDeliveryCandidate(
+                    conversationId = conversation.id,
                     agentId = conversation.agentId,
                     agentName = agentName,
-                    conversationId = conversation.id,
                     conversationSummary = conversation.summary,
                     messageId = latestNotifiable.id,
-                    messagePreview = latestNotifiable.summary,
-                )
+                    runId = latestNotifiable.runId,
+                    source = NotificationCandidateSource.HeartbeatFallback,
+                    phase = NotificationCandidatePhase.Settled,
+                    previewText = latestNotifiable.summary,
+                    isFinal = true,
+                ),
             )
-            syncStateStore.setLastNotifiedMessageId(conversation.id, latestNotifiable.id)
         }
 
         syncStateStore.setProcessedLastActivityAt(conversation.id, lastActivityAt)

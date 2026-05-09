@@ -60,6 +60,31 @@ class ChannelHeartbeatSyncTest {
     }
 
     @Test
+    fun `heartbeat fallback does not duplicate message already notified by realtime coordinator path`() = runTest {
+        val fixture = createFixture()
+        fixture.sync.run()
+        fixture.conversations.clear()
+        fixture.conversations += listOf(
+            Conversation(
+                id = "conv-1",
+                agentId = "agent-1",
+                summary = "Main thread",
+                lastMessageAt = "2026-04-10T10:05:00Z",
+            )
+        )
+        fixture.messagesByConversation["conv-1"] = listOf(
+            ConversationInspectorMessage(id = "assistant-2", messageType = "assistant_message", date = null, runId = null, stepId = null, otid = null, summary = "Already delivered"),
+        )
+        fixture.stateStore.setLastNotifiedMessageId("conv-1", "assistant-2")
+
+        val result = fixture.sync.run()
+
+        assertTrue(result is ListenableWorker.Result.Success)
+        assertEquals("assistant-2", fixture.stateStore.getLastNotifiedMessageId("conv-1"))
+        verify(exactly = 0) { fixture.publisher.publish(any()) }
+    }
+
+    @Test
     fun `user-only updates advance baseline without notifying`() = runTest {
         val fixture = createFixture()
         fixture.sync.run()
@@ -91,6 +116,7 @@ class ChannelHeartbeatSyncTest {
         val agentRepository = mockk<AgentRepository>()
         val stateStore = mockk<ChannelSyncStateStore>()
         val publisher = mockk<ChannelNotificationPublisher>()
+        val replyHandler = mockk<NotificationReplyHandler>()
         val settingsRepository = mockk<SettingsRepository>()
 
         val conversations = mutableListOf(
@@ -128,7 +154,15 @@ class ChannelHeartbeatSyncTest {
             notified[firstArg()] = secondArg()
             Unit
         }
+        every { replyHandler.activeReplyStreams } returns MutableStateFlow(emptySet())
         every { publisher.publish(any()) } just runs
+
+        val coordinator = NotificationDeliveryCoordinator(
+            currentConversationTracker = CurrentConversationTracker(),
+            notificationReplyHandler = replyHandler,
+            syncStateStore = stateStore,
+            publisher = publisher,
+        )
 
         val sync = ChannelHeartbeatSync(
             settingsRepository = settingsRepository,
@@ -136,7 +170,7 @@ class ChannelHeartbeatSyncTest {
             messageRepository = messageRepository,
             agentRepository = agentRepository,
             syncStateStore = stateStore,
-            notificationPublisher = publisher,
+            notificationDeliveryCoordinator = coordinator,
         )
 
         return Fixture(sync, stateStore, publisher, conversations, messagesByConversation)

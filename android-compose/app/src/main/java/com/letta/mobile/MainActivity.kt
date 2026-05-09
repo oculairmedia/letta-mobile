@@ -114,6 +114,7 @@ class MainActivity : ComponentActivity() {
                     ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
                 ) {
                     notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    return@LaunchedEffect
                 }
                 // letta-mobile-mge5: start the foreground service that keeps
                 // resume-stream subscribers alive even when the app is
