@@ -25,7 +25,6 @@ import com.letta.mobile.util.mapErrorToUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
-import kotlinx.collections.immutable.toImmutableSet
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -46,71 +45,10 @@ import kotlinx.coroutines.flow.update
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
-internal fun runIdsEligibleForCompletionAutoCollapse(messages: List<UiMessage>): Set<String> {
-    val newestRunId = messages.asReversed().firstNotNullOfOrNull { message ->
-        message.runId?.takeIf { message.role == "assistant" && it.isNotBlank() }
-    }
-    return newestRunId?.let { setOf(it) }.orEmpty()
-}
-
-internal fun collapsedRunIdsAfterRunCompletion(
-    messages: List<UiMessage>,
-    collapsedRunIds: Set<String>,
-    autoCollapseSuppressedRunIds: Set<String>,
-): Set<String> {
-    val eligibleRunIds = runIdsEligibleForCompletionAutoCollapse(messages)
-        .filterNot { it in autoCollapseSuppressedRunIds }
-    if (eligibleRunIds.isEmpty()) return collapsedRunIds
-    return LinkedHashSet<String>(collapsedRunIds).apply { addAll(eligibleRunIds) }
-}
-
 private sealed interface ClientModeBootstrapState {
     data object Idle : ClientModeBootstrapState
     data object NewConversationPending : ClientModeBootstrapState
     data class Ready(val conversationId: String) : ClientModeBootstrapState
-}
-
-/**
- * Process-local idempotency for automatic route-provided messages (Android
- * shares, notification/deeplink starters). The per-ViewModel AtomicBoolean is
- * enough for re-resolves in one instance, but Android share delivery can create
- * two equivalent chat route/ViewModel instances before the first navigation is
- * fully settled. In that case both instances carry the same initialMessage and
- * otherwise race into the send path. Keep this narrowly scoped and time-bound
- * so normal manual sends are unaffected.
- */
-internal object InitialRouteMessageDeliveryGuard {
-    private const val DELIVERY_WINDOW_MS = 30_000L
-    private val deliveredAtByKey = linkedMapOf<String, Long>()
-
-    fun key(agentId: String, conversationId: String?, message: String): String = buildString {
-        append(agentId)
-        append('|')
-        append(conversationId.orEmpty())
-        append('|')
-        append(message)
-    }
-
-    fun tryConsume(
-        key: String,
-        nowMs: Long = System.currentTimeMillis(),
-    ): Boolean = synchronized(deliveredAtByKey) {
-        val cutoff = nowMs - DELIVERY_WINDOW_MS
-        val iterator = deliveredAtByKey.entries.iterator()
-        while (iterator.hasNext()) {
-            if (iterator.next().value < cutoff) iterator.remove()
-        }
-        if (deliveredAtByKey.containsKey(key)) {
-            false
-        } else {
-            deliveredAtByKey[key] = nowMs
-            true
-        }
-    }
-
-    fun resetForTests() = synchronized(deliveredAtByKey) {
-        deliveredAtByKey.clear()
-    }
 }
 
 @HiltViewModel
@@ -135,9 +73,6 @@ class AdminChatViewModel @Inject constructor(
         private const val CONVERSATION_CACHE_TTL_MS = 30_000L
         private const val MESSAGE_SYNC_INTERVAL_MS = 5_000L
         private const val CHAT_SEARCH_REMOTE_DEBOUNCE_MS = 180L
-        private const val COLLAPSED_RUN_IDS_KEY = "collapsedRunIds"
-        private const val AUTO_COLLAPSE_SUPPRESSED_RUN_IDS_KEY = "autoCollapseSuppressedRunIds"
-        private const val EXPANDED_REASONING_MESSAGE_IDS_KEY = "expandedReasoningMessageIds"
         private const val CLIENT_MODE_CONVERSATION_ID_KEY = "clientModeConversationId"
     }
 
@@ -313,6 +248,8 @@ class AdminChatViewModel @Inject constructor(
         }
     }
 
+    private val runExpansionState = ChatRunExpansionState(savedStateHandle, _uiState)
+
     private val pendingToolsMap = java.util.concurrent.ConcurrentHashMap<String, PendingToolCall>()
     private var hasSummary = false
     // letta-mobile-flk.6: tracks whether the VM has already resolved its
@@ -330,70 +267,14 @@ class AdminChatViewModel @Inject constructor(
     private var clientModeBootstrapState: ClientModeBootstrapState =
         if (isFreshRoute) ClientModeBootstrapState.NewConversationPending else ClientModeBootstrapState.Idle
 
-    private fun collapsedRunIds(): Set<String> =
-        savedStateHandle.get<ArrayList<String>>(COLLAPSED_RUN_IDS_KEY)?.toSet().orEmpty()
+    fun toggleRunCollapsed(runId: String) = runExpansionState.toggleRunCollapsed(runId)
 
-    private fun autoCollapseSuppressedRunIds(): Set<String> =
-        savedStateHandle.get<ArrayList<String>>(AUTO_COLLAPSE_SUPPRESSED_RUN_IDS_KEY)?.toSet().orEmpty()
-
-    private fun expandedReasoningMessageIds(): Set<String> =
-        savedStateHandle.get<ArrayList<String>>(EXPANDED_REASONING_MESSAGE_IDS_KEY)?.toSet().orEmpty()
-
-    private fun persistCollapsedRunIds(ids: Set<String>) {
-        savedStateHandle[COLLAPSED_RUN_IDS_KEY] = ArrayList(ids)
-        _uiState.value = _uiState.value.copy(collapsedRunIds = ids.toImmutableSet())
-    }
-
-    private fun persistExpandedReasoningMessageIds(ids: Set<String>) {
-        savedStateHandle[EXPANDED_REASONING_MESSAGE_IDS_KEY] = ArrayList(ids)
-        _uiState.value = _uiState.value.copy(expandedReasoningMessageIds = ids.toImmutableSet())
-    }
-
-    private fun persistAutoCollapseSuppressedRunIds(ids: Set<String>) {
-        savedStateHandle[AUTO_COLLAPSE_SUPPRESSED_RUN_IDS_KEY] = ArrayList(ids)
-    }
-
-    fun toggleRunCollapsed(runId: String) {
-        val nextCollapsed = collapsedRunIds().toMutableSet()
-        val nextSuppressed = autoCollapseSuppressedRunIds().toMutableSet()
-        if (nextCollapsed.remove(runId)) {
-            // User expanded an auto-collapsed completed run; do not immediately
-            // collapse it again on the next timeline emission.
-            nextSuppressed.add(runId)
-        } else {
-            nextCollapsed.add(runId)
-            nextSuppressed.remove(runId)
-        }
-        persistAutoCollapseSuppressedRunIds(nextSuppressed)
-        persistCollapsedRunIds(nextCollapsed)
-    }
-
-    fun toggleReasoningExpanded(messageId: String) {
-        val next = expandedReasoningMessageIds().toMutableSet().apply {
-            if (!add(messageId)) remove(messageId)
-        }
-        persistExpandedReasoningMessageIds(next)
-    }
-
-    private fun collapseCompletedRunsByDefault(state: ChatUiState): ChatUiState {
-        val nextCollapsed = collapsedRunIdsAfterRunCompletion(
-            messages = state.messages,
-            collapsedRunIds = state.collapsedRunIds,
-            autoCollapseSuppressedRunIds = autoCollapseSuppressedRunIds(),
-        )
-        if (nextCollapsed == state.collapsedRunIds) return state
-        savedStateHandle[COLLAPSED_RUN_IDS_KEY] = ArrayList(nextCollapsed)
-        return state.copy(collapsedRunIds = nextCollapsed.toImmutableSet())
-    }
+    fun toggleReasoningExpanded(messageId: String) = runExpansionState.toggleReasoningExpanded(messageId)
 
     private fun collapseCompletedRunsIfStreamingFinished(
         previous: ChatUiState,
         next: ChatUiState,
-    ): ChatUiState = if (previous.isStreaming && !next.isStreaming) {
-        collapseCompletedRunsByDefault(next)
-    } else {
-        next
-    }
+    ): ChatUiState = runExpansionState.collapseCompletedRunsIfStreamingFinished(previous, next)
 
     /**
      * Fresh-route Client Mode sends do not have a timeline conversation id
@@ -492,10 +373,7 @@ class AdminChatViewModel @Inject constructor(
         } else {
             seedAgentNameFromMemoryCache()
             observeAgentNameCache()
-            _uiState.value = _uiState.value.copy(
-                collapsedRunIds = collapsedRunIds().toImmutableSet(),
-                expandedReasoningMessageIds = expandedReasoningMessageIds().toImmutableSet(),
-            )
+            runExpansionState.hydrateUiState()
             viewModelScope.launch {
                 settingsRepository.observeClientModeEnabled()
                     .distinctUntilChanged()
