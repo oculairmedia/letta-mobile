@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -54,6 +55,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.R
@@ -62,6 +64,7 @@ import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.data.tooloutput.ToolOutputParser
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.MessageBubbleShape
 import com.letta.mobile.ui.components.ActionSheet
@@ -931,10 +934,13 @@ private fun ToolCallEntrance(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun CompactToolCallGroupCard(
+internal fun CompactToolCallGroupCard(
     toolCalls: List<UiToolCall>,
     pendingApprovalToolCallIds: Set<String>,
     modifier: Modifier = Modifier,
+    approvalRequests: List<UiApprovalRequest> = emptyList(),
+    activeApprovalRequestId: String? = null,
+    onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)? = null,
 ) {
     val isPinchingForCard = LocalChatIsPinching.current
     Card(
@@ -952,7 +958,7 @@ private fun CompactToolCallGroupCard(
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(5.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -977,6 +983,13 @@ private fun CompactToolCallGroupCard(
                     )
                 }
             }
+            approvalRequests.forEach { approval ->
+                ApprovalRequestControls(
+                    approval = approval,
+                    isSubmitting = activeApprovalRequestId == approval.requestId,
+                    onDecision = onApprovalDecision,
+                )
+            }
         }
     }
 }
@@ -987,69 +1000,122 @@ private fun CompactToolCallRow(
     approvalState: ToolApprovalState?,
 ) {
     val fontScale = LocalChatFontScale.current
+    var expanded by remember(toolCall.toolCallMotionKey()) { mutableStateOf(false) }
     val display = remember(toolCall.name, toolCall.arguments) {
         ToolDisplayRegistry.resolve(toolCall.name, toolCall.arguments)
     }
-    val summary = remember(toolCall.name, toolCall.arguments, toolCall.result, toolCall.status, display.detailLine) {
-        compactToolCallSummary(toolCall, display.detailLine)
+    val argumentSummary = remember(toolCall.arguments) { summarizeToolArguments(toolCall.arguments) }
+    val executionTimeText = remember(toolCall.executionTimeMs) { toolCall.executionTimeMs?.let(::formatToolExecutionTime) }
+    val displayResult = remember(toolCall.result) { toolCall.result?.displayToolResult() }
+    val resultPreview = remember(displayResult) { displayResult?.takeIf { it.isNotBlank() } }
+    val summary = remember(toolCall.name, toolCall.arguments, displayResult, toolCall.status, display.detailLine) {
+        compactToolCallSummary(toolCall, display.detailLine, displayResult)
+    }
+    val compactTitle = remember(toolCall.name, summary) {
+        "${toolCall.name} - $summary"
     }
     val isError = ToolReturnStatus.isError(toolCall.status)
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = ChatMotion.chipCrossfadeSpec,
+        label = "CompactToolCallChevronRotation",
+    )
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Text(display.emoji, style = MaterialTheme.chatTypography.codeBlock)
-        Text(
-            text = toolCall.name,
-            style = MaterialTheme.typography.chatBubbleSender
-                .copy(fontFamily = MaterialTheme.chatTypography.codeBlock.fontFamily)
-                .scaledBy(fontScale),
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(0.42f),
-        )
-        Text(
-            text = summary,
-            style = MaterialTheme.typography.listItemSupporting
-                .copy(fontFamily = MaterialTheme.chatTypography.codeBlock.fontFamily)
-                .scaledBy(fontScale),
-            color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(0.58f),
-        )
-        if (approvalState != null) {
-            AnimatedToolApprovalChip(state = approvalState)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics(mergeDescendants = true) { }
+                .clickable(
+                    onClickLabel = if (expanded) "Collapse tool details" else "Expand tool details",
+                ) { expanded = !expanded }
+                .padding(vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(display.emoji, style = MaterialTheme.chatTypography.codeBlock)
+            Text(
+                text = compactTitle,
+                style = MaterialTheme.typography.chatBubbleSender
+                    .copy(fontFamily = MaterialTheme.chatTypography.codeBlock.fontFamily)
+                    .scaledBy(fontScale),
+                color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (approvalState != null) {
+                AnimatedToolApprovalChip(state = approvalState)
+            }
+            executionTimeText?.let { time ->
+                ToolMetaChip(text = time)
+            }
+            when {
+                isError -> Icon(
+                    imageVector = LettaIcons.Error,
+                    contentDescription = "Error",
+                    modifier = Modifier.size(LettaIconSizing.Inline),
+                    tint = MaterialTheme.colorScheme.error,
+                )
+                toolCall.result != null -> Icon(
+                    imageVector = LettaIcons.CheckCircle,
+                    contentDescription = "Success",
+                    modifier = Modifier.size(LettaIconSizing.Inline),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+            Icon(
+                imageVector = LettaIcons.ExpandMore,
+                contentDescription = if (expanded) "Collapse tool details" else "Expand tool details",
+                modifier = Modifier
+                    .size(14.dp)
+                    .rotate(chevronRotation),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.58f),
+            )
         }
-        when {
-            isError -> Icon(
-                imageVector = LettaIcons.Error,
-                contentDescription = "Error",
-                modifier = Modifier.size(LettaIconSizing.Inline),
-                tint = MaterialTheme.colorScheme.error,
-            )
-            toolCall.result != null -> Icon(
-                imageVector = LettaIcons.CheckCircle,
-                contentDescription = "Success",
-                modifier = Modifier.size(LettaIconSizing.Inline),
-                tint = MaterialTheme.colorScheme.primary,
-            )
+        AnimatedVisibility(
+            visible = expanded,
+            enter = ChatMotion.verticalEnter(slideDivisor = 4),
+            exit = ChatMotion.verticalExit(slideDivisor = 4),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 22.dp, top = 2.dp, bottom = 4.dp),
+            ) {
+                ToolCallExpandedSummary(
+                    toolCall = toolCall,
+                    argumentSummary = argumentSummary,
+                    resultPreview = resultPreview,
+                    isError = isError,
+                    fontScale = fontScale,
+                )
+                ToolCallExpandedBody(
+                    toolCall = toolCall,
+                    display = display,
+                    executionTimeText = executionTimeText,
+                    displayResult = displayResult,
+                    isError = isError,
+                    fontScale = fontScale,
+                )
+            }
         }
     }
 }
 
-private fun compactToolCallSummary(toolCall: UiToolCall, displayDetailLine: String?): String {
-    val result = toolCall.result?.trim()?.takeIf { it.isNotBlank() }
+private fun compactToolCallSummary(
+    toolCall: UiToolCall,
+    displayDetailLine: String?,
+    displayResult: String? = toolCall.result?.displayToolResult(),
+): String {
+    val result = displayResult?.takeIf { it.isNotBlank() }
     if (result != null) return "${if (ToolReturnStatus.isError(toolCall.status)) "Error" else "Result"}: $result"
     val argumentSummary = summarizeToolArguments(toolCall.arguments)
     if (argumentSummary != null) return "${argumentSummary.label}: ${argumentSummary.value}"
     return displayDetailLine ?: if (toolCall.result == null) "Running" else "Completed"
 }
+
+private fun String.displayToolResult(): String = ToolOutputParser.sanitizeResultFieldText(this)
 
 private enum class ToolApprovalState {
     RequestingInput,
@@ -1169,6 +1235,143 @@ private fun ToolSummaryLine(
 }
 
 @Composable
+private fun ToolCallExpandedSummary(
+    toolCall: UiToolCall,
+    argumentSummary: ToolArgumentSummary?,
+    resultPreview: String?,
+    isError: Boolean,
+    fontScale: Float,
+) {
+    argumentSummary?.let { summary ->
+        Spacer(modifier = Modifier.height(6.dp))
+        ToolSummaryLine(
+            label = summary.label,
+            value = summary.value,
+            fontScale = fontScale,
+            maxLines = 2,
+        )
+    }
+    if (resultPreview != null) {
+        Spacer(modifier = Modifier.height(4.dp))
+        ToolSummaryLine(
+            label = if (isError) "Error" else "Result",
+            value = resultPreview,
+            fontScale = fontScale,
+            isError = isError,
+            maxLines = 2,
+        )
+    } else if (toolCall.result == null) {
+        Spacer(modifier = Modifier.height(4.dp))
+        ToolSummaryLine(
+            label = "Status",
+            value = "Running",
+            fontScale = fontScale,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun ToolCallExpandedBody(
+    toolCall: UiToolCall,
+    display: ToolDisplayInfo,
+    executionTimeText: String?,
+    displayResult: String?,
+    isError: Boolean,
+    fontScale: Float,
+) {
+    val codeStyle = MaterialTheme.chatTypography.codeBlock
+    Column(modifier = Modifier.padding(top = 4.dp)) {
+        Text(
+            text = "Tool: ${toolCall.name}",
+            style = MaterialTheme.typography.chatBubbleSender.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+        )
+        executionTimeText?.let { time ->
+            Text(
+                text = "Execution time: $time",
+                style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            )
+        }
+        display.detailLine?.let { detail ->
+            Text(
+                text = detail,
+                style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (toolCall.arguments.isNotBlank()) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Arguments",
+                style = MaterialTheme.typography.sectionTitle.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+            )
+            Text(
+                text = toolCall.arguments,
+                style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 6,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        displayResult?.takeIf { it.isNotBlank() }?.let { result ->
+            var resultExpanded by remember(toolCall.result) { mutableStateOf(false) }
+            val resultChevronRotation by animateFloatAsState(
+                targetValue = if (resultExpanded) 180f else 0f,
+                animationSpec = ChatMotion.chipCrossfadeSpec,
+                label = "ToolOutputChevronRotation",
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics(mergeDescendants = true) { }
+                    .clickable { resultExpanded = !resultExpanded },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = if (isError) "Error" else "Output",
+                    style = MaterialTheme.typography.sectionTitle.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                    color = if (isError) {
+                        MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+                val lineCount = result.count { it == '\n' } + 1
+                if (lineCount > 1 || result.length > 80) {
+                    Text(
+                        text = if (resultExpanded) "collapse" else "${lineCount} line${if (lineCount == 1) "" else "s"}",
+                        style = MaterialTheme.typography.labelSmall.scaledBy(fontScale),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+                Icon(
+                    imageVector = LettaIcons.ExpandMore,
+                    contentDescription = if (resultExpanded) "Collapse output" else "Expand output",
+                    modifier = Modifier
+                        .size(14.dp)
+                        .rotate(resultChevronRotation),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                )
+            }
+            ToolOutputRenderer(
+                raw = result,
+                expanded = resultExpanded,
+                isError = isError,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Composable
 private fun ToolCallCard(
     toolCall: UiToolCall,
     approvalStateOverride: ToolApprovalState? = null,
@@ -1181,7 +1384,8 @@ private fun ToolCallCard(
     }
     val argumentSummary = remember(toolCall.arguments) { summarizeToolArguments(toolCall.arguments) }
     val executionTimeText = remember(toolCall.executionTimeMs) { toolCall.executionTimeMs?.let(::formatToolExecutionTime) }
-    val resultPreview = remember(toolCall.result) { toolCall.result?.trim()?.takeIf { it.isNotBlank() } }
+    val displayResult = remember(toolCall.result) { toolCall.result?.displayToolResult() }
+    val resultPreview = remember(displayResult) { displayResult?.takeIf { it.isNotBlank() } }
     // Explicit-error-whitelist: only paint the Error icon / red color when
     // the server actually said "error". Treating `null`, "completed", or any
     // unrecognized value as error caused the long-running mis-labeling bug
@@ -1197,7 +1401,7 @@ private fun ToolCallCard(
         toolCall.name,
         argumentSummary,
         resultPreview,
-        toolCall.result,
+        displayResult,
         isError,
     ) {
         when {
@@ -1216,14 +1420,7 @@ private fun ToolCallCard(
     // more presence — slightly stronger surface tint and a 1.dp outline
     // so it reads as a distinct artifact in a stack of bubbles, without
     // shouting like a colored pill would.
-    // letta-mobile-5e0f.r2: gate animateContentSize on !isPinching.
-    val isPinchingForCard = LocalChatIsPinching.current
     Card(
-        modifier = if (isPinchingForCard) {
-            Modifier
-        } else {
-            Modifier.animateContentSize(animationSpec = ChatMotion.contentSizeSpec)
-        },
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
         ),
@@ -1281,33 +1478,13 @@ private fun ToolCallCard(
             }
 
             if (showDetails) {
-                argumentSummary?.let { summary ->
-                    Spacer(modifier = Modifier.height(6.dp))
-                    ToolSummaryLine(
-                        label = summary.label,
-                        value = summary.value,
-                        fontScale = fontScale,
-                        maxLines = 2,
-                    )
-                }
-                if (resultPreview != null) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    ToolSummaryLine(
-                        label = if (isError) "Error" else "Result",
-                        value = resultPreview,
-                        fontScale = fontScale,
-                        isError = isError,
-                        maxLines = 2,
-                    )
-                } else if (toolCall.result == null) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    ToolSummaryLine(
-                        label = "Status",
-                        value = "Running",
-                        fontScale = fontScale,
-                        maxLines = 1,
-                    )
-                }
+                ToolCallExpandedSummary(
+                    toolCall = toolCall,
+                    argumentSummary = argumentSummary,
+                    resultPreview = resultPreview,
+                    isError = isError,
+                    fontScale = fontScale,
+                )
             }
 
             // Expanded content
@@ -1359,8 +1536,13 @@ private fun ToolCallCard(
                     // Result — inner collapsible (letta-mobile-mge5.19).
                     // Default collapsed: show the result-label row with a
                     // chevron + first-line preview. Tap expands to full.
-                    toolCall.result?.let { result ->
+                    displayResult?.takeIf { it.isNotBlank() }?.let { result ->
                         var resultExpanded by remember(toolCall.result) { mutableStateOf(false) }
+                        val resultChevronRotation by animateFloatAsState(
+                            targetValue = if (resultExpanded) 180f else 0f,
+                            animationSpec = ChatMotion.chipCrossfadeSpec,
+                            label = "ToolOutputChevronRotation",
+                        )
                         Spacer(modifier = Modifier.height(6.dp))
                         Row(
                             modifier = Modifier
@@ -1392,26 +1574,15 @@ private fun ToolCallCard(
                                 contentDescription = if (resultExpanded) "Collapse output" else "Expand output",
                                 modifier = Modifier
                                     .size(14.dp)
-                                    .rotate(if (resultExpanded) 180f else 0f),
+                                    .rotate(resultChevronRotation),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                             )
                         }
-                        Text(
-                            text = result,
-                            style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                            color = if (isError) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            maxLines = if (resultExpanded) Int.MAX_VALUE else 2,
-                            overflow = TextOverflow.Ellipsis,
-                            // letta-mobile-5e0f.r2: gate animateContentSize on !isPinching.
-                            modifier = if (isPinchingForCard) {
-                                Modifier
-                            } else {
-                                Modifier.animateContentSize(animationSpec = ChatMotion.contentSizeSpec)
-                            },
+                        ToolOutputRenderer(
+                            raw = result,
+                            expanded = resultExpanded,
+                            isError = isError,
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 }
@@ -1491,7 +1662,7 @@ private fun formatToolExecutionTime(durationMs: Long): String {
     }
 }
 
-private fun buildMessageCopyText(message: UiMessage): String {
+internal fun buildMessageCopyText(message: UiMessage): String {
     return buildString {
         if (message.content.isNotBlank()) {
             append(message.content)
