@@ -5,6 +5,14 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
+/**
+ * App-local Room database.
+ *
+ * Migration policy: production builders must register explicit migrations and must not use
+ * destructive fallback. Pending local messages can contain user image bubbles that are not
+ * recoverable from the server, so schema changes must preserve existing rows. Schema JSON is
+ * exported under core/schemas and migration coverage lives in LettaDatabaseMigrationTest.
+ */
 @Database(
     entities = [AgentEntity::class, BugReportEntity::class, PendingLocalEntity::class],
     version = 4,
