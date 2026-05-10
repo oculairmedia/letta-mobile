@@ -1,11 +1,23 @@
 package com.letta.mobile.data.repository
 
+import android.util.Log
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
 import com.letta.mobile.data.api.ConversationApi
+import com.letta.mobile.data.local.ConversationDao
+import com.letta.mobile.data.local.ConversationEntity
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.paging.ConversationPagingSource
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
@@ -19,6 +31,7 @@ data class ConversationCountEstimate(
 @Singleton
 class AllConversationsRepository @Inject constructor(
     private val conversationApi: ConversationApi,
+    private val conversationDao: ConversationDao? = null,
 ) {
     private val _conversations = MutableStateFlow<List<Conversation>>(emptyList())
     val conversations: StateFlow<List<Conversation>> = _conversations.asStateFlow()
@@ -30,13 +43,51 @@ class AllConversationsRepository @Inject constructor(
     private var currentCursor: String? = null
     private var lastRefreshAtMillis: Long = 0L
     private var hasLoadedAtLeastOnce: Boolean = false
+    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    init {
+        repositoryScope.launch {
+            try {
+                val cached = conversationDao?.getAllOnce()?.map { it.toConversation() }.orEmpty()
+                if (cached.isNotEmpty()) {
+                    _conversations.value = cached
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to load cached conversations", e)
+            }
+        }
+    }
+
+    fun getConversationsPaged(
+        agentId: String? = null,
+        archiveStatus: String? = null,
+        summarySearch: String? = null,
+    ): Flow<PagingData<Conversation>> {
+        return Pager(
+            config = PagingConfig(
+                pageSize = ConversationPagingSource.PAGE_SIZE,
+                enablePlaceholders = false,
+                initialLoadSize = ConversationPagingSource.PAGE_SIZE,
+            ),
+            pagingSourceFactory = {
+                ConversationPagingSource(
+                    conversationApi = conversationApi,
+                    agentId = agentId,
+                    archiveStatus = archiveStatus,
+                    summarySearch = summarySearch,
+                    order = "desc",
+                    orderBy = "last_message_at",
+                )
+            },
+        ).flow
+    }
 
     suspend fun loadNextPage() {
         if (!_hasMore.value) return
 
         val newConversations = conversationApi.listConversations(
             limit = PAGE_SIZE,
-            after = currentCursor
+            after = currentCursor,
         )
 
         hasLoadedAtLeastOnce = true
@@ -50,6 +101,7 @@ class AllConversationsRepository @Inject constructor(
                 val deduped = newConversations.filter { it.id !in existingIds }
                 current + deduped
             }
+            cacheConversations(newConversations)
             currentCursor = newConversations.last().id
         }
     }
@@ -86,10 +138,16 @@ class AllConversationsRepository @Inject constructor(
                 listOf(conversation) + current
             }
         }
+        repositoryScope.launch {
+            conversationDao?.upsert(ConversationEntity.fromConversation(conversation))
+        }
     }
 
     fun handleOptimisticDelete(conversationId: String) {
         _conversations.update { current -> current.filter { it.id != conversationId } }
+        repositoryScope.launch {
+            conversationDao?.delete(conversationId)
+        }
     }
 
     /**
@@ -121,5 +179,10 @@ class AllConversationsRepository @Inject constructor(
 
     companion object {
         private const val PAGE_SIZE = 50
+        private const val TAG = "AllConversationsRepo"
+    }
+
+    private suspend fun cacheConversations(conversations: List<Conversation>) {
+        conversationDao?.upsertAll(conversations.map { ConversationEntity.fromConversation(it) })
     }
 }

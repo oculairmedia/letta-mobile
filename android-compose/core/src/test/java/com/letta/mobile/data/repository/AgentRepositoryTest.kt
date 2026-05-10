@@ -41,6 +41,19 @@ class AgentRepositoryTest {
     }
 
     @Test
+    fun `refreshAgents hydrates cache with paged offset requests`() = runTest {
+        repeat(125) { index ->
+            fakeApi.agents.add(TestData.agent(id = "a$index", name = "Agent $index"))
+        }
+
+        repository.refreshAgents()
+
+        assertEquals(125, repository.agents.value.size)
+        assertEquals(List(7) { 20 }, fakeApi.listLimits)
+        assertEquals(listOf(0, 20, 40, 60, 80, 100, 120), fakeApi.listOffsets)
+    }
+
+    @Test
     fun `deleteAgent removes deleted agent from cached agents immediately`() = runTest {
         fakeApi.agents.addAll(
             listOf(

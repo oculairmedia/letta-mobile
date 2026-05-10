@@ -72,16 +72,37 @@ class AgentRepository @Inject constructor(
     }
 
     private suspend fun refreshAgentsLocked() {
-        val fresh = agentApi.listAgents(limit = 1000)
+        val fresh = fetchAgentsForCache()
         _agents.update { fresh }
         lastRefreshAtMillis = System.currentTimeMillis()
         try {
             val entities = fresh.map { AgentEntity.fromAgent(it) }
             agentDao.insertAll(entities)
-            agentDao.deleteExcept(fresh.map { it.id })
+            if (fresh.isEmpty()) {
+                agentDao.deleteAll()
+            } else {
+                agentDao.deleteExcept(fresh.map { it.id })
+            }
         } catch (e: Exception) {
             Log.w("AgentRepository", "Failed to cache agents to Room", e)
         }
+    }
+
+    private suspend fun fetchAgentsForCache(): List<Agent> {
+        val merged = mutableListOf<Agent>()
+        var offset = AgentPagingSource.INITIAL_OFFSET
+        var pagesFetched = 0
+        while (pagesFetched < MAX_CACHE_REFRESH_PAGES) {
+            val page = agentApi.listAgents(limit = AgentPagingSource.PAGE_SIZE, offset = offset)
+            if (page.isEmpty()) break
+
+            val existingIds = merged.map { it.id }.toSet()
+            merged += page.filter { it.id !in existingIds }
+            if (page.size < AgentPagingSource.PAGE_SIZE) break
+            offset += page.size
+            pagesFetched++
+        }
+        return merged
     }
 
     fun getCachedAgent(id: String): Agent? = _agents.value.find { it.id == id }
@@ -215,5 +236,9 @@ class AgentRepository @Inject constructor(
                 )
             }
         }
+    }
+
+    private companion object {
+        const val MAX_CACHE_REFRESH_PAGES = 20
     }
 }

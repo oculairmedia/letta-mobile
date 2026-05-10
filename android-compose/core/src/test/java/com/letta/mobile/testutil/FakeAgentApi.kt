@@ -16,13 +16,20 @@ class FakeAgentApi : AgentApi(mockk(relaxed = true)) {
     var failCode = 500
     var failMessage = "Server error"
     val calls = mutableListOf<String>()
+    val listLimits = mutableListOf<Int?>()
+    val listOffsets = mutableListOf<Int?>()
     var exportPayloadByAgentId = mutableMapOf<String, String>()
 
     override suspend fun listAgents(limit: Int?, offset: Int?, tags: List<String>?): List<Agent> {
         calls.add("listAgents")
+        listLimits.add(limit)
+        listOffsets.add(offset)
         if (listDelayMillis > 0L) delay(listDelayMillis)
         if (shouldFail) throw ApiException(failCode, failMessage)
-        return agents.toList()
+        val filtered = tags?.takeIf { it.isNotEmpty() }?.let { requiredTags ->
+            agents.filter { agent -> requiredTags.all { it in agent.tags } }
+        } ?: agents
+        return limit?.let { filtered.drop(offset ?: 0).take(it) } ?: filtered.toList()
     }
 
     override suspend fun getAgent(agentId: String): Agent {
