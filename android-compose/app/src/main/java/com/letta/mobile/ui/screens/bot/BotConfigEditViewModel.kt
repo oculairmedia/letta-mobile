@@ -197,6 +197,14 @@ class BotConfigEditViewModel @Inject constructor(
             onError("Unknown skill IDs: ${unknownSkillIds.joinToString(", ")}")
             return
         }
+        val generatedApiServerToken = if (apiServerEnabled && apiServerToken.isBlank()) {
+            UUID.randomUUID().toString()
+        } else {
+            apiServerToken.trim()
+        }
+        if (apiServerEnabled && apiServerToken.isBlank()) {
+            apiServerToken = generatedApiServerToken
+        }
         val config = BotConfig(
             id = configId,
             heartbeatAgentId = heartbeatAgentId.trim().ifBlank { null },
@@ -221,7 +229,7 @@ class BotConfigEditViewModel @Inject constructor(
             enabled = enabled,
             apiServerEnabled = apiServerEnabled,
             apiServerPort = apiServerPort,
-            apiServerToken = apiServerToken.trim().ifBlank { null },
+            apiServerToken = generatedApiServerToken.ifBlank { null },
         )
         viewModelScope.launch {
             try {

@@ -68,15 +68,25 @@ class BotApiServer @Inject constructor(
     val authRequired: Boolean get() = !currentAuthToken.isNullOrBlank()
 
     private var currentPort: Int? = null
+    private var currentHost: String? = null
+    private var allowUnauthenticated = false
 
-    fun start(port: Int = DEFAULT_PORT, authToken: String? = null) {
+    fun start(
+        port: Int = DEFAULT_PORT,
+        authToken: String? = null,
+        allowUnauthenticated: Boolean = false,
+        host: String = LOOPBACK_HOST,
+    ) {
         val normalizedAuthToken = authToken?.trim()?.takeIf { it.isNotEmpty() }
-        if (running && currentPort == port && currentAuthToken == normalizedAuthToken) return
+        val normalizedHost = host.trim().ifBlank { LOOPBACK_HOST }
+        if (running && currentPort == port && currentHost == normalizedHost &&
+            currentAuthToken == normalizedAuthToken && this.allowUnauthenticated == allowUnauthenticated
+        ) return
         if (running) {
             stop()
         }
 
-        server = embeddedServer(Netty, port = port) {
+        server = embeddedServer(Netty, host = normalizedHost, port = port) {
             install(ContentNegotiation) {
                 json(Json {
                     ignoreUnknownKeys = true
@@ -87,7 +97,7 @@ class BotApiServer @Inject constructor(
 
             routing {
                 suspend fun RoutingContext.requireAuthorization(): Boolean {
-                    if (isAuthorizedRequest(call, normalizedAuthToken)) return true
+                    if (isAuthorizedRequest(call, normalizedAuthToken, allowUnauthenticated)) return true
 
                     Log.w(TAG, "Rejected unauthorized API request from ${clientRateLimitKey(call)} to ${call.request.path()}")
                     call.response.header(HttpHeaders.WWWAuthenticate, "Bearer")
@@ -171,8 +181,10 @@ class BotApiServer @Inject constructor(
         server?.start(wait = false)
         running = true
         currentPort = port
+        currentHost = normalizedHost
         currentAuthToken = normalizedAuthToken
-        Log.i(TAG, "Bot API server started on port $port")
+        this.allowUnauthenticated = allowUnauthenticated
+        Log.i(TAG, "Bot API server started on $normalizedHost:$port")
     }
 
     fun stop() {
@@ -181,12 +193,15 @@ class BotApiServer @Inject constructor(
         running = false
         currentPort = null
         currentAuthToken = null
+        currentHost = null
+        allowUnauthenticated = false
         Log.i(TAG, "Bot API server stopped")
     }
 
     companion object {
         private const val TAG = "BotApiServer"
         const val DEFAULT_PORT = 8080
+        const val LOOPBACK_HOST = "127.0.0.1"
         private const val DEFAULT_RATE_LIMIT_REQUESTS = 30
         private const val DEFAULT_RATE_LIMIT_WINDOW_MILLIS = 60_000L
     }
@@ -209,11 +224,23 @@ internal fun io.ktor.server.response.ApplicationResponse.applyRateLimitHeaders(
     header("Retry-After", resetAfterSeconds.coerceAtLeast(0).toString())
 }
 
-internal fun isAuthorizedRequest(call: ApplicationCall, authToken: String?): Boolean =
-    isAuthorizedHeader(call.request.header(HttpHeaders.Authorization), authToken)
+internal fun isAuthorizedRequest(
+    call: ApplicationCall,
+    authToken: String?,
+    allowUnauthenticated: Boolean = false,
+): Boolean = isAuthorizedHeader(
+    authHeader = call.request.header(HttpHeaders.Authorization),
+    authToken = authToken,
+    allowUnauthenticated = allowUnauthenticated,
+)
 
-internal fun isAuthorizedHeader(authHeader: String?, authToken: String?): Boolean {
-    val expectedToken = authToken?.trim()?.takeIf { it.isNotEmpty() } ?: return true
+internal fun isAuthorizedHeader(
+    authHeader: String?,
+    authToken: String?,
+    allowUnauthenticated: Boolean = false,
+): Boolean {
+    val expectedToken = authToken?.trim()?.takeIf { it.isNotEmpty() }
+        ?: return allowUnauthenticated
     return extractBearerToken(authHeader) == expectedToken
 }
 

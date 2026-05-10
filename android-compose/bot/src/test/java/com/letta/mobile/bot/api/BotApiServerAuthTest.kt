@@ -7,9 +7,14 @@ import org.junit.jupiter.api.Tag
 @Tag("unit")
 class BotApiServerAuthTest : WordSpec({
     "isAuthorizedHeader" should {
-        "document current unsafe blank-token behavior before hardening" {
-            isAuthorizedHeader(authHeader = null, authToken = null) shouldBe true
-            isAuthorizedHeader(authHeader = "Bearer ignored", authToken = "") shouldBe true
+        "reject blank tokens by default" {
+            isAuthorizedHeader(authHeader = null, authToken = null) shouldBe false
+            isAuthorizedHeader(authHeader = "Bearer ignored", authToken = "") shouldBe false
+        }
+
+        "allow blank tokens only with explicit unsafe opt-in" {
+            isAuthorizedHeader(authHeader = null, authToken = null, allowUnauthenticated = true) shouldBe true
+            isAuthorizedHeader(authHeader = "Bearer ignored", authToken = "", allowUnauthenticated = true) shouldBe true
         }
 
         "accept matching bearer tokens" {

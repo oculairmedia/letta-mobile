@@ -145,6 +145,21 @@ class BotConfigEditViewModelTest {
     }
 
     @Test
+    fun saveGeneratesApiServerTokenWhenEnabledWithBlankToken() = runTest(mainDispatcherRule.dispatcher) {
+        val savedSlot = slot<BotConfig>()
+        coJustRun { configStore.saveConfig(capture(savedSlot)) }
+        val vm = createViewModel()
+        vm.apiServerEnabled = true
+        vm.apiServerToken = ""
+
+        vm.save(onSuccess = {}, onError = {})
+        advanceUntilIdle()
+
+        assert(savedSlot.captured.apiServerToken?.isNotBlank() == true)
+        assert(vm.apiServerToken == savedSlot.captured.apiServerToken)
+    }
+
+    @Test
     fun saveCallsConfigStoreOnSuccess() = runTest(mainDispatcherRule.dispatcher) {
         val vm = createViewModel()
 
