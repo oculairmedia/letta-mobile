@@ -287,6 +287,60 @@ class TimelineSyncLoopTest {
     }
 
     @Test
+    fun `duplicate assistant stream seq does not append terminal snapshot`() = runBlocking {
+        val first = "The command results are:\n"
+        val second = "- pwd: /opt/stacks/letta-mobile\n- whoami: root\n"
+        val full = first + second
+        val api = FakeSyncApi()
+        api.nextStreamMessages = listOf(
+            AssistantMessage(
+                id = "reply-stream",
+                contentRaw = JsonPrimitive(first),
+                otid = "reply-otid-dup-seq",
+                seqId = 1,
+            ),
+            AssistantMessage(
+                id = "reply-stream",
+                contentRaw = JsonPrimitive(second),
+                seqId = 2,
+            ),
+            // Replayed/terminal snapshot for the same seq should not be
+            // treated as a third delta and appended to itself.
+            AssistantMessage(
+                id = "reply-stream",
+                contentRaw = JsonPrimitive(full),
+                seqId = 2,
+            ),
+        )
+        val scope = CoroutineScope(Dispatchers.IO)
+        val sync = TimelineSyncLoop(api, "conv1", scope)
+
+        sync.send("run tools")
+
+        withTimeout(5_000) {
+            while (sync.state.value.findByOtid("reply-otid-dup-seq") == null) delay(10)
+            while ((sync.state.value.events.firstOrNull {
+                    it is TimelineEvent.Confirmed && it.serverId == "reply-stream"
+                }?.content?.length ?: 0) < full.length) {
+                delay(10)
+            }
+            delay(50)
+        }
+
+        val assistant = sync.state.value.events.firstOrNull {
+            it is TimelineEvent.Confirmed && it.serverId == "reply-stream"
+        }
+        assertNotNull("assistant event must be emitted", assistant)
+        assertEquals(full, assistant!!.content)
+        assertEquals(
+            "terminal snapshot must not be appended as a second copy",
+            1,
+            assistant.content.windowed(full.length).count { it == full },
+        )
+        scope.coroutineContext.job.cancel()
+    }
+
+    @Test
     fun `client mode collapsed assistant duplicate server frame does not double content`() = runBlocking {
         val api = FakeSyncApi()
         val scope = CoroutineScope(Dispatchers.Unconfined)

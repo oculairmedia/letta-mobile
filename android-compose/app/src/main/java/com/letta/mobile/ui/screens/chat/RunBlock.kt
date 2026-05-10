@@ -273,11 +273,19 @@ internal fun compactRunToolCallSteps(messages: List<UiMessage>): List<RunTimelin
     }
 
     messages.forEach { message ->
-        if (message.isRunCompactableToolCallMessage()) {
-            pendingToolMessages += message
-        } else {
-            flushToolMessages()
-            steps.add(RunTimelineStep.Message(message))
+        when {
+            message.isRunCompactableToolCallMessage() -> {
+                pendingToolMessages += message
+            }
+            message.hasStandaloneContentAndToolCalls() -> {
+                flushToolMessages()
+                steps.add(RunTimelineStep.Message(message.withoutToolCallsForStandaloneContent()))
+                pendingToolMessages += message.withoutStandaloneContentForToolGroup()
+            }
+            else -> {
+                flushToolMessages()
+                steps.add(RunTimelineStep.Message(message))
+            }
         }
     }
     flushToolMessages()
@@ -293,6 +301,22 @@ private fun UiMessage.isRunCompactableToolCallMessage(): Boolean =
         approvalResponse == null &&
         attachments.isEmpty() &&
         !toolCalls.isNullOrEmpty()
+
+private fun UiMessage.hasStandaloneContentAndToolCalls(): Boolean =
+    role == "assistant" &&
+        !isReasoning &&
+        !isError &&
+        content.isNotBlank() &&
+        generatedUi == null &&
+        approvalResponse == null &&
+        attachments.isEmpty() &&
+        !toolCalls.isNullOrEmpty()
+
+private fun UiMessage.withoutToolCallsForStandaloneContent(): UiMessage =
+    copy(toolCalls = null, approvalRequest = null)
+
+private fun UiMessage.withoutStandaloneContentForToolGroup(): UiMessage =
+    copy(content = "")
 
 /**
  * When collapsed, picks the most representative message to show as preview.

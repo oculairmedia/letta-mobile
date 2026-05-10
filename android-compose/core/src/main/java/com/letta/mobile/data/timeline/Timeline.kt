@@ -126,6 +126,7 @@ sealed class TimelineEvent {
         val toolReturnContentByCallId: Map<String, String> = emptyMap(),
         val toolReturnIsErrorByCallId: Map<String, Boolean> = emptyMap(),
         override val source: MessageSource = MessageSource.LETTA_SERVER,
+        val seqId: Int? = null,
     ) : TimelineEvent()
 }
 

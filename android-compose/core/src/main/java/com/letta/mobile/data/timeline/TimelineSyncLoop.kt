@@ -1425,6 +1425,17 @@ class TimelineSyncLoop(
         // instead of the full assistant text — reported 2026-04-18.
         val existing = _state.value.findByServerId(confirmed.serverId, confirmed.messageType)
         if (existing != null) {
+            if (existing.hasAlreadyIngestedStreamFrame(confirmed)) {
+                Telemetry.event(
+                    "TimelineSync", "streamSubscriber.duplicateSeqSkipped",
+                    "serverId" to confirmed.serverId,
+                    "messageType" to (message.messageType ?: "?"),
+                    "existingSeqId" to existing.seqId,
+                    "incomingSeqId" to confirmed.seqId,
+                    "conversationId" to conversationId,
+                )
+                return@withLock
+            }
             val oldText = existing.content
             val newText = confirmed.content
             // letta-mobile (lettabot-uww.11 fix): the WS gateway emits
@@ -1494,6 +1505,7 @@ class TimelineSyncLoop(
                     toolReturnIsErrorByCallId = existing.toolReturnIsErrorByCallId + confirmed.toolReturnIsErrorByCallId,
                     approvalRequestId = confirmed.approvalRequestId ?: existing.approvalRequestId,
                     source = existing.source,
+                    seqId = latestSeqId(existing.seqId, confirmed.seqId),
                 )
             )
             _state.value = _state.value.replaceByServerId(merged)
@@ -1648,6 +1660,21 @@ private fun compareNullableInts(left: Int?, right: Int?): Int = when {
     else -> 0
 }
 
+private fun TimelineEvent.Confirmed.hasAlreadyIngestedStreamFrame(
+    incoming: TimelineEvent.Confirmed,
+): Boolean =
+    messageType == TimelineMessageType.ASSISTANT &&
+        incoming.messageType == TimelineMessageType.ASSISTANT &&
+        seqId != null &&
+        incoming.seqId != null &&
+        incoming.seqId <= seqId
+
+private fun latestSeqId(left: Int?, right: Int?): Int? = when {
+    left == null -> right
+    right == null -> left
+    else -> maxOf(left, right)
+}
+
 private fun hydratedMessageTypePriority(message: LettaMessage): Int = when (message) {
     is UserMessage -> 0
     is ReasoningMessage, is HiddenReasoningMessage -> 1
@@ -1714,5 +1741,6 @@ internal fun LettaMessage.toTimelineEvent(position: Double): TimelineEvent.Confi
         attachments = attachments,
         toolCalls = toolCallsList,
         approvalRequestId = approvalId,
+        seqId = seqId,
     )
 }

@@ -357,9 +357,35 @@ class MessageGroupingTest {
         )
 
         assertEquals(3, steps.size)
-        assertTrue(steps[0] is RunTimelineStep.Message)
-        assertTrue(steps[1] is RunTimelineStep.Message)
-        assertTrue(steps[2] is RunTimelineStep.Message)
+        val firstTool = steps[0] as RunTimelineStep.Message
+        val text = steps[1] as RunTimelineStep.Message
+        val group = steps[2] as RunTimelineStep.ToolCallGroup
+        assertEquals(listOf("tc1"), listOf(firstTool.message.id))
+        assertEquals("about to run ls", text.message.content)
+        assertTrue(text.message.toolCalls.isNullOrEmpty())
+        assertEquals(listOf("tc2", "tc3"), group.messages.map { it.id })
+        assertEquals(listOf("call-tc2", "call-tc3"), group.toolCalls.map { it.toolCallId })
+    }
+
+    @Test
+    fun `first tool-call message with preamble still joins following compact group`() {
+        val steps = compactRunToolCallSteps(
+            listOf(
+                assistantToolCall("tc1", command = "pwd", content = "I'll inspect the environment."),
+                assistantToolCall("tc2", command = "date"),
+                assistantToolCall("tc3", command = "whoami"),
+                assistant("a1", runId = "r1"),
+            ),
+        )
+
+        assertEquals(3, steps.size)
+        val preamble = steps[0] as RunTimelineStep.Message
+        val group = steps[1] as RunTimelineStep.ToolCallGroup
+        assertEquals("I'll inspect the environment.", preamble.message.content)
+        assertTrue(preamble.message.toolCalls.isNullOrEmpty())
+        assertEquals(listOf("tc1", "tc2", "tc3"), group.messages.map { it.id })
+        assertEquals(listOf("call-tc1", "call-tc2", "call-tc3"), group.toolCalls.map { it.toolCallId })
+        assertEquals("a1", (steps[2] as RunTimelineStep.Message).message.id)
     }
 
     private fun user(id: String, ts: String = "2026-04-19T12:00:00Z") = UiMessage(
