@@ -47,6 +47,7 @@ import com.letta.mobile.ui.components.DateSeparator
 import com.letta.mobile.ui.components.ScrollToBottomFab
 import com.letta.mobile.ui.components.TypingIndicator
 import com.letta.mobile.ui.theme.LocalChatIsPinching
+import com.letta.mobile.ui.theme.chatDimens
 import java.time.LocalDate
 import kotlin.math.round
 import kotlinx.coroutines.delay
@@ -273,9 +274,13 @@ fun ChatMessageList(
         CompositionLocalProvider(LocalChatIsPinching provides isPinching) {
             LazyColumn(
                 state = listState,
-                // letta-mobile-23h5 (polish 2026-04-19): wider side
-                // gutters so bubbles don't kiss the screen edge.
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+                // Use the chat theme's compact gutter so assistant prose,
+                // tool output, and run blocks get the widest useful line
+                // length without touching the screen edge.
+                contentPadding = PaddingValues(
+                    horizontal = MaterialTheme.chatDimens.contentPaddingHorizontal,
+                    vertical = 8.dp,
+                ),
                 reverseLayout = true,
                 // letta-mobile-5e0f.r3: GPU-only pinch scale. During
                 // a pinch gesture transientPinchScale ranges 0.7..1.6
@@ -343,6 +348,8 @@ fun ChatMessageList(
                                         onToggleCollapsed = { onToggleRunCollapsed(runId) },
                                         modifier = Modifier.padding(top = 6.dp, bottom = 0.dp),
                                         isStreaming = state.isStreaming,
+                                        activeApprovalRequestId = state.activeApprovalRequestId,
+                                        onApprovalDecision = onSubmitApproval,
                                     ) { message, position, rowModifier ->
                                         RenderChatMessage(
                                             message = message,
@@ -390,6 +397,8 @@ fun ChatMessageList(
                                     onToggleCollapsed = { onToggleRunCollapsed(renderItem.runId) },
                                     modifier = highlightModifier.padding(top = 6.dp, bottom = 0.dp),
                                     isStreaming = state.isStreaming,
+                                    activeApprovalRequestId = state.activeApprovalRequestId,
+                                    onApprovalDecision = onSubmitApproval,
                                 ) { message, position, rowModifier ->
                                     RenderChatMessage(
                                         message = message,
