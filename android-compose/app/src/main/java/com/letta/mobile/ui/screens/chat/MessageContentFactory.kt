@@ -440,6 +440,7 @@ object ToolCallRenderer : MessageContentRenderer {
                 }
                 MessageToolCalls(
                     toolCalls = stableToolCalls,
+                    messageId = message.id,
                     animateEntrance = shouldAnimateToolCallEntrance(isStreaming),
                     approvalRequest = message.approvalRequest,
                 )

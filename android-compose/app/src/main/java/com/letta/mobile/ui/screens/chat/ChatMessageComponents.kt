@@ -85,9 +85,14 @@ import com.letta.mobile.ui.theme.listItemMetadata
 import com.letta.mobile.ui.theme.listItemSupporting
 import com.letta.mobile.ui.theme.scaledBy
 import com.letta.mobile.ui.theme.sectionTitle
+import java.util.LinkedHashMap
 import kotlinx.collections.immutable.toImmutableList
 
 private const val REASONING_PREVIEW_MAX_LENGTH = 96
+private const val TOOL_CALL_ENTRANCE_ANIMATION_HISTORY_SIZE = 512
+
+private val toolCallEntranceAnimationHistory =
+    RecentStringSet(TOOL_CALL_ENTRANCE_ANIMATION_HISTORY_SIZE)
 
 private fun UiMessage.displayRoleLabel(defaultLabel: String): String {
     val toolCall = toolCalls?.singleOrNull()
@@ -860,6 +865,7 @@ private fun String.reasoningPreview(): String {
 internal fun MessageToolCalls(
     toolCalls: kotlinx.collections.immutable.ImmutableList<UiToolCall>,
     modifier: Modifier = Modifier,
+    messageId: String? = null,
     animateEntrance: Boolean = false,
     approvalRequest: UiApprovalRequest? = null,
 ) {
@@ -869,7 +875,17 @@ internal fun MessageToolCalls(
             .orEmpty()
     }
     if (shouldUseCompactToolCallGroup(toolCalls)) {
-        if (animateEntrance) {
+        val entranceKey = remember(messageId, toolCalls) {
+            toolCalls.joinToString(
+                prefix = "tool-group|${messageId.orEmpty()}|",
+                separator = "|",
+            ) { it.toolCallMotionKey() }
+        }
+        val shouldAnimateEntrance = remember(animateEntrance, entranceKey) {
+            shouldRunToolCallEntranceAnimation(animateEntrance, entranceKey)
+        }
+        if (shouldAnimateEntrance) {
+            RecordToolCallEntranceAnimation(entranceKey)
             ToolCallEntrance {
                 CompactToolCallGroupCard(
                     toolCalls = toolCalls,
@@ -891,8 +907,16 @@ internal fun MessageToolCalls(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         toolCalls.forEachIndexed { index, toolCall ->
-            key(index, toolCall.toolCallMotionKey()) {
-                if (animateEntrance) {
+            val motionKey = toolCall.toolCallMotionKey()
+            key(index, motionKey) {
+                val entranceKey = remember(messageId, motionKey) {
+                    "tool|${messageId.orEmpty()}|$motionKey"
+                }
+                val shouldAnimateEntrance = remember(animateEntrance, entranceKey) {
+                    shouldRunToolCallEntranceAnimation(animateEntrance, entranceKey)
+                }
+                if (shouldAnimateEntrance) {
+                    RecordToolCallEntranceAnimation(entranceKey)
                     ToolCallEntrance {
                         ToolCallCard(
                             toolCall = toolCall,
@@ -912,6 +936,56 @@ internal fun MessageToolCalls(
 
 internal fun shouldUseCompactToolCallGroup(toolCalls: List<UiToolCall>): Boolean =
     toolCalls.size > 1
+
+internal fun shouldRunToolCallEntranceAnimation(
+    animateEntrance: Boolean,
+    key: String,
+): Boolean =
+    animateEntrance && !toolCallEntranceAnimationHistory.contains(key)
+
+internal fun recordToolCallEntranceAnimationRun(key: String) {
+    toolCallEntranceAnimationHistory.addIfAbsent(key)
+}
+
+@Composable
+private fun RecordToolCallEntranceAnimation(key: String) {
+    LaunchedEffect(key) {
+        recordToolCallEntranceAnimationRun(key)
+    }
+}
+
+internal fun clearToolCallEntranceAnimationHistoryForTest() {
+    toolCallEntranceAnimationHistory.clear()
+}
+
+private class RecentStringSet(
+    private val maxEntries: Int,
+) {
+    private val lock = Any()
+    private val values = object : LinkedHashMap<String, Unit>(maxEntries, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Unit>?): Boolean =
+            size > maxEntries
+    }
+
+    fun contains(value: String): Boolean = synchronized(lock) {
+        values.containsKey(value)
+    }
+
+    fun addIfAbsent(value: String): Boolean = synchronized(lock) {
+        if (values.containsKey(value)) {
+            false
+        } else {
+            values[value] = Unit
+            true
+        }
+    }
+
+    fun clear() {
+        synchronized(lock) {
+            values.clear()
+        }
+    }
+}
 
 private fun UiToolCall.toolCallMotionKey(): String = buildString {
     append(toolCallId ?: name)

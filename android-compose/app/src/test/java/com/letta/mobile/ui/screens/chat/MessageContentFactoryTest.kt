@@ -16,6 +16,20 @@ class MessageContentFactoryTest {
     }
 
     @Test
+    fun `tool call entrance animation is recorded only from side effect`() {
+        clearToolCallEntranceAnimationHistoryForTest()
+
+        assertTrue(shouldRunToolCallEntranceAnimation(animateEntrance = true, key = "tool|call-a"))
+        assertTrue(shouldRunToolCallEntranceAnimation(animateEntrance = true, key = "tool|call-a"))
+
+        recordToolCallEntranceAnimationRun("tool|call-a")
+        assertFalse(shouldRunToolCallEntranceAnimation(animateEntrance = true, key = "tool|call-a"))
+
+        assertFalse(shouldRunToolCallEntranceAnimation(animateEntrance = false, key = "tool|call-b"))
+        assertTrue(shouldRunToolCallEntranceAnimation(animateEntrance = true, key = "tool|call-b"))
+    }
+
+    @Test
     fun `multiple tool calls use compact group renderer`() {
         assertFalse(shouldUseCompactToolCallGroup(emptyList()))
         assertFalse(
