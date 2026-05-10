@@ -13,6 +13,11 @@ allOpen {
     annotation("javax.inject.Singleton")
 }
 
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+    arg("room.incremental", "true")
+}
+
 detekt {
     buildUponDefaultConfig = true
     config.setFrom("$rootDir/detekt.yml")

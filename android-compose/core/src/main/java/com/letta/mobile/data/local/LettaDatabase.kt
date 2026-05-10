@@ -8,7 +8,7 @@ import androidx.room.RoomDatabase
 @Database(
     entities = [AgentEntity::class, BugReportEntity::class, PendingLocalEntity::class],
     version = 3,
-    exportSchema = false,
+    exportSchema = true,
 )
 abstract class LettaDatabase : RoomDatabase() {
     abstract fun agentDao(): AgentDao
@@ -25,7 +25,10 @@ abstract class LettaDatabase : RoomDatabase() {
                     context.applicationContext,
                     LettaDatabase::class.java,
                     "letta_database"
-                ).fallbackToDestructiveMigration().build()
+                )
+                    .addMigrations(*LettaDatabaseMigrations.ALL)
+                    .fallbackToDestructiveMigration()
+                    .build()
                 INSTANCE = instance
                 instance
             }
