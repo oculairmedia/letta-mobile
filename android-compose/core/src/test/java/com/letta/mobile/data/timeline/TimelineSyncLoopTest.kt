@@ -1398,6 +1398,7 @@ scope.coroutineContext.job.cancel()
 
     @Test
     fun `stream subscriber resolves ingested listener dynamically`() = runTest {
+        com.letta.mobile.util.Telemetry.clear()
         val api = OneShotAssistantStreamApi()
         val dispatcher = StandardTestDispatcher(testScheduler)
         val scope = CoroutineScope(dispatcher)
@@ -1432,6 +1433,17 @@ scope.coroutineContext.job.cancel()
             listOf("conv-dynamic-listener", "asst-dynamic", "assistant_message", "late listener works"),
             received,
         )
+        val dispatchEvent = com.letta.mobile.util.Telemetry.snapshot().firstOrNull {
+            it.tag == "TimelineSync" &&
+                it.name == "streamSubscriber.listenerDispatch" &&
+                (it.attrs["conversationId"] as? String) == "conv-dynamic-listener"
+        }
+        assertNotNull("expected listener dispatch telemetry", dispatchEvent)
+        assertEquals("asst-dynamic", dispatchEvent!!.attrs["serverId"])
+        assertEquals("assistant_message", dispatchEvent.attrs["messageType"])
+        assertEquals(true, dispatchEvent.attrs["hasListener"])
+        assertEquals(19, dispatchEvent.attrs["previewLength"])
+        assertFalse("listener dispatch telemetry must not include raw preview", dispatchEvent.attrs.containsKey("contentPreview"))
         scope.coroutineContext.job.cancel()
     }
 }

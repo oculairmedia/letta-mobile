@@ -1599,7 +1599,16 @@ class TimelineSyncLoop(
         val mt = message.messageType
         if (mt == "assistant_message" || mt == "tool_return_message") {
             try {
-                (ingestedListenerProvider?.invoke() ?: ingestedListener)?.onMessageIngested(
+                val listener = ingestedListenerProvider?.invoke() ?: ingestedListener
+                Telemetry.event(
+                    "TimelineSync", "streamSubscriber.listenerDispatch",
+                    "conversationId" to conversationId,
+                    "serverId" to confirmed.serverId,
+                    "messageType" to mt,
+                    "hasListener" to (listener != null),
+                    "previewLength" to confirmed.content.take(140).length,
+                )
+                listener?.onMessageIngested(
                     conversationId = conversationId,
                     serverId = confirmed.serverId,
                     messageType = mt,
