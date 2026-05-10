@@ -3,25 +3,15 @@ package com.letta.mobile.ui.screens.chat
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.letta.mobile.bot.protocol.BotStreamChunk
-import com.letta.mobile.bot.protocol.BotStreamEvent
 import com.letta.mobile.bot.protocol.InternalBotClient
 import com.letta.mobile.data.mapper.toUiMessages
 import com.letta.mobile.data.model.AppMessage
-import com.letta.mobile.channel.NotificationCandidatePhase
-import com.letta.mobile.channel.NotificationCandidateSource
-import com.letta.mobile.channel.NotificationDeliveryCandidate
 import com.letta.mobile.channel.NotificationDeliveryCoordinator
 import com.letta.mobile.channel.NotificationReplyHandler
 import com.letta.mobile.data.model.Agent
-import com.letta.mobile.data.model.Block
-import com.letta.mobile.data.model.BlockUpdateParams
-import com.letta.mobile.data.model.ProjectBugReport
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.MessageType
-import com.letta.mobile.data.model.buildContentParts
-import com.letta.mobile.data.model.toJsonArray
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.BugReportRepository
@@ -35,7 +25,6 @@ import com.letta.mobile.util.mapErrorToUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
-import kotlinx.collections.immutable.toImmutableMap
 import kotlinx.collections.immutable.toImmutableSet
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -150,7 +139,6 @@ class AdminChatViewModel @Inject constructor(
         private const val AUTO_COLLAPSE_SUPPRESSED_RUN_IDS_KEY = "autoCollapseSuppressedRunIds"
         private const val EXPANDED_REASONING_MESSAGE_IDS_KEY = "expandedReasoningMessageIds"
         private const val CLIENT_MODE_CONVERSATION_ID_KEY = "clientModeConversationId"
-        private const val MAX_PRE_CONVERSATION_CLIENT_MODE_CHUNKS = 128
     }
 
     val agentId: String = requireNotNull(savedStateHandle.get<String>("agentId")) {
@@ -407,24 +395,6 @@ class AdminChatViewModel @Inject constructor(
         next
     }
 
-    private var clientModeStreamJob: Job? = null
-
-    /**
-     * letta-mobile-5s1n (regression fix): explicit "Client Mode stream in
-     * flight" flag, set BEFORE any timeline mutations and cleared after the
-     * stream coroutine's `finally`. Used by the timeline observer to know
-     * whether to preserve `isStreaming` / `isAgentTyping` across emissions.
-     *
-     * We can't rely on `clientModeStreamJob?.isActive`: with
-     * `UnconfinedTestDispatcher` (and equivalently fast main-thread
-     * dispatch in production), the launched coroutine begins running
-     * synchronously inside `viewModelScope.launch { ... }` and triggers
-     * observer emissions BEFORE the `clientModeStreamJob` assignment
-     * completes — leaving the field at its old (often null) value when
-     * the observer reads it.
-     */
-    @Volatile private var clientModeStreamInFlight: Boolean = false
-    @Volatile private var clientModeStreamStartedAtElapsedMs: Long = 0L
     /**
      * Fresh-route Client Mode sends do not have a timeline conversation id
      * until the gateway echoes one. Keep exactly one quarantined optimistic
@@ -441,8 +411,6 @@ class AdminChatViewModel @Inject constructor(
     private fun clearPendingClientModeBootstrapUserMessage() {
         pendingClientModeBootstrapUserMessage = null
     }
-    private var pendingClientModeStreamSessionId: String? = null
-    private val pendingClientModeStreamChunks = ArrayDeque<BotStreamChunk>()
     private var chatSearchJob: Job? = null
     private val chatTimelineObserver = ChatTimelineObserver(
         scope = viewModelScope,
@@ -450,10 +418,47 @@ class AdminChatViewModel @Inject constructor(
         currentConversationTracker = currentConversationTracker,
         activeReplyStreams = notificationReplyHandler.activeReplyStreams,
         uiState = _uiState,
-        isClientModeStreamInFlight = { clientModeStreamInFlight },
+        isClientModeStreamInFlight = { clientModeSendCoordinator.isStreamInFlight },
         isFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight },
         clearFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = false },
         collapseCompletedRunsIfStreamingFinished = ::collapseCompletedRunsIfStreamingFinished,
+    )
+    private val clientModeSendCoordinator = ClientModeSendCoordinator(
+        scope = viewModelScope,
+        agentId = agentId,
+        clientModeChatSender = clientModeChatSender,
+        timelineRepository = timelineRepository,
+        notificationDeliveryCoordinator = notificationDeliveryCoordinator,
+        currentConversationTracker = currentConversationTracker,
+        uiState = _uiState,
+        clearComposerAfterSend = { composerController.clearAfterSend() },
+        currentClientModeConversationId = ::currentClientModeConversationId,
+        setClientModeConversationId = ::setClientModeConversationId,
+        setRouteConversationId = { savedStateHandle["conversationId"] = it },
+        setActiveConversationId = { activeConversationId = it },
+        markClientModeBootstrapReady = { clientModeBootstrapState = ClientModeBootstrapState.Ready(it) },
+        pendingBootstrapMessages = ::pendingClientModeBootstrapMessages,
+        setBootstrapUserMessage = { pendingClientModeBootstrapUserMessage = it },
+        clearBootstrapUserMessage = ::clearPendingClientModeBootstrapUserMessage,
+        startTimelineObserver = ::startTimelineObserver,
+        stopTimelineObserver = ::stopTimelineObserver,
+        refreshContextWindow = ::refreshContextWindow,
+        collapseCompletedRunsIfStreamingFinished = ::collapseCompletedRunsIfStreamingFinished,
+    )
+    private val projectChatCoordinator = ProjectChatCoordinator(
+        scope = viewModelScope,
+        agentId = agentId,
+        projectContext = projectContext,
+        uiState = _uiState,
+        clientModeEnabled = clientModeEnabled,
+        clientModeAgentLocationRepository = clientModeAgentLocationRepository,
+        agentRepository = agentRepository,
+        blockRepository = blockRepository,
+        bugReportRepository = bugReportRepository,
+        projectAgentActivityLoader = projectAgentActivityLoader,
+        conversationId = { conversationId },
+        setComposerError = { composerController.setError(it) },
+        sendMessage = ::sendMessage,
     )
 
     private fun seedAgentNameFromMemoryCache() {
@@ -496,10 +501,7 @@ class AdminChatViewModel @Inject constructor(
                     .distinctUntilChanged()
                     .collect { enabled ->
                         if (!enabled) {
-                            clientModeStreamJob?.cancel()
-                            resetPreConversationClientModeBuffer()
-                            clientModeStreamInFlight = false
-                            clientModeStreamStartedAtElapsedMs = 0L
+                            clientModeSendCoordinator.cancelActiveStream()
                             _uiState.update {
                                 it.copy(
                                     isClientModeEnabled = false,
@@ -531,258 +533,25 @@ class AdminChatViewModel @Inject constructor(
         }
     }
 
-    fun refreshClientModeLocation() {
-        if (agentId.isBlank() || !clientModeEnabled.value) return
-        viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    clientModeLocation = it.clientModeLocation.copy(
-                        isLoading = true,
-                        error = null,
-                        defaultPath = it.clientModeLocation.defaultPath ?: projectContext?.filesystemPath,
-                    )
-                )
-            }
-            runCatching { clientModeAgentLocationRepository.getLocation(agentId) }
-                .onSuccess { location ->
-                    _uiState.update {
-                        val previous = it.clientModeLocation
-                        it.copy(
-                            clientModeLocation = previous.copy(
-                                isLoading = false,
-                                currentPath = location?.currentPath ?: previous.currentPath,
-                                defaultPath = location?.defaultPath ?: previous.defaultPath ?: projectContext?.filesystemPath,
-                                error = null,
-                            )
-                        )
-                    }
-                }
-                .onFailure { e ->
-                    _uiState.update {
-                        it.copy(
-                            clientModeLocation = it.clientModeLocation.copy(
-                                isLoading = false,
-                                error = mapErrorToUserMessage(e.asException(), "Failed to refresh agent location"),
-                            )
-                        )
-                    }
-                }
-        }
-    }
+    fun refreshClientModeLocation() = projectChatCoordinator.refreshClientModeLocation()
 
-    fun sendClientModeLocationChange(path: String) {
-        val normalized = path.trim()
-        if (normalized.isBlank()) return
-        if (_uiState.value.isStreaming) {
-            composerController.setError("Wait for the current response before changing location")
-            return
-        }
-        _uiState.update {
-            it.copy(
-                clientModeLocation = it.clientModeLocation.copy(
-                    lastRequestedPath = normalized,
-                    error = null,
-                )
-            )
-        }
-        sendMessage(buildClientModeLocationPrompt(normalized))
-    }
+    fun sendClientModeLocationChange(path: String) = projectChatCoordinator.sendClientModeLocationChange(path)
 
-    fun openClientModeLocationPicker() {
-        if (!clientModeEnabled.value) return
-        val initialPath = _uiState.value.clientModeLocation.currentPath
-            ?: _uiState.value.clientModeLocation.lastRequestedPath
-            ?: _uiState.value.clientModeLocation.defaultPath
-        _uiState.update {
-            it.copy(
-                clientModeFilesystemPicker = it.clientModeFilesystemPicker.copy(
-                    isVisible = true,
-                    error = null,
-                )
-            )
-        }
-        browseClientModeLocation(initialPath)
-    }
+    fun openClientModeLocationPicker() = projectChatCoordinator.openClientModeLocationPicker()
 
-    fun closeClientModeLocationPicker() {
-        _uiState.update {
-            it.copy(clientModeFilesystemPicker = it.clientModeFilesystemPicker.copy(isVisible = false))
-        }
-    }
+    fun closeClientModeLocationPicker() = projectChatCoordinator.closeClientModeLocationPicker()
 
-    fun browseClientModeLocation(path: String?) {
-        if (!clientModeEnabled.value) return
-        viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    clientModeFilesystemPicker = it.clientModeFilesystemPicker.copy(
-                        isLoading = true,
-                        error = null,
-                    )
-                )
-            }
-            runCatching { clientModeAgentLocationRepository.browseDirectories(path) }
-                .onSuccess { listing ->
-                    _uiState.update {
-                        it.copy(
-                            clientModeFilesystemPicker = it.clientModeFilesystemPicker.copy(
-                                isVisible = true,
-                                isLoading = false,
-                                path = listing?.path ?: path,
-                                parent = listing?.parent,
-                                entries = listing?.entries ?: persistentListOf(),
-                                truncated = listing?.truncated ?: false,
-                                error = if (listing == null) "Client-mode server is not configured" else null,
-                            )
-                        )
-                    }
-                }
-                .onFailure { e ->
-                    _uiState.update {
-                        it.copy(
-                            clientModeFilesystemPicker = it.clientModeFilesystemPicker.copy(
-                                isLoading = false,
-                                error = mapErrorToUserMessage(e.asException(), "Failed to browse server filesystem"),
-                            )
-                        )
-                    }
-                }
-        }
-    }
+    fun browseClientModeLocation(path: String?) = projectChatCoordinator.browseClientModeLocation(path)
 
-    fun selectClientModeLocation(path: String) {
-        closeClientModeLocationPicker()
-        sendClientModeLocationChange(path)
-    }
+    fun selectClientModeLocation(path: String) = projectChatCoordinator.selectClientModeLocation(path)
 
-    fun refreshContextWindow() {
-        if (agentId.isBlank()) return
-        viewModelScope.launch {
-            _uiState.update {
-                it.copy(contextWindow = it.contextWindow.copy(isLoading = true, error = null))
-            }
-            try {
-                val overview = agentRepository.getContextWindow(agentId, conversationId)
-                _uiState.update {
-                    it.copy(
-                        contextWindow = ContextWindowUiState(
-                            isLoading = false,
-                            maxTokens = overview.contextWindowSizeMax,
-                            currentTokens = overview.contextWindowSizeCurrent,
-                            messageCount = overview.numMessages,
-                            systemTokens = overview.numTokensSystem,
-                            coreMemoryTokens = overview.numTokensCoreMemory,
-                            externalMemoryTokens = overview.numTokensExternalMemorySummary,
-                            summaryMemoryTokens = overview.numTokensSummaryMemory,
-                            toolTokens = overview.numTokensFunctionsDefinitions +
-                                overview.numTokensToolUsageRules +
-                                overview.numTokensDirectories +
-                                overview.numTokensMemoryFilesystem,
-                            messageTokens = overview.numTokensMessages,
-                            archivalMemoryCount = overview.numArchivalMemory,
-                            recallMemoryCount = overview.numRecallMemory,
-                        )
-                    )
-                }
-            } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
-                        contextWindow = it.contextWindow.copy(
-                            isLoading = false,
-                            error = mapErrorToUserMessage(e, "Failed to load context window"),
-                        )
-                    )
-                }
-            }
-        }
-    }
+    fun refreshContextWindow() = projectChatCoordinator.refreshContextWindow()
 
-    fun loadProjectAgents() {
-        val project = projectContext ?: return
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                projectAgents = _uiState.value.projectAgents.copy(isLoading = true, error = null)
-            )
-            try {
-                val activities = projectAgentActivityLoader.load(project, agentId)
-                _uiState.value = _uiState.value.copy(
-                    projectAgents = ProjectAgentsUiState(
-                        isLoading = false,
-                        agents = activities.toImmutableList(),
-                    )
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    projectAgents = _uiState.value.projectAgents.copy(
-                        isLoading = false,
-                        error = mapErrorToUserMessage(e, "Failed to load active agents"),
-                    )
-                )
-            }
-        }
-    }
+    fun loadProjectAgents() = projectChatCoordinator.loadProjectAgents()
 
-    fun loadRecentBugReports() {
-        val projectIdentifier = projectContext?.identifier ?: return
-        viewModelScope.launch {
-            try {
-                val recent = bugReportRepository.getRecentBugReports(projectIdentifier)
-                _uiState.value = _uiState.value.copy(
-                    bugReports = _uiState.value.bugReports.copy(
-                        recentReports = recent.toImmutableList(),
-                        error = null,
-                    )
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    bugReports = _uiState.value.bugReports.copy(
-                        error = mapErrorToUserMessage(e, "Failed to load recent bug reports"),
-                    )
-                )
-            }
-        }
-    }
+    fun loadRecentBugReports() = projectChatCoordinator.loadRecentBugReports()
 
-    fun submitStructuredBugReport(draft: ProjectBugReportDraft) {
-        val project = projectContext ?: return
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                bugReports = _uiState.value.bugReports.copy(isSubmitting = true, error = null)
-            )
-            try {
-                val prompt = buildBugReportPrompt(draft)
-                val logged = bugReportRepository.logBugReport(
-                    ProjectBugReport(
-                        projectIdentifier = project.identifier,
-                        title = draft.title.trim(),
-                        description = draft.description.trim(),
-                        severity = draft.severity.wireValue,
-                        tags = draft.tags,
-                        attachmentReferences = draft.attachmentReferences,
-                        structuredPrompt = prompt,
-                        createdAt = java.time.Instant.now().toString(),
-                    )
-                )
-                _uiState.value = _uiState.value.copy(
-                    bugReports = _uiState.value.bugReports.copy(
-                        isSubmitting = false,
-                        lastSubmittedPrompt = prompt,
-                        recentReports = (listOf(logged) + _uiState.value.bugReports.recentReports
-                            .filterNot { it.id == logged.id }
-                            .take(4)).toImmutableList(),
-                    )
-                )
-                sendMessage(prompt)
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    bugReports = _uiState.value.bugReports.copy(
-                        isSubmitting = false,
-                        error = mapErrorToUserMessage(e, "Failed to submit bug report"),
-                    )
-                )
-            }
-        }
-    }
+    fun submitStructuredBugReport(draft: ProjectBugReportDraft) = projectChatCoordinator.submitStructuredBugReport(draft)
 
     fun tryHandleSlashCommand(text: String): Boolean =
         ChatSlashCommandParser.parse(
@@ -820,8 +589,8 @@ class AdminChatViewModel @Inject constructor(
     fun interruptRun() {
         if (!_uiState.value.isStreaming) return
         val elapsedSinceClientModeStart = android.os.SystemClock.elapsedRealtime() -
-            clientModeStreamStartedAtElapsedMs
-        if (clientModeStreamInFlight && elapsedSinceClientModeStart in 0..750) {
+            clientModeSendCoordinator.streamStartedAtElapsedMs
+        if (clientModeSendCoordinator.isStreamInFlight && elapsedSinceClientModeStart in 0..750) {
             Telemetry.event(
                 "AdminChatVM", "clientMode.ignoreImmediateInterrupt",
                 "elapsedMs" to elapsedSinceClientModeStart,
@@ -845,9 +614,7 @@ class AdminChatViewModel @Inject constructor(
                 }
             }
             runCatching { internalBotClient.abort() }
-            clientModeStreamJob?.cancel(CancellationException("User interrupted active run"))
-            clientModeStreamInFlight = false
-            clientModeStreamStartedAtElapsedMs = 0L
+            clientModeSendCoordinator.cancelActiveStream("User interrupted active run")
         }
     }
 
@@ -892,67 +659,12 @@ class AdminChatViewModel @Inject constructor(
         .distinct()
         .take(1)
 
-    fun loadProjectBrief() {
-        if (projectContext == null) return
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                projectBrief = _uiState.value.projectBrief.copy(isLoading = true, error = null)
-            )
-            try {
-                val blocks = blockRepository.getBlocks(agentId)
-                _uiState.value = _uiState.value.copy(
-                    projectBrief = ProjectBriefUiState(
-                        isLoading = false,
-                        sections = buildProjectBriefSections(blocks).toImmutableMap(),
-                    )
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    projectBrief = _uiState.value.projectBrief.copy(
-                        isLoading = false,
-                        error = mapErrorToUserMessage(e, "Failed to load project brief"),
-                    )
-                )
-            }
-        }
-    }
+    fun loadProjectBrief() = projectChatCoordinator.loadProjectBrief()
 
     fun saveProjectBriefSection(
         key: ProjectBriefSectionKey,
         content: String,
-    ) {
-        val existingSection = _uiState.value.projectBrief.sections[key] ?: return
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                projectBrief = _uiState.value.projectBrief.copy(isSaving = true, error = null)
-            )
-            try {
-                val updatedBlock = blockRepository.updateAgentBlock(
-                    agentId = agentId,
-                    blockLabel = existingSection.blockLabel,
-                    params = BlockUpdateParams(value = content),
-                )
-                val updatedSection = existingSection.copy(
-                    content = updatedBlock.value,
-                    updatedAt = updatedBlock.updatedAt,
-                )
-                _uiState.value = _uiState.value.copy(
-                    projectBrief = _uiState.value.projectBrief.copy(
-                        isSaving = false,
-                        sections = (_uiState.value.projectBrief.sections + (key to updatedSection))
-                            .toImmutableMap(),
-                    )
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    projectBrief = _uiState.value.projectBrief.copy(
-                        isSaving = false,
-                        error = mapErrorToUserMessage(e, "Failed to save project brief"),
-                    )
-                )
-            }
-        }
-    }
+    ) = projectChatCoordinator.saveProjectBriefSection(key, content)
 
     private fun resolveConversationAndLoad(
         useClientModeForResolve: Boolean = clientModeEnabled.value,
@@ -1412,539 +1124,10 @@ class AdminChatViewModel @Inject constructor(
         text: String,
         attachments: List<MessageContentPart.Image> = emptyList(),
     ) {
-        clientModeStreamJob?.cancel()
-        // letta-mobile-5s1n (regression fix): mark stream in flight BEFORE
-        // launching, so observer emissions inside the launch (which run
-        // synchronously on UnconfinedTestDispatcher / immediate main) see
-        // the flag even before `clientModeStreamJob` is assigned.
-        clientModeStreamInFlight = true
-        clientModeStreamStartedAtElapsedMs = android.os.SystemClock.elapsedRealtime()
-        // Fresh Client Mode bootstrap can spend noticeable time creating the
-        // blank Letta conversation before a timeline append or gateway chunk
-        // happens. Surface the run as streaming immediately so the UI shows
-        // the thinking affordance and a second composer submit is routed as a
-        // steering/stop action instead of starting a new send that cancels the
-        // in-flight bootstrap. Keep the conversation state unchanged until a
-        // real conversation id exists.
-        _uiState.value = _uiState.value.copy(
-            isLoadingMessages = false,
-            isLoadingOlderMessages = false,
-            hasMoreOlderMessages = false,
-            isStreaming = true,
-            isAgentTyping = true,
-            error = null,
-        )
-        val startedAt = java.time.Instant.now().toString()
-        val userMessageId = "client-user-${java.util.UUID.randomUUID()}"
-        val assistantMessageId = "client-assistant-${java.util.UUID.randomUUID()}"
-        resetPreConversationClientModeBuffer()
-        pendingClientModeStreamSessionId = assistantMessageId
-        val outboundText = buildClientModeOutboundText(text, attachments)
-        // letta-mobile-c87t: when entering an existing-conversation route under
-        // Client Mode, prefer the route's conversationId arg so the gateway can
-        // resumeSession() into the matching Letta conversation. Fall back to
-        // the saved-state-handle pointer for cases where Client Mode set up the
-        // conversation itself (fresh-route entry continued in-place).
-        val initialPriorConversationId = explicitConversationId ?: currentClientModeConversationId()
-        // letta-mobile-w4pp: do NOT pre-create an empty Letta conversation
-        // for fresh Client Mode routes. Field logs from Pixel 9 Pro showed
-        // the gateway rejecting sends into those app-created empty
-        // conversations with BAD_MESSAGE / `Missing "type" field`. Fresh
-        // routes pass conversationId=null, let the gateway allocate the real
-        // conversation, then migrate the quarantined user echo plus buffered
-        // assistant chunks into the timeline when the first chunk/result echoes
-        // that conversation id.
-        composerController.clearAfterSend()
-        clientModeStreamJob = viewModelScope.launch {
-            val priorConversationId = initialPriorConversationId
-            // letta-mobile-c87t (PR 2): when we already know the
-            // conversationId, append the user bubble through the timeline so
-            // the SSE-side reconcile + fuzzy matcher (PR 1) can collapse it
-            // against the Letta-persisted echo. This activates the dormant
-            // CLIENT_MODE_HARNESS source path, gives 8cm8 the telemetry it
-            // needs, and removes the user-bubble dual-write that Meridian
-            // flagged.
-            //
-            // Truly fresh Client Mode sends now pre-create a blank Letta
-            // conversation above, so the normal timeline-backed path is used
-            // immediately. The in-memory branch remains only as a legacy
-            // fallback for callers that somehow still have no conversationId.
-            currentConversationTracker.setCurrent(priorConversationId)
-            if (priorConversationId != null) {
-                // Bind this Client Mode conversation so the timeline becomes
-                // the source of truth for the message list.
-                val convId = priorConversationId
-                // letta-mobile-5s1n (regression fix): set the streaming flags
-                // BEFORE appending to the timeline. The observer flow re-emits
-                // synchronously on every timeline state change and reads
-                // `prev.isStreaming` to decide whether to preserve the in-flight
-                // signal (see startTimelineObserver). If we wrote `true` after
-                // the append, the observer would race ahead with the old
-                // `false`, clobber it, and the spinner would never show.
-                _uiState.value = _uiState.value.copy(
-                    isLoadingMessages = false,
-                    isLoadingOlderMessages = false,
-                    hasMoreOlderMessages = false,
-                    isStreaming = true,
-                    isAgentTyping = true,
-                    error = null,
-                    conversationState = ConversationState.Ready(convId),
-                )
-                runCatching {
-                    timelineRepository.appendClientModeLocal(
-                        conversationId = convId,
-                        content = text,
-                        attachments = attachments,
-                    )
-                }.onFailure { e ->
-                    android.util.Log.w(
-                        "AdminChatViewModel",
-                        "appendClientModeLocal failed; continuing without legacy in-memory fallback",
-                        e,
-                    )
-                }
-                // Ensure observer is running so subsequent timeline state
-                // emissions (and the SSE-driven Confirmed echoes) reach the
-                // UI. Idempotent for the same conversationId.
-                startTimelineObserver(convId)
-            } else {
-                // Fresh-route: no conversationId yet; expose only a quarantined
-                // optimistic USER echo until the gateway echoes one, then
-                // append it to the timeline and clear this bootstrap state.
-                stopTimelineObserver()
-                pendingClientModeBootstrapUserMessage = UiMessage(
-                    id = userMessageId,
-                    role = "user",
-                    content = text,
-                    timestamp = startedAt,
-                    attachments = attachments.map {
-                        com.letta.mobile.data.model.UiImageAttachment(
-                            base64 = it.base64,
-                            mediaType = it.mediaType,
-                        )
-                    },
-                )
-                _uiState.value = _uiState.value.copy(
-                    messages = pendingClientModeBootstrapMessages(),
-                    isLoadingMessages = false,
-                    isLoadingOlderMessages = false,
-                    hasMoreOlderMessages = false,
-                    isStreaming = true,
-                    isAgentTyping = true,
-                    error = null,
-                    conversationState = ConversationState.NoConversation,
-                )
-            }
-
-            var latestConversationId = priorConversationId
-            // letta-mobile-c87t: track whether the gateway substituted a different
-            // conversation for the one we requested (recovery path). On the first
-            // chunk that carries a non-null conversationId, compare against
-            // priorConversationId; if it differs, emit a banner + propagate the
-            // new ID to the nav saved-state-handle so a back-then-re-enter doesn't
-            // try to resume the dead requested ID again.
-            var swapEvaluated = false
-            var accumulatedAssistantPreview = ""
-            // letta-mobile-hf93: track whether the gateway ever sent any
-            // user-visible payload (text, reasoning, or a tool event) for
-            // this turn. If the stream terminates with no payload — e.g. a
-            // gateway/upstream-agent error that produced only a result
-            // frame — we surface an error instead of silently flashing
-            // the typing indicator.
-            var sawAssistantPayload = false
-            // letta-mobile-5s1n / yoic.2.5: one-shot guard for migrating the
-            // quarantined fresh-route USER echo into the timeline. Known-conv
-            // sends skip migration because the bubble was appended up-front.
-            var migratedToTimeline = priorConversationId != null
-            try {
-                clientModeChatSender.streamMessage(
-                    screenAgentId = agentId,
-                    text = outboundText,
-                    conversationId = priorConversationId,
-                ).collect { chunk ->
-                    chunk.conversationId?.takeIf { it.isNotBlank() }?.let { conversationId ->
-                        latestConversationId = conversationId
-
-                        val isTextPayload = !chunk.text.isNullOrEmpty() &&
-                            chunk.event != BotStreamEvent.REASONING &&
-                            chunk.event != BotStreamEvent.TOOL_CALL &&
-                            chunk.event != BotStreamEvent.TOOL_RESULT
-
-                        if (isTextPayload) {
-                            accumulatedAssistantPreview += chunk.text.orEmpty()
-                            submitClientModeNotificationCandidate(
-                                conversationId = conversationId,
-                                messageId = assistantMessageId,
-                                previewText = accumulatedAssistantPreview,
-                                phase = NotificationCandidatePhase.Partial,
-                                isFinal = false,
-                            )
-                        }
-                        if (!swapEvaluated) {
-                            swapEvaluated = true
-                            // Substitution detected: gateway opened a fresh conversation
-                            // because our requested one was unrecoverable. Surface the
-                            // banner and update the nav arg so subsequent renavigations
-                            // pick up the new ID.
-                            if (priorConversationId != null && priorConversationId != conversationId) {
-                                _uiState.update { state ->
-                                    state.copy(
-                                        clientModeConversationSwap = ClientModeConversationSwap(
-                                            requestedConversationId = priorConversationId,
-                                            newConversationId = conversationId,
-                                        ),
-                                    )
-                                }
-                                savedStateHandle["conversationId"] = conversationId
-
-                                // letta-mobile-flk.5: when the gateway swaps
-                                // conversations mid-stream (recovery from a
-                                // stuck/unrecoverable conv — typically
-                                // pending requires_approval), the user's
-                                // optimistic Local was appended to the OLD
-                                // conv's timeline (or is still the quarantined
-                                // fresh-route bootstrap echo). The assistant
-                                // chunks about to flow on this same stream
-                                // belong to the NEW conv on the Letta server.
-                                // If we leave the observer pointed at the OLD
-                                // conv we'll keep writing assistant Locals
-                                // there and the user sees nothing in the
-                                // conv they're now navigated to.
-                                //
-                                // Migrate the user bubble to the new conv,
-                                // clear the bootstrap echo (the new conv's
-                                // timeline is now the authority), and re-point
-                                // the observer. Subsequent
-                                // chunks already use latestConversationId
-                                // for their write target via
-                                // handleClientModeStreamChunk.
-                                runCatching {
-                                    timelineRepository.appendClientModeLocal(
-                                        conversationId = conversationId,
-                                        content = text,
-                                        attachments = attachments,
-                                    )
-                                    clearPendingClientModeBootstrapUserMessage()
-                                    setClientModeConversationId(conversationId)
-                                    clientModeBootstrapState = ClientModeBootstrapState.Ready(conversationId)
-                                    currentConversationTracker.setCurrent(conversationId)
-                                    startTimelineObserver(conversationId)
-                                    // Mark the legacy fresh-route migration
-                                    // as already done so the block below
-                                    // (which assumes priorConversationId ==
-                                    // null) doesn't double-migrate.
-                                    migratedToTimeline = true
-                                }.onFailure { e ->
-                                    android.util.Log.w(
-                                        "AdminChatViewModel",
-                                        "Conversation swap migration to new conv timeline failed; staying on old conv",
-                                        e,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    if (!latestConversationId.isNullOrBlank()) {
-                        setClientModeConversationId(latestConversationId)
-                        activeConversationId = latestConversationId
-                        clientModeBootstrapState = ClientModeBootstrapState.Ready(latestConversationId)
-                        currentConversationTracker.setCurrent(latestConversationId)
-                        // letta-mobile-5s1n: fresh-route migration. The first
-                        // time the gateway echoes a conversationId for a fresh
-                        // send, we move the optimistic user bubble into the
-                        // timeline (where assistant streaming will also write,
-                        // via handleClientModeStreamChunkViaTimeline) and start
-                        // the timeline observer so the UI sees Local + assistant
-                        // content uniformly. Idempotent — guarded by
-                        // `migratedToTimeline`.
-                        if (priorConversationId == null && !migratedToTimeline) {
-                            migratedToTimeline = true
-                            val newConvId = latestConversationId
-                            if (newConvId != null) {
-                                runCatching {
-                                    timelineRepository.appendClientModeLocal(
-                                        conversationId = newConvId,
-                                        content = text,
-                                        attachments = attachments,
-                                    )
-                                    replayPreConversationClientModeBuffer(
-                                        conversationId = newConvId,
-                                        assistantMessageId = assistantMessageId,
-                                    )
-                                    // Drop the bootstrap user echo; the
-                                    // observer will render it plus replayed
-                                    // assistant chunks as timeline Locals.
-                                    clearPendingClientModeBootstrapUserMessage()
-                                    startTimelineObserver(newConvId)
-                                }.onFailure { e ->
-                                    android.util.Log.w(
-                                        "AdminChatViewModel",
-                                        "Fresh-route migration to timeline failed; keeping bootstrap user echo only",
-                                        e,
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // letta-mobile-hf93: count any payload-bearing chunk —
-                    // text, reasoning event, tool call/result — as an
-                    // assistant payload. Empty terminal frames don't count.
-                    if (chunkCarriesAssistantPayload(chunk)) {
-                        sawAssistantPayload = true
-                    }
-
-                    if (!chunk.done) {
-                        handleClientModeStreamChunk(
-                            chunk = chunk,
-                            assistantMessageId = assistantMessageId,
-                            timestamp = startedAt,
-                            conversationId = latestConversationId?.takeIf { it.isNotBlank() },
-                        )
-                        return@collect
-                    }
-
-                    handleClientModeStreamChunk(
-                        chunk = chunk,
-                        assistantMessageId = assistantMessageId,
-                        timestamp = startedAt,
-                        replaceAssistant = true,
-                        conversationId = latestConversationId?.takeIf { it.isNotBlank() },
-                    )
-
-                    latestConversationId?.takeIf { it.isNotBlank() }?.let { conversationId ->
-                        if (accumulatedAssistantPreview.isNotBlank()) {
-                            submitClientModeNotificationCandidate(
-                                conversationId = conversationId,
-                                messageId = assistantMessageId,
-                                previewText = accumulatedAssistantPreview,
-                                phase = NotificationCandidatePhase.Final,
-                                isFinal = true,
-                            )
-                        }
-                    }
-
-                    // letta-mobile-hf93: a stream that completed without
-                    // any payload would otherwise look identical to a
-                    // dropped network round-trip — typing indicator
-                    // briefly flashes, then nothing. Surface an explicit
-                    // error so the user knows the round-trip happened.
-                    val terminalError = if (!sawAssistantPayload && !chunk.aborted) {
-                        "Agent returned no content. Try again or check the agent's status."
-                    } else {
-                        null
-                    }
-
-                    val prevState = _uiState.value
-                    _uiState.value = collapseCompletedRunsIfStreamingFinished(
-                        previous = prevState,
-                        next = prevState.copy(
-                            conversationState = latestConversationId?.let { ConversationState.Ready(it) }
-                                ?: ConversationState.NoConversation,
-                            isStreaming = false,
-                            isAgentTyping = false,
-                            error = terminalError ?: prevState.error,
-                        ),
-                    )
-                }
-            } catch (cancelled: CancellationException) {
-                _uiState.value = _uiState.value.copy(
-                    conversationState = latestConversationId?.let { ConversationState.Ready(it) }
-                        ?: _uiState.value.conversationState,
-                    isStreaming = false,
-                    isAgentTyping = false,
-                )
-            } catch (e: Exception) {
-                android.util.Log.e("AdminChatViewModel", "sendViaClientMode: stream exception", e)
-                _uiState.value = _uiState.value.copy(
-                    conversationState = latestConversationId?.let { ConversationState.Ready(it) }
-                        ?: ConversationState.NoConversation,
-                    error = e.message ?: "Client Mode send failed",
-                    isStreaming = false,
-                    isAgentTyping = false,
-                )
-            } finally {
-                resetPreConversationClientModeBuffer()
-                clientModeStreamInFlight = false
-                clientModeStreamStartedAtElapsedMs = 0L
-                refreshContextWindow()
-                if (clientModeStreamJob?.isCancelled != false) {
-                    clientModeStreamJob = null
-                }
-            }
-        }
-    }
-
-    private fun resetPreConversationClientModeBuffer() {
-        pendingClientModeStreamSessionId = null
-        pendingClientModeStreamChunks.clear()
-    }
-
-    private fun bufferPreConversationClientModeChunk(
-        chunk: BotStreamChunk,
-        assistantMessageId: String,
-    ) {
-        if (chunk.done && !chunkCarriesAssistantPayload(chunk)) return
-        if (pendingClientModeStreamSessionId != assistantMessageId) {
-            pendingClientModeStreamSessionId = assistantMessageId
-            pendingClientModeStreamChunks.clear()
-        }
-        if (pendingClientModeStreamChunks.size >= MAX_PRE_CONVERSATION_CLIENT_MODE_CHUNKS) {
-            pendingClientModeStreamChunks.removeFirst()
-            Telemetry.event(
-                "AdminChatVM", "clientMode.preConversationBuffer.dropOldest",
-                "assistantMessageId" to assistantMessageId,
-                "maxChunks" to MAX_PRE_CONVERSATION_CLIENT_MODE_CHUNKS,
-                level = Telemetry.Level.WARN,
-            )
-        }
-        pendingClientModeStreamChunks.addLast(chunk)
-        Telemetry.event(
-            "AdminChatVM", "clientMode.preConversationChunkBuffered",
-            "assistantMessageId" to assistantMessageId,
-            "event" to (chunk.event?.name ?: "null"),
-            "hasText" to (chunk.text != null),
-            "bufferedChunks" to pendingClientModeStreamChunks.size,
-        )
-    }
-
-    private suspend fun replayPreConversationClientModeBuffer(
-        conversationId: String,
-        assistantMessageId: String,
-    ) {
-        if (pendingClientModeStreamSessionId != assistantMessageId) return
-        if (pendingClientModeStreamChunks.isEmpty()) return
-        val bufferedChunks = pendingClientModeStreamChunks.toList()
-        var replayed = 0
-        bufferedChunks.forEach { bufferedChunk ->
-            runCatching {
-                timelineRepository.upsertClientModeStreamChunk(
-                    conversationId = conversationId,
-                    chunk = bufferedChunk.toTimelineStreamChunk(),
-                    assistantMessageId = assistantMessageId,
-                )
-            }.onSuccess {
-                replayed++
-            }.onFailure {
-                logTimelineUpsertFailure(
-                    t = it,
-                    kind = bufferedChunk.event?.name ?: "ASSISTANT",
-                    localId = assistantMessageId,
-                )
-            }
-        }
-        resetPreConversationClientModeBuffer()
-        Telemetry.event(
-            "AdminChatVM", "clientMode.preConversationBufferReplayed",
-            "conversationId" to conversationId,
-            "assistantMessageId" to assistantMessageId,
-            "replayedChunks" to replayed,
-            "droppedChunks" to (bufferedChunks.size - replayed),
-        )
-    }
-
-    private fun handleClientModeStreamChunk(
-        chunk: BotStreamChunk,
-        assistantMessageId: String,
-        timestamp: String,
-        replaceAssistant: Boolean = false,
-        conversationId: String? = null,
-    ) {
-        if (conversationId != null) {
-            handleClientModeStreamChunkViaTimeline(
-                chunk = chunk,
-                conversationId = conversationId,
-                assistantMessageId = assistantMessageId,
-                timestamp = timestamp,
-                replaceAssistant = replaceAssistant,
-            )
-            return
-        }
-        bufferPreConversationClientModeChunk(
-            chunk = chunk,
-            assistantMessageId = assistantMessageId,
-        )
-    }
-
-    /**
-     * Route a Client Mode assistant/reasoning/tool stream chunk through the
-     * TimelineRepository reducer. The timeline observer is the only normal
-     * read path for known-conversation Client Mode messages.
-     */
-    private fun handleClientModeStreamChunkViaTimeline(
-        chunk: BotStreamChunk,
-        conversationId: String,
-        assistantMessageId: String,
-        @Suppress("UNUSED_PARAMETER") timestamp: String,
-        @Suppress("UNUSED_PARAMETER") replaceAssistant: Boolean,
-    ) {
-        viewModelScope.launch {
-            runCatching {
-                timelineRepository.upsertClientModeStreamChunk(
-                    conversationId = conversationId,
-                    chunk = chunk.toTimelineStreamChunk(),
-                    assistantMessageId = assistantMessageId,
-                )
-            }.onFailure {
-                logTimelineUpsertFailure(
-                    t = it,
-                    kind = chunk.event?.name ?: "ASSISTANT",
-                    localId = assistantMessageId,
-                )
-            }
-        }
-    }
-
-    /**
-     * letta-mobile-hf93: a chunk "carries assistant payload" when it has
-     * any user-visible content — non-empty text, a tool call/result, or
-     * (eventually) a non-empty reasoning frame. The terminal `done=true`
-     * frame on its own does NOT count, since WsBotClient emits one for
-     * every stream regardless of whether the upstream agent produced
-     * output.
-     */
-    private fun chunkCarriesAssistantPayload(chunk: BotStreamChunk): Boolean {
-        if (!chunk.text.isNullOrEmpty()) return true
-        return when (chunk.event) {
-            BotStreamEvent.TOOL_CALL,
-            BotStreamEvent.TOOL_RESULT,
-            BotStreamEvent.REASONING -> true
-            // letta-mobile-flk.5: CONVERSATION_SWAP is a control-plane
-            // signal, not user-visible content — must not gate the
-            // hf93 "no-payload" terminal-error path.
-            BotStreamEvent.CONVERSATION_SWAP,
-            BotStreamEvent.ASSISTANT, null -> false
-        }
-    }
-
-    private fun submitClientModeNotificationCandidate(
-        conversationId: String,
-        messageId: String,
-        previewText: String,
-        phase: NotificationCandidatePhase,
-        isFinal: Boolean,
-    ) {
-        notificationDeliveryCoordinator.submit(
-            NotificationDeliveryCandidate(
-                conversationId = conversationId,
-                agentId = agentId,
-                agentName = _uiState.value.agentName,
-                conversationSummary = null,
-                messageId = messageId,
-                runId = null,
-                source = NotificationCandidateSource.WebsocketClientMode,
-                phase = phase,
-                previewText = previewText,
-                isFinal = isFinal,
-            ),
-        )
-    }
-
-    private fun logTimelineUpsertFailure(t: Throwable, kind: String, localId: String) {
-        android.util.Log.w(
-            "AdminChatViewModel",
-            "Client Mode timeline upsert failed (kind=$kind, localId=$localId)",
-            t,
+        clientModeSendCoordinator.send(
+            text = text,
+            attachments = attachments,
+            explicitConversationId = explicitConversationId,
         )
     }
 
@@ -2193,130 +1376,5 @@ class AdminChatViewModel @Inject constructor(
         currentConversationTracker.setCurrent(null)
         super.onCleared()
     }
-
-}
-
-private val projectBriefLabelAliases = mapOf(
-    ProjectBriefSectionKey.Description to listOf(
-        "project_description",
-        "project-description",
-        "project description",
-        "description",
-        "brief_description",
-    ),
-    ProjectBriefSectionKey.KeyDecisions to listOf(
-        "key_decisions",
-        "key-decisions",
-        "key decisions",
-        "decisions",
-        "project_decisions",
-    ),
-    ProjectBriefSectionKey.TechStack to listOf(
-        "tech_stack",
-        "tech-stack",
-        "tech stack",
-        "stack",
-        "technology_stack",
-    ),
-    ProjectBriefSectionKey.ActiveGoals to listOf(
-        "active_goals",
-        "active-goals",
-        "active goals",
-        "goals",
-        "current_goals",
-    ),
-    ProjectBriefSectionKey.RecentChanges to listOf(
-        "recent_changes",
-        "recent-changes",
-        "recent changes",
-        "changes",
-        "latest_changes",
-    ),
-)
-
-private fun buildProjectBriefSections(blocks: List<Block>): Map<ProjectBriefSectionKey, ProjectBriefSection> {
-    return ProjectBriefSectionKey.entries.mapNotNull { key ->
-        val block = blocks.firstOrNull { candidate ->
-            val canonical = candidate.label?.canonicalBriefLabel() ?: return@firstOrNull false
-            projectBriefLabelAliases.getValue(key).any { alias ->
-                canonical == alias.canonicalBriefLabel()
-            }
-        } ?: return@mapNotNull null
-
-        key to ProjectBriefSection(
-            key = key,
-            blockLabel = block.label ?: return@mapNotNull null,
-            content = block.value,
-            updatedAt = block.updatedAt,
-        )
-    }.toMap()
-}
-
-private fun String.canonicalBriefLabel(): String =
-    lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
-
-private fun buildClientModeLocationPrompt(path: String): String = """
-Please switch your active working directory to:
-
-$path
-
-Use this as the cwd/base path for subsequent filesystem and shell tool calls in this conversation. After switching, briefly confirm the current working directory.
-""".trim()
-
-private fun BotStreamChunk.toTimelineStreamChunk(): com.letta.mobile.data.timeline.ClientModeStreamChunk =
-    com.letta.mobile.data.timeline.ClientModeStreamChunk(
-        event = when (event) {
-            BotStreamEvent.REASONING -> com.letta.mobile.data.timeline.ClientModeStreamEvent.REASONING
-            BotStreamEvent.TOOL_CALL -> com.letta.mobile.data.timeline.ClientModeStreamEvent.TOOL_CALL
-            BotStreamEvent.TOOL_RESULT -> com.letta.mobile.data.timeline.ClientModeStreamEvent.TOOL_RESULT
-            BotStreamEvent.ASSISTANT -> com.letta.mobile.data.timeline.ClientModeStreamEvent.ASSISTANT
-            BotStreamEvent.CONVERSATION_SWAP, null -> null
-        },
-        text = text,
-        uuid = uuid,
-        toolCallId = toolCallId,
-        toolName = toolName,
-        toolInput = toolInput?.toString(),
-        toolCalls = toolCalls.orEmpty(),
-        isError = isError,
-        done = done,
-    )
-
-/**
- * Client Mode rides through lettabot's WebSocket gateway, whose Matrix/Tuwunel
- * client already supports multimodal input by JSON-serializing Letta-native
- * MessageContentItem[] into the text `content` frame and parsing it back on the
- * gateway. Mirror that wire contract here: text-only messages stay plain text;
- * image sends become `[text?, image...]` using Letta's native base64 image part
- * schema.
- */
-private fun buildClientModeOutboundText(
-    text: String,
-    attachments: List<MessageContentPart.Image>,
-): String = if (attachments.isEmpty()) {
-    text
-} else {
-    buildContentParts(text, attachments).toJsonArray().toString()
-}
-
-private fun buildBugReportPrompt(draft: ProjectBugReportDraft): String {
-    val title = draft.title.trim()
-    val description = draft.description.trim()
-    val tags = draft.tags.joinToString(", ").ifBlank { "none" }
-    val attachments = draft.attachmentReferences.joinToString("\n") { "- $it" }
-        .ifBlank { "- none" }
-
-    return buildString {
-        appendLine("Bug Report: $title")
-        appendLine("Severity: ${draft.severity.wireValue}")
-        appendLine("Tags: $tags")
-        appendLine("Description:")
-        appendLine(description)
-        appendLine()
-        appendLine("Attached media references:")
-        appendLine(attachments)
-        appendLine()
-        append("Please triage this issue, decide whether to create/update beads, and route it to the appropriate coding agent if needed.")
-    }.trim()
 
 }
