@@ -20,7 +20,6 @@ import com.letta.mobile.data.model.ProjectBugReport
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.MessageType
-import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.buildContentParts
 import com.letta.mobile.data.model.toJsonArray
 import com.letta.mobile.data.repository.AgentRepository
@@ -34,9 +33,7 @@ import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.mapErrorToUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
-import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableMap
 import kotlinx.collections.immutable.toImmutableSet
@@ -77,205 +74,6 @@ internal fun collapsedRunIdsAfterRunCompletion(
     if (eligibleRunIds.isEmpty()) return collapsedRunIds
     return LinkedHashSet<String>(collapsedRunIds).apply { addAll(eligibleRunIds) }
 }
-
-@androidx.compose.runtime.Immutable
-data class ProjectChatContext(
-    val identifier: String,
-    val name: String,
-    val lettaFolderId: String? = null,
-    val filesystemPath: String? = null,
-    val gitUrl: String? = null,
-    val lastSyncAt: String? = null,
-    val activeCodingAgents: String? = null,
-)
-
-@androidx.compose.runtime.Immutable
-data class PendingToolCall(
-    val id: String,
-    val name: String,
-    val startedAt: Long = System.currentTimeMillis(),
-)
-
-enum class ProjectBriefSectionKey {
-    Description,
-    KeyDecisions,
-    TechStack,
-    ActiveGoals,
-    RecentChanges,
-}
-
-@androidx.compose.runtime.Immutable
-data class ProjectBriefSection(
-    val key: ProjectBriefSectionKey,
-    val blockLabel: String,
-    val content: String,
-    val updatedAt: String? = null,
-)
-
-@androidx.compose.runtime.Immutable
-data class ProjectBriefUiState(
-    val isLoading: Boolean = false,
-    val isSaving: Boolean = false,
-    // ImmutableMap so Compose treats this whole state as stable — raw
-    // kotlin.collections.Map is an unstable interface type to the
-    // compiler (it could be a MutableMap at runtime). See o7ob.2.6.
-    val sections: kotlinx.collections.immutable.ImmutableMap<ProjectBriefSectionKey, ProjectBriefSection> =
-        kotlinx.collections.immutable.persistentMapOf(),
-    val error: String? = null,
-)
-
-enum class BugSeverity(val wireValue: String) {
-    Critical("critical"),
-    High("high"),
-    Medium("medium"),
-    Low("low"),
-}
-
-@androidx.compose.runtime.Immutable
-data class ProjectBugReportDraft(
-    val title: String = "",
-    val description: String = "",
-    val severity: BugSeverity = BugSeverity.Medium,
-    val tags: ImmutableList<String> = persistentListOf(),
-    val attachmentReferences: ImmutableList<String> = persistentListOf(),
-)
-
-@androidx.compose.runtime.Immutable
-data class ProjectBugReportUiState(
-    val isSubmitting: Boolean = false,
-    val recentReports: ImmutableList<ProjectBugReport> = persistentListOf(),
-    val lastSubmittedPrompt: String? = null,
-    val error: String? = null,
-)
-
-enum class ProjectAgentStatusTone {
-    Neutral,
-    Good,
-    Busy,
-    Error,
-}
-
-@androidx.compose.runtime.Immutable
-data class ProjectAgentActivity(
-    val id: String,
-    val name: String,
-    val statusLabel: String,
-    val statusTone: ProjectAgentStatusTone,
-    val detail: String? = null,
-    val model: String? = null,
-    val lastActivity: String? = null,
-)
-
-@androidx.compose.runtime.Immutable
-data class ProjectAgentsUiState(
-    val isLoading: Boolean = false,
-    val agents: ImmutableList<ProjectAgentActivity> = persistentListOf(),
-    val error: String? = null,
-)
-
-@androidx.compose.runtime.Immutable
-data class ClientModeLocationUiState(
-    val isLoading: Boolean = false,
-    val currentPath: String? = null,
-    val defaultPath: String? = null,
-    val lastRequestedPath: String? = null,
-    val error: String? = null,
-)
-
-@androidx.compose.runtime.Immutable
-data class ClientModeFilesystemPickerUiState(
-    val isVisible: Boolean = false,
-    val isLoading: Boolean = false,
-    val path: String? = null,
-    val parent: String? = null,
-    val entries: ImmutableList<ClientModeDirectoryEntry> = persistentListOf(),
-    val truncated: Boolean = false,
-    val error: String? = null,
-)
-
-@androidx.compose.runtime.Immutable
-data class ContextWindowUiState(
-    val isLoading: Boolean = false,
-    val error: String? = null,
-    val maxTokens: Int = 0,
-    val currentTokens: Int = 0,
-    val messageCount: Int = 0,
-    val systemTokens: Int = 0,
-    val coreMemoryTokens: Int = 0,
-    val externalMemoryTokens: Int = 0,
-    val summaryMemoryTokens: Int = 0,
-    val toolTokens: Int = 0,
-    val messageTokens: Int = 0,
-    val archivalMemoryCount: Int = 0,
-    val recallMemoryCount: Int = 0,
-) {
-    val usagePercent: Int
-        get() = if (maxTokens > 0) ((currentTokens.toFloat() / maxTokens.toFloat()) * 100).toInt().coerceIn(0, 100) else 0
-}
-
-sealed interface ConversationState {
-    @androidx.compose.runtime.Immutable
-    data object Loading : ConversationState
-
-    @androidx.compose.runtime.Immutable
-    data class Ready(val conversationId: String) : ConversationState
-
-    @androidx.compose.runtime.Immutable
-    data object NoConversation : ConversationState
-
-    @androidx.compose.runtime.Immutable
-    data class Error(val message: String) : ConversationState
-}
-
-@androidx.compose.runtime.Immutable
-data class ChatUiState(
-    val conversationState: ConversationState = ConversationState.Loading,
-    val messages: ImmutableList<UiMessage> = persistentListOf(),
-    val isLoadingMessages: Boolean = true,
-    val isLoadingOlderMessages: Boolean = false,
-    val hasMoreOlderMessages: Boolean = false,
-    val isStreaming: Boolean = false,
-    val isAgentTyping: Boolean = false,
-    val pendingTools: ImmutableList<PendingToolCall> = persistentListOf(),
-    val agentName: String = "",
-    val error: String? = null,
-    val promptTokens: Int? = null,
-    val completionTokens: Int? = null,
-    val totalTokens: Int? = null,
-    val activeApprovalRequestId: String? = null,
-    val collapsedRunIds: kotlinx.collections.immutable.ImmutableSet<String> = persistentSetOf(),
-    val expandedReasoningMessageIds: kotlinx.collections.immutable.ImmutableSet<String> = persistentSetOf(),
-    val projectBrief: ProjectBriefUiState = ProjectBriefUiState(),
-    val bugReports: ProjectBugReportUiState = ProjectBugReportUiState(),
-    val projectAgents: ProjectAgentsUiState = ProjectAgentsUiState(),
-    val contextWindow: ContextWindowUiState = ContextWindowUiState(),
-    val isClientModeEnabled: Boolean = false,
-    val clientModeLocation: ClientModeLocationUiState = ClientModeLocationUiState(),
-    val clientModeFilesystemPicker: ClientModeFilesystemPickerUiState = ClientModeFilesystemPickerUiState(),
-    val searchQuery: String = "",
-    val isSearchActive: Boolean = false,
-    val isSearching: Boolean = false,
-    val searchResults: ImmutableList<ParsedSearchMessage> = persistentListOf(),
-    /**
-     * Surfaced when the LettaBot harness substituted a fresh conversation ID for
-     * the one we requested (i.e. our requested conv was unrecoverable on the
-     * gateway/SDK side, gateway opened a new conversation and reported it back
-     * via session_init). The original Letta-server timeline rows for the prior
-     * conversation remain visible; new client-mode turns persist under the new
-     * conversation. Dismissable. See `letta-mobile-c87t`.
-     */
-    val clientModeConversationSwap: ClientModeConversationSwap? = null,
-)
-
-/**
- * Banner state for the gateway's conversation-substitution recovery path.
- * Emitted by `AdminChatViewModel` when `session_init.conversation_id` differs
- * from the conversation we asked the gateway to resume.
- */
-data class ClientModeConversationSwap(
-    val requestedConversationId: String,
-    val newConversationId: String,
-)
 
 private sealed interface ClientModeBootstrapState {
     data object Idle : ClientModeBootstrapState
@@ -424,19 +222,6 @@ class AdminChatViewModel @Inject constructor(
         ChatUiState(agentName = initialAgentName.orEmpty())
     )
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
-
-    /**
-     * letta-mobile-23h5 (regression fix 2026-04-19): older messages fetched via
-     * pagination need to survive the next timeline observer emission (which
-     * overwrites `_uiState.messages` with the live timeline contents). Hold
-     * a per-conversation prefix here, scoped to a (conversationId → list)
-     * pair so a conversation switch resets the prefix automatically.
-     *
-     * The timeline observer concatenates `olderMessagesPrefix` ahead of its
-     * mapped events on every emission; the loader replaces this list when a
-     * new page arrives.
-     */
-    private var olderMessagesPrefix: Pair<String, List<UiMessage>> = "" to emptyList()
 
     private val composerController = ChatComposerController()
     val composerState: StateFlow<ChatComposerState> = composerController.state
@@ -622,8 +407,6 @@ class AdminChatViewModel @Inject constructor(
         next
     }
 
-    private var timelineObserverJob: kotlinx.coroutines.Job? = null
-    private var timelineHydrateSignalJob: kotlinx.coroutines.Job? = null
     private var clientModeStreamJob: Job? = null
 
     /**
@@ -660,12 +443,18 @@ class AdminChatViewModel @Inject constructor(
     }
     private var pendingClientModeStreamSessionId: String? = null
     private val pendingClientModeStreamChunks = ArrayDeque<BotStreamChunk>()
-    // Conversation id the current observer job is bound to. Needed so we can
-    // detect "same conversation, already observing" vs "user switched convs
-    // and we must rebind" — fixing letta-mobile-nw2e, where the previous
-    // `isActive == true` guard silently ignored conversation switches.
-    private var timelineObserverConversationId: String? = null
     private var chatSearchJob: Job? = null
+    private val chatTimelineObserver = ChatTimelineObserver(
+        scope = viewModelScope,
+        timelineRepository = timelineRepository,
+        currentConversationTracker = currentConversationTracker,
+        activeReplyStreams = notificationReplyHandler.activeReplyStreams,
+        uiState = _uiState,
+        isClientModeStreamInFlight = { clientModeStreamInFlight },
+        isFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight },
+        clearFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = false },
+        collapseCompletedRunsIfStreamingFinished = ::collapseCompletedRunsIfStreamingFinished,
+    )
 
     private fun seedAgentNameFromMemoryCache() {
         val cachedName = chatSessionResolver.cachedAgentName(agentId) ?: return
@@ -1546,14 +1335,8 @@ class AdminChatViewModel @Inject constructor(
                 // pages with this new page so consecutive scroll-ups grow
                 // the prefix monotonically.
                 val olderUi = olderMessages.toUiMessages()
-                val (prevConv, prevPrefix) = olderMessagesPrefix
-                val basePrefix = if (prevConv == conversationId) prevPrefix else emptyList()
-                val seenIds = HashSet<String>(basePrefix.size + olderUi.size)
-                val grown = ArrayList<UiMessage>(basePrefix.size + olderUi.size)
-                for (m in olderUi) if (seenIds.add(m.id)) grown.add(m)
-                for (m in basePrefix) if (seenIds.add(m.id)) grown.add(m)
-                olderMessagesPrefix = conversationId to grown
-                val mergedMessages = mergeOlderMessages(
+                val mergedMessages = chatTimelineObserver.mergeOlderPage(
+                    conversationId = conversationId,
                     olderMessages = olderUi,
                     existingMessages = _uiState.value.messages,
                 )
@@ -1688,13 +1471,9 @@ class AdminChatViewModel @Inject constructor(
             // fallback for callers that somehow still have no conversationId.
             currentConversationTracker.setCurrent(priorConversationId)
             if (priorConversationId != null) {
-                // Stop any prior observer for a different conversation, then
-                // start one for this Client Mode conversation so the timeline
-                // becomes the source of truth for the message list.
+                // Bind this Client Mode conversation so the timeline becomes
+                // the source of truth for the message list.
                 val convId = priorConversationId
-                if (timelineObserverConversationId != convId) {
-                    stopTimelineObserver()
-                }
                 // letta-mobile-5s1n (regression fix): set the streaming flags
                 // BEFORE appending to the timeline. The observer flow re-emits
                 // synchronously on every timeline state change and reads
@@ -2177,11 +1956,7 @@ class AdminChatViewModel @Inject constructor(
     }
 
     private fun stopTimelineObserver() {
-        timelineObserverJob?.cancel()
-        timelineObserverJob = null
-        timelineHydrateSignalJob?.cancel()
-        timelineHydrateSignalJob = null
-        timelineObserverConversationId = null
+        chatTimelineObserver.stop()
     }
 
     fun reportComposerError(message: String) {
@@ -2293,177 +2068,8 @@ class AdminChatViewModel @Inject constructor(
      * left the UI locked onto the first-selected conversation's timeline.
      */
     private fun startTimelineObserver(conversationId: String) {
-        val convIdSame = timelineObserverConversationId == conversationId
-        val jobActive = timelineObserverJob?.isActive == true
-        if (convIdSame && jobActive) {
-            return
-        }
-        // Conversation switch (or first bind): tear down any in-flight
-        // subscriptions from the previous conversation before starting new
-        // ones. Without this the hydrate-signal job would leak on every
-        // switch (it was a local `val` in the old impl, never cancellable).
-        timelineObserverJob?.cancel()
-        timelineHydrateSignalJob?.cancel()
-        // letta-mobile-23h5 (regression fix 2026-04-19): drop any backfill
-        // prefix from the previous conversation so it cannot bleed into the
-        // new conversation's history.
-        olderMessagesPrefix = "" to emptyList()
-        timelineObserverConversationId = conversationId
-        timelineObserverJob = viewModelScope.launch {
-            val flow = try {
-                timelineRepository.observe(conversationId)
-            } catch (e: Exception) {
-                android.util.Log.e("AdminChatViewModel", "Timeline observe failed", e)
-                _uiState.value = _uiState.value.copy(error = "Timeline init failed: ${e.message}")
-                return@launch
-            }
-            // Also subscribe to the loop's sync events so we can definitively
-            // clear the loading spinner on Hydrated (even for empty convs).
-            val loop = timelineRepository.getOrCreate(conversationId)
-            currentConversationTracker.setCurrent(conversationId)
-            timelineHydrateSignalJob = viewModelScope.launch {
-                loop.events.collect { ev ->
-                    when (ev) {
-                        is com.letta.mobile.data.timeline.TimelineSyncEvent.Hydrated -> {
-                            android.util.Log.i(
-                                "AdminChatViewModel",
-                                "Timeline ready conv=$conversationId count=${ev.messageCount}",
-                            )
-                            _uiState.value = _uiState.value.copy(isLoadingMessages = false)
-                        }
-                        is com.letta.mobile.data.timeline.TimelineSyncEvent.HydrateFailed -> {
-                            _uiState.value = _uiState.value.copy(isLoadingMessages = false)
-                        }
-                        is com.letta.mobile.data.timeline.TimelineSyncEvent.ReconcileError -> {
-                            // letta-mobile-j44j: reconcile's GET /messages can
-                            // fail after a successful stream (e.g. network blip
-                            // after the last SSE frame). TimelineSyncLoop already
-                            // retries transient errors internally; by the time
-                            // this event reaches us the retry was exhausted.
-                            //
-                            // The assistant reply has already appeared in the
-                            // timeline (Confirmed events arrived during SSE),
-                            // so we don't clear messages — we just tell the
-                            // user the post-stream sync didn't finish so they
-                            // know to pull-to-refresh if the bubble looks off.
-                            // Also clear the streaming/typing indicators so the
-                            // UI doesn't stay stuck pretending we're still
-                            // waiting on the server.
-                            val prevState = _uiState.value
-                            _uiState.value = collapseCompletedRunsIfStreamingFinished(
-                                previous = prevState,
-                                next = prevState.copy(
-                                    error = "Couldn't sync agent reply — pull to refresh",
-                                    isStreaming = false,
-                                    isAgentTyping = false,
-                                ),
-                            )
-                        }
-                        else -> Unit
-                    }
-                }
-            }
-
-            try {
-                flow.collect { timeline ->
-                    val live = timeline.events.mapNotNull { it.toUiMessageOrNull() }
-                    // Prepend any backfilled older pages for THIS conversation.
-                    val (prefixConv, prefixList) = olderMessagesPrefix
-                    val prefix = if (prefixConv == conversationId) prefixList else emptyList()
-                    val seenIds = HashSet<String>(live.size + prefix.size)
-                    val combined = ArrayList<UiMessage>(live.size + prefix.size)
-                    for (m in prefix) if (seenIds.add(m.id)) combined.add(m)
-                    for (m in live) if (seenIds.add(m.id)) combined.add(m)
-
-                    val ui = combined.toImmutableList()
-                    val tailIsAssistant = timeline.events.lastOrNull().let {
-                        it is com.letta.mobile.data.timeline.TimelineEvent.Confirmed &&
-                            it.messageType == com.letta.mobile.data.timeline.TimelineMessageType.ASSISTANT
-                    }
-                    // letta-mobile-5s1n (regression fix): derive streaming
-                    // flags from LETTA_SERVER Locals only. CLIENT_MODE_HARNESS
-                    // Locals are stamped SENT at append (the WS gateway is
-                    // the delivery authority — see TimelineSyncLoop.appendClientModeLocal),
-                    // so a `SENDING` predicate would always be false for
-                    // Client Mode flows and would erroneously clear the
-                    // spinner that `sendMessageViaClientMode` set.
-                    //
-                    // sendMessageViaClientMode owns isStreaming/isAgentTyping
-                    // for the Client Mode path end-to-end (sets true on
-                    // send, clears in the stream-complete `finally`). We
-                    // must NOT overwrite those flags from this observer —
-                    // we only contribute the LETTA_SERVER pending signal.
-                    val anyLettaServerLocalPending = timeline.events.any {
-                        it is com.letta.mobile.data.timeline.TimelineEvent.Local &&
-                            it.deliveryState == com.letta.mobile.data.timeline.DeliveryState.SENDING &&
-                            it.source != com.letta.mobile.data.timeline.MessageSource.CLIENT_MODE_HARNESS
-                    }
-                    // If a Client Mode stream is in flight, keep the flags
-                    // the send coroutine set; otherwise derive from server
-                    // pending (legacy optimistic-send semantics).
-                    // Prefer the explicit flag (set BEFORE the launch starts)
-                    // over `clientModeStreamJob?.isActive` because the launched
-                    // coroutine runs eagerly on Unconfined/main and triggers
-                    // observer emissions before the job assignment lands.
-                    val streamInFlight = clientModeStreamInFlight
-                    // Any non-empty emission also implies hydrate succeeded.
-                    val clearLoading = ui.isNotEmpty()
-                    // letta-mobile-23h5 (regression fix 2026-04-19): the
-                    // timeline source-of-truth path was never flipping
-                    // hasMoreOlderMessages to true, so ChatScreen's scroll
-                    // detector (`!state.hasMoreOlderMessages → return false`)
-                    // never fired loadOlderMessages. Optimistically assume
-                    // there's history to fetch any time we have at least one
-                    // confirmed message; the first page fetch corrects this
-                    // (sets it back to false when fewer than PAGE_SIZE rows
-                    // come back).
-                    val anyConfirmed = ui.any { !it.isPending }
-                    // Optimistically allow the scroll detector to call
-                    // loadOlderMessages once we have any confirmed history
-                    // — the loader settles the truth (sets back to false
-                    // when fewer than PAGE_SIZE rows come back).
-                    val newHasMoreOlder = if (anyConfirmed) true
-                                          else _uiState.value.hasMoreOlderMessages
-                    if (followingDuplicateInitialMessageInFlight && tailIsAssistant) {
-                        followingDuplicateInitialMessageInFlight = false
-                    }
-                    val duplicateInitialMessageInFlight = followingDuplicateInitialMessageInFlight
-                    val prev = _uiState.value
-                    val isReplyStreaming = notificationReplyHandler.activeReplyStreams.value.contains(conversationId)
-                    val nextIsStreaming = if (streamInFlight) prev.isStreaming
-                                          else if (isReplyStreaming) true
-                                          else if (duplicateInitialMessageInFlight) true
-                                          else anyLettaServerLocalPending
-                    val nextIsAgentTyping = if (streamInFlight) prev.isAgentTyping
-                                            else if (isReplyStreaming) true
-                                            else if (duplicateInitialMessageInFlight) true
-                                            else (anyLettaServerLocalPending && !tailIsAssistant)
-                    _uiState.value = collapseCompletedRunsIfStreamingFinished(
-                        previous = prev,
-                        next = prev.copy(
-                            messages = ui,
-                            isLoadingMessages = if (clearLoading) false
-                                               else prev.isLoadingMessages,
-                            isStreaming = nextIsStreaming,
-                            isAgentTyping = nextIsAgentTyping,
-                            hasMoreOlderMessages = newHasMoreOlder,
-                        ),
-                    )
-                }
-            } finally {
-                // Tear down the sibling hydrate-signal collector when the
-                // main observer terminates (conv switch, scope cancel, etc.).
-                // Field-based reference replaces the prior local `val hydrateSignal`
-                // so the job is also cancellable from `startTimelineObserver`
-                // on conversation switch — see letta-mobile-nw2e.
-                timelineHydrateSignalJob?.cancel()
-            }
-        }
+        chatTimelineObserver.start(conversationId)
     }
-
-    /** Convert a [TimelineEvent] to a [UiMessage] for display. */
-    internal fun com.letta.mobile.data.timeline.TimelineEvent.toUiMessageOrNull(): UiMessage? =
-        timelineEventToUiMessage(this)
 
     fun submitApproval(
         requestId: String,
@@ -2511,16 +2117,6 @@ class AdminChatViewModel @Inject constructor(
                 }
             }
         }
-    }
-
-    private fun mergeOlderMessages(
-        olderMessages: List<UiMessage>,
-        existingMessages: List<UiMessage>,
-    ): List<UiMessage> {
-        if (olderMessages.isEmpty()) return existingMessages
-
-        val existingIds = existingMessages.mapTo(mutableSetOf()) { it.id }
-        return olderMessages.filterNot { it.id in existingIds } + existingMessages
     }
 
     fun resetMessages() {
