@@ -1,5 +1,11 @@
 package com.letta.mobile.data.repository
 
+import android.content.Context
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import com.letta.mobile.data.local.ConversationEntity
+import com.letta.mobile.data.local.ConversationRefreshEntity
+import com.letta.mobile.data.local.LettaDatabase
 import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.TestData
 import io.mockk.coEvery
@@ -10,26 +16,42 @@ import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.jupiter.api.Tag
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], manifest = Config.NONE)
 @OptIn(ExperimentalCoroutinesApi::class)
 @Tag("integration")
 class ConversationRepositoryTest {
 
     private lateinit var fakeApi: FakeConversationApi
     private lateinit var repository: ConversationRepository
+    private lateinit var database: LettaDatabase
 
     @Before
     fun setup() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        database = Room.inMemoryDatabaseBuilder(context, LettaDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
         fakeApi = FakeConversationApi()
         val agentRepository = mockk<AgentRepository>(relaxed = true)
         coEvery { agentRepository.checkpointAndRestoreConfig(any(), any()) } coAnswers {
             secondArg<suspend () -> Unit>().invoke()
         }
-        repository = ConversationRepository(fakeApi, agentRepository)
+        repository = ConversationRepository(fakeApi, agentRepository, database.conversationDao())
+    }
+
+    @After
+    fun tearDown() {
+        database.close()
     }
 
     @Test
@@ -57,6 +79,33 @@ class ConversationRepositoryTest {
 
         assertEquals(2, result.size)
         assertTrue(fakeApi.calls.contains("listConversations"))
+    }
+
+    @Test
+    fun `getConversations emits cached Room rows before network`() = runTest {
+        val cached = TestData.conversation(id = "cached-1", agentId = "a1", summary = "Cached title")
+        database.conversationDao().upsert(ConversationEntity.fromConversation(cached, cachedAtEpochMs = 10L))
+        database.conversationDao().upsertRefreshState(
+            ConversationRefreshEntity(agentId = "a1", lastRefreshAtMillis = System.currentTimeMillis()),
+        )
+        fakeApi.listDelayMillis = 1_000L
+
+        val result = repository.getConversations("a1").first()
+
+        assertEquals(listOf("Cached title"), result.map { it.summary })
+        assertTrue(fakeApi.calls.none { it == "listConversations" })
+    }
+
+    @Test
+    fun `empty refresh response is cached as fresh`() = runTest {
+        repository.refreshConversations("a1")
+        fakeApi.calls.clear()
+
+        val refreshed = repository.refreshConversationsIfStale("a1", maxAgeMs = 60_000)
+
+        assertEquals(false, refreshed)
+        assertTrue(repository.getConversations("a1").first().isEmpty())
+        assertTrue(fakeApi.calls.none { it == "listConversations" })
     }
 
     @Test

@@ -78,6 +78,41 @@ class LettaDatabaseCharacterizationTest {
         )
     }
 
+    @Test
+    fun `ConversationEntity preserves title archive state and id lists`() {
+        val conversation = TestData.conversation(
+            id = "conversation-1",
+            agentId = "agent-1",
+            summary = "Cached title",
+        ).copy(
+            archived = true,
+            archivedAt = "2026-05-10T10:00:00Z",
+            inContextMessageIds = listOf("message,with,commas", "message-2"),
+            isolatedBlockIds = listOf("block-1", "block-2"),
+        )
+
+        assertEquals(conversation, ConversationEntity.fromConversation(conversation).toConversation())
+    }
+
+    @Test
+    fun `conversations round trip through Room`() = runTest {
+        val db = inMemoryDatabase()
+        val conversation = TestData.conversation(
+            id = "conversation-1",
+            agentId = "agent-1",
+            summary = "Cached title",
+        )
+
+        db.conversationDao().replaceForAgent(
+            agentId = "agent-1",
+            conversations = listOf(ConversationEntity.fromConversation(conversation, cachedAtEpochMs = 123L)),
+            refreshedAtMillis = 456L,
+        )
+
+        assertEquals(listOf(conversation), db.conversationDao().getForAgentOnce("agent-1").map { it.toConversation() })
+        assertEquals(456L, db.conversationDao().getRefreshState("agent-1")?.lastRefreshAtMillis)
+    }
+
     private fun inMemoryDatabase(): LettaDatabase {
         val context = ApplicationProvider.getApplicationContext<Context>()
         return Room.inMemoryDatabaseBuilder(context, LettaDatabase::class.java)

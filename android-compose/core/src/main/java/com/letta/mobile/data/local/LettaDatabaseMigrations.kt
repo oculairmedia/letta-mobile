@@ -63,5 +63,40 @@ object LettaDatabaseMigrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+    val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `conversations` (
+                    `id` TEXT NOT NULL,
+                    `agentId` TEXT NOT NULL,
+                    `summary` TEXT,
+                    `createdAt` TEXT,
+                    `updatedAt` TEXT,
+                    `lastMessageAt` TEXT,
+                    `archived` INTEGER,
+                    `archivedAt` TEXT,
+                    `inContextMessageIdsJson` TEXT NOT NULL,
+                    `isolatedBlockIdsJson` TEXT NOT NULL,
+                    `cachedAtEpochMs` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_conversations_agentId` ON `conversations` (`agentId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_conversations_lastMessageAt` ON `conversations` (`lastMessageAt`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_conversations_createdAt` ON `conversations` (`createdAt`)")
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `conversation_refresh_state` (
+                    `agentId` TEXT NOT NULL,
+                    `lastRefreshAtMillis` INTEGER NOT NULL,
+                    PRIMARY KEY(`agentId`)
+                )
+                """.trimIndent(),
+            )
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
 }

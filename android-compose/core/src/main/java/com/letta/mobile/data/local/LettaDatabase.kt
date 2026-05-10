@@ -14,14 +14,21 @@ import androidx.room.RoomDatabase
  * exported under core/schemas and migration coverage lives in LettaDatabaseMigrationTest.
  */
 @Database(
-    entities = [AgentEntity::class, BugReportEntity::class, PendingLocalEntity::class],
-    version = 4,
+    entities = [
+        AgentEntity::class,
+        BugReportEntity::class,
+        PendingLocalEntity::class,
+        ConversationEntity::class,
+        ConversationRefreshEntity::class,
+    ],
+    version = 5,
     exportSchema = true,
 )
 abstract class LettaDatabase : RoomDatabase() {
     abstract fun agentDao(): AgentDao
     abstract fun bugReportDao(): BugReportDao
     abstract fun pendingLocalDao(): PendingLocalDao
+    abstract fun conversationDao(): ConversationDao
 
     companion object {
         @Volatile

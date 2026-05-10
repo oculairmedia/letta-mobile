@@ -69,6 +69,7 @@ class LettaDatabaseMigrationTest {
         assertEquals(listOf("alpha", "beta"), agents.single().toAgent().tags)
         assertTrue(db.bugReportDao().getRecentForProject("project-1", limit = 10).isEmpty())
         assertTrue(db.pendingLocalDao().listForConversation("conversation-1").isEmpty())
+        assertTrue(db.conversationDao().getForAgentOnce("agent-1").isEmpty())
     }
 
     @Test
@@ -104,6 +105,7 @@ class LettaDatabaseMigrationTest {
         assertEquals(7L, reports.single().id)
         assertEquals("Bug title", reports.single().title)
         assertTrue(db.pendingLocalDao().listForConversation("conversation-1").isEmpty())
+        assertTrue(db.conversationDao().getForAgentOnce("agent-1").isEmpty())
     }
 
     @Test
@@ -157,6 +159,36 @@ class LettaDatabaseMigrationTest {
         val agent = db.agentDao().getAllOnce().single()
         assertEquals(AgentEntity.encodeTags(listOf("alpha", "beta", "gamma")), agent.tagsJson)
         assertEquals(listOf("alpha", "beta", "gamma"), agent.toAgent().tags)
+        assertTrue(db.conversationDao().getForAgentOnce("agent-1").isEmpty())
+    }
+
+    @Test
+    fun `opens current v4 database and adds conversation cache tables`() = runTest {
+        createLegacyDatabase(version = 4) { db ->
+            createAgentsTable(db)
+            createProjectBugReportsTable(db)
+            createPendingLocalMessagesTable(db)
+        }
+
+        val db = openMigratedDatabase()
+
+        assertTrue(db.conversationDao().getForAgentOnce("agent-1").isEmpty())
+        assertEquals(null, db.conversationDao().getRefreshState("agent-1"))
+        db.conversationDao().replaceForAgent(
+            agentId = "agent-1",
+            conversations = listOf(
+                ConversationEntity.fromConversation(
+                    com.letta.mobile.data.model.Conversation(
+                        id = "conversation-1",
+                        agentId = "agent-1",
+                        summary = "Cached title",
+                    ),
+                ),
+            ),
+            refreshedAtMillis = 789L,
+        )
+        assertEquals("Cached title", db.conversationDao().getForAgentOnce("agent-1").single().summary)
+        assertEquals(789L, db.conversationDao().getRefreshState("agent-1")?.lastRefreshAtMillis)
     }
 
     private fun createLegacyDatabase(version: Int, createSchema: (SQLiteDatabase) -> Unit) {

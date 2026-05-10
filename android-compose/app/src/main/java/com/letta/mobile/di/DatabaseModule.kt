@@ -3,6 +3,7 @@ package com.letta.mobile.di
 import android.content.Context
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.BugReportDao
+import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.local.LettaDatabase
 import com.letta.mobile.data.local.PendingLocalDao
 import com.letta.mobile.data.local.RoomPendingLocalStore
@@ -45,5 +46,10 @@ object DatabaseModule {
     @Provides
     fun providePendingLocalDao(database: LettaDatabase): PendingLocalDao {
         return database.pendingLocalDao()
+    }
+
+    @Provides
+    fun provideConversationDao(database: LettaDatabase): ConversationDao {
+        return database.conversationDao()
     }
 }

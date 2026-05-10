@@ -211,7 +211,7 @@ class ConversationsViewModelTest {
 
     private class FakeConversationRepository(
         agentRepository: AgentRepository,
-    ) : ConversationRepository(FakeConversationApi(), agentRepository) {
+    ) : ConversationRepository(FakeConversationApi(), agentRepository, mockk(relaxed = true)) {
         val deletedConversationIds = mutableListOf<String>()
         val archivedUpdates = mutableListOf<Pair<String, Boolean>>()
 
