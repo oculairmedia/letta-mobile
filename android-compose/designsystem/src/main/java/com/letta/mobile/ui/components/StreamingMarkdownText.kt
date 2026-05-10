@@ -333,7 +333,7 @@ private fun StreamingMarkdownTable(
 ) {
     val outlineColor = MaterialTheme.colorScheme.outlineVariant
     val headerContainer = MaterialTheme.colorScheme.surfaceContainerHigh
-    val bodyContainer = MaterialTheme.colorScheme.surfaceContainerLow
+    val bodyContainer = LettaCardDefaults.listContainerColor
     val cellTextStyle = MaterialTheme.typography.bodySmall
 
     Column(

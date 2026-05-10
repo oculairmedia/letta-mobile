@@ -40,13 +40,14 @@ fun Accordions(
 ) {
     val chevronRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
+        animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
         label = "chevron",
     )
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .animateContentSize()
+            .animateContentSize(animationSpec = MaterialTheme.motionScheme.fastSpatialSpec())
     ) {
         Row(
             modifier = Modifier
@@ -83,8 +84,18 @@ fun Accordions(
 
         AnimatedVisibility(
             visible = expanded,
-            enter = fadeIn() + slideInVertically(initialOffsetY = { it / 4 }) + expandVertically(),
-            exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 4 }) + shrinkVertically(),
+            enter = fadeIn(animationSpec = MaterialTheme.motionScheme.fastSpatialSpec()) +
+                slideInVertically(
+                    animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+                    initialOffsetY = { it / 4 },
+                ) +
+                expandVertically(animationSpec = MaterialTheme.motionScheme.fastSpatialSpec()),
+            exit = fadeOut(animationSpec = MaterialTheme.motionScheme.fastSpatialSpec()) +
+                slideOutVertically(
+                    animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+                    targetOffsetY = { it / 4 },
+                ) +
+                shrinkVertically(animationSpec = MaterialTheme.motionScheme.fastSpatialSpec()),
         ) {
             content()
         }
