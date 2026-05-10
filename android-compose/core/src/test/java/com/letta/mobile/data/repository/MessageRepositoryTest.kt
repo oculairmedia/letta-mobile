@@ -6,7 +6,6 @@ import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.BatchMessageRequest
 import com.letta.mobile.data.model.CreateBatchMessagesRequest
 import com.letta.mobile.data.model.Job
-import com.letta.mobile.data.model.MessageCreate
 import com.letta.mobile.data.model.MessageSearchRequest
 import com.letta.mobile.data.model.MessageSearchResult
 import com.letta.mobile.data.model.UserMessage
@@ -16,9 +15,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
-import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -95,18 +92,6 @@ class MessageRepositoryTest {
         assertEquals("conv-1", fakeApi.lastFetchConversationId)
         assertEquals(MessageRepository.OLDER_MESSAGES_PAGE_SIZE, fakeApi.lastFetchMessageLimit)
         assertEquals("before-1", fakeApi.lastFetchBeforeMessageId)
-    }
-
-    @Test
-    fun `sendSteeringMessage builds non-streaming user message with otid`() = runTest {
-        repository.sendSteeringMessage(conversationId = "conv-1", content = "steer", otid = "otid-1")
-
-        assertEquals("conv-1", fakeApi.lastNoStreamConversationId)
-        assertEquals(false, fakeApi.lastNoStreamRequest?.streaming)
-        val message = json.decodeFromJsonElement<MessageCreate>(fakeApi.lastNoStreamRequest!!.messages!!.single())
-        assertEquals("user", message.role)
-        assertEquals("steer", message.content.jsonPrimitive.contentOrNull)
-        assertEquals("otid-1", message.otid)
     }
 
     @Test

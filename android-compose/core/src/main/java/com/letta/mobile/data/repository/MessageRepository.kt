@@ -18,7 +18,6 @@ import com.letta.mobile.data.model.EventMessage
 import com.letta.mobile.data.model.HiddenReasoningMessage
 import com.letta.mobile.data.model.Job
 import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.model.MessageCreate
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.MessageSearchRequest
 import com.letta.mobile.data.model.MessageSearchResult
@@ -172,27 +171,6 @@ open class MessageRepository @Inject constructor(
 
     suspend fun cancelMessage(agentId: String, runIds: List<String>? = null): Map<String, String> {
         return messageApi.cancelMessage(agentId = agentId, runIds = runIds)
-    }
-
-    suspend fun sendSteeringMessage(
-        conversationId: String,
-        content: String,
-        otid: String,
-    ) {
-        val request = MessageCreateRequest(
-            messages = listOf(
-                Json.encodeToJsonElement(
-                    MessageCreate.serializer(),
-                    MessageCreate(
-                        role = "user",
-                        content = JsonPrimitive(content),
-                        otid = otid,
-                    ),
-                ),
-            ),
-            streaming = false,
-        )
-        messageApi.sendConversationMessageNoStream(conversationId, request)
     }
 
     suspend fun searchMessages(request: MessageSearchRequest): List<MessageSearchResult> {
