@@ -22,12 +22,10 @@ import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.MessageContentPart
-import com.letta.mobile.data.model.MessageSearchRequest
 import com.letta.mobile.data.model.MessageType
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.buildContentParts
-import com.letta.mobile.data.model.toParsed
 import com.letta.mobile.data.model.toJsonArray
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.BlockRepository
@@ -413,6 +411,13 @@ class AdminChatViewModel @Inject constructor(
         )
     }
 
+    private val chatSearchController = ChatSearchController(messageRepository)
+    private val chatSessionResolver = ChatSessionResolver(
+        agentRepository = agentRepository,
+        conversationRepository = conversationRepository,
+        backgroundRefreshScope = viewModelScope,
+    )
+
     private val _uiState = MutableStateFlow(
         ChatUiState(agentName = initialAgentName.orEmpty())
     )
@@ -460,7 +465,12 @@ class AdminChatViewModel @Inject constructor(
             return
         }
 
-        val localResults = localChatSearchResults(query)
+        val localResults = chatSearchController.localResults(
+            query = query,
+            state = _uiState.value,
+            agentId = agentId,
+            conversationId = conversationId,
+        )
         _uiState.update {
             it.copy(
                 searchQuery = query,
@@ -473,23 +483,17 @@ class AdminChatViewModel @Inject constructor(
         chatSearchJob = viewModelScope.launch {
             delay(CHAT_SEARCH_REMOTE_DEBOUNCE_MS)
             try {
-                val results = messageRepository.searchMessages(
-                    MessageSearchRequest(
-                        query = query,
-                        searchMode = "fts",
-                        roles = listOf("user", "assistant"),
-                        agentId = agentId,
-                        limit = 50,
-                    )
-                )
-                val parsed = results
-                    .map { it.toParsed() }
-                    .filter { it.agentId == agentId }
+                val parsed = chatSearchController.remoteResults(query, agentId)
                 _uiState.update { current ->
                     if (current.searchQuery == query) {
                         current.copy(
-                            searchResults = mergeSearchResults(
-                                local = localChatSearchResults(query, current),
+                            searchResults = chatSearchController.mergeResults(
+                                local = chatSearchController.localResults(
+                                    query = query,
+                                    state = current,
+                                    agentId = agentId,
+                                    conversationId = conversationId,
+                                ),
                                 remote = parsed,
                             ),
                             isSearching = false,
@@ -507,46 +511,6 @@ class AdminChatViewModel @Inject constructor(
                 }
             }
         }
-    }
-
-    private fun localChatSearchResults(
-        query: String,
-        state: ChatUiState = _uiState.value,
-    ): ImmutableList<ParsedSearchMessage> {
-        val trimmedQuery = query.trim()
-        if (trimmedQuery.isBlank()) return persistentListOf()
-        val currentConversationId = conversationId
-        return state.messages
-            .asSequence()
-            .filter { it.role == "user" || it.role == "assistant" }
-            .filter { it.content.contains(trimmedQuery, ignoreCase = true) }
-            .map { message ->
-                ParsedSearchMessage(
-                    messageId = message.id,
-                    agentId = agentId,
-                    role = message.role,
-                    content = message.content,
-                    date = message.timestamp,
-                    conversationId = currentConversationId,
-                )
-            }
-            .toList()
-            .toImmutableList()
-    }
-
-    private fun mergeSearchResults(
-        local: List<ParsedSearchMessage>,
-        remote: List<ParsedSearchMessage>,
-    ): ImmutableList<ParsedSearchMessage> {
-        val seen = LinkedHashSet<String>()
-        return (local + remote)
-            .filter { seen.add(it.searchIdentity()) }
-            .toImmutableList()
-    }
-
-    private fun ParsedSearchMessage.searchIdentity(): String {
-        return messageId
-            ?: listOfNotNull(agentId, conversationId, role, content).joinToString("|")
     }
 
     fun clearChatSearch() {
@@ -711,10 +675,7 @@ class AdminChatViewModel @Inject constructor(
     private var chatSearchJob: Job? = null
 
     private fun seedAgentNameFromMemoryCache() {
-        val cachedName = agentRepository.getCachedAgent(agentId)
-            ?.name
-            ?.takeIf { it.isNotBlank() }
-            ?: return
+        val cachedName = chatSessionResolver.cachedAgentName(agentId) ?: return
         _uiState.update { current ->
             if (current.agentName.isBlank()) current.copy(agentName = cachedName) else current
         }
@@ -722,9 +683,7 @@ class AdminChatViewModel @Inject constructor(
 
     private fun observeAgentNameCache() {
         viewModelScope.launch {
-            agentRepository.agents
-                .map { agents -> agents.firstOrNull { it.id == agentId }?.name.orEmpty() }
-                .distinctUntilChanged()
+            chatSessionResolver.observeCachedAgentName(agentId)
                 .collect { cachedName ->
                     if (cachedName.isBlank()) return@collect
                     _uiState.update { current ->
@@ -1399,25 +1358,8 @@ class AdminChatViewModel @Inject constructor(
      *   for this agent after the refresh.
      */
     private suspend fun resolveMostRecentConversation(maxAgeMs: Long): String? {
-        mostRecentCachedConversationId()?.let { cachedConversationId ->
-            if (!conversationRepository.hasFreshConversations(agentId, maxAgeMs)) {
-                viewModelScope.launch {
-                    runCatching { conversationRepository.refreshConversationsIfStale(agentId, maxAgeMs) }
-                }
-            }
-            return cachedConversationId
-        }
-        conversationRepository.refreshConversationsIfStale(agentId, maxAgeMs)
-        return mostRecentCachedConversationId()
-    }
-
-    private fun mostRecentCachedConversationId(): String? {
-        val mostRecent = conversationRepository.getCachedConversations(agentId)
-            .sortedByDescending { it.lastMessageAt ?: it.createdAt ?: "" }
-            .firstOrNull()
-            ?: return null
-        activeConversationId = mostRecent.id
-        return mostRecent.id
+        return chatSessionResolver.resolveMostRecentConversation(agentId, maxAgeMs)
+            ?.also { activeConversationId = it }
     }
 
     private suspend fun loadMessagesInternal() {
