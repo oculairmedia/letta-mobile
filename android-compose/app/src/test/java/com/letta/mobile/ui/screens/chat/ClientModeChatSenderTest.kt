@@ -13,6 +13,7 @@ import io.mockk.verify
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -23,15 +24,9 @@ import org.junit.jupiter.api.Tag
 class ClientModeChatSenderTest {
     @Test
     fun `fresh client mode send uses null conversation id plus force new`() = runTest {
-        val internalBotClient = mockk<InternalBotClient>()
-        val controller = mockk<ClientModeController>()
-        val requestSlot = slot<BotChatRequest>()
-        coEvery { controller.ensureReady() } returns Unit
-        every { internalBotClient.streamMessage(capture(requestSlot)) } returns flowOf(
-            BotStreamChunk(conversationId = "conv-new", done = true),
-        )
+        val fixture = ClientModeSenderFixture()
 
-        ClientModeChatSender(internalBotClient, controller)
+        fixture.sender
             .streamMessage(
                 screenAgentId = "agent-1",
                 text = "hello",
@@ -39,23 +34,16 @@ class ClientModeChatSenderTest {
             )
             .toList()
 
-        coVerify(exactly = 1) { controller.ensureReady() }
-        verify(exactly = 1) { internalBotClient.streamMessage(any()) }
-        assertNull(requestSlot.captured.conversationId)
-        assertTrue(requestSlot.captured.forceNew)
+        fixture.verifyReadyAndSent()
+        assertNull(fixture.capturedRequest.conversationId)
+        assertTrue(fixture.capturedRequest.forceNew)
     }
 
     @Test
     fun `existing client mode send does not force new conversation`() = runTest {
-        val internalBotClient = mockk<InternalBotClient>()
-        val controller = mockk<ClientModeController>()
-        val requestSlot = slot<BotChatRequest>()
-        coEvery { controller.ensureReady() } returns Unit
-        every { internalBotClient.streamMessage(capture(requestSlot)) } returns flowOf(
-            BotStreamChunk(conversationId = "conv-existing", done = true),
-        )
+        val fixture = ClientModeSenderFixture()
 
-        ClientModeChatSender(internalBotClient, controller)
+        fixture.sender
             .streamMessage(
                 screenAgentId = "agent-1",
                 text = "hello",
@@ -63,8 +51,47 @@ class ClientModeChatSenderTest {
             )
             .toList()
 
-        coVerify(exactly = 1) { controller.ensureReady() }
-        verify(exactly = 1) { internalBotClient.streamMessage(any()) }
-        assertFalse(requestSlot.captured.forceNew)
+        fixture.verifyReadyAndSent()
+        assertFalse(fixture.capturedRequest.forceNew)
+    }
+
+    @Test
+    fun `existing conversation client mode request preserves route agent and conversation id`() = runTest {
+        val fixture = ClientModeSenderFixture()
+
+        fixture.sender
+            .streamMessage(
+                screenAgentId = "route-agent",
+                text = "follow up",
+                conversationId = "route-conv",
+            )
+            .toList()
+
+        fixture.verifyReadyAndSent()
+        assertEquals("route-agent", fixture.capturedRequest.agentId)
+        assertEquals("route-conv", fixture.capturedRequest.conversationId)
+        assertEquals("agent:route-agent", fixture.capturedRequest.chatId)
+        assertFalse(fixture.capturedRequest.forceNew)
+    }
+
+    private class ClientModeSenderFixture {
+        private val internalBotClient = mockk<InternalBotClient>()
+        private val controller = mockk<ClientModeController>()
+        private val requestSlot = slot<BotChatRequest>()
+
+        val sender = ClientModeChatSender(internalBotClient, controller)
+        val capturedRequest: BotChatRequest get() = requestSlot.captured
+
+        init {
+            coEvery { controller.ensureReady() } returns Unit
+            every { internalBotClient.streamMessage(capture(requestSlot)) } returns flowOf(
+                BotStreamChunk(conversationId = "conv-existing", done = true),
+            )
+        }
+
+        fun verifyReadyAndSent() {
+            coVerify(exactly = 1) { controller.ensureReady() }
+            verify(exactly = 1) { internalBotClient.streamMessage(any()) }
+        }
     }
 }

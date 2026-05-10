@@ -2,7 +2,7 @@
 
 **Status:** Current contract (2026-05-10)
 
-Client Mode uses the lettabot WebSocket gateway, but chat rendering still uses `TimelineRepository` as the source of truth. This document is the single lifecycle contract for gateway-backed USER, ASSISTANT, REASONING, TOOL_CALL, and TOOL_RESULT events.
+Client Mode uses the lettabot WebSocket gateway, but chat rendering still uses `TimelineRepository` as the source of truth. This document is the single lifecycle contract for gateway-backed USER, ASSISTANT, REASONING, TOOL_CALL, and TOOL_RESULT events. For the cross-module regression matrix that protects this contract, see [`chat-boundary-regression-harness.md`](chat-boundary-regression-harness.md).
 
 ## Layers and allowed writes
 
