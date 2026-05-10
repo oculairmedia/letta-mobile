@@ -41,5 +41,27 @@ object LettaDatabaseMigrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+    val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            val cursor = db.query("SELECT `id`, `tagsJson` FROM `agents` WHERE `tagsJson` IS NOT NULL")
+            try {
+                val idIndex = cursor.getColumnIndexOrThrow("id")
+                val tagsIndex = cursor.getColumnIndexOrThrow("tagsJson")
+                val update = db.compileStatement("UPDATE `agents` SET `tagsJson` = ? WHERE `id` = ?")
+                while (cursor.moveToNext()) {
+                    val rawTags = cursor.getString(tagsIndex)
+                    if (AgentEntity.isJsonEncodedTags(rawTags)) continue
+
+                    update.clearBindings()
+                    update.bindString(1, AgentEntity.encodeTags(AgentEntity.decodeTags(rawTags)))
+                    update.bindString(2, cursor.getString(idIndex))
+                    update.executeUpdateDelete()
+                }
+            } finally {
+                cursor.close()
+            }
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
 }

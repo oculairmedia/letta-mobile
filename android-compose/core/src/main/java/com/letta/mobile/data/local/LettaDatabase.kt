@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [AgentEntity::class, BugReportEntity::class, PendingLocalEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class LettaDatabase : RoomDatabase() {

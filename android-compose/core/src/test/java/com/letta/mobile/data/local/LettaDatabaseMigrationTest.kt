@@ -65,7 +65,8 @@ class LettaDatabaseMigrationTest {
         assertEquals(1, agents.size)
         assertEquals("agent-1", agents.single().id)
         assertEquals("Agent One", agents.single().name)
-        assertEquals("alpha,beta", agents.single().tagsJson)
+        assertEquals(AgentEntity.encodeTags(listOf("alpha", "beta")), agents.single().tagsJson)
+        assertEquals(listOf("alpha", "beta"), agents.single().toAgent().tags)
         assertTrue(db.bugReportDao().getRecentForProject("project-1", limit = 10).isEmpty())
         assertTrue(db.pendingLocalDao().listForConversation("conversation-1").isEmpty())
     }
@@ -120,6 +121,28 @@ class LettaDatabaseMigrationTest {
             createPendingLocalMessagesTable(db)
             db.execSQL(
                 """
+                INSERT INTO agents (
+                    id, name, description, model, embedding, agentType, enableSleeptime,
+                    createdAt, updatedAt, tagsJson, toolCount, blockCount
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """.trimIndent(),
+                arrayOf<Any?>(
+                    "agent-legacy-tags",
+                    "Legacy Tags",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    "alpha,beta,gamma",
+                    0,
+                    0,
+                ),
+            )
+            db.execSQL(
+                """
                 INSERT INTO pending_local_messages (
                     otid, conversationId, content, attachmentsJson, sentAtEpochMs
                 ) VALUES (?, ?, ?, ?, ?)
@@ -131,6 +154,9 @@ class LettaDatabaseMigrationTest {
         val db = openMigratedDatabase()
 
         assertEquals(listOf(row), db.pendingLocalDao().listForConversation("conversation-1"))
+        val agent = db.agentDao().getAllOnce().single()
+        assertEquals(AgentEntity.encodeTags(listOf("alpha", "beta", "gamma")), agent.tagsJson)
+        assertEquals(listOf("alpha", "beta", "gamma"), agent.toAgent().tags)
     }
 
     private fun createLegacyDatabase(version: Int, createSchema: (SQLiteDatabase) -> Unit) {

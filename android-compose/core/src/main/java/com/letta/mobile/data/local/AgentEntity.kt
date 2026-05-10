@@ -3,6 +3,10 @@ package com.letta.mobile.data.local
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.letta.mobile.data.model.Agent
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.Json
 
 @Entity(tableName = "agents")
 data class AgentEntity(
@@ -29,10 +33,38 @@ data class AgentEntity(
         enableSleeptime = enableSleeptime,
         createdAt = createdAt,
         updatedAt = updatedAt,
-        tags = tagsJson?.split(",")?.filter { it.isNotBlank() } ?: emptyList(),
+        tags = decodeTags(tagsJson),
     )
 
     companion object {
+        private val json = Json { ignoreUnknownKeys = true }
+        private val tagListSerializer = ListSerializer(String.serializer())
+
+        fun encodeTags(tags: List<String>): String = json.encodeToString(tagListSerializer, tags)
+
+        fun decodeTags(rawTags: String?): List<String> {
+            val raw = rawTags?.takeIf { it.isNotBlank() } ?: return emptyList()
+            return try {
+                json.decodeFromString(tagListSerializer, raw)
+            } catch (_: SerializationException) {
+                raw.split(",").map { it.trim() }.filter { it.isNotBlank() }
+            } catch (_: IllegalArgumentException) {
+                raw.split(",").map { it.trim() }.filter { it.isNotBlank() }
+            }
+        }
+
+        fun isJsonEncodedTags(rawTags: String?): Boolean {
+            val raw = rawTags?.trim()?.takeIf { it.isNotEmpty() } ?: return true
+            return try {
+                json.decodeFromString(tagListSerializer, raw)
+                true
+            } catch (_: SerializationException) {
+                false
+            } catch (_: IllegalArgumentException) {
+                false
+            }
+        }
+
         fun fromAgent(agent: Agent) = AgentEntity(
             id = agent.id,
             name = agent.name,
@@ -43,7 +75,7 @@ data class AgentEntity(
             enableSleeptime = agent.enableSleeptime,
             createdAt = agent.createdAt,
             updatedAt = agent.updatedAt,
-            tagsJson = agent.tags.joinToString(","),
+            tagsJson = encodeTags(agent.tags),
             toolCount = agent.tools.size,
             blockCount = agent.blocks.size,
         )

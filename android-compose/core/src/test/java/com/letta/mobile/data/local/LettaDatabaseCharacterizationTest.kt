@@ -9,7 +9,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Ignore
 import org.junit.Test
@@ -71,13 +70,24 @@ class LettaDatabaseCharacterizationTest {
     }
 
     @Test
-    fun `documents AgentEntity tags currently lose comma-containing tag boundaries`() {
-        val originalTags = listOf("alpha,beta", "gamma")
+    fun `AgentEntity tags preserve commas quotes unicode and empty lists`() {
+        val originalTags = listOf("alpha,beta", "quote \" tag", "emoji 🚀", "spaced tag")
         val entity = AgentEntity.fromAgent(TestData.agent(tags = originalTags))
 
-        assertEquals("alpha,beta,gamma", entity.tagsJson)
-        assertNotEquals(originalTags, entity.toAgent().tags)
-        assertEquals(listOf("alpha", "beta", "gamma"), entity.toAgent().tags)
+        assertEquals(originalTags, entity.toAgent().tags)
+        assertEquals(emptyList<String>(), AgentEntity.fromAgent(TestData.agent(tags = emptyList())).toAgent().tags)
+    }
+
+    @Test
+    fun `AgentEntity decodes legacy comma-joined tags as best-effort fallback`() {
+        assertEquals(
+            listOf("alpha", "beta", "gamma"),
+            AgentEntity(
+                id = "agent-legacy",
+                name = "Legacy Agent",
+                tagsJson = "alpha,beta,gamma",
+            ).toAgent().tags,
+        )
     }
 
     private fun inMemoryDatabase(): LettaDatabase {
