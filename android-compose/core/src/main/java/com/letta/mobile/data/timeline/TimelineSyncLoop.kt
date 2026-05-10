@@ -145,6 +145,13 @@ class TimelineSyncLoop(
     // and can clear their loading state.
     private val _events = MutableSharedFlow<TimelineSyncEvent>(replay = 1, extraBufferCapacity = 64)
 
+    // Resume-stream frames are not guaranteed to arrive in causal order. In
+    // practice a tool_return can beat the tool_call/approval_request frame it
+    // belongs to, which used to make live output disappear until a later REST
+    // reconcile reattached it. Keep unmatched returns in memory and fold them
+    // into the call event as soon as that event lands.
+    private val pendingToolReturnsByCallId = LinkedHashMap<String, ToolReturnMessage>()
+
     /** Signal that hydrate failed — emitted by [TimelineRepository]. */
     internal suspend fun emitHydrateFailed(message: String) {
         _events.emit(TimelineSyncEvent.HydrateFailed(message))
@@ -828,6 +835,39 @@ class TimelineSyncLoop(
         }
     }
 
+    /**
+     * Attach any tool_return frames that arrived before their tool_call frame.
+     * Must be called under [writeMutex].
+     */
+    private fun applyPendingToolReturns(ev: TimelineEvent.Confirmed): TimelineEvent.Confirmed {
+        if (ev.messageType != TimelineMessageType.TOOL_CALL || ev.toolCalls.isEmpty()) return ev
+        val matchingReturns = ev.toolCalls.mapNotNull { toolCall ->
+            val callId = toolCall.effectiveId.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val toolReturn = pendingToolReturnsByCallId.remove(callId) ?: return@mapNotNull null
+            callId to toolReturn
+        }
+        if (matchingReturns.isEmpty()) return ev
+        val firstReturn = matchingReturns.first().second
+        val returnContentByCallId = ev.toolReturnContentByCallId + matchingReturns.mapNotNull { (callId, toolReturn) ->
+            toolReturn.toolReturn.funcResponse?.let { callId to it }
+        }.toMap()
+        val returnIsErrorByCallId = ev.toolReturnIsErrorByCallId + matchingReturns.associate { (callId, toolReturn) ->
+            callId to (toolReturn.isErr == true || toolReturn.status == "error")
+        }
+        Telemetry.event(
+            "TimelineSync", "toolReturn.attachedPending",
+            "serverId" to ev.serverId,
+            "count" to matchingReturns.size,
+        )
+        return ev.copy(
+            approvalDecided = true,
+            toolReturnContent = firstReturn.toolReturn.funcResponse ?: ev.toolReturnContent,
+            toolReturnIsError = firstReturn.isErr == true || firstReturn.status == "error" || ev.toolReturnIsError,
+            toolReturnContentByCallId = returnContentByCallId,
+            toolReturnIsErrorByCallId = returnIsErrorByCallId,
+        )
+    }
+
     internal suspend fun reconcileForExternalRun(runId: String) = writeMutex.withLock {
         val timer = Telemetry.startTimer("TimelineSync", "externalRunReconcile")
         var appended = 0
@@ -1317,8 +1357,10 @@ class TimelineSyncLoop(
                         "bodyLen" to body.length,
                     )
                 } else {
+                    pendingToolReturnsByCallId[tcid] = message
                     // The call bubble may not exist yet if the return arrived
-                    // before the request was ingested. Log so we can see it.
+                    // before the request was ingested. Buffer it so live UI
+                    // does not have to wait for REST reconcile/hydrate.
                     Telemetry.event(
                         "TimelineSync", "toolReturn.noMatch",
                         "toolCallId" to tcid,
@@ -1413,19 +1455,21 @@ class TimelineSyncLoop(
                 else if (oldCalls.isEmpty()) newCalls
                 else if (newScore >= oldScore) newCalls
                 else oldCalls
-            val merged = confirmed.copy(
-                content = mergedText,
-                toolCalls = mergedCalls,
-                // Preserve these fields from the existing event — a delta
-                // that arrives AFTER a tool_return attachment would
-                // otherwise overwrite the attached output.
-                approvalDecided = existing.approvalDecided || confirmed.approvalDecided,
-                toolReturnContent = confirmed.toolReturnContent ?: existing.toolReturnContent,
-                toolReturnIsError = confirmed.toolReturnIsError || existing.toolReturnIsError,
-                toolReturnContentByCallId = existing.toolReturnContentByCallId + confirmed.toolReturnContentByCallId,
-                toolReturnIsErrorByCallId = existing.toolReturnIsErrorByCallId + confirmed.toolReturnIsErrorByCallId,
-                approvalRequestId = confirmed.approvalRequestId ?: existing.approvalRequestId,
-                source = existing.source,
+            val merged = applyPendingToolReturns(
+                confirmed.copy(
+                    content = mergedText,
+                    toolCalls = mergedCalls,
+                    // Preserve these fields from the existing event — a delta
+                    // that arrives AFTER a tool_return attachment would
+                    // otherwise overwrite the attached output.
+                    approvalDecided = existing.approvalDecided || confirmed.approvalDecided,
+                    toolReturnContent = confirmed.toolReturnContent ?: existing.toolReturnContent,
+                    toolReturnIsError = confirmed.toolReturnIsError || existing.toolReturnIsError,
+                    toolReturnContentByCallId = existing.toolReturnContentByCallId + confirmed.toolReturnContentByCallId,
+                    toolReturnIsErrorByCallId = existing.toolReturnIsErrorByCallId + confirmed.toolReturnIsErrorByCallId,
+                    approvalRequestId = confirmed.approvalRequestId ?: existing.approvalRequestId,
+                    source = existing.source,
+                )
             )
             _state.value = _state.value.replaceByServerId(merged)
             _state.value = _state.value.copy(liveCursor = confirmed.serverId)
@@ -1485,7 +1529,7 @@ class TimelineSyncLoop(
             )
             return@withLock
         }
-        _state.value = _state.value.append(confirmed)
+        _state.value = _state.value.append(applyPendingToolReturns(confirmed))
         _state.value = _state.value.copy(liveCursor = confirmed.serverId)
         _events.emit(TimelineSyncEvent.StreamEventIngested(confirmed.serverId, message.messageType))
         Telemetry.event(

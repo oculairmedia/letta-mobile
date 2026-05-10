@@ -941,6 +941,55 @@ class TimelineSyncLoopTest {
     }
 
     @Test
+    fun `streamed tool_return arriving before tool_call attaches when call lands`() = runBlocking {
+        val api = FakeSyncApi()
+        val job = kotlinx.coroutines.Job()
+        val scope = CoroutineScope(Dispatchers.Unconfined + job)
+        val sync = TimelineSyncLoop(api, "conv1", scope)
+        val toolCallId = "toolu_early_return"
+
+        try {
+            sync.ingestStreamEvent(
+                com.letta.mobile.data.model.ToolReturnMessage(
+                    id = "return-before-call",
+                    toolCallId = toolCallId,
+                    toolReturnRaw = JsonPrimitive("early output"),
+                    status = "success",
+                    runId = "run-early",
+                )
+            )
+
+            assertTrue(
+                "tool_return should not render as a standalone event",
+                sync.state.value.events.none {
+                    it is TimelineEvent.Confirmed && it.messageType == TimelineMessageType.TOOL_RETURN
+                },
+            )
+
+            sync.ingestStreamEvent(
+                com.letta.mobile.data.model.ApprovalRequestMessage(
+                    id = "call-after-return",
+                    runId = "run-early",
+                    toolCall = com.letta.mobile.data.model.ToolCall(
+                        id = toolCallId,
+                        name = "Bash",
+                        arguments = "{\"command\":\"echo early\"}",
+                    ),
+                )
+            )
+
+            val toolCallEvent = sync.state.value.events
+                .filterIsInstance<TimelineEvent.Confirmed>()
+                .single { it.messageType == TimelineMessageType.TOOL_CALL }
+            assertEquals("early output", toolCallEvent.toolReturnContent)
+            assertEquals("early output", toolCallEvent.toolReturnContentByCallId[toolCallId])
+            assertTrue(toolCallEvent.approvalDecided)
+        } finally {
+            job.cancel()
+        }
+    }
+
+    @Test
     fun `tool_return with short discriminator is still dispatched via SseParser`() = runBlocking {
         // letta-mobile-mge5.18 regression guard: SSE uses message_type="tool_return"
         // (without _message). LettaMessageSerializer must accept both forms.
