@@ -87,7 +87,7 @@ private fun Timeline.reduceClientModeAssistantChunk(
 ): ClientModeStreamReduction {
     val delta = chunk.text?.takeIf { it.isNotEmpty() }
         ?: return ClientModeStreamReduction(this, localId = null, appended = false)
-    val localId = "cm-assist-$assistantMessageId"
+    val localId = clientModeAssistantLocalId(assistantMessageId, delta)
     return reduceClientModeLocal(localId) {
         upsertClientModeLocal(
             otid = localId,
@@ -122,6 +122,47 @@ private fun Timeline.reduceClientModeAssistantChunk(
             },
         )
     }
+}
+
+private fun Timeline.clientModeAssistantLocalId(
+    assistantMessageId: String,
+    delta: String,
+): String {
+    val baseId = "cm-assist-$assistantMessageId"
+    val base = findByOtid(baseId)
+    val latestToolPosition = events
+        .asSequence()
+        .filterIsInstance<TimelineEvent.Local>()
+        .filter {
+            it.source == MessageSource.CLIENT_MODE_HARNESS &&
+                it.messageType == TimelineMessageType.TOOL_CALL
+        }
+        .maxOfOrNull { it.position }
+        ?: return baseId
+
+    if (base == null || base.position > latestToolPosition) return baseId
+
+    // Keep punctuation-only continuation deltas (e.g. "...") attached to the
+    // pre-tool assistant bubble. Full post-tool prose gets a separate segment
+    // so final SSE fuzzy-collapse can absorb it without mutating the preamble.
+    if (delta.isAssistantContinuationPunctuation()) return baseId
+
+    val segment = events
+        .asSequence()
+        .filterIsInstance<TimelineEvent.Local>()
+        .filter {
+            it.source == MessageSource.CLIENT_MODE_HARNESS &&
+                it.messageType == TimelineMessageType.TOOL_CALL &&
+                it.position > base.position
+        }
+        .count()
+        .coerceAtLeast(1)
+    return "$baseId-after-tool-$segment"
+}
+
+private fun String.isAssistantContinuationPunctuation(): Boolean {
+    val first = firstOrNull { !it.isWhitespace() } ?: return false
+    return first in setOf('.', ',', '!', '?', ':', ';', ')', ']', '}')
 }
 
 private fun Timeline.reduceClientModeToolChunk(

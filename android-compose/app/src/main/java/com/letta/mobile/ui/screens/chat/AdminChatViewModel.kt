@@ -4,8 +4,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.bot.protocol.InternalBotClient
-import com.letta.mobile.data.mapper.toUiMessages
-import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.channel.NotificationDeliveryCoordinator
 import com.letta.mobile.channel.NotificationReplyHandler
 import com.letta.mobile.data.model.Agent
@@ -33,20 +31,12 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.async
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.flow.update
-import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
-
-private sealed interface ClientModeBootstrapState {
-    data object Idle : ClientModeBootstrapState
-    data object NewConversationPending : ClientModeBootstrapState
-    data class Ready(val conversationId: String) : ClientModeBootstrapState
-}
 
 @HiltViewModel
 class AdminChatViewModel @Inject constructor(
@@ -67,7 +57,6 @@ class AdminChatViewModel @Inject constructor(
     private val notificationReplyHandler: NotificationReplyHandler,
 ) : ViewModel() {
     companion object {
-        private const val CONVERSATION_CACHE_TTL_MS = 30_000L
         private const val MESSAGE_SYNC_INTERVAL_MS = 5_000L
         private const val CLIENT_MODE_CONVERSATION_ID_KEY = "clientModeConversationId"
     }
@@ -104,14 +93,11 @@ class AdminChatViewModel @Inject constructor(
     // never shared across chats, never inherited via agent_id. Initial value
     // comes from the route's explicit nav arg if present; otherwise null
     // until resolveConversationAndLoad assigns one.
-    @Volatile private var activeConversationId: String? =
-        requestedConversationArg?.takeIf { it.isNotBlank() }
     private val clientModeEnabled: StateFlow<Boolean> = settingsRepository.observeClientModeEnabled()
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
-    private val initialMessageConsumed = AtomicBoolean(false)
     private var followingDuplicateInitialMessageInFlight = false
     val conversationId: String?
-        get() = if (shouldUseClientModeForCurrentRoute) currentClientModeConversationId() else activeConversationId
+        get() = chatConversationCoordinator.conversationId(shouldUseClientModeForCurrentRoute)
     val projectContext: ProjectChatContext? = savedStateHandle.get<String>("projectIdentifier")?.let { identifier ->
         val name = savedStateHandle.get<String>("projectName") ?: identifier
         ProjectChatContext(
@@ -182,22 +168,6 @@ class AdminChatViewModel @Inject constructor(
     private val runExpansionState = ChatRunExpansionState(savedStateHandle, _uiState)
 
     private val pendingToolsMap = java.util.concurrent.ConcurrentHashMap<String, PendingToolCall>()
-    private var hasSummary = false
-    // letta-mobile-flk.6: tracks whether the VM has already resolved its
-    // conversation at least once. Used to gate the fresh-route fallback
-    // suppression so it only fires on the very first resolveConversationAndLoad
-    // call (the actual nav entry). Subsequent re-resolutions — like a
-    // mid-session client-mode toggle — are allowed to fall back to the
-    // most-recent persisted conversation as before.
-    private var hasResolvedConversationOnce: Boolean = false
-    // letta-mobile-vynx: a fresh Client Mode route is an explicit
-    // "new conversation with no history" bootstrap. Keep that as a real VM
-    // state so later Client Mode re-resolves cannot hydrate the agent's most
-    // recent cached conversation before the first send. It transitions to
-    // Ready only after we have created/persisted the empty Letta conversation.
-    private var clientModeBootstrapState: ClientModeBootstrapState =
-        if (isFreshRoute) ClientModeBootstrapState.NewConversationPending else ClientModeBootstrapState.Idle
-
     fun toggleRunCollapsed(runId: String) = runExpansionState.toggleRunCollapsed(runId)
 
     fun toggleReasoningExpanded(messageId: String) = runExpansionState.toggleReasoningExpanded(messageId)
@@ -241,6 +211,27 @@ class AdminChatViewModel @Inject constructor(
         clearFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = false },
         collapseCompletedRunsIfStreamingFinished = ::collapseCompletedRunsIfStreamingFinished,
     )
+    private val chatConversationCoordinator = ChatConversationCoordinator(
+        scope = viewModelScope,
+        agentId = agentId,
+        initialMessage = initialMessage,
+        explicitConversationId = explicitConversationId,
+        isFreshRoute = isFreshRoute,
+        chatSessionResolver = chatSessionResolver,
+        agentRepository = agentRepository,
+        currentConversationTracker = currentConversationTracker,
+        uiState = _uiState,
+        pendingClientModeBootstrapMessages = ::pendingClientModeBootstrapMessages,
+        setPendingClientModeBootstrapUserMessage = { pendingClientModeBootstrapUserMessage = it },
+        clearPendingClientModeBootstrapUserMessage = ::clearPendingClientModeBootstrapUserMessage,
+        currentClientModeConversationId = ::currentClientModeConversationId,
+        setClientModeConversationId = ::setClientModeConversationId,
+        startTimelineObserver = ::startTimelineObserver,
+        stopTimelineObserver = ::stopTimelineObserver,
+        sendMessageViaClientMode = ::sendMessageViaClientMode,
+        sendMessageViaTimeline = { sendMessageViaTimeline(it) },
+        markFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = true },
+    )
     private val clientModeSendCoordinator = ClientModeSendCoordinator(
         scope = viewModelScope,
         agentId = agentId,
@@ -253,8 +244,8 @@ class AdminChatViewModel @Inject constructor(
         currentClientModeConversationId = ::currentClientModeConversationId,
         setClientModeConversationId = ::setClientModeConversationId,
         setRouteConversationId = { savedStateHandle["conversationId"] = it },
-        setActiveConversationId = { activeConversationId = it },
-        markClientModeBootstrapReady = { clientModeBootstrapState = ClientModeBootstrapState.Ready(it) },
+        setActiveConversationId = chatConversationCoordinator::setActiveConversationId,
+        markClientModeBootstrapReady = chatConversationCoordinator::markClientModeBootstrapReady,
         pendingBootstrapMessages = ::pendingClientModeBootstrapMessages,
         setBootstrapUserMessage = { pendingClientModeBootstrapUserMessage = it },
         clearBootstrapUserMessage = ::clearPendingClientModeBootstrapUserMessage,
@@ -263,6 +254,31 @@ class AdminChatViewModel @Inject constructor(
         refreshContextWindow = ::refreshContextWindow,
         collapseCompletedRunsIfStreamingFinished = ::collapseCompletedRunsIfStreamingFinished,
     )
+    private val timelineSendCoordinator: TimelineSendCoordinator by lazy {
+        TimelineSendCoordinator(
+            scope = viewModelScope,
+            agentId = agentId,
+            isFreshRoute = isFreshRoute,
+            explicitConversationId = explicitConversationId,
+            conversationRepository = conversationRepository,
+            timelineRepository = timelineRepository,
+            uiState = _uiState,
+            clearComposerAfterSend = { composerController.clearAfterSend() },
+            activeConversationId = { chatConversationCoordinator.activeConversationId },
+            setActiveConversationId = chatConversationCoordinator::setActiveConversationId,
+            startTimelineObserver = ::startTimelineObserver,
+        )
+    }
+    private val chatHistoryPager: ChatHistoryPager by lazy {
+        ChatHistoryPager(
+            scope = viewModelScope,
+            agentId = agentId,
+            messageRepository = messageRepository,
+            chatTimelineObserver = chatTimelineObserver,
+            uiState = _uiState,
+            activeConversationId = { chatConversationCoordinator.activeConversationId },
+        )
+    }
     private val projectChatCoordinator = ProjectChatCoordinator(
         scope = viewModelScope,
         agentId = agentId,
@@ -452,403 +468,17 @@ class AdminChatViewModel @Inject constructor(
 
     private fun resolveConversationAndLoad(
         useClientModeForResolve: Boolean = clientModeEnabled.value,
-    ) {
-        // letta-mobile-flk.6: capture the fresh-route bit at entry. It's
-        // only honored on the *first* call (initial nav entry) — see
-        // `hasResolvedConversationOnce` and `suppressFreshRouteFallback`
-        // below. Subsequent calls (e.g. mid-session client-mode toggle)
-        // resolve normally so legacy behavior is preserved.
-        val isFirstResolve = !hasResolvedConversationOnce
-        hasResolvedConversationOnce = true
-        // letta-mobile-flk.6 / w2hx.6: on a genuine fresh-route entry, ensure
-        // this VM's local activeConversationId is null so the UI starts truly
-        // empty. Pre-w2hx.6 this had to clear an agent-keyed singleton map
-        // because that map could be pre-populated by other surfaces (agent
-        // list, recents drawer); now activeConversationId lives on this VM
-        // alone and only reflects this chat's nav arg, so the clear is just
-        // a local null assignment.
-        if (isFreshRoute && isFirstResolve && explicitConversationId == null) {
-            activeConversationId = null
-            android.util.Log.i(
-                "AdminChatViewModel",
-                "flk6.clearActive agent=$agentId reason=freshRouteInitialResolve",
-            )
-        }
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                conversationState = ConversationState.Loading,
-                isLoadingMessages = true,
-                error = null,
-            )
+    ) = chatConversationCoordinator.resolveConversationAndLoad(useClientModeForResolve)
 
-            try {
-                if (useClientModeForResolve) {
-                    // letta-mobile-c87t (PR 2): when we have a Client Mode
-                    // conversationId, route through the timeline observer so
-                    // SSE-side persisted messages flow into the UI alongside
-                    // the optimistic CLIENT_MODE_HARNESS Locals from
-                    // appendClientModeLocal. Without this the chat would only
-                    // ever show in-memory bubbles and history wouldn't load.
-                    //
-                    // Resolution order: explicit nav arg → saved-state-handle
-                    // pointer → most-recent server-side conversation for this
-                    // agent (Client Mode default-load behavior). Fresh routes
-                    // — when the user explicitly opened a new conversation
-                    // (freshRouteKey set, or conversationId arg was blank) —
-                    // remain in NewConversationPending and must not hydrate a
-                    // cached prior conversation on any re-resolve before the
-                    // first send creates the empty bootstrap conversation.
-                    // See letta-mobile-c87t, flk.6, and vynx.
-                    val suppressFreshRouteFallbackClient =
-                        clientModeBootstrapState == ClientModeBootstrapState.NewConversationPending ||
-                            (isFreshRoute && isFirstResolve)
-                    val clientConversationId = explicitConversationId
-                        ?: currentClientModeConversationId()?.also {
-                            clientModeBootstrapState = ClientModeBootstrapState.Ready(it)
-                        }
-                        ?: if (!suppressFreshRouteFallbackClient) {
-                            runCatching {
-                                resolveMostRecentConversation(CONVERSATION_CACHE_TTL_MS)
-                            }.getOrNull()?.also { resolved ->
-                                setClientModeConversationId(resolved)
-                                clientModeBootstrapState = ClientModeBootstrapState.Ready(resolved)
-                            }
-                        } else {
-                            null
-                        }
-                    currentConversationTracker.setCurrent(clientConversationId)
-                    val agent = agentRepository.getCachedAgent(agentId)
-                        ?: runCatching { agentRepository.getAgent(agentId).first() }.getOrNull()
-                    if (clientConversationId != null) {
-                        // Make sure the observer is running for this conv;
-                        // it'll repopulate _uiState.messages on first emission.
-                        startTimelineObserver(clientConversationId)
-                        _uiState.value = _uiState.value.copy(
-                            agentName = agent?.name ?: _uiState.value.agentName,
-                            conversationState = ConversationState.Ready(clientConversationId),
-                            // Don't write messages here — the timeline observer
-                            // is the source of truth.
-                            isLoadingOlderMessages = false,
-                            hasMoreOlderMessages = false,
-                            isStreaming = false,
-                            isAgentTyping = false,
-                            error = null,
-                        )
-                    } else {
-                        // Fresh route, no conv yet — keep isolated bootstrap
-                        // state and do not observe/hydrate any prior timeline.
-                        stopTimelineObserver()
-                        _uiState.value = _uiState.value.copy(
-                            agentName = agent?.name ?: _uiState.value.agentName,
-                            conversationState = ConversationState.NoConversation,
-                            messages = pendingClientModeBootstrapMessages(),
-                            isLoadingMessages = false,
-                            isLoadingOlderMessages = false,
-                            hasMoreOlderMessages = false,
-                            isStreaming = false,
-                            isAgentTyping = false,
-                            error = null,
-                        )
-                    }
-                    consumeInitialMessageIfPresent()?.let { message ->
-                        sendMessageViaClientMode(message)
-                    }
-                    return@launch
-                }
+    private suspend fun loadMessagesInternal() = chatConversationCoordinator.loadMessagesInternal()
 
-                // letta-mobile-flk.6: on the *initial* fresh-route entry,
-                // suppress the most-recent-conversation fallback so a "New
-                // chat" tap doesn't silently hydrate the UI with the
-                // agent's previous server-side conversation. Once the VM
-                // has resolved at least once (`hasResolvedConversationOnce`),
-                // subsequent re-resolutions (e.g. a mid-session client-mode
-                // toggle, exercised by the
-                // "toggling client mode off restores timeline messages"
-                // test) are allowed to fall back to most-recent as before.
-                // This mirrors the existing guard in the Client-Mode branch
-                // above (line ~629).
-                val suppressFreshRouteFallback = isFreshRoute && isFirstResolve
-                if (
-                    !suppressFreshRouteFallback &&
-                    activeConversationId == null &&
-                    explicitConversationId == null
-                ) {
-                    resolveMostRecentConversation(CONVERSATION_CACHE_TTL_MS)
-                }
-
-                // letta-mobile-flk.6 / w2hx.6: a fresh-route entry must NOT
-                // inherit a prior `activeConversationId` from before this
-                // resolve. Pre-w2hx.6 we also had to guard against a
-                // process-wide singleton leaking across chats; that's gone.
-                // Once `hasResolvedConversationOnce` flips, behave normally.
-                val conversationId = if (suppressFreshRouteFallback) {
-                    explicitConversationId?.also { activeConversationId = it }
-                } else {
-                    activeConversationId ?: explicitConversationId?.also { activeConversationId = it }
-                }
-
-                if (conversationId == null) {
-                    _uiState.value = _uiState.value.copy(
-                        conversationState = ConversationState.NoConversation,
-                        messages = persistentListOf(),
-                        isLoadingMessages = false,
-                        isLoadingOlderMessages = false,
-                        hasMoreOlderMessages = false,
-                        error = null,
-                    )
-                } else {
-                    _uiState.value = _uiState.value.copy(
-                        conversationState = ConversationState.Ready(conversationId),
-                        error = null,
-                    )
-                    loadMessagesInternal()
-                }
-
-                consumeInitialMessageIfPresent()?.let { message ->
-                    sendMessageViaTimeline(message)
-                }
-            } catch (e: Exception) {
-                android.util.Log.w("AdminChatViewModel", "Failed to resolve conversation", e)
-                _uiState.value = _uiState.value.copy(
-                    conversationState = ConversationState.Error(
-                        message = e.message ?: "Failed to load conversation",
-                    ),
-                    messages = persistentListOf(),
-                    isLoadingMessages = false,
-                    isLoadingOlderMessages = false,
-                    hasMoreOlderMessages = false,
-                    isStreaming = false,
-                    isAgentTyping = false,
-                    error = null,
-                )
-            }
-        }
-    }
-
-    /**
-     * letta-mobile-w2hx.6: resolve the most-recent server-side conversation
-     * for this VM's agent and assign it to this VM's [activeConversationId].
-     * Replaces ConversationManager.resolveAndSetActiveConversation, which
-     * wrote into a process-wide map keyed on agentId — that map could leak
-     * one chat's resolved conv into a sibling chat's resolve. The chat row
-     * (this VM) now owns its own active id.
-     *
-     * @return the resolved conversation id, or null if there are none cached
-     *   for this agent after the refresh.
-     */
-    private suspend fun resolveMostRecentConversation(maxAgeMs: Long): String? {
-        return chatSessionResolver.resolveMostRecentConversation(agentId, maxAgeMs)
-            ?.also { activeConversationId = it }
-    }
-
-    private suspend fun loadMessagesInternal() {
-        val loadTimer = Telemetry.startTimer("AdminChatVM", "loadMessages")
-        val requestedConversationId = activeConversationId ?: explicitConversationId?.also {
-            activeConversationId = it
-        }
-        val currentConversationId = activeConversationId ?: explicitConversationId
-        if (requestedConversationId == null) {
-            if (requestedConversationId == currentConversationId) {
-                _uiState.value = _uiState.value.copy(
-                    conversationState = ConversationState.NoConversation,
-                    messages = persistentListOf(),
-                    isLoadingMessages = false,
-                    isLoadingOlderMessages = false,
-                    hasMoreOlderMessages = false,
-                    error = null,
-                )
-            }
-            loadTimer.stop("result" to "noConversation")
-            return
-        }
-        val cachedAgent = agentRepository.getCachedAgent(agentId)
-        // Timeline is the source of truth — legacy cache is never read here.
-        val cachedMessages = emptyList<AppMessage>()
-        if (cachedAgent != null || cachedMessages.isNotEmpty()) {
-            if (requestedConversationId == currentConversationId) {
-                _uiState.value = _uiState.value.copy(
-                    agentName = cachedAgent?.name ?: _uiState.value.agentName,
-                    messages = if (cachedMessages.isNotEmpty()) cachedMessages.toUiMessages().toImmutableList() else _uiState.value.messages,
-                    isLoadingMessages = cachedMessages.isEmpty(),
-                    error = null,
-                )
-            }
-        } else {
-            if (requestedConversationId == currentConversationId) {
-                _uiState.value = _uiState.value.copy(isLoadingMessages = true)
-            }
-        }
-        try {
-            val agent = agentRepository.getAgent(agentId).first()
-            if (requestedConversationId != (activeConversationId ?: explicitConversationId)) {
-                loadTimer.stop("result" to "staleConversation")
-                return
-            }
-            _uiState.value = _uiState.value.copy(
-                agentName = agent.name,
-                conversationState = ConversationState.Ready(requestedConversationId),
-            )
-
-            // Hand control of _uiState.messages to the timeline observer.
-            // It calls TimelineRepository.hydrate() and emits as messages
-            // arrive. Keep isLoadingMessages=true until the observer sees
-            // the first emission (see startTimelineObserver).
-            _uiState.value = _uiState.value.copy(
-                isLoadingMessages = true,
-                isLoadingOlderMessages = false,
-                hasMoreOlderMessages = false,
-            )
-            startTimelineObserver(requestedConversationId)
-            loadTimer.stop(
-                "conversationId" to requestedConversationId,
-                "mode" to "timeline",
-            )
-        } catch (e: Exception) {
-            loadTimer.stopError(e, "conversationId" to requestedConversationId)
-            if (requestedConversationId != (activeConversationId ?: explicitConversationId)) {
-                return
-            }
-            _uiState.value = _uiState.value.copy(
-                conversationState = ConversationState.Ready(requestedConversationId),
-                isLoadingMessages = false,
-                isLoadingOlderMessages = false,
-                error = e.message ?: "Failed to load messages",
-            )
-        }
-    }
-
-    private fun consumeInitialMessageIfPresent(): String? {
-        val message = initialMessage?.takeIf { it.isNotBlank() } ?: return null
-        if (!initialMessageConsumed.compareAndSet(false, true)) return null
-
-        val deliveryKey = InitialRouteMessageDeliveryGuard.key(
-            agentId = agentId,
-            conversationId = activeConversationId ?: explicitConversationId ?: currentClientModeConversationId(),
-            message = message,
-        )
-        return if (InitialRouteMessageDeliveryGuard.tryConsume(deliveryKey)) {
-            message
-        } else {
-            android.util.Log.w(
-                "AdminChatViewModel",
-                "Suppressed duplicate initial route message agent=$agentId " +
-                    "conversation=${activeConversationId ?: explicitConversationId ?: currentClientModeConversationId()} " +
-                    "messageHash=${message.hashCode()}",
-            )
-            // A duplicate share route/ViewModel can win the send race before
-            // the user-visible route settles. The visible VM still needs to
-            // reflect that the shared message is in flight; the timeline
-            // observer for the resolved conversation will clear these flags
-            // when the assistant response lands.
-            followingDuplicateInitialMessageInFlight = true
-
-            // letta-mobile-1yk0: for fresh Client Mode routes, also stage the
-            // initial prompt itself. Without this, the visible duplicate route
-            // only showed the thinking indicator until the gateway-created
-            // conversation migrated into the timeline; then the prompt and
-            // response appeared together. That looked like the app ignored the
-            // initial message. We do NOT send again here — this is a local
-            // mirror of the already in-flight route message.
-            if (clientModeEnabled.value && isFreshRoute) {
-                val alreadyVisible = pendingClientModeBootstrapUserMessage?.let {
-                    it.role == "user" && it.content == message
-                } == true || _uiState.value.messages.any {
-                    it.role == "user" && it.content == message
-                }
-                if (!alreadyVisible) {
-                    pendingClientModeBootstrapUserMessage = UiMessage(
-                        id = "client-user-initial-duplicate-${message.hashCode()}",
-                        role = "user",
-                        content = message,
-                        timestamp = java.time.Instant.now().toString(),
-                    )
-                }
-                _uiState.value = _uiState.value.copy(
-                    conversationState = ConversationState.NoConversation,
-                    messages = pendingClientModeBootstrapMessages(),
-                    isLoadingMessages = false,
-                    isStreaming = true,
-                    isAgentTyping = true,
-                )
-            } else {
-                _uiState.value = _uiState.value.copy(
-                    isLoadingMessages = false,
-                    isStreaming = true,
-                    isAgentTyping = true,
-                )
-            }
-            null
-        }
-    }
-
-    fun loadMessages() {
-        if (!shouldUseClientModeForCurrentRoute && activeConversationId == null) {
-            resolveConversationAndLoad()
-            return
-        }
-        viewModelScope.launch { loadMessagesInternal() }
-    }
+    fun loadMessages() = chatConversationCoordinator.loadMessages(shouldUseClientModeForCurrentRoute)
 
     fun retryConversationLoad() {
         resolveConversationAndLoad()
     }
 
-    fun loadOlderMessages() {
-        if (clientModeEnabled.value) return
-        val conversationId = activeConversationId ?: return
-        val currentState = _uiState.value
-        if (
-            currentState.isLoadingMessages ||
-            currentState.isLoadingOlderMessages ||
-            !currentState.hasMoreOlderMessages ||
-            currentState.isStreaming
-        ) {
-            return
-        }
-
-        val oldestLoadedMessageId = currentState.messages
-            .firstOrNull { !it.isPending }
-            ?.id
-            ?: return
-
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoadingOlderMessages = true)
-            try {
-                val olderMessages = messageRepository.fetchOlderMessages(
-                    agentId = agentId,
-                    conversationId = conversationId,
-                    beforeMessageId = oldestLoadedMessageId,
-                )
-                if (conversationId != activeConversationId) {
-                    return@launch
-                }
-
-                // letta-mobile-23h5 (regression fix 2026-04-19): merge older
-                // messages into the per-conversation backfill prefix instead
-                // of writing them straight into _uiState.messages — the
-                // timeline observer would otherwise overwrite them on its
-                // very next emission. Concatenate previously-backfilled
-                // pages with this new page so consecutive scroll-ups grow
-                // the prefix monotonically.
-                val olderUi = olderMessages.toUiMessages()
-                val mergedMessages = chatTimelineObserver.mergeOlderPage(
-                    conversationId = conversationId,
-                    olderMessages = olderUi,
-                    existingMessages = _uiState.value.messages,
-                )
-                _uiState.value = _uiState.value.copy(
-                    messages = mergedMessages.toImmutableList(),
-                    isLoadingOlderMessages = false,
-                    hasMoreOlderMessages = olderMessages.size >= MessageRepository.OLDER_MESSAGES_PAGE_SIZE,
-                )
-            } catch (e: Exception) {
-                android.util.Log.w("AdminChatViewModel", "Failed to load older messages", e)
-                if (conversationId == activeConversationId) {
-                    _uiState.value = _uiState.value.copy(isLoadingOlderMessages = false)
-                }
-            }
-        }
-    }
+    fun loadOlderMessages() = chatHistoryPager.loadOlderMessages(clientModeEnabled.value)
 
     fun sendMessage(text: String) {
         when (_uiState.value.conversationState) {
@@ -894,7 +524,7 @@ class AdminChatViewModel @Inject constructor(
             "flk6.sendMessage agent=$agentId via=${if (isClientMode) "client_mode" else "timeline"} " +
                 "isFreshRoute=$isFreshRoute explicitConv=$explicitConversationId " +
                 "clientModeConv=${currentClientModeConversationId()} " +
-                "active=$activeConversationId",
+                "active=${chatConversationCoordinator.activeConversationId}",
         )
         if (isClientMode) {
             sendMessageViaClientMode(text, attachments)
@@ -961,64 +591,7 @@ class AdminChatViewModel @Inject constructor(
     private fun sendMessageViaTimeline(
         text: String,
         attachments: List<com.letta.mobile.data.model.MessageContentPart.Image> = emptyList(),
-    ) {
-        viewModelScope.launch {
-            val enqueueTimer = Telemetry.startTimer("AdminChatVM", "send.enqueue")
-            composerController.clearAfterSend()
-            _uiState.value = _uiState.value.copy(
-                isStreaming = true,
-                isAgentTyping = true,
-            )
-            try {
-                // letta-mobile-flk.6 / w2hx.6: a fresh-route entry (user
-                // tapped "New chat" with no conversationId arg and no in-flight
-                // pointer) must NOT inherit a sibling chat's conv id. Pre-w2hx.6
-                // we read from a process-wide singleton keyed on agentId; now
-                // `activeConversationId` is local to this VM, so a fresh route
-                // simply means "no conv yet" and we create a new Letta
-                // conversation for this chat.
-                var convId: String? = if (isFreshRoute) {
-                    explicitConversationId
-                } else {
-                    explicitConversationId ?: activeConversationId
-                }
-                if (convId == null) {
-                    val summary = text.take(80).let { if (text.length > 80) "$it\u2026" else it }
-                    convId = conversationRepository.createConversation(agentId, summary).id
-                    activeConversationId = convId
-                    hasSummary = true
-                    _uiState.value = _uiState.value.copy(
-                        conversationState = ConversationState.Ready(convId),
-                    )
-                } else if (!hasSummary) {
-                    runCatching {
-                        val summary = text.take(80).let { if (text.length > 80) "$it\u2026" else it }
-                        conversationRepository.updateConversation(convId, agentId, summary)
-                        hasSummary = true
-                    }
-                }
-                // Ensure observer is attached for this conversation
-                startTimelineObserver(convId)
-                // Enqueue via the Timeline sync loop — returns immediately after
-                // appending the Local event and queuing the HTTP request.
-                val otid = if (attachments.isEmpty()) {
-                    timelineRepository.sendMessage(convId, text)
-                } else {
-                    timelineRepository.sendMessage(convId, text, attachments)
-                }
-                enqueueTimer.stop("otid" to otid, "conversationId" to convId)
-                // isStreaming / isAgentTyping will be cleared when we see a Confirmed
-                // assistant event land in the timeline (see startTimelineObserver).
-            } catch (e: Exception) {
-                enqueueTimer.stopError(e)
-                _uiState.value = _uiState.value.copy(
-                    error = e.message,
-                    isStreaming = false,
-                    isAgentTyping = false,
-                )
-            }
-        }
-    }
+    ) = timelineSendCoordinator.send(text, attachments)
 
     /**
      * Subscribe to the [TimelineRepository]'s StateFlow for the given
@@ -1052,7 +625,7 @@ class AdminChatViewModel @Inject constructor(
             )
 
             when (val result = chatApprovalCoordinator.submitApproval(
-                activeConversationId = activeConversationId,
+                activeConversationId = chatConversationCoordinator.activeConversationId,
                 requestId = requestId,
                 toolCallIds = toolCallIds,
                 approve = approve,
@@ -1088,30 +661,12 @@ class AdminChatViewModel @Inject constructor(
 
     fun resetMessages() {
         if (shouldUseClientModeForCurrentRoute) {
-            setClientModeConversationId(null)
-            clientModeBootstrapState = if (isFreshRoute) {
-                ClientModeBootstrapState.NewConversationPending
-            } else {
-                ClientModeBootstrapState.Idle
-            }
-            clearPendingClientModeBootstrapUserMessage()
-            currentConversationTracker.setCurrent(null)
-            stopTimelineObserver()
-            _uiState.value = _uiState.value.copy(
-                conversationState = ConversationState.NoConversation,
-                messages = persistentListOf(),
-                isLoadingMessages = false,
-                isLoadingOlderMessages = false,
-                hasMoreOlderMessages = false,
-                isStreaming = false,
-                isAgentTyping = false,
-                error = null,
-            )
+            chatConversationCoordinator.resetClientModeConversationState()
             return
         }
         viewModelScope.launch {
             try {
-                val convId = activeConversationId ?: run {
+                val convId = chatConversationCoordinator.activeConversationId ?: run {
                     _uiState.value = _uiState.value.copy(error = "No active conversation to reset")
                     return@launch
                 }

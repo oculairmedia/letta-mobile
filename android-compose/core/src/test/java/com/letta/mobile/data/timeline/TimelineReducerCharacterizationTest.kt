@@ -289,6 +289,62 @@ class TimelineReducerCharacterizationTest {
     }
 
     @Test
+    fun `client mode post-tool assistant prose does not mutate pre-tool preamble`() = withLoop { loop ->
+        loop.upsertClientModeStreamChunk(
+            chunk = ClientModeStreamChunk(
+                event = ClientModeStreamEvent.ASSISTANT,
+                text = "I'll create the bead first.\n\n",
+            ),
+            assistantMessageId = "assistant-1",
+        )
+        loop.upsertClientModeStreamChunk(
+            chunk = ClientModeStreamChunk(
+                event = ClientModeStreamEvent.TOOL_CALL,
+                toolCallId = "call-bd-create",
+                toolCalls = listOf(ToolCall(toolCallId = "call-bd-create", name = "Bash", arguments = "bd create")),
+            ),
+            assistantMessageId = "assistant-1",
+        )
+        loop.upsertClientModeStreamChunk(
+            chunk = ClientModeStreamChunk(
+                event = ClientModeStreamEvent.TOOL_RESULT,
+                toolCallId = "call-bd-create",
+                text = "created letta-mobile-bunm",
+            ),
+            assistantMessageId = "assistant-1",
+        )
+        loop.upsertClientModeStreamChunk(
+            chunk = ClientModeStreamChunk(
+                event = ClientModeStreamEvent.ASSISTANT,
+                text = "Filed it: letta-mobile-bunm\n\nMatrix heartbeat creates fresh conversations.",
+            ),
+            assistantMessageId = "assistant-1",
+        )
+
+        loop.ingestStreamEvent(
+            AssistantMessage(
+                id = "server-assist-final",
+                contentRaw = JsonPrimitive("Filed it: letta-mobile-bunm\n\nMatrix heartbeat creates fresh conversations."),
+            )
+        )
+
+        val events = loop.state.value.events
+        val preamble = events.first { it.otid == "cm-assist-assistant-1" } as TimelineEvent.Local
+        val tool = events.first { it.otid == "cm-tool-call-bd-create" } as TimelineEvent.Local
+        val final = events.single {
+            it is TimelineEvent.Confirmed && it.messageType == TimelineMessageType.ASSISTANT
+        } as TimelineEvent.Confirmed
+
+        assertEquals("I'll create the bead first.\n\n", preamble.content)
+        assertEquals(TimelineMessageType.TOOL_CALL, tool.messageType)
+        assertEquals("Filed it: letta-mobile-bunm\n\nMatrix heartbeat creates fresh conversations.", final.content)
+        assertTrue(
+            "The post-tool local should fuzzy-collapse into the server final instead of leaving a second final prose bubble",
+            events.none { it is TimelineEvent.Local && it.otid == "cm-assist-assistant-1-after-tool-1" },
+        )
+    }
+
+    @Test
     fun `client mode reasoning local is fuzzy-collapsed when matching server reasoning arrives`() = withLoop { loop ->
         loop.upsertClientModeStreamChunk(
             chunk = ClientModeStreamChunk(
