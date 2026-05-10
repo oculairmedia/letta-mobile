@@ -2,10 +2,6 @@ package com.letta.mobile.ui.screens.agentlist
 
 import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,7 +41,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -66,12 +61,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -94,22 +87,21 @@ import com.letta.mobile.ui.components.ModelDropdown
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.FormItem
+import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.components.ShimmerGrid
-import com.letta.mobile.ui.components.TagDrillInDialog
 import com.letta.mobile.ui.navigation.agentAvatarSharedElementKey
 import com.letta.mobile.ui.navigation.optionalSharedElement
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.screens.tools.ToolPickerDialog
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.tags.TagDrillInEntityType
-import com.letta.mobile.ui.tags.TagDrillInSource
-import com.letta.mobile.ui.tags.TagDrillInViewModel
 import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.ui.theme.listItemMetadata
 import com.letta.mobile.ui.theme.listItemSupporting
-import com.letta.mobile.ui.theme.customColors
+import com.letta.mobile.ui.theme.LettaSpacing
+import com.letta.mobile.ui.theme.LocalWindowSizeClass
+import com.letta.mobile.ui.theme.isExpandedWidth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -121,8 +113,6 @@ fun AgentListScreen(
     viewModel: AgentListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val tagDrillInViewModel: TagDrillInViewModel = hiltViewModel()
-    val tagDrillInState by tagDrillInViewModel.uiState.collectAsStateWithLifecycle()
     var showCreateDialog by remember { mutableStateOf(false) }
     var showImportDialog by remember { mutableStateOf(false) }
     var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
@@ -306,17 +296,18 @@ fun AgentListScreen(
                         )
                     } else {
                         if (showGrid) {
+                            val minTileWidth = if (LocalWindowSizeClass.current.isExpandedWidth) 220.dp else 150.dp
                             LazyVerticalGrid(
                                 state = gridState,
-                                columns = GridCells.Fixed(3),
-                                contentPadding = PaddingValues(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                columns = GridCells.Adaptive(minSize = minTileWidth),
+                                contentPadding = PaddingValues(LettaSpacing.screenHorizontal),
+                                verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
+                                horizontalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
                             ) {
                                 if (favoriteAgent != null && uiState.searchQuery.isBlank()) {
                                     item(
                                         key = "favorite-${favoriteAgent.id}",
-                                        span = { GridItemSpan(3) },
+                                        span = { GridItemSpan(maxLineSpan) },
                                     ) {
                                         FavoriteAgentCard(
                                             agent = favoriteAgent,
@@ -324,12 +315,6 @@ fun AgentListScreen(
                                             onEdit = { onNavigateToEditAgent(favoriteAgent.id) },
                                             onUnfavorite = { viewModel.toggleFavorite(favoriteAgent.id) },
                                             contextualActionsEnabled = !isShareMode,
-                                            onTagClick = { tag ->
-                                                tagDrillInViewModel.showTag(
-                                                    tag,
-                                                    TagDrillInSource(TagDrillInEntityType.AGENT, favoriteAgent.id),
-                                                )
-                                            },
                                         )
                                     }
                                 }
@@ -345,20 +330,14 @@ fun AgentListScreen(
                                         onToggleFavorite = { viewModel.toggleFavorite(agent.id) },
                                         onTogglePinned = { viewModel.togglePinned(agent.id) },
                                         contextualActionsEnabled = !isShareMode,
-                                        onTagClick = { tag ->
-                                            tagDrillInViewModel.showTag(
-                                                tag,
-                                                TagDrillInSource(TagDrillInEntityType.AGENT, agent.id),
-                                            )
-                                        },
                                     )
                                 }
                             }
                         } else {
                             LazyColumn(
                                 state = listState,
-                                contentPadding = PaddingValues(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                                contentPadding = PaddingValues(LettaSpacing.screenHorizontal),
+                                verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
                             ) {
                                 if (favoriteAgent != null && uiState.searchQuery.isBlank()) {
                                     item(key = "favorite-${favoriteAgent.id}") {
@@ -368,12 +347,6 @@ fun AgentListScreen(
                                             onEdit = { onNavigateToEditAgent(favoriteAgent.id) },
                                             onUnfavorite = { viewModel.toggleFavorite(favoriteAgent.id) },
                                             contextualActionsEnabled = !isShareMode,
-                                            onTagClick = { tag ->
-                                                tagDrillInViewModel.showTag(
-                                                    tag,
-                                                    TagDrillInSource(TagDrillInEntityType.AGENT, favoriteAgent.id),
-                                                )
-                                            },
                                         )
                                     }
                                 }
@@ -389,12 +362,6 @@ fun AgentListScreen(
                                         onToggleFavorite = { viewModel.toggleFavorite(agent.id) },
                                         onTogglePinned = { viewModel.togglePinned(agent.id) },
                                         contextualActionsEnabled = !isShareMode,
-                                        onTagClick = { tag ->
-                                            tagDrillInViewModel.showTag(
-                                                tag,
-                                                TagDrillInSource(TagDrillInEntityType.AGENT, agent.id),
-                                            )
-                                        },
                                     )
                                 }
                             }
@@ -434,11 +401,6 @@ fun AgentListScreen(
             },
         )
     }
-
-    TagDrillInDialog(
-        state = tagDrillInState,
-        onDismiss = tagDrillInViewModel::dismiss,
-    )
 }
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -448,113 +410,106 @@ private fun FavoriteAgentCard(
     onClick: () -> Unit,
     onEdit: () -> Unit,
     onUnfavorite: () -> Unit,
-    onTagClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     contextualActionsEnabled: Boolean = true,
 ) {
-    val contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-    val subtleColor = contentColor.copy(alpha = 0.6f)
+    var showContextMenu by remember { mutableStateOf(false) }
+    val toolCount = agent.tools.size
+    val blockCount = agent.blocks.size
+    val supporting = agent.description
+        ?.takeIf { it.isNotBlank() }
+        ?: agent.model
+        ?: "No model"
 
     Card(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-        ),
+        shape = LettaCardDefaults.prominentListShape,
+        colors = LettaCardDefaults.listCardColors(),
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = LettaIcons.Star,
-                    contentDescription = "Favorite",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp),
-                )
-                Spacer(modifier = Modifier.width(10.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(
+                modifier = Modifier
+                    .size(44.dp)
+                    .optionalSharedElement(agentAvatarSharedElementKey(agent.id)),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = LettaIcons.Star,
+                        contentDescription = "Favorite",
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = agent.name,
+                        style = MaterialTheme.typography.listItemHeadline,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Icon(
+                        imageVector = LettaIcons.Favorite,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(LettaIconSizing.Inline),
+                    )
+                }
+
                 Text(
-                    text = agent.name,
-                    style = MaterialTheme.typography.titleLarge,
+                    text = supporting,
+                    style = MaterialTheme.typography.listItemSupporting,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = contentColor,
-                    modifier = Modifier.weight(1f),
                 )
-                if (contextualActionsEnabled) {
-                    IconButton(onClick = onEdit) {
-                        Icon(LettaIcons.Agent, contentDescription = "Edit", tint = contentColor)
-                    }
-                }
-            }
-
-            agent.description?.takeIf { it.isNotBlank() }?.let { desc ->
                 Text(
-                    text = desc,
-                    style = MaterialTheme.typography.listItemSupporting,
-                    color = subtleColor,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                InfoChip(label = "Model", value = agent.model ?: "—", color = subtleColor)
-                agent.embedding?.let { InfoChip(label = "Embed", value = it, color = subtleColor) }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                val toolCount = agent.tools.size
-                val blockCount = agent.blocks.size
-                InfoChip(label = "Tools", value = toolCount.toString(), color = subtleColor)
-                InfoChip(label = "Memory", value = "$blockCount blocks", color = subtleColor)
-                agent.modelSettings?.temperature?.let {
-                    InfoChip(label = "Temp", value = String.format("%.1f", it), color = subtleColor)
-                }
-                if (agent.enableSleeptime == true) {
-                    InfoChip(label = "Sleep", value = "On", color = subtleColor)
-                }
-            }
-
-            agent.tags.takeIf { it.isNotEmpty() }?.let { tags ->
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    tags.take(4).forEach { tag ->
-                        SuggestionChip(
-                            onClick = { onTagClick(tag) },
-                            label = { Text(tag, style = MaterialTheme.typography.labelSmall) },
-                        )
-                    }
-                    if (tags.size > 4) {
-                        Text(
-                            "+${tags.size - 4}",
-                            style = MaterialTheme.typography.listItemMetadata,
-                            color = subtleColor,
-                            modifier = Modifier.align(Alignment.CenterVertically),
-                        )
-                    }
-                }
-            }
-
-            agent.createdAt?.let { created ->
-                Text(
-                    text = "Created ${com.letta.mobile.util.formatRelativeTime(created)}",
+                    text = "$toolCount ${stringResource(R.string.common_tools)} - $blockCount memory",
                     style = MaterialTheme.typography.listItemMetadata,
-                    color = subtleColor.copy(alpha = 0.5f),
-                    modifier = Modifier.padding(top = 6.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
+            }
+
+            if (contextualActionsEnabled) {
+                IconButton(onClick = { showContextMenu = true }) {
+                    Icon(LettaIcons.MoreVert, contentDescription = null)
+                }
             }
         }
+    }
+
+    ActionSheet(
+        show = showContextMenu,
+        onDismiss = { showContextMenu = false },
+        title = agent.name,
+    ) {
+        ActionSheetItem(
+            text = stringResource(R.string.action_edit),
+            icon = LettaIcons.Edit,
+            onClick = { showContextMenu = false; onEdit() },
+        )
+        ActionSheetItem(
+            text = "Remove Favorite",
+            icon = LettaIcons.Favorite,
+            onClick = { showContextMenu = false; onUnfavorite() },
+        )
     }
 }
 
@@ -596,25 +551,7 @@ private fun ShareContentPreviewCard(
     }
 }
 
-@Composable
-private fun InfoChip(
-    label: String,
-    value: String,
-    color: androidx.compose.ui.graphics.Color,
-) {
-    Column {
-        Text(text = label, style = MaterialTheme.typography.listItemMetadata, color = color.copy(alpha = 0.6f))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.listItemSupporting,
-            color = color,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AgentCard(
     agent: Agent,
@@ -625,26 +562,23 @@ private fun AgentCard(
     onDelete: () -> Unit,
     onToggleFavorite: () -> Unit,
     onTogglePinned: () -> Unit = {},
-    onTagClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     contextualActionsEnabled: Boolean = true,
 ) {
-    val accentColors = MaterialTheme.customColors
     var showContextMenu by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
-    val agentColor = remember(agent.id) {
-        val hue = (agent.id.hashCode().and(0xFF)) * 360f / 256f
-        android.graphics.Color.HSVToColor(floatArrayOf(hue, 0.3f, 0.9f))
-    }
     val toolCount = agent.tools.size
     val blockCount = agent.blocks.size
+    val supporting = agent.description
+        ?.takeIf { it.isNotBlank() }
+        ?: agent.model
+        ?: "No model"
 
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = if (contextualActionsEnabled) {
@@ -656,34 +590,42 @@ private fun AgentCard(
                     null
                 },
             ),
-        shape = RoundedCornerShape(28.dp),
+        shape = RoundedCornerShape(16.dp),
         color = if (isFavorite) {
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
+            MaterialTheme.colorScheme.primaryContainer
         } else {
-            accentColors.freshAccentContainer
+            LettaCardDefaults.listContainerColor
         },
-        tonalElevation = 0.dp,
+        tonalElevation = 3.dp,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.Top,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Surface(
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(44.dp)
                     .optionalSharedElement(agentAvatarSharedElementKey(agent.id)),
-                shape = RoundedCornerShape(16.dp),
-                color = Color(agentColor),
+                shape = RoundedCornerShape(12.dp),
+                color = if (isPinned) {
+                    MaterialTheme.colorScheme.tertiaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerHighest
+                },
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = LettaIcons.Agent,
                         contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp),
+                        tint = if (isPinned) {
+                            MaterialTheme.colorScheme.onTertiaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                        modifier = Modifier.size(22.dp),
                     )
                 }
             }
@@ -708,50 +650,36 @@ private fun AgentCard(
                             modifier = Modifier.size(LettaIconSizing.Inline),
                         )
                     }
-                    if (contextualActionsEnabled) {
-                        IconButton(onClick = { showContextMenu = true }) {
-                            Icon(LettaIcons.MoreVert, contentDescription = null)
-                        }
+                    if (isPinned) {
+                        Icon(
+                            imageVector = LettaIcons.Pin,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier
+                                .padding(start = 6.dp)
+                                .size(LettaIconSizing.Inline),
+                        )
                     }
                 }
 
-                agent.description?.takeIf { it.isNotBlank() }?.let { description ->
-                    Text(
-                        text = description,
-                        style = MaterialTheme.typography.listItemSupporting,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    AgentMetaChip(text = agent.model ?: "No model")
-                    AgentMetaChip(text = "$toolCount ${stringResource(R.string.common_tools)}")
-                    AgentMetaChip(text = "$blockCount memory")
-                    agent.embedding?.takeIf { it.isNotBlank() }?.let { embedding ->
-                        AgentMetaChip(text = embedding)
-                    }
-                    if (agent.enableSleeptime == true) {
-                        AgentMetaChip(text = "Sleep")
-                    }
-                    agent.tags.take(3).forEach { tag ->
-                        AgentTagChip(tag = tag, onClick = { onTagClick(tag) })
-                    }
-                    if (agent.tags.size > 3) {
-                        AgentMetaChip(text = "+${agent.tags.size - 3}")
-                    }
-                }
-
-                agent.createdAt?.let { createdAt ->
-                    Text(
-                        text = "Created ${com.letta.mobile.util.formatRelativeTime(createdAt)}",
-                        style = MaterialTheme.typography.listItemMetadata,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                Text(
+                    text = supporting,
+                    style = MaterialTheme.typography.listItemSupporting,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "$toolCount ${stringResource(R.string.common_tools)} - $blockCount memory",
+                    style = MaterialTheme.typography.listItemMetadata,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (contextualActionsEnabled) {
+                IconButton(onClick = { showContextMenu = true }) {
+                    Icon(LettaIcons.MoreVert, contentDescription = null)
                 }
             }
         }
@@ -808,25 +736,17 @@ private fun CompactAgentCard(
     onDelete: () -> Unit,
     onToggleFavorite: () -> Unit,
     onTogglePinned: () -> Unit = {},
-    onTagClick: (String) -> Unit = {},
     modifier: Modifier = Modifier,
     contextualActionsEnabled: Boolean = true,
 ) {
-    val accentColors = MaterialTheme.customColors
     var showContextMenu by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
-    val agentColor = remember(agent.id) {
-        val hue = (agent.id.hashCode().and(0xFF)) * 360f / 256f
-        android.graphics.Color.HSVToColor(floatArrayOf(hue, 0.3f, 0.9f))
-    }
-
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .height(96.dp)
-            .clip(RoundedCornerShape(28.dp))
+            .height(108.dp)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = if (contextualActionsEnabled) {
@@ -838,50 +758,69 @@ private fun CompactAgentCard(
                     null
                 },
             ),
-        shape = RoundedCornerShape(28.dp),
+        shape = RoundedCornerShape(16.dp),
         color = if (isFavorite) {
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
+            MaterialTheme.colorScheme.primaryContainer
         } else {
-            accentColors.freshAccentContainer
+            LettaCardDefaults.listContainerColor
         },
-        tonalElevation = 0.dp,
+        tonalElevation = 3.dp,
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(30.dp)
-                    .background(Color(agentColor)),
-            )
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-            ) {
-                Icon(
-                    imageVector = LettaIcons.Agent,
-                    contentDescription = null,
-                    tint = Color.White,
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
                     modifier = Modifier
-                        .size(20.dp)
+                        .size(30.dp)
                         .optionalSharedElement(agentAvatarSharedElementKey(agent.id)),
-                )
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (isPinned) {
+                        MaterialTheme.colorScheme.tertiaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHighest
+                    },
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = LettaIcons.Agent,
+                            contentDescription = null,
+                            tint = if (isPinned) {
+                                MaterialTheme.colorScheme.onTertiaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            },
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = agent.name,
-                    style = MaterialTheme.typography.listItemHeadline,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = agent.model ?: "No model",
-                    style = MaterialTheme.typography.listItemMetadata,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 2.dp),
-                )
+                if (isPinned) {
+                    Icon(
+                        imageVector = LettaIcons.Pin,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(LettaIconSizing.Inline),
+                    )
+                }
             }
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = agent.name,
+                style = MaterialTheme.typography.listItemHeadline,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = agent.model ?: "No model",
+                style = MaterialTheme.typography.listItemMetadata,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 
@@ -923,42 +862,6 @@ private fun CompactAgentCard(
         onDismiss = { showDeleteDialog = false },
         destructive = true,
     )
-}
-
-@Composable
-private fun AgentMetaChip(text: String) {
-    val accentColors = MaterialTheme.customColors
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = accentColors.freshAccentContainer,
-    ) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.listItemMetadata,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-@Composable
-private fun AgentTagChip(tag: String, onClick: () -> Unit) {
-    Surface(
-        modifier = Modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.tertiaryContainer,
-    ) {
-        Text(
-            text = tag,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.listItemMetadata,
-            color = MaterialTheme.colorScheme.onTertiaryContainer,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
 }
 
 @Composable

@@ -65,6 +65,7 @@ import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.DateSeparator
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ExpandableTitleSearch
+import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.components.ShimmerConversationList
 import com.letta.mobile.ui.components.ShimmerBox
@@ -405,8 +406,7 @@ private fun ConversationCard(
     var showRenameDialog by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
-    val title = conversation.summary
-        ?: "${display.agentName} \u00B7 ${formatRelativeTime(conversation.createdAt)}"
+    val title = conversation.summary?.takeIf { it.isNotBlank() } ?: "Conversation"
 
     Card(
         modifier = modifier
@@ -419,6 +419,8 @@ private fun ConversationCard(
                 }
             ),
         shape = RoundedCornerShape(12.dp),
+        colors = LettaCardDefaults.listCardColors(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
@@ -467,8 +469,8 @@ private fun ConversationCard(
                 )
             }
 
-            val timeText = formatRelativeTime(conversation.lastMessageAt ?: conversation.createdAt)
-            if (timeText.isNotBlank()) {
+            val timeText = conversationActivityText(conversation)
+            if (timeText != null) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = timeText,
@@ -534,6 +536,12 @@ private fun ConversationCard(
         onDismiss = { showRenameDialog = false },
         initialValue = conversation.summary ?: "",
     )
+}
+
+private fun conversationActivityText(conversation: com.letta.mobile.data.model.Conversation): String? {
+    val timestamp = conversation.lastMessageAt ?: conversation.createdAt ?: return null
+    val relative = formatRelativeTime(timestamp).takeIf { it.isNotBlank() } ?: return null
+    return if (conversation.lastMessageAt != null) "Last activity $relative" else "Created $relative"
 }
 
 @Composable
@@ -723,7 +731,7 @@ private fun ConversationAdminDialog(
 private fun ConversationInspectorCard(message: ConversationInspectorMessage) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
+        colors = LettaCardDefaults.listCardColors(),
     ) {
         Column(
             modifier = Modifier.padding(12.dp),

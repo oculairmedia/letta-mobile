@@ -9,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -39,6 +40,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -92,6 +94,7 @@ import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.ConnectionState
 import com.letta.mobile.ui.components.LettaSearchBar
 import com.letta.mobile.ui.components.ConnectionStatusBanner
+import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.MarkdownText
 import com.letta.mobile.ui.components.Accordions
 import com.letta.mobile.ui.components.ActionSheet
@@ -573,9 +576,7 @@ internal fun ProjectAgentsCard(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        ),
+        colors = LettaCardDefaults.listCardColors(),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -955,9 +956,7 @@ internal fun ProjectBriefCard(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        ),
+        colors = LettaCardDefaults.listCardColors(),
     ) {
         Accordions(
             title = stringResource(R.string.screen_project_brief_title),
@@ -1337,49 +1336,18 @@ internal fun ConversationPickerSheet(
                             isActive -> MaterialTheme.colorScheme.primaryContainer
                             else -> CardDefaults.cardColors().containerColor
                         }
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .combinedClickable(
-                                    onClick = {
-                                        if (isSelectionMode) {
-                                            viewModel.toggleSelection(conversation.id)
-                                        } else {
-                                            dismissThen {
-                                                onConversationSelected(
-                                                    ConversationSwitchAction.ExistingConversation(conversation.id)
-                                                )
-                                            }
-                                        }
-                                    },
-                                    onLongClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        viewModel.toggleSelection(conversation.id)
-                                    },
-                                ),
-                            colors = CardDefaults.cardColors(containerColor = containerColor),
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = conversation.summary ?: "Conversation",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    val timeText = formatRelativeTime(conversation.lastMessageAt ?: conversation.createdAt)
-                                    if (timeText.isNotBlank()) {
-                                        Text(
-                                            text = timeText,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                }
-                                if (isChecked) {
+                        ConversationMenuItem(
+                            conversation = conversation,
+                            containerColor = containerColor,
+                            leadingIcon = {
+                                Icon(
+                                    LettaIcons.ChatOutline,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(LettaIconSizing.Toolbar),
+                                )
+                            },
+                            trailingIcon = if (isChecked) {
+                                {
                                     Icon(
                                         LettaIcons.CheckCircle,
                                         contentDescription = "Selected",
@@ -1387,8 +1355,23 @@ internal fun ConversationPickerSheet(
                                         tint = selectionColors.selectionIndicator,
                                     )
                                 }
-                            }
-                        }
+                            } else null,
+                            onClick = {
+                                if (isSelectionMode) {
+                                    viewModel.toggleSelection(conversation.id)
+                                } else {
+                                    dismissThen {
+                                        onConversationSelected(
+                                            ConversationSwitchAction.ExistingConversation(conversation.id)
+                                        )
+                                    }
+                                }
+                            },
+                            onLongClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.toggleSelection(conversation.id)
+                            },
+                        )
                     }
                 }
             }
@@ -1557,6 +1540,64 @@ private fun AgentPickerSheet(
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ConversationMenuItem(
+    conversation: Conversation,
+    containerColor: androidx.compose.ui.graphics.Color,
+    leadingIcon: @Composable () -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    trailingIcon: (@Composable () -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 64.dp)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+            ),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = 64.dp)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            leadingIcon()
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = conversation.summary?.takeIf { it.isNotBlank() } ?: "Conversation",
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                conversationActivityText(conversation)?.let { timeText ->
+                    Text(
+                        text = timeText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            trailingIcon?.invoke()
+        }
+    }
+}
+
+private fun conversationActivityText(conversation: Conversation): String? {
+    val timestamp = conversation.lastMessageAt ?: conversation.createdAt ?: return null
+    val relative = formatRelativeTime(timestamp).takeIf { it.isNotBlank() } ?: return null
+    return if (conversation.lastMessageAt != null) "Last activity $relative" else "Created $relative"
 }
 
 sealed interface ConversationSwitchAction {
@@ -1741,6 +1782,19 @@ private fun ClientModeLocationUiState.displayLabel(): String? {
     return path.trimEnd('/').substringAfterLast('/').ifBlank { path }
 }
 
+@Composable
+private fun contrastDrawerItemColors() =
+    NavigationDrawerItemDefaults.colors(
+        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+        unselectedContainerColor = LettaCardDefaults.listContainerColor,
+        selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        unselectedTextColor = MaterialTheme.colorScheme.onSurface,
+        selectedBadgeColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        unselectedBadgeColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+
 @androidx.annotation.VisibleForTesting
 @Composable
 internal fun DrawerContent(
@@ -1793,11 +1847,13 @@ internal fun DrawerContent(
         )
 
         Spacer(modifier = Modifier.height(12.dp))
+        val drawerItemColors = contrastDrawerItemColors()
         NavigationDrawerItem(
             icon = { Icon(LettaIcons.Edit, contentDescription = "Edit") },
             label = { Text(stringResource(R.string.screen_drawer_edit_agent)) },
             selected = false,
             onClick = onEditAgent,
+            colors = drawerItemColors,
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -1843,6 +1899,7 @@ internal fun DrawerContent(
                 label = { Text(mode.replaceFirstChar { it.uppercase() }) },
                 selected = chatMode == mode,
                 onClick = { onChatModeSelected(mode) },
+                colors = drawerItemColors,
             )
         }
 
@@ -1859,6 +1916,7 @@ internal fun DrawerContent(
             label = { Text(stringResource(R.string.screen_conversations_new_action)) },
             selected = currentConversationId == null,
             onClick = onNewConversation,
+            colors = drawerItemColors,
         )
         if (conversations.isEmpty()) {
             Text(
@@ -1870,34 +1928,25 @@ internal fun DrawerContent(
         } else {
             conversations.forEach { conversation ->
                 val isActive = conversation.id == currentConversationId
-                NavigationDrawerItem(
-                    icon = {
-                        if (isActive) {
-                            Icon(LettaIcons.CheckCircle, contentDescription = null)
-                        } else {
-                            Icon(LettaIcons.ChatOutline, contentDescription = null)
-                        }
+                ConversationMenuItem(
+                    conversation = conversation,
+                    containerColor = if (isActive) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        LettaCardDefaults.listContainerColor
                     },
-                    label = {
-                        Column {
-                            Text(
-                                text = conversation.summary ?: "Conversation",
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            val timeText = formatRelativeTime(conversation.lastMessageAt ?: conversation.createdAt)
-                            if (timeText.isNotBlank()) {
-                                Text(
-                                    text = timeText,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
+                    leadingIcon = {
+                        Icon(
+                            if (isActive) LettaIcons.CheckCircle else LettaIcons.ChatOutline,
+                            contentDescription = null,
+                            modifier = Modifier.size(LettaIconSizing.Toolbar),
+                            tint = if (isActive) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
                     },
-                    selected = isActive,
                     onClick = { onConversationSelected(conversation.id) },
                 )
             }
@@ -1910,6 +1959,7 @@ internal fun DrawerContent(
             label = { Text("Reset Messages") },
             selected = false,
             onClick = onResetMessages,
+            colors = drawerItemColors,
         )
 
         Spacer(modifier = Modifier.height(12.dp))
