@@ -1,7 +1,8 @@
 # Letta API Behavior Empirical Findings
 
 **Date:** 2026-04-17
-**Bead:** letta-mobile-mdlg
+**Latest validation:** 2026-05-10
+**Beads:** letta-mobile-mdlg, letta-mobile-ar2w
 **Test server:** http://192.168.50.90:8289
 **Test agent:** agent-d53a5c94-908d-4b6d-a95c-cce0466cf1c3 (Letta Mobile Admin)
 **Test conversation:** conv-bb4cf3c0-beb0-4dfb-ada0-7236f0a8dda1
@@ -15,7 +16,7 @@
 | Does server enforce `otid` uniqueness? | ❌ NO — duplicates accepted silently |
 | Does streaming endpoint echo user message with our otid? | ❌ NO — only sends assistant/reasoning/tool messages |
 | Are server-generated otids ordered within a step? | ✅ YES — `{prefix}{00/01}` or `{prefix}{80/81}` pattern |
-| Is the non-streaming POST endpoint usable? | ⚠️ NO — returns `{"detail": "An unknown error occurred"}` currently |
+| Is the non-streaming POST endpoint usable? | ⚠️ PARTIAL — now returns 200, but a message sent during an active run starts a separate run instead of steering that active run |
 | Does GET /conversations/{id}/messages return our otid? | ✅ YES — reliably |
 
 ## Detailed findings
@@ -92,16 +93,30 @@ data: { cleanup_error event — appears to be benign server-side bug }
 2. GET /conversations/{id}/messages = retrieves our user message with our otid preserved
 3. Stream gives us the assistant response(s) with their own server otids
 
-### 5. Non-streaming endpoint currently broken
+### 5. Non-streaming endpoint does not steer an active run
 
-`POST /v1/conversations/{conv_id}/messages` with `streaming: false` returns:
+2026-04-17 validation found `POST /v1/conversations/{conv_id}/messages` with `streaming: false` returned:
 ```json
 {"detail": "An unknown error occurred"}
 ```
 
 Root cause visible in stream error: `name 'uuid' is not defined` — a Python import error in the server. Even streaming requests emit this error AFTER the stream completes, but streaming works despite it.
 
-**For the client design:** always use streaming mode. Non-streaming is not reliable currently.
+2026-05-10 validation for `letta-mobile-ar2w` found the endpoint now returns 200, but it does **not** inject the user message into the active run. Test flow:
+
+1. Created a throwaway conversation on `http://192.168.50.90:8289`.
+2. Started a streaming conversation message and observed active run `run-630a8492-fd26-4be4-913e-58bb1ffaaf7a`.
+3. While that stream was open, posted another user message to the same conversation with `streaming: false` and a client `otid`.
+4. Retrieved conversation messages.
+
+Observed result:
+
+| Message | OTID | Run ID | Step ID |
+|---------|------|--------|---------|
+| Initial streamed user message | `ar2w-initial-*` | `run-630a8492-fd26-4be4-913e-58bb1ffaaf7a` | `step-1d5f16af-b9b9-4f8e-a12d-b552d0808368` |
+| Non-streaming user message sent during active stream | `ar2w-steer-*` | `run-5b3fa114-3011-4062-8375-1d196e5f2419` | `step-599a9584-c215-4faa-8deb-33972b19b825` |
+
+**For the client design:** do not label a plain non-streaming conversation message as active-run steering. It is a separate turn/run on the current server. Keep using streaming mode for normal sends, and use a dedicated active-run steering API only if Letta documents one.
 
 ### 6. Stream pattern — full event sequence
 
@@ -141,7 +156,7 @@ data: {"message_type":"stop_reason"}
 
 4. **Within-step ordering via `(step_id, otid)` tuple** — never use timestamps alone.
 
-5. **Always use streaming mode** — non-streaming currently broken on our server.
+5. **Always use streaming mode for normal sends** — non-streaming sends are no longer simply broken, but they create a separate run even when an active run exists.
 
 6. **Timeline reconciliation algorithm:**
    - On send: append Local event with our otid
