@@ -472,6 +472,7 @@ class AdminChatViewModelTest {
         // letta-mobile-w2hx.6: resolution now goes through ConversationRepository
         // directly (refreshConversationsIfStale + getCachedConversations);
         // make the refresh fail to simulate the same offline-resolver path.
+        activeConversationIds.remove("agent-1")
         coEvery { conversationRepository.refreshConversationsIfStale(any(), any()) } throws IllegalStateException("Resolver offline")
 
         val vm = createViewModel(conversationId = null)
@@ -500,6 +501,7 @@ class AdminChatViewModelTest {
 
     @Test
     fun `sendMessage is blocked while conversation resolution is in error state`() = runTest {
+        activeConversationIds.remove("agent-1")
         coEvery { conversationRepository.refreshConversationsIfStale(any(), any()) } throws IllegalStateException("Resolver offline")
 
         val vm = createViewModel(conversationId = null)
@@ -1821,6 +1823,43 @@ class AdminChatViewModelTest {
         assertEquals(null, vm.uiState.value.activeApprovalRequestId)
     }
 
+    @Test
+    fun `submitApproval without active conversation surfaces error and does not call repository`() = runTest {
+        val vm = createViewModel(conversationId = null, freshRouteKey = 1L)
+        advanceUntilIdle()
+
+        vm.submitApproval(
+            requestId = "approval-missing-conversation",
+            toolCallIds = listOf("tool-call-1"),
+            approve = true,
+        )
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { messageRepository.submitApproval(any(), any(), any(), any(), any()) }
+        assertEquals("No active conversation available for approval", vm.uiState.value.error)
+        assertFalse(vm.uiState.value.isStreaming)
+        assertFalse(vm.uiState.value.isAgentTyping)
+        assertNull(vm.uiState.value.activeApprovalRequestId)
+    }
+
+    @Test
+    fun `submitApproval clears streaming flags when repository fails`() = runTest {
+        coEvery { messageRepository.submitApproval(any(), any(), any(), any(), any()) } throws IllegalStateException("approval failed")
+        val vm = createViewModel()
+
+        vm.submitApproval(
+            requestId = "approval-failure",
+            toolCallIds = listOf("tool-call-1"),
+            approve = false,
+        )
+        advanceUntilIdle()
+
+        assertEquals("approval failed", vm.uiState.value.error)
+        assertFalse(vm.uiState.value.isStreaming)
+        assertFalse(vm.uiState.value.isAgentTyping)
+        assertNull(vm.uiState.value.activeApprovalRequestId)
+    }
+
     // Project-chat embedded-bot-gateway send tests were removed in Phase 5 —
     // `sendMessage` now unconditionally routes through TimelineRepository.
     // Gateway integration coverage lives in `InternalBotClientTest`.
@@ -1992,6 +2031,46 @@ class AdminChatViewModelTest {
         assertEquals("Coder", state.agents.first().name)
         assertEquals("Working", state.agents.first().statusLabel)
         assertEquals("gpt-4.1", state.agents.first().model)
+    }
+
+    @Test
+    fun `project agents without folder id use live status for current agent only`() = runTest {
+        coEvery { internalBotClient.listAgents() } returns listOf(
+            BotAgentInfo(id = "agent-1", name = "Coder", status = "running"),
+            BotAgentInfo(id = "agent-2", name = "Other", status = "ready"),
+        )
+
+        val savedState = SavedStateHandle().apply {
+            set("agentId", "agent-1")
+            set("conversationId", "conv-1")
+            set("projectIdentifier", "letta-mobile")
+            set("projectName", "Letta Mobile")
+        }
+
+        val vm = AdminChatViewModel(
+            savedState,
+            messageRepository,
+            timelineRepository,
+            agentRepository,
+            blockRepository,
+            bugReportRepository,
+            folderRepository,
+            conversationRepository,
+            settingsRepository,
+            internalBotClient,
+            clientModeChatSender,
+            clientModeAgentLocationRepository,
+            com.letta.mobile.channel.CurrentConversationTracker(),
+            notificationDeliveryCoordinator,
+            notificationReplyHandler,
+        )
+        advanceUntilIdle()
+
+        val state = vm.uiState.value.projectAgents
+        assertFalse(state.isLoading)
+        assertEquals(1, state.agents.size)
+        assertEquals("agent-1", state.agents.single().id)
+        assertEquals("Working", state.agents.single().statusLabel)
     }
 
     @Test
