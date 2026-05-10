@@ -27,7 +27,6 @@ abstract class LettaDatabase : RoomDatabase() {
                     "letta_database"
                 )
                     .addMigrations(*LettaDatabaseMigrations.ALL)
-                    .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
                 instance

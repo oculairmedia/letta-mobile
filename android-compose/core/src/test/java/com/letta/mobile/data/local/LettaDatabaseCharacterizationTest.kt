@@ -10,7 +10,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.jupiter.api.Tag
@@ -31,17 +30,6 @@ class LettaDatabaseCharacterizationTest {
         database = null
     }
 
-    @Test
-    fun `documents current destructive migration production risk`() {
-        val source = lettaDatabaseSource().readText()
-
-        assertTrue(
-            "This characterization should be inverted when letta-mobile-yoic.4.4 removes destructive migration.",
-            source.contains("fallbackToDestructiveMigration"),
-        )
-    }
-
-    @Ignore("Enable when letta-mobile-yoic.4.4 removes fallbackToDestructiveMigration from production builder")
     @Test
     fun `production database builder must not use destructive migration`() {
         val source = lettaDatabaseSource().readText()
