@@ -155,7 +155,7 @@ class ChannelHeartbeatSyncTest {
             Unit
         }
         every { replyHandler.activeReplyStreams } returns MutableStateFlow(emptySet())
-        every { publisher.publish(any()) } just runs
+        every { publisher.publish(any()) } returns true
 
         val coordinator = NotificationDeliveryCoordinator(
             currentConversationTracker = CurrentConversationTracker(),

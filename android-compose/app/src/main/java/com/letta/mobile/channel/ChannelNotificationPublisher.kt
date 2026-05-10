@@ -29,6 +29,13 @@ data class ChannelNotification(
     val messagePreview: String,
 )
 
+internal data class ChannelNotificationContent(
+    val title: String,
+    val messageText: String,
+    val titleText: SanitizedNotificationText,
+    val preview: SanitizedNotificationText,
+)
+
 @Singleton
 class ChannelNotificationPublisher @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -49,7 +56,7 @@ class ChannelNotificationPublisher @Inject constructor(
         manager.createNotificationChannel(channel)
     }
 
-    fun publish(notification: ChannelNotification) {
+    fun publish(notification: ChannelNotification): Boolean {
         ensureChannel()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -61,7 +68,7 @@ class ChannelNotificationPublisher @Inject constructor(
                 "reason" to "POST_NOTIFICATIONS_DENIED",
                 "conversationId" to notification.conversationId,
             )
-            return
+            return false
         }
 
         val manager = NotificationManagerCompat.from(context)
@@ -72,7 +79,7 @@ class ChannelNotificationPublisher @Inject constructor(
                 "reason" to "NOTIFICATIONS_DISABLED",
                 "conversationId" to notification.conversationId,
             )
-            return
+            return false
         }
 
         val target = NotificationNavigationTarget(
@@ -87,12 +94,7 @@ class ChannelNotificationPublisher @Inject constructor(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        val title = notification.agentName.ifBlank {
-            context.getString(R.string.channel_notifications_fallback_title)
-        }
-        val messageText = notification.messagePreview.ifBlank {
-            context.getString(R.string.channel_notifications_fallback_text)
-        }
+        val content = resolveContent(notification)
         val notificationId = notificationIdForConversation(notification.conversationId)
         val notificationTag = notificationTagForConversation(notification.conversationId)
 
@@ -119,20 +121,60 @@ class ChannelNotificationPublisher @Inject constructor(
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_notify_chat)
-            .setContentTitle(title)
-            .setContentText(messageText)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(messageText))
+            .setContentTitle(content.title)
+            .setContentText(content.messageText)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(content.messageText))
             .setSubText(notification.conversationSummary)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .addAction(replyAction)
 
-        manager.notify(notificationTag, notificationId, builder.build())
+        try {
+            manager.notify(notificationTag, notificationId, builder.build())
+        } catch (t: Throwable) {
+            Telemetry.error(
+                "ChannelNotificationPublisher", "publishFailed", t,
+                "conversationId" to notification.conversationId,
+                "messageId" to notification.messageId,
+                "notificationTag" to notificationTag,
+                "notificationId" to notificationId,
+                "rawPreviewLength" to content.preview.rawLength,
+                "normalizedPreviewLength" to content.preview.normalizedLength,
+                "finalPreviewLength" to content.messageText.length,
+                "previewFallbackReason" to content.preview.fallbackReason.name,
+            )
+            return false
+        }
         Telemetry.event(
             "ChannelNotificationPublisher", "published",
             "conversationId" to notification.conversationId,
             "messageId" to notification.messageId,
+            "notificationTag" to notificationTag,
+            "notificationId" to notificationId,
+            "rawPreviewLength" to content.preview.rawLength,
+            "normalizedPreviewLength" to content.preview.normalizedLength,
+            "finalPreviewLength" to content.messageText.length,
+            "previewFallbackReason" to content.preview.fallbackReason.name,
+            "titleFallbackReason" to content.titleText.fallbackReason.name,
+        )
+        return true
+    }
+
+    internal fun resolveContent(notification: ChannelNotification): ChannelNotificationContent {
+        val titleText = NotificationContentSanitizer.sanitizeTitle(
+            raw = notification.agentName,
+            fallback = context.getString(R.string.channel_notifications_fallback_title),
+        )
+        val previewText = NotificationContentSanitizer.sanitizePreview(
+            raw = notification.messagePreview,
+            fallback = context.getString(R.string.channel_notifications_fallback_text),
+        )
+        return ChannelNotificationContent(
+            title = titleText.text,
+            messageText = previewText.text,
+            titleText = titleText,
+            preview = previewText,
         )
     }
 

@@ -192,6 +192,13 @@ class ChatPushService : Service() {
                 messageType: String?,
                 contentPreview: String?,
             ) {
+                Telemetry.event(
+                    "ChatPushService", "listener.messageIngested",
+                    "conversationId" to conversationId,
+                    "serverId" to serverId,
+                    "messageType" to (messageType ?: "<null>"),
+                    "previewLength" to (contentPreview?.length ?: 0),
+                )
                 val (agentId, agentName) = try {
                     // Best-effort: look up the conversation's agent for a nice title.
                     val conv = conversationApi.getConversation(conversationId)
@@ -216,6 +223,10 @@ class ChatPushService : Service() {
                 )
             }
         }
+        Telemetry.event(
+            "ChatPushService", "listenerInstalled",
+            "listenerNonNull" to (timelineRepository.ingestedListener != null),
+        )
     }
 
     private fun warmupSubscribers() {

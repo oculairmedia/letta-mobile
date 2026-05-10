@@ -1,11 +1,10 @@
 package com.letta.mobile.channel
 
 import io.mockk.every
-import io.mockk.just
 import io.mockk.mockk
-import io.mockk.runs
 import io.mockk.slot
 import io.mockk.verify
+import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -107,6 +106,46 @@ class NotificationDeliveryCoordinatorTest {
     }
 
     @Test
+    fun `defers low-signal streaming token instead of publishing it`() {
+        Telemetry.clear()
+        val fixture = createFixture()
+
+        val decision = fixture.coordinator.submit(
+            candidate(
+                source = NotificationCandidateSource.WebsocketClientMode,
+                phase = NotificationCandidatePhase.Partial,
+                isFinal = false,
+                previewText = "I",
+            ),
+        )
+
+        assertEquals(
+            NotificationDeliveryDecision.Deferred(NotificationDeferralReason.AwaitingFinalPreview),
+            decision,
+        )
+        verify(exactly = 0) { fixture.publisher.publish(any()) }
+        assertTrue(
+            Telemetry.snapshot().any {
+                it.tag == "NotificationDelivery" &&
+                    it.name == "deferred" &&
+                    it.attrs["previewFallbackReason"] == "TooShort"
+            },
+        )
+    }
+
+    @Test
+    fun `final low-signal preview is published for fallback rendering`() {
+        val fixture = createFixture()
+        val captured = slot<ChannelNotification>()
+
+        val decision = fixture.coordinator.submit(candidate(previewText = "I"))
+
+        assertEquals(NotificationDeliveryDecision.Published("message-1"), decision)
+        verify(exactly = 1) { fixture.publisher.publish(capture(captured)) }
+        assertEquals("I", captured.captured.messagePreview)
+    }
+
+    @Test
     fun `websocket stream publishes once when final preview arrives`() {
         val fixture = createFixture()
 
@@ -145,10 +184,32 @@ class NotificationDeliveryCoordinatorTest {
         verify(exactly = 1) { fixture.publisher.publish(match { it.messageId == "run-1" }) }
     }
 
+    @Test
+    fun `publisher rejection is visible and does not record dedupe state`() {
+        Telemetry.clear()
+        val fixture = createFixture(publisherAccepted = false)
+
+        val decision = fixture.coordinator.submit(candidate())
+
+        assertEquals(
+            NotificationDeliveryDecision.Suppressed(NotificationSuppressionReason.PublishRejected),
+            decision,
+        )
+        assertTrue(fixture.notified.isEmpty())
+        assertTrue(
+            Telemetry.snapshot().any {
+                it.tag == "NotificationDelivery" &&
+                    it.name == "suppressed" &&
+                    it.attrs["reason"] == "PublishRejected"
+            },
+        )
+    }
+
     private fun createFixture(
         currentConversationId: String? = null,
         activeReplyStreams: Set<String> = emptySet(),
         notified: MutableMap<String, String> = mutableMapOf(),
+        publisherAccepted: Boolean = true,
     ): Fixture {
         val tracker = CurrentConversationTracker().apply { setCurrent(currentConversationId) }
         val replyHandler = mockk<NotificationReplyHandler>()
@@ -161,7 +222,7 @@ class NotificationDeliveryCoordinatorTest {
             notified[firstArg()] = secondArg()
             Unit
         }
-        every { publisher.publish(any()) } just runs
+        every { publisher.publish(any()) } returns publisherAccepted
 
         return Fixture(
             coordinator = NotificationDeliveryCoordinator(
