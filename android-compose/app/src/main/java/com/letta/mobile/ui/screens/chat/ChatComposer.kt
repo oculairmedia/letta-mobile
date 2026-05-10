@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -12,11 +13,9 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -38,6 +37,12 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.ui.components.LettaInputBar
 import com.letta.mobile.ui.icons.LettaIcons
 import kotlinx.collections.immutable.ImmutableList
+
+internal val ChatComposerAttachButtonSize = 36.dp
+private val ChatComposerAttachIconSize = 18.dp
+private val ChatComposerInputHorizontalPadding = 8.dp
+private val ChatComposerInputVerticalPadding = 6.dp
+private val ChatComposerInputItemSpacing = 6.dp
 
 /**
  * The chat input composer: text bar + staged attachment thumbnails + attach
@@ -107,20 +112,27 @@ fun ChatComposer(
             actionContainerColor = if (isStreaming) MaterialTheme.colorScheme.errorContainer else null,
             actionContentColor = if (isStreaming) MaterialTheme.colorScheme.onErrorContainer else null,
             actionSizeFraction = if (isStreaming) 0.7f else 1f,
+            contentPadding = PaddingValues(
+                horizontal = ChatComposerInputHorizontalPadding,
+                vertical = ChatComposerInputVerticalPadding,
+            ),
+            itemSpacing = ChatComposerInputItemSpacing,
             leadingContent = {
-                FilledIconButton(
-                    onClick = onAttachImage,
-                    modifier = Modifier.size(44.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    ),
+                Surface(
+                    modifier = Modifier
+                        .size(ChatComposerAttachButtonSize)
+                        .clickable(onClick = onAttachImage),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 ) {
-                    Icon(
-                        LettaIcons.Add,
-                        contentDescription = stringResource(R.string.action_attach_image),
-                        modifier = Modifier.size(20.dp),
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            LettaIcons.Add,
+                            contentDescription = stringResource(R.string.action_attach_image),
+                            modifier = Modifier.size(ChatComposerAttachIconSize),
+                        )
+                    }
                 }
             },
             onSend = { text ->
