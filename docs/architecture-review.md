@@ -1,10 +1,10 @@
 # letta-mobile Architecture Review
 
-Updated review of the current letta-mobile architecture after the timeline migration and recent client-mode stabilization work.
+Updated review of the current letta-mobile architecture after the timeline migration, Client Mode stabilization, and chat contract hardening work.
 
 ## Current Structure
 
-The project is now best understood as a **module-based architecture**, not a single package tree.
+The project is best understood as a **module-based architecture**, not a single package tree.
 
 ```
 android-compose/
@@ -23,21 +23,29 @@ Within those modules, the older `data / domain / ui / util` split still exists, 
 ## What Is Working Well
 
 1. **Module boundaries are clearer than the older review implied**
-   - `app` owns screen state and navigation
-   - `core` owns message/timeline persistence and sync
-   - `bot` owns gateway/session/runtime transport behavior
-   - `designsystem` owns reusable Compose UI
+   - `app` owns screen state, navigation, and app-specific orchestration.
+   - `core` owns message/timeline persistence and sync.
+   - `bot` owns gateway/session/runtime transport behavior.
+   - `designsystem` owns reusable Compose UI.
 
-2. **`stream/` and `timeline/` were the right places to elevate**
-   - The recent regressions confirmed this: the hard bugs now cluster around stream completion, timeline reconcile, and client-mode session ownership.
+2. **TimelineRepository is now the chat source of truth**
+   - Client Mode assistant/reasoning/tool chunks route through `TimelineRepository`.
+   - Fresh-route pre-conversation chunks are buffered and replayed into the timeline once the gateway returns a conversation id.
+   - Tool batch/result bookkeeping is in timeline metadata/reducer code, not ViewModel maps.
+   - The legacy `clientModeMessages` assistant/tool path and old `ClientModeStreamReducer` are gone; only a quarantined fresh-route USER bootstrap echo remains before a real conversation id exists.
 
-3. **The UI component vs screen split already exists**
-   - Shared components mostly live in `designsystem/ui/components/`
-   - Screen flows live in `app/ui/screens/...`
+3. **The app ↔ bot ↔ timeline contract is now explicit**
+   - Client Mode timeline lifecycle: [`client-mode-timeline-rules.md`](architecture/client-mode-timeline-rules.md)
+   - Cross-boundary regression matrix: [`chat-boundary-regression-harness.md`](architecture/chat-boundary-regression-harness.md)
+   - These documents identify the canonical tests for route/session ownership, delta-stream semantics, terminal frames, and local→confirmed timeline folding.
+
+4. **The UI component vs screen split already exists**
+   - Shared components mostly live in `designsystem/ui/components/`.
+   - Screen flows live in `app/ui/screens/...`.
    - This recommendation from the earlier review is effectively complete.
 
-4. **There are already some useful contract seams**
-   - Examples: `LettaRuntimeClient`, several `I*Repository` interfaces, immutable `Timeline` state objects, and strong unit coverage around timeline behavior.
+5. **There are useful contract seams**
+   - Examples: `LettaRuntimeClient`, `ClientModeChatSender`, several `I*Repository` interfaces, immutable `Timeline` state objects, and focused timeline/bot/app regression coverage.
 
 ## What Is Still Accurate From the Older Review
 
@@ -49,6 +57,10 @@ Within those modules, the older `data / domain / ui / util` split still exists, 
 
 3. **A clearer domain-model boundary would still help**
    - `domain/` exists, but most model types still live in `data/model/`, so upstream API shape can still ripple outward more than ideal.
+
+4. **Large-file pressure remains real**
+   - `AdminChatViewModel.kt` is still far too large even after collaborator extraction.
+   - Several UI screens remain above the preferred size threshold and should be decomposed as they are touched.
 
 ## What Is Stale In the Older Review
 
@@ -62,75 +74,63 @@ Within those modules, the older `data / domain / ui / util` split still exists, 
    - That is now a first-class architectural subsystem, especially for Client Mode and gateway-backed chat.
 
 4. **The warning about paging being the main duplication hotspot is no longer the best framing**
-   - The highest-risk bug surface is now the seam between:
-     - route state in `app`
-     - gateway/session selection in `bot`
-     - message ingestion and reconcile in `core/timeline`
+   - The highest-risk bug surface was the seam between route state, gateway/session selection, stream chunk semantics, and timeline reconcile. That seam now has explicit docs and regression tripwires.
 
 ## Current Risk Concentration
 
-The architecture is no longer bottlenecked by broad layering problems. The current risk is concentrated in the **chat contract boundary**:
+The architecture is no longer bottlenecked by broad layering problems or undocumented chat-boundary contracts. The current risk is concentrated in **oversized orchestrators and screens**:
 
-- `AdminChatViewModel` and route/session state in `app`
-- Client Mode gateway/session selection in `app/clientmode` + `bot`
-- stream chunk semantics in `bot`
-- reconcile and timeline ingestion in `core/data/timeline`
+- `AdminChatViewModel` still coordinates route resolution, timeline observation, Client Mode sends, stream lifecycle flags, notifications, composer state, project context, and reset/search gates.
+- Several large Compose screens still mix layout, dialogs, state-specific sections, and interaction wiring in one file.
+- Some lower-level classes such as `WsBotClient` are still large enough that protocol handling and lifecycle behavior are harder to audit than necessary.
 
-This is the area where recent regressions came from:
+## Completed Chat Hardening Section
 
-- wrong-agent existing-conversation sends
-- duplicate terminal assistant content
-- fragile assumptions around stream completion and conversation ownership
+The previously recommended chat-focused work section was:
 
-## Open Architectural Gaps
+> Define explicit chat contracts across app, bot, and timeline.
 
-1. **Timeline/sync boundaries are still more concrete than interface-first**
-   - `TimelineRepository` and `TimelineSyncLoop` are still concrete classes
-   - tests are good, but the abstraction layer is not yet as explicit as the rest of the repo
+That section is now complete:
 
-2. **Client Mode crosses modules without a single explicit contract document**
-   - route agent selection
-   - conversation ownership
-   - terminal chunk semantics
-   - timeline ingestion expectations
-   These all exist in code, but not yet as one stable architecture contract.
-
-3. **Domain models remain partly coupled to data models**
-   - still worth improving, but lower priority than the live chat boundary issues
+1. **Conversation ownership and route-agent/session binding** are covered by Client Mode sender and bot lifecycle tests.
+2. **Bot stream semantics** are covered by delta and terminal-frame tests in `bot`.
+3. **Timeline ingestion/reconcile rules** are documented in `client-mode-timeline-rules.md` and covered by timeline reducer characterization tests.
+4. **Cross-boundary regression harness** is documented in `chat-boundary-regression-harness.md`.
 
 ## Recommended Next Section Of Work
 
-Now that the message-sync migration is complete, the next chat-focused work section should be:
+The next chat-focused workstream should be:
 
-### **Define explicit chat contracts across app, bot, and timeline**
+### **Thin `AdminChatViewModel` into an orchestration shell**
 
-This should cover, at minimum:
+The goal is no longer to discover hidden chat contracts; those are now documented. The next step is to move remaining business logic behind tested collaborators so `AdminChatViewModel` primarily composes state and delegates work.
 
-1. **Conversation ownership contract**
-   - which agent owns an existing conversation
-   - how route agent, gateway agent, and conversation agent must align
+Recommended boundaries:
 
-2. **Client Mode session contract**
-   - when a route reuses a session
-   - when it must restart one
-   - what inputs are authoritative for selection
+1. **Client Mode send/session coordinator**
+   - Own `sendMessageViaClientMode`, pre-conversation buffering/replay calls, and stream-completion state transitions.
+   - Keep the existing `ClientModeChatSender` request-shape contract intact.
 
-3. **Streaming contract**
-   - what non-terminal chunks may contain
-   - what terminal `done=true` chunks may contain
-   - whether completion chunks are metadata-only or content-bearing
+2. **Timeline observer/state projector**
+   - Own `startTimelineObserver`, hydrate signal handling, older-message prefix merge, and streaming/typing flag derivation.
+   - Keep `TimelineEventToUiMessage` as the pure projection boundary.
 
-4. **Timeline ingestion contract**
-   - which layers may append optimistic locals
-   - which layers may replace or confirm them
-   - how reconcile behaves for user vs assistant vs tool vs reasoning events
+3. **Run/composer gate coordinator**
+   - Own duplicate initial-message delivery guard, active-run steering, interrupt/stop behavior, and composer effects.
 
-This is the natural next step because it turns the completed migration into a stable platform instead of a moving target.
+4. **Project context coordinator**
+   - Further reduce direct VM ownership of project brief, bug report, folder/activity, and location-prompt flows.
+
+Success criteria for the first pass should be pragmatic:
+
+- `AdminChatViewModel.kt` trends substantially downward and has clear section boundaries.
+- No behavior change in chat open, send, approval, stream, search, or project chat.
+- The canonical chat-boundary test matrix remains green after each extraction.
 
 ## Deferred Context
 
-The agent-admin surface has real bugs and deserves attention, especially around model switching and save consistency. That is important, but it should be treated as a separate workstream. The current recommendation is to finish hardening the chat boundary first, section by section, before shifting focus.
+The agent-admin surface has real bugs and deserves attention, especially around model switching and save consistency. That is important, but it should be treated as a separate workstream. The current recommendation is to finish thinning the chat orchestrator first, then shift to agent-admin consistency once chat ownership is easier to reason about.
 
 ## Overall
 
-The architecture is in better shape than the older review suggests. The biggest remaining challenge is not broad layering — it is making the **chat boundary contracts explicit** across `app`, `bot`, and `core/timeline` so future chat work stops reintroducing state-machine regressions.
+The architecture is in better shape than the older review suggests. The biggest remaining challenge is no longer broad layering or undocumented chat contracts — it is reducing the size and responsibility density of key orchestrators, starting with `AdminChatViewModel`, while preserving the now-explicit app ↔ bot ↔ timeline contracts.
