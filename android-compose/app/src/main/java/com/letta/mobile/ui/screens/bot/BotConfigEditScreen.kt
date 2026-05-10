@@ -651,7 +651,7 @@ private fun ApiServerSection(vm: BotConfigEditViewModel) {
                     trailingContent = {
                         HelpIcon(
                             title = "API Auth Token",
-                            description = "Bearer token required to authenticate requests to the embedded API server. Leave blank to allow unauthenticated access (not recommended).",
+                            description = "Bearer token required to authenticate requests to the embedded API server. Leave blank to generate a token on save.",
                         )
                     },
                 )
