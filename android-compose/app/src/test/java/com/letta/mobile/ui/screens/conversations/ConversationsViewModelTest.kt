@@ -98,6 +98,29 @@ class ConversationsViewModelTest {
     }
 
     @Test
+    fun `loadConversations surfaces conversation refresh failure and stops loading`() = runTest {
+        fakeAllRepo.refreshError = IllegalStateException("Conversations failed")
+
+        viewModel.loadConversations()
+
+        assertFalse(viewModel.uiState.value.isLoading)
+        assertEquals("Conversations failed", viewModel.uiState.value.error)
+        assertEquals(0, viewModel.uiState.value.conversations.size)
+    }
+
+    @Test
+    fun `loadConversations keeps conversations when agent refresh fails`() = runTest {
+        fakeAllRepo.setConversations(listOf(TestData.conversation(id = "1", agentId = "a1")))
+        fakeAgentRepo.refreshError = IllegalStateException("Agents failed")
+
+        viewModel.loadConversations()
+
+        assertFalse(viewModel.uiState.value.isLoading)
+        assertEquals(null, viewModel.uiState.value.error)
+        assertEquals(1, viewModel.uiState.value.conversations.size)
+    }
+
+    @Test
     fun `deleteConversation delegates to repository and removes from state`() = runTest {
         fakeAllRepo.setConversations(listOf(TestData.conversation(id = "1", agentId = "a1")))
         viewModel.loadConversations()
@@ -168,10 +191,12 @@ class ConversationsViewModelTest {
         override val conversations: StateFlow<List<Conversation>> = _conversations.asStateFlow()
         var fresh: Boolean = false
         var didRefresh: Boolean = false
+        var refreshError: Throwable? = null
 
         fun setConversations(list: List<Conversation>) { _conversations.value = list }
         override suspend fun refresh() { didRefresh = true }
         override suspend fun refreshIfStale(maxAgeMs: Long): Boolean {
+            refreshError?.let { throw it }
             if (fresh) return false
             didRefresh = true
             return true
@@ -218,8 +243,10 @@ class ConversationsViewModelTest {
         override val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
         var fresh: Boolean = false
         var didRefresh: Boolean = false
+        var refreshError: Throwable? = null
         override suspend fun refreshAgents() { didRefresh = true }
         override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean {
+            refreshError?.let { throw it }
             if (fresh) return false
             didRefresh = true
             return true

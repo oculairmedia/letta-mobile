@@ -15,11 +15,13 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import java.time.Instant
 import javax.inject.Inject
 
@@ -43,6 +45,11 @@ data class ConversationsUiState(
     val inspectorError: String? = null,
     val recompilePreview: String? = null,
     val error: String? = null,
+)
+
+private data class ConversationListLoadResult(
+    val agents: Result<List<Agent>>,
+    val conversations: Result<List<Conversation>>,
 )
 
 @HiltViewModel
@@ -93,32 +100,45 @@ class ConversationsViewModel @Inject constructor(
 
     fun loadConversations() {
         viewModelScope.launch {
-            if (_uiState.value.conversations.isEmpty()) {
+            val hadConversationsAtStart = _uiState.value.conversations.isNotEmpty()
+            if (!hadConversationsAtStart) {
                 _uiState.value = _uiState.value.copy(isLoading = true)
             }
-            try {
-                launch { 
+
+            val loadResult = supervisorScope {
+                val agents = async {
                     agentRepository.refreshAgentsIfStale(LIST_CACHE_TTL_MS)
-                    agentNameCache = agentRepository.agents.value
-                        .associate { it.id to it.name }
-                        .toMutableMap()
-                    _uiState.value = _uiState.value.copy(
-                        agents = agentRepository.agents.value.toImmutableList(),
-                    )
+                    agentRepository.agents.value
                 }
-                launch {
+                val conversations = async {
                     allConversationsRepository.refreshIfStale(LIST_CACHE_TTL_MS)
-                    _uiState.value = _uiState.value.copy(
-                        conversations = applyPinnedState(allConversationsRepository.conversations.value.map { it.toDisplay() }).toImmutableList(),
-                        isLoading = false,
-                        error = null,
-                    )
+                    allConversationsRepository.conversations.value
                 }
-            } catch (e: Exception) {
-                Log.w("ConversationsVM", "Load failed", e)
+                ConversationListLoadResult(
+                    agents = runCatching { agents.await() },
+                    conversations = runCatching { conversations.await() },
+                )
+            }
+
+            loadResult.agents.onSuccess { agents ->
+                agentNameCache = agents.associate { it.id to it.name }.toMutableMap()
+            }.onFailure { error ->
+                Log.w("ConversationsVM", "Agent load failed", error)
+            }
+
+            loadResult.conversations.onSuccess { conversations ->
                 _uiState.value = _uiState.value.copy(
+                    conversations = applyPinnedState(conversations.map { it.toDisplay() }).toImmutableList(),
+                    agents = loadResult.agents.getOrDefault(_uiState.value.agents).toImmutableList(),
                     isLoading = false,
-                    error = if (_uiState.value.conversations.isEmpty()) e.message else null,
+                    error = null,
+                )
+            }.onFailure { error ->
+                Log.w("ConversationsVM", "Load failed", error)
+                _uiState.value = _uiState.value.copy(
+                    agents = loadResult.agents.getOrDefault(_uiState.value.agents).toImmutableList(),
+                    isLoading = false,
+                    error = if (hadConversationsAtStart) null else error.message,
                 )
             }
         }
