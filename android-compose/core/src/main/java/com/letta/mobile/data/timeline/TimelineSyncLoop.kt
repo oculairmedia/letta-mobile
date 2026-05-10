@@ -455,6 +455,31 @@ class TimelineSyncLoop(
     }
 
     /**
+     * Fold a Client Mode assistant/reasoning/tool stream chunk through the
+     * timeline reducer. This is the typed replacement for app-layer callers
+     * supplying ad hoc build/transform lambdas.
+     */
+    suspend fun upsertClientModeStreamChunk(
+        chunk: ClientModeStreamChunk,
+        assistantMessageId: String,
+        sentAt: Instant = Instant.now(),
+    ): String? {
+        val reduction = writeMutex.withLock {
+            val reduced = _state.value.reduceClientModeStreamChunk(
+                chunk = chunk,
+                assistantMessageId = assistantMessageId,
+                sentAt = sentAt,
+            )
+            _state.value = reduced.timeline
+            if (reduced.appended && reduced.localId != null) {
+                _events.emit(TimelineSyncEvent.LocalAppended(reduced.localId))
+            }
+            reduced
+        }
+        return reduction.localId
+    }
+
+    /**
      * letta-mobile-iuh6: Post-handler collapse — re-runs fuzzy matching
      * across all existing Confirmed events to absorb any CLIENT_MODE_HARNESS
      * Locals that were written AFTER the initial SSE reconcile already ran.

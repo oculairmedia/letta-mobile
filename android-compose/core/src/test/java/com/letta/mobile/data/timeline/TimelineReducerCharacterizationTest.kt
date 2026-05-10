@@ -151,6 +151,60 @@ class TimelineReducerCharacterizationTest {
     }
 
     @Test
+    fun `client mode stream chunks reduce into timeline locals`() = withLoop { loop ->
+        loop.upsertClientModeStreamChunk(
+            chunk = ClientModeStreamChunk(text = "Hel", event = ClientModeStreamEvent.ASSISTANT),
+            assistantMessageId = "assistant-1",
+        )
+        loop.upsertClientModeStreamChunk(
+            chunk = ClientModeStreamChunk(text = "lo", event = ClientModeStreamEvent.ASSISTANT),
+            assistantMessageId = "assistant-1",
+        )
+        loop.upsertClientModeStreamChunk(
+            chunk = ClientModeStreamChunk(text = "Think", event = ClientModeStreamEvent.REASONING, uuid = "reason-1"),
+            assistantMessageId = "assistant-1",
+        )
+        loop.upsertClientModeStreamChunk(
+            chunk = ClientModeStreamChunk(text = "ing", event = ClientModeStreamEvent.REASONING, uuid = "reason-1"),
+            assistantMessageId = "assistant-1",
+        )
+
+        val assistant = loop.state.value.events.first { it.otid == "cm-assist-assistant-1" } as TimelineEvent.Local
+        val reasoning = loop.state.value.events.first { it.otid == "cm-reason-reason-1" } as TimelineEvent.Local
+        assertEquals("Hello", assistant.content)
+        assertEquals("Thinking", reasoning.reasoningContent)
+    }
+
+    @Test
+    fun `client mode batched tool results update original timeline local`() = withLoop { loop ->
+        loop.upsertClientModeStreamChunk(
+            chunk = ClientModeStreamChunk(
+                event = ClientModeStreamEvent.TOOL_CALL,
+                toolCallId = "batch-1",
+                toolCalls = listOf(
+                    ToolCall(toolCallId = "call-a", name = "read", arguments = "a"),
+                    ToolCall(toolCallId = "call-b", name = "write", arguments = "b"),
+                ),
+            ),
+            assistantMessageId = "assistant-1",
+        )
+        loop.upsertClientModeStreamChunk(
+            chunk = ClientModeStreamChunk(
+                event = ClientModeStreamEvent.TOOL_RESULT,
+                toolCallId = "call-b",
+                text = "done",
+            ),
+            assistantMessageId = "assistant-1",
+        )
+
+        val tool = loop.state.value.events.single() as TimelineEvent.Local
+        assertEquals("cm-tool-batch-1", tool.otid)
+        assertEquals(listOf("call-a", "call-b"), tool.toolCalls.map { it.effectiveId })
+        assertEquals("done", tool.toolReturnContentByCallId["call-b"])
+        assertEquals(null, tool.toolReturnContentByCallId["call-a"])
+    }
+
+    @Test
     fun `client mode local stream is replay-collapsed when matching server event arrives`() = withLoop { loop ->
         loop.upsertClientModeLocalAssistantChunk(
             localId = "cm-assist-1",

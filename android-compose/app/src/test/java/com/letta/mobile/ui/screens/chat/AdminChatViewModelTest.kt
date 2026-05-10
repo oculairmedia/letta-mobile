@@ -17,6 +17,7 @@ import com.letta.mobile.data.model.MessageSearchResult
 import com.letta.mobile.data.model.MessageType
 import com.letta.mobile.data.model.ProjectBugReport
 import com.letta.mobile.data.model.ToolCall
+import com.letta.mobile.data.timeline.reduceClientModeStreamChunk
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.BugReportRepository
@@ -180,6 +181,21 @@ class AdminChatViewModelTest {
                 tl.copy(events = tl.events + seed)
             }
             localId
+        }
+        coEvery {
+            timelineRepository.upsertClientModeStreamChunk(any(), any(), any())
+        } answers {
+            val convId = firstArg<String>()
+            val chunk = secondArg<com.letta.mobile.data.timeline.ClientModeStreamChunk>()
+            val assistantMessageId = thirdArg<String>()
+            val flow = flowFor(convId)
+            val reduction = flow.value.reduceClientModeStreamChunk(
+                chunk = chunk,
+                assistantMessageId = assistantMessageId,
+                sentAt = Instant.now(),
+            )
+            flow.value = reduction.timeline
+            reduction.localId
         }
         agentRepository = mockk(relaxed = true)
         blockRepository = BlockRepository(FakeBlockApi())
@@ -1200,6 +1216,36 @@ class AdminChatViewModelTest {
     // fix at the source, not papered over on the client. The byte-perfect
     // reassembly tests below (prefix collisions, mermaid char-by-char,
     // exact field repro) already enforce the new contract.
+
+    @Test
+    fun `client mode stream chunks render from timeline repository path`() = runTest {
+        clientModeEnabledFlow.value = true
+        every {
+            clientModeChatSender.streamMessage(any(), any(), any())
+        } returns flow {
+            emit(BotStreamChunk(text = "Hel", conversationId = "conv-1", event = BotStreamEvent.ASSISTANT))
+            emit(BotStreamChunk(text = "lo", conversationId = "conv-1", event = BotStreamEvent.ASSISTANT, done = true))
+        }
+
+        val vm = createViewModel(conversationId = "conv-1")
+        advanceUntilIdle()
+        vm.sendMessage("hi")
+        advanceUntilIdle()
+
+        val assistant = vm.uiState.value.messages.lastOrNull { it.role == "assistant" }
+        assertNotNull(assistant)
+        assertEquals("Hello", assistant!!.content)
+        coVerify(exactly = 2) {
+            timelineRepository.upsertClientModeStreamChunk(
+                conversationId = "conv-1",
+                chunk = any(),
+                assistantMessageId = any(),
+            )
+        }
+        coVerify(exactly = 0) {
+            timelineRepository.upsertClientModeLocalAssistantChunk("conv-1", any(), any(), any())
+        }
+    }
 
     /**
      * letta-mobile-lv3e: golden trace from a real lettabot WS session.

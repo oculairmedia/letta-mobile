@@ -17,7 +17,6 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.model.ProjectBugReport
-import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.MessageType
@@ -2237,258 +2236,30 @@ class AdminChatViewModel @Inject constructor(
     }
 
     /**
-     * letta-mobile-5s1n: route a Client Mode assistant stream chunk through
-     * the timeline. Idempotent across repeat chunks for the same logical
-     * event (same localId), so calling repeatedly grows a single bubble
-     * rather than appending duplicates.
+     * Route a Client Mode assistant/reasoning/tool stream chunk through the
+     * TimelineRepository reducer. The timeline observer is the only normal
+     * read path for known-conversation Client Mode messages.
      */
     private fun handleClientModeStreamChunkViaTimeline(
         chunk: BotStreamChunk,
         conversationId: String,
         assistantMessageId: String,
-        timestamp: String,
-        replaceAssistant: Boolean,
+        @Suppress("UNUSED_PARAMETER") timestamp: String,
+        @Suppress("UNUSED_PARAMETER") replaceAssistant: Boolean,
     ) {
-        // Use chunk arrival time for timeline fuzzy-collapse. This function is
-        // called for Client Mode agent output after the run may have spent
-        // several seconds bootstrapping/thinking. If we stamp reasoning /
-        // assistant locals with the send-start timestamp, the later REST/SSE
-        // confirmed events can fall outside Timeline's 10s Client Mode fuzzy
-        // window and get appended as duplicate extra responses.
-        val sentAt = java.time.Instant.now()
-        when (chunk.event) {
-            BotStreamEvent.REASONING -> {
-                val localId = "cm-reason-${chunk.uuid ?: assistantMessageId}"
-                // letta-mobile-lv3e (REVERTS letta-mobile-vu6a): reasoning
-                // chunks are deltas, same as assistant text. Append, don't
-                // replace. Defensive snapshot-shape detection mirrors the
-                // TimelineSyncLoop merge so we won't double-concat if the
-                // gateway ever changes shape.
-                val delta = chunk.text.orEmpty()
-                viewModelScope.launch {
-                    runCatching {
-                        timelineRepository.upsertClientModeLocalAssistantChunk(
-                            conversationId = conversationId,
-                            localId = localId,
-                            build = {
-                                com.letta.mobile.data.timeline.TimelineEvent.Local(
-                                    position = 0.0, // upsert assigns nextLocalPosition
-                                    otid = localId,
-                                    content = "",
-                                    role = com.letta.mobile.data.timeline.Role.ASSISTANT,
-                                    sentAt = sentAt,
-                                    deliveryState = com.letta.mobile.data.timeline.DeliveryState.SENT,
-                                    source = com.letta.mobile.data.timeline.MessageSource.CLIENT_MODE_HARNESS,
-                                    messageType = com.letta.mobile.data.timeline.TimelineMessageType.REASONING,
-                                    reasoningContent = delta,
-                                )
-                            },
-                            transform = { existing ->
-                                val prior = existing.reasoningContent.orEmpty()
-                                // letta-mobile (lettabot-uww.11 fix): reasoning
-                                // text is emitted by the gateway as PURE
-                                // DELTAS, same contract as assistant text.
-                                // The previous wucn-snapshot-recovery cascade
-                                // silently dropped chars on prefix collisions
-                                // and destructively replaced the accumulator
-                                // on >=32-char "near-snapshots". Trust the
-                                // contract and append.
-                                val merged = if (delta.isEmpty()) prior else prior + delta
-                                existing.copy(
-                                    reasoningContent = merged,
-                                    messageType = com.letta.mobile.data.timeline.TimelineMessageType.REASONING,
-                                    sentAt = sentAt,
-                                )
-                            },
-                        )
-                    }.onFailure { logTimelineUpsertFailure(it, "REASONING", localId) }
-                }
-            }
-
-            BotStreamEvent.TOOL_CALL,
-            BotStreamEvent.TOOL_RESULT,
-            -> {
-                // letta-mobile-lv3e (audit): wire contract for tool_call /
-                // tool_result is SNAPSHOT-shaped (NOT delta), unlike the
-                // assistant/reasoning text streams. The lettabot WS gateway
-                // (ws-gateway.ts:330-370) accumulates tool_call argument
-                // deltas server-side and flushes ONE complete tool_call
-                // event with fully-merged `toolInput` per tool invocation.
-                // tool_result is similarly emitted as a single frame with
-                // the complete `content` payload.
-                //
-                // Replace-not-append semantics here are correct given that
-                // contract: each frame fully describes the tool call. If
-                // the gateway ever changes to stream tool_input deltas
-                // directly (without server-side accumulation), this
-                // transform would silently keep only the LAST non-blank
-                // toolInput — same shape as the vu6a bug. The
-                // `arguments.ifBlank { existing }` fallback below preserves
-                // prior args if a follow-up frame omits them, which is
-                // the only documented variation.
-                val incomingToolCalls = chunk.effectiveToolCalls()
-                val rawToolCallId = chunk.toolFrameId(incomingToolCalls) ?: return
-                val toolCallId = if (chunk.event == BotStreamEvent.TOOL_RESULT) {
-                    clientToolBatchMessageIds[rawToolCallId] ?: rawToolCallId
-                } else {
-                    rawToolCallId
-                }
-                val localId = "cm-tool-$toolCallId"
-                val isResult = chunk.event == BotStreamEvent.TOOL_RESULT
-                val resultText: String? = if (isResult) chunk.text else null
-                val resultIsError: Boolean = isResult && chunk.isError
-                val resultCallId = if (isResult) rawToolCallId else toolCallId
-                val resultByCallId: Map<String, String> = if (resultText != null) {
-                    mapOf(resultCallId to resultText)
-                } else {
-                    emptyMap()
-                }
-                val resultErrorByCallId: Map<String, Boolean> = if (isResult) {
-                    mapOf(resultCallId to resultIsError)
-                } else {
-                    emptyMap()
-                }
-                val startedAtByCallId = mutableMapOf<String, java.time.Instant>()
-                if (chunk.event == BotStreamEvent.TOOL_CALL) {
-                    val startedAtMs = System.currentTimeMillis()
-                    clientToolStartedAtMs.putIfAbsent(toolCallId, startedAtMs)
-                    startedAtByCallId[toolCallId] = sentAt
-                    incomingToolCalls.forEach { call ->
-                        call.effectiveId.takeIf { it.isNotBlank() }?.let { callId ->
-                            clientToolStartedAtMs.putIfAbsent(callId, startedAtMs)
-                            clientToolBatchMessageIds.putIfAbsent(callId, toolCallId)
-                            startedAtByCallId[callId] = sentAt
-                        }
-                    }
-                }
-                viewModelScope.launch {
-                    runCatching {
-                        timelineRepository.upsertClientModeLocalAssistantChunk(
-                            conversationId = conversationId,
-                            localId = localId,
-                            build = {
-                                com.letta.mobile.data.timeline.TimelineEvent.Local(
-                                    position = 0.0,
-                                    otid = localId,
-                                    content = "",
-                                    role = com.letta.mobile.data.timeline.Role.ASSISTANT,
-                                    sentAt = sentAt,
-                                    deliveryState = com.letta.mobile.data.timeline.DeliveryState.SENT,
-                                    source = com.letta.mobile.data.timeline.MessageSource.CLIENT_MODE_HARNESS,
-                                    messageType = com.letta.mobile.data.timeline.TimelineMessageType.TOOL_CALL,
-                                    toolCalls = incomingToolCalls,
-                                    toolReturnContent = resultText,
-                                    toolReturnIsError = resultIsError,
-                                    toolReturnContentByCallId = resultByCallId,
-                                    toolReturnIsErrorByCallId = resultErrorByCallId,
-                                    toolStartedAtByCallId = startedAtByCallId,
-                                )
-                            },
-                            transform = { existing ->
-                                val mergedToolCalls = mergeToolCallSnapshots(
-                                    existing = existing.toolCalls,
-                                    incoming = incomingToolCalls,
-                                )
-                                existing.copy(
-                                    messageType = com.letta.mobile.data.timeline.TimelineMessageType.TOOL_CALL,
-                                    toolCalls = mergedToolCalls,
-                                    toolReturnContent = resultText ?: existing.toolReturnContent,
-                                    toolReturnIsError = if (isResult) resultIsError else existing.toolReturnIsError,
-                                    toolReturnContentByCallId = existing.toolReturnContentByCallId + resultByCallId,
-                                    toolReturnIsErrorByCallId = existing.toolReturnIsErrorByCallId + resultErrorByCallId,
-                                    toolStartedAtByCallId = existing.toolStartedAtByCallId + startedAtByCallId,
-                                    sentAt = sentAt,
-                                )
-                            },
-                        )
-                    }.onFailure { logTimelineUpsertFailure(it, "TOOL", localId) }
-                }
-            }
-
-            else -> {
-                // letta-mobile-lv3e (REVERTS letta-mobile-vu6a):
-                // BotStreamChunk.text is a DELTA — the gateway emits only
-                // the NEW fragment per frame, not the cumulative buffer.
-                // Verified via :cli:run wsstream against the real gateway:
-                // each frame's content is a fragment that must be APPENDED
-                // to the running bubble. vu6a's "snapshot semantics" was
-                // based on a synthetic test feeding ["Hel","Hello","Hello world"]
-                // and produced the user-visible "chunks replace each other"
-                // bug Emmanuel reported 2026-04-25.
-                //
-                // We still ignore empty/null text on the terminal frame so
-                // it doesn't append a no-op (or, worse, clobber via the
-                // empty-string path).
-                val delta = chunk.text?.takeIf { it.isNotEmpty() } ?: return
-                val localId = "cm-assist-$assistantMessageId"
-                viewModelScope.launch {
-                    runCatching {
-                        timelineRepository.upsertClientModeLocalAssistantChunk(
-                            conversationId = conversationId,
-                            localId = localId,
-                            build = {
-                                com.letta.mobile.data.timeline.TimelineEvent.Local(
-                                    position = 0.0,
-                                    otid = localId,
-                                    content = delta,
-                                    role = com.letta.mobile.data.timeline.Role.ASSISTANT,
-                                    sentAt = sentAt,
-                                    deliveryState = com.letta.mobile.data.timeline.DeliveryState.SENT,
-                                    source = com.letta.mobile.data.timeline.MessageSource.CLIENT_MODE_HARNESS,
-                                    messageType = com.letta.mobile.data.timeline.TimelineMessageType.ASSISTANT,
-                                )
-                            },
-                            transform = { existing ->
-                                // letta-mobile-aie.7 (scope wucn to
-                                // timeline-sync only): the WS streaming path
-                                // sees raw delta fragments from the gateway;
-                                // it does NOT see server-normalized
-                                // near-snapshots (those originate in the
-                                // upstream Letta SSE stream, which is
-                                // processed by TimelineSyncLoop where the
-                                // wucn heuristic still lives).
-                                //
-                                // The previous wucn copy on this path was
-                                // added defensively but was never required
-                                // by any observed gateway behaviour. With
-                                // server-side stream coalescing
-                                // (LETTABOT_COALESCE_ENABLED) batching ~140-
-                                // char text deltas, those batches have NO
-                                // prefix relationship to existing content
-                                // and would trip the >=32-char heuristic on
-                                // every batch after the first — silently
-                                // dropping or overwriting text. So we drop
-                                // the heuristic from this path.
-                                //
-                                // Normal WS assistant frames are pure deltas;
-                                // append them byte-for-byte. The only safe
-                                // place to apply prefix/idempotency collapse is
-                                // a defensive text-bearing terminal frame: a
-                                // terminal frame should normally be empty, but
-                                // a reconnect/sleep-wake edge can surface a
-                                // final snapshot-shaped frame. Collapsing only
-                                // that terminal snapshot avoids reintroducing
-                                // the old wucn bug where legitimate repeated
-                                // prefix deltas were silently dropped.
-                                val merged = if (chunk.done) {
-                                    when {
-                                        delta == existing.content -> existing.content
-                                        delta.startsWith(existing.content) -> delta
-                                        existing.content.startsWith(delta) -> existing.content
-                                        else -> existing.content + delta
-                                    }
-                                } else {
-                                    existing.content + delta
-                                }
-                                existing.copy(
-                                    content = merged,
-                                    messageType = com.letta.mobile.data.timeline.TimelineMessageType.ASSISTANT,
-                                    sentAt = sentAt,
-                                )
-                            },
-                        )
-                    }.onFailure { logTimelineUpsertFailure(it, "ASSISTANT", localId) }
-                }
+        viewModelScope.launch {
+            runCatching {
+                timelineRepository.upsertClientModeStreamChunk(
+                    conversationId = conversationId,
+                    chunk = chunk.toTimelineStreamChunk(),
+                    assistantMessageId = assistantMessageId,
+                )
+            }.onFailure {
+                logTimelineUpsertFailure(
+                    t = it,
+                    kind = chunk.event?.name ?: "ASSISTANT",
+                    localId = assistantMessageId,
+                )
             }
         }
     }
@@ -3076,68 +2847,24 @@ $path
 Use this as the cwd/base path for subsequent filesystem and shell tool calls in this conversation. After switching, briefly confirm the current working directory.
 """.trim()
 
-private fun BotStreamChunk.effectiveToolCalls(): List<ToolCall> {
-    val batchedCalls = toolCalls.orEmpty().filter { call ->
-        call.effectiveId.isNotBlank() ||
-            !call.name.isNullOrBlank() ||
-            !call.arguments.isNullOrBlank()
-    }
-    if (batchedCalls.isNotEmpty()) return batchedCalls
-
-    if (toolCallId == null && uuid == null && toolName == null && toolInput == null) {
-        return emptyList()
-    }
-    return listOf(
-        ToolCall(
-            id = toolCallId ?: uuid,
-            name = toolName ?: "tool",
-            arguments = toolInput?.toString().orEmpty(),
-        )
+private fun BotStreamChunk.toTimelineStreamChunk(): com.letta.mobile.data.timeline.ClientModeStreamChunk =
+    com.letta.mobile.data.timeline.ClientModeStreamChunk(
+        event = when (event) {
+            BotStreamEvent.REASONING -> com.letta.mobile.data.timeline.ClientModeStreamEvent.REASONING
+            BotStreamEvent.TOOL_CALL -> com.letta.mobile.data.timeline.ClientModeStreamEvent.TOOL_CALL
+            BotStreamEvent.TOOL_RESULT -> com.letta.mobile.data.timeline.ClientModeStreamEvent.TOOL_RESULT
+            BotStreamEvent.ASSISTANT -> com.letta.mobile.data.timeline.ClientModeStreamEvent.ASSISTANT
+            BotStreamEvent.CONVERSATION_SWAP, null -> null
+        },
+        text = text,
+        uuid = uuid,
+        toolCallId = toolCallId,
+        toolName = toolName,
+        toolInput = toolInput?.toString(),
+        toolCalls = toolCalls.orEmpty(),
+        isError = isError,
+        done = done,
     )
-}
-
-private fun BotStreamChunk.toolFrameId(calls: List<ToolCall>): String? {
-    return toolCallId
-        ?: uuid
-        ?: calls.firstNotNullOfOrNull { call ->
-            call.effectiveId.takeIf { it.isNotBlank() }
-        }
-        ?: calls.takeIf { it.isNotEmpty() }?.hashCode()?.toString()
-}
-
-private fun mergeToolCallSnapshots(
-    existing: List<ToolCall>,
-    incoming: List<ToolCall>,
-): List<ToolCall> {
-    if (incoming.isEmpty()) return existing
-    if (existing.isEmpty()) return incoming
-
-    val merged = existing.toMutableList()
-    incoming.forEach { incomingCall ->
-        val incomingId = incomingCall.effectiveId.takeIf { it.isNotBlank() }
-        val index = if (incomingId != null) {
-            merged.indexOfFirst { it.effectiveId == incomingId }
-        } else {
-            -1
-        }
-        if (index >= 0) {
-            merged[index] = merged[index].mergeWith(incomingCall)
-        } else {
-            merged.add(incomingCall)
-        }
-    }
-    return merged
-}
-
-private fun ToolCall.mergeWith(incoming: ToolCall): ToolCall = ToolCall(
-    id = incoming.id ?: id,
-    toolCallId = incoming.toolCallId ?: toolCallId,
-    name = incoming.name?.takeIf {
-        it.isNotBlank() && (it != "tool" || name.isNullOrBlank() || name == "tool")
-    } ?: name,
-    arguments = incoming.arguments?.takeIf { it.isNotBlank() } ?: arguments,
-    type = incoming.type,
-)
 
 /**
  * Client Mode rides through lettabot's WebSocket gateway, whose Matrix/Tuwunel

@@ -179,6 +179,16 @@ open class TimelineRepository @Inject constructor(
         transform = transform,
     )
 
+    /** Route a typed Client Mode stream chunk through the timeline reducer. */
+    suspend fun upsertClientModeStreamChunk(
+        conversationId: String,
+        chunk: ClientModeStreamChunk,
+        assistantMessageId: String,
+    ): String? = getOrCreate(conversationId).upsertClientModeStreamChunk(
+        chunk = chunk,
+        assistantMessageId = assistantMessageId,
+    )
+
     /**
      * letta-mobile-iuh6: Re-run fuzzy collapse across existing events after
      * a notification reply handler's WS stream completes. Absorbs any
