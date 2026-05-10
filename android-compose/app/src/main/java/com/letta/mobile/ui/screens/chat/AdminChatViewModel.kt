@@ -32,13 +32,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.flow.update
@@ -72,7 +69,6 @@ class AdminChatViewModel @Inject constructor(
     companion object {
         private const val CONVERSATION_CACHE_TTL_MS = 30_000L
         private const val MESSAGE_SYNC_INTERVAL_MS = 5_000L
-        private const val CHAT_SEARCH_REMOTE_DEBOUNCE_MS = 180L
         private const val CLIENT_MODE_CONVERSATION_ID_KEY = "clientModeConversationId"
     }
 
@@ -129,7 +125,6 @@ class AdminChatViewModel @Inject constructor(
         )
     }
 
-    private val chatSearchController = ChatSearchController(messageRepository)
     private val chatSessionResolver = ChatSessionResolver(
         agentRepository = agentRepository,
         conversationRepository = conversationRepository,
@@ -168,73 +163,9 @@ class AdminChatViewModel @Inject constructor(
         }
     }
 
-    fun updateChatSearchQuery(query: String) {
-        chatSearchJob?.cancel()
-        if (query.isBlank()) {
-            clearChatSearch()
-            return
-        }
+    fun updateChatSearchQuery(query: String) = chatSearchCoordinator.updateQuery(query)
 
-        val localResults = chatSearchController.localResults(
-            query = query,
-            state = _uiState.value,
-            agentId = agentId,
-            conversationId = conversationId,
-        )
-        _uiState.update {
-            it.copy(
-                searchQuery = query,
-                isSearchActive = true,
-                isSearching = true,
-                searchResults = localResults,
-            )
-        }
-
-        chatSearchJob = viewModelScope.launch {
-            delay(CHAT_SEARCH_REMOTE_DEBOUNCE_MS)
-            try {
-                val parsed = chatSearchController.remoteResults(query, agentId)
-                _uiState.update { current ->
-                    if (current.searchQuery == query) {
-                        current.copy(
-                            searchResults = chatSearchController.mergeResults(
-                                local = chatSearchController.localResults(
-                                    query = query,
-                                    state = current,
-                                    agentId = agentId,
-                                    conversationId = conversationId,
-                                ),
-                                remote = parsed,
-                            ),
-                            isSearching = false,
-                        )
-                    } else {
-                        current
-                    }
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                android.util.Log.w("AdminChatViewModel", "Chat search failed", e)
-                _uiState.update { current ->
-                    if (current.searchQuery == query) current.copy(isSearching = false) else current
-                }
-            }
-        }
-    }
-
-    fun clearChatSearch() {
-        chatSearchJob?.cancel()
-        chatSearchJob = null
-        _uiState.update {
-            it.copy(
-                searchQuery = "",
-                isSearchActive = false,
-                isSearching = false,
-                searchResults = persistentListOf(),
-            )
-        }
-    }
+    fun clearChatSearch() = chatSearchCoordinator.clear()
 
     fun setChatBackground(background: ChatBackground) {
         viewModelScope.launch {
@@ -292,7 +223,13 @@ class AdminChatViewModel @Inject constructor(
     private fun clearPendingClientModeBootstrapUserMessage() {
         pendingClientModeBootstrapUserMessage = null
     }
-    private var chatSearchJob: Job? = null
+    private val chatSearchCoordinator = ChatSearchCoordinator(
+        scope = viewModelScope,
+        messageRepository = messageRepository,
+        uiState = _uiState,
+        agentId = agentId,
+        conversationId = { conversationId },
+    )
     private val chatTimelineObserver = ChatTimelineObserver(
         scope = viewModelScope,
         timelineRepository = timelineRepository,
