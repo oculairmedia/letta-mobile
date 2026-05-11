@@ -218,6 +218,7 @@ class ClientModeSendCoordinatorTest {
                 reconciliations += firstArg<String>() to secondArg<String>()
                 Unit
             }
+            coEvery { timelineRepository.postHandlerCollapse(any()) } returns Unit
             every { notificationDeliveryCoordinator.submit(any()) } answers {
                 notificationCandidates += firstArg<NotificationDeliveryCandidate>()
                 NotificationDeliveryDecision.Deferred(NotificationDeferralReason.AwaitingFinalPreview)

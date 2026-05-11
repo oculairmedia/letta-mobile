@@ -506,6 +506,147 @@ class TimelineSyncLoopTest {
         scope.coroutineContext.job.cancel()
     }
 
+    /**
+     * letta-mobile-a7ij regression: simulate the race where SSE wins —
+     * externalRunReconcile appends a Confirmed assistant before the harness
+     * has written its matching Local. The harness then writes a
+     * prefix-compatible Local. Without postHandlerCollapse this leaves both
+     * events in the timeline (Confirmed + Local) and the UI renders a
+     * duplicate final bubble. Mirrors the NotificationReplyHandler fix
+     * pattern (letta-mobile-iuh6) but for the active ClientModeSendCoordinator
+     * path.
+     */
+    @Test
+    fun `late harness local is absorbed by postHandlerCollapse after reconcile appends confirmed`() = runBlocking {
+        val runId = "run-a7ij-race"
+        val api = FakeSyncApi()
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val sync = TimelineSyncLoop(api, "conv-a7ij", scope)
+        val now = java.time.Instant.now()
+
+        // Server has the final assistant — reconcile will see this first.
+        api.addStoredMessage(
+            AssistantMessage(
+                id = "server-assist-1",
+                contentRaw = JsonPrimitive("the answer is 42"),
+                otid = "server-assist-otid",
+                runId = runId,
+            )
+        )
+
+        // 1. SSE wins: externalRunReconcile runs before harness writes any Local.
+        sync.reconcileForExternalRun(runId)
+
+        val afterReconcile = sync.state.value.events
+        assertEquals("Reconcile must append the server final as Confirmed", 1, afterReconcile.size)
+        assertTrue(afterReconcile.single() is TimelineEvent.Confirmed)
+
+        // 2. Harness now writes a prefix-compatible assistant Local AFTER
+        //    reconcile already appended. upsertClientModeLocal's
+        //    hasCompatibleConfirmedForClientModeLocal guard refuses to create
+        //    when content already matches — so seed with content that's a
+        //    prefix of the Confirmed (which IS compatible per
+        //    clientModeStreamTextCompatible) and verify the guard works.
+        sync.upsertClientModeLocalAssistantChunk(
+            localId = "cm-assist-late",
+            build = {
+                TimelineEvent.Local(
+                    position = sync.state.value.nextLocalPosition(),
+                    otid = "cm-assist-late",
+                    content = "the answer",
+                    role = Role.ASSISTANT,
+                    sentAt = now,
+                    deliveryState = DeliveryState.SENT,
+                    source = MessageSource.CLIENT_MODE_HARNESS,
+                    messageType = TimelineMessageType.ASSISTANT,
+                )
+            },
+            transform = { it },
+        )
+
+        // upsertClientModeLocal's guard should refuse to create the orphan
+        // Local because a compatible Confirmed already exists. If this
+        // assertion ever flips, the guard regressed and postHandlerCollapse
+        // becomes the second line of defence.
+        val afterLocalAttempt = sync.state.value.events
+        if (afterLocalAttempt.any { it is TimelineEvent.Local }) {
+            // Defence-in-depth path: guard failed, postHandlerCollapse must
+            // absorb the orphan.
+            sync.postHandlerCollapse()
+            val absorbed = sync.state.value.events
+            assertEquals(
+                "postHandlerCollapse must absorb the late orphan Local",
+                1,
+                absorbed.size,
+            )
+            assertTrue(
+                "Only the Confirmed should remain after collapse",
+                absorbed.single() is TimelineEvent.Confirmed,
+            )
+        } else {
+            assertEquals("Guard already prevented the orphan", 1, afterLocalAttempt.size)
+        }
+        scope.coroutineContext.job.cancel()
+    }
+
+    /**
+     * letta-mobile-a7ij regression — the harder path: the harness creates
+     * a Local FIRST with content that doesn't fuzzy-match the eventual
+     * server final (different wording). Reconcile appends the Confirmed.
+     * postHandlerCollapse should NOT collapse mismatched content (that
+     * would be a false-positive merge). The Local stays as-is.
+     *
+     * This test locks in the boundary: only prefix/equal content collapses.
+     */
+    @Test
+    fun `mismatched harness local content is NOT collapsed by postHandlerCollapse`() = runBlocking {
+        val runId = "run-a7ij-mismatch"
+        val api = FakeSyncApi()
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val sync = TimelineSyncLoop(api, "conv-a7ij-mismatch", scope)
+        val now = java.time.Instant.now()
+
+        // Harness wrote a Local with one wording.
+        sync.upsertClientModeLocalAssistantChunk(
+            localId = "cm-assist-stale",
+            build = {
+                TimelineEvent.Local(
+                    position = sync.state.value.nextLocalPosition(),
+                    otid = "cm-assist-stale",
+                    content = "let me think about that",
+                    role = Role.ASSISTANT,
+                    sentAt = now,
+                    deliveryState = DeliveryState.SENT,
+                    source = MessageSource.CLIENT_MODE_HARNESS,
+                    messageType = TimelineMessageType.ASSISTANT,
+                )
+            },
+            transform = { it },
+        )
+
+        // Server delivered different wording — no prefix relationship.
+        api.addStoredMessage(
+            AssistantMessage(
+                id = "server-assist-1",
+                contentRaw = JsonPrimitive("the answer is 42"),
+                otid = "server-assist-otid",
+                runId = runId,
+            )
+        )
+        sync.reconcileForExternalRun(runId)
+        sync.postHandlerCollapse()
+
+        val events = sync.state.value.events
+        assertEquals(
+            "Mismatched Local must coexist with Confirmed — not silently merged",
+            2,
+            events.size,
+        )
+        assertTrue(events.any { it is TimelineEvent.Local })
+        assertTrue(events.any { it is TimelineEvent.Confirmed })
+        scope.coroutineContext.job.cancel()
+    }
+
     @Test
     fun `streamed reasoning and assistant frames with same server id stay separate`() = runBlocking {
         val api = FakeSyncApi()

@@ -486,6 +486,12 @@ internal class ClientModeSendCoordinator(
         reason: String,
     ): Boolean = runCatching {
         timelineRepository.reconcileRecentMessages(conversationId, "client_mode_$reason")
+        // letta-mobile-a7ij: when SSE wins the race and reconcile appends a
+        // Confirmed before the harness writes its matching Local, the orphan
+        // Local stays in the timeline and renders as a duplicate bubble.
+        // Re-run fuzzy collapse here — same pattern as NotificationReplyHandler
+        // (letta-mobile-iuh6). Idempotent: no-op when nothing to absorb.
+        timelineRepository.postHandlerCollapse(conversationId)
     }.onFailure { t ->
         Telemetry.error(
             "AdminChatVM", "clientMode.reconcileFailed", t,
