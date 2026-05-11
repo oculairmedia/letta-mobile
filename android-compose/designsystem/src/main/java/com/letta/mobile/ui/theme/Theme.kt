@@ -191,6 +191,86 @@ private fun buildDarkScheme(
 )
 
 @VisibleForTesting
+internal fun ColorScheme.withLettaContrastBoost(): ColorScheme {
+    val isLightTheme = background.luminance() > 0.5f
+    val boostedPrimary = primary.boostAccentContrast(isLightTheme)
+    val boostedSecondary = secondary.boostAccentContrast(isLightTheme)
+    val boostedTertiary = tertiary.boostAccentContrast(isLightTheme)
+    return copy(
+        primary = boostedPrimary,
+        primaryContainer = boostedPrimary.toAccentContainer(isLightTheme),
+        onPrimaryContainer = onSurface,
+        secondary = boostedSecondary,
+        secondaryContainer = boostedSecondary.toAccentContainer(isLightTheme),
+        onSecondaryContainer = onSurface,
+        tertiary = boostedTertiary,
+        tertiaryContainer = boostedTertiary.toAccentContainer(isLightTheme),
+        onTertiaryContainer = onSurface,
+        onSurfaceVariant = onSurfaceVariant.boostSupportingTextContrast(isLightTheme),
+        outline = outline.boostOutlineContrast(isLightTheme),
+        outlineVariant = outlineVariant.boostOutlineVariantContrast(isLightTheme),
+    )
+}
+
+private fun Color.boostAccentContrast(isLightTheme: Boolean): Color {
+    val hsl = toHslColor()
+    val saturation = if (hsl.saturation < NeutralSaturationThreshold) {
+        hsl.saturation
+    } else {
+        hsl.saturation.coerceAtLeast(if (isLightTheme) 0.58f else 0.72f)
+    }
+    val lightness = if (isLightTheme) {
+        hsl.lightness.coerceIn(0.30f, 0.46f)
+    } else {
+        hsl.lightness.coerceIn(0.68f, 0.84f)
+    }
+    return Color.hsl(hsl.hue, saturation, lightness, alpha)
+}
+
+private fun Color.toAccentContainer(isLightTheme: Boolean): Color {
+    val hsl = toHslColor()
+    val saturation = if (hsl.saturation < NeutralSaturationThreshold) {
+        hsl.saturation
+    } else {
+        hsl.saturation.coerceAtLeast(if (isLightTheme) 0.32f else 0.42f)
+    }
+    val lightness = if (isLightTheme) 0.86f else 0.26f
+    return Color.hsl(hsl.hue, saturation, lightness)
+}
+
+private fun Color.boostSupportingTextContrast(isLightTheme: Boolean): Color {
+    val hsl = toHslColor()
+    val lightness = if (isLightTheme) {
+        hsl.lightness.coerceAtMost(0.26f)
+    } else {
+        hsl.lightness.coerceAtLeast(0.78f)
+    }
+    return Color.hsl(hsl.hue, hsl.saturation, lightness, alpha)
+}
+
+private fun Color.boostOutlineContrast(isLightTheme: Boolean): Color {
+    val hsl = toHslColor()
+    val lightness = if (isLightTheme) {
+        hsl.lightness.coerceAtMost(0.62f)
+    } else {
+        hsl.lightness.coerceAtLeast(0.42f)
+    }
+    return Color.hsl(hsl.hue, hsl.saturation, lightness, alpha)
+}
+
+private fun Color.boostOutlineVariantContrast(isLightTheme: Boolean): Color {
+    val hsl = toHslColor()
+    val lightness = if (isLightTheme) {
+        hsl.lightness.coerceAtMost(0.72f)
+    } else {
+        hsl.lightness.coerceAtLeast(0.32f)
+    }
+    return Color.hsl(hsl.hue, hsl.saturation, lightness, alpha)
+}
+
+private const val NeutralSaturationThreshold = 0.08f
+
+@VisibleForTesting
 internal fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
     val complementary = colorScheme.primary.complementary()
     val complementaryHsl = complementary.toHslColor()
@@ -416,12 +496,13 @@ fun LettaTheme(
     val presetColors = presetThemeColors(themePreset)
     val useDynamicColor = dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
-    val colorScheme = when {
+    val baseColorScheme = when {
         useDynamicColor && useDarkTheme -> dynamicDarkColorScheme(context)
         useDynamicColor && !useDarkTheme -> dynamicLightColorScheme(context)
         useDarkTheme -> presetColors.darkScheme
         else -> presetColors.lightScheme
     }
+    val colorScheme = baseColorScheme.withLettaContrastBoost()
 
     val customColors = deriveCustomColors(colorScheme)
 

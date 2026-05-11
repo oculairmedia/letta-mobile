@@ -1,7 +1,9 @@
 package com.letta.mobile.ui.theme
 
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import com.letta.mobile.data.model.ThemePreset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -35,6 +37,32 @@ class ThemeColorsTest {
         val scheme = presetThemeColors(ThemePreset.AMOLED_BLACK).darkScheme
         assertEquals(Color.Black, scheme.surface)
         assertEquals(Color.Black, scheme.background)
+    }
+
+    @Test
+    fun `contrast boost deepens light accents and supporting text`() {
+        val scheme = lightColorScheme(
+            primary = Color(0xFF7ABBB0),
+            background = Color.White,
+            onSurfaceVariant = Color(0xFF6E6E6E),
+        )
+        val boosted = scheme.withLettaContrastBoost()
+
+        assertTrue(boosted.primary.luminance() < scheme.primary.luminance())
+        assertTrue(boosted.onSurfaceVariant.luminance() < scheme.onSurfaceVariant.luminance())
+    }
+
+    @Test
+    fun `contrast boost brightens dark accents and supporting text`() {
+        val scheme = darkColorScheme(
+            primary = Color(0xFF2A8C7F),
+            background = Color.Black,
+            onSurfaceVariant = Color(0xFF9A9A9A),
+        )
+        val boosted = scheme.withLettaContrastBoost()
+
+        assertTrue(boosted.primary.luminance() > scheme.primary.luminance())
+        assertTrue(boosted.onSurfaceVariant.luminance() > scheme.onSurfaceVariant.luminance())
     }
 
     // ── deriveCustomColors ────────────────────────────────────
