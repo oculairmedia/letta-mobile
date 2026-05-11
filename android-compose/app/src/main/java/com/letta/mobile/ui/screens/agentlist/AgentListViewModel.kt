@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -39,6 +41,7 @@ data class AgentListUiState(
     val selectedTags: Set<String> = emptySet(),
     val isImporting: Boolean = false,
     val isLoading: Boolean = true,
+    val isHydrating: Boolean = false,
     val isRefreshing: Boolean = false,
     val isCreating: Boolean = false,
     val error: String? = null,
@@ -59,6 +62,7 @@ class AgentListViewModel @Inject constructor(
         val searchQuery: String = "",
         val selectedTags: Set<String> = emptySet(),
         val isLoading: Boolean = true,
+        val isHydrating: Boolean = false,
         val isRefreshing: Boolean = false,
         val isCreating: Boolean = false,
         val isImporting: Boolean = false,
@@ -98,7 +102,8 @@ class AgentListViewModel @Inject constructor(
             pinnedAgentIds = pinnedIds,
             searchQuery = overlay.transient.searchQuery,
             selectedTags = overlay.transient.selectedTags,
-            isLoading = overlay.transient.isLoading,
+            isLoading = overlay.transient.isLoading && agents.isEmpty(),
+            isHydrating = overlay.transient.isHydrating,
             isRefreshing = overlay.transient.isRefreshing,
             isCreating = overlay.transient.isCreating,
             isImporting = overlay.transient.isImporting,
@@ -136,17 +141,31 @@ class AgentListViewModel @Inject constructor(
     fun loadAgents() {
         viewModelScope.launch {
             if (agentRepository.agents.value.isEmpty()) {
-                _transient.update { it.copy(isLoading = true, error = null) }
+                _transient.update { it.copy(isLoading = true, isHydrating = true, error = null) }
+            } else {
+                _transient.update { it.copy(isHydrating = true, error = null) }
             }
             try {
+                val firstPageMarker = launch {
+                    agentRepository.agents
+                        .drop(if (agentRepository.agents.value.isEmpty()) 0 else 1)
+                        .first { it.isNotEmpty() }
+                        .let { agents ->
+                            _transient.update { it.copy(isLoading = false) }
+                            Log.i("AgentListViewModel", "AgentList first-page ready count=${agents.size}")
+                            Log.i("AgentListViewModel", "AgentList hydrated count=${agents.size}")
+                        }
+                }
                 agentRepository.refreshAgentsIfStale(LIST_CACHE_TTL_MS)
-                _transient.update { it.copy(isLoading = false) }
+                firstPageMarker.cancel()
+                _transient.update { it.copy(isLoading = false, isHydrating = false) }
                 Log.i("AgentListViewModel", "AgentList hydrated count=${agentRepository.agents.value.size}")
             } catch (e: Exception) {
                 Log.w("AgentListViewModel", "AgentList hydrate failed", e)
                 _transient.update {
                     it.copy(
                         isLoading = false,
+                        isHydrating = false,
                         error = if (agentRepository.agents.value.isEmpty()) {
                             e.message ?: "Failed to load agents"
                         } else null,
@@ -158,14 +177,15 @@ class AgentListViewModel @Inject constructor(
 
     fun refresh() {
         viewModelScope.launch {
-            _transient.update { it.copy(isRefreshing = true) }
+            _transient.update { it.copy(isRefreshing = true, isHydrating = true) }
             try {
                 agentRepository.refreshAgents()
-                _transient.update { it.copy(isRefreshing = false) }
+                _transient.update { it.copy(isRefreshing = false, isHydrating = false) }
             } catch (e: Exception) {
                 _transient.update {
                     it.copy(
                         isRefreshing = false,
+                        isHydrating = false,
                         error = e.message ?: "Failed to refresh",
                     )
                 }

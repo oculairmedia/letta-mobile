@@ -16,6 +16,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -263,6 +264,26 @@ class AgentListViewModelTest {
         viewModel = AgentListViewModel(agentRepository, settingsRepository, toolRepository, modelRepository)
 
         assertEquals(2, viewModel.getFilteredAgents().size)
+    }
+
+    @Test
+    fun `loadAgents shows first hydrated page while refresh continues`() = runTest {
+        val agentsFlow = MutableStateFlow<List<Agent>>(emptyList())
+        val keepRefreshing = CompletableDeferred<Unit>()
+        every { agentRepository.agents } returns agentsFlow
+        coEvery { agentRepository.refreshAgentsIfStale(any()) } coAnswers {
+            agentsFlow.value = listOf(Agent(id = "a1", name = "Needle Agent"))
+            keepRefreshing.await()
+            true
+        }
+
+        viewModel = AgentListViewModel(agentRepository, settingsRepository, toolRepository, modelRepository)
+
+        assertEquals(listOf("a1"), viewModel.uiState.value.agents.map { it.id })
+        assertFalse(viewModel.uiState.value.isLoading)
+        assertTrue(viewModel.uiState.value.isHydrating)
+
+        keepRefreshing.complete(Unit)
     }
 
     @Test

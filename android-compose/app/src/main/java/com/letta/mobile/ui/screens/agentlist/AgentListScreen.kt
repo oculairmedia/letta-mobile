@@ -167,7 +167,11 @@ fun AgentListScreen(
     val favoriteAgent = uiState.favoriteAgentId?.let { favId ->
         uiState.agents.find { it.id == favId }
     }
-    val gridAgents = filteredAgents.filter { it.id != uiState.favoriteAgentId }
+    val displayAgents = remember(filteredAgents, favoriteAgent) {
+        resolveAgentListDisplayAgents(filteredAgents, favoriteAgent)
+    }
+    val visibleFavoriteAgent = displayAgents.visibleFavoriteAgent
+    val gridAgents = displayAgents.listAgents
 
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
@@ -290,8 +294,12 @@ fun AgentListScreen(
                     if (filteredAgents.isEmpty()) {
                         EmptyState(
                             icon = LettaIcons.Agent,
-                            message = if (uiState.searchQuery.isBlank()) stringResource(R.string.screen_agents_empty)
-                            else "No agents matching \"${uiState.searchQuery}\"",
+                            message = when {
+                                uiState.searchQuery.isNotBlank() && uiState.isHydrating ->
+                                    "Still loading agents while searching for \"${uiState.searchQuery}\""
+                                uiState.searchQuery.isBlank() -> stringResource(R.string.screen_agents_empty)
+                                else -> "No agents matching \"${uiState.searchQuery}\""
+                            },
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {
@@ -304,16 +312,25 @@ fun AgentListScreen(
                                 verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
                                 horizontalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
                             ) {
-                                if (favoriteAgent != null && uiState.searchQuery.isBlank()) {
+                                if (uiState.isHydrating) {
                                     item(
-                                        key = "favorite-${favoriteAgent.id}",
+                                        key = "agent-hydrating-banner",
+                                        span = { GridItemSpan(maxLineSpan) },
+                                    ) {
+                                        AgentHydratingBanner(loadedCount = uiState.agents.size)
+                                    }
+                                }
+
+                                if (visibleFavoriteAgent != null) {
+                                    item(
+                                        key = "favorite-${visibleFavoriteAgent.id}",
                                         span = { GridItemSpan(maxLineSpan) },
                                     ) {
                                         FavoriteAgentCard(
-                                            agent = favoriteAgent,
-                                            onClick = { selectAgent(favoriteAgent.id, favoriteAgent.name) },
-                                            onEdit = { onNavigateToEditAgent(favoriteAgent.id) },
-                                            onUnfavorite = { viewModel.toggleFavorite(favoriteAgent.id) },
+                                            agent = visibleFavoriteAgent,
+                                            onClick = { selectAgent(visibleFavoriteAgent.id, visibleFavoriteAgent.name) },
+                                            onEdit = { onNavigateToEditAgent(visibleFavoriteAgent.id) },
+                                            onUnfavorite = { viewModel.toggleFavorite(visibleFavoriteAgent.id) },
                                             contextualActionsEnabled = !isShareMode,
                                         )
                                     }
@@ -339,13 +356,19 @@ fun AgentListScreen(
                                 contentPadding = PaddingValues(LettaSpacing.screenHorizontal),
                                 verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
                             ) {
-                                if (favoriteAgent != null && uiState.searchQuery.isBlank()) {
-                                    item(key = "favorite-${favoriteAgent.id}") {
+                                if (uiState.isHydrating) {
+                                    item(key = "agent-hydrating-banner") {
+                                        AgentHydratingBanner(loadedCount = uiState.agents.size)
+                                    }
+                                }
+
+                                if (visibleFavoriteAgent != null) {
+                                    item(key = "favorite-${visibleFavoriteAgent.id}") {
                                         FavoriteAgentCard(
-                                            agent = favoriteAgent,
-                                            onClick = { selectAgent(favoriteAgent.id, favoriteAgent.name) },
-                                            onEdit = { onNavigateToEditAgent(favoriteAgent.id) },
-                                            onUnfavorite = { viewModel.toggleFavorite(favoriteAgent.id) },
+                                            agent = visibleFavoriteAgent,
+                                            onClick = { selectAgent(visibleFavoriteAgent.id, visibleFavoriteAgent.name) },
+                                            onEdit = { onNavigateToEditAgent(visibleFavoriteAgent.id) },
+                                            onUnfavorite = { viewModel.toggleFavorite(visibleFavoriteAgent.id) },
                                             contextualActionsEnabled = !isShareMode,
                                         )
                                     }
@@ -400,6 +423,56 @@ fun AgentListScreen(
                 showImportDialog = false
             },
         )
+    }
+}
+
+internal data class AgentListDisplayAgents(
+    val visibleFavoriteAgent: Agent?,
+    val listAgents: List<Agent>,
+)
+
+internal fun resolveAgentListDisplayAgents(
+    filteredAgents: List<Agent>,
+    favoriteAgent: Agent?,
+): AgentListDisplayAgents {
+    val filteredAgentIds = filteredAgents.mapTo(mutableSetOf()) { it.id }
+    val visibleFavoriteAgent = favoriteAgent?.takeIf { it.id in filteredAgentIds }
+    return AgentListDisplayAgents(
+        visibleFavoriteAgent = visibleFavoriteAgent,
+        listAgents = filteredAgents.filter { it.id != visibleFavoriteAgent?.id },
+    )
+}
+
+@Composable
+private fun AgentHydratingBanner(
+    loadedCount: Int,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(bottom = LettaSpacing.cardGap),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+        ),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            LoadingIndicator(modifier = Modifier.size(18.dp))
+            Column {
+                Text("Loading more agents", style = MaterialTheme.typography.labelLarge)
+                Text(
+                    "$loadedCount loaded so far. Search results will update as more agents arrive.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
