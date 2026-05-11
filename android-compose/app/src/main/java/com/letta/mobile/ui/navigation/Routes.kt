@@ -33,6 +33,19 @@ import kotlinx.serialization.Serializable
 @Serializable data class BotConfigEditRoute(val configId: String? = null)
 
 @Serializable
+data class ProjectIssuesRoute(
+    val projectId: String,
+    val projectName: String? = null,
+)
+
+@Serializable
+data class ProjectIssueDetailRoute(
+    val projectId: String,
+    val issueId: String,
+    val projectName: String? = null,
+)
+
+@Serializable
 data class McpServerToolsRoute(val serverId: String)
 
 @Serializable
@@ -50,7 +63,14 @@ data class AgentChatRoute(
     val projectGitUrl: String? = null,
     val projectLastSyncAt: String? = null,
     val projectActiveCodingAgents: String? = null,
+    val projectStartAction: String? = null,
 )
+
+object ProjectChatStartAction {
+    const val ActiveAgents = "active_agents"
+    const val ProjectBrief = "project_brief"
+    const val BugReport = "bug_report"
+}
 
 @Serializable
 data class EditAgentRoute(val agentId: String)

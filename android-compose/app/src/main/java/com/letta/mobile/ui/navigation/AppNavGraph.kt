@@ -31,6 +31,8 @@ import com.letta.mobile.channel.ChatPushAlarmScheduler
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.ui.screens.projects.ProjectHomeScreen
+import com.letta.mobile.ui.screens.projects.ProjectIssueDetailScreen
+import com.letta.mobile.ui.screens.projects.ProjectIssuesScreen
 import com.letta.mobile.ui.screens.dashboard.HomeScreen
 import com.letta.mobile.ui.screens.about.AboutScreen
 import com.letta.mobile.ui.screens.bot.BotConfigEditScreen
@@ -159,7 +161,7 @@ fun AppNavGraph(
         composable<HomeRoute> {
             ProjectHomeScreen(
                 onNavigateBack = null,
-                onNavigateToProjectChat = { project ->
+                onNavigateToProjectChat = { project, projectStartAction ->
                     navController.navigate(
                         AgentChatRoute(
                             agentId = project.lettaAgentId.orEmpty(),
@@ -170,6 +172,15 @@ fun AppNavGraph(
                             projectGitUrl = project.gitUrl,
                             projectLastSyncAt = project.lastSyncAt,
                             projectActiveCodingAgents = project.techStack,
+                            projectStartAction = projectStartAction,
+                        )
+                    )
+                },
+                onNavigateToProjectIssues = { project ->
+                    navController.navigate(
+                        ProjectIssuesRoute(
+                            projectId = project.identifier,
+                            projectName = project.name,
                         )
                     )
                 },
@@ -177,6 +188,36 @@ fun AppNavGraph(
                 activeBackendLabel = activeBackendLabel,
                 onNavigateToBackendSwitcher = { navController.navigate(ConfigListRoute) },
             )
+        }
+
+        composable<ProjectIssuesRoute>(
+            enterTransition = drillInEnter,
+            exitTransition = drillInExit,
+            popEnterTransition = drillInPopEnter,
+            popExitTransition = drillInPopExit,
+        ) { backStackEntry ->
+            val route = backStackEntry.toRoute<ProjectIssuesRoute>()
+            ProjectIssuesScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToIssue = { issueId ->
+                    navController.navigate(
+                        ProjectIssueDetailRoute(
+                            projectId = route.projectId,
+                            issueId = issueId,
+                            projectName = route.projectName,
+                        )
+                    )
+                },
+            )
+        }
+
+        composable<ProjectIssueDetailRoute>(
+            enterTransition = drillInEnter,
+            exitTransition = drillInExit,
+            popEnterTransition = drillInPopEnter,
+            popExitTransition = drillInPopExit,
+        ) {
+            ProjectIssueDetailScreen(onNavigateBack = { navController.popBackStack() })
         }
 
         composable<AdminRoute> {
@@ -534,7 +575,7 @@ fun AppNavGraph(
         ) {
             ProjectHomeScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onNavigateToProjectChat = { project ->
+                onNavigateToProjectChat = { project, projectStartAction ->
                     navController.navigate(
                         AgentChatRoute(
                             agentId = project.lettaAgentId.orEmpty(),
@@ -545,6 +586,15 @@ fun AppNavGraph(
                             projectGitUrl = project.gitUrl,
                             projectLastSyncAt = project.lastSyncAt,
                             projectActiveCodingAgents = project.techStack,
+                            projectStartAction = projectStartAction,
+                        )
+                    )
+                },
+                onNavigateToProjectIssues = { project ->
+                    navController.navigate(
+                        ProjectIssuesRoute(
+                            projectId = project.identifier,
+                            projectName = project.name,
                         )
                     )
                 },
@@ -561,6 +611,7 @@ fun AppNavGraph(
             val route = backStackEntry.toRoute<AgentChatRoute>()
             CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
                 AgentScaffold(
+                    initialProjectStartAction = route.projectStartAction,
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToSettings = { agentId ->
                         navController.navigate(EditAgentRoute(agentId))

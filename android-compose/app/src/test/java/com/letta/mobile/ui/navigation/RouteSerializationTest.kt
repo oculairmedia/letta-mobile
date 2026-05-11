@@ -47,6 +47,22 @@ class RouteSerializationTest {
     fun `ProjectsRoute serializes and deserializes`() =
         verifyIdempotent(ProjectsRoute)
 
+    @Test
+    fun `ProjectIssuesRoute round-trips`() {
+        verifyRoundTrip(ProjectIssuesRoute(projectId = "letta-mobile", projectName = "Letta Mobile"))
+    }
+
+    @Test
+    fun `ProjectIssueDetailRoute round-trips`() {
+        verifyRoundTrip(
+            ProjectIssueDetailRoute(
+                projectId = "letta-mobile",
+                issueId = "letta-mobile-x8pm",
+                projectName = "Letta Mobile",
+            )
+        )
+    }
+
     // ── Data classes (parameterized routes) ──────────────────
 
     @Test
@@ -71,6 +87,7 @@ class RouteSerializationTest {
             projectGitUrl = "https://github.com/test/repo",
             projectLastSyncAt = "2024-01-01T00:00:00Z",
             projectActiveCodingAgents = "agent-a,agent-b",
+            projectStartAction = ProjectChatStartAction.BugReport,
         )
         verifyRoundTrip(route)
     }
