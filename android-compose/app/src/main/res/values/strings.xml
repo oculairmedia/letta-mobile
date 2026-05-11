@@ -105,6 +105,10 @@
     <string name="screen_projects_new_project_git_url_none">Not linked yet</string>
     <string name="screen_projects_missing_agent">%1$s doesn’t have a linked Letta agent yet.</string>
     <string name="screen_projects_open_chat_action">Open project chat</string>
+    <string name="screen_projects_open_issues_action">Open issue tracker</string>
+    <string name="screen_projects_active_agents_action">Active agents</string>
+    <string name="screen_projects_project_brief_action">Project brief</string>
+    <string name="screen_projects_actions_menu">Project actions</string>
     <string name="screen_projects_archive_action">Archive project</string>
     <string name="screen_projects_edit_pending">Editing %1$s isn’t wired yet.</string>
     <string name="screen_projects_archive_pending">Archiving %1$s isn’t wired yet.</string>
@@ -127,6 +131,27 @@
     <string name="screen_projects_last_activity_unknown">Last activity unavailable</string>
     <string name="screen_projects_last_activity">Updated %1$s</string>
     <string name="screen_projects_search_hint">Search projects…</string>
+
+    <string name="screen_project_issues_title">Issue tracker</string>
+    <string name="screen_project_issues_search_hint">Search issues…</string>
+    <string name="screen_project_issues_ready_section">Ready work</string>
+    <string name="screen_project_issues_all_section">All issues</string>
+    <string name="screen_project_issues_empty">No issues found for this project.</string>
+    <string name="screen_project_issues_empty_search">No issues matching “%1$s”</string>
+    <string name="screen_project_issues_filter_all">All</string>
+    <string name="screen_project_issues_ready_label">Ready</string>
+    <string name="screen_project_issues_blocked_label">Blocked</string>
+    <string name="screen_project_issue_detail_title">Issue detail</string>
+    <string name="screen_project_issue_claim_action">Claim issue</string>
+    <string name="screen_project_issue_unclaim_action">Clear assignee</string>
+    <string name="screen_project_issue_close_action">Close issue</string>
+    <string name="screen_project_issue_reopen_action">Reopen issue</string>
+    <string name="screen_project_issue_add_note_action">Add note</string>
+    <string name="screen_project_issue_note_label">Note</string>
+    <string name="screen_project_issue_acceptance_title">Acceptance criteria</string>
+    <string name="screen_project_issue_acceptance_summary">%1$d criteria</string>
+    <string name="screen_project_issue_blocked_by_summary">Blocked by %1$d issue(s)</string>
+    <string name="screen_project_issue_notes_title">Notes</string>
 
     <string name="screen_usage_title">Usage Analytics</string>
     <string name="screen_usage_total_tokens">Total Tokens</string>

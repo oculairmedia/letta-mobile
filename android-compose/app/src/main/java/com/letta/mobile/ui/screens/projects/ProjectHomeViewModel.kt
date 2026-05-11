@@ -185,9 +185,6 @@ class ProjectHomeViewModel @Inject constructor(
                 _uiState.value = UiState.Success(current.copy(isRefreshing = true))
             }
 
-            // The /api/registry/projects endpoint may not be available on all
-            // server deployments; degrade gracefully to an empty list so the
-            // home screen remains usable and navigation stays accessible.
             val refreshed = runCatching {
                 if (forceRefresh) {
                     projectRepository.refreshProjects()
@@ -197,11 +194,19 @@ class ProjectHomeViewModel @Inject constructor(
             }
 
             if (refreshed.isFailure) {
+                val error = refreshed.exceptionOrNull()
                 android.util.Log.w(
                     "ProjectHomeVM",
                     "Failed to load projects",
-                    refreshed.exceptionOrNull(),
+                    error,
                 )
+
+                if (current == null && projectRepository.projects.value.isEmpty()) {
+                    _uiState.value = UiState.Error(error?.message ?: "Failed to load projects")
+                    return@launch
+                }
+
+                _events.trySend(ProjectHomeUiEvent.ShowMessage(error?.message ?: "Failed to refresh projects"))
             }
 
             val projects = projectRepository.projects.value
@@ -605,7 +610,8 @@ class ProjectHomeViewModel @Inject constructor(
     }
 
     private fun projectLastActivity(project: ProjectSummary): String {
-        return project.updatedAt
+        return project.lastActivityAt
+            ?: project.updatedAt
             ?: project.lastSyncAt
             ?: project.lastCheckedAt
             ?: project.lastScanAt

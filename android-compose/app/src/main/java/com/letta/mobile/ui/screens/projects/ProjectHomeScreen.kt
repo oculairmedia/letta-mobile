@@ -70,6 +70,7 @@ import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.ShimmerBox
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.navigation.ProjectChatStartAction
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.isExpandedWidth
@@ -79,7 +80,8 @@ import com.letta.mobile.util.formatRelativeTime
 @Composable
 fun ProjectHomeScreen(
     onNavigateBack: (() -> Unit)?,
-    onNavigateToProjectChat: (project: ProjectSummary) -> Unit,
+    onNavigateToProjectChat: (project: ProjectSummary, projectStartAction: String?) -> Unit,
+    onNavigateToProjectIssues: (project: ProjectSummary) -> Unit,
     onNavigateToSettings: () -> Unit,
     activeBackendLabel: String? = null,
     onNavigateToBackendSwitcher: (() -> Unit)? = null,
@@ -250,7 +252,7 @@ fun ProjectHomeScreen(
                                         if (agentId.isNullOrBlank()) {
                                             snackbar.dispatch(missingAgentMessage.format(project.name))
                                         } else {
-                                            onNavigateToProjectChat(project)
+                                            onNavigateToProjectChat(project, null)
                                         }
                                     },
                                     onOpenActions = { viewModel.selectProject(project.identifier) },
@@ -588,17 +590,42 @@ fun ProjectHomeScreen(
                     title = selectedProject?.name,
                 ) {
                     val project = selectedProject ?: return@ActionSheet
+                    fun openProjectChat(projectStartAction: String?) {
+                        viewModel.selectProject(null)
+                        val agentId = project.lettaAgentId
+                        if (agentId.isNullOrBlank()) {
+                            snackbar.dispatch(missingAgentMessage.format(project.name))
+                        } else {
+                            onNavigateToProjectChat(project, projectStartAction)
+                        }
+                    }
+
+                    ActionSheetItem(
+                        text = stringResource(R.string.screen_projects_active_agents_action),
+                        icon = LettaIcons.People,
+                        onClick = { openProjectChat(ProjectChatStartAction.ActiveAgents) },
+                    )
+                    ActionSheetItem(
+                        text = stringResource(R.string.screen_projects_project_brief_action),
+                        icon = LettaIcons.FileOpen,
+                        onClick = { openProjectChat(ProjectChatStartAction.ProjectBrief) },
+                    )
+                    ActionSheetItem(
+                        text = stringResource(R.string.screen_project_bug_report_open),
+                        icon = LettaIcons.Error,
+                        onClick = { openProjectChat(ProjectChatStartAction.BugReport) },
+                    )
                     ActionSheetItem(
                         text = stringResource(R.string.screen_projects_open_chat_action),
                         icon = LettaIcons.Chat,
+                        onClick = { openProjectChat(null) },
+                    )
+                    ActionSheetItem(
+                        text = stringResource(R.string.screen_projects_open_issues_action),
+                        icon = LettaIcons.ListIcon,
                         onClick = {
                             viewModel.selectProject(null)
-                            val agentId = project.lettaAgentId
-                            if (agentId.isNullOrBlank()) {
-                                snackbar.dispatch(missingAgentMessage.format(project.name))
-                            } else {
-                                onNavigateToProjectChat(project)
-                            }
+                            onNavigateToProjectIssues(project)
                         },
                     )
                     ActionSheetItem(
@@ -704,7 +731,7 @@ private fun ProjectTile(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .height(182.dp)
+            .height(176.dp)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = {
@@ -744,41 +771,55 @@ private fun ProjectTile(
                     }
                 }
 
-                BadgedBox(
-                    badge = {
-                        val issueCount = project.beadsIssueCount ?: project.issueCount ?: 0
-                        if (issueCount > 0) {
-                            Badge {
-                                Text(issueCount.toString())
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    BadgedBox(
+                        badge = {
+                            val issueCount = project.beadsIssueCount ?: project.issueCount ?: 0
+                            if (issueCount > 0) {
+                                Badge {
+                                    Text(issueCount.toString())
+                                }
+                            }
+                        }
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp),
+                                ) {
+                                    Surface(
+                                        modifier = Modifier.fillMaxSize(),
+                                        shape = RoundedCornerShape(50),
+                                        color = statusColor,
+                                    ) {}
+                                }
+                                Text(
+                                    text = project.status?.replaceFirstChar { it.uppercase() } ?: stringResource(R.string.common_unknown),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
                         }
                     }
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    IconButton(
+                        onClick = onOpenActions,
+                        modifier = Modifier.size(36.dp),
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp),
-                            ) {
-                                Surface(
-                                    modifier = Modifier.fillMaxSize(),
-                                    shape = RoundedCornerShape(50),
-                                    color = statusColor,
-                                ) {}
-                            }
-                            Text(
-                                text = project.status?.replaceFirstChar { it.uppercase() } ?: stringResource(R.string.common_unknown),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                        Icon(
+                            imageVector = LettaIcons.Menu,
+                            contentDescription = stringResource(R.string.screen_projects_actions_menu),
+                        )
                     }
                 }
             }

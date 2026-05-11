@@ -82,6 +82,31 @@ class ProjectHomeViewModelTest {
     }
 
     @Test
+    fun `initial load failure shows error instead of empty projects`() = runTest {
+        fakeApi.shouldFail = true
+
+        val viewModel = ProjectHomeViewModel(repository)
+
+        val state = viewModel.uiState.value as UiState.Error
+        assertTrue(state.message.contains("Server error"))
+    }
+
+    @Test
+    fun `refresh failure keeps cached projects and emits message`() = runTest {
+        fakeApi.projects += project(identifier = "alpha", name = "Alpha")
+        val viewModel = ProjectHomeViewModel(repository)
+        fakeApi.shouldFail = true
+        val event = async { viewModel.events.first() }
+
+        viewModel.refresh()
+
+        val state = viewModel.uiState.value as UiState.Success
+        assertEquals(listOf("Alpha"), state.data.projects.map { it.name })
+        assertEquals(false, state.data.isRefreshing)
+        assertTrue((event.await() as ProjectHomeUiEvent.ShowMessage).message.contains("Server error"))
+    }
+
+    @Test
     fun `selectProject tracks current project from loaded state`() = runTest {
         fakeApi.projects += listOf(
             project(identifier = "alpha", name = "Alpha"),
@@ -736,16 +761,15 @@ class ProjectHomeViewModelTest {
     }
 
     @Test
-    fun `loadProjects degrades to empty success state on repository failure`() = runTest {
+    fun `loadProjects exposes error state on initial repository failure`() = runTest {
         fakeApi.shouldFail = true
 
         val viewModel = ProjectHomeViewModel(repository)
 
         val state = viewModel.uiState.value
-        assertTrue(state is UiState.Success)
-        val success = state as UiState.Success
-        assertTrue(success.data.projects.isEmpty())
-        assertEquals(false, success.data.isRefreshing)
+        assertTrue(state is UiState.Error)
+        val error = state as UiState.Error
+        assertTrue(error.message.contains("Server error"))
     }
 
     private fun project(
