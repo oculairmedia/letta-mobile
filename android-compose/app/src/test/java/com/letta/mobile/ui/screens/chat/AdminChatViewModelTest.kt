@@ -218,6 +218,8 @@ class AdminChatViewModelTest {
         every { settingsRepository.getChatBackgroundKey() } returns flowOf("default")
         every { settingsRepository.getChatFontScale() } returns flowOf(1f)
         every { settingsRepository.observeClientModeEnabled() } returns clientModeEnabledFlow
+        every { settingsRepository.favoriteAgentId } returns MutableStateFlow<String?>(null)
+        every { settingsRepository.getPinnedAgentIds() } returns MutableStateFlow<Set<String>>(emptySet())
         every {
             clientModeChatSender.streamMessage(any(), any(), any())
         } returns flow { }

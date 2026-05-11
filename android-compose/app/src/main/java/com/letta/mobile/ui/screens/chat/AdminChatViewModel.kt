@@ -143,11 +143,25 @@ class AdminChatViewModel @Inject constructor(
     val availableAgents: StateFlow<List<Agent>> = agentRepository.agents
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val favoriteAgentId: StateFlow<String?> = settingsRepository.favoriteAgentId
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), settingsRepository.favoriteAgentId.value)
+
+    val pinnedAgentIds: StateFlow<Set<String>> = settingsRepository.getPinnedAgentIds()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
     fun refreshAvailableAgents() {
         viewModelScope.launch {
             runCatching { agentRepository.refreshAgentsIfStale(maxAgeMs = 60_000) }
         }
     }
+
+    fun toggleAgentPinned(agentId: String) {
+        viewModelScope.launch {
+            settingsRepository.setAgentPinned(agentId, agentId !in pinnedAgentIds.value)
+        }
+    }
+
+    fun toggleCurrentAgentPinned() = toggleAgentPinned(agentId)
 
     fun updateChatSearchQuery(query: String) = chatSearchCoordinator.updateQuery(query)
 
@@ -314,6 +328,29 @@ class AdminChatViewModel @Inject constructor(
         }
     }
 
+    private fun observeLastChatSelection() {
+        settingsRepository.setLastChatSelection(
+            agentId = agentId,
+            agentName = initialAgentName,
+            conversationId = conversationId,
+        )
+        viewModelScope.launch {
+            uiState
+                .map { state ->
+                    val readyConversationId = (state.conversationState as? ConversationState.Ready)?.conversationId
+                    state.agentName.takeIf { it.isNotBlank() } to readyConversationId
+                }
+                .distinctUntilChanged()
+                .collect { (resolvedAgentName, resolvedConversationId) ->
+                    settingsRepository.setLastChatSelection(
+                        agentId = agentId,
+                        agentName = resolvedAgentName,
+                        conversationId = resolvedConversationId,
+                    )
+                }
+        }
+    }
+
     init {
         // letta-mobile-w2hx.6: route arg already pre-populated `activeConversationId`
         // at field init; no shared singleton to seed.
@@ -324,6 +361,7 @@ class AdminChatViewModel @Inject constructor(
         if (agentId.isBlank()) {
             _uiState.value = _uiState.value.copy(error = "No agent selected")
         } else {
+            observeLastChatSelection()
             seedAgentNameFromMemoryCache()
             observeAgentNameCache()
             runExpansionState.hydrateUiState()

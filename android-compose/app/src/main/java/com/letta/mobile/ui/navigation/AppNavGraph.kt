@@ -112,6 +112,9 @@ class NavViewModel @Inject constructor(
 ) : ViewModel() {
     val hasConfig = settingsRepository.activeConfig.map { it != null }
     val activeConfig = settingsRepository.activeConfig
+    val favoriteAgentId = settingsRepository.favoriteAgentId
+    val adminAgentId = settingsRepository.adminAgentId
+    val lastChatSelection = settingsRepository.lastChatSelection
 
     fun clearAllData() {
         ChatPushAlarmScheduler.cancel(appContext)
@@ -132,11 +135,24 @@ fun AppNavGraph(
     val navViewModel: NavViewModel = hiltViewModel()
     val hasConfig by navViewModel.hasConfig.collectAsState(initial = true)
     val activeConfig by navViewModel.activeConfig.collectAsState(initial = null)
+    val favoriteAgentId by navViewModel.favoriteAgentId.collectAsState()
+    val adminAgentId by navViewModel.adminAgentId.collectAsState()
+    val lastChatSelection by navViewModel.lastChatSelection.collectAsState()
     val activeBackendLabel = activeConfig.toBackendLabel()
 
     val initialNotificationTarget = remember { notificationTarget }
+    val restoredChatSelection = lastChatSelection
+    val fallbackAgentId = favoriteAgentId ?: adminAgentId
     val startDestination: Any = when {
         hasConfig && initialNotificationTarget != null -> initialNotificationTarget.toRoute()
+        hasConfig && restoredChatSelection != null -> restoredChatSelection.let { selection ->
+            AgentChatRoute(
+                agentId = selection.agentId,
+                agentName = selection.agentName,
+                conversationId = selection.conversationId,
+            )
+        }
+        hasConfig && fallbackAgentId != null -> AgentChatRoute(agentId = fallbackAgentId)
         hasConfig -> HomeRoute
         else -> ConfigRoute
     }
