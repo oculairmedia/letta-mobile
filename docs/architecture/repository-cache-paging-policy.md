@@ -55,6 +55,7 @@ Acceptable exceptions must be documented at the call site and fit one of these c
 
 - API contract is known to return a tiny bounded set, and no paging params exist.
 - Detail screen requests a deliberately bounded first page with clear truncation/"load more" affordance.
+- A documented defensive fallback is required because a server ignores or repeats a page cursor/offset; the code must detect no-progress pagination, log the fallback, and cover it with a named regression test.
 - Test fixture or migration utility code that is not production startup/UI behavior.
 
 Useful local audit command:
