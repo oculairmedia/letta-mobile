@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.projects
 
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -200,6 +201,14 @@ class ProjectIssuesViewModel @Inject constructor(
                 _uiState.value = UiState.Success(current.copy(isRefreshing = true))
             }
 
+            val analyticsParams = defaultIssueAnalyticsParams()
+            Log.i(
+                TAG,
+                "Load issues project=${route.projectId} forceRefresh=$forceRefresh " +
+                    "rangeStart=${analyticsParams.rangeStart} rangeEnd=${analyticsParams.rangeEnd} " +
+                    "timezone=${analyticsParams.timezone} timelineLimit=${analyticsParams.timelineLimit}",
+            )
+
             val (readyResult, issuesResult, analyticsResult) = supervisorScope {
                 val readyDeferred = async {
                     projectWorkRepository.refreshReadyWork(route.projectId, limit = ISSUE_PAGE_SIZE)
@@ -213,7 +222,7 @@ class ProjectIssuesViewModel @Inject constructor(
                 val analyticsDeferred = async {
                     projectWorkRepository.refreshIssueAnalytics(
                         projectId = route.projectId,
-                        params = defaultIssueAnalyticsParams(),
+                        params = analyticsParams,
                     )
                 }
                 Triple(
@@ -227,10 +236,40 @@ class ProjectIssuesViewModel @Inject constructor(
                 val issues = issuePage.items
                 val ready = readyResult.getOrElse { emptyList() }
                 val analyticsError = analyticsResult.exceptionOrNull()
+                val analyticsResponse = analyticsResult.getOrNull()
+                if (analyticsResponse == null) {
+                    Log.w(
+                        TAG,
+                        "Analytics unavailable; using client fallback project=${route.projectId} " +
+                            "issues=${issues.size} error=${analyticsError?.message}",
+                        analyticsError,
+                    )
+                } else {
+                    Log.i(
+                        TAG,
+                        "Analytics raw project=${route.projectId} createdBuckets=${analyticsResponse.createdBuckets.size} " +
+                            "createdTotal=${analyticsResponse.createdBuckets.sumOf { it.createdCount }} " +
+                            "completedBuckets=${analyticsResponse.completedBuckets.size} " +
+                            "completedTotal=${analyticsResponse.completedBuckets.sumOf { it.completedCount }} " +
+                            "timeline=${analyticsResponse.completedTimeline.size} " +
+                            "summaryCreated=${analyticsResponse.summary.totalCreatedInRange} " +
+                            "summaryCompleted=${analyticsResponse.summary.totalCompletedInRange} " +
+                            "source=${analyticsResponse.completionSource} partial=${analyticsResponse.isPartial} " +
+                            "hasMore=${analyticsResponse.timelinePage.hasMore}",
+                    )
+                }
                 val analytics = withContext(Dispatchers.Default) {
-                    analyticsResult.getOrNull()?.toProjectIssueAnalytics()
+                    analyticsResponse?.toProjectIssueAnalytics()
                         ?: buildFallbackProjectIssueAnalytics(issues)
                 }
+                Log.i(
+                    TAG,
+                    "Analytics UI project=${route.projectId} issues=${issues.size} ready=${ready.size} " +
+                        "buckets=${analytics.creationBuckets.size} createdChartTotal=${analytics.creationBuckets.sumOf { it.count }} " +
+                        "completedBucketTotal=${analytics.creationBuckets.sumOf { it.completedCount }} " +
+                        "timeline=${analytics.completedTimeline.size} summary=${analytics.summary.analyticsSummaryLog()} " +
+                        "source=${analytics.completionSource} partial=${analytics.isPartial} hasMore=${analytics.timelineHasMore}",
+                )
                 _uiState.value = UiState.Success(
                     ProjectIssuesUiState(
                         projectId = route.projectId,
@@ -511,3 +550,9 @@ private fun String.toIssueInstantOrNull(zoneId: ZoneId): Instant? =
         ?: runCatching { OffsetDateTime.parse(this).toInstant() }.getOrNull()
         ?: runCatching { LocalDateTime.parse(this).atZone(zoneId).toInstant() }.getOrNull()
         ?: runCatching { LocalDate.parse(this).atStartOfDay(zoneId).toInstant() }.getOrNull()
+
+private fun IssueAnalyticsSummaryUi?.analyticsSummaryLog(): String =
+    this?.let { "created=${it.totalCreatedInRange},completed=${it.totalCompletedInRange},open=${it.openCount},ready=${it.readyCount}" }
+        ?: "none"
+
+private const val TAG = "ProjectIssuesVM"

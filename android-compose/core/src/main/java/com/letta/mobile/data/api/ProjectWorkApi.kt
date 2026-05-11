@@ -1,5 +1,6 @@
 package com.letta.mobile.data.api
 
+import android.util.Log
 import com.letta.mobile.data.model.IssueAnalyticsResponse
 import com.letta.mobile.data.model.ProjectIssueAnalyticsParams
 import com.letta.mobile.data.model.ProjectIssueConflictResponse
@@ -94,20 +95,41 @@ open class ProjectWorkApi @Inject constructor(
         projectId: String,
         params: ProjectIssueAnalyticsParams,
     ): IssueAnalyticsResponse {
-        val response = client().get("${baseUrl()}/api/projects/$projectId/issue-analytics") {
-            optionalParameter("rangeStart", params.rangeStart)
-            optionalParameter("rangeEnd", params.rangeEnd)
-            optionalParameter("granularity", params.granularity)
-            optionalParameter("timezone", params.timezone)
-            optionalParameter("statusFilter", params.statusFilter)
-            optionalParameter("typeFilter", params.typeFilter)
-            optionalParameter("priorityFilter", params.priorityFilter)
-            optionalParameter("assigneeFilter", params.assigneeFilter)
-            optionalParameter("labelFilter", params.labelFilter)
-            optionalParameter("cursor", params.cursor)
-            optionalParameter("timelineLimit", params.timelineLimit)
+        Log.i(
+            TAG,
+            "Request issue analytics project=$projectId rangeStart=${params.rangeStart} " +
+                "rangeEnd=${params.rangeEnd} granularity=${params.granularity} timezone=${params.timezone} " +
+                "timelineLimit=${params.timelineLimit} filters=${params.analyticsFilterLogSummary()}",
+        )
+        return try {
+            val response = client().get("${baseUrl()}/api/projects/$projectId/issue-analytics") {
+                optionalParameter("rangeStart", params.rangeStart)
+                optionalParameter("rangeEnd", params.rangeEnd)
+                optionalParameter("granularity", params.granularity)
+                optionalParameter("timezone", params.timezone)
+                optionalParameter("statusFilter", params.statusFilter)
+                optionalParameter("typeFilter", params.typeFilter)
+                optionalParameter("priorityFilter", params.priorityFilter)
+                optionalParameter("assigneeFilter", params.assigneeFilter)
+                optionalParameter("labelFilter", params.labelFilter)
+                optionalParameter("cursor", params.cursor)
+                optionalParameter("timelineLimit", params.timelineLimit)
+            }
+            val analytics = response.bodyOrThrow<IssueAnalyticsResponse>()
+            Log.i(
+                TAG,
+                "Issue analytics response project=$projectId status=${response.status.value} " +
+                    "createdBuckets=${analytics.createdBuckets.size} createdTotal=${analytics.createdBuckets.sumOf { it.createdCount }} " +
+                    "completedBuckets=${analytics.completedBuckets.size} completedTotal=${analytics.completedBuckets.sumOf { it.completedCount }} " +
+                    "timeline=${analytics.completedTimeline.size} summaryCreated=${analytics.summary.totalCreatedInRange} " +
+                    "summaryCompleted=${analytics.summary.totalCompletedInRange} hasMore=${analytics.timelinePage.hasMore} " +
+                    "source=${analytics.completionSource} partial=${analytics.isPartial}",
+            )
+            analytics
+        } catch (error: Exception) {
+            Log.e(TAG, "Issue analytics request failed project=$projectId", error)
+            throw error
         }
-        return response.bodyOrThrow()
     }
 
     open suspend fun getIssue(issueId: String): ProjectIssueDetailResponse {
@@ -211,6 +233,19 @@ open class ProjectWorkApi @Inject constructor(
             throw ApiException(status.value, bodyAsText())
         }
         return body()
+    }
+
+    private fun ProjectIssueAnalyticsParams.analyticsFilterLogSummary(): String = listOfNotNull(
+        statusFilter?.let { "status" },
+        typeFilter?.let { "type" },
+        priorityFilter?.let { "priority" },
+        assigneeFilter?.let { "assignee" },
+        labelFilter?.let { "label" },
+        cursor?.let { "cursor" },
+    ).ifEmpty { listOf("none") }.joinToString(",")
+
+    private companion object {
+        const val TAG = "ProjectWorkApi"
     }
 }
 
