@@ -30,6 +30,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -111,6 +112,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.navigation.ProjectChatStartAction
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.listItemHeadline
@@ -136,6 +138,7 @@ object AgentScaffoldTestTags {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AgentScaffold(
+    initialProjectStartAction: String? = null,
     onNavigateBack: () -> Unit,
     onNavigateToSettings: (String) -> Unit,
     onNavigateToArchival: ((String) -> Unit)? = null,
@@ -147,7 +150,7 @@ fun AgentScaffold(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var showBugReportSheet by remember { mutableStateOf(false) }
+    var showBugReportSheet by rememberSaveable { mutableStateOf(initialProjectStartAction == ProjectChatStartAction.BugReport) }
     var showAgentSwitcher by remember { mutableStateOf(false) }
     var isChatSearchExpanded by rememberSaveable { mutableStateOf(false) }
     val chatSearchFocusRequester = remember { FocusRequester() }
@@ -163,6 +166,7 @@ fun AgentScaffold(
     val agentId = viewModel.agentId
     val conversationId = viewModel.conversationId
     val projectContext = viewModel.projectContext
+    var isProjectInfoExpanded by rememberSaveable(projectContext?.identifier) { mutableStateOf(false) }
     val screenTitle = projectContext?.name ?: agentName.ifBlank { stringResource(R.string.screen_chat_title) }
     val switchableAgents = remember(availableAgents, agentId, agentName) {
         if (availableAgents.any { it.id == agentId }) {
@@ -352,22 +356,18 @@ fun AgentScaffold(
                     .fillMaxSize(),
             ) {
                 projectContext?.let { project ->
-                    ProjectContextCard(project = project, modifier = Modifier.testTag(AgentScaffoldTestTags.PROJECT_CONTEXT_CARD))
-                    ProjectAgentsCard(
-                        state = uiState.projectAgents,
-                        onRetry = viewModel::loadProjectAgents,
-                        modifier = Modifier.testTag(AgentScaffoldTestTags.PROJECT_AGENTS_CARD),
-                    )
-                    ProjectBriefCard(
+                    ProjectInfoTray(
+                        project = project,
+                        agentsState = uiState.projectAgents,
                         brief = uiState.projectBrief,
-                        onRetry = viewModel::loadProjectBrief,
-                        onSaveSection = viewModel::saveProjectBriefSection,
-                        modifier = Modifier.testTag(AgentScaffoldTestTags.PROJECT_BRIEF_CARD),
-                    )
-                    ProjectBugReportSummaryCard(
-                        state = uiState.bugReports,
-                        onCreateReport = { showBugReportSheet = true },
-                        modifier = Modifier.testTag(AgentScaffoldTestTags.PROJECT_BUG_SUMMARY_CARD),
+                        bugReports = uiState.bugReports,
+                        expanded = isProjectInfoExpanded,
+                        onExpandedChange = { isProjectInfoExpanded = it },
+                        onRetryAgents = viewModel::loadProjectAgents,
+                        onRetryBrief = viewModel::loadProjectBrief,
+                        onSaveBriefSection = viewModel::saveProjectBriefSection,
+                        onCreateBugReport = { showBugReportSheet = true },
+                        modifier = Modifier.testTag(AgentScaffoldTestTags.PROJECT_CONTEXT_CARD),
                     )
                 }
                 if (uiState.isSearchActive) {
@@ -573,10 +573,10 @@ internal fun ProjectAgentsCard(
     modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = LettaCardDefaults.listCardColors(),
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -716,9 +716,7 @@ internal fun ProjectBugReportSummaryCard(
     modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
         ),
@@ -953,10 +951,10 @@ internal fun ProjectBriefCard(
     var expanded by rememberSaveable { mutableStateOf(true) }
 
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = LettaCardDefaults.listCardColors(),
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ),
     ) {
         Accordions(
             title = stringResource(R.string.screen_project_brief_title),
@@ -1111,65 +1109,37 @@ private fun minLinesFor(key: ProjectBriefSectionKey): Int = when (key) {
 
 @androidx.annotation.VisibleForTesting
 @Composable
-internal fun ProjectContextCard(
+internal fun ProjectInfoTray(
     project: ProjectChatContext,
+    agentsState: ProjectAgentsUiState,
+    brief: ProjectBriefUiState,
+    bugReports: ProjectBugReportUiState,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onRetryAgents: () -> Unit,
+    onRetryBrief: () -> Unit,
+    onSaveBriefSection: (ProjectBriefSectionKey, String) -> Unit,
+    onCreateBugReport: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var expanded by rememberSaveable(project.identifier) { mutableStateOf(false) }
-
     Card(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { expanded = !expanded }
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = project.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = project.identifier,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-
-                AssistChip(
-                    onClick = { expanded = !expanded },
-                    label = {
-                        Text(
-                            text = if (expanded) stringResource(R.string.common_hide) else stringResource(R.string.common_details),
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (expanded) LettaIcons.ExpandLess else LettaIcons.ExpandMore,
-                            contentDescription = null,
-                            modifier = Modifier.size(LettaIconSizing.Inline),
-                        )
-                    },
-                )
-            }
+            ProjectContextCard(
+                project = project,
+                expanded = expanded,
+                onExpandedChange = onExpandedChange,
+                modifier = Modifier.testTag(AgentScaffoldTestTags.PROJECT_CONTEXT_CARD),
+            )
 
             AnimatedVisibility(
                 visible = expanded,
@@ -1177,23 +1147,102 @@ internal fun ProjectContextCard(
                 exit = ChatMotion.expandExit(),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ProjectInfoLine(
-                        label = stringResource(R.string.screen_project_chat_path_label),
-                        value = project.filesystemPath,
+                    ProjectAgentsCard(
+                        state = agentsState,
+                        onRetry = onRetryAgents,
+                        modifier = Modifier.testTag(AgentScaffoldTestTags.PROJECT_AGENTS_CARD),
                     )
-                    ProjectInfoLine(
-                        label = stringResource(R.string.screen_project_chat_git_url_label),
-                        value = project.gitUrl,
+                    ProjectBriefCard(
+                        brief = brief,
+                        onRetry = onRetryBrief,
+                        onSaveSection = onSaveBriefSection,
+                        modifier = Modifier.testTag(AgentScaffoldTestTags.PROJECT_BRIEF_CARD),
                     )
-                    ProjectInfoLine(
-                        label = stringResource(R.string.screen_project_chat_active_agents_label),
-                        value = project.activeCodingAgents,
-                    )
-                    ProjectInfoLine(
-                        label = stringResource(R.string.screen_project_chat_last_sync_label),
-                        value = project.lastSyncAt?.let(::formatRelativeTime),
+                    ProjectBugReportSummaryCard(
+                        state = bugReports,
+                        onCreateReport = onCreateBugReport,
+                        modifier = Modifier.testTag(AgentScaffoldTestTags.PROJECT_BUG_SUMMARY_CARD),
                     )
                 }
+            }
+        }
+    }
+}
+
+@androidx.annotation.VisibleForTesting
+@Composable
+internal fun ProjectContextCard(
+    project: ProjectChatContext,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { onExpandedChange(!expanded) }
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = project.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = project.identifier,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            FilledTonalButton(
+                onClick = { onExpandedChange(!expanded) },
+            ) {
+                Icon(
+                    imageVector = if (expanded) LettaIcons.ExpandLess else LettaIcons.ExpandMore,
+                    contentDescription = null,
+                    modifier = Modifier.size(LettaIconSizing.Inline),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (expanded) stringResource(R.string.common_hide) else stringResource(R.string.common_details),
+                )
+            }
+        }
+
+        AnimatedVisibility(
+            visible = expanded,
+            enter = ChatMotion.expandEnter(),
+            exit = ChatMotion.expandExit(),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ProjectInfoLine(
+                    label = stringResource(R.string.screen_project_chat_path_label),
+                    value = project.filesystemPath,
+                )
+                ProjectInfoLine(
+                    label = stringResource(R.string.screen_project_chat_git_url_label),
+                    value = project.gitUrl,
+                )
+                ProjectInfoLine(
+                    label = stringResource(R.string.screen_project_chat_active_agents_label),
+                    value = project.activeCodingAgents,
+                )
+                ProjectInfoLine(
+                    label = stringResource(R.string.screen_project_chat_last_sync_label),
+                    value = project.lastSyncAt?.let(::formatRelativeTime),
+                )
             }
         }
     }
@@ -1213,12 +1262,12 @@ private fun ProjectInfoLine(
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
             text = value ?: stringResource(R.string.common_unknown),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onTertiaryContainer,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
         )
     }
