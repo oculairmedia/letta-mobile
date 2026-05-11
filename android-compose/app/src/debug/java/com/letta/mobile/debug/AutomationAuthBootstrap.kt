@@ -14,19 +14,23 @@ object AutomationAuthBootstrap {
     private const val TAG = "AutomationAuth"
     const val PREFS_NAME = "letta_automation"
     const val KEY_PAYLOAD_BASE64 = "config_payload_base64"
+    const val EXTRA_PAYLOAD_BASE64 = "com.letta.mobile.extra.AUTOMATION_CONFIG_PAYLOAD_BASE64"
     private const val DEFAULT_CONFIG_ID = "automation-auth"
 
     private val json = Json { ignoreUnknownKeys = true }
 
     fun importPendingConfig(context: Context, settingsRepository: SettingsRepository) {
-        importPendingConfig(context) { config ->
-            settingsRepository.saveConfig(config)
-        }
+        importPendingConfig(
+            context = context,
+            saveConfig = { config -> settingsRepository.saveConfig(config) },
+            saveClientModeSettings = { settings -> settings.applyTo(settingsRepository) },
+        )
     }
 
     internal fun importPendingConfig(
         context: Context,
         saveConfig: suspend (LettaConfig) -> Unit,
+        saveClientModeSettings: suspend (AutomationClientModeSettings) -> Unit = {},
     ) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val encodedPayload = prefs.getString(KEY_PAYLOAD_BASE64, null)?.trim().orEmpty()
@@ -38,6 +42,9 @@ object AutomationAuthBootstrap {
             val payload = decodePayload(encodedPayload)
             runBlocking {
                 saveConfig(payload.toLettaConfig())
+                payload.toClientModeSettings()?.let { settings ->
+                    saveClientModeSettings(settings)
+                }
             }
             Log.i(TAG, "Imported automation credentials for ${payload.serverUrl}")
         }.onFailure { error ->
@@ -59,6 +66,9 @@ object AutomationAuthBootstrap {
         val accessToken: String,
         val configId: String = DEFAULT_CONFIG_ID,
         val mode: String? = null,
+        val clientModeEnabled: Boolean? = null,
+        val clientModeBaseUrl: String? = null,
+        val clientModeApiKey: String? = null,
     ) {
         fun normalized(): AutomationAuthPayload {
             val normalizedUrl = serverUrl.trim()
@@ -94,6 +104,35 @@ object AutomationAuthBootstrap {
                 serverUrl = serverUrl,
                 accessToken = accessToken,
             )
+        }
+
+        fun toClientModeSettings(): AutomationClientModeSettings? {
+            val enabled = clientModeEnabled
+            val baseUrl = clientModeBaseUrl?.trim()?.removeSuffix("/")
+            val apiKey = clientModeApiKey?.trim()?.takeIf { it.isNotBlank() }
+            if (enabled == null && baseUrl.isNullOrBlank() && apiKey == null) {
+                return null
+            }
+            require(enabled != true || !baseUrl.isNullOrBlank()) {
+                "clientModeBaseUrl is required when clientModeEnabled is true"
+            }
+            return AutomationClientModeSettings(
+                enabled = enabled ?: false,
+                baseUrl = baseUrl.orEmpty(),
+                apiKey = apiKey,
+            )
+        }
+    }
+
+    internal data class AutomationClientModeSettings(
+        val enabled: Boolean,
+        val baseUrl: String,
+        val apiKey: String?,
+    ) {
+        suspend fun applyTo(settingsRepository: SettingsRepository) {
+            settingsRepository.setClientModeEnabled(enabled)
+            settingsRepository.setClientModeBaseUrl(baseUrl)
+            settingsRepository.setClientModeApiKey(apiKey)
         }
     }
 }

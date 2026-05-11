@@ -26,6 +26,7 @@ class AutomationAuthBootstrapTest {
     private lateinit var stagingPrefs: android.content.SharedPreferences
     private val savedConfigs = mutableListOf<LettaConfig>()
     private var activeConfig: LettaConfig? = null
+    private var clientModeSettings: AutomationAuthBootstrap.AutomationClientModeSettings? = null
 
     @Before
     fun setUp() {
@@ -34,6 +35,7 @@ class AutomationAuthBootstrapTest {
         stagingPrefs.edit().clear().commit()
         savedConfigs.clear()
         activeConfig = null
+        clientModeSettings = null
     }
 
     @After
@@ -81,6 +83,32 @@ class AutomationAuthBootstrapTest {
         assertEquals("https://demo.letta.internal", activeConfig?.serverUrl)
         assertEquals("fresh-token", activeConfig?.accessToken)
         assertTrue(savedConfigs.any { it.id == "automation-auth" })
+    }
+
+    @Test
+    fun importPendingConfig_promotesClientModeSettingsWhenPresent() = runBlocking {
+        stagePayload(
+            """
+            {
+              "serverUrl":"https://demo.letta.internal",
+              "accessToken":"test-token",
+              "clientModeEnabled":true,
+              "clientModeBaseUrl":" ws://192.168.50.90:8407/api/v1/agent-gateway/ ",
+              "clientModeApiKey":" gateway-token "
+            }
+            """.trimIndent(),
+        )
+
+        AutomationAuthBootstrap.importPendingConfig(
+            context = context,
+            saveConfig = ::recordConfig,
+            saveClientModeSettings = { settings -> clientModeSettings = settings },
+        )
+
+        assertEquals(true, clientModeSettings?.enabled)
+        assertEquals("ws://192.168.50.90:8407/api/v1/agent-gateway", clientModeSettings?.baseUrl)
+        assertEquals("gateway-token", clientModeSettings?.apiKey)
+        assertNull(stagingPrefs.getString(AutomationAuthBootstrap.KEY_PAYLOAD_BASE64, null))
     }
 
     @Test
