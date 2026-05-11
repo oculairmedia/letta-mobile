@@ -2,19 +2,22 @@ package com.letta.mobile.ui.screens.projects
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -59,6 +62,21 @@ import com.letta.mobile.ui.components.TextInputDialog
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.util.formatRelativeTime
+import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
+import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
+import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
+import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModelProducer
+import com.patrykandpatrick.vico.compose.cartesian.data.columnSeries
+import com.patrykandpatrick.vico.compose.cartesian.layer.ColumnCartesianLayer
+import com.patrykandpatrick.vico.compose.cartesian.layer.rememberColumnCartesianLayer
+import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
+import com.patrykandpatrick.vico.compose.common.Fill
+import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
+import com.pushpal.jetlime.EventPointType
+import com.pushpal.jetlime.ItemsList
+import com.pushpal.jetlime.JetLimeColumn
+import com.pushpal.jetlime.JetLimeEvent
+import com.pushpal.jetlime.JetLimeEventDefaults
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -153,6 +171,15 @@ fun ProjectIssuesScreen(
                             IssueFilterRow(
                                 selectedStatus = state.data.selectedStatus,
                                 onStatusSelected = viewModel::selectStatus,
+                            )
+                        }
+                        item {
+                            ProjectIssueCreationChartCard(buckets = state.data.creationBuckets)
+                        }
+                        item {
+                            ProjectIssueCompletedTimelineCard(
+                                items = state.data.completedTimeline,
+                                onIssueClick = onNavigateToIssue,
                             )
                         }
                         if (state.data.readyWork.isNotEmpty()) {
@@ -347,6 +374,184 @@ private fun IssueFilterRow(
                 onClick = { onStatusSelected(status) },
                 label = { Text(status?.toIssueLabel() ?: stringResource(R.string.screen_project_issues_filter_all)) },
             )
+        }
+    }
+}
+
+@Composable
+private fun ProjectIssueCreationChartCard(
+    buckets: List<ProjectIssueCreationBucket>,
+    modifier: Modifier = Modifier,
+) {
+    val values = remember(buckets) { buckets.map { it.count } }
+    val labels = remember(buckets) { buckets.map { it.label } }
+    val labelStride = remember(labels) { (labels.size / 6).coerceAtLeast(1) }
+    val barColor = MaterialTheme.colorScheme.primary
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.screen_project_issues_created_chart_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+
+            if (values.isEmpty() || values.all { it == 0 }) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(R.string.screen_project_issues_created_chart_empty),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                val modelProducer = remember { CartesianChartModelProducer() }
+
+                LaunchedEffect(values) {
+                    modelProducer.runTransaction {
+                        columnSeries { series(values) }
+                    }
+                }
+
+                CartesianChartHost(
+                    chart = rememberCartesianChart(
+                        rememberColumnCartesianLayer(
+                            ColumnCartesianLayer.ColumnProvider.series(
+                                rememberLineComponent(fill = Fill(barColor)),
+                            ),
+                        ),
+                        startAxis = VerticalAxis.rememberStart(),
+                        bottomAxis = HorizontalAxis.rememberBottom(
+                            valueFormatter = { _, value, _ ->
+                                val index = value.toInt()
+                                when {
+                                    index == labels.lastIndex -> labels[index]
+                                    index % labelStride == 0 -> labels.getOrNull(index).orEmpty()
+                                    else -> ""
+                                }
+                            },
+                        ),
+                    ),
+                    modelProducer = modelProducer,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProjectIssueCompletedTimelineCard(
+    items: List<ProjectIssueTimelineItem>,
+    onIssueClick: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        color = LettaCardDefaults.listContainerColor,
+        tonalElevation = 2.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.screen_project_issues_completed_timeline_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+
+            if (items.isEmpty()) {
+                EmptyState(
+                    icon = LettaIcons.CheckCircle,
+                    message = stringResource(R.string.screen_project_issues_completed_timeline_empty),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                val timelineHeight = ((items.size.coerceAtMost(4) * 96) + 24).dp
+                val pointFillColor = MaterialTheme.colorScheme.tertiary
+                val pointColor = MaterialTheme.colorScheme.tertiaryContainer
+                val pointStrokeColor = MaterialTheme.colorScheme.onTertiaryContainer
+
+                JetLimeColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(timelineHeight),
+                    itemsList = ItemsList(items),
+                    key = { _, item -> item.id },
+                ) { _, item, position ->
+                    JetLimeEvent(
+                        style = JetLimeEventDefaults.eventStyle(
+                            position = position,
+                            pointColor = pointColor,
+                            pointFillColor = pointFillColor,
+                            pointRadius = 10.dp,
+                            pointStrokeColor = pointStrokeColor,
+                            pointStrokeWidth = 1.dp,
+                            pointType = EventPointType.filled(1f),
+                        ),
+                    ) {
+                        ProjectIssueTimelineEvent(
+                            item = item,
+                            onClick = { onIssueClick(item.id) },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProjectIssueTimelineEvent(
+    item: ProjectIssueTimelineItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        tonalElevation = 1.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.screen_project_issues_completed_at, formatRelativeTime(item.completedAt)),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.tertiary,
+            )
+            Text(
+                text = item.title,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                IssueMetaChip(item.id)
+                IssueMetaChip(item.statusLabel)
+                item.priority?.let { IssueMetaChip(it.uppercase()) }
+                item.type?.let { IssueMetaChip(it) }
+            }
         }
     }
 }

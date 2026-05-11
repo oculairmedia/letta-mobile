@@ -141,6 +141,11 @@
     <string name="screen_project_issues_filter_all">All</string>
     <string name="screen_project_issues_ready_label">Ready</string>
     <string name="screen_project_issues_blocked_label">Blocked</string>
+    <string name="screen_project_issues_created_chart_title">Issue creation volume</string>
+    <string name="screen_project_issues_created_chart_empty">No issue creation dates available yet.</string>
+    <string name="screen_project_issues_completed_timeline_title">Completed issue timeline</string>
+    <string name="screen_project_issues_completed_timeline_empty">No completed issues yet.</string>
+    <string name="screen_project_issues_completed_at">Completed %1$s</string>
     <string name="screen_project_issue_detail_title">Issue detail</string>
     <string name="screen_project_issue_claim_action">Claim issue</string>
     <string name="screen_project_issue_unclaim_action">Clear assignee</string>

@@ -314,6 +314,9 @@ dependencies {
     // Vico charts
     implementation("com.patrykandpatrick.vico:compose-m3:3.1.0")
 
+    // Timeline visualization
+    implementation("io.github.pushpalroy:jetlime:4.3.0")
+
     // Paging 3
     implementation("androidx.paging:paging-runtime-ktx:3.4.2")
     implementation("androidx.paging:paging-compose:3.4.2")
