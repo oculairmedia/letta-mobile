@@ -72,6 +72,11 @@ class BotGateway @Inject constructor(
             _status.value = GatewayStatus.STOPPING
             _sessions.value.values.forEach { session ->
                 try {
+                    session.abortStream()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error aborting active stream for session ${session.configId}", e)
+                }
+                try {
                     session.stop()
                 } catch (e: Exception) {
                     Log.w(TAG, "Error stopping session ${session.configId}", e)

@@ -369,6 +369,7 @@ enum class ConnectionState {
     READY,
     PROCESSING,
     RECONNECTING,
+    ERROR,
 }
 
 enum class BotGatewayErrorCode {

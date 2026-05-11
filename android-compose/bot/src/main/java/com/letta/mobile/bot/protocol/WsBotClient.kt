@@ -63,6 +63,8 @@ class WsBotClient(
     // dedup-by-id renderer can show running indicators incrementally.
     progressiveToolCalls: Boolean = false,
     private val streamReceiveTimeoutMs: Long = DEFAULT_STREAM_RECEIVE_TIMEOUT_MS,
+    private val reconnectDelaysMs: List<Long> = DEFAULT_RECONNECT_DELAYS_MS,
+    private val maxReconnectAttempts: Int = DEFAULT_MAX_RECONNECT_ATTEMPTS,
 ) : BotClient, GatewayReadyClient, AutoCloseable {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -310,6 +312,7 @@ class WsBotClient(
                                 is WsErrorMessage -> {
                                     val errorCode = message.code.toGatewayErrorCode()
                                     if (errorCode == BotGatewayErrorCode.NO_SESSION && sessionRetries < maxSessionRetries) {
+                                        val requestedConversationId = request.conversationId
                                         sessionRetries++
                                         Log.i(
                                             TAG,
@@ -317,6 +320,16 @@ class WsBotClient(
                                                 "conv=${request.conversationId}",
                                         )
                                         recoverSession(request)
+                                        if (requestedConversationId != null &&
+                                            activeConversationId != null &&
+                                            activeConversationId != requestedConversationId
+                                        ) {
+                                            Log.w(
+                                                TAG,
+                                                "NO_SESSION recovery resumed a different conversation " +
+                                                    "requested=$requestedConversationId active=$activeConversationId",
+                                            )
+                                        }
                                         releaseRoute(activeRoute)
                                         activeRoute = RequestRoute(
                                             requestId = UUID.randomUUID().toString(),
@@ -833,10 +846,10 @@ class WsBotClient(
 
         val agentId = activeAgentId ?: return
         reconnectJob = scope.launch {
-            val delaysMs = listOf(1_000L, 2_000L, 5_000L, 10_000L, 30_000L)
             var attempt = 0
+            var lastFailure: Throwable? = null
 
-            while (!isUserClosing) {
+            while (!isUserClosing && attempt < maxReconnectAttempts) {
                 val result = runCatching {
                     connectionMutex.withLock {
                         openSocketLocked()
@@ -852,8 +865,31 @@ class WsBotClient(
                     return@launch
                 }
 
-                kotlinx.coroutines.delay(delaysMs[minOf(attempt, delaysMs.lastIndex)])
+                lastFailure = result.exceptionOrNull()
+                val delayMs = reconnectDelaysMs.getOrElse(attempt) { reconnectDelaysMs.lastOrNull() ?: 0L }
+                if (delayMs > 0) {
+                    delay(delayMs)
+                }
                 attempt++
+            }
+
+            if (!isUserClosing) {
+                val failure = BotGatewayException(
+                    code = BotGatewayErrorCode.STREAM_ERROR,
+                    message = "WebSocket reconnect failed after $maxReconnectAttempts attempts",
+                    cause = lastFailure,
+                )
+                Log.e(TAG, failure.message, failure)
+                activeRoutes.values.forEach { it.channel.trySend(RequestSignal.Failure(failure)) }
+                pendingRoutes.values.forEach { it.channel.trySend(RequestSignal.Failure(failure)) }
+                connectionMutex.withLock {
+                    socket?.cancel()
+                    socket = null
+                    socketOpen = false
+                    openDeferred?.takeIf { !it.isCompleted }?.completeExceptionally(failure)
+                    sessionInitDeferred?.takeIf { !it.isCompleted }?.completeExceptionally(failure)
+                    _connectionState.value = ConnectionState.ERROR
+                }
             }
         }
     }
@@ -1143,5 +1179,7 @@ class WsBotClient(
         private const val TAG = "WsBotClient"
         private const val WS_PATH = "/api/v1/agent-gateway"
         private const val DEFAULT_STREAM_RECEIVE_TIMEOUT_MS = 300_000L
+        private val DEFAULT_RECONNECT_DELAYS_MS = listOf(1_000L, 2_000L, 5_000L, 10_000L, 30_000L)
+        private const val DEFAULT_MAX_RECONNECT_ATTEMPTS = 6
     }
 }
