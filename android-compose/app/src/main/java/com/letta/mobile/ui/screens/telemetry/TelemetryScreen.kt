@@ -30,7 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,7 +64,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun TelemetryScreen(onBack: () -> Unit) {
     val context = LocalContext.current
-    val events by Telemetry.events.collectAsState()
+    val events by Telemetry.events.collectAsStateWithLifecycle()
 
     var tagFilter by remember { mutableStateOf<String?>(null) }
     var filterMenuOpen by remember { mutableStateOf(false) }
@@ -145,7 +145,7 @@ fun TelemetryScreen(onBack: () -> Unit) {
                 modifier = Modifier.fillMaxSize().padding(padding),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                items(visibleEvents) { ev -> TelemetryEventRow(ev) }
+                items(visibleEvents, key = { "${it.timestampMs}/${it.tag}/${it.name}" }) { ev -> TelemetryEventRow(ev) }
             }
         }
     }

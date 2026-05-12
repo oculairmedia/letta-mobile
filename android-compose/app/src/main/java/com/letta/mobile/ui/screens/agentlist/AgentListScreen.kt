@@ -261,7 +261,7 @@ fun AgentListScreen(
                                 label = { Text(stringResource(R.string.screen_agents_filter_all)) },
                             )
                         }
-                        items(allTags.size) { index ->
+                        items(allTags.size, key = { allTags[it] }) { index ->
                             val tag = allTags[index]
                             FilterChip(
                                 selected = tag in uiState.selectedTags,

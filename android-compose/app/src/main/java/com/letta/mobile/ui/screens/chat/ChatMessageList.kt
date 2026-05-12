@@ -327,7 +327,10 @@ fun ChatMessageList(
                     val currentDate = renderItem.boundaryTimestamp.take(10)
                     val showDate = prevDate != null && prevDate != currentDate
 
-                    item(key = renderItem.key) {
+                    item(key = renderItem.key, contentType = when (renderItem) {
+                        is ChatRenderItem.Single -> "single"
+                        is ChatRenderItem.RunBlock -> "runblock"
+                    }) {
                         // letta-mobile-lbur follow-up: log render item keys for dedup analysis
                         when (renderItem) {
                             is ChatRenderItem.Single -> {
@@ -434,7 +437,7 @@ fun ChatMessageList(
                         // Tie the separator key to the boundary message id so
                         // the same date can legitimately appear multiple times
                         // (e.g. after older-page merges) without colliding.
-                        item(key = "date-${renderItem.key}") {
+                        item(key = "date-${renderItem.key}", contentType = "date") {
                             val date = try {
                                 LocalDate.parse(currentDate)
                             } catch (_: Exception) {

@@ -123,7 +123,7 @@ fun AllToolsScreen(
                                 label = { Text(stringResource(R.string.screen_tools_filter_all)) },
                             )
                         }
-                        items(allToolTags.size) { index ->
+                        items(allToolTags.size, key = { allToolTags[it] }) { index ->
                             val tag = allToolTags[index]
                             FilterChip(
                                 selected = tag in selectedToolTags,
