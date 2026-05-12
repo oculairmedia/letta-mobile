@@ -125,7 +125,7 @@ class AgentScaffoldHiltTest {
         }
 
         composeRule.onNodeWithTag(AgentScaffoldTestTags.MENU_BUTTON).performClick()
-        composeRule.onNodeWithText("Edit Agent").performClick()
+        composeRule.onNodeWithTag(AgentScaffoldTestTags.DRAWER_EDIT_AGENT).performClick()
         assert(settingsCalledWith == "agent-hilt-1") {
             "Expected onNavigateToSettings with agent-hilt-1, got: $settingsCalledWith"
         }
