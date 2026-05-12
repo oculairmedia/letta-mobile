@@ -41,16 +41,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.LargeFlexibleTopAppBar
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -167,6 +170,8 @@ private enum class EditAgentConfigTab(val label: String) {
 object EditAgentTestTags {
     const val CONTENT_LIST = "edit_agent_content_list"
     const val TAB_PREFIX = "edit_agent_tab_"
+    const val SECTION_PICKER_TRIGGER = "edit_agent_section_picker_trigger"
+    const val SECTION_PICKER_SHEET = "edit_agent_section_picker_sheet"
 
     fun tab(label: String): String = TAB_PREFIX + label.lowercase(Locale.US)
 }
@@ -193,7 +198,7 @@ fun EditAgentScreen(
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
         topBar = {
             LargeFlexibleTopAppBar(
-                title = { Text(stringResource(R.string.screen_agent_edit_title)) },
+                title = {},
                 colors = LettaTopBarDefaults.largeTopAppBarColors(),
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
@@ -521,6 +526,8 @@ private fun EditAgentContent(
 
     var selectedTab by rememberSaveable { mutableStateOf(EditAgentConfigTab.Basics) }
     val tabs = remember { EditAgentConfigTab.entries.toList() }
+    var showSectionPicker by rememberSaveable { mutableStateOf(false) }
+    val sectionPickerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     LaunchedEffect(maxContextWindow, state.contextWindow) {
         if (maxContextWindow != null && state.contextWindow > maxContextWindow) {
@@ -576,29 +583,62 @@ private fun EditAgentContent(
             }
         }
 
+        // letta-mobile-qfn9: PrimaryTabRow with 6 fixed-width tabs wraps
+        // text mid-word on 360–411dp screens (Basic\ns, Mode\ls, Runti\nme).
+        // Replaced with a single-line section selector that opens a modal
+        // bottom sheet listing every section with the same validation
+        // warning marker the tabs previously showed.
         item(key = "tabs") {
-            PrimaryTabRow(
-                selectedTabIndex = tabs.indexOf(selectedTab),
-                containerColor = LettaCardDefaults.listContainerColor,
+            Surface(
+                onClick = { showSectionPicker = true },
+                shape = LettaCardDefaults.listShape,
+                color = LettaCardDefaults.listContainerColor,
                 contentColor = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag(EditAgentTestTags.SECTION_PICKER_TRIGGER),
             ) {
-                tabs.forEach { tab ->
-                    Tab(
-                        selected = selectedTab == tab,
-                        onClick = { selectedTab = tab },
-                        modifier = Modifier.testTag(EditAgentTestTags.tab(tab.label)),
-                        text = {
-                            val hasWarning = tab.hasValidationWarning(state)
-                            Text(
-                                text = if (hasWarning) "${tab.label} •" else tab.label,
-                                color = if (hasWarning) {
-                                    MaterialTheme.colorScheme.error
-                                } else {
-                                    MaterialTheme.colorScheme.primary
-                                },
-                            )
-                        },
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Section",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        val activeHasWarning = selectedTab.hasValidationWarning(state)
+                        Text(
+                            text = if (activeHasWarning) "${selectedTab.label} •" else selectedTab.label,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (activeHasWarning) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            },
+                        )
+                    }
+                    // letta-mobile-qfn9: aggregate validation indicator. When
+                    // a section other than the active one has a warning, the
+                    // user could previously see the '•' on the affected tab.
+                    // Surface that via a label here so warnings remain visible
+                    // even when the affected section isn't selected.
+                    val otherWarnings = tabs.count { it != selectedTab && it.hasValidationWarning(state) }
+                    if (otherWarnings > 0) {
+                        Text(
+                            text = "$otherWarnings • ",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(end = 8.dp),
+                        )
+                    }
+                    Icon(
+                        LettaIcons.ExpandMore,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -1044,6 +1084,68 @@ private fun EditAgentContent(
                 showCompactionModelPicker = false
             },
         )
+    }
+
+    // letta-mobile-qfn9: section picker bottom sheet. Replaces the wrapping
+    // PrimaryTabRow with a one-line trigger and a sheet that lists every
+    // section. Same validation warning marker ('•') applied per row.
+    if (showSectionPicker) {
+        ModalBottomSheet(
+            onDismissRequest = { showSectionPicker = false },
+            sheetState = sectionPickerSheetState,
+            modifier = Modifier.testTag(EditAgentTestTags.SECTION_PICKER_SHEET),
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Sections",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                )
+                tabs.forEach { tab ->
+                    val hasWarning = tab.hasValidationWarning(state)
+                    val isSelected = tab == selectedTab
+                    ListItem(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                selectedTab = tab
+                                showSectionPicker = false
+                            }
+                            .testTag(EditAgentTestTags.tab(tab.label)),
+                        headlineContent = {
+                            Text(
+                                text = if (hasWarning) "${tab.label} •" else tab.label,
+                                color = when {
+                                    hasWarning -> MaterialTheme.colorScheme.error
+                                    isSelected -> MaterialTheme.colorScheme.primary
+                                    else -> MaterialTheme.colorScheme.onSurface
+                                },
+                            )
+                        },
+                        leadingContent = {
+                            if (isSelected) {
+                                Icon(
+                                    LettaIcons.Check,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            } else {
+                                Spacer(modifier = Modifier.size(24.dp))
+                            }
+                        },
+                        colors = ListItemDefaults.colors(
+                            containerColor = if (isSelected) {
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                            } else {
+                                androidx.compose.ui.graphics.Color.Transparent
+                            },
+                        ),
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+        }
     }
 }
 

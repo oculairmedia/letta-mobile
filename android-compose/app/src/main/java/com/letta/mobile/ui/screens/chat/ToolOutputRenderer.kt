@@ -1,5 +1,9 @@
 package com.letta.mobile.ui.screens.chat
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -31,6 +36,7 @@ import com.letta.mobile.data.tooloutput.ToolOutputBlock
 import com.letta.mobile.data.tooloutput.ToolOutputDocument
 import com.letta.mobile.data.tooloutput.ToolOutputParser
 import com.letta.mobile.ui.theme.LocalChatFontScale
+import com.letta.mobile.ui.theme.LocalChatIsPinching
 import com.letta.mobile.ui.theme.chatTypography
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.listItemSupporting
@@ -61,6 +67,7 @@ private val toolOutputHighlightCache =
     )
 
 @Composable
+@OptIn(ExperimentalAnimationApi::class)
 internal fun ToolOutputRenderer(
     raw: String,
     expanded: Boolean,
@@ -77,6 +84,14 @@ internal fun ToolOutputRenderer(
             value = withContext(Dispatchers.Default) { cachedToolOutputDocument(raw) }
         }
     }
+    // letta-mobile-3wjn: Restore eased expand/collapse on user-initiated taps.
+    // Commit 74314380 stripped this when stabilizing the run timeline. The
+    // animation here is keyed on `expanded` (a user-toggled state), not on
+    // streamed `raw` content growth, so it does not collide with the
+    // LazyColumn measurement issue that 74314380 fixed. We still suppress
+    // during pinch because animateContentSize/AnimatedContent during a
+    // multi-touch gesture can cascade height interpolations across bubbles.
+    val isPinching = LocalChatIsPinching.current
     val clipboard = LocalClipboardManager.current
     Column(
         modifier = modifier
@@ -86,11 +101,30 @@ internal fun ToolOutputRenderer(
                 )
             },
     ) {
-        ToolOutputBody(
-            document = document,
-            expanded = expanded,
-            isError = isError,
-        )
+        if (isPinching) {
+            ToolOutputBody(
+                document = document,
+                expanded = expanded,
+                isError = isError,
+            )
+        } else {
+            AnimatedContent(
+                targetState = expanded,
+                modifier = Modifier.fillMaxWidth(),
+                transitionSpec = {
+                    (ChatMotion.expandEnter() togetherWith ChatMotion.expandExit())
+                        .using(SizeTransform(clip = true) { _, _ -> ChatMotion.contentSizeSpec })
+                },
+                contentAlignment = Alignment.TopStart,
+                label = "ToolOutputExpandedState",
+            ) { isExpanded ->
+                ToolOutputBody(
+                    document = document,
+                    expanded = isExpanded,
+                    isError = isError,
+                )
+            }
+        }
     }
 }
 

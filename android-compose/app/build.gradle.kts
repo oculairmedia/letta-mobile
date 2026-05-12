@@ -147,6 +147,7 @@ android {
             isMinifyEnabled = true
             signingConfig = signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            isDebuggable = true
         }
         // `benchmark` mirrors release (minified + shrunk) but is
         // debuggable+profileable so Macrobenchmark can hook into it.

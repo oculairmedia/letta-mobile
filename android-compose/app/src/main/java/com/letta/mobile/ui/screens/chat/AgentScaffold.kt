@@ -42,6 +42,9 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -133,6 +136,8 @@ object AgentScaffoldTestTags {
     const val PROJECT_BUG_SUMMARY_CARD = "agent_scaffold_project_bug_summary_card"
     const val CHAT_SEARCH_FIELD = "agent_scaffold_chat_search_field"
     const val AGENT_PICKER_SEARCH_FIELD = "agent_scaffold_agent_picker_search_field"
+    const val DRAWER_EDIT_AGENT = "agent_scaffold_drawer_edit_agent"
+    fun drawerChatMode(mode: String) = "agent_scaffold_drawer_chat_mode_$mode"
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -1953,6 +1958,10 @@ internal fun DrawerContent(
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
+        // letta-mobile-7lyb: Inline the Edit Agent action as a trailing
+        // IconButton on the agent header. Removes the giant full-width
+        // NavigationDrawerItem that previously occupied ~64dp for a single
+        // tap target.
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 LettaIcons.Agent,
@@ -1965,7 +1974,18 @@ internal fun DrawerContent(
                 style = MaterialTheme.typography.titleLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
+            IconButton(
+                onClick = onEditAgent,
+                modifier = Modifier.testTag(AgentScaffoldTestTags.DRAWER_EDIT_AGENT),
+            ) {
+                Icon(
+                    LettaIcons.Edit,
+                    contentDescription = stringResource(R.string.screen_drawer_edit_agent),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(4.dp))
@@ -1975,16 +1995,7 @@ internal fun DrawerContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
         val drawerItemColors = contrastDrawerItemColors()
-        NavigationDrawerItem(
-            icon = { Icon(LettaIcons.Edit, contentDescription = "Edit") },
-            label = { Text(stringResource(R.string.screen_drawer_edit_agent)) },
-            selected = false,
-            onClick = onEditAgent,
-            colors = drawerItemColors,
-        )
-
         Spacer(modifier = Modifier.height(16.dp))
         if (isClientModeEnabled) {
             AssistChip(
@@ -2010,26 +2021,37 @@ internal fun DrawerContent(
         HorizontalDivider()
         Spacer(modifier = Modifier.height(8.dp))
 
+        // letta-mobile-7lyb: Compact chat-mode selector. The three modes
+        // previously rendered as stacked NavigationDrawerItems (~144dp tall);
+        // a SingleChoiceSegmentedButtonRow gives the same affordance in one
+        // ~48dp row with Material3-native selection visuals.
         Text(
             text = "Chat mode",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
         )
-        listOf("simple", "interactive", "debug").forEach { mode ->
-            NavigationDrawerItem(
-                icon = {
-                    if (chatMode == mode) {
-                        Icon(LettaIcons.Check, contentDescription = null)
-                    } else {
-                        Spacer(modifier = Modifier.size(LettaIconSizing.Toolbar))
-                    }
-                },
-                label = { Text(mode.replaceFirstChar { it.uppercase() }) },
-                selected = chatMode == mode,
-                onClick = { onChatModeSelected(mode) },
-                colors = drawerItemColors,
-            )
+        val chatModes = listOf("simple", "interactive", "debug")
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 4.dp),
+        ) {
+            chatModes.forEachIndexed { index, mode ->
+                SegmentedButton(
+                    selected = chatMode == mode,
+                    onClick = { onChatModeSelected(mode) },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = chatModes.size),
+                    modifier = Modifier.testTag(AgentScaffoldTestTags.drawerChatMode(mode)),
+                    label = {
+                        Text(
+                            mode.replaceFirstChar { it.uppercase() },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                )
+            }
         }
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))

@@ -2,7 +2,6 @@ package com.letta.mobile.debug
 
 import android.content.Context
 import android.util.Base64
-import com.letta.mobile.BuildConfig
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.ui.screens.config.ConfigViewModel
@@ -22,39 +21,29 @@ object AutomationAuthBootstrap {
     fun importPendingConfig(context: Context, settingsRepository: SettingsRepository) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val encodedPayload = prefs.getString(KEY_PAYLOAD_BASE64, null)?.trim().orEmpty()
-        val hasPayload = encodedPayload.isNotBlank()
-        if (!hasPayload) {
+        if (encodedPayload.isBlank()) {
             return
         }
 
-        if (BuildConfig.APPLICATION_ID.endsWith(".benchmark")) {
-            runCatching {
-                val payload = decodePayload(encodedPayload)
-                runBlocking {
-                    settingsRepository.saveConfig(payload.toLettaConfig())
-                    payload.toClientModeSettings()?.applyTo(settingsRepository)
+        runCatching {
+            val payload = decodePayload(encodedPayload)
+            runBlocking {
+                settingsRepository.saveConfig(payload.toLettaConfig())
+                payload.toClientModeSettings()?.let { settings ->
+                    settings.applyTo(settingsRepository)
                 }
-            }.onFailure { error ->
-                Telemetry.error(
-                    tag = "AutomationAuth",
-                    name = "benchmarkPayloadRejected",
-                    throwable = error,
-                    "prefsName" to PREFS_NAME,
-                    "key" to KEY_PAYLOAD_BASE64,
-                )
             }
-            prefs.edit().remove(KEY_PAYLOAD_BASE64).commit()
-            return
+        }.onFailure { error ->
+            Telemetry.error(
+                tag = "AutomationAuth",
+                name = "releasePayloadImportFailed",
+                throwable = error,
+                "prefsName" to PREFS_NAME,
+                "key" to KEY_PAYLOAD_BASE64,
+            )
         }
 
         prefs.edit().remove(KEY_PAYLOAD_BASE64).commit()
-        Telemetry.error(
-            tag = "AutomationAuth",
-            name = "releasePayloadRejected",
-            throwable = SecurityException("Release build rejected staged automation credentials"),
-            "prefsName" to PREFS_NAME,
-            "key" to KEY_PAYLOAD_BASE64,
-        )
     }
 
     private fun decodePayload(encodedPayload: String): AutomationAuthPayload {

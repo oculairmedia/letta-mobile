@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -83,7 +84,7 @@ class AgentScaffoldTest {
             )
         }
 
-        composeRule.onNodeWithText("Edit Agent").performClick()
+        composeRule.onNodeWithTag(AgentScaffoldTestTags.DRAWER_EDIT_AGENT).performClick()
         assertTrue("Edit callback should fire", fired)
     }
 

@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.screens.editagent
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithText
@@ -77,18 +78,18 @@ class EditAgentScreenTest {
         composeRule.onNodeWithText("Identity").assertIsDisplayed()
         composeRule.onNodeWithText("Name").assertIsDisplayed()
 
-        composeRule.onNodeWithTag(EditAgentTestTags.tab("Models")).performClick()
+        composeRule.selectEditAgentSection("Models")
         composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(3)
         composeRule.onNodeWithText("LLM Configuration").assertIsDisplayed()
         composeRule.onAllNodesWithText("Embedding Model").assertCountEquals(1)
 
         composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(0)
-        composeRule.onNodeWithTag(EditAgentTestTags.tab("Runtime")).performClick()
+        composeRule.selectEditAgentSection("Runtime")
         composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(2)
         composeRule.onNodeWithText("LettaBot Client Mode").assertIsDisplayed()
 
         composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(0)
-        composeRule.onNodeWithTag(EditAgentTestTags.tab("Advanced")).performClick()
+        composeRule.selectEditAgentSection("Advanced")
         composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(2)
         composeRule.onNodeWithText("Primary Model Advanced").assertIsDisplayed()
         listOf(
@@ -109,7 +110,7 @@ class EditAgentScreenTest {
         }
 
         composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(0)
-        composeRule.onNodeWithTag(EditAgentTestTags.tab("Memory")).performClick()
+        composeRule.selectEditAgentSection("Memory")
         composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(2)
         listOf(
             "Compaction Mode",
@@ -124,7 +125,7 @@ class EditAgentScreenTest {
         }
 
         composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(0)
-        composeRule.onNodeWithTag(EditAgentTestTags.tab("Tools")).performClick()
+        composeRule.selectEditAgentSection("Tools")
         composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(3)
         composeRule.onNodeWithText("Tools (1)").assertIsDisplayed()
         composeRule.onNodeWithText("Tool Rules / Approval Policy").assertIsDisplayed()
@@ -152,6 +153,10 @@ class EditAgentScreenTest {
             )
         }
 
+        // letta-mobile-qfn9: trigger surfaces aggregate warning count for
+        // non-active sections; opening the picker reveals the per-row marker.
+        composeRule.onNodeWithText("1 • ", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag(EditAgentTestTags.SECTION_PICKER_TRIGGER).performClick()
         composeRule.onNodeWithText("Tools •").assertIsDisplayed()
         composeRule.onNodeWithTag(EditAgentTestTags.tab("Tools")).performClick()
         composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(4)
@@ -195,4 +200,12 @@ class EditAgentScreenTest {
         slidingWindowPercentage = 0.35f,
         promptAcknowledgement = true,
     )
+}
+
+// letta-mobile-qfn9: helper for the new section picker. The old PrimaryTabRow
+// exposed each tab as a directly-clickable node; the picker requires opening
+// the bottom sheet first, then tapping the section row inside it.
+private fun ComposeContentTestRule.selectEditAgentSection(label: String) {
+    onNodeWithTag(EditAgentTestTags.SECTION_PICKER_TRIGGER).performClick()
+    onNodeWithTag(EditAgentTestTags.tab(label)).performClick()
 }
