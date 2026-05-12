@@ -1,8 +1,10 @@
 package com.letta.mobile.data.model
 
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+@Immutable
 @Serializable
 data class Block(
     val id: String,

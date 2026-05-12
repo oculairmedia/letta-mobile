@@ -1,5 +1,6 @@
 package com.letta.mobile.data.model
 
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -43,6 +44,7 @@ data class CompactionSettings(
     @SerialName("sliding_window_percentage") val slidingWindowPercentage: Double? = null,
 )
 
+@Immutable
 @Serializable
 data class Agent(
     val id: String,
