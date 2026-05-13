@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.screens.chat
 
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.BlockId
 import androidx.lifecycle.SavedStateHandle
 import com.letta.mobile.bot.core.BotSession
 import com.letta.mobile.bot.chat.ClientModeChatSender
@@ -2068,11 +2070,11 @@ class AdminChatViewModelTest {
     fun `project brief loads mapped sections from core memory blocks`() = runTest {
         val fakeBlockApi = FakeBlockApi().apply {
             blocks["agent-1"] = mutableListOf(
-                Block(id = "b1", label = "project_description", value = "Ship the Android PM surface"),
-                Block(id = "b2", label = "key_decisions", value = "- Use shared project chat\n- Keep brief editable"),
-                Block(id = "b3", label = "tech_stack", value = "Kotlin\nCompose\nLetta API"),
-                Block(id = "b4", label = "active_goals", value = "- Finish bz40.2.4"),
-                Block(id = "b5", label = "recent_changes", value = "Added public proxy support"),
+                Block(id = BlockId("b1"), label = "project_description", value = "Ship the Android PM surface"),
+                Block(id = BlockId("b2"), label = "key_decisions", value = "- Use shared project chat\n- Keep brief editable"),
+                Block(id = BlockId("b3"), label = "tech_stack", value = "Kotlin\nCompose\nLetta API"),
+                Block(id = BlockId("b4"), label = "active_goals", value = "- Finish bz40.2.4"),
+                Block(id = BlockId("b5"), label = "recent_changes", value = "Added public proxy support"),
             )
         }
         blockRepository = BlockRepository(fakeBlockApi)
@@ -2114,7 +2116,7 @@ class AdminChatViewModelTest {
     fun `save project brief updates matching memory block`() = runTest {
         val fakeBlockApi = FakeBlockApi().apply {
             blocks["agent-1"] = mutableListOf(
-                Block(id = "b1", label = "project_description", value = "Old brief"),
+                Block(id = BlockId("b1"), label = "project_description", value = "Old brief"),
             )
         }
         blockRepository = BlockRepository(fakeBlockApi)
@@ -2163,7 +2165,7 @@ class AdminChatViewModelTest {
         )
         every { agentRepository.getAgent("agent-1") } returns flowOf(
             Agent(
-                id = "agent-1",
+                id = AgentId("agent-1"),
                 name = "Coder",
                 model = "gpt-4.1",
                 updatedAt = "2026-04-13T12:00:00Z",
@@ -3040,8 +3042,8 @@ class AdminChatViewModelTest {
 
         verify(exactly = 1) {
             notificationDeliveryCoordinator.submit(match {
-                it.source == com.letta.mobile.channel.NotificationCandidateSource.WebsocketClientMode &&
-                    it.phase == com.letta.mobile.channel.NotificationCandidatePhase.Final &&
+                it.source == com.letta.mobile.data.channel.NotificationCandidateSource.WebsocketClientMode &&
+                    it.phase == com.letta.mobile.data.channel.NotificationCandidatePhase.Final &&
                     it.conversationId == "conv-1" &&
                     it.previewText == "Hello" &&
                     it.isFinal
@@ -3081,8 +3083,8 @@ class AdminChatViewModelTest {
 
         verify(exactly = 1) {
             notificationDeliveryCoordinator.submit(match {
-                it.source == com.letta.mobile.channel.NotificationCandidateSource.WebsocketClientMode &&
-                    it.phase == com.letta.mobile.channel.NotificationCandidatePhase.Final &&
+                it.source == com.letta.mobile.data.channel.NotificationCandidateSource.WebsocketClientMode &&
+                    it.phase == com.letta.mobile.data.channel.NotificationCandidatePhase.Final &&
                     it.conversationId == "conv-1" &&
                     it.previewText == "Hello" &&
                     it.isFinal

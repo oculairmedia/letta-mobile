@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.tags
 
+import com.letta.mobile.data.model.ToolId
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Step
 import com.letta.mobile.data.model.StepListParams
@@ -44,10 +46,10 @@ class TagDrillInViewModelTest {
         stepRepository = mockk(relaxed = true)
 
         every { agentRepository.agents } returns MutableStateFlow(
-            listOf(Agent(id = "agent-1", name = "Starter Agent", tags = listOf("starter", "general")))
+            listOf(Agent(id = AgentId("agent-1"), name = "Starter Agent", tags = listOf("starter", "general")))
         )
         every { toolRepository.getTools() } returns MutableStateFlow(
-            listOf(Tool(id = "tool-1", name = "Starter Tool", tags = listOf("starter", "utility")))
+            listOf(Tool(id = ToolId("tool-1"), name = "Starter Tool", tags = listOf("starter", "utility")))
         )
         coEvery { agentRepository.refreshAgentsIfStale(any()) } returns false
         coEvery { toolRepository.refreshToolsIfStale(any()) } returns false

@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.schedules
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.ScheduleCreateParams
@@ -129,16 +130,16 @@ class ScheduleListViewModelTest {
     private class FakeAgentRepo : AgentRepository(FakeAgentApi(), mockk(relaxed = true)) {
         private val _agents = MutableStateFlow(
             listOf(
-                Agent(id = "a1", name = "Agent One"),
-                Agent(id = "a2", name = "Agent Two"),
+                Agent(id = AgentId("a1"), name = "Agent One"),
+                Agent(id = AgentId("a2"), name = "Agent Two"),
             )
         )
 
         override val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
         override suspend fun refreshAgents() {}
-        override fun getAgent(id: String): Flow<Agent> = flow { emit(_agents.value.first { it.id == id }) }
+        override fun getAgent(id: String): Flow<Agent> = flow { emit(_agents.value.first { it.id.value == id }) }
         override suspend fun createAgent(params: com.letta.mobile.data.model.AgentCreateParams): Agent = _agents.value.first()
-        override suspend fun updateAgent(id: String, params: com.letta.mobile.data.model.AgentUpdateParams): Agent = _agents.value.first { it.id == id }
+        override suspend fun updateAgent(id: String, params: com.letta.mobile.data.model.AgentUpdateParams): Agent = _agents.value.first { it.id.value == id }
         override suspend fun deleteAgent(id: String) {}
     }
 

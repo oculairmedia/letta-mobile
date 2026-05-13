@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.chat
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.bot.protocol.BotAgentInfo
 import com.letta.mobile.bot.protocol.InternalBotClient
 import com.letta.mobile.data.model.Agent
@@ -62,7 +63,7 @@ class ProjectAgentActivityLoaderTest {
         coEvery { folderRepository.listAgentsForFolder("folder-1") } returns listOf("agent-1", "agent-2")
         coEvery { agentRepository.refreshAgentsIfStale(60_000) } returns true
         every { agentRepository.getCachedAgent("agent-1") } returns Agent(
-            id = "agent-1",
+            id = AgentId("agent-1"),
             name = "Cached One",
             model = "gpt-4.1",
             updatedAt = "2026-05-01T00:00:00Z",
@@ -70,7 +71,7 @@ class ProjectAgentActivityLoaderTest {
         every { agentRepository.getCachedAgent("agent-2") } returns null
         every { agentRepository.getAgent("agent-2") } returns flowOf(
             Agent(
-                id = "agent-2",
+                id = AgentId("agent-2"),
                 name = "Fetched Two",
                 model = "claude",
                 lastRunCompletion = "Last completion",

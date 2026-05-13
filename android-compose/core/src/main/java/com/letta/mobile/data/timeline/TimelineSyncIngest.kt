@@ -24,6 +24,11 @@ internal suspend fun ingestStreamEvent(
     conversationId: String,
     ingestNotificationDispatcher: TimelineIngestNotificationDispatcher,
 ) {
+    // letta-mobile-rnyg: collect events to emit inside the writeMutex so we
+    // can publish them AFTER releasing the lock. MutableSharedFlow.emit can
+    // suspend (default BufferOverflow.SUSPEND), and any subscriber re-entering
+    // a code path that needs writeMutex would deadlock if we emit under it.
+    val pendingEvents = mutableListOf<TimelineSyncEvent>()
     val notification = writeMutex.withLock<PendingIngestNotification?> {
         // letta-mobile-mge5.15: ApprovalResponseMessage doesn't produce its own
         // bubble — instead we find the corresponding ApprovalRequestMessage
@@ -48,7 +53,7 @@ internal suspend fun ingestStreamEvent(
             }
             val updated = match.copy(approvalDecided = true)
             state.value = state.value.replaceByServerId(updated)
-            events.emit(TimelineSyncEvent.StreamEventIngested(match.serverId, message.messageType))
+            pendingEvents += TimelineSyncEvent.StreamEventIngested(match.serverId, message.messageType)
             return@withLock null
         }
         // Observe a tool_return_message → the tool ran → approval (if any)
@@ -91,12 +96,25 @@ internal suspend fun ingestStreamEvent(
                         toolReturnIsErrorByCallId = match.toolReturnIsErrorByCallId + (tcid to isError),
                     )
                     state.value = state.value.replaceByServerId(updated)
-                    events.emit(TimelineSyncEvent.StreamEventIngested(match.serverId, message.messageType))
+                    pendingEvents += TimelineSyncEvent.StreamEventIngested(match.serverId, message.messageType)
                     Telemetry.event(
                         "TimelineSync", "toolReturn.attached",
                         "serverId" to match.serverId,
                         "bodyLen" to body.length,
                     )
+                    // letta-mobile-rnyg: tool_return_message was previously
+                    // dropped without ever building a PendingIngestNotification,
+                    // so background users never saw "tool finished". Surface
+                    // the attached return like the fall-through assistant/tool
+                    // path below.
+                    val mt = message.messageType
+                    if (mt == "tool_return_message" && body.isNotBlank()) {
+                        return@withLock PendingIngestNotification(
+                            serverId = match.serverId,
+                            messageType = mt,
+                            contentPreview = body.take(140),
+                        )
+                    }
                 } else {
                     pendingToolReturnsByCallId[tcid] = message
                     // The call bubble may not exist yet if the return arrived
@@ -227,7 +245,7 @@ internal suspend fun ingestStreamEvent(
             )
             state.value = state.value.replaceByServerId(merged)
             state.value = state.value.copy(liveCursor = confirmed.serverId)
-            events.emit(TimelineSyncEvent.StreamEventIngested(confirmed.serverId, message.messageType))
+            pendingEvents += TimelineSyncEvent.StreamEventIngested(confirmed.serverId, message.messageType)
             // letta-mobile-5s1n probe: assistant deltas after the first frame
             // hit this branch silently. Track them so we can prove (or
             // disprove) that the merged content is actually accumulating —
@@ -271,7 +289,7 @@ internal suspend fun ingestStreamEvent(
         if (fuzzy.collapsed != null) {
             state.value = fuzzy.timeline
             state.value = state.value.copy(liveCursor = confirmed.serverId)
-            events.emit(TimelineSyncEvent.StreamEventIngested(confirmed.serverId, message.messageType))
+            pendingEvents += TimelineSyncEvent.StreamEventIngested(confirmed.serverId, message.messageType)
             Telemetry.event(
                 "TimelineSync", "streamSubscriber.fuzzyCollapsed",
                 "conversationId" to conversationId,
@@ -285,7 +303,7 @@ internal suspend fun ingestStreamEvent(
         }
         state.value = state.value.append(applyPendingToolReturns(confirmed, pendingToolReturnsByCallId))
         state.value = state.value.copy(liveCursor = confirmed.serverId)
-        events.emit(TimelineSyncEvent.StreamEventIngested(confirmed.serverId, message.messageType))
+        pendingEvents += TimelineSyncEvent.StreamEventIngested(confirmed.serverId, message.messageType)
         Telemetry.event(
             "TimelineSync", "streamSubscriber.ingested",
             "serverId" to confirmed.serverId,
@@ -309,6 +327,8 @@ internal suspend fun ingestStreamEvent(
             null
         }
     }
+    // Lock released — safe to suspend on emit/dispatch.
+    pendingEvents.forEach { events.emit(it) }
     ingestNotificationDispatcher.dispatch(notification)
 }
 

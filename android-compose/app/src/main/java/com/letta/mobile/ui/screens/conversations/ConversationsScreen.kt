@@ -538,10 +538,15 @@ private fun ConversationCard(
     )
 }
 
+@Composable
 private fun conversationActivityText(conversation: com.letta.mobile.data.model.Conversation): String? {
     val timestamp = conversation.lastMessageAt ?: conversation.createdAt ?: return null
     val relative = formatRelativeTime(timestamp).takeIf { it.isNotBlank() } ?: return null
-    return if (conversation.lastMessageAt != null) "Last activity $relative" else "Created $relative"
+    return if (conversation.lastMessageAt != null) {
+        stringResource(R.string.screen_conversations_last_activity_format, relative)
+    } else {
+        stringResource(R.string.screen_conversations_created_format, relative)
+    }
 }
 
 @Composable

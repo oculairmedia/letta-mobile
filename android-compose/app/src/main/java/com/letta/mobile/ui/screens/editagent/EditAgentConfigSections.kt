@@ -760,4 +760,5 @@ internal fun snapContextWindowValue(value: Float, maxValue: Int): Int {
         .coerceIn(0, maxValue)
 }
 
-internal fun formatEditAgentNumber(value: Int): String = String.format(Locale.US, "%,d", value)
+internal fun formatEditAgentNumber(value: Int): String =
+    String.format(Locale.getDefault(), "%,d", value)

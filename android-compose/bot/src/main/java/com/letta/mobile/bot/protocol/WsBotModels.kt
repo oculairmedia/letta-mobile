@@ -6,6 +6,27 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
+/**
+ * Per-request state shared between the WS reader coroutine and the
+ * `streamMessage` flow consumer.
+ *
+ * Threading model
+ * ---------------
+ * Today the gateway enforces a single in-flight request at a time:
+ * `requestMutex` (see `WsBotProtocol.streamMessage` / `promoteRoute`) serializes
+ * the body of each stream and is the writer-side guarantee that `conversationId`
+ * and `firstFrameSent` cannot be mutated concurrently while a request is alive.
+ *
+ * Readers, however, are not all on the writer's coroutine — most notably
+ * `soleInFlightRouteOrNull` filters routes by `firstFrameSent` from a different
+ * coroutine context. The `@Volatile` annotations exist so that those
+ * cross-thread reads see the writer's most recent value (happens-before via
+ * volatile semantics), even though the writer side is already serialized.
+ *
+ * If/when the design switches to concurrent in-flight streams, both fields
+ * must move behind an explicit `Mutex` (or be replaced with `AtomicReference`)
+ * — `@Volatile` alone is not sufficient for compound read-modify-write.
+ */
 internal data class RequestRoute(
     val requestId: String,
     val channel: SendChannel<RequestSignal>,

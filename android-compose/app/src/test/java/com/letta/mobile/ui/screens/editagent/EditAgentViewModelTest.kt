@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.screens.editagent
 
+import com.letta.mobile.data.model.BlockId
+import com.letta.mobile.data.model.AgentId
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.letta.mobile.data.model.Agent
@@ -731,7 +733,7 @@ class EditAgentViewModelTest {
         override fun getAgent(id: String): Flow<Agent> = flow {
             if (shouldFail) throw Exception("Load failed")
             emit(Agent(
-                id = "a1",
+                id = AgentId("a1"),
                 name = "Test Agent",
                 description = "A test agent",
                 model = loadedModel,
@@ -763,7 +765,7 @@ class EditAgentViewModelTest {
             if (shouldFail) throw Exception("Update failed")
             lastUpdateParams = params
             return Agent(
-                id = id,
+                id = AgentId(id),
                 name = params.name ?: "Test Agent",
                 description = params.description,
                 model = params.model,
@@ -802,7 +804,7 @@ class EditAgentViewModelTest {
             lastUpdatedLabel = blockLabel
             lastUpdatedParams = params
             return Block(
-                id = "updated-block",
+                id = BlockId("updated-block"),
                 label = blockLabel,
                 value = params.value ?: "",
                 description = params.description,
@@ -817,7 +819,7 @@ class EditAgentViewModelTest {
             clearLimit: Boolean,
         ): Block {
             return Block(
-                id = blockId,
+                id = BlockId(blockId),
                 label = "global",
                 value = params.value ?: "",
                 description = if (clearDescription) null else params.description,

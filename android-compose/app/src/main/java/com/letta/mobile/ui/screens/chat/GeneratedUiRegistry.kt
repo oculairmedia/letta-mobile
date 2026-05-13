@@ -38,7 +38,8 @@ interface GeneratedUiComponentRenderer {
 @Singleton
 class GeneratedUiRegistry @Inject constructor() {
     init {
-        require(INSTANCE == null) { "GeneratedUiRegistry already initialized" }
+        // letta-mobile-rnyg: do not fail on reassignment — tests construct
+        // multiple instances. Last writer wins.
         INSTANCE = this
     }
 
@@ -54,8 +55,19 @@ class GeneratedUiRegistry @Inject constructor() {
         @Volatile
         private var INSTANCE: GeneratedUiRegistry? = null
 
-        fun resolve(componentName: String): GeneratedUiComponentRenderer? =
-            INSTANCE!!.resolve(componentName)
+        /**
+         * Static bridge for existing callers. Delegates to the Hilt-managed
+         * singleton. `LettaApplication` eagerly injects the instance so the
+         * production path goes through the Hilt-built singleton; tests and
+         * other callers that reach this before Hilt has built the registry
+         * get a lazily-created default instance.
+         */
+        fun resolve(componentName: String): GeneratedUiComponentRenderer? {
+            val instance = INSTANCE ?: synchronized(this) {
+                INSTANCE ?: GeneratedUiRegistry().also { INSTANCE = it }
+            }
+            return instance.resolve(componentName)
+        }
     }
 }
 

@@ -135,7 +135,7 @@ fun McpServerToolsScreen(
                             contentPadding = PaddingValues(16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            items(state.data.tools, key = { it.id }) { tool ->
+                            items(state.data.tools, key = { it.id.value }) { tool ->
                                 McpServerToolCard(
                                     tool = tool,
                                     isRunning = state.data.toolRunState.activeToolId == tool.id.value && state.data.toolRunState.result == null && state.data.toolRunState.errorMessage == null,

@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.tools
 
+import com.letta.mobile.data.model.AgentId
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.letta.mobile.data.model.Agent
@@ -161,16 +162,16 @@ class ToolDetailViewModelTest {
     private class FakeAgentRepository : AgentRepository(FakeAgentApi(), mockk(relaxed = true)) {
         private val agentsFlow = kotlinx.coroutines.flow.MutableStateFlow(
             listOf(
-                Agent(id = "a1", name = "Agent One", tools = listOf(TestData.tool(id = "t1", name = "my_tool"))),
-                Agent(id = "a2", name = "Agent Two", tools = emptyList()),
+                Agent(id = AgentId("a1"), name = "Agent One", tools = listOf(TestData.tool(id = "t1", name = "my_tool"))),
+                Agent(id = AgentId("a2"), name = "Agent Two", tools = emptyList()),
             )
         )
 
         override val agents = agentsFlow
         override suspend fun refreshAgents() {}
-        override fun getAgent(id: String) = kotlinx.coroutines.flow.flow { emit(agentsFlow.value.first { it.id == id }) }
+        override fun getAgent(id: String) = kotlinx.coroutines.flow.flow { emit(agentsFlow.value.first { it.id.value == id }) }
         override suspend fun createAgent(params: com.letta.mobile.data.model.AgentCreateParams) = agentsFlow.value.first()
-        override suspend fun updateAgent(id: String, params: com.letta.mobile.data.model.AgentUpdateParams) = agentsFlow.value.first { it.id == id }
+        override suspend fun updateAgent(id: String, params: com.letta.mobile.data.model.AgentUpdateParams) = agentsFlow.value.first { it.id.value == id }
         override suspend fun deleteAgent(id: String) {}
     }
 

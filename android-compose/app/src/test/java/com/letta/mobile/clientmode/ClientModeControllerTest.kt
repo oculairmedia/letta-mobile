@@ -1,6 +1,7 @@
 package com.letta.mobile.clientmode
 
 import androidx.lifecycle.LifecycleOwner
+import com.letta.mobile.bot.clientmode.ClientModeController
 import com.letta.mobile.bot.core.BotGateway
 import com.letta.mobile.bot.core.GatewayStatus
 import com.letta.mobile.data.repository.SettingsRepository

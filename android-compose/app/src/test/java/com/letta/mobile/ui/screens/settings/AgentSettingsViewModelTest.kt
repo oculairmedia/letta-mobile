@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.screens.settings
 
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.BlockId
 import androidx.lifecycle.SavedStateHandle
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentUpdateParams
@@ -58,7 +60,7 @@ class AgentSettingsViewModelTest {
 
         every { agentRepository.getAgent("a1") } returns flowOf(
             Agent(
-                id = "a1",
+                id = AgentId("a1"),
                 name = "Test Agent",
                 description = "A test agent",
                 model = "letta/letta-free",
@@ -75,8 +77,8 @@ class AgentSettingsViewModelTest {
                     providerType = "openai",
                 ),
                 blocks = listOf(
-                    Block(id = "b1", label = "persona", value = "persona value"),
-                    Block(id = "b2", label = "human", value = "human value"),
+                    Block(id = BlockId("b1"), label = "persona", value = "persona value"),
+                    Block(id = BlockId("b2"), label = "human", value = "human value"),
                 ),
             ),
         )
@@ -101,7 +103,7 @@ class AgentSettingsViewModelTest {
         val paramsSlot = slot<AgentUpdateParams>()
         coEvery { agentRepository.updateAgent(eq("a1"), capture(paramsSlot)) } answers {
             Agent(
-                id = "a1",
+                id = AgentId("a1"),
                 name = "Test Agent",
                 modelSettings = paramsSlot.captured.modelSettings,
                 system = paramsSlot.captured.system,
@@ -199,7 +201,7 @@ class AgentSettingsViewModelTest {
         val paramsSlot = slot<AgentUpdateParams>()
         coEvery { agentRepository.updateAgent(eq("a1"), capture(paramsSlot)) } answers {
             Agent(
-                id = "a1",
+                id = AgentId("a1"),
                 name = "Test Agent",
                 modelSettings = paramsSlot.captured.modelSettings,
                 system = paramsSlot.captured.system,

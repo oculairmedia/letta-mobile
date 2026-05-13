@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.screens.editagent
 
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ToolId
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -153,9 +155,12 @@ class EditAgentScreenTest {
             )
         }
 
-        // letta-mobile-qfn9: trigger surfaces aggregate warning count for
-        // non-active sections; opening the picker reveals the per-row marker.
-        composeRule.onNodeWithText("1 • ", substring = true).assertIsDisplayed()
+        // letta-mobile-qfn9 / letta-mobile-w3dl: trigger surfaces aggregate
+        // warning count for non-active sections — the colored bullet is now
+        // accompanied by a non-color cue (Icon + contentDescription) for
+        // accessibility, so assert against the count text and accessibility
+        // description rather than a literal "•" glyph.
+        composeRule.onNodeWithText("1").assertIsDisplayed()
         composeRule.onNodeWithTag(EditAgentTestTags.SECTION_PICKER_TRIGGER).performClick()
         composeRule.onNodeWithText("Tools •").assertIsDisplayed()
         composeRule.onNodeWithTag(EditAgentTestTags.tab("Tools")).performClick()
@@ -165,7 +170,7 @@ class EditAgentScreenTest {
 
     private fun advancedState() = EditAgentUiState(
         agent = Agent(
-            id = "agent-advanced",
+            id = AgentId("agent-advanced"),
             name = "Advanced Agent",
             model = "openai/gpt-5-mini",
             embedding = "openai/text-embedding-3-small",
@@ -189,7 +194,7 @@ class EditAgentScreenTest {
         modelToolCallParser = "openai-tools",
         modelAnthropicEffort = "medium",
         attachedTools = kotlinx.collections.immutable.persistentListOf(
-            com.letta.mobile.data.model.Tool(id = "tool-shell", name = "shell"),
+            com.letta.mobile.data.model.Tool(id = ToolId("tool-shell"), name = "shell"),
         ),
         toolRulesJson = "[{\"type\":\"requires_approval\",\"tool_name\":\"shell\"}]",
         compactionMode = "self_compact_all",

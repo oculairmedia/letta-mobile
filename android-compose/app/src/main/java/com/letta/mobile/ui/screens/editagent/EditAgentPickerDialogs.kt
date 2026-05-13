@@ -499,8 +499,9 @@ internal fun FullScreenBlockPickerDialog(
                 is UiState.Success -> {
                     val availableBlocks = remember(state.data.blocks, excludedBlockIds, query) {
                         val normalizedQuery = query.trim().lowercase()
+                        val excluded = excludedBlockIds.mapTo(HashSet()) { BlockId(it) }
                         state.data.blocks
-                            .filter { it.id !in excludedBlockIds.map { BlockId(it) } }
+                            .filter { it.id !in excluded }
                             .filter { block ->
                                 normalizedQuery.isBlank() ||
                                     (block.label?.lowercase()?.contains(normalizedQuery) == true) ||

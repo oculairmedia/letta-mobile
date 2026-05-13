@@ -450,7 +450,7 @@ private fun AgentPickerDialog(
             Text(text = emptyMessage, style = MaterialTheme.typography.bodyMedium)
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                items(agents, key = { it.id }) { agent ->
+                items(agents, key = { it.id.value }) { agent ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,

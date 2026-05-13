@@ -19,6 +19,9 @@ import com.letta.mobile.crash.CrashReporter
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.performance.DebugPerformanceMonitor
 import com.letta.mobile.performance.ProductionJankStatsMonitor
+import com.letta.mobile.ui.screens.chat.GeneratedUiRegistry
+import com.letta.mobile.ui.screens.chat.ToolDisplayRegistry
+import com.letta.mobile.util.EncryptedPrefsHelper
 import dagger.Lazy
 import dagger.hilt.android.HiltAndroidApp
 import io.ktor.client.HttpClient
@@ -54,6 +57,30 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
 
     @Inject
     lateinit var clientModeController: Lazy<ClientModeController>
+
+    /**
+     * Eagerly inject the legacy static-bridge singletons (syf4 migration) so
+     * their companion `resolve(...)` / `getEncryptedPrefs(...)` calls (still
+     * used during composition / repository construction before the migration
+     * to constructor injection completes) never see a null `INSTANCE`. Without
+     * this, the first caller to reach the static bridge before any other code
+     * requests the singleton will NPE on `INSTANCE!!`.
+     *
+     * `EncryptedPrefsHelper` is critical because `SettingsRepository.<init>`
+     * calls `EncryptedPrefsHelper.getEncryptedPrefs(...)` synchronously, and
+     * `SettingsRepository` is constructed before the registries' first use.
+     */
+    @Suppress("unused")
+    @Inject
+    lateinit var encryptedPrefsHelper: EncryptedPrefsHelper
+
+    @Suppress("unused")
+    @Inject
+    lateinit var generatedUiRegistry: GeneratedUiRegistry
+
+    @Suppress("unused")
+    @Inject
+    lateinit var toolDisplayRegistry: ToolDisplayRegistry
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 

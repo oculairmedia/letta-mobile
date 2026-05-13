@@ -3,6 +3,7 @@ package com.letta.mobile.testutil
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.api.BlockApi
 import com.letta.mobile.data.model.Block
+import com.letta.mobile.data.model.BlockId
 import com.letta.mobile.data.model.BlockUpdateParams
 import io.mockk.mockk
 
@@ -21,7 +22,7 @@ class FakeBlockApi : BlockApi(mockk(relaxed = true)) {
         val index = agentBlocks.indexOfFirst { it.label == blockLabel }
         val existing = agentBlocks.getOrNull(index)
         val updated = Block(
-            id = existing?.id ?: "block-${blockLabel}",
+            id = existing?.id ?: BlockId("block-$blockLabel"),
             label = blockLabel,
             value = params.value ?: existing?.value ?: "",
             description = params.description ?: existing?.description,
@@ -60,8 +61,8 @@ class FakeBlockApi : BlockApi(mockk(relaxed = true)) {
         calls.add("updateGlobalBlock:$blockId:$clearDescription:$clearLimit")
         lastUpdateParams = params
         if (shouldFail) throw ApiException(500, "Server error")
-        val index = allBlocks.indexOfFirst { it.id == blockId }
-        val existing = allBlocks.getOrNull(index) ?: Block(id = blockId, value = params.value ?: "")
+        val index = allBlocks.indexOfFirst { it.id.value == blockId }
+        val existing = allBlocks.getOrNull(index) ?: Block(id = BlockId(blockId), value = params.value ?: "")
         val updated = existing.copy(
             value = params.value ?: existing.value,
             description = when {

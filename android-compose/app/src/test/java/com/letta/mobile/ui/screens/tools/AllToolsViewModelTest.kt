@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.tools
 
+import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.repository.McpServerRepository
 import com.letta.mobile.data.repository.ToolRepository
@@ -48,8 +49,8 @@ class AllToolsViewModelTest {
     fun `updateSearchQuery filters tools by name and description`() = runTest {
         fakeRepository.setTools(
             listOf(
-                Tool(id = "t1", name = "weather_lookup", description = "Forecast helper"),
-                Tool(id = "t2", name = "calendar_sync", description = "Calendar helper"),
+                Tool(id = ToolId("t1"), name = "weather_lookup", description = "Forecast helper"),
+                Tool(id = ToolId("t2"), name = "calendar_sync", description = "Calendar helper"),
             )
         )
         viewModel.loadTools()
@@ -66,8 +67,8 @@ class AllToolsViewModelTest {
     fun `getFilteredTools returns all tools when query blank`() = runTest {
         fakeRepository.setTools(
             listOf(
-                Tool(id = "t1", name = "weather_lookup"),
-                Tool(id = "t2", name = "calendar_sync"),
+                Tool(id = ToolId("t1"), name = "weather_lookup"),
+                Tool(id = ToolId("t2"), name = "calendar_sync"),
             )
         )
         viewModel.loadTools()
@@ -81,8 +82,8 @@ class AllToolsViewModelTest {
     fun `loadTools publishes regular tools before slow mcp tools finish`() = runTest {
         fakeRepository.setTools(
             listOf(
-                Tool(id = "t1", name = "weather_lookup"),
-                Tool(id = "t2", name = "calendar_sync"),
+                Tool(id = ToolId("t1"), name = "weather_lookup"),
+                Tool(id = ToolId("t2"), name = "calendar_sync"),
             )
         )
         val mcpGate = CompletableDeferred<List<Tool>>()
@@ -91,20 +92,20 @@ class AllToolsViewModelTest {
         viewModel = AllToolsViewModel(fakeRepository, mockMcpServerRepository)
 
         val initial = awaitSuccessState()
-        assertEquals(listOf("t1", "t2"), initial.tools.map { it.id })
+        assertEquals(listOf("t1", "t2"), initial.tools.map { it.id.value })
         assertEquals(true, initial.isLoadingMcpTools)
 
-        mcpGate.complete(listOf(Tool(id = "m1", name = "mcp_tool")))
+        mcpGate.complete(listOf(Tool(id = ToolId("m1"), name = "mcp_tool")))
         advanceUntilIdle()
 
         val enriched = awaitSuccessState()
-        assertEquals(listOf("m1", "t1", "t2"), enriched.tools.map { it.id })
+        assertEquals(listOf("m1", "t1", "t2"), enriched.tools.map { it.id.value })
         assertEquals(false, enriched.isLoadingMcpTools)
     }
 
     @Test
     fun `loadMoreTools keeps paged tools when mcp tools finish later`() = runTest {
-        fakeRepository.setTools((1..51).map { index -> Tool(id = "t$index", name = "tool_$index") })
+        fakeRepository.setTools((1..51).map { index -> Tool(id = ToolId("t$index"), name = "tool_$index") })
         val mcpGate = CompletableDeferred<List<Tool>>()
         coEvery { mockMcpServerRepository.fetchAllMcpTools() } coAnswers { mcpGate.await() }
 
@@ -118,16 +119,16 @@ class AllToolsViewModelTest {
 
         val paged = awaitSuccessState()
         assertEquals(51, paged.tools.size)
-        assertEquals("t51", paged.tools.last().id)
+        assertEquals("t51", paged.tools.last().id.value)
         assertEquals(true, paged.isLoadingMcpTools)
 
-        mcpGate.complete(listOf(Tool(id = "m1", name = "mcp_tool")))
+        mcpGate.complete(listOf(Tool(id = ToolId("m1"), name = "mcp_tool")))
         advanceUntilIdle()
 
         val enriched = awaitSuccessState()
         assertEquals(52, enriched.tools.size)
-        assertEquals("m1", enriched.tools.first().id)
-        assertEquals("t51", enriched.tools.last().id)
+        assertEquals("m1", enriched.tools.first().id.value)
+        assertEquals("t51", enriched.tools.last().id.value)
         assertEquals(false, enriched.isLoadingMcpTools)
     }
 

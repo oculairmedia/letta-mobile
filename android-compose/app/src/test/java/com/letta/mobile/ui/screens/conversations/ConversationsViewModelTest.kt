@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.conversations
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.repository.AgentRepository
@@ -258,7 +259,7 @@ class ConversationsViewModelTest {
     }
 
     private class FakeAgentRepository : AgentRepository(FakeAgentApi(), mockk(relaxed = true)) {
-        private val _agents = MutableStateFlow(listOf(Agent(id = "a1", name = "Agent One")))
+        private val _agents = MutableStateFlow(listOf(Agent(id = AgentId("a1"), name = "Agent One")))
         override val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
         var fresh: Boolean = false
         var didRefresh: Boolean = false

@@ -54,7 +54,12 @@ class EditAgentViewModel @Inject constructor(
     @Volatile private var originalEmbedding: String = ""
     @Volatile private var originalProviderType: String = ""
 
-    private lateinit var useCases: EditAgentUseCases
+    // letta-mobile-rnyg: nullable rather than lateinit — the loadAgent flow
+    // assigns this on its success path, so any delegated action invoked
+    // before initial load completes (or while a retry is in flight) would
+    // otherwise throw UninitializedPropertyAccessException. Surface a UI
+    // error instead.
+    @Volatile private var useCases: EditAgentUseCases? = null
 
     init {
         loadAgent()
@@ -687,15 +692,23 @@ class EditAgentViewModel @Inject constructor(
         _uiState.value = UiState.Success(currentState.copy(toolRulesJson = value))
     }
 
+    private fun requireUseCasesOrError(): EditAgentUseCases? {
+        val cases = useCases
+        if (cases == null) {
+            _uiState.value = UiState.Error("Agent is still loading. Please try again.")
+        }
+        return cases
+    }
+
     fun saveAgent(onSuccess: () -> Unit) {
         viewModelScope.launch {
-            useCases.saveAgent(onSuccess)
+            requireUseCasesOrError()?.saveAgent(onSuccess)
         }
     }
 
     fun exportAgent(onResult: (String) -> Unit) {
         viewModelScope.launch {
-            useCases.exportAgent(onResult)
+            requireUseCasesOrError()?.exportAgent(onResult)
         }
     }
 
@@ -706,19 +719,19 @@ class EditAgentViewModel @Inject constructor(
         onSuccess: (ImportedAgentsResponse) -> Unit,
     ) {
         viewModelScope.launch {
-            useCases.cloneAgent(cloneName, overrideExistingTools, stripMessages, onSuccess)
+            requireUseCasesOrError()?.cloneAgent(cloneName, overrideExistingTools, stripMessages, onSuccess)
         }
     }
 
     fun resetMessages(onSuccess: () -> Unit = {}) {
         viewModelScope.launch {
-            useCases.resetMessages(onSuccess)
+            requireUseCasesOrError()?.resetMessages(onSuccess)
         }
     }
 
     fun deleteAgent(onSuccess: () -> Unit) {
         viewModelScope.launch {
-            useCases.deleteAgent(onSuccess)
+            requireUseCasesOrError()?.deleteAgent(onSuccess)
         }
     }
 

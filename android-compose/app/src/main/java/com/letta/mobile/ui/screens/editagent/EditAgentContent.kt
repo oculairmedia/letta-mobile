@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -249,20 +250,35 @@ internal fun EditAgentContent(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Section",
+                            text = stringResource(R.string.screen_agent_edit_section_label),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         val activeHasWarning = selectedTab.hasValidationWarning(state)
-                        Text(
-                            text = if (activeHasWarning) "${selectedTab.label} •" else selectedTab.label,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = if (activeHasWarning) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.primary
-                            },
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = selectedTab.label,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = if (activeHasWarning) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                },
+                            )
+                            if (activeHasWarning) {
+                                // letta-mobile-w3dl: non-color accessible cue.
+                                // The '•' glyph alone fails screen readers and
+                                // color-perception users — pair it with an
+                                // Icon that carries a contentDescription.
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    LettaIcons.Error,
+                                    contentDescription = stringResource(R.string.screen_agent_edit_validation_warning),
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
+                        }
                     }
                     // letta-mobile-qfn9: aggregate validation indicator. When
                     // a section other than the active one has a warning, the
@@ -271,12 +287,26 @@ internal fun EditAgentContent(
                     // even when the affected section isn't selected.
                     val otherWarnings = tabs.count { it != selectedTab && it.hasValidationWarning(state) }
                     if (otherWarnings > 0) {
-                        Text(
-                            text = "$otherWarnings • ",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.error,
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(end = 8.dp),
-                        )
+                        ) {
+                            Icon(
+                                LettaIcons.Error,
+                                contentDescription = stringResource(
+                                    R.string.screen_agent_edit_validation_warning_count,
+                                    otherWarnings,
+                                ),
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text(
+                                text = otherWarnings.toString(),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
                     }
                     Icon(
                         LettaIcons.ExpandMore,
@@ -290,7 +320,7 @@ internal fun EditAgentContent(
         if (selectedTab == EditAgentConfigTab.Basics) {
             // ── Identity ──
             item(key = "identity") {
-                CardGroup(title = { Text("Identity") }) {
+                CardGroup(title = { Text(stringResource(R.string.screen_agent_edit_identity_section)) }) {
                     item(
                         headlineContent = {
                             OutlinedTextField(
@@ -740,7 +770,7 @@ internal fun EditAgentContent(
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "Sections",
+                    text = stringResource(R.string.screen_agent_edit_sections_title),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),

@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.screens.agentlist
 
+import com.letta.mobile.data.model.ToolId
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.EmbeddingModel
@@ -57,8 +59,8 @@ class AgentListViewModelTest {
         every { settingsRepository.getPinnedAgentIds() } returns MutableStateFlow(emptySet())
         every { toolRepository.getTools() } returns MutableStateFlow(
             listOf(
-                Tool(id = "t1", name = "tool_one"),
-                Tool(id = "t2", name = "tool_two"),
+                Tool(id = ToolId("t1"), name = "tool_one"),
+                Tool(id = ToolId("t2"), name = "tool_two"),
             )
         )
         every { modelRepository.llmModels } returns MutableStateFlow(
@@ -96,7 +98,7 @@ class AgentListViewModelTest {
     @Test
     fun `createAgent forwards tool ids and include base tools`() = runTest {
         val paramsSlot = slot<AgentCreateParams>()
-        coEvery { agentRepository.createAgent(capture(paramsSlot)) } returns Agent(id = "a1", name = "Agent")
+        coEvery { agentRepository.createAgent(capture(paramsSlot)) } returns Agent(id = AgentId("a1"), name = "Agent")
 
         var createdId: String? = null
         viewModel.createAgent(
@@ -104,12 +106,12 @@ class AgentListViewModelTest {
                 name = "Agent",
                 model = "openai/gpt-4o",
                 embedding = "openai/text-embedding-3-small",
-                toolIds = listOf("t1", "t2"),
+                toolIds = listOf(ToolId("t1"), ToolId("t2")),
                 includeBaseTools = true,
             )
         ) { createdId = it }
 
-        assertEquals(listOf("t1", "t2"), paramsSlot.captured.toolIds)
+        assertEquals(listOf(ToolId("t1"), ToolId("t2")), paramsSlot.captured.toolIds)
         assertTrue(paramsSlot.captured.includeBaseTools == true)
         assertEquals("a1", createdId)
         coVerify(exactly = 1) { agentRepository.createAgent(any()) }
@@ -154,9 +156,9 @@ class AgentListViewModelTest {
     fun `getAllTags returns sorted distinct tags from all agents`() = runTest {
         every { agentRepository.agents } returns MutableStateFlow(
             listOf(
-                Agent(id = "a1", name = "Agent1", tags = listOf("beta", "alpha")),
-                Agent(id = "a2", name = "Agent2", tags = listOf("alpha", "gamma")),
-                Agent(id = "a3", name = "Agent3", tags = emptyList()),
+                Agent(id = AgentId("a1"), name = "Agent1", tags = listOf("beta", "alpha")),
+                Agent(id = AgentId("a2"), name = "Agent2", tags = listOf("alpha", "gamma")),
+                Agent(id = AgentId("a3"), name = "Agent3", tags = emptyList()),
             )
         )
         viewModel = AgentListViewModel(agentRepository, settingsRepository, toolRepository, modelRepository)
@@ -169,8 +171,8 @@ class AgentListViewModelTest {
     fun `getAllTags returns empty list when no agents have tags`() = runTest {
         every { agentRepository.agents } returns MutableStateFlow(
             listOf(
-                Agent(id = "a1", name = "Agent1"),
-                Agent(id = "a2", name = "Agent2"),
+                Agent(id = AgentId("a1"), name = "Agent1"),
+                Agent(id = AgentId("a2"), name = "Agent2"),
             )
         )
         viewModel = AgentListViewModel(agentRepository, settingsRepository, toolRepository, modelRepository)
@@ -210,9 +212,9 @@ class AgentListViewModelTest {
     fun `getFilteredAgents filters by selected tags with AND logic`() = runTest {
         every { agentRepository.agents } returns MutableStateFlow(
             listOf(
-                Agent(id = "a1", name = "Agent1", tags = listOf("alpha", "beta")),
-                Agent(id = "a2", name = "Agent2", tags = listOf("alpha")),
-                Agent(id = "a3", name = "Agent3", tags = listOf("beta", "gamma")),
+                Agent(id = AgentId("a1"), name = "Agent1", tags = listOf("alpha", "beta")),
+                Agent(id = AgentId("a2"), name = "Agent2", tags = listOf("alpha")),
+                Agent(id = AgentId("a3"), name = "Agent3", tags = listOf("beta", "gamma")),
             )
         )
         viewModel = AgentListViewModel(agentRepository, settingsRepository, toolRepository, modelRepository)
@@ -224,23 +226,23 @@ class AgentListViewModelTest {
         viewModel.toggleTag("alpha")
         val alphaFiltered = viewModel.getFilteredAgents()
         assertEquals(2, alphaFiltered.size)
-        assertTrue(alphaFiltered.any { it.id == "a1" })
-        assertTrue(alphaFiltered.any { it.id == "a2" })
+        assertTrue(alphaFiltered.any { it.id.value == "a1" })
+        assertTrue(alphaFiltered.any { it.id.value == "a2" })
 
         // AND logic: alpha + beta — only a1 has both
         viewModel.toggleTag("beta")
         val andFiltered = viewModel.getFilteredAgents()
         assertEquals(1, andFiltered.size)
-        assertEquals("a1", andFiltered.first().id)
+        assertEquals("a1", andFiltered.first().id.value)
     }
 
     @Test
     fun `getFilteredAgents combines tag filter with search query`() = runTest {
         every { agentRepository.agents } returns MutableStateFlow(
             listOf(
-                Agent(id = "a1", name = "ChatBot", tags = listOf("production")),
-                Agent(id = "a2", name = "HelperBot", tags = listOf("production")),
-                Agent(id = "a3", name = "TestBot", tags = listOf("staging")),
+                Agent(id = AgentId("a1"), name = "ChatBot", tags = listOf("production")),
+                Agent(id = AgentId("a2"), name = "HelperBot", tags = listOf("production")),
+                Agent(id = AgentId("a3"), name = "TestBot", tags = listOf("staging")),
             )
         )
         viewModel = AgentListViewModel(agentRepository, settingsRepository, toolRepository, modelRepository)
@@ -250,15 +252,15 @@ class AgentListViewModelTest {
 
         val results = viewModel.getFilteredAgents()
         assertEquals(1, results.size)
-        assertEquals("a1", results.first().id)
+        assertEquals("a1", results.first().id.value)
     }
 
     @Test
     fun `getFilteredAgents returns all when no tags selected and no search`() = runTest {
         every { agentRepository.agents } returns MutableStateFlow(
             listOf(
-                Agent(id = "a1", name = "Agent1", tags = listOf("alpha")),
-                Agent(id = "a2", name = "Agent2"),
+                Agent(id = AgentId("a1"), name = "Agent1", tags = listOf("alpha")),
+                Agent(id = AgentId("a2"), name = "Agent2"),
             )
         )
         viewModel = AgentListViewModel(agentRepository, settingsRepository, toolRepository, modelRepository)
@@ -272,14 +274,14 @@ class AgentListViewModelTest {
         val keepRefreshing = CompletableDeferred<Unit>()
         every { agentRepository.agents } returns agentsFlow
         coEvery { agentRepository.refreshAgentsIfStale(any()) } coAnswers {
-            agentsFlow.value = listOf(Agent(id = "a1", name = "Needle Agent"))
+            agentsFlow.value = listOf(Agent(id = AgentId("a1"), name = "Needle Agent"))
             keepRefreshing.await()
             true
         }
 
         viewModel = AgentListViewModel(agentRepository, settingsRepository, toolRepository, modelRepository)
 
-        assertEquals(listOf("a1"), viewModel.uiState.value.agents.map { it.id })
+        assertEquals(listOf("a1"), viewModel.uiState.value.agents.map { it.id.value })
         assertFalse(viewModel.uiState.value.isLoading)
         assertTrue(viewModel.uiState.value.isHydrating)
 
@@ -290,8 +292,8 @@ class AgentListViewModelTest {
     fun `deleteAgent removes deleted agent from ui state immediately`() = runTest {
         val agentsFlow = MutableStateFlow(
             listOf(
-                Agent(id = "a1", name = "Agent1"),
-                Agent(id = "a2", name = "Agent2"),
+                Agent(id = AgentId("a1"), name = "Agent1"),
+                Agent(id = AgentId("a2"), name = "Agent2"),
             )
         )
         val favFlow = MutableStateFlow<String?>("a1")
@@ -299,13 +301,13 @@ class AgentListViewModelTest {
         every { settingsRepository.favoriteAgentId } returns favFlow
         every { settingsRepository.setFavoriteAgentId(any()) } answers { favFlow.value = firstArg() }
         coEvery { agentRepository.deleteAgent("a1") } answers {
-            agentsFlow.value = agentsFlow.value.filterNot { it.id == "a1" }
+            agentsFlow.value = agentsFlow.value.filterNot { it.id.value == "a1" }
         }
         viewModel = AgentListViewModel(agentRepository, settingsRepository, toolRepository, modelRepository)
 
         viewModel.deleteAgent("a1")
 
-        assertEquals(listOf("a2"), viewModel.uiState.value.agents.map { it.id })
+        assertEquals(listOf("a2"), viewModel.uiState.value.agents.map { it.id.value })
         assertEquals(null, viewModel.uiState.value.favoriteAgentId)
         coVerify(exactly = 1) { agentRepository.deleteAgent("a1") }
         io.mockk.verify(exactly = 1) { settingsRepository.setFavoriteAgentId(null) }

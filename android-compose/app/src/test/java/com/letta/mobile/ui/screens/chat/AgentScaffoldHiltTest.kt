@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.chat
 
+import com.letta.mobile.data.model.AgentId
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.ui.test.assertIsDisplayed
@@ -224,13 +225,13 @@ class AgentScaffoldHiltTest {
     fun agentPickerFiltersByVisibleAgentMetadata() {
         availableAgentsFlow.value = listOf(
             Agent(
-                id = "agent-alpha",
+                id = AgentId("agent-alpha"),
                 name = "Alpha Agent",
                 description = "Roadmap helper",
                 model = "openai/gpt-5-mini",
             ),
             Agent(
-                id = "agent-beta",
+                id = AgentId("agent-beta"),
                 name = "Beta Specialist",
                 description = "Release triage",
                 model = "anthropic/claude-3-5-sonnet",

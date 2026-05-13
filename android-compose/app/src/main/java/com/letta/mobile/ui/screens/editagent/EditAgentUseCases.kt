@@ -12,6 +12,7 @@ import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.util.mapErrorToUserMessage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -131,6 +132,8 @@ internal class EditAgentUseCases(
             settingsRepository.setClientModeBaseUrl(state.clientModeBaseUrl.trim())
             settingsRepository.setClientModeApiKey(state.clientModeApiKey.trim().ifBlank { null })
             onSuccess()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             uiState.value = UiState.Error(e.message ?: "Failed to save agent")
         }
@@ -304,6 +307,8 @@ internal class EditAgentUseCases(
         try {
             val data = agentRepository.exportAgent(agentId)
             onResult(data)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             uiState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to export agent"))
         }
@@ -328,6 +333,8 @@ internal class EditAgentUseCases(
             )
             uiState.value = UiState.Success(state.copy(isCloning = false))
             onSuccess(response)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             uiState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to clone agent"))
         }
@@ -337,6 +344,8 @@ internal class EditAgentUseCases(
         try {
             messageRepository.resetMessages(agentId)
             onSuccess()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             uiState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to reset messages"))
         }
@@ -346,6 +355,8 @@ internal class EditAgentUseCases(
         try {
             agentRepository.deleteAgent(agentId)
             onSuccess()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             uiState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to delete agent"))
         }

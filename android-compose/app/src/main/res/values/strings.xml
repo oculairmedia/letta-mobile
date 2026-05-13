@@ -19,6 +19,8 @@
     <string name="screen_home_search_no_results">No results found</string>
     <string name="screen_home_search_tools_section">Tools</string>
     <string name="screen_home_search_blocks_section">Blocks</string>
+    <string name="screen_home_search_unnamed_block">Unnamed</string>
+    <string name="screen_home_search_message_role_fallback">Message</string>
     <string name="screen_home_favorite_subtitle">Your favourite agent</string>
     <string name="screen_home_pinned_subtitle">Pinned agent</string>
     <string name="action_configure_agent">Configure</string>
@@ -206,7 +208,28 @@
     <string name="screen_conversations_empty">No conversations yet</string>
     <string name="screen_conversations_search_empty">No matching conversations</string>
     <string name="screen_conversations_search_hint">Search conversations\u2026</string>
+    <string name="screen_conversations_unnamed">Conversation</string>
+    <string name="screen_conversations_last_activity_format">Last activity %1$s</string>
+    <string name="screen_conversations_created_format">Created %1$s</string>
+    <string name="screen_conversations_delete_message_one">Delete this conversation? This cannot be undone.</string>
+    <plurals name="screen_conversations_delete_message">
+        <item quantity="one">Delete %1$d conversation? This cannot be undone.</item>
+        <item quantity="other">Delete %1$d conversations? This cannot be undone.</item>
+    </plurals>
     <string name="screen_agents_empty">No agents yet</string>
+    <string name="screen_agents_no_matches">No agents matching \u201c%1$s\u201d</string>
+    <string name="screen_agents_favorite_indicator">Favorite agent</string>
+    <string name="screen_agents_pinned_indicator">Pinned agent</string>
+    <string name="screen_agents_current_indicator">Current agent</string>
+    <string name="screen_drawer_agent_icon_description">Agent</string>
+    <string name="screen_drawer_default_agent_name">Agent</string>
+    <string name="screen_drawer_message_count">%1$d messages</string>
+    <string name="screen_drawer_chat_mode_label">Chat mode</string>
+    <string name="screen_drawer_chat_mode_simple">Simple</string>
+    <string name="screen_drawer_chat_mode_interactive">Interactive</string>
+    <string name="screen_drawer_chat_mode_debug">Debug</string>
+    <string name="screen_drawer_reset_icon_description">Reset</string>
+    <string name="common_selected">Selected</string>
     <string name="screen_tools_empty">No tools available</string>
     <string name="screen_tools_search_hint">Search tools…</string>
     <string name="screen_tools_empty_search">No tools matching “%1$s”</string>
@@ -381,6 +404,11 @@
     <string name="screen_agent_edit_agent_saved">Agent saved</string>
     <string name="screen_agent_edit_default_name">Agent</string>
     <string name="screen_agent_edit_remove_tag">Remove tag</string>
+    <string name="screen_agent_edit_section_label">Section</string>
+    <string name="screen_agent_edit_sections_title">Sections</string>
+    <string name="screen_agent_edit_identity_section">Identity</string>
+    <string name="screen_agent_edit_validation_warning">Validation warning</string>
+    <string name="screen_agent_edit_validation_warning_count">%1$d sections with warnings</string>
     <string name="common_tags">Tags</string>
     <string name="screen_tag_drill_in_title">Tagged “%1$s”</string>
     <string name="screen_tag_drill_in_loading">Loading tagged items…</string>
@@ -597,6 +625,7 @@
     <string name="screen_settings_clone_helper">Create a new agent from this agent’s export, with optional safety guards.</string>
     <string name="screen_settings_clone_dialog_helper">Cloning uses the current export format and re-imports it through Letta’s import endpoint.</string>
     <string name="screen_settings_clone_name_label">Clone name</string>
+    <string name="screen_settings_clone_default_name_format">%1$s Copy</string>
     <string name="screen_settings_clone_success_single">Cloned agent successfully</string>
     <string name="screen_settings_clone_success_multiple">Cloned %1$d agents successfully</string>
     <string name="screen_agents_create_embedding_placeholder">e.g. openai/text-embedding-3-small</string>

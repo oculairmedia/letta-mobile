@@ -182,6 +182,7 @@ internal fun DashboardWidgetTile(
     onClick: () -> Unit,
     onUnpin: () -> Unit,
     isDragging: Boolean = false,
+    enableLongPressMenu: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
@@ -205,6 +206,22 @@ internal fun DashboardWidgetTile(
         label = "tileElevation",
     )
 
+    // letta-mobile-rnyg: the long-press shortcut menu and the reordering grid's
+    // long-press-to-drag gesture both fight for the same surface. When the tile
+    // is rendered inside ReorderableWidgetGrid, suppress the menu so dragging
+    // wins; the parent provides reorder semantics in that mode.
+    val clickModifier = if (enableLongPressMenu) {
+        Modifier.combinedClickable(
+            onClick = onClick,
+            onLongClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                showMenu = true
+            },
+        )
+    } else {
+        Modifier.combinedClickable(onClick = onClick)
+    }
+
     Card(
         modifier = modifier
             .graphicsLayer {
@@ -212,13 +229,7 @@ internal fun DashboardWidgetTile(
                 scaleY = scale
                 shadowElevation = elevation * density
             }
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    showMenu = true
-                },
-            ),
+            .then(clickModifier),
         colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
         Column(
@@ -364,19 +375,25 @@ internal fun ReorderableWidgetGrid(
                                         change.consume()
                                         dragOffset += Offset(dragAmount.x, dragAmount.y)
 
-                                        val draggedRect = itemRects[index] ?: return@detectDragGesturesAfterLongPress
+                                        // letta-mobile-rnyg: after the first swap the dragged
+                                        // item lives at draggingIndex, not the original `index`
+                                        // that scoped this pointerInput. Always derive the
+                                        // current slot from draggingIndex so subsequent
+                                        // crossings reorder the right item.
+                                        val currentIndex = draggingIndex ?: index
+                                        val draggedRect = itemRects[currentIndex] ?: return@detectDragGesturesAfterLongPress
                                         val draggedCenter = draggedRect.center + dragOffset
                                         val targetIndex = itemRects.entries
                                             .firstOrNull { (i, rect) ->
-                                                i != index && rect.contains(draggedCenter)
+                                                i != currentIndex && rect.contains(draggedCenter)
                                             }?.key
 
-                                        if (targetIndex != null && targetIndex != index) {
-                                            val oldRect = itemRects[index] ?: return@detectDragGesturesAfterLongPress
+                                        if (targetIndex != null && targetIndex != currentIndex) {
+                                            val oldRect = itemRects[currentIndex] ?: return@detectDragGesturesAfterLongPress
                                             val newRect = itemRects[targetIndex] ?: return@detectDragGesturesAfterLongPress
 
                                             currentList = currentList.toMutableList().apply {
-                                                val item = removeAt(index)
+                                                val item = removeAt(currentIndex)
                                                 add(targetIndex, item)
                                             }
                                             draggingIndex = targetIndex
@@ -405,6 +422,7 @@ internal fun ReorderableWidgetGrid(
                             onClick = { onShortcutClick(shortcut) },
                             onUnpin = { onUnpinShortcut(shortcut) },
                             isDragging = isDragging,
+                            enableLongPressMenu = false,
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }

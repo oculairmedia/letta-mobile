@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.projects
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.api.ProjectApi
 import com.letta.mobile.data.model.ProjectCatalog
@@ -846,7 +847,7 @@ class ProjectHomeViewModelTest {
         updatedAt = updatedAt,
         filesystemPath = filesystemPath,
         gitUrl = gitUrl,
-        lettaAgentId = "agent-$identifier",
+        lettaAgentId = AgentId("agent-$identifier"),
     )
 
     private class FakeProjectApi : ProjectApi(mockk(relaxed = true)) {

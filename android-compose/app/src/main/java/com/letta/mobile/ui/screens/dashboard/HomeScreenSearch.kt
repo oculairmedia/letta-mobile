@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -193,8 +194,9 @@ internal fun SearchResultsContent(
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
+                                val blockLabel = block.label ?: stringResource(R.string.screen_home_search_unnamed_block)
                                 Text(
-                                    text = highlightSearchMatches(block.label ?: "Unnamed", searchQuery, highlightColors),
+                                    text = highlightSearchMatches(blockLabel, searchQuery, highlightColors),
                                     style = MaterialTheme.typography.bodyMedium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
@@ -226,8 +228,15 @@ internal fun SearchResultsContent(
                 )
             }
             if (messagesExpanded) {
-                items(messageResults.size, key = { "msg-$it" }) { index ->
-                    val msg = messageResults[index]
+                itemsIndexed(
+                    items = messageResults,
+                    // letta-mobile-w3dl: identity-based key (was position-based
+                    // "msg-$index") so animateItem() can track inserts/moves
+                    // across result refreshes. Compose key lambdas must be
+                    // unique — fall back to a position-based slug only when
+                    // messageId is unexpectedly null (rare).
+                    key = { index, msg -> msg.messageId ?: "msg-$index" },
+                ) { _, msg ->
                     Card(
                         onClick = { onMessageClick(msg) },
                         modifier = Modifier.fillMaxWidth().animateItem(),
@@ -242,7 +251,8 @@ internal fun SearchResultsContent(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = msg.role?.replaceFirstChar { it.uppercase() } ?: "Message",
+                                    text = msg.role?.replaceFirstChar { it.uppercase() }
+                                        ?: stringResource(R.string.screen_home_search_message_role_fallback),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )

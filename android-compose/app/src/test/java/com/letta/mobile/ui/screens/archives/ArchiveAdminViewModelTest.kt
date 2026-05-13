@@ -106,7 +106,7 @@ class ArchiveAdminViewModelTest {
         val availableAgents = viewModel.getAvailableAgentsForArchive()
 
         assertEquals(1, availableAgents.size)
-        assertEquals("agent-2", availableAgents.first().id)
+        assertEquals("agent-2", availableAgents.first().id.value)
     }
 
     @Test

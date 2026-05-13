@@ -78,7 +78,7 @@ internal fun MemoryBlockItem(
         OutlinedTextField(
             value = block.limit?.toString().orEmpty(),
             onValueChange = { value ->
-                if (value.isBlank() || value.toIntOrNull() != null) {
+                if (value.isBlank() || (value.toIntOrNull()?.let { it >= 0 } == true)) {
                     onLimitChange(value.toIntOrNull())
                 }
             },
@@ -167,7 +167,7 @@ internal fun AddBlockDialog(
             OutlinedTextField(
                 value = newLimit,
                 onValueChange = { value ->
-                    if (value.isBlank() || value.toIntOrNull() != null) {
+                    if (value.isBlank() || (value.toIntOrNull()?.let { it >= 0 } == true)) {
                         newLimit = value
                     }
                 },
@@ -186,7 +186,9 @@ internal fun CloneAgentDialog(
     onDismiss: () -> Unit,
     onClone: (cloneName: String?, overrideExistingTools: Boolean, stripMessages: Boolean) -> Unit,
 ) {
-    var cloneName by remember(initialName) { mutableStateOf(if (initialName.isBlank()) "" else "$initialName Copy") }
+    val defaultCloneName = if (initialName.isBlank()) ""
+        else stringResource(R.string.screen_settings_clone_default_name_format, initialName)
+    var cloneName by remember(defaultCloneName) { mutableStateOf(defaultCloneName) }
     var overrideExistingTools by remember { mutableStateOf(true) }
     var stripMessages by remember { mutableStateOf(true) }
 
@@ -257,7 +259,6 @@ internal fun ToolDetailDialog(
         show = true,
         title = tool.name,
         confirmText = stringResource(R.string.action_close),
-        dismissText = stringResource(R.string.action_close),
         onConfirm = onDismiss,
         onDismiss = onDismiss,
     ) {

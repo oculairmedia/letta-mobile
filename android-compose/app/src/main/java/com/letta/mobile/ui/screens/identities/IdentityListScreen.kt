@@ -222,8 +222,13 @@ fun IdentityListScreen(
     }
 
     attachTarget?.let { identity ->
+        val attachableAgents = remember(uiState, identity.agentIds) {
+            val attached = identity.agentIds.mapTo(HashSet()) { AgentId(it) }
+            (uiState as? UiState.Success)?.data?.knownAgents.orEmpty()
+                .filter { it.id !in attached }
+        }
         AgentAttachDialog(
-            agents = (uiState as? UiState.Success)?.data?.knownAgents.orEmpty().filter { it.id !in identity.agentIds.map { AgentId(it) } },
+            agents = attachableAgents,
             onDismiss = { attachTarget = null },
             onAttach = { agentId ->
                 viewModel.attachIdentity(agentId = agentId, identityId = identity.id) {

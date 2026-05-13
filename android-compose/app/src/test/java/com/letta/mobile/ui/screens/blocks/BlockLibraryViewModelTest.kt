@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.screens.blocks
 
+import com.letta.mobile.data.model.BlockId
+import com.letta.mobile.data.model.AgentId
 import app.cash.turbine.test
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Block
@@ -50,8 +52,8 @@ class BlockLibraryViewModelTest {
     @Test
     fun `loadBlocks sets Success with block list`() = runTest {
         fakeRepo.allBlocks = listOf(
-            Block(id = "b1", label = "persona", value = "I am helpful."),
-            Block(id = "b2", label = "human", value = "User info."),
+            Block(id = BlockId("b1"), label = "persona", value = "I am helpful."),
+            Block(id = BlockId("b2"), label = "human", value = "User info."),
         )
         viewModel.loadBlocks()
         viewModel.uiState.test {
@@ -70,8 +72,8 @@ class BlockLibraryViewModelTest {
     @Test
     fun `setFilter updates filter and reloads`() = runTest {
         fakeRepo.allBlocks = listOf(
-            Block(id = "b1", label = "persona", value = "Persona block."),
-            Block(id = "b2", label = "human", value = "Human block."),
+            Block(id = BlockId("b1"), label = "persona", value = "Persona block."),
+            Block(id = BlockId("b2"), label = "human", value = "Human block."),
         )
         viewModel.setFilter(label = "persona", isTemplate = null)
         viewModel.uiState.test {
@@ -85,8 +87,8 @@ class BlockLibraryViewModelTest {
     @Test
     fun `loadBlocks with template filter returns only templates`() = runTest {
         fakeRepo.allBlocks = listOf(
-            Block(id = "b1", label = "persona", value = "Template", isTemplate = true),
-            Block(id = "b2", label = "human", value = "Not template", isTemplate = false),
+            Block(id = BlockId("b1"), label = "persona", value = "Template", isTemplate = true),
+            Block(id = BlockId("b2"), label = "human", value = "Not template", isTemplate = false),
         )
         viewModel.setFilter(label = null, isTemplate = true)
         viewModel.uiState.test {
@@ -100,8 +102,8 @@ class BlockLibraryViewModelTest {
     @Test
     fun `updateSearchQuery filters loaded blocks locally`() = runTest {
         fakeRepo.allBlocks = listOf(
-            Block(id = "b1", label = "persona", value = "Template block", description = "Behavior rules"),
-            Block(id = "b2", label = "human", value = "Human block", description = "User profile"),
+            Block(id = BlockId("b1"), label = "persona", value = "Template block", description = "Behavior rules"),
+            Block(id = BlockId("b2"), label = "human", value = "Human block", description = "User profile"),
         )
         viewModel.loadBlocks()
 
@@ -114,7 +116,7 @@ class BlockLibraryViewModelTest {
 
     @Test
     fun `deleteBlock delegates to repository`() = runTest {
-        fakeRepo.allBlocks = listOf(Block(id = "b1", label = "persona", value = "Template block"))
+        fakeRepo.allBlocks = listOf(Block(id = BlockId("b1"), label = "persona", value = "Template block"))
 
         viewModel.deleteBlock("b1")
 
@@ -139,7 +141,7 @@ class BlockLibraryViewModelTest {
 
     @Test
     fun `updateBlock delegates to repository by block id and reloads blocks`() = runTest {
-        fakeRepo.allBlocks = listOf(Block(id = "b1", label = "persona", value = "Old value"))
+        fakeRepo.allBlocks = listOf(Block(id = BlockId("b1"), label = "persona", value = "Old value"))
 
         viewModel.updateGlobalBlock(
             blockId = "b1",
@@ -159,7 +161,7 @@ class BlockLibraryViewModelTest {
     @Test
     fun `updateGlobalBlock can clear optional metadata`() = runTest {
         fakeRepo.allBlocks = listOf(
-            Block(id = "b1", label = "persona", value = "Old value", description = "desc", limit = 64)
+            Block(id = BlockId("b1"), label = "persona", value = "Old value", description = "desc", limit = 64)
         )
 
         viewModel.updateGlobalBlock(
@@ -177,7 +179,7 @@ class BlockLibraryViewModelTest {
 
     @Test
     fun `createBlock failure preserves success state with operation error`() = runTest {
-        fakeRepo.allBlocks = listOf(Block(id = "b1", label = "persona", value = "Existing block"))
+        fakeRepo.allBlocks = listOf(Block(id = BlockId("b1"), label = "persona", value = "Existing block"))
         viewModel.loadBlocks()
         fakeRepo.shouldFail = true
 
@@ -191,16 +193,16 @@ class BlockLibraryViewModelTest {
     @Test
     fun `loadBlocks populates agentsByBlock from agent repository`() = runTest {
         fakeRepo.allBlocks = listOf(
-            Block(id = "b1", label = "persona", value = "Persona block"),
-            Block(id = "b2", label = "human", value = "Human block"),
+            Block(id = BlockId("b1"), label = "persona", value = "Persona block"),
+            Block(id = BlockId("b2"), label = "human", value = "Human block"),
         )
         agentsFlow.value = listOf(
-            Agent(id = "a1", name = "Agent One", blocks = listOf(
-                Block(id = "b1", label = "persona", value = "Persona block"),
+            Agent(id = AgentId("a1"), name = "Agent One", blocks = listOf(
+                Block(id = BlockId("b1"), label = "persona", value = "Persona block"),
             )),
-            Agent(id = "a2", name = "Agent Two", blocks = listOf(
-                Block(id = "b1", label = "persona", value = "Persona block"),
-                Block(id = "b2", label = "human", value = "Human block"),
+            Agent(id = AgentId("a2"), name = "Agent Two", blocks = listOf(
+                Block(id = BlockId("b1"), label = "persona", value = "Persona block"),
+                Block(id = BlockId("b2"), label = "human", value = "Human block"),
             )),
         )
 
@@ -214,7 +216,7 @@ class BlockLibraryViewModelTest {
 
     @Test
     fun `detachBlockFromAgent calls repository and reloads`() = runTest {
-        fakeRepo.allBlocks = listOf(Block(id = "b1", label = "persona", value = "Block"))
+        fakeRepo.allBlocks = listOf(Block(id = BlockId("b1"), label = "persona", value = "Block"))
         var successCalled = false
 
         viewModel.detachBlockFromAgent("b1", "a1") { successCalled = true }
@@ -225,7 +227,7 @@ class BlockLibraryViewModelTest {
 
     @Test
     fun `attachBlockToAgent calls repository and reloads`() = runTest {
-        fakeRepo.allBlocks = listOf(Block(id = "b1", label = "persona", value = "Block"))
+        fakeRepo.allBlocks = listOf(Block(id = BlockId("b1"), label = "persona", value = "Block"))
         var successCalled = false
 
         viewModel.attachBlockToAgent("b1", "a1") { successCalled = true }
@@ -253,12 +255,12 @@ class BlockLibraryViewModelTest {
 
         override suspend fun getBlocks(agentId: String): List<Block> = emptyList()
         override suspend fun retrieveBlock(blockId: String): Block =
-            allBlocks.firstOrNull { it.id == blockId } ?: throw IllegalArgumentException("Unknown block $blockId")
+            allBlocks.firstOrNull { it.id.value == blockId } ?: throw IllegalArgumentException("Unknown block $blockId")
 
         override suspend fun countBlocks(): Int = allBlocks.size
 
         override suspend fun updateAgentBlock(agentId: String, blockLabel: String, params: BlockUpdateParams): Block =
-            Block(id = "stub", label = blockLabel, value = params.value ?: "")
+            Block(id = BlockId("stub"), label = blockLabel, value = params.value ?: "")
 
         override suspend fun updateGlobalBlock(
             blockId: String,
@@ -267,7 +269,7 @@ class BlockLibraryViewModelTest {
             clearLimit: Boolean,
         ): Block {
             updatedBlockIds.add(blockId)
-            val existing = allBlocks.firstOrNull { it.id == blockId } ?: Block(id = blockId, value = params.value ?: "")
+            val existing = allBlocks.firstOrNull { it.id.value == blockId } ?: Block(id = BlockId(blockId), value = params.value ?: "")
             val updated = existing.copy(
                 value = params.value ?: existing.value,
                 description = when {
@@ -281,14 +283,14 @@ class BlockLibraryViewModelTest {
                     else -> existing.limit
                 },
             )
-            allBlocks = allBlocks.map { if (it.id == blockId) updated else it }
+            allBlocks = allBlocks.map { if (it.id.value == blockId) updated else it }
             return updated
         }
         override suspend fun createBlock(params: BlockCreateParams): Block {
             if (shouldFail) throw Exception("Failed to create block")
             createdBlocks.add(params)
             val created = Block(
-                id = "block-${createdBlocks.size}",
+                id = BlockId("block-${createdBlocks.size}"),
                 label = params.label,
                 value = params.value,
                 description = params.description,
@@ -299,7 +301,7 @@ class BlockLibraryViewModelTest {
         }
         override suspend fun deleteBlock(blockId: String) {
             deletedBlockIds.add(blockId)
-            allBlocks = allBlocks.filterNot { it.id == blockId }
+            allBlocks = allBlocks.filterNot { it.id.value == blockId }
         }
         override suspend fun attachBlock(agentId: String, blockId: String) {
             attachedPairs.add(agentId to blockId)

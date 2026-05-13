@@ -72,7 +72,7 @@ private fun ToolsContent(
         ) {
             items(
                 items = state.tools,
-                key = { it.id }
+                key = { it.id.value }
             ) { tool ->
                 ToolCard(
                     tool = tool,

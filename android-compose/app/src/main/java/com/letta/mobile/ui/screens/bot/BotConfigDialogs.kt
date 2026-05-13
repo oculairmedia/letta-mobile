@@ -88,7 +88,7 @@ internal fun AgentSearchResults(
             )
         } else {
             LazyColumn(modifier = Modifier.heightIn(max = 240.dp)) {
-                items(filtered, key = { it.id }) { agent ->
+                items(filtered, key = { it.id.value }) { agent ->
                     ListItem(
                         headlineContent = {
                             Text(agent.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -127,7 +127,7 @@ internal fun AgentSearchAllResults(
         ),
     ) {
         LazyColumn(modifier = Modifier.heightIn(max = 240.dp)) {
-            items(agents, key = { it.id }) { agent ->
+            items(agents, key = { it.id.value }) { agent ->
                 ListItem(
                     headlineContent = {
                         Text(agent.name, maxLines = 1, overflow = TextOverflow.Ellipsis)

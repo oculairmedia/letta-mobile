@@ -38,6 +38,7 @@ import com.letta.mobile.ui.theme.chatColors
 import com.letta.mobile.ui.theme.chatDimens
 import com.letta.mobile.ui.theme.chatTypography
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * A message renders bubble-less (just markdown on the page background) when

@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.identities
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.AgentEntity
 import com.letta.mobile.data.model.Agent
@@ -166,7 +167,7 @@ private fun sampleIdentity(id: String, identifierKey: String, name: String, type
 )
 
 private fun sampleAgent(id: String, name: String) = Agent(
-    id = id,
+    id = AgentId(id),
     name = name,
 )
 

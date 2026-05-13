@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.screens.agentlist
 
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -9,8 +10,8 @@ class AgentListDisplayAgentsTest {
 
     @Test
     fun `matching favorite remains visible during search`() {
-        val meridian = Agent(id = "meridian", name = "Meridian")
-        val other = Agent(id = "other", name = "Other")
+        val meridian = Agent(id = AgentId("meridian"), name = "Meridian")
+        val other = Agent(id = AgentId("other"), name = "Other")
 
         val display = resolveAgentListDisplayAgents(
             filteredAgents = listOf(meridian, other),
@@ -23,8 +24,8 @@ class AgentListDisplayAgentsTest {
 
     @Test
     fun `non matching favorite is not removed from search results`() {
-        val meridian = Agent(id = "meridian", name = "Meridian")
-        val favorite = Agent(id = "favorite", name = "Favorite")
+        val meridian = Agent(id = AgentId("meridian"), name = "Meridian")
+        val favorite = Agent(id = AgentId("favorite"), name = "Favorite")
 
         val display = resolveAgentListDisplayAgents(
             filteredAgents = listOf(meridian),
@@ -37,9 +38,9 @@ class AgentListDisplayAgentsTest {
 
     @Test
     fun `pinned agents are grouped before regular agents without moving favorite duplicate`() {
-        val favorite = Agent(id = "favorite", name = "Favorite")
-        val pinned = Agent(id = "pinned", name = "Pinned")
-        val regular = Agent(id = "regular", name = "Regular")
+        val favorite = Agent(id = AgentId("favorite"), name = "Favorite")
+        val pinned = Agent(id = AgentId("pinned"), name = "Pinned")
+        val regular = Agent(id = AgentId("regular"), name = "Regular")
 
         val display = resolveAgentListDisplayAgents(
             filteredAgents = listOf(regular, favorite, pinned),

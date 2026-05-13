@@ -2,14 +2,14 @@ package com.letta.mobile.ui.screens.mcp
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -59,7 +59,6 @@ internal data class McpServerFormState(
     val rawConfigText: String = "",
 )
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ServerFormDialog(
     initialServer: McpServer?,
@@ -130,22 +129,28 @@ internal fun ServerFormDialog(
                 item(
                     headlineContent = {
                         FormItem(label = { Text(stringResource(R.string.screen_mcp_transport_type)) }) {
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                FilterChip(
+                            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                                SegmentedButton(
                                     selected = formState.transportType == MCP_TYPE_STREAMABLE_HTTP,
                                     onClick = { formState = formState.copy(transportType = MCP_TYPE_STREAMABLE_HTTP) },
-                                    label = { Text(stringResource(R.string.screen_mcp_transport_streamable_http)) },
-                                )
-                                FilterChip(
+                                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
+                                ) {
+                                    Text(stringResource(R.string.screen_mcp_transport_streamable_http))
+                                }
+                                SegmentedButton(
                                     selected = formState.transportType == MCP_TYPE_SSE,
                                     onClick = { formState = formState.copy(transportType = MCP_TYPE_SSE) },
-                                    label = { Text(stringResource(R.string.screen_mcp_transport_sse)) },
-                                )
-                                FilterChip(
+                                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
+                                ) {
+                                    Text(stringResource(R.string.screen_mcp_transport_sse))
+                                }
+                                SegmentedButton(
                                     selected = formState.transportType == MCP_TYPE_STDIO,
                                     onClick = { formState = formState.copy(transportType = MCP_TYPE_STDIO) },
-                                    label = { Text(stringResource(R.string.screen_mcp_transport_stdio)) },
-                                )
+                                    shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
+                                ) {
+                                    Text(stringResource(R.string.screen_mcp_transport_stdio))
+                                }
                             }
                         }
                     },

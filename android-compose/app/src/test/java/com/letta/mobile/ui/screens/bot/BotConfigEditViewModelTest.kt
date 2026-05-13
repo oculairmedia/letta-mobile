@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.bot
 
+import com.letta.mobile.data.model.AgentId
 import androidx.lifecycle.SavedStateHandle
 import com.letta.mobile.bot.config.BotConfig
 import com.letta.mobile.bot.config.BotConfigStore
@@ -57,7 +58,7 @@ class BotConfigEditViewModelTest {
 
     @Test
     fun selectAgentSetsHeartbeatAgentId() = runTest(mainDispatcherRule.dispatcher) {
-        val agent = Agent(id = "agent-42", name = "TestAgent")
+        val agent = Agent(id = AgentId("agent-42"), name = "TestAgent")
 
         val vm = createViewModel()
 
@@ -72,7 +73,7 @@ class BotConfigEditViewModelTest {
 
     @Test
     fun clearAgentSelectionClearsState() = runTest(mainDispatcherRule.dispatcher) {
-        val agent = Agent(id = "agent-1", name = "Agent")
+        val agent = Agent(id = AgentId("agent-1"), name = "Agent")
 
         val vm = createViewModel()
 
@@ -193,7 +194,7 @@ class BotConfigEditViewModelTest {
             channels = listOf("in_app", "push"),
         )
         every { configStore.configs } returns MutableStateFlow(listOf(config))
-        every { agentRepository.getCachedAgent("agent-42") } returns Agent(id = "agent-42", name = "Heartbeat Agent")
+        every { agentRepository.getCachedAgent("agent-42") } returns Agent(id = AgentId("agent-42"), name = "Heartbeat Agent")
 
         val vm = createViewModel(SavedStateHandle(mapOf("configId" to "cfg-1")))
         advanceUntilIdle()
@@ -206,7 +207,7 @@ class BotConfigEditViewModelTest {
 
     @Test
     fun filteredAgentsDelegatesToAgentSearch() = runTest(mainDispatcherRule.dispatcher) {
-        val agents = listOf(Agent(id = "a1", name = "Agent One"))
+        val agents = listOf(Agent(id = AgentId("a1"), name = "Agent One"))
         agentsFlow.value = agents
         every { agentSearch.search(any(), "one") } returns agents
 

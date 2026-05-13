@@ -341,7 +341,7 @@ fun AgentListScreen(
                                     }
                                 }
 
-                                items(gridAgents, key = { it.id }) { agent ->
+                                items(gridAgents, key = { it.id.value }) { agent ->
                                     CompactAgentCard(
                                         agent = agent,
                                         isFavorite = agent.id.value == uiState.favoriteAgentId,
@@ -379,7 +379,7 @@ fun AgentListScreen(
                                     }
                                 }
 
-                                lazyItems(gridAgents, key = { it.id }) { agent ->
+                                lazyItems(gridAgents, key = { it.id.value }) { agent ->
                                     AgentCard(
                                         agent = agent,
                                         isFavorite = agent.id.value == uiState.favoriteAgentId,

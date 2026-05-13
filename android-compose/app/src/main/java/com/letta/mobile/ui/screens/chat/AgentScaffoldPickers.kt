@@ -54,6 +54,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -178,7 +179,7 @@ internal fun ConversationPickerSheet(
 
             if (conversations.isEmpty()) {
                 Text(
-                    text = "No conversations yet",
+                    text = stringResource(R.string.screen_conversations_empty),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 16.dp),
@@ -210,7 +211,7 @@ internal fun ConversationPickerSheet(
                                 {
                                     Icon(
                                         LettaIcons.CheckCircle,
-                                        contentDescription = "Selected",
+                                        contentDescription = stringResource(R.string.common_selected),
                                         modifier = Modifier.size(LettaIconSizing.Toolbar),
                                         tint = selectionColors.selectionIndicator,
                                     )
@@ -243,7 +244,11 @@ internal fun ConversationPickerSheet(
     ConfirmDialog(
         show = showDeleteConfirm,
         title = stringResource(R.string.screen_conversations_dialog_delete_title),
-        message = "Delete ${selectedIds.size} conversation${if (selectedIds.size > 1) "s" else ""}? This cannot be undone.",
+        message = pluralStringResource(
+            R.plurals.screen_conversations_delete_message,
+            selectedIds.size,
+            selectedIds.size,
+        ),
         confirmText = stringResource(R.string.action_delete),
         dismissText = stringResource(R.string.action_cancel),
         onConfirm = {
@@ -338,7 +343,7 @@ internal fun AgentPickerSheet(
                     text = if (searchQuery.isBlank()) {
                         stringResource(R.string.screen_agents_empty)
                     } else {
-                        "No agents matching \"$searchQuery\""
+                        stringResource(R.string.screen_agents_no_matches, searchQuery)
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -378,9 +383,10 @@ internal fun AgentPickerSheet(
                                 modifier = Modifier.padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
+                                val defaultAgentName = stringResource(R.string.screen_drawer_default_agent_name)
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = agent.name.ifBlank { "Agent" },
+                                        text = agent.name.ifBlank { defaultAgentName },
                                         style = MaterialTheme.typography.bodyMedium,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
@@ -399,7 +405,7 @@ internal fun AgentPickerSheet(
                                 if (isFavorite) {
                                     Icon(
                                         LettaIcons.Star,
-                                        contentDescription = "Favorite agent",
+                                        contentDescription = stringResource(R.string.screen_agents_favorite_indicator),
                                         modifier = Modifier
                                             .padding(start = 8.dp)
                                             .size(LettaIconSizing.Inline),
@@ -409,7 +415,7 @@ internal fun AgentPickerSheet(
                                 if (isPinned) {
                                     Icon(
                                         LettaIcons.Pin,
-                                        contentDescription = "Pinned agent",
+                                        contentDescription = stringResource(R.string.screen_agents_pinned_indicator),
                                         modifier = Modifier
                                             .padding(start = 8.dp)
                                             .size(LettaIconSizing.Inline),
@@ -419,7 +425,7 @@ internal fun AgentPickerSheet(
                                 if (isActive) {
                                     Icon(
                                         LettaIcons.CheckCircle,
-                                        contentDescription = "Current agent",
+                                        contentDescription = stringResource(R.string.screen_agents_current_indicator),
                                         modifier = Modifier.size(LettaIconSizing.Toolbar),
                                         tint = MaterialTheme.colorScheme.primary,
                                     )
@@ -477,9 +483,10 @@ internal fun ConversationMenuItem(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             leadingIcon()
+            val fallbackTitle = stringResource(R.string.screen_conversations_unnamed)
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = conversation.summary?.takeIf { it.isNotBlank() } ?: "Conversation",
+                    text = conversation.summary?.takeIf { it.isNotBlank() } ?: fallbackTitle,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -499,10 +506,15 @@ internal fun ConversationMenuItem(
     }
 }
 
+@Composable
 internal fun conversationActivityText(conversation: Conversation): String? {
     val timestamp = conversation.lastMessageAt ?: conversation.createdAt ?: return null
     val relative = formatRelativeTime(timestamp).takeIf { it.isNotBlank() } ?: return null
-    return if (conversation.lastMessageAt != null) "Last activity $relative" else "Created $relative"
+    return if (conversation.lastMessageAt != null) {
+        stringResource(R.string.screen_conversations_last_activity_format, relative)
+    } else {
+        stringResource(R.string.screen_conversations_created_format, relative)
+    }
 }
 
 sealed interface ConversationSwitchAction {
@@ -536,12 +548,13 @@ class ConversationPickerViewModel @Inject constructor(
     fun deleteSelected(agentId: String, onActiveDeleted: () -> Unit = {}, activeConversationId: String? = null) {
         val ids = _selectedIds.value.toList()
         if (ids.isEmpty()) return
-        val deletedActive = activeConversationId != null && activeConversationId in ids
         _selectedIds.value = emptySet()
         viewModelScope.launch {
+            var deletedActive = false
             for (id in ids) {
                 try {
                     conversationRepository.deleteConversation(id, agentId)
+                    if (id == activeConversationId) deletedActive = true
                 } catch (_: Exception) { /* individual failures are handled by the repository's rollback */ }
             }
             if (deletedActive) onActiveDeleted()
@@ -733,15 +746,16 @@ internal fun DrawerContent(
         // IconButton on the agent header. Removes the giant full-width
         // NavigationDrawerItem that previously occupied ~64dp for a single
         // tap target.
+        val drawerDefaultAgentName = stringResource(R.string.screen_drawer_default_agent_name)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 LettaIcons.Agent,
-                contentDescription = "Agent",
+                contentDescription = stringResource(R.string.screen_drawer_agent_icon_description),
                 tint = MaterialTheme.colorScheme.primary,
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = agentName.ifBlank { "Agent" },
+                text = agentName.ifBlank { drawerDefaultAgentName },
                 style = MaterialTheme.typography.titleLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -761,7 +775,7 @@ internal fun DrawerContent(
 
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "$messageCount messages",
+            text = stringResource(R.string.screen_drawer_message_count, messageCount),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -797,18 +811,26 @@ internal fun DrawerContent(
         // a SingleChoiceSegmentedButtonRow gives the same affordance in one
         // ~48dp row with Material3-native selection visuals.
         Text(
-            text = "Chat mode",
+            text = stringResource(R.string.screen_drawer_chat_mode_label),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
         )
-        val chatModes = listOf("simple", "interactive", "debug")
+        // letta-mobile-w3dl: pair each mode value (transport key sent to the
+        // viewmodel) with its localized label resource. Keeps the chat-mode
+        // string identifier stable for analytics/storage while honoring the
+        // user's locale for the visible button text.
+        val chatModes = listOf(
+            "simple" to R.string.screen_drawer_chat_mode_simple,
+            "interactive" to R.string.screen_drawer_chat_mode_interactive,
+            "debug" to R.string.screen_drawer_chat_mode_debug,
+        )
         SingleChoiceSegmentedButtonRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 4.dp, vertical = 4.dp),
         ) {
-            chatModes.forEachIndexed { index, mode ->
+            chatModes.forEachIndexed { index, (mode, labelRes) ->
                 SegmentedButton(
                     selected = chatMode == mode,
                     onClick = { onChatModeSelected(mode) },
@@ -816,7 +838,7 @@ internal fun DrawerContent(
                     modifier = Modifier.testTag(AgentScaffoldTestTags.drawerChatMode(mode)),
                     label = {
                         Text(
-                            mode.replaceFirstChar { it.uppercase() },
+                            stringResource(labelRes),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -842,7 +864,7 @@ internal fun DrawerContent(
         )
         if (conversations.isEmpty()) {
             Text(
-                text = "No conversations yet",
+                text = stringResource(R.string.screen_conversations_empty),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -877,8 +899,13 @@ internal fun DrawerContent(
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
         NavigationDrawerItem(
-            icon = { Icon(LettaIcons.Delete, contentDescription = "Reset") },
-            label = { Text("Reset Messages") },
+            icon = {
+                Icon(
+                    LettaIcons.Delete,
+                    contentDescription = stringResource(R.string.screen_drawer_reset_icon_description),
+                )
+            },
+            label = { Text(stringResource(R.string.action_reset_messages)) },
             selected = false,
             onClick = onResetMessages,
             colors = drawerItemColors,
