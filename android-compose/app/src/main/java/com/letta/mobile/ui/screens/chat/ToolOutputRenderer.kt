@@ -527,16 +527,3 @@ private fun ToolOutputSyntaxColors.colorFor(kind: ToolOutputHighlightKind): Colo
     ToolOutputHighlightKind.Error -> error
     ToolOutputHighlightKind.Header -> header
 }
-
-internal fun initialToolOutputDocument(raw: String): ToolOutputDocument {
-    if (raw.length <= ToolOutputBackgroundParseThresholdChars) {
-        return cachedToolOutputDocument(raw)
-    }
-    val preview = ToolOutputParser.stripAnsi(raw.take(ToolOutputMaxRenderedChars))
-    return ToolOutputDocument(
-        raw = raw,
-        blocks = listOf(ToolOutputBlock.PlainText(preview)),
-        isTruncated = raw.length > preview.length,
-        omittedCharCount = raw.length - preview.length,
-    )
-}
