@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Block direct commits to main / master. The repo workflow is:
+#   branch -> PR -> CI passes -> squash-merge.
+# Branch protection on the remote is the real wall; this catches the
+# mistake locally before it ever gets pushed.
+set -euo pipefail
+
+branch="$(git symbolic-ref --short HEAD 2>/dev/null || true)"
+
+case "$branch" in
+  main|master)
+    cat >&2 <<EOF
+✗ Direct commits to '$branch' are blocked.
+
+The repo workflow is branch -> PR -> squash-merge. Create a feature branch:
+
+    git checkout -b feat/your-change
+    git add -A && git commit -m '...'
+    git push -u origin feat/your-change && gh pr create
+
+(If you really must bypass: git commit --no-verify -- but you almost
+certainly should not.)
+EOF
+    exit 1
+    ;;
+esac

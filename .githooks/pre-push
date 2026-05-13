@@ -1,5 +1,29 @@
 #!/usr/bin/env bash
+# Local guard before pushing.
+#   1. Refuse pushes that target main / master directly. Branch protection
+#      on the remote will reject them anyway -- this skips the round-trip.
+#   2. Run a quick Kotlin compile so syntactic breakage is caught locally
+#      before CI burns time on it.
 set -euo pipefail
+
+# stdin format (one line per ref being pushed):
+#   <local_ref> <local_sha> <remote_ref> <remote_sha>
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main|refs/heads/master)
+      cat >&2 <<EOF
+✗ Direct pushes to '$remote_ref' are blocked.
+
+Open a PR from a feature branch instead:
+    gh pr create
+
+(If you really must bypass: git push --no-verify -- but you almost
+certainly should not.)
+EOF
+      exit 1
+      ;;
+  esac
+done
 
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root/android-compose"
@@ -9,4 +33,4 @@ if [ -z "${JAVA_HOME:-}" ]; then
   exit 1
 fi
 
-./gradlew :app:compileDebugKotlin
+./gradlew :app:compileRootDebugKotlin
