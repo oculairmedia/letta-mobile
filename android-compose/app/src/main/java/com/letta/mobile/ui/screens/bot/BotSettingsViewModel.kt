@@ -49,6 +49,10 @@ class BotSettingsViewModel @Inject constructor(
         }
     }
 
+    // letta-mobile-2y33: ActivityManager.getRunningServices() is deprecated
+    // since API 26. No reliable replacement exists for checking if a specific
+    // foreground service is running across all API levels. getActiveForegroundServices()
+    // requires API 34+. Kept with suppression until minSdk ≥ 34.
     @Suppress("DEPRECATION")
     private fun isBotServiceRunning(): Boolean {
         val context = getApplication<Application>()

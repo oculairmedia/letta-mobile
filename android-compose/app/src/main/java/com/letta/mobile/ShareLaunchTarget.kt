@@ -58,6 +58,8 @@ data class ShareLaunchTarget(
             }
         }
 
+        // letta-mobile-2y33: getParcelableExtra(key) without Class<T> is
+        // only deprecated on API 33+; this branch runs pre-Tiramisu.
         @Suppress("DEPRECATION")
         private inline fun <reified T : Parcelable> Intent.getParcelableCompat(key: String): T? {
             return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -67,6 +69,8 @@ data class ShareLaunchTarget(
             }
         }
 
+        // letta-mobile-2y33: getParcelableArrayListExtra(key) without Class<T>
+        // is only deprecated on API 33+; this branch runs pre-Tiramisu.
         @Suppress("DEPRECATION")
         private inline fun <reified T : Parcelable> Intent.getParcelableArrayListCompat(key: String): List<T> {
             return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {

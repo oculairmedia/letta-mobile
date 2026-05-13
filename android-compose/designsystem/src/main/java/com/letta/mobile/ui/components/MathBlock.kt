@@ -116,6 +116,10 @@ private fun createKatexWebView(
         // No file:// or content:// access; only the asset intercept is allowed
         allowFileAccess = false
         allowContentAccess = false
+        // letta-mobile-2y33: allowFileAccessFromFileURLs / allowUniversalAccessFromFileURLs
+        // are deprecated since API 30. Both are set to false as defense-in-depth for
+        // older API levels. No replacement needed — these are security hardenings on
+        // legacy devices.
         @Suppress("DEPRECATION")
         allowFileAccessFromFileURLs = false
         @Suppress("DEPRECATION")

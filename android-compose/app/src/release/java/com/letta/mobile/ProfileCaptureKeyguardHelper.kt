@@ -15,6 +15,9 @@ object ProfileCaptureKeyguardHelper {
             activity.setShowWhenLocked(true)
             activity.setTurnScreenOn(true)
         } else {
+            // letta-mobile-2y33: FLAG_SHOW_WHEN_LOCKED is deprecated since API 27.
+            // This branch runs pre-O_MR1 (API < 27) so the new API
+            // (setShowWhenLocked) is not available here.
             @Suppress("DEPRECATION")
             activity.window.addFlags(
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or

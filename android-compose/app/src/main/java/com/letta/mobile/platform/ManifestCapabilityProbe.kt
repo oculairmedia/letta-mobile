@@ -24,6 +24,8 @@ object ManifestCapabilityProbe {
                 PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS.toLong()),
             )
         } else {
+            // letta-mobile-2y33: getPackageInfo(name, flags) is only
+            // deprecated on API 33+; this branch runs pre-Tiramisu.
             @Suppress("DEPRECATION")
             context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_PERMISSIONS)
         }
@@ -51,6 +53,8 @@ object ManifestCapabilityProbe {
                 PackageManager.ComponentInfoFlags.of(PackageManager.GET_META_DATA.toLong()),
             )
         } else {
+            // letta-mobile-2y33: getServiceInfo(component, int) is only
+            // deprecated on API 33+; this branch runs pre-Tiramisu.
             @Suppress("DEPRECATION")
             context.packageManager.getServiceInfo(component, PackageManager.GET_META_DATA)
         }
