@@ -1,7 +1,5 @@
 package com.letta.mobile.ui.screens.chat
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
@@ -107,14 +105,7 @@ private fun AssistantResponseText(
     } else {
         text
     }
-    // Animate the cursor alpha from 1f → 0f over 500ms when streaming ends, so the cursor
-    // fades out gracefully rather than disappearing with a hard cut.
-    val cursorAlpha by animateFloatAsState(
-        targetValue = if (isStreaming) 1f else 0f,
-        animationSpec = tween(durationMillis = if (isStreaming) 0 else 500),
-        label = "cursor_fade",
-    )
-    val showCursor = isStreaming || smoothedText != text || cursorAlpha > 0.01f
+    val showCursor = isStreaming || smoothedText != text
     // Keep the same streaming renderer for messages that streamed in this composition even after
     // the smoother catches up. Swapping to settled MarkdownText at stream termination causes a
     // final parsed-subtree/spacing handoff flash; hydrated messages still use MarkdownText because
@@ -126,7 +117,6 @@ private fun AssistantResponseText(
         tailStyle = MaterialTheme.chatTypography.messageBody,
         tailTransform = if (showCursor) ::streamingDisplayText else { value -> value },
         cursorText = if (showCursor) STREAMING_CURSOR else null,
-        cursorAlpha = cursorAlpha,
         deferUnstableMarkdown = showCursor,
         stabilizeTables = hasStreamed || hasTable,
         isStreaming = isStreaming,
