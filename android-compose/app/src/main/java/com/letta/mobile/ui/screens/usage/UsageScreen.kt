@@ -414,8 +414,12 @@ private fun ChartCard(
                         ),
                         startAxis = VerticalAxis.rememberStart(),
                         bottomAxis = HorizontalAxis.rememberBottom(
+                            // Vico 3.1.0 rejects blank strings -- fall back to
+                            // the raw index instead of "" for out-of-bounds
+                            // values so the formatter contract is always met.
                             valueFormatter = { _, value, _ ->
-                                chartLabels.getOrNull(value.toInt()) ?: ""
+                                val index = value.toInt()
+                                chartLabels.getOrNull(index) ?: index.toString()
                             },
                         ),
                     ),

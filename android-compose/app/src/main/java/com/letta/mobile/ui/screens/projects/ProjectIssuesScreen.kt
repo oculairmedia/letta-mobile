@@ -456,6 +456,15 @@ private fun ProjectIssueCreationChartCard(
                     }
                 }
 
+                // letta-mobile: Vico 3.1.0 rejects blank strings from
+                // CartesianValueFormatter -- use HorizontalAxis.ItemPlacer to
+                // control which x-values get labeled instead, and have the
+                // formatter always return a real string. (Previously the
+                // formatter returned "" for non-stride indexes, which crashed
+                // the issue-tracker screen on render.)
+                val bottomAxisItemPlacer = remember(labels, labelStride) {
+                    HorizontalAxis.ItemPlacer.aligned(spacing = { labelStride })
+                }
                 CartesianChartHost(
                     chart = rememberCartesianChart(
                         rememberColumnCartesianLayer(
@@ -467,12 +476,9 @@ private fun ProjectIssueCreationChartCard(
                         bottomAxis = HorizontalAxis.rememberBottom(
                             valueFormatter = { _, value, _ ->
                                 val index = value.toInt()
-                                when {
-                                    index == labels.lastIndex -> labels[index]
-                                    index % labelStride == 0 -> labels.getOrNull(index).orEmpty()
-                                    else -> ""
-                                }
+                                labels.getOrNull(index) ?: index.toString()
                             },
+                            itemPlacer = bottomAxisItemPlacer,
                         ),
                     ),
                     modelProducer = modelProducer,
