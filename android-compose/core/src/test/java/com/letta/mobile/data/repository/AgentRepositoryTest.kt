@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.TestData
 import io.mockk.mockk
@@ -37,7 +38,7 @@ class AgentRepositoryTest {
         }.joinAll()
 
         assertEquals(1, fakeApi.calls.count { it == "listAgents" })
-        assertEquals(listOf("a1"), repository.agents.value.map { it.id })
+        assertEquals(listOf(AgentId("a1")), repository.agents.value.map { it.id })
     }
 
     @Test
@@ -77,7 +78,7 @@ class AgentRepositoryTest {
         repository.refreshAgents()
 
         assertEquals(126, repository.agents.value.size)
-        assertEquals("Meridian", repository.agents.value.single { it.id == "meridian" }.name)
+        assertEquals("Meridian", repository.agents.value.single { it.id == AgentId("meridian") }.name)
         assertEquals(listOf(50, 50, 126), fakeApi.listLimits)
         assertEquals(listOf(0, 50, null), fakeApi.listOffsets)
         assertEquals(1, fakeApi.calls.count { it == "countAgents" })
@@ -95,7 +96,7 @@ class AgentRepositoryTest {
 
         repository.deleteAgent("a1")
 
-        assertEquals(listOf("a2"), repository.agents.value.map { it.id })
-        assertFalse(fakeApi.agents.any { it.id == "a1" })
+        assertEquals(listOf("a2"), repository.agents.value.map { it.id.value })
+        assertFalse(fakeApi.agents.any { it.id == AgentId("a1") })
     }
 }

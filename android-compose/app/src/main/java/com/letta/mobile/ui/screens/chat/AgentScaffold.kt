@@ -90,6 +90,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.repository.ConversationRepository
@@ -179,10 +180,10 @@ fun AgentScaffold(
     val currentAgentIsFavorite = agentId == favoriteAgentId
     val currentAgentIsPinned = agentId in pinnedAgentIds
     val switchableAgents = remember(availableAgents, agentId, agentName, favoriteAgentId, pinnedAgentIds) {
-        val agents = if (availableAgents.any { it.id == agentId }) {
+        val agents = if (availableAgents.any { it.id.value == agentId }) {
             availableAgents
         } else {
-            listOf(Agent(id = agentId, name = agentName.ifBlank { "Agent" })) + availableAgents
+            listOf(Agent(id = AgentId(agentId), name = agentName.ifBlank { "Agent" })) + availableAgents
         }
         sortAgentsForPicker(
             agents = agents,
@@ -446,11 +447,11 @@ fun AgentScaffold(
             favoriteAgentId = favoriteAgentId,
             pinnedAgentIds = pinnedAgentIds,
             onDismiss = { showAgentSwitcher = false },
-            onTogglePinned = { selectedAgent -> viewModel.toggleAgentPinned(selectedAgent.id) },
+            onTogglePinned = { selectedAgent -> viewModel.toggleAgentPinned(selectedAgent.id.value) },
             onAgentSelected = { selectedAgent ->
                 showAgentSwitcher = false
-                if (selectedAgent.id != agentId) {
-                    onSwitchConversation?.invoke(selectedAgent.id, null, selectedAgent.name.takeIf { it.isNotBlank() })
+                if (selectedAgent.id.value != agentId) {
+                    onSwitchConversation?.invoke(selectedAgent.id.value, null, selectedAgent.name.takeIf { it.isNotBlank() })
                 }
             },
         )
@@ -1515,7 +1516,7 @@ private fun AgentPickerSheet(
             val query = searchQuery.trim()
             agents.filter { agent ->
                 agent.name.contains(query, ignoreCase = true) ||
-                    agent.id.contains(query, ignoreCase = true) ||
+                    agent.id.value.contains(query, ignoreCase = true) ||
                     agent.description?.contains(query, ignoreCase = true) == true ||
                     agent.model?.contains(query, ignoreCase = true) == true ||
                     agent.tags.any { it.contains(query, ignoreCase = true) }
@@ -1578,10 +1579,10 @@ private fun AgentPickerSheet(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.heightIn(max = 400.dp),
                 ) {
-                    items(filteredAgents, key = { it.id }) { agent ->
-                        val isActive = agent.id == currentAgentId
-                        val isFavorite = agent.id == favoriteAgentId
-                        val isPinned = agent.id in pinnedAgentIds
+                    items(filteredAgents, key = { it.id.value }) { agent ->
+                        val isActive = agent.id.value == currentAgentId
+                        val isFavorite = agent.id.value == favoriteAgentId
+                        val isPinned = agent.id.value in pinnedAgentIds
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1616,7 +1617,7 @@ private fun AgentPickerSheet(
                                     )
                                     val detail = agent.model
                                         ?: agent.description?.takeIf { it.isNotBlank() }
-                                        ?: agent.id.take(12)
+                                        ?: agent.id.value.take(12)
                                     Text(
                                         text = detail,
                                         style = MaterialTheme.typography.labelSmall,
@@ -1669,10 +1670,10 @@ private fun sortAgentsForPicker(
     favoriteAgentId: String?,
     pinnedAgentIds: Set<String>,
 ): List<Agent> = agents
-    .distinctBy { it.id }
+    .distinctBy { it.id.value }
     .sortedWith(
-        compareByDescending<Agent> { it.id == favoriteAgentId }
-            .thenByDescending { it.id in pinnedAgentIds }
+        compareByDescending<Agent> { it.id.value == favoriteAgentId }
+            .thenByDescending { it.id.value in pinnedAgentIds }
             .thenBy { it.name.lowercase(Locale.getDefault()) },
     )
 

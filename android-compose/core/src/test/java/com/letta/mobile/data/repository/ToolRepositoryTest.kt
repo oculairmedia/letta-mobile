@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.testutil.FakeToolApi
 import com.letta.mobile.testutil.TestData
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -38,7 +39,7 @@ class ToolRepositoryTest {
         }.joinAll()
 
         assertEquals(1, fakeApi.calls.count { it == "listTools" })
-        assertEquals(listOf("1"), repository.getTools().first().map { it.id })
+        assertEquals(listOf(ToolId("1")), repository.getTools().first().map { it.id })
     }
 
     @Test
@@ -141,7 +142,7 @@ class ToolRepositoryTest {
         repository.deleteTool("t1")
 
         assertTrue(fakeApi.calls.contains("deleteTool:t1"))
-        assertTrue(repository.getTools().first().none { it.id == "t1" })
+        assertTrue(repository.getTools().first().none { it.id == ToolId("t1") })
     }
 
     @Test(expected = com.letta.mobile.data.api.ApiException::class)

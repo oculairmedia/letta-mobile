@@ -42,6 +42,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Identity
 import com.letta.mobile.data.model.IdentityCreateParams
 import com.letta.mobile.data.model.IdentityUpdateParams
@@ -222,7 +223,7 @@ fun IdentityListScreen(
 
     attachTarget?.let { identity ->
         AgentAttachDialog(
-            agents = (uiState as? UiState.Success)?.data?.knownAgents.orEmpty().filter { it.id !in identity.agentIds },
+            agents = (uiState as? UiState.Success)?.data?.knownAgents.orEmpty().filter { it.id !in identity.agentIds.map { AgentId(it) } },
             onDismiss = { attachTarget = null },
             onAttach = { agentId ->
                 viewModel.attachIdentity(agentId = agentId, identityId = identity.id) {
@@ -340,13 +341,13 @@ private fun IdentityDetailDialog(
     onDetachAgent: (String) -> Unit,
 ) {
     val attachedAgentsById = remember(identity.id, knownAgents) {
-        knownAgents.associateBy { it.id }
+        knownAgents.associateBy { it.id.value }
     }
     val attachedAgents = remember(identity.id, identity.agentIds, knownAgents) {
         identity.agentIds.mapNotNull { attachedAgentsById[it] }
     }
     val unresolvedAgentIds = remember(identity.id, identity.agentIds, knownAgents) {
-        identity.agentIds.filterNot(attachedAgentsById::containsKey)
+        identity.agentIds.filterNot { attachedAgentsById.containsKey(it) }
     }
 
     ConfirmDialog(
@@ -405,7 +406,7 @@ private fun IdentityDetailDialog(
                         item(
                             headlineContent = { Text(agent.name, style = MaterialTheme.typography.listItemSupporting) },
                             trailingContent = {
-                                TextButton(onClick = { onDetachAgent(agent.id) }) {
+                                TextButton(onClick = { onDetachAgent(agent.id.value) }) {
                                     Text(stringResource(R.string.action_remove), color = MaterialTheme.colorScheme.error)
                                 }
                             },
@@ -566,10 +567,10 @@ private fun AgentAttachDialog(
                     modifier = Modifier.height(240.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(agents, key = { it.id }) { agent ->
+                    items(agents, key = { it.id.value }) { agent ->
                         TextButton(
                             onClick = {
-                                selection = if (selection == agent.id) null else agent.id
+                                selection = if (selection == agent.id.value) null else agent.id.value
                             },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
@@ -584,7 +585,7 @@ private fun AgentAttachDialog(
                                 ) {
                                     Text(agent.name, style = MaterialTheme.typography.bodyMedium)
                                     Text(
-                                        text = agent.id,
+                                        text = agent.id.value,
                                         style = MaterialTheme.typography.bodySmall,
                                         fontFamily = FontFamily.Monospace,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -593,7 +594,7 @@ private fun AgentAttachDialog(
                                     )
                                 }
                                 androidx.compose.material3.Checkbox(
-                                    checked = selection == agent.id,
+                                    checked = selection == agent.id.value,
                                     onCheckedChange = null,
                                 )
                             }

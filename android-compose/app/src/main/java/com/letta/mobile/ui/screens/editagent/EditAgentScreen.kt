@@ -81,6 +81,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Block
+import com.letta.mobile.data.model.BlockId
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.Tool
@@ -2144,14 +2145,14 @@ private fun FullScreenToolPickerDialog(
                     ),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(filteredTools, key = { it.id }) { tool ->
-                        val isSelected = tool.id in selection
+                    items(filteredTools, key = { it.id.value }) { tool ->
+                        val isSelected = tool.id.value in selection
                         SelectableToolCard(
                             tool = tool,
                             query = query,
                             selected = isSelected,
                             onClick = {
-                                selection = if (isSelected) selection - tool.id else selection + tool.id
+                                selection = if (isSelected) selection - tool.id.value else selection + tool.id.value
                             },
                         )
                     }
@@ -2240,7 +2241,7 @@ private fun FullScreenBlockPickerDialog(
                     val availableBlocks = remember(state.data.blocks, excludedBlockIds, query) {
                         val normalizedQuery = query.trim().lowercase()
                         state.data.blocks
-                            .filter { it.id !in excludedBlockIds }
+                            .filter { it.id !in excludedBlockIds.map { BlockId(it) } }
                             .filter { block ->
                                 normalizedQuery.isBlank() ||
                                     (block.label?.lowercase()?.contains(normalizedQuery) == true) ||
@@ -2265,14 +2266,14 @@ private fun FullScreenBlockPickerDialog(
                             ),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            items(availableBlocks, key = { it.id }) { block ->
-                                val isSelected = block.id in selection
+                            items(availableBlocks, key = { it.id.value }) { block ->
+                                val isSelected = block.id.value in selection
                                 SelectableBlockCard(
                                     block = block,
                                     query = query,
                                     selected = isSelected,
                                     onClick = {
-                                        selection = if (isSelected) selection - block.id else selection + block.id
+                                        selection = if (isSelected) selection - block.id.value else selection + block.id.value
                                     },
                                 )
                             }

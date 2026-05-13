@@ -36,7 +36,7 @@ class ChannelHeartbeatSync @Inject constructor(
         }
 
         runCatching { agentRepository.refreshAgents() }
-        val agentNames = agentRepository.agents.value.associate { it.id to it.name }
+        val agentNames = agentRepository.agents.value.associate { it.id.value to it.name }
 
         conversations.forEach { conversation ->
             processConversation(conversation, agentNames[conversation.agentId].orEmpty())

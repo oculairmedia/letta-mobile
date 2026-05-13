@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.BlockUpdateParams
@@ -100,7 +101,7 @@ class BlockLibraryViewModel @Inject constructor(
             }
             .groupBy({ it.first }, { it.second })
         _uiState.value = UiState.Success(
-            currentState.copy(agentsByBlock = agentsByBlock, allAgents = agents.toImmutableList())
+            currentState.copy(agentsByBlock = agentsByBlock.mapKeys { it.key.value }, allAgents = agents.toImmutableList())
         )
     }
 
@@ -249,7 +250,7 @@ class BlockLibraryViewModel @Inject constructor(
     fun updateBlockAgents(blockId: String, newAgentIds: Set<String>, onSuccess: () -> Unit) {
         viewModelScope.launch {
             val currentAgentIds = (_uiState.value as? UiState.Success)?.data
-                ?.agentsByBlock?.get(blockId)?.map { it.id }?.toSet() ?: emptySet()
+                ?.agentsByBlock?.get(blockId)?.map { it.id.value }?.toSet() ?: emptySet()
             val toAttach = newAgentIds - currentAgentIds
             val toDetach = currentAgentIds - newAgentIds
             try {

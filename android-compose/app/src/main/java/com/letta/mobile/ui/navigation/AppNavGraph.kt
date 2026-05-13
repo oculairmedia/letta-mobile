@@ -180,7 +180,7 @@ fun AppNavGraph(
                 onNavigateToProjectChat = { project, projectStartAction ->
                     navController.navigate(
                         AgentChatRoute(
-                            agentId = project.lettaAgentId.orEmpty(),
+                            agentId = project.lettaAgentId?.value.orEmpty(),
                             projectIdentifier = project.identifier,
                             projectName = project.name,
                             projectLettaFolderId = project.lettaFolderId,
@@ -594,7 +594,7 @@ fun AppNavGraph(
                 onNavigateToProjectChat = { project, projectStartAction ->
                     navController.navigate(
                         AgentChatRoute(
-                            agentId = project.lettaAgentId.orEmpty(),
+                            agentId = project.lettaAgentId?.value.orEmpty(),
                             projectIdentifier = project.identifier,
                             projectName = project.name,
                             projectLettaFolderId = project.lettaFolderId,

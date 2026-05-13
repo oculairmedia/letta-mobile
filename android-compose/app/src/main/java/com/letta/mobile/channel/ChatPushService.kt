@@ -18,6 +18,7 @@ import androidx.core.content.ContextCompat
 import com.letta.mobile.MainActivity
 import com.letta.mobile.R
 import com.letta.mobile.data.api.ConversationApi
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.timeline.IngestedMessageListener
 import com.letta.mobile.data.timeline.TimelineRepository
@@ -222,7 +223,7 @@ class ChatPushService : Service() {
                 val (agentId, agentName) = try {
                     // Best-effort: look up the conversation's agent for a nice title.
                     val conv = conversationApi.getConversation(conversationId)
-                    conv.agentId to agentRepository.agents.value.firstOrNull { it.id == conv.agentId }?.name.orEmpty()
+                    conv.agentId to agentRepository.agents.value.firstOrNull { it.id == AgentId(conv.agentId) }?.name.orEmpty()
                 } catch (_: Exception) {
                     "" to ""
                 }

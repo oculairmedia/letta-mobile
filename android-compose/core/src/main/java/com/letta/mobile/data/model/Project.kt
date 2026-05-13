@@ -20,7 +20,7 @@ import kotlinx.serialization.json.jsonPrimitive
 @Immutable
 @Serializable
 data class ProjectSummary(
-    val id: String? = null,
+    val id: ProjectId? = null,
     val identifier: String,
     val name: String,
     @SerialName("filesystem_path") val filesystemPath: String? = null,
@@ -28,7 +28,7 @@ data class ProjectSummary(
     val status: String? = null,
     @SerialName("vibe_id") val vibeId: String? = null,
     @SerialName("huly_id") val hulyId: String? = null,
-    @SerialName("letta_agent_id") val lettaAgentId: String? = null,
+    @SerialName("letta_agent_id") val lettaAgentId: AgentId? = null,
     @SerialName("letta_folder_id") val lettaFolderId: String? = null,
     @SerialName("letta_source_id") val lettaSourceId: String? = null,
     @SerialName("issue_count") val issueCount: Int? = null,

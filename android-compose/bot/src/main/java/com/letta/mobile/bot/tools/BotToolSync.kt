@@ -15,7 +15,7 @@ class BotToolSync @Inject constructor(
     ) {
         toolRegistry.listToolCreateParams(toolNames).forEach { params ->
             val tool = runtimeClient.upsertTool(params)
-            runtimeClient.attachTool(agentId, tool.id)
+            runtimeClient.attachTool(agentId, tool.id.value)
         }
     }
 }

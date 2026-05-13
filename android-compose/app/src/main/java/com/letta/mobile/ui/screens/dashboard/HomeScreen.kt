@@ -356,7 +356,7 @@ private fun HomeContent(
                 blockResults = state.blockResults,
                 isSearching = state.isSearching,
                 searchQuery = state.searchQuery,
-                onAgentClick = { agent -> onNavigateToChat(agent.id, agent.name, null) },
+                onAgentClick = { agent -> onNavigateToChat(agent.id.value, agent.name, null) },
                 onMessageClick = { parsed ->
                     val agentId = parsed.agentId ?: return@SearchResultsContent
                     val convId = parsed.conversationId
@@ -978,7 +978,7 @@ private fun SearchResultsContent(
             if (toolsExpanded) {
                 items(toolResults, key = { "tool-${it.id}" }) { tool ->
                     Card(
-                        onClick = { onToolClick(tool.id) },
+                        onClick = { onToolClick(tool.id.value) },
                         modifier = Modifier.fillMaxWidth().animateItem(),
                     ) {
                         Row(
@@ -1028,7 +1028,7 @@ private fun SearchResultsContent(
             if (blocksExpanded) {
                 items(blockResults, key = { "block-${it.id}" }) { block ->
                     Card(
-                        onClick = { onBlockClick(block.id) },
+                        onClick = { onBlockClick(block.id.value) },
                         modifier = Modifier.fillMaxWidth().animateItem(),
                     ) {
                         Row(

@@ -57,7 +57,7 @@ fun BlockPickerDialog(
             }
             is UiState.Success -> {
                 val availableBlocks = remember(state.data.blocks, excludedBlockIds) {
-                    state.data.blocks.filter { it.id !in excludedBlockIds }
+                    state.data.blocks.filter { it.id.value !in excludedBlockIds }
                 }
                 if (availableBlocks.isEmpty()) {
                     Text(
@@ -69,15 +69,15 @@ fun BlockPickerDialog(
                         modifier = Modifier.heightIn(max = 360.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        items(availableBlocks, key = { it.id }) { block ->
+                        items(availableBlocks, key = { it.id.value }) { block ->
                             BlockPickerRow(
                                 block = block,
-                                selected = block.id in selection,
+                                selected = block.id.value in selection,
                                 onToggle = {
-                                    selection = if (block.id in selection) {
-                                        selection - block.id
+                                    selection = if (block.id.value in selection) {
+                                        selection - block.id.value
                                     } else {
-                                        selection + block.id
+                                        selection + block.id.value
                                     }
                                 },
                             )

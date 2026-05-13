@@ -103,7 +103,7 @@ class BotConfigEditViewModel @Inject constructor(
     }
 
     fun selectAgent(agent: Agent) {
-        heartbeatAgentId = agent.id
+        heartbeatAgentId = agent.id.value
         selectedAgentName = agent.name
         agentSearchQuery = ""
         agentSearchExpanded = false

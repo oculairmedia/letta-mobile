@@ -122,7 +122,7 @@ class DashboardViewModel @Inject constructor(
                 .collect { (favId, pinnedIds) ->
                     val favName = favId?.let { agentRepository.getCachedAgent(it)?.name }
                     val pinned = pinnedIds.mapNotNull { id ->
-                        agentRepository.getCachedAgent(id)?.let { PinnedAgent(it.id, it.name) }
+                        agentRepository.getCachedAgent(id)?.let { PinnedAgent(it.id.value, it.name) }
                     }
                     _uiState.value = _uiState.value.copy(
                         favoriteAgentId = favId,

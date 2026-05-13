@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.TelemetryContext
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
@@ -33,6 +34,7 @@ open class LettaApiClient @Inject constructor(
         coerceInputValues = true
     }
 
+    private val telemetryContext = TelemetryContext()
     private val mutex = Mutex()
     private var cachedClient: HttpClient? = null
     private var cachedBaseUrl: String? = null
@@ -101,7 +103,7 @@ open class LettaApiClient @Inject constructor(
                     // app/server heartbeats plus the explicit stream watchdog.
                     pingInterval(30, TimeUnit.SECONDS)
                 }
-                addInterceptor(TelemetryInterceptor)
+                addInterceptor(TelemetryInterceptor(telemetryContext))
             }
 
             install(ContentNegotiation) {

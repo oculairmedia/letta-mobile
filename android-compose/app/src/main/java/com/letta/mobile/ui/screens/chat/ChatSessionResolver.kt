@@ -21,7 +21,7 @@ internal class ChatSessionResolver(
 
     fun observeCachedAgentName(agentId: String): Flow<String> {
         return agentRepository.agents
-            .map { agents -> agents.firstOrNull { it.id == agentId }?.name.orEmpty() }
+            .map { agents -> agents.firstOrNull { it.id.value == agentId }?.name.orEmpty() }
             .distinctUntilChanged()
     }
 

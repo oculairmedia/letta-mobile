@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import com.letta.mobile.data.model.DomainIdConverters
 
 /**
  * App-local Room database.
@@ -24,6 +25,7 @@ import androidx.room.RoomDatabase
     version = 5,
     exportSchema = true,
 )
+@androidx.room.TypeConverters(DomainIdConverters::class)
 abstract class LettaDatabase : RoomDatabase() {
     abstract fun agentDao(): AgentDao
     abstract fun bugReportDao(): BugReportDao

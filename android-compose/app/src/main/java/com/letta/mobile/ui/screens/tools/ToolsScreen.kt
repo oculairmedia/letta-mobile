@@ -44,7 +44,7 @@ fun ToolsScreen(
         )
         is UiState.Success -> ToolsContent(
             state = state.data,
-            onRemoveTool = { viewModel.removeTool(it.id) },
+            onRemoveTool = { viewModel.removeTool(it.id.value) },
             modifier = modifier
         )
     }

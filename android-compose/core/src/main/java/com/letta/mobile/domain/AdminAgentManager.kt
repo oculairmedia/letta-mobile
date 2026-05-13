@@ -59,13 +59,13 @@ class AdminAgentManager @Inject constructor(
             }
             if (byTag != null) {
                 Log.d(TAG, "Found admin agent by tag: ${byTag.id}")
-                settingsRepository.setAdminAgentId(byTag.id)
+                settingsRepository.setAdminAgentId(byTag.id.value)
                 return byTag
             }
             val byName = allAgents.find { it.name == ADMIN_NAME }
             if (byName != null) {
                 Log.d(TAG, "Found admin agent by name: ${byName.id}")
-                settingsRepository.setAdminAgentId(byName.id)
+                settingsRepository.setAdminAgentId(byName.id.value)
                 return byName
             }
         } catch (e: Exception) {
@@ -90,7 +90,7 @@ class AdminAgentManager @Inject constructor(
                 ),
             )
         )
-        settingsRepository.setAdminAgentId(created.id)
+        settingsRepository.setAdminAgentId(created.id.value)
         Log.d(TAG, "Created admin agent: ${created.id}")
         return created
     }

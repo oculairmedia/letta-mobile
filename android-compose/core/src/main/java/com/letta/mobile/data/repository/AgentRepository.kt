@@ -8,6 +8,7 @@ import com.letta.mobile.data.api.AgentApi
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.AgentEntity
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
@@ -83,7 +84,7 @@ class AgentRepository @Inject constructor(
             if (fresh.isEmpty()) {
                 agentDao.deleteAll()
             } else {
-                agentDao.deleteExcept(fresh.map { it.id })
+                agentDao.deleteExcept(fresh.map { it.id.value })
             }
         } catch (e: Exception) {
             Log.w("AgentRepository", "Failed to cache agents to Room", e)
@@ -128,7 +129,7 @@ class AgentRepository @Inject constructor(
         return fullList
     }
 
-    fun getCachedAgent(id: String): Agent? = _agents.value.find { it.id == id }
+    fun getCachedAgent(id: String): Agent? = _agents.value.find { it.id == AgentId(id) }
 
     fun hasFreshAgents(maxAgeMs: Long): Boolean {
         return _agents.value.isNotEmpty() && System.currentTimeMillis() - lastRefreshAtMillis <= maxAgeMs
@@ -141,7 +142,7 @@ class AgentRepository @Inject constructor(
     }
 
     override fun getAgent(id: String): Flow<Agent> = flow {
-        val cached = _agents.value.find { it.id == id }
+        val cached = _agents.value.find { it.id == AgentId(id) }
         if (cached != null) {
             emit(cached)
         }
@@ -176,9 +177,9 @@ class AgentRepository @Inject constructor(
 
     override suspend fun deleteAgent(id: String) {
         agentApi.deleteAgent(id)
-        _agents.update { current -> current.filterNot { it.id == id } }
+        _agents.update { current -> current.filterNot { it.id == AgentId(id) } }
         try {
-            agentDao.deleteExcept(_agents.value.map { it.id })
+            agentDao.deleteExcept(_agents.value.map { it.id.value })
         } catch (e: Exception) {
             Log.w("AgentRepository", "Failed to update cached agents after delete", e)
         }

@@ -50,7 +50,7 @@ class ScheduleListViewModel @Inject constructor(
                 agentRepository.refreshAgents()
                 val agents = agentRepository.agents.value.toImmutableList()
                 val selectedAgentId = (_uiState.value as? UiState.Success)?.data?.selectedAgentId
-                    ?: agents.firstOrNull()?.id
+                    ?: agents.firstOrNull()?.id?.value
                 val schedules = if (selectedAgentId != null) {
                     scheduleRepository.refreshSchedules(selectedAgentId)
                     scheduleRepository.getSchedules(selectedAgentId).first().toImmutableList()
@@ -71,7 +71,7 @@ class ScheduleListViewModel @Inject constructor(
                     _uiState.value = UiState.Success(
                         ScheduleListUiState(
                             agents = agentRepository.agents.value.toImmutableList(),
-                            selectedAgentId = agentRepository.agents.value.firstOrNull()?.id,
+                            selectedAgentId = agentRepository.agents.value.firstOrNull()?.id?.value,
                             schedules = persistentListOf(),
                             scheduleAdminAvailable = false,
                             scheduleAdminMessage = SCHEDULE_ADMIN_UNAVAILABLE_MESSAGE,

@@ -27,6 +27,6 @@ class ClientToolSync @Inject constructor(
 
         val syncedTool = toolApi.upsertTool(deviceInfoTool)
 
-        toolApi.attachTool(agentId, syncedTool.id)
+        toolApi.attachTool(agentId, syncedTool.id.value)
     }
 }

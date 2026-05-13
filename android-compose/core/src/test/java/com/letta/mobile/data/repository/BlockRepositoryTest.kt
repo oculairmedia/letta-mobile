@@ -1,6 +1,7 @@
 package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.Block
+import com.letta.mobile.data.model.BlockId
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.testutil.FakeBlockApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -45,7 +46,7 @@ class BlockRepositoryTest {
 
     @Test
     fun `updateGlobalBlock calls global API endpoint`() = runTest {
-        fakeApi.allBlocks.add(Block(id = "b1", label = "persona", value = "Old value"))
+        fakeApi.allBlocks.add(Block(id = BlockId("b1"), label = "persona", value = "Old value"))
 
         val result = repository.updateGlobalBlock("b1", BlockUpdateParams(value = "New value", description = "desc"))
 
@@ -56,7 +57,7 @@ class BlockRepositoryTest {
 
     @Test
     fun `updateGlobalBlock can clear optional metadata`() = runTest {
-        fakeApi.allBlocks.add(Block(id = "b1", label = "persona", value = "Old value", description = "desc", limit = 42))
+        fakeApi.allBlocks.add(Block(id = BlockId("b1"), label = "persona", value = "Old value", description = "desc", limit = 42))
 
         val result = repository.updateGlobalBlock(
             "b1",
@@ -79,8 +80,8 @@ class BlockRepositoryTest {
 
     @Test
     fun `listAllBlocks returns all blocks`() = runTest {
-        fakeApi.allBlocks.add(Block(id = "b1", label = "persona", value = "Test persona"))
-        fakeApi.allBlocks.add(Block(id = "b2", label = "human", value = "Test human"))
+        fakeApi.allBlocks.add(Block(id = BlockId("b1"), label = "persona", value = "Test persona"))
+        fakeApi.allBlocks.add(Block(id = BlockId("b2"), label = "human", value = "Test human"))
         val result = repository.listAllBlocks()
         assertEquals(2, result.size)
         assertTrue(fakeApi.calls.contains("listAllBlocks"))
@@ -88,8 +89,8 @@ class BlockRepositoryTest {
 
     @Test
     fun `listAllBlocks filters by label`() = runTest {
-        fakeApi.allBlocks.add(Block(id = "b1", label = "persona", value = "Test persona"))
-        fakeApi.allBlocks.add(Block(id = "b2", label = "human", value = "Test human"))
+        fakeApi.allBlocks.add(Block(id = BlockId("b1"), label = "persona", value = "Test persona"))
+        fakeApi.allBlocks.add(Block(id = BlockId("b2"), label = "human", value = "Test human"))
         val result = repository.listAllBlocks(label = "persona")
         assertEquals(1, result.size)
         assertEquals("persona", result[0].label)
@@ -97,8 +98,8 @@ class BlockRepositoryTest {
 
     @Test
     fun `listAllBlocks filters by isTemplate`() = runTest {
-        fakeApi.allBlocks.add(Block(id = "b1", label = "persona", value = "Template", isTemplate = true))
-        fakeApi.allBlocks.add(Block(id = "b2", label = "human", value = "Not template", isTemplate = false))
+        fakeApi.allBlocks.add(Block(id = BlockId("b1"), label = "persona", value = "Template", isTemplate = true))
+        fakeApi.allBlocks.add(Block(id = BlockId("b2"), label = "human", value = "Not template", isTemplate = false))
         val result = repository.listAllBlocks(isTemplate = true)
         assertEquals(1, result.size)
         assertEquals(true, result[0].isTemplate)

@@ -100,7 +100,7 @@ class UsageViewModel @Inject constructor(
                 }
 
                 val agentNames = agentRepository.agents.value
-                    .associate { it.id to (it.name ?: it.id) }
+                    .associate { it.id.value to (it.name ?: it.id.value) }
 
                 val analytics = UsageAnalyticsCalculator.calculate(
                     steps = steps,

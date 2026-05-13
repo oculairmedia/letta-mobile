@@ -11,6 +11,50 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
+ * Context parameter wrapper for [Telemetry]. When declared as a context
+ * parameter on a function, callers must provide [TelemetryContext] in scope
+ * and can call [event], [error], [measure], and [startTimer] without
+ * importing [Telemetry] directly.
+ *
+ * Usage:
+ * ```
+ * context(TelemetryContext)
+ * fun doWork() {
+ *     event("MyTag", "started")
+ *     val result = measure("MyTag", "computation") { heavyLifting() }
+ * }
+ * ```
+ *
+ * See: letta-mobile-925m.3
+ */
+class TelemetryContext {
+    inline fun event(
+        tag: String,
+        name: String,
+        vararg attrs: Pair<String, Any?>,
+        durationMs: Long? = null,
+        level: Telemetry.Level = Telemetry.Level.INFO,
+    ) = Telemetry.event(tag, name, *attrs, durationMs = durationMs, level = level)
+
+    inline fun error(
+        tag: String,
+        name: String,
+        throwable: Throwable,
+        vararg attrs: Pair<String, Any?>,
+    ) = Telemetry.error(tag, name, throwable, *attrs)
+
+    inline fun <T> measure(
+        tag: String,
+        name: String,
+        vararg attrs: Pair<String, Any?>,
+        block: () -> T,
+    ): T = Telemetry.measure(tag, name, *attrs, block = block)
+
+    inline fun startTimer(tag: String, name: String): Telemetry.Timer =
+        Telemetry.startTimer(tag, name)
+}
+
+/**
  * Telemetry — unified event stream for latency, lifecycle, and errors.
  *
  * Design goals:

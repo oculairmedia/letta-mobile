@@ -143,7 +143,7 @@ fun ToolDetailScreen(
                 onTagClick = { tag ->
                     tagDrillInViewModel.showTag(
                         tag,
-                        TagDrillInSource(TagDrillInEntityType.TOOL, state.data.id),
+                        TagDrillInSource(TagDrillInEntityType.TOOL, state.data.id.value),
                     )
                 },
                 modifier = Modifier.padding(paddingValues),
@@ -347,7 +347,7 @@ private fun ToolDetailContent(
                             headlineContent = { Text(agent.name) },
                             supportingContent = {
                                 Text(
-                                    text = agent.id,
+                                    text = agent.id.value,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             },
@@ -359,7 +359,7 @@ private fun ToolDetailContent(
                                 )
                             },
                             trailingContent = {
-                                IconButton(onClick = { onDetachAgent(agent.id) }) {
+                                IconButton(onClick = { onDetachAgent(agent.id.value) }) {
                                     Icon(
                                         imageVector = LettaIcons.Close,
                                         contentDescription = stringResource(R.string.action_remove),
@@ -495,16 +495,16 @@ private fun AgentAttachDialog(
                 )
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(agents, key = { it.id }) { agent ->
+                    items(agents, key = { it.id.value }) { agent ->
                         TextButton(
                             onClick = {
-                                selection = if (agent.id in selection) selection - agent.id else selection + agent.id
+                                selection = if (agent.id.value in selection) selection - agent.id.value else selection + agent.id.value
                             },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(agent.name, modifier = Modifier.weight(1f))
                             Text(
-                                if (agent.id in selection) stringResource(R.string.action_remove) else stringResource(R.string.action_attach)
+                                if (agent.id.value in selection) stringResource(R.string.action_remove) else stringResource(R.string.action_attach)
                             )
                         }
                     }

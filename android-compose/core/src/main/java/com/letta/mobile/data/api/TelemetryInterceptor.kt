@@ -1,30 +1,21 @@
 package com.letta.mobile.data.api
 
 import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.TelemetryContext
 import okhttp3.Interceptor
 import okhttp3.Response
 
 /**
  * OkHttp interceptor that records one Telemetry event per HTTP round-trip.
  *
- * Emits `Http` / `request` with attributes:
- *   - method        (GET/POST/…)
- *   - path          (everything after /v1 to keep noise low)
- *   - status        (HTTP status code)
- *   - durationMs    (wire time)
- *   - bytes         (response content length if known)
+ * Accepts [TelemetryContext] as a context parameter so the interceptor
+ * can call [event] and [error] without a static import of [Telemetry].
  *
- * Errors (IOException, etc.) are emitted as `Http` / `request:failed`.
- *
- * This lets the dev screen answer questions like:
- *   - What is the p50/p95 latency for GET /runs/{id}/steps?
- *   - How many concurrent requests are in-flight at any moment?
- *   - Which screen fired this burst of traffic?
- *
- * Low-overhead: just two System.currentTimeMillis() calls + a single Event
- * allocation. Safe to leave on in dev builds; controlled by Telemetry.enabled.
+ * See: letta-mobile-925m.3
  */
-internal object TelemetryInterceptor : Interceptor {
+internal class TelemetryInterceptor(
+    private val telemetryContext: TelemetryContext,
+) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         val path = request.url.encodedPath
@@ -34,7 +25,7 @@ internal object TelemetryInterceptor : Interceptor {
         val response = try {
             chain.proceed(request)
         } catch (t: Throwable) {
-            Telemetry.error(
+            telemetryContext.error(
                 "Http", "request:failed", t,
                 "method" to method,
                 "path" to path,
@@ -47,7 +38,7 @@ internal object TelemetryInterceptor : Interceptor {
         val bytes = response.header("Content-Length")?.toLongOrNull() ?: -1L
         val level = if (response.code >= 400) Telemetry.Level.WARN else Telemetry.Level.DEBUG
 
-        Telemetry.event(
+        telemetryContext.event(
             "Http", "request",
             "method" to method,
             "path" to path,

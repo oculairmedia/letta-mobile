@@ -96,7 +96,7 @@ class AllToolsViewModel @Inject constructor(
                 _uiState.value = UiState.Success(
                     latestState.copy(
                         tools = (mcpTools + dedupedRegular).toImmutableList(),
-                        mcpToolIds = mcpToolIds,
+                        mcpToolIds = mcpToolIds.map { it.value }.toSet(),
                         isLoadingMcpTools = false,
                     )
                 )
@@ -126,9 +126,9 @@ class AllToolsViewModel @Inject constructor(
                 if (generation != loadGeneration) return@launch
 
                 val latestState = (_uiState.value as? UiState.Success)?.data ?: return@launch
-                val existingIds = latestState.tools.mapTo(mutableSetOf()) { it.id }
+                val existingIds = latestState.tools.mapTo(mutableSetOf()) { it.id.value }
                 val dedupedNew = newPage.filter { tool ->
-                    tool.id !in latestState.mcpToolIds && existingIds.add(tool.id)
+                    tool.id.value !in latestState.mcpToolIds && existingIds.add(tool.id.value)
                 }
 
                 _uiState.value = UiState.Success(

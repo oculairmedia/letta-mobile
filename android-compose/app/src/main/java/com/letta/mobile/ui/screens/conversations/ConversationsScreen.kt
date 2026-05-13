@@ -293,7 +293,7 @@ fun ConversationsScreen(
             agents = agents,
             onDismiss = { showAgentPickerDialog = false },
             onAgentSelected = { agentId ->
-                val agentName = agents.firstOrNull { it.id == agentId }?.name?.takeIf { it.isNotBlank() }
+                val agentName = agents.firstOrNull { it.id.value == agentId }?.name?.takeIf { it.isNotBlank() }
                 viewModel.createConversation(agentId) { conversationId ->
                     showAgentPickerDialog = false
                     onNavigateToChat(agentId, conversationId, agentName)
@@ -817,9 +817,9 @@ private fun AgentPickerDialog(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier.height(300.dp),
             ) {
-                items(agents, key = { it.id }) { agent ->
+                items(agents, key = { it.id.value }) { agent ->
                     Card(
-                        onClick = { onAgentSelected(agent.id) },
+                        onClick = { onAgentSelected(agent.id.value) },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {

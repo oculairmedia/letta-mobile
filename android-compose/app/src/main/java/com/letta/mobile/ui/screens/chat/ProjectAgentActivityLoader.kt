@@ -35,7 +35,7 @@ internal class ProjectAgentActivityLoader(
         }
 
         return agents.map { agent ->
-            liveStatuses[agent.id].toProjectAgentActivity(agent)
+            liveStatuses[agent.id.value].toProjectAgentActivity(agent)
         }.sortedWith(compareBy<ProjectAgentActivity> { it.statusLabel }.thenBy { it.name.lowercase() })
     }
 
@@ -56,7 +56,7 @@ internal class ProjectAgentActivityLoader(
             ?: if (this != null) "Embedded bot session available" else null
 
         return ProjectAgentActivity(
-            id = agent?.id ?: this?.id.orEmpty(),
+            id = agent?.id?.value ?: this?.id.orEmpty(),
             name = agent?.name ?: this?.name.orEmpty(),
             statusLabel = statusLabel,
             statusTone = statusTone,

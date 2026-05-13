@@ -79,6 +79,7 @@ import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ModelSettings
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.ConfirmDialog
@@ -165,7 +166,7 @@ fun AgentListScreen(
     }
 
     val favoriteAgent = uiState.favoriteAgentId?.let { favId ->
-        uiState.agents.find { it.id == favId }
+        uiState.agents.find { it.id.value == favId }
     }
     val displayAgents = remember(filteredAgents, favoriteAgent, uiState.pinnedAgentIds) {
         resolveAgentListDisplayAgents(
@@ -332,9 +333,9 @@ fun AgentListScreen(
                                     ) {
                                         FavoriteAgentCard(
                                             agent = visibleFavoriteAgent,
-                                            onClick = { selectAgent(visibleFavoriteAgent.id, visibleFavoriteAgent.name) },
-                                            onEdit = { onNavigateToEditAgent(visibleFavoriteAgent.id) },
-                                            onUnfavorite = { viewModel.toggleFavorite(visibleFavoriteAgent.id) },
+                                            onClick = { selectAgent(visibleFavoriteAgent.id.value, visibleFavoriteAgent.name) },
+                                            onEdit = { onNavigateToEditAgent(visibleFavoriteAgent.id.value) },
+                                            onUnfavorite = { viewModel.toggleFavorite(visibleFavoriteAgent.id.value) },
                                             contextualActionsEnabled = !isShareMode,
                                         )
                                     }
@@ -343,13 +344,13 @@ fun AgentListScreen(
                                 items(gridAgents, key = { it.id }) { agent ->
                                     CompactAgentCard(
                                         agent = agent,
-                                        isFavorite = agent.id == uiState.favoriteAgentId,
-                                        isPinned = agent.id in uiState.pinnedAgentIds,
-                                        onClick = { selectAgent(agent.id, agent.name) },
-                                        onLongPress = { onNavigateToEditAgent(agent.id) },
-                                        onDelete = { viewModel.deleteAgent(agent.id) },
-                                        onToggleFavorite = { viewModel.toggleFavorite(agent.id) },
-                                        onTogglePinned = { viewModel.togglePinned(agent.id) },
+                                        isFavorite = agent.id.value == uiState.favoriteAgentId,
+                                        isPinned = agent.id.value in uiState.pinnedAgentIds,
+                                        onClick = { selectAgent(agent.id.value, agent.name) },
+                                        onLongPress = { onNavigateToEditAgent(agent.id.value) },
+                                        onDelete = { viewModel.deleteAgent(agent.id.value) },
+                                        onToggleFavorite = { viewModel.toggleFavorite(agent.id.value) },
+                                        onTogglePinned = { viewModel.togglePinned(agent.id.value) },
                                         contextualActionsEnabled = !isShareMode,
                                     )
                                 }
@@ -370,9 +371,9 @@ fun AgentListScreen(
                                     item(key = "favorite-${visibleFavoriteAgent.id}") {
                                         FavoriteAgentCard(
                                             agent = visibleFavoriteAgent,
-                                            onClick = { selectAgent(visibleFavoriteAgent.id, visibleFavoriteAgent.name) },
-                                            onEdit = { onNavigateToEditAgent(visibleFavoriteAgent.id) },
-                                            onUnfavorite = { viewModel.toggleFavorite(visibleFavoriteAgent.id) },
+                                            onClick = { selectAgent(visibleFavoriteAgent.id.value, visibleFavoriteAgent.name) },
+                                            onEdit = { onNavigateToEditAgent(visibleFavoriteAgent.id.value) },
+                                            onUnfavorite = { viewModel.toggleFavorite(visibleFavoriteAgent.id.value) },
                                             contextualActionsEnabled = !isShareMode,
                                         )
                                     }
@@ -381,13 +382,13 @@ fun AgentListScreen(
                                 lazyItems(gridAgents, key = { it.id }) { agent ->
                                     AgentCard(
                                         agent = agent,
-                                        isFavorite = agent.id == uiState.favoriteAgentId,
-                                        isPinned = agent.id in uiState.pinnedAgentIds,
-                                        onClick = { selectAgent(agent.id, agent.name) },
-                                        onLongPress = { onNavigateToEditAgent(agent.id) },
-                                        onDelete = { viewModel.deleteAgent(agent.id) },
-                                        onToggleFavorite = { viewModel.toggleFavorite(agent.id) },
-                                        onTogglePinned = { viewModel.togglePinned(agent.id) },
+                                        isFavorite = agent.id.value == uiState.favoriteAgentId,
+                                        isPinned = agent.id.value in uiState.pinnedAgentIds,
+                                        onClick = { selectAgent(agent.id.value, agent.name) },
+                                        onLongPress = { onNavigateToEditAgent(agent.id.value) },
+                                        onDelete = { viewModel.deleteAgent(agent.id.value) },
+                                        onToggleFavorite = { viewModel.toggleFavorite(agent.id.value) },
+                                        onTogglePinned = { viewModel.togglePinned(agent.id.value) },
                                         contextualActionsEnabled = !isShareMode,
                                     )
                                 }
@@ -448,7 +449,7 @@ internal fun resolveAgentListDisplayAgents(
             .filter { it.id != visibleFavoriteAgent?.id }
             .mapIndexed { index, agent -> index to agent }
             .sortedWith(
-                compareByDescending<Pair<Int, Agent>> { it.second.id in pinnedAgentIds }
+                compareByDescending<Pair<Int, Agent>> { it.second.id.value in pinnedAgentIds }
                     .thenBy { it.first },
             )
             .map { it.second },
@@ -522,7 +523,7 @@ private fun FavoriteAgentCard(
             Surface(
                 modifier = Modifier
                     .size(44.dp)
-                    .optionalSharedElement(agentAvatarSharedElementKey(agent.id)),
+                    .optionalSharedElement(agentAvatarSharedElementKey(agent.id.value)),
                 shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.primaryContainer,
             ) {
@@ -693,7 +694,7 @@ private fun AgentCard(
             Surface(
                 modifier = Modifier
                     .size(44.dp)
-                    .optionalSharedElement(agentAvatarSharedElementKey(agent.id)),
+                    .optionalSharedElement(agentAvatarSharedElementKey(agent.id.value)),
                 shape = RoundedCornerShape(12.dp),
                 color = if (isPinned) {
                     MaterialTheme.colorScheme.tertiaryContainer
@@ -861,7 +862,7 @@ private fun CompactAgentCard(
                 Surface(
                     modifier = Modifier
                         .size(30.dp)
-                        .optionalSharedElement(agentAvatarSharedElementKey(agent.id)),
+                        .optionalSharedElement(agentAvatarSharedElementKey(agent.id.value)),
                     shape = RoundedCornerShape(10.dp),
                     color = if (isPinned) {
                         MaterialTheme.colorScheme.tertiaryContainer
@@ -1011,7 +1012,7 @@ private fun CreateAgentDialog(
                     maxOutputTokens = maxOutputTokens.toIntOrNull(),
                     parallelToolCalls = parallelToolCalls,
                 ),
-                toolIds = selectedToolIds.ifEmpty { null },
+                toolIds = selectedToolIds.map { ToolId(it) }.ifEmpty { null },
                 system = systemPrompt.ifBlank { null },
                 enableSleeptime = enableSleeptime,
                 includeBaseTools = includeBaseTools,

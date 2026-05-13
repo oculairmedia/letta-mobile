@@ -280,7 +280,7 @@ class AgentListViewModel @Inject constructor(
                 val agent = agentRepository.createAgent(params)
                 _transient.update { it.copy(isCreating = false) }
                 agentRepository.refreshAgents()
-                onSuccess(agent.id)
+                onSuccess(agent.id.value)
             } catch (e: Exception) {
                 _transient.update {
                     it.copy(

@@ -52,19 +52,19 @@ fun ToolPickerDialog(
                 modifier = Modifier.heightIn(max = 360.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(tools, key = { it.id }) { tool ->
+                items(tools, key = { it.id.value }) { tool ->
                     TextButton(
                         onClick = {
-                            selection = if (tool.id in selection) {
-                                selection - tool.id
+                            selection = if (tool.id.value in selection) {
+                                selection - tool.id.value
                             } else {
-                                selection + tool.id
+                                selection + tool.id.value
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Checkbox(
-                            checked = tool.id in selection,
+                            checked = tool.id.value in selection,
                             onCheckedChange = null,
                         )
                         Column(

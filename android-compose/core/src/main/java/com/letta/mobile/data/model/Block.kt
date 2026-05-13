@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
 @Immutable
 @Serializable
 data class Block(
-    val id: String,
+    val id: BlockId,
     val label: String? = null,
     val value: String,
     val limit: Int? = null,

@@ -85,7 +85,7 @@ class ConversationsViewModel @Inject constructor(
         }
         val cachedAgents = agentRepository.agents.value
         if (cachedAgents.isNotEmpty()) {
-            agentNameCache = cachedAgents.associate { it.id to it.name }.toMutableMap()
+            agentNameCache = cachedAgents.associate { it.id.value to it.name }.toMutableMap()
         }
         val cachedConversations = allConversationsRepository.conversations.value
         if (cachedConversations.isNotEmpty()) {
@@ -121,7 +121,7 @@ class ConversationsViewModel @Inject constructor(
             }
 
             loadResult.agents.onSuccess { agents ->
-                agentNameCache = agents.associate { it.id to it.name }.toMutableMap()
+                agentNameCache = agents.associate { it.id.value to it.name }.toMutableMap()
             }.onFailure { error ->
                 Log.w("ConversationsVM", "Agent load failed", error)
             }

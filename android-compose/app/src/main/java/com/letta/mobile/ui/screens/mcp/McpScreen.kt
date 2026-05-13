@@ -276,10 +276,10 @@ private fun ToolsTab(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(tools, key = { it.id }) { tool ->
+            items(tools, key = { it.id.value }) { tool ->
                 ToolCard(
                     tool = tool,
-                    parent = toolParents[tool.id],
+                    parent = toolParents[tool.id.value],
                     onNavigateToServerTools = onNavigateToServerTools,
                 )
             }

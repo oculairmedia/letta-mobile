@@ -184,20 +184,20 @@ fun BlockLibraryScreen(
                             contentPadding = PaddingValues(16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            items(filteredBlocks, key = { it.id }) { block ->
+                            items(filteredBlocks, key = { it.id.value }) { block ->
                                 BlockLibraryCard(
                                     block = block,
-                                    agents = state.data.agentsByBlock[block.id] ?: emptyList(),
-                                    isSelected = block.id in selectedIds,
+                                    agents = state.data.agentsByBlock[block.id.value] ?: emptyList(),
+                                    isSelected = block.id.value in selectedIds,
                                     isSelectionMode = isSelectionMode,
                                     onTap = {
                                         if (isSelectionMode) {
-                                            viewModel.toggleSelection(block.id)
+                                            viewModel.toggleSelection(block.id.value)
                                         } else {
                                             inspectTarget = block
                                         }
                                     },
-                                    onLongPress = { viewModel.toggleSelection(block.id) },
+                                    onLongPress = { viewModel.toggleSelection(block.id.value) },
                                 )
                             }
                         }
@@ -224,7 +224,7 @@ fun BlockLibraryScreen(
 
     inspectTarget?.let { block ->
         val successData = (uiState as? UiState.Success)?.data
-        val agents = successData?.agentsByBlock?.get(block.id) ?: emptyList()
+        val agents = successData?.agentsByBlock?.get(block.id.value) ?: emptyList()
         BlockDetailDialog(
             block = block,
             agents = agents,
@@ -266,7 +266,7 @@ fun BlockLibraryScreen(
             labelEnabled = false,
             onDismiss = { editTarget = null },
             onConfirm = { _, value, description, limit ->
-                viewModel.updateGlobalBlock(block.id, value, description, limit) {
+                viewModel.updateGlobalBlock(block.id.value, value, description, limit) {
                     editTarget = null
                     inspectTarget = null
                 }
@@ -277,7 +277,7 @@ fun BlockLibraryScreen(
     manageAgentsTarget?.let { block ->
         val successData = (uiState as? UiState.Success)?.data
         val attachedAgentIds = remember(successData?.agentsByBlock, block.id) {
-            successData?.agentsByBlock?.get(block.id)?.map { it.id }?.toSet() ?: emptySet()
+            successData?.agentsByBlock?.get(block.id.value)?.map { it.id }?.toSet() ?: emptySet()
         }
         val allAgents = remember(successData?.allAgents) {
             successData?.allAgents ?: emptyList()
@@ -285,10 +285,10 @@ fun BlockLibraryScreen(
 
         AgentMultiSelectDialog(
             agents = allAgents,
-            selectedAgentIds = attachedAgentIds,
+            selectedAgentIds = attachedAgentIds.map { it.value }.toSet(),
             onDismiss = { manageAgentsTarget = null },
             onConfirm = { newSelection ->
-                viewModel.updateBlockAgents(block.id, newSelection) {
+                viewModel.updateBlockAgents(block.id.value, newSelection) {
                     manageAgentsTarget = null
                 }
             },
@@ -569,11 +569,11 @@ private fun AgentMultiSelectDialog(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier.heightIn(max = 360.dp),
             ) {
-                items(agents, key = { it.id }) { agent ->
-                    val isChecked = agent.id in selection
+                items(agents, key = { it.id.value }) { agent ->
+                    val isChecked = agent.id.value in selection
                     TextButton(
                         onClick = {
-                            selection = if (isChecked) selection - agent.id else selection + agent.id
+                            selection = if (isChecked) selection - agent.id.value else selection + agent.id.value
                         },
                         modifier = Modifier.fillMaxWidth(),
                     ) {

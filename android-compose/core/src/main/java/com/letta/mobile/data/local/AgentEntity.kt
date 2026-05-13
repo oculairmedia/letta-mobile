@@ -3,6 +3,7 @@ package com.letta.mobile.data.local
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
@@ -24,7 +25,7 @@ data class AgentEntity(
     val blockCount: Int = 0,
 ) {
     fun toAgent() = Agent(
-        id = id,
+        id = AgentId(id),
         name = name,
         description = description,
         model = model,
@@ -66,7 +67,7 @@ data class AgentEntity(
         }
 
         fun fromAgent(agent: Agent) = AgentEntity(
-            id = agent.id,
+            id = agent.id.value,
             name = agent.name,
             description = agent.description,
             model = agent.model,

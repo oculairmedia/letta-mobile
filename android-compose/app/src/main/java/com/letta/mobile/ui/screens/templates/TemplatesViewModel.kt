@@ -93,7 +93,7 @@ class TemplatesViewModel @Inject constructor(
                         includeBaseTools = true,
                     )
                 )
-                onSuccess(agent.id)
+                onSuccess(agent.id.value)
             } catch (e: Exception) {
                 _uiState.value = UiState.Error(e.message ?: "Failed to create agent")
             }

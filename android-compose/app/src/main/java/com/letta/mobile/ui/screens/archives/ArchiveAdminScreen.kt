@@ -223,7 +223,7 @@ fun ArchiveAdminScreen(
             agents = (uiState as? UiState.Success)?.data?.let { viewModel.getAvailableAgentsForArchive() }.orEmpty(),
             onDismiss = { attachTarget = null },
             onSelect = { agent ->
-                viewModel.attachArchiveToAgent(archive.id, agent.id) {
+                viewModel.attachArchiveToAgent(archive.id, agent.id.value) {
                     attachTarget = null
                 }
             },
@@ -238,7 +238,7 @@ fun ArchiveAdminScreen(
             confirmText = stringResource(R.string.action_remove),
             dismissText = stringResource(R.string.action_cancel),
             onConfirm = {
-                viewModel.detachArchiveFromAgent(archive.id, agent.id)
+                viewModel.detachArchiveFromAgent(archive.id, agent.id.value)
                 detachTarget = null
             },
             onDismiss = { detachTarget = null },

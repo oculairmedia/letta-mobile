@@ -138,7 +138,7 @@ fun McpServerToolsScreen(
                             items(state.data.tools, key = { it.id }) { tool ->
                                 McpServerToolCard(
                                     tool = tool,
-                                    isRunning = state.data.toolRunState.activeToolId == tool.id && state.data.toolRunState.result == null && state.data.toolRunState.errorMessage == null,
+                                    isRunning = state.data.toolRunState.activeToolId == tool.id.value && state.data.toolRunState.result == null && state.data.toolRunState.errorMessage == null,
                                     onRun = { pendingRunTool = tool },
                                 )
                             }
@@ -156,7 +156,7 @@ fun McpServerToolsScreen(
             tool = runTool,
             onDismiss = { pendingRunTool = null },
             onRun = { rawArgs ->
-                viewModel.runTool(runTool.id, rawArgs)
+                viewModel.runTool(runTool.id.value, rawArgs)
                 pendingRunTool = null
             },
         )

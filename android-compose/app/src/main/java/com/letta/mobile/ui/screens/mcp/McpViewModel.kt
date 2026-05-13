@@ -75,7 +75,7 @@ class McpViewModel @Inject constructor(
                     serverToolsMap[server.id] = tools
                     tools.forEach { tool ->
                         toolParents.putIfAbsent(
-                            tool.id,
+                            tool.id.value,
                             McpToolParent(serverId = server.id, serverName = server.serverName),
                         )
                     }

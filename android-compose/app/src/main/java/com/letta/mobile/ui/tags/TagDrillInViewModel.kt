@@ -130,7 +130,7 @@ class TagDrillInViewModel @Inject constructor(
 
 private fun Agent.toTagDrillInItem(activeTag: String): TagDrillInItem {
     return TagDrillInItem(
-        id = id,
+        id = id.value,
         entityType = TagDrillInEntityType.AGENT,
         title = name,
         supportingText = description,
@@ -141,7 +141,7 @@ private fun Agent.toTagDrillInItem(activeTag: String): TagDrillInItem {
 
 private fun Tool.toTagDrillInItem(activeTag: String): TagDrillInItem {
     return TagDrillInItem(
-        id = id,
+        id = id.value,
         entityType = TagDrillInEntityType.TOOL,
         title = name,
         supportingText = description,

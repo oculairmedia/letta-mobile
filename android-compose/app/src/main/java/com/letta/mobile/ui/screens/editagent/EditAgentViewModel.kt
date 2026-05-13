@@ -206,7 +206,7 @@ class EditAgentViewModel @Inject constructor(
                 val agent = agentRepository.getAgent(agentId).last()
                 val editableBlocks = agent.blocks.map { block ->
                     EditableBlock(
-                        id = block.id,
+                        id = block.id.value,
                         label = block.label ?: "",
                         value = block.value ?: "",
                         description = block.description,
@@ -240,7 +240,7 @@ class EditAgentViewModel @Inject constructor(
                 _uiState.value = UiState.Success(
                     EditAgentUiState(
                         agent = agent,
-                        agentId = agent.id,
+                        agentId = agent.id.value,
                         name = agent.name,
                         description = agent.description ?: "",
                         model = agent.model ?: "",
@@ -399,7 +399,7 @@ class EditAgentViewModel @Inject constructor(
                         limit = limit,
                     )
                 )
-                blockRepository.attachBlock(agentId, block.id)
+                blockRepository.attachBlock(agentId, block.id.value)
                 loadAgent()
             } catch (e: Exception) {
                 android.util.Log.w("EditAgentVM", "Failed to create block", e)

@@ -8,7 +8,7 @@ import kotlinx.serialization.json.JsonObject
 @Immutable
 @Serializable
 data class Tool(
-    val id: String,
+    val id: ToolId,
     val name: String,
     val description: String? = null,
     @SerialName("tool_type") val toolType: String? = null,

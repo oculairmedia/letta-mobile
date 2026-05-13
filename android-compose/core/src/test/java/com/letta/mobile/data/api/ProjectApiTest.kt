@@ -1,5 +1,6 @@
 package com.letta.mobile.data.api
 
+import com.letta.mobile.data.model.AgentId
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -84,7 +85,7 @@ class ProjectApiTest : com.letta.mobile.testutil.TrackedMockClientTestSupport() 
         val result = api.getProject("GRAPH")
 
         assertTrue(capturedUrl!!.endsWith("/api/projects/GRAPH"))
-        assertEquals("agent-1", result.lettaAgentId)
+        assertEquals(AgentId("agent-1"), result.lettaAgentId)
     }
 
     @Test

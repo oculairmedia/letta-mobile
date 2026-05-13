@@ -283,7 +283,7 @@ private fun SettingsContent(
                     tool = tool,
                     onDismiss = { selectedTool = null },
                     onTagClick = { tag ->
-                        onTagClick(tag, TagDrillInSource(TagDrillInEntityType.TOOL, tool.id))
+                        onTagClick(tag, TagDrillInSource(TagDrillInEntityType.TOOL, tool.id.value))
                     },
                 )
             }
@@ -304,7 +304,7 @@ private fun SettingsContent(
                                     onClick = {
                                         onTagClick(
                                             tag,
-                                            TagDrillInSource(TagDrillInEntityType.AGENT, agent.id),
+                                            TagDrillInSource(TagDrillInEntityType.AGENT, agent.id.value),
                                         )
                                     },
                                     label = { Text(tag) },

@@ -2,6 +2,7 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.model.ProjectDataFreshness
+import com.letta.mobile.data.model.ProjectId
 import com.letta.mobile.data.model.ProjectRepoInfo
 import com.letta.mobile.data.model.ProjectSummary
 import com.letta.mobile.data.model.ProjectTrackerInfo
@@ -107,7 +108,7 @@ class ProjectRepositoryTest {
     fun `refreshProjects flattens mobile project api repo and tracker summary fields`() = runTest {
         fakeApi.projects.add(
             ProjectSummary(
-                id = "LETMOB",
+                id = ProjectId("LETMOB"),
                 identifier = "LETMOB",
                 name = "Letta Mobile",
                 repo = ProjectRepoInfo(

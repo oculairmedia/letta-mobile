@@ -1,14 +1,17 @@
 package com.letta.mobile.testutil
 
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.Block
+import com.letta.mobile.data.model.BlockId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.McpToolExecutionResult
 import com.letta.mobile.data.model.MessageType
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.ToolId
 import java.time.Instant
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -22,7 +25,7 @@ object TestData {
         system: String? = null,
         blocks: List<Block> = emptyList(),
     ) = Agent(
-        id = id,
+        id = AgentId(id),
         name = name,
         model = model,
         description = description,
@@ -70,7 +73,7 @@ object TestData {
         name: String = "test_tool",
         description: String? = "A test tool",
     ) = Tool(
-        id = id,
+        id = ToolId(id),
         name = name,
         description = description,
     )
@@ -80,7 +83,7 @@ object TestData {
         label: String = "persona",
         value: String = "I am a helpful assistant.",
     ) = Block(
-        id = id,
+        id = BlockId(id),
         label = label,
         value = value,
     )

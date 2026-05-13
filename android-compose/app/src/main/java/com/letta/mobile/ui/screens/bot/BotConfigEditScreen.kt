@@ -377,7 +377,7 @@ private fun AgentSearchField(vm: BotConfigEditViewModel) {
                                 },
                                 supportingContent = {
                                     Text(
-                                        agent.model ?: agent.id.take(16),
+                                        agent.model ?: agent.id.value.take(16),
                                         style = MaterialTheme.typography.bodySmall,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
@@ -412,7 +412,7 @@ private fun AgentSearchField(vm: BotConfigEditViewModel) {
                             },
                             supportingContent = {
                                 Text(
-                                    agent.model ?: agent.id.take(16),
+                                    agent.model ?: agent.id.value.take(16),
                                     style = MaterialTheme.typography.bodySmall,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,

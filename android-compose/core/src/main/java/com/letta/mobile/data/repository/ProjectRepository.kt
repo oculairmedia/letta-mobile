@@ -3,6 +3,7 @@ package com.letta.mobile.data.repository
 import com.letta.mobile.data.api.ProjectApi
 import com.letta.mobile.data.api.ProjectCreateRequest
 import com.letta.mobile.data.api.ProjectUpdateRequest
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ProjectCatalog
 import com.letta.mobile.data.model.ProjectSummary
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -135,7 +136,7 @@ class ProjectRepository @Inject constructor(
     private fun ProjectSummary.sanitize(): ProjectSummary = copy(
         filesystemPath = filesystemPath ?: repo?.filesystemPath,
         gitUrl = (gitUrl ?: repo?.remoteUrl)?.let(::sanitizeGitUrl),
-        lettaAgentId = lettaAgentId ?: agents?.defaultAgentId,
+        lettaAgentId = lettaAgentId ?: agents?.defaultAgentId?.let { AgentId(it) },
         issueCount = issueCount ?: tracker?.summary?.totalKnown,
         beadsIssueCount = beadsIssueCount ?: tracker?.summary?.totalKnown,
         updatedAt = normalizeTimestamp(updatedAt),

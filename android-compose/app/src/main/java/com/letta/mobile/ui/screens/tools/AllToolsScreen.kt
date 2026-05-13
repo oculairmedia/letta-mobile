@@ -175,10 +175,10 @@ fun AllToolsScreen(
                                 }
                             }
 
-                            items(filteredTools, key = { it.id }) { tool ->
+                            items(filteredTools, key = { it.id.value }) { tool ->
                                 ToolTile(
                                     tool = tool,
-                                    onClick = { onNavigateToToolDetail(tool.id) },
+                                    onClick = { onNavigateToToolDetail(tool.id.value) },
                                 )
                             }
 

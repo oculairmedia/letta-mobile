@@ -249,7 +249,7 @@ fun ProjectHomeScreen(
                                     isPinned = project.identifier in state.data.pinnedProjectIds,
                                     onClick = {
                                         val agentId = project.lettaAgentId
-                                        if (agentId.isNullOrBlank()) {
+                                        if (agentId == null || agentId.value.isBlank()) {
                                             snackbar.dispatch(missingAgentMessage.format(project.name))
                                         } else {
                                             onNavigateToProjectChat(project, null)
@@ -594,7 +594,7 @@ fun ProjectHomeScreen(
                     fun openProjectChat(projectStartAction: String?) {
                         viewModel.selectProject(null)
                         val agentId = project.lettaAgentId
-                        if (agentId.isNullOrBlank()) {
+                        if (agentId == null || agentId.value.isBlank()) {
                             snackbar.dispatch(missingAgentMessage.format(project.name))
                         } else {
                             onNavigateToProjectChat(project, projectStartAction)

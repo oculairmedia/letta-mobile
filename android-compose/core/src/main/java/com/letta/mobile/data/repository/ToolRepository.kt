@@ -2,6 +2,7 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.api.ToolApi
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.model.ToolCreateParams
 import com.letta.mobile.data.model.ToolUpdateParams
 import kotlinx.coroutines.flow.Flow
@@ -64,7 +65,7 @@ class ToolRepository @Inject constructor(
 
     override suspend fun attachTool(agentId: String, toolId: String) {
         toolApi.attachTool(agentId, toolId)
-        val tool = _tools.value.find { it.id == toolId }
+        val tool = _tools.value.find { it.id == ToolId(toolId) }
         if (tool != null) {
             _toolsByAgent.update { current -> current.toMutableMap().apply {
                         val existing = get(agentId) ?: emptyList()
@@ -77,7 +78,7 @@ class ToolRepository @Inject constructor(
         toolApi.detachTool(agentId, toolId)
         _toolsByAgent.update { current -> current.toMutableMap().apply {
                     val existing = get(agentId) ?: emptyList()
-                    put(agentId, existing.filter { it.id != toolId })
+                    put(agentId, existing.filter { it.id != ToolId(toolId) })
                 } }
     }
 
@@ -105,9 +106,9 @@ class ToolRepository @Inject constructor(
 
     override suspend fun deleteTool(toolId: String) {
         toolApi.deleteTool(toolId)
-        _tools.update { current -> current.filterNot { it.id == toolId } }
+        _tools.update { current -> current.filterNot { it.id == ToolId(toolId) } }
         _toolsByAgent.update { current ->
-            current.mapValues { (_, tools) -> tools.filterNot { it.id == toolId } }
+            current.mapValues { (_, tools) -> tools.filterNot { it.id == ToolId(toolId) } }
         }
     }
 }

@@ -195,7 +195,7 @@ private fun AgentSelector(
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val selectedAgent = agents.firstOrNull { it.id == selectedAgentId }
+    val selectedAgent = agents.firstOrNull { it.id.value == selectedAgentId }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
@@ -224,7 +224,7 @@ private fun AgentSelector(
                     text = { Text(agent.name) },
                     onClick = {
                         expanded = false
-                        onAgentSelected(agent.id)
+                        onAgentSelected(agent.id.value)
                     },
                 )
             }
@@ -283,7 +283,7 @@ private fun CreateScheduleDialog(
     onCreate: (String, ScheduleCreateParams) -> Unit,
 ) {
     var selectedAgent by remember(agents, selectedAgentId) {
-        mutableStateOf(selectedAgentId ?: agents.firstOrNull()?.id.orEmpty())
+        mutableStateOf(selectedAgentId ?: agents.firstOrNull()?.id?.value.orEmpty())
     }
     var content by remember { mutableStateOf("") }
     var isRecurring by remember { mutableStateOf(false) }
