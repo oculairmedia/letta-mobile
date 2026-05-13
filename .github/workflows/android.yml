@@ -106,6 +106,12 @@ jobs:
           SENTRY_URL: ${{ secrets.SENTRY_URL }}
         run: ./gradlew ${{ matrix.gradle_task }} --no-daemon --build-cache
 
+      - name: Remove signing keystore
+        # Same hygiene as the release workflow -- runner is ephemeral but
+        # don't leave the decoded keystore on disk longer than needed.
+        if: always() && matrix.variant == 'play-release'
+        run: rm -f app/letta-release.jks
+
       - name: Upload ${{ matrix.variant }} APK
         uses: actions/upload-artifact@v4
         with:

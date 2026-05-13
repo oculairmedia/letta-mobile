@@ -1,0 +1,94 @@
+name: Release
+
+# Tag-driven release. Push a tag like `v1.2.3` to cut a release:
+#   git tag -a v1.2.3 -m "release: 1.2.3"
+#   git push origin v1.2.3
+#
+# The workflow builds the signed play-release APK, creates a GitHub Release
+# with auto-generated notes from PRs merged since the previous tag, and
+# attaches the APK as a release asset.
+#
+# Trigger by accident? Delete the tag (`git push --delete origin v1.2.3`)
+# and the release before anyone downloads it.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (must already exist, e.g. v1.2.3)"
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android-compose
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0  # full history so release-notes auto-generation can diff against the prior tag
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Decode signing keystore
+        run: echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > app/letta-release.jks
+
+      - name: Build signed play-release APK
+        env:
+          SIGNING_STORE_FILE: letta-release.jks
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          SENTRY_URL: ${{ secrets.SENTRY_URL }}
+        run: ./gradlew :app:assemblePlayRelease --no-daemon --build-cache
+
+      - name: Remove signing keystore
+        # Runner is ephemeral, but don't leave the decoded keystore on disk
+        # any longer than necessary. `if: always()` so failure paths clean
+        # up too.
+        if: always()
+        run: rm -f app/letta-release.jks
+
+      - name: Rename APK with tag
+        id: artifact
+        working-directory: android-compose/app/build/outputs/apk/play/release
+        run: |
+          set -euo pipefail
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          src=$(ls *.apk | head -n 1)
+          dest="letta-mobile-${tag}.apk"
+          cp -f "$src" "$dest"
+          echo "path=android-compose/app/build/outputs/apk/play/release/${dest}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Create release with auto-generated notes
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.artifact.outputs.tag }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: ${{ steps.artifact.outputs.path }}

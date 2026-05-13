@@ -6,7 +6,7 @@ The active Android app lives in `android-compose/`.
 
 All changes go through a pull request. `main` is protected — direct pushes are rejected.
 
-```
+```bash
 git checkout main && git pull               # start from a fresh main
 git checkout -b feat/your-change            # branch first, always
 # ...edit, commit normally...
@@ -28,7 +28,7 @@ git push --force-with-lease                 # safe force-push of your branch
 | Layer | What it does | Bypass |
 |-------|--------------|--------|
 | `.githooks/pre-commit` | Refuses commits on `main`/`master` | `git commit --no-verify` |
-| `.githooks/pre-push`   | Refuses pushes to `origin main`, runs `compileRootDebugKotlin` | `git push --no-verify` |
+| `.githooks/pre-push`   | Refuses pushes targeting `refs/heads/main` or `refs/heads/master` on any remote, runs `compileRootDebugKotlin` | `git push --no-verify` |
 | GitHub branch protection | Blocks direct pushes, requires `test` + `build-apk` to pass, linear history only | Admin override in the UI |
 
 The local hooks are nudges — they save a round-trip to CI. The branch-protection rule is the wall.
@@ -76,7 +76,7 @@ Run these from `android-compose/` before pushing (the pre-push hook covers the f
 
 ```bash
 ./gradlew :app:compileRootDebugKotlin
-./gradlew :app:testDebugUnitTest
+./gradlew :app:testRootDebugUnitTest
 ```
 
 Device install:

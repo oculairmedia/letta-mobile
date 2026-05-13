@@ -1,0 +1,58 @@
+# Dependabot configuration for letta-mobile.
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+#
+# PRs land via the normal CI gate (test + build-apk) and merge via squash.
+# Weekly cadence is deliberate -- daily would drown the inbox; monthly lets
+# CVEs linger. Limit per ecosystem keeps the PR queue manageable.
+
+version: 2
+
+updates:
+  # Gradle deps (Compose, Hilt, Ktor, Coil, etc.)
+  - package-ecosystem: gradle
+    directory: /android-compose
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - gradle
+    commit-message:
+      prefix: chore(deps)
+      include: scope
+    groups:
+      # Group related libraries so a single PR bumps the whole family.
+      compose:
+        patterns:
+          - "androidx.compose*"
+          - "androidx.compose.material*"
+      ktor:
+        patterns:
+          - "io.ktor:*"
+      kotlinx:
+        patterns:
+          - "org.jetbrains.kotlinx:*"
+      coil:
+        patterns:
+          - "io.coil-kt*"
+      androidx-core:
+        patterns:
+          - "androidx.core:*"
+          - "androidx.lifecycle:*"
+          - "androidx.activity:*"
+          - "androidx.navigation:*"
+
+  # GitHub Actions used in .github/workflows/
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: chore(ci)
+      include: scope

@@ -12,6 +12,52 @@ bd close <id>         # Complete work
 bd dolt push          # Push beads data to remote
 ```
 
+## Repository Workflow
+
+**`main` is protected — direct pushes are rejected by both local hooks and a GitHub branch-protection rule.** Full reference: [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Every change goes branch → PR → CI passes → squash-merge. The loop:
+
+```bash
+git checkout main && git pull               # start from fresh main
+git checkout -b feat/your-change            # branch first, ALWAYS
+# ...edit, commit normally...
+git push -u origin feat/your-change         # push the branch (NOT main)
+gh pr create                                # open PR with the template
+
+# If main moved while you worked:
+git fetch && git rebase origin/main         # REBASE, never merge
+git push --force-with-lease                 # safe force-push to your branch
+
+# When CI is green:
+# Squash-merge via GitHub UI. Branch auto-deletes.
+```
+
+**Hard rules for agents:**
+
+- **Never commit on `main` / `master`.** The pre-commit hook in `.githooks/pre-commit` will refuse. Bypassing with `--no-verify` defeats the purpose — don't.
+- **Never push to `origin main`.** The pre-push hook refuses and branch protection on the remote would reject it anyway.
+- **Never merge `main` into a feature branch.** Always `git rebase origin/main`. Merging produces phantom-conflict commit chains (same content, different SHAs) that wedge the next merge to `main`.
+- **CI gates merges, not pushes.** Required status checks: `test` and `build-apk`. Both must be green before squash-merge.
+- **First-time setup in a fresh clone:** run `./scripts/install-hooks.sh` to activate the local hooks via `core.hooksPath`.
+
+**When CI fails on your PR:**
+
+1. Read the failure (`gh pr checks <num>` or `gh run view <id> --log-failed`).
+2. Fix on the same branch — push the fix; CI re-runs automatically.
+3. Don't open a second PR for the fix; iterate on the existing branch.
+
+**When `main` has moved and your PR is now behind:**
+
+```bash
+git fetch
+git rebase origin/main
+# resolve conflicts in editor if any
+git push --force-with-lease
+```
+
+Do not `git merge origin/main` into your feature branch — see hard rules above.
+
 ## Non-Interactive Shell Commands
 
 **ALWAYS use non-interactive flags** with file operations to avoid hanging on confirmation prompts.
@@ -266,31 +312,43 @@ bd close <id>         # Complete work
 
 ## Session Completion
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until the PR is open and CI is running (or merged).
 
 **MANDATORY WORKFLOW:**
 
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
+1. **File issues for remaining work** — Create beads issues for anything that needs follow-up.
+2. **Run quality gates** locally (if code changed):
    ```bash
-   git pull --rebase
-   bd dolt push
-   git push
-   git status  # MUST show "up to date with origin"
+   ./gradlew :app:compileRootDebugKotlin
+   ./gradlew :app:testRootDebugUnitTest
    ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session. Add a `bd note` to the active/next bead with a concise bootstrap handoff and include the exact retrieval command in your final response:
+3. **Update issue status** — Close finished work, update in-progress items.
+4. **Sync beads**:
    ```bash
-   bd show <active-or-next-bead-id> && git status --short --branch
+   bd dolt push
+   ```
+5. **PUSH THE BRANCH AND OPEN A PR** — never push to `main` directly:
+   ```bash
+   # if your feature branch is behind main:
+   git fetch && git rebase origin/main
+   git push -u origin <your-branch>           # or --force-with-lease if rebased
+   gh pr create                               # if no PR exists yet
+   gh pr checks <PR#>                         # confirm CI is queued/running
+   git status                                 # MUST show "up to date with origin/<your-branch>"
+   ```
+6. **Clean up** — Clear stashes, delete merged local branches.
+7. **Verify** — All changes committed AND pushed to the feature branch AND a PR exists.
+8. **Hand off** — Add a `bd note` to the active/next bead with a concise bootstrap handoff. Include the exact retrieval command in your final response:
+   ```bash
+   bd show <active-or-next-bead-id> && git status --short --branch && gh pr view <PR#>
    ```
 
 **CRITICAL RULES:**
 
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
+- Work is NOT complete until the feature branch is pushed AND a PR exists.
+- NEVER `git push origin main` — the pre-push hook will reject it; even if you bypass it locally, branch protection on the remote will too. This is by design.
+- NEVER stop before pushing — that leaves work stranded locally.
+- NEVER say "ready to push when you are" — YOU must push the branch and open the PR.
+- If push fails on a feature branch, resolve (rebase / fix hook failure / set `JAVA_HOME`) and retry until it succeeds.
+- Don't merge your own PR until CI is green. Squash-merge only.
 <!-- END BEADS INTEGRATION -->
