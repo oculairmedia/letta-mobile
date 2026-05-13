@@ -3,9 +3,11 @@ package com.letta.mobile.ui.screens.chat
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.letta.mobile.bot.chat.ClientModeChatSender
 import com.letta.mobile.bot.protocol.InternalBotClient
+import com.letta.mobile.bot.repository.ClientModeAgentLocationRepository
+import com.letta.mobile.bot.channel.NotificationReplyHandler
 import com.letta.mobile.channel.NotificationDeliveryCoordinator
-import com.letta.mobile.channel.NotificationReplyHandler
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.MessageContentPart
@@ -52,7 +54,7 @@ class AdminChatViewModel @Inject constructor(
     private val internalBotClient: InternalBotClient,
     private val clientModeChatSender: ClientModeChatSender,
     private val clientModeAgentLocationRepository: ClientModeAgentLocationRepository,
-    private val currentConversationTracker: com.letta.mobile.channel.CurrentConversationTracker,
+    private val currentConversationTracker: com.letta.mobile.data.channel.CurrentConversationTracker,
     private val notificationDeliveryCoordinator: NotificationDeliveryCoordinator,
     private val notificationReplyHandler: NotificationReplyHandler,
 ) : ViewModel() {

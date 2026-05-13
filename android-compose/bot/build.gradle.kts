@@ -100,6 +100,10 @@ dependencies {
 
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.3.8")
+
+    // Compose runtime for @Stable and @Immutable annotations
+    implementation("androidx.compose.runtime:runtime:1.8.3")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")

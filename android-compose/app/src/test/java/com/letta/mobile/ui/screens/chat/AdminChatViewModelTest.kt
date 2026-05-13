@@ -2,11 +2,13 @@ package com.letta.mobile.ui.screens.chat
 
 import androidx.lifecycle.SavedStateHandle
 import com.letta.mobile.bot.core.BotSession
+import com.letta.mobile.bot.chat.ClientModeChatSender
 import com.letta.mobile.bot.protocol.BotAgentInfo
 import com.letta.mobile.bot.protocol.BotStreamEvent
 import com.letta.mobile.bot.protocol.BotStreamChunk
 import com.letta.mobile.bot.protocol.BotChatResponse
 import com.letta.mobile.bot.protocol.InternalBotClient
+import com.letta.mobile.bot.repository.ClientModeAgentLocationRepository
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.Block
@@ -85,7 +87,7 @@ class AdminChatViewModelTest {
     private lateinit var internalBotClient: InternalBotClient
     private lateinit var clientModeChatSender: ClientModeChatSender
     private lateinit var notificationDeliveryCoordinator: com.letta.mobile.channel.NotificationDeliveryCoordinator
-    private lateinit var notificationReplyHandler: com.letta.mobile.channel.NotificationReplyHandler
+    private lateinit var notificationReplyHandler: com.letta.mobile.bot.channel.NotificationReplyHandler
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var clientModeEnabledFlow: MutableStateFlow<Boolean>
     private var messages: List<AppMessage> = emptyList()
@@ -296,7 +298,7 @@ class AdminChatViewModelTest {
             internalBotClient,
             clientModeChatSender,
             clientModeAgentLocationRepository,
-            com.letta.mobile.channel.CurrentConversationTracker(),
+            com.letta.mobile.data.channel.CurrentConversationTracker(),
             notificationDeliveryCoordinator,
             notificationReplyHandler,
         )
@@ -1785,7 +1787,7 @@ class AdminChatViewModelTest {
             internalBotClient,
             clientModeChatSender,
             clientModeAgentLocationRepository,
-            com.letta.mobile.channel.CurrentConversationTracker(),
+            com.letta.mobile.data.channel.CurrentConversationTracker(),
             notificationDeliveryCoordinator,
             notificationReplyHandler,
         )
@@ -1921,7 +1923,7 @@ class AdminChatViewModelTest {
             internalBotClient,
             clientModeChatSender,
             clientModeAgentLocationRepository,
-            com.letta.mobile.channel.CurrentConversationTracker(),
+            com.letta.mobile.data.channel.CurrentConversationTracker(),
             notificationDeliveryCoordinator,
             notificationReplyHandler,
         )
@@ -2095,7 +2097,7 @@ class AdminChatViewModelTest {
             internalBotClient,
             clientModeChatSender,
             clientModeAgentLocationRepository,
-            com.letta.mobile.channel.CurrentConversationTracker(),
+            com.letta.mobile.data.channel.CurrentConversationTracker(),
             notificationDeliveryCoordinator,
             notificationReplyHandler,
         )
@@ -2137,7 +2139,7 @@ class AdminChatViewModelTest {
             internalBotClient,
             clientModeChatSender,
             clientModeAgentLocationRepository,
-            com.letta.mobile.channel.CurrentConversationTracker(),
+            com.letta.mobile.data.channel.CurrentConversationTracker(),
             notificationDeliveryCoordinator,
             notificationReplyHandler,
         )
@@ -2189,7 +2191,7 @@ class AdminChatViewModelTest {
             internalBotClient,
             clientModeChatSender,
             clientModeAgentLocationRepository,
-            com.letta.mobile.channel.CurrentConversationTracker(),
+            com.letta.mobile.data.channel.CurrentConversationTracker(),
             notificationDeliveryCoordinator,
             notificationReplyHandler,
         )
@@ -2230,7 +2232,7 @@ class AdminChatViewModelTest {
             internalBotClient,
             clientModeChatSender,
             clientModeAgentLocationRepository,
-            com.letta.mobile.channel.CurrentConversationTracker(),
+            com.letta.mobile.data.channel.CurrentConversationTracker(),
             notificationDeliveryCoordinator,
             notificationReplyHandler,
         )
@@ -2265,7 +2267,7 @@ class AdminChatViewModelTest {
             internalBotClient,
             clientModeChatSender,
             clientModeAgentLocationRepository,
-            com.letta.mobile.channel.CurrentConversationTracker(),
+            com.letta.mobile.data.channel.CurrentConversationTracker(),
             notificationDeliveryCoordinator,
             notificationReplyHandler,
         )
@@ -2296,7 +2298,7 @@ class AdminChatViewModelTest {
             internalBotClient,
             clientModeChatSender,
             clientModeAgentLocationRepository,
-            com.letta.mobile.channel.CurrentConversationTracker(),
+            com.letta.mobile.data.channel.CurrentConversationTracker(),
             notificationDeliveryCoordinator,
             notificationReplyHandler,
         )
@@ -3009,7 +3011,7 @@ class AdminChatViewModelTest {
     fun `client mode routes final notification candidate through coordinator`() = runTest {
         clientModeEnabledFlow.value = true
         every { notificationReplyHandler.activeReplyStreams } returns MutableStateFlow(emptySet())
-        val tracker = com.letta.mobile.channel.CurrentConversationTracker()
+        val tracker = com.letta.mobile.data.channel.CurrentConversationTracker()
         tracker.setCurrent("conv-1")
 
         every {
@@ -3051,7 +3053,7 @@ class AdminChatViewModelTest {
     fun `client mode publishes final notification when terminal frame omits conversation id`() = runTest {
         clientModeEnabledFlow.value = true
         every { notificationReplyHandler.activeReplyStreams } returns MutableStateFlow(emptySet())
-        val tracker = com.letta.mobile.channel.CurrentConversationTracker()
+        val tracker = com.letta.mobile.data.channel.CurrentConversationTracker()
 
         every {
             clientModeChatSender.streamMessage(any(), any(), any())
@@ -3105,7 +3107,7 @@ class AdminChatViewModelTest {
     fun `onScreenPaused clears tracker and onScreenResumed restores it`() = runTest {
         clientModeEnabledFlow.value = true
         every { notificationReplyHandler.activeReplyStreams } returns MutableStateFlow(emptySet())
-        val tracker = com.letta.mobile.channel.CurrentConversationTracker()
+        val tracker = com.letta.mobile.data.channel.CurrentConversationTracker()
 
         val vm = AdminChatViewModel(
             SavedStateHandle().apply {

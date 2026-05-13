@@ -1,10 +1,10 @@
-package com.letta.mobile.ui.screens.chat
+package com.letta.mobile.bot.chat
 
+import com.letta.mobile.bot.clientmode.ClientModeController
 import com.letta.mobile.bot.config.BotConfig
 import com.letta.mobile.bot.protocol.BotChatRequest
 import com.letta.mobile.bot.protocol.BotStreamChunk
 import com.letta.mobile.bot.protocol.InternalBotClient
-import com.letta.mobile.clientmode.ClientModeController
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow

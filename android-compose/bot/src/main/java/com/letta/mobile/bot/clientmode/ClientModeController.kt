@@ -1,4 +1,4 @@
-package com.letta.mobile.clientmode
+package com.letta.mobile.bot.clientmode
 
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner

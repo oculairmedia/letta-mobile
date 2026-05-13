@@ -11,7 +11,7 @@ import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.crossfade
 import com.letta.mobile.channel.ChannelHeartbeatScheduler
 import com.letta.mobile.channel.ChannelNotificationPublisher
-import com.letta.mobile.clientmode.ClientModeController
+import com.letta.mobile.bot.clientmode.ClientModeController
 import com.letta.mobile.debug.AutomationAuthBootstrap
 import com.letta.mobile.bot.heartbeat.BotHeartbeatScheduler
 import com.letta.mobile.bot.service.BotServiceAutoStarter

@@ -3,7 +3,8 @@ package com.letta.mobile.ui.screens.chat
 import com.letta.mobile.bot.protocol.BotChatRequest
 import com.letta.mobile.bot.protocol.BotStreamChunk
 import com.letta.mobile.bot.protocol.InternalBotClient
-import com.letta.mobile.clientmode.ClientModeController
+import com.letta.mobile.bot.chat.ClientModeChatSender
+import com.letta.mobile.bot.clientmode.ClientModeController
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every

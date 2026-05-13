@@ -4,6 +4,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import com.letta.mobile.bot.channel.NotificationReplyHandler
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals

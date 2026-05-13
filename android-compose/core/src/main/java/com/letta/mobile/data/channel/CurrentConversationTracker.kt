@@ -1,4 +1,4 @@
-package com.letta.mobile.channel
+package com.letta.mobile.data.channel
 
 import javax.inject.Inject
 import javax.inject.Singleton

@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.chat
 
+import com.letta.mobile.bot.repository.ClientModeDirectoryEntry
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.ProjectBugReport
 import com.letta.mobile.data.model.UiMessage

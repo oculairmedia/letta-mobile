@@ -1,6 +1,6 @@
 package com.letta.mobile.ui.screens.chat
 
-import com.letta.mobile.channel.CurrentConversationTracker
+import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.mapper.toUiMessages
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.UiMessage

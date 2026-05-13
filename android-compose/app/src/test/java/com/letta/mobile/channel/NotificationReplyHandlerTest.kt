@@ -1,11 +1,17 @@
 package com.letta.mobile.channel
 
+import com.letta.mobile.bot.channel.NotificationReplyHandler
+import com.letta.mobile.bot.chat.ClientModeChatSender
 import com.letta.mobile.bot.protocol.BotStreamChunk
+import com.letta.mobile.data.channel.NotificationCandidatePhase
+import com.letta.mobile.data.channel.NotificationCandidateSource
+import com.letta.mobile.data.channel.NotificationDelivery
+import com.letta.mobile.data.channel.NotificationDeliveryCandidate
+import com.letta.mobile.data.channel.NotificationDeliveryDecision
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.timeline.TimelineEvent
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.testutil.TestData
-import com.letta.mobile.ui.screens.chat.ClientModeChatSender
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -27,7 +33,7 @@ class NotificationReplyHandlerTest {
         val chatSender = mockk<ClientModeChatSender>()
         val timelineRepository = mockk<TimelineRepository>()
         val agentRepository = mockk<AgentRepository>()
-        val coordinator = mockk<NotificationDeliveryCoordinator>()
+        val coordinator = mockk<NotificationDelivery>()
         val coordinatorProvider = Provider { coordinator }
         val captured = slot<NotificationDeliveryCandidate>()
 
@@ -49,7 +55,7 @@ class NotificationReplyHandlerTest {
             clientModeChatSender = chatSender,
             timelineRepository = timelineRepository,
             agentRepository = agentRepository,
-            notificationDeliveryCoordinatorProvider = coordinatorProvider,
+            notificationDeliveryProvider = coordinatorProvider,
         )
 
         val job = handler.sendReply("agent-1", "conv-1", "hello")

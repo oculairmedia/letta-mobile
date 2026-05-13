@@ -1,5 +1,14 @@
 package com.letta.mobile.channel
 
+import com.letta.mobile.bot.channel.NotificationReplyHandler
+import com.letta.mobile.data.channel.CurrentConversationTracker
+import com.letta.mobile.data.channel.NotificationCandidatePhase
+import com.letta.mobile.data.channel.NotificationCandidateSource
+import com.letta.mobile.data.channel.NotificationDeferralReason
+import com.letta.mobile.data.channel.NotificationDelivery
+import com.letta.mobile.data.channel.NotificationDeliveryCandidate
+import com.letta.mobile.data.channel.NotificationDeliveryDecision
+import com.letta.mobile.data.channel.NotificationSuppressionReason
 import com.letta.mobile.util.Telemetry
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -34,8 +43,8 @@ class NotificationDeliveryCoordinator @Inject constructor(
     private val notificationReplyHandler: NotificationReplyHandler,
     private val syncStateStore: ChannelSyncStateStore,
     private val publisher: ChannelNotificationPublisher,
-) {
-    fun submit(candidate: NotificationDeliveryCandidate): NotificationDeliveryDecision {
+) : NotificationDelivery {
+    override fun submit(candidate: NotificationDeliveryCandidate): NotificationDeliveryDecision {
         val notificationId = candidate.notificationIdentity
             ?: return candidate.suppressed(NotificationSuppressionReason.MissingIdentity)
 
@@ -134,51 +143,3 @@ class NotificationDeliveryCoordinator @Inject constructor(
         )
 }
 
-data class NotificationDeliveryCandidate(
-    val conversationId: String,
-    val agentId: String,
-    val agentName: String,
-    val conversationSummary: String?,
-    val messageId: String?,
-    val runId: String?,
-    val source: NotificationCandidateSource,
-    val phase: NotificationCandidatePhase,
-    val previewText: String,
-    val isFinal: Boolean,
-) {
-    val notificationIdentity: String?
-        get() = messageId?.takeIf { it.isNotBlank() }
-            ?: runId?.takeIf { it.isNotBlank() }
-}
-
-enum class NotificationCandidateSource {
-    TimelineIngestion,
-    WebsocketClientMode,
-    NotificationReplyStream,
-    HeartbeatFallback,
-}
-
-enum class NotificationCandidatePhase {
-    Partial,
-    Final,
-    Settled,
-}
-
-sealed interface NotificationDeliveryDecision {
-    data class Published(val notificationId: String) : NotificationDeliveryDecision
-    data class Deferred(val reason: NotificationDeferralReason) : NotificationDeliveryDecision
-    data class Suppressed(val reason: NotificationSuppressionReason) : NotificationDeliveryDecision
-}
-
-enum class NotificationDeferralReason {
-    AwaitingFinalPreview,
-}
-
-enum class NotificationSuppressionReason {
-    MissingIdentity,
-    BlankPreview,
-    ForegroundConversation,
-    ActiveNotificationReplyStream,
-    DuplicateNotification,
-    PublishRejected,
-}

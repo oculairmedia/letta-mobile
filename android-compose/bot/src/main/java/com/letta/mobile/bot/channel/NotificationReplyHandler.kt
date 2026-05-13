@@ -1,15 +1,19 @@
-package com.letta.mobile.channel
+package com.letta.mobile.bot.channel
 
 import android.util.Log
+import com.letta.mobile.bot.chat.ClientModeChatSender
 import com.letta.mobile.bot.protocol.BotStreamEvent
+import com.letta.mobile.data.channel.NotificationCandidatePhase
+import com.letta.mobile.data.channel.NotificationCandidateSource
+import com.letta.mobile.data.channel.NotificationDelivery
+import com.letta.mobile.data.channel.NotificationDeliveryCandidate
+import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.timeline.DeliveryState
 import com.letta.mobile.data.timeline.MessageSource
 import com.letta.mobile.data.timeline.Role
 import com.letta.mobile.data.timeline.TimelineEvent
-import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.timeline.TimelineMessageType
 import com.letta.mobile.data.timeline.TimelineRepository
-import com.letta.mobile.ui.screens.chat.ClientModeChatSender
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
@@ -30,7 +34,7 @@ class NotificationReplyHandler @Inject constructor(
     private val clientModeChatSender: ClientModeChatSender,
     private val timelineRepository: TimelineRepository,
     private val agentRepository: AgentRepository,
-    private val notificationDeliveryCoordinatorProvider: Provider<NotificationDeliveryCoordinator>,
+    private val notificationDeliveryProvider: Provider<NotificationDelivery>,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -93,7 +97,7 @@ class NotificationReplyHandler @Inject constructor(
                             val delta = chunk.text?.takeIf { it.isNotEmpty() }
                             if (chunk.done) {
                                 if (accumulatedAssistantPreview.isNotBlank()) {
-                                    notificationDeliveryCoordinatorProvider.get().submit(
+                                    notificationDeliveryProvider.get().submit(
                                         NotificationDeliveryCandidate(
                                             conversationId = convId,
                                             agentId = agentId,

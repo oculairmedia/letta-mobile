@@ -1,4 +1,4 @@
-package com.letta.mobile.ui.screens.chat
+package com.letta.mobile.bot.repository
 
 import com.letta.mobile.bot.protocol.BotAgentInfo
 import com.letta.mobile.bot.protocol.WsBotClient

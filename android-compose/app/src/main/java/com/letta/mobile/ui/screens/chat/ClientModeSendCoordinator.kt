@@ -1,11 +1,12 @@
 package com.letta.mobile.ui.screens.chat
 
+import com.letta.mobile.bot.chat.ClientModeChatSender
 import com.letta.mobile.bot.protocol.BotStreamChunk
 import com.letta.mobile.bot.protocol.BotStreamEvent
-import com.letta.mobile.channel.CurrentConversationTracker
-import com.letta.mobile.channel.NotificationCandidatePhase
-import com.letta.mobile.channel.NotificationCandidateSource
-import com.letta.mobile.channel.NotificationDeliveryCandidate
+import com.letta.mobile.data.channel.CurrentConversationTracker
+import com.letta.mobile.data.channel.NotificationCandidatePhase
+import com.letta.mobile.data.channel.NotificationCandidateSource
+import com.letta.mobile.data.channel.NotificationDeliveryCandidate
 import com.letta.mobile.channel.NotificationDeliveryCoordinator
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiImageAttachment
