@@ -8,7 +8,13 @@ import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.material3.AssistChip
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -126,7 +132,7 @@ internal fun ChatMessageItem(
     modifier: Modifier = Modifier,
 ) {
     val isUser = message.role == "user"
-    val showAvatar = false
+    val showAvatar = groupPosition == GroupPosition.First || groupPosition == GroupPosition.None
     val context = LocalContext.current
     val copyLabel = stringResource(R.string.action_copy)
     val copyText = remember(message) { buildMessageCopyText(message) }
@@ -192,8 +198,23 @@ internal fun ChatMessageItem(
         return
     }
 
+    val spineColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.13f)
+    val spineModifier = if (!isUser && !message.isReasoning) {
+        Modifier.drawBehind {
+            val x = 12.dp.toPx()
+            drawLine(
+                color = spineColor,
+                start = Offset(x, 0f),
+                end = Offset(x, size.height),
+                strokeWidth = 1.5.dp.toPx(),
+            )
+        }
+    } else {
+        Modifier
+    }
+
     Column(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().then(spineModifier),
         horizontalAlignment = avatarAlignment,
     ) {
         if (showAvatar) {
@@ -748,53 +769,81 @@ internal fun MessageReasoning(
             .then(sizeAnimation)
             .padding(vertical = 4.dp),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(
-                    enabled = onToggleCollapsed != null,
-                    onClickLabel = clickLabel,
-                ) { onToggleCollapsed?.invoke() }
-                .padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            AnimatedVisibility(
-                visible = isStreaming,
-                enter = ChatMotion.horizontalEnter(),
-                exit = ChatMotion.horizontalExit(),
-            ) {
-                @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-                LoadingIndicator(
-                    modifier = Modifier.size(18.dp),
-                    color = MaterialTheme.colorScheme.primary,
+        Crossfade(targetState = isStreaming, label = "reasoning_state") { streaming ->
+            if (streaming) {
+                // Streaming: compact, quiet indicator with pulsing "Synthesizing…" text
+                val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+                val pulse by infiniteTransition.animateFloat(
+                    initialValue = 0.5f,
+                    targetValue = 0.92f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(900),
+                        repeatMode = RepeatMode.Reverse,
+                    ),
+                    label = "synthesizing_pulse",
                 )
-            }
-            Text(
-                text = if (isStreaming) "Thinking…" else "Reasoning",
-                style = MaterialTheme.typography.sectionTitle,
-                color = if (isStreaming) {
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.92f)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    @OptIn(ExperimentalMaterial3ExpressiveApi::class)
+                    LoadingIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        text = "Synthesizing…",
+                        style = MaterialTheme.typography.sectionTitle,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = pulse),
+                    )
+                }
+            } else {
+                // Settled: chip when collapsed, full header when expanded
+                if (isCollapsed) {
+                    AssistChip(
+                        onClick = { onToggleCollapsed?.invoke() },
+                        label = { Text("✦ thought process", style = MaterialTheme.typography.labelMedium) },
+                        modifier = Modifier.padding(vertical = 2.dp),
+                    )
                 } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
-            Text(
-                text = if (isCollapsed) previewText else "Shown",
-                style = MaterialTheme.typography.listItemSupporting,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            Icon(
-                imageVector = LettaIcons.ExpandMore,
-                contentDescription = clickLabel,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (onToggleCollapsed != null) 0.8f else 0.4f),
-                modifier = Modifier
-                    .size(LettaIconSizing.Inline)
-                    .rotate(if (isCollapsed) 0f else 180f),
-            )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(
+                                enabled = onToggleCollapsed != null,
+                                onClickLabel = clickLabel,
+                            ) { onToggleCollapsed?.invoke() }
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(
+                            text = "Reasoning",
+                            style = MaterialTheme.typography.sectionTitle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = "Shown",
+                            style = MaterialTheme.typography.listItemSupporting,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Icon(
+                            imageVector = LettaIcons.ExpandMore,
+                            contentDescription = clickLabel,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                            modifier = Modifier
+                                .size(LettaIconSizing.Inline)
+                                .rotate(180f),
+                        )
+                    }
+                }
+            }
         }
 
         AnimatedVisibility(

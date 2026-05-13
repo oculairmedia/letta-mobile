@@ -49,6 +49,7 @@ import com.letta.mobile.ui.components.TypingIndicator
 import com.letta.mobile.ui.theme.LocalChatIsPinching
 import com.letta.mobile.ui.theme.chatDimens
 import java.time.LocalDate
+import kotlin.math.abs
 import kotlin.math.round
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -84,25 +85,17 @@ fun ChatMessageList(
     // 2-finger event in a gesture until the user lifts.
     var isPinching by remember { mutableStateOf(false) }
 
-    // letta-mobile-5e0f.r3: realtime visual pinch, deferred text reflow.
-    // Modifier.graphicsLayer scales the list during the pinch gesture. This
-    // path does not mutate fontScale on every quantized step (r2's
-    // "continuous reflow" approach) — that recomposed the entire chat tree
-    // at gesture rate.
-    // (~5–10 fontScale changes/sec × every Text reading LocalChatTypography
-    // × cascading height interpolations) which produced the high-frequency
-    // strobe Emmanuel reported. Instead the chat list scales as a single
-    // GPU layer (zero recomposition, zero re-measure, zero re-layout)
-    // and we commit one true font-scale reflow on lift. Bias: smoothness
-    // > pixel-perfect text shaping mid-gesture. Accepted UX trade-off:
-    // a tiny snap on release as the layer rasters at scale 1.0 but
-    // typography re-flows to the committed scale.
-    //
-    // If this is revisited, prefer a hybrid checkpoint model: keep GPU
-    // scaling every frame, but commit real fontScale at a bounded cadence
-    // (for example every 80-120 ms or every 4-6% scale delta), and profile
-    // expanded tool outputs, markdown/code blocks, and run blocks before
-    // shipping it.
+    // letta-mobile-d9zy.1: throttled hybrid reflow for pinch-to-zoom.
+    // Modifier.graphicsLayer scales the list every pointer frame (zero
+    // recomposition, zero remeasure — pure GPU compositor work). In
+    // addition, a LaunchedEffect runs a 100 ms periodic checkpoint: if
+    // transientPinchScale has drifted more than 5% from 1.0f it fires
+    // onActiveFontScaleChange mid-gesture and simultaneously resets
+    // transientPinchScale to 1.0f, so the GPU layer un-scales exactly as
+    // the new typography lays out — no visible jump. This gives a bounded
+    // number of text reflows (at most ~10/sec) while keeping frame pacing
+    // smooth at the GPU layer rate. The final snap on lift still persists
+    // the setting via onFontScaleChange.
     var transientPinchScale by remember { mutableFloatStateOf(1f) }
 
     LaunchedEffect(pinchTick) {
@@ -110,6 +103,42 @@ fun ChatMessageList(
             showFontIndicator = true
             delay(1000)
             showFontIndicator = false
+        }
+    }
+
+    // letta-mobile-d9zy.1: mid-gesture hybrid checkpoint.
+    // While isPinching is true, poll every 100 ms. If transientPinchScale
+    // has drifted more than 5% from the reset baseline of 1.0f, snap the
+    // committed fontScale to the current visual scale and reset
+    // transientPinchScale to 1.0f so the GPU layer returns to identity at
+    // the same moment the text reflows — preventing a visible jump.
+    //
+    // midGestureBase tracks the committed scale after each checkpoint so the
+    // gesture loop can rebase liveZoom against it, ensuring the GPU layer
+    // stays at 1.0f immediately after a commit rather than snapping back to
+    // the pre-commit accumulated value on the next pointer frame.
+    var midGestureBase by remember { mutableFloatStateOf(1f) }
+    val currentOnActiveFontScaleChange by rememberUpdatedState(onActiveFontScaleChange)
+    LaunchedEffect(isPinching) {
+        if (!isPinching) return@LaunchedEffect
+        while (true) {
+            delay(100)
+            // Guard: gesture may have ended during the delay.
+            if (!isPinching) break
+            val scale = transientPinchScale
+            if (abs(scale - 1f) > 0.05f) {
+                val step = 0.02f
+                val raw = (midGestureBase * scale).coerceIn(0.7f, 1.6f)
+                val snapped = (round(raw / step) * step).coerceIn(0.7f, 1.6f)
+                // Atomic flip: commit new font scale and return the GPU layer
+                // to identity in the same state mutation so there is no frame
+                // where both the old text layout and a non-unity graphicsLayer
+                // are visible simultaneously. Also update midGestureBase so
+                // the gesture loop rebases liveZoom from here.
+                currentOnActiveFontScaleChange(snapped)
+                midGestureBase = snapped
+                transientPinchScale = 1f
+            }
         }
     }
 
@@ -185,55 +214,25 @@ fun ChatMessageList(
         modifier = modifier
             .fillMaxSize()
             .pointerInput(Unit) {
-                // letta-mobile-5e0f.r3: GPU-backed pinch preview with
-                // deferred text reflow.
-                //
-                // Why this approach: r2 tried "continuous reflow"
-                // (push fontScale to the theme on every quantized
-                // 2% step). Even with memoized ChatTypography +
-                // compositionLocalOf + animateContentSize gating,
-                // every fontScale tick re-measured every Text in
-                // every visible bubble at a new size — and on a
-                // device with markdown/code blocks/tool cards
-                // that's a measurable repaint. At 5–10 ticks/sec
-                // the result was the high-frequency strobe
-                // Emmanuel reported.
-                //
-                // r3 fix: during the gesture we ONLY mutate
-                // transientPinchScale, which is wired to a single
-                // Modifier.graphicsLayer { scaleX/scaleY } on the
-                // chat-list Box. graphicsLayer is GPU compositor
-                // work — no recomposition, no remeasure, no
-                // relayout, no Text re-shaping. The chat scales
-                // as a single textured layer at native frame
-                // rate.
-                //
-                // On gesture commit (lift) we:
-                //   1. Compute the final snapped fontScale.
-                //   2. Push it through onActiveFontScaleChange
-                //      so the theme reflows ONCE.
-                //   3. Reset transientPinchScale to 1f in the
-                //      same recomposition so the layer un-scales
-                //      as the new typography lays out — a single
-                //      visible "snap" instead of 45 stuttering
-                //      reflows.
-                //
-                // Trade-off: mid-gesture the text is rastered at the
-                // committed scale and stretched by the layer, so glyphs are
-                // slightly softer than a true reflow would render. Accepted
-                // in exchange for stable frame pacing.
-                //
-                // Do not replace this with pointer-frame typography reflow
-                // without a perf pass. The safer next step is a throttled
-                // hybrid: GPU scale every frame, periodic real fontScale
-                // checkpoints, one persisted setting write on lift.
+                // letta-mobile-d9zy.1: throttled hybrid pinch-to-zoom.
+                // transientPinchScale drives a Modifier.graphicsLayer every
+                // pointer frame (GPU compositor work — no recomposition, no
+                // remeasure). A separate LaunchedEffect fires
+                // onActiveFontScaleChange at most every 100 ms when the
+                // scale delta exceeds 5%, simultaneously resetting
+                // transientPinchScale to 1.0f so the GPU layer un-scales as
+                // the new text layout takes over. On lift we do a final snap
+                // and persist via onFontScaleChange.
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false)
                     var gesturePinching = false
-                    // The committed (already-applied to theme) scale
-                    // at the start of the gesture. The visual layer
-                    // multiplies further pinch deltas on top.
-                    val baseScale = activeFontScale
+                    // Seed midGestureBase from the current committed scale
+                    // so mid-gesture checkpoints compute against a fresh
+                    // baseline. The LaunchedEffect advances midGestureBase
+                    // after each checkpoint; the gesture loop reads it via
+                    // the outer mutableFloatStateOf so liveZoom is always
+                    // relative to the most-recently-committed scale.
+                    midGestureBase = activeFontScale
                     // Live raw zoom accumulator — drives the
                     // graphicsLayer directly so the user sees
                     // every pointer frame.
@@ -250,13 +249,22 @@ fun ChatMessageList(
                             val zoom = event.calculateZoom()
                             if (zoom != 1f) {
                                 event.changes.forEach { it.consume() }
-                                liveZoom *= zoom
+                                // If the LaunchedEffect fired a mid-gesture
+                                // checkpoint since the last frame, midGestureBase
+                                // will have advanced and transientPinchScale will
+                                // have been reset to 1.0f. Rebase liveZoom from
+                                // transientPinchScale (the GPU layer's current
+                                // factor) so we accumulate only the new delta
+                                // since the last checkpoint, not the full
+                                // history since gesture start.
+                                val currentBase = midGestureBase
+                                liveZoom = transientPinchScale * zoom
                                 // Clamp the visual layer to the
                                 // committable range (relative to
-                                // baseScale) so the user can't
+                                // currentBase) so the user can't
                                 // scale past what we'll snap to.
-                                val targetScale = (baseScale * liveZoom).coerceIn(0.7f, 1.6f)
-                                liveZoom = targetScale / baseScale
+                                val targetScale = (currentBase * liveZoom).coerceIn(0.7f, 1.6f)
+                                liveZoom = targetScale / currentBase
                                 transientPinchScale = liveZoom
                             }
                         }
@@ -266,7 +274,7 @@ fun ChatMessageList(
                         // happens once on lift — not 45 times
                         // during the gesture.
                         val step = 0.02f
-                        val finalRaw = (baseScale * liveZoom).coerceIn(0.7f, 1.6f)
+                        val finalRaw = (midGestureBase * liveZoom).coerceIn(0.7f, 1.6f)
                         val snapped = (round(finalRaw / step) * step)
                             .coerceIn(0.7f, 1.6f)
                         // Atomic-ish flip: theme + scale layer

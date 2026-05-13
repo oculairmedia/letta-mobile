@@ -75,6 +75,7 @@ fun StreamingMarkdownText(
     tailStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.bodyMedium,
     tailTransform: (String) -> String = { it },
     cursorText: String? = null,
+    cursorAlpha: Float = 1f,
     deferUnstableMarkdown: Boolean = true,
     stabilizeTables: Boolean = false,
     isStreaming: Boolean = true,
@@ -282,11 +283,13 @@ fun StreamingMarkdownText(
             // Edge case: text ends exactly at a committed boundary
             // (e.g. just after a paragraph break with no chars typed
             // yet). Show a standalone cursor so streaming still feels
-            // live.
+            // live. cursorAlpha allows the caller to fade the cursor
+            // out smoothly when streaming ends.
             Text(
                 text = cursorText,
                 style = tailStyle,
                 color = textColor,
+                modifier = Modifier.alpha(cursorAlpha),
             )
         }
     }

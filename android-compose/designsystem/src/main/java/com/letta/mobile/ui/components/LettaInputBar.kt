@@ -1,7 +1,11 @@
 package com.letta.mobile.ui.components
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -152,11 +156,19 @@ fun LettaInputBar(
                 disabledContentColor = colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
             ),
         ) {
-            Icon(
-                actionIcon,
-                contentDescription = actionContentDescription,
-                modifier = Modifier.size(actionIconSize),
-            )
+            AnimatedContent(
+                targetState = actionIcon,
+                transitionSpec = {
+                    scaleIn(animationSpec = tween(180)) togetherWith scaleOut(animationSpec = tween(180))
+                },
+                label = "actionIconTransition",
+            ) { icon ->
+                Icon(
+                    icon,
+                    contentDescription = actionContentDescription,
+                    modifier = Modifier.size(actionIconSize),
+                )
+            }
         }
     }
 }

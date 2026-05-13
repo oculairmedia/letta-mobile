@@ -1,5 +1,10 @@
 package com.letta.mobile.ui.screens.chat
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,14 +17,17 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -60,61 +68,93 @@ fun ChatComposer(
     val hasSendableContent = inputText.isNotBlank() || pendingAttachments.isNotEmpty()
     val canSend = !isStreaming && canSendMessages && hasSendableContent
 
-    Column(modifier = modifier.fillMaxWidth()) {
-        if (pendingAttachments.isNotEmpty()) {
-            AttachmentStrip(
-                attachments = pendingAttachments,
-                onRemove = onRemoveAttachment,
+    Box(modifier = modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            if (pendingAttachments.isNotEmpty()) {
+                AttachmentStrip(
+                    attachments = pendingAttachments,
+                    onRemove = onRemoveAttachment,
+                )
+            }
+
+            LettaInputBar(
+                text = inputText,
+                onTextChange = onTextChange,
+                placeholder = stringResource(R.string.screen_chat_input_hint),
+                sendContentDescription = stringResource(R.string.action_send_message),
+                enabled = canSendMessages,
+                canSendOverride = if (isStreaming) true else canSend,
+                actionIcon = if (isStreaming) LettaIcons.Close else LettaIcons.Send,
+                actionContentDescription = if (isStreaming) {
+                    stringResource(R.string.action_stop_run)
+                } else {
+                    stringResource(R.string.action_send_message)
+                },
+                actionContainerColor = if (isStreaming) MaterialTheme.colorScheme.errorContainer else null,
+                actionContentColor = if (isStreaming) MaterialTheme.colorScheme.onErrorContainer else null,
+                actionSizeFraction = if (isStreaming) 0.7f else 1f,
+                contentPadding = PaddingValues(
+                    horizontal = ChatComposerInputHorizontalPadding,
+                    vertical = ChatComposerInputVerticalPadding,
+                ),
+                itemSpacing = ChatComposerInputItemSpacing,
+                leadingContent = {
+                    Surface(
+                        modifier = Modifier
+                            .size(ChatComposerAttachButtonSize)
+                            .clickable(onClick = onAttachImage),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                LettaIcons.Add,
+                                contentDescription = stringResource(R.string.action_attach_image),
+                                modifier = Modifier.size(ChatComposerAttachIconSize),
+                            )
+                        }
+                    }
+                },
+                onSend = { text ->
+                    if (isStreaming) {
+                        onStop()
+                    } else {
+                        onSend(text)
+                    }
+                },
             )
         }
 
-        LettaInputBar(
-            text = inputText,
-            onTextChange = onTextChange,
-            placeholder = stringResource(R.string.screen_chat_input_hint),
-            sendContentDescription = stringResource(R.string.action_send_message),
-            enabled = canSendMessages,
-            canSendOverride = if (isStreaming) true else canSend,
-            actionIcon = if (isStreaming) LettaIcons.Close else LettaIcons.Send,
-            actionContentDescription = if (isStreaming) {
-                stringResource(R.string.action_stop_run)
-            } else {
-                stringResource(R.string.action_send_message)
-            },
-            actionContainerColor = if (isStreaming) MaterialTheme.colorScheme.errorContainer else null,
-            actionContentColor = if (isStreaming) MaterialTheme.colorScheme.onErrorContainer else null,
-            actionSizeFraction = if (isStreaming) 0.7f else 1f,
-            contentPadding = PaddingValues(
-                horizontal = ChatComposerInputHorizontalPadding,
-                vertical = ChatComposerInputVerticalPadding,
-            ),
-            itemSpacing = ChatComposerInputItemSpacing,
-            leadingContent = {
-                Surface(
+        // Streaming pulse ring — overlaid at the trailing action button position to indicate
+        // active network connection while the stop button is shown.
+        if (isStreaming) {
+            val infiniteTransition = rememberInfiniteTransition(label = "stream_pulse")
+            val pulseAlpha by infiniteTransition.animateFloat(
+                initialValue = 0.3f,
+                targetValue = 0.8f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(800),
+                    repeatMode = RepeatMode.Reverse,
+                ),
+                label = "pulse_alpha",
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 6.dp)
+                    .size(48.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
                     modifier = Modifier
-                        .size(ChatComposerAttachButtonSize)
-                        .clickable(onClick = onAttachImage),
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            LettaIcons.Add,
-                            contentDescription = stringResource(R.string.action_attach_image),
-                            modifier = Modifier.size(ChatComposerAttachIconSize),
-                        )
-                    }
-                }
-            },
-            onSend = { text ->
-                if (isStreaming) {
-                    onStop()
-                } else {
-                    onSend(text)
-                }
-            },
-        )
+                        .size(36.dp)
+                        .alpha(pulseAlpha),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
     }
 }
 
