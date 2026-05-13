@@ -128,7 +128,10 @@ fun computeVersionCode(versionName: String): Int {
     val major = parts.getOrElse(0) { 0 }
     val minor = parts.getOrElse(1) { 0 }
     val patch = parts.getOrElse(2) { 0 }
-    return major * 10_000 + minor * 100 + patch
+    // Android rejects versionCode <= 0. Floor at 1 so the `0.0.0-dev`
+    // fallback (no v* tag yet, or a shallow checkout that can't reach
+    // any tag) still produces a valid Android build.
+    return (major * 10_000 + minor * 100 + patch).coerceAtLeast(1)
 }
 
 val computedVersionName = computeVersionName()
