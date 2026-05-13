@@ -19,6 +19,8 @@ import com.letta.mobile.ui.theme.scaledBy
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import javax.inject.Inject
+import javax.inject.Singleton
 
 private val generatedUiJson = Json { ignoreUnknownKeys = true }
 
@@ -33,7 +35,13 @@ interface GeneratedUiComponentRenderer {
     )
 }
 
-object GeneratedUiRegistry {
+@Singleton
+class GeneratedUiRegistry @Inject constructor() {
+    init {
+        require(INSTANCE == null) { "GeneratedUiRegistry already initialized" }
+        INSTANCE = this
+    }
+
     private val renderers: Map<String, GeneratedUiComponentRenderer> = listOf(
         SummaryCardRenderer,
         MetricCardRenderer,
@@ -41,6 +49,14 @@ object GeneratedUiRegistry {
     ).associateBy { it.componentName }
 
     fun resolve(componentName: String): GeneratedUiComponentRenderer? = renderers[componentName]
+
+    companion object {
+        @Volatile
+        private var INSTANCE: GeneratedUiRegistry? = null
+
+        fun resolve(componentName: String): GeneratedUiComponentRenderer? =
+            INSTANCE!!.resolve(componentName)
+    }
 }
 
 object SummaryCardRenderer : GeneratedUiComponentRenderer {

@@ -6,10 +6,26 @@ import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import java.security.KeyStore
+import javax.inject.Inject
+import javax.inject.Singleton
 
-object EncryptedPrefsHelper {
-    private const val TAG = "EncryptedPrefsHelper"
-    private const val PREFS_NAME = "letta_secure_prefs"
+@Singleton
+class EncryptedPrefsHelper @Inject constructor() {
+    init {
+        require(INSTANCE == null) { "EncryptedPrefsHelper already initialized" }
+        INSTANCE = this
+    }
+
+    companion object {
+        private const val TAG = "EncryptedPrefsHelper"
+        private const val PREFS_NAME = "letta_secure_prefs"
+
+        @Volatile
+        private var INSTANCE: EncryptedPrefsHelper? = null
+
+        fun getEncryptedPrefs(context: Context): SharedPreferences =
+            INSTANCE!!.getEncryptedPrefs(context)
+    }
 
     fun getEncryptedPrefs(context: Context): SharedPreferences {
         return runCatching {

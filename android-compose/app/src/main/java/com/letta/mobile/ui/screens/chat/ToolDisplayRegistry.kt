@@ -1,12 +1,21 @@
 package com.letta.mobile.ui.screens.chat
 
+import javax.inject.Inject
+import javax.inject.Singleton
+
 data class ToolDisplayInfo(
     val emoji: String,
     val label: String,
     val detailLine: String? = null,
 )
 
-object ToolDisplayRegistry {
+@Singleton
+class ToolDisplayRegistry @Inject constructor() {
+    init {
+        require(INSTANCE == null) { "ToolDisplayRegistry already initialized" }
+        INSTANCE = this
+    }
+
     private val registry = mapOf(
         "web_search" to ToolDisplayInfo("🔍", "Searching the web"),
         "archival_memory_search" to ToolDisplayInfo("🧠", "Searching memory"),
@@ -102,4 +111,16 @@ object ToolDisplayRegistry {
 
     private fun String.truncate(max: Int): String =
         if (length > max) take(max) + "…" else this
+
+    companion object {
+        @Volatile
+        private var INSTANCE: ToolDisplayRegistry? = null
+
+        /**
+         * Static bridge for existing callers. Delegates to the Hilt-managed
+         * singleton. Throws if Hilt has not initialized the instance yet.
+         */
+        fun resolve(toolName: String, args: String? = null): ToolDisplayInfo =
+            INSTANCE!!.resolve(toolName, args)
+    }
 }
