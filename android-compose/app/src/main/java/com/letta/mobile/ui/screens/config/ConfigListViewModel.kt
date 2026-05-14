@@ -13,8 +13,10 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -37,41 +39,62 @@ class ConfigListViewModel @Inject constructor(
     @param:ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow<UiState<ConfigListUiState>>(UiState.Loading)
-    val uiState: StateFlow<UiState<ConfigListUiState>> = _uiState.asStateFlow()
+    // letta-mobile-cdlk: observe the underlying flows so the backend-switcher
+    // sheet stays in sync with concurrent edits (e.g. user adds a config via
+    // ConfigScreen, comes back, opens the sheet — the new entry must appear
+    // without a manual reload). The previous one-shot `loadConfigs()` only
+    // refreshed when this VM's setActiveConfig / deleteConfig completed, which
+    // missed cross-screen state changes.
+    //
+    // `_actionError` is folded into the same combined flow so a thrown
+    // setActiveConfig / deleteConfig still surfaces via uiState (matches
+    // the previous explicit-Error-state contract that ConfigListViewModelTest
+    // pins). Set to null after a successful action to clear the banner.
+    private val _actionError = MutableStateFlow<String?>(null)
 
-    init {
-        loadConfigs()
-    }
-
-    fun loadConfigs() {
-        viewModelScope.launch {
-            _uiState.value = UiState.Loading
-            try {
-                val configs = settingsRepository.configs.value
-                val activeId = settingsRepository.activeConfig.value?.id
+    val uiState: StateFlow<UiState<ConfigListUiState>> =
+        combine(
+            settingsRepository.configs,
+            settingsRepository.activeConfig,
+            _actionError,
+        ) { configs, active, error ->
+            if (error != null) {
+                UiState.Error(error) as UiState<ConfigListUiState>
+            } else {
+                val activeId = active?.id
                 val serverConfigs = configs.map {
                     ServerConfig(
                         id = it.id,
                         mode = if (it.mode == LettaConfig.Mode.CLOUD) ServerMode.CLOUD else ServerMode.SELF_HOSTED,
                         url = it.serverUrl,
-                        isActive = it.id == activeId
+                        isActive = it.id == activeId,
                     )
                 }
-                _uiState.value = UiState.Success(ConfigListUiState(configs = serverConfigs.toImmutableList()))
-            } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "Failed to load configs")
+                UiState.Success(ConfigListUiState(configs = serverConfigs.toImmutableList()))
             }
         }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000L),
+                initialValue = UiState.Loading,
+            )
+
+    /**
+     * Kept for [ConfigListScreen]'s error-retry path: clearing
+     * [_actionError] lets the flow-driven `uiState` recompute to Success
+     * from the current repository snapshot.
+     */
+    fun loadConfigs() {
+        _actionError.value = null
     }
 
     fun setActiveConfig(configId: String) {
         viewModelScope.launch {
             try {
                 settingsRepository.setActiveConfigId(configId)
-                loadConfigs()
+                _actionError.value = null
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "Failed to set active config")
+                _actionError.value = e.message ?: "Failed to set active config"
             }
         }
     }
@@ -80,12 +103,12 @@ class ConfigListViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 settingsRepository.deleteConfig(configId)
+                _actionError.value = null
                 if (settingsRepository.activeConfig.value == null) {
                     ChatPushAlarmScheduler.cancel(appContext)
                 }
-                loadConfigs()
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "Failed to delete config")
+                _actionError.value = e.message ?: "Failed to delete config"
             }
         }
     }

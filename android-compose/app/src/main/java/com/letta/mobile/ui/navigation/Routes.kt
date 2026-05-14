@@ -6,7 +6,17 @@ import kotlinx.serialization.Serializable
 @Serializable data object AdminRoute
 @Serializable data object ConversationsRoute
 @Serializable data object AgentListRoute
-@Serializable data object ConfigRoute
+@Serializable data class ConfigRoute(
+    /**
+     * When true, the screen opens with an empty form and saves as a brand-new
+     * config (fresh UUID) instead of overwriting the currently active one.
+     * Used by the backend-switcher sheet's "+ Add server" affordance
+     * (letta-mobile-cdlk). Defaults to false so every existing call site —
+     * Settings nav, the post-clear bootstrap, etc. — keeps the original
+     * "edit active config" behaviour.
+     */
+    val createNew: Boolean = false,
+)
 @Serializable data object ConfigListRoute
 @Serializable data object TemplatesRoute
 @Serializable data object ArchivesRoute

@@ -32,8 +32,15 @@ class RouteSerializationTest {
         verifyIdempotent(AgentListRoute)
 
     @Test
-    fun `ConfigRoute serializes and deserializes`() =
-        verifyIdempotent(ConfigRoute)
+    fun `ConfigRoute serializes and deserializes`() {
+        // letta-mobile-cdlk: ConfigRoute changed from `data object` to
+        // `data class ConfigRoute(val createNew: Boolean = false)`.
+        // verifyIdempotent only handles singletons; use verifyRoundTrip
+        // for instances and cover both default (createNew = false) and
+        // the new create-mode (createNew = true) explicitly.
+        verifyRoundTrip(ConfigRoute())
+        verifyRoundTrip(ConfigRoute(createNew = true))
+    }
 
     @Test
     fun `BlocksRoute serializes and deserializes`() =

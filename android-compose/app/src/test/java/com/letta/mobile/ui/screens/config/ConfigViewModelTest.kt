@@ -2,6 +2,7 @@ package com.letta.mobile.ui.screens.config
 
 import android.content.Context
 import app.cash.turbine.test
+import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
@@ -51,7 +52,11 @@ class ConfigViewModelTest {
         mockkObject(EncryptedPrefsHelper)
         every { EncryptedPrefsHelper.getEncryptedPrefs(any()) } returns sharedPreferences
         fakeRepository = FakeSettingsRepository(appContext)
-        viewModel = ConfigViewModel(fakeRepository)
+        // letta-mobile-cdlk: ConfigViewModel now reads ConfigRoute(createNew)
+        // from SavedStateHandle. Empty handle is fine for the existing edit-
+        // active-config test cases (createNew defaults to false when the
+        // route arg is absent).
+        viewModel = ConfigViewModel(SavedStateHandle(), fakeRepository)
     }
 
     @After

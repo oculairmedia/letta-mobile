@@ -17,7 +17,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.navigation.NavHostController
@@ -43,6 +46,7 @@ import com.letta.mobile.ui.screens.archives.ArchiveAdminScreen
 import com.letta.mobile.ui.screens.archival.ArchivalScreen
 import com.letta.mobile.ui.screens.blocks.BlockLibraryScreen
 import com.letta.mobile.ui.screens.chat.AgentScaffold
+import com.letta.mobile.ui.screens.config.BackendSwitcherSheet
 import com.letta.mobile.ui.screens.config.ConfigListScreen
 import com.letta.mobile.ui.screens.config.ConfigScreen
 import com.letta.mobile.ui.screens.conversations.ConversationsScreen
@@ -140,6 +144,14 @@ fun AppNavGraph(
     val lastChatSelection by navViewModel.lastChatSelection.collectAsStateWithLifecycle(initialValue = null)
     val activeBackendLabel = activeConfig.toBackendLabel()
 
+    // letta-mobile-cdlk: backend-switcher bottom sheet. State is lifted to
+    // the NavHost host so a single sheet instance overlays whichever screen
+    // owns the pill (Home, Conversations, ProjectHome, TwoPaneConversations).
+    // rememberSaveable so the sheet survives configuration changes; the
+    // ModalBottomSheet manages its own enter/exit animation internally.
+    var showBackendSwitcher by rememberSaveable { mutableStateOf(false) }
+    val openBackendSwitcher: () -> Unit = remember { { showBackendSwitcher = true } }
+
     val initialNotificationTarget = remember { notificationTarget }
     val restoredChatSelection = lastChatSelection
     val fallbackAgentId = favoriteAgentId ?: adminAgentId
@@ -154,7 +166,7 @@ fun AppNavGraph(
         }
         hasConfig && fallbackAgentId != null -> AgentChatRoute(agentId = fallbackAgentId)
         hasConfig -> HomeRoute
-        else -> ConfigRoute
+        else -> ConfigRoute()
     }
 
     LaunchedEffect(notificationTarget) {
@@ -200,9 +212,9 @@ fun AppNavGraph(
                         )
                     )
                 },
-                onNavigateToSettings = { navController.navigate(ConfigRoute) },
+                onNavigateToSettings = { navController.navigate(ConfigRoute()) },
                 activeBackendLabel = activeBackendLabel,
-                onNavigateToBackendSwitcher = { navController.navigate(ConfigListRoute) },
+                onNavigateToBackendSwitcher = openBackendSwitcher,
             )
         }
 
@@ -242,7 +254,7 @@ fun AppNavGraph(
                 onNavigateToConversations = { navController.navigate(ConversationsRoute) },
                 onNavigateToTools = { navController.navigate(AllToolsRoute) },
                 onNavigateToBlocks = { navController.navigate(BlocksRoute) },
-                onNavigateToSettings = { navController.navigate(ConfigRoute) },
+                onNavigateToSettings = { navController.navigate(ConfigRoute()) },
                 onNavigateToChat = { agentId, agentName, initialMessage ->
                     navController.navigate(
                         AgentChatRoute(
@@ -277,7 +289,7 @@ fun AppNavGraph(
                 onNavigateToProjects = { navController.navigate(HomeRoute) },
                 onNavigateToModels = { navController.navigate(ModelsRoute) },
                 activeBackendLabel = activeBackendLabel,
-                onNavigateToBackendSwitcher = { navController.navigate(ConfigListRoute) },
+                onNavigateToBackendSwitcher = openBackendSwitcher,
                 title = "Admin",
             )
         }
@@ -323,7 +335,7 @@ fun AppNavGraph(
                 if (windowSizeClass.isExpandedWidth) {
                     TwoPaneConversationsLayout(
                         outerNavController = navController,
-                        onNavigateToSettings = { navController.navigate(ConfigRoute) },
+                        onNavigateToSettings = { navController.navigate(ConfigRoute()) },
                         onNavigateToAgentList = { navController.navigate(AgentListRoute) },
                         onNavigateToTemplates = { navController.navigate(TemplatesRoute) },
                         onNavigateToArchives = { navController.navigate(ArchivesRoute) },
@@ -341,7 +353,7 @@ fun AppNavGraph(
                         onNavigateToBotSettings = { navController.navigate(BotSettingsRoute) },
                         onNavigateToProjects = { navController.navigate(HomeRoute) },
                         activeBackendLabel = activeBackendLabel,
-                        onNavigateToBackendSwitcher = { navController.navigate(ConfigListRoute) },
+                        onNavigateToBackendSwitcher = openBackendSwitcher,
                     )
                 } else {
                     ConversationsScreen(
@@ -354,7 +366,7 @@ fun AppNavGraph(
                                 )
                             )
                         },
-                        onNavigateToSettings = { navController.navigate(ConfigRoute) },
+                        onNavigateToSettings = { navController.navigate(ConfigRoute()) },
                         onNavigateToAgentList = { navController.navigate(AgentListRoute) },
                         onNavigateToTemplates = { navController.navigate(TemplatesRoute) },
                         onNavigateToArchives = { navController.navigate(ArchivesRoute) },
@@ -372,7 +384,7 @@ fun AppNavGraph(
                         onNavigateToBotSettings = { navController.navigate(BotSettingsRoute) },
                         onNavigateToProjects = { navController.navigate(HomeRoute) },
                         activeBackendLabel = activeBackendLabel,
-                        onNavigateToBackendSwitcher = { navController.navigate(ConfigListRoute) },
+                        onNavigateToBackendSwitcher = openBackendSwitcher,
                     )
                 }
             }
@@ -614,7 +626,7 @@ fun AppNavGraph(
                         )
                     )
                 },
-                onNavigateToSettings = { navController.navigate(ConfigRoute) },
+                onNavigateToSettings = { navController.navigate(ConfigRoute()) },
             )
         }
 
@@ -686,7 +698,7 @@ fun AppNavGraph(
                 onNavigateBack = { navController.popBackStack() },
                 onLogout = {
                     navViewModel.clearAllData()
-                    navController.navigate(ConfigRoute) {
+                    navController.navigate(ConfigRoute()) {
                         popUpTo(0) { inclusive = true }
                     }
                 },
@@ -739,6 +751,22 @@ fun AppNavGraph(
         }
     }
         }
+    }
+
+    // letta-mobile-cdlk: render the backend-switcher sheet at the top level
+    // so it overlays whichever screen owns the pill. The Hilt-scoped
+    // ConfigListViewModel that BackendSwitcherSheet pulls observes the
+    // settings flow, so the sheet contents stay fresh across reopens.
+    if (showBackendSwitcher) {
+        BackendSwitcherSheet(
+            onDismiss = { showBackendSwitcher = false },
+            onNavigateToAddNewServer = {
+                navController.navigate(ConfigRoute(createNew = true))
+            },
+            onNavigateToEditServer = {
+                navController.navigate(ConfigRoute())
+            },
+        )
     }
 }
 
