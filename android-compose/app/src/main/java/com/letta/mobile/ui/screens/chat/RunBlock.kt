@@ -1,5 +1,8 @@
 package com.letta.mobile.ui.screens.chat
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -153,45 +156,62 @@ fun RunBlock(
                 // uniformly removes that swap entirely — when collapsed we
                 // simply render only `messages.last()`; when expanded we
                 // render the whole run.
-                val visibleMessages = if (collapsed) {
-                    listOf(selectCollapsedPreview(messages))
-                } else {
-                    messages
-                }
-                val visibleSteps = remember(visibleMessages) {
-                    compactRunToolCallSteps(visibleMessages)
-                }
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    visibleSteps.forEachIndexed { idx, step ->
-                        key(step.key) {
-                            val position = when {
-                                collapsed -> GroupPosition.None
-                                visibleSteps.size == 1 -> GroupPosition.None
-                                idx == 0 -> GroupPosition.First
-                                idx == visibleSteps.lastIndex -> GroupPosition.Last
-                                else -> GroupPosition.Middle
-                            }
-                            val drawLineAbove = idx > 0
-                            val drawLineBelow = idx < visibleSteps.lastIndex
-                            when (step) {
-                                is RunTimelineStep.Message -> RunMessageStepRow(
-                                    message = step.message,
-                                    position = position,
-                                    runIdentityColor = runIdentityColor,
-                                    drawLineAbove = drawLineAbove,
-                                    drawLineBelow = drawLineBelow,
-                                    renderRow = renderRow,
-                                )
+                //
+                // Motion restoration: wrap the visible-step Column in
+                // AnimatedContent keyed on `collapsed` only (NOT on
+                // `messages`), so user-driven expand/collapse plays the
+                // canonical ChatMotion ramp while streaming updates flow
+                // through the inner lambda without re-triggering the
+                // transition. Mirrors the pattern in ToolOutputRenderer
+                // (single source of truth for expand/collapse motion).
+                AnimatedContent(
+                    targetState = collapsed,
+                    transitionSpec = {
+                        (ChatMotion.expandEnter() togetherWith ChatMotion.expandExit())
+                            .using(SizeTransform(clip = true) { _, _ -> ChatMotion.contentSizeSpec })
+                    },
+                    label = "RunBlockExpandCollapse",
+                ) { isCollapsed ->
+                    val visibleMessages = if (isCollapsed) {
+                        listOf(selectCollapsedPreview(messages))
+                    } else {
+                        messages
+                    }
+                    val visibleSteps = remember(visibleMessages) {
+                        compactRunToolCallSteps(visibleMessages)
+                    }
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        visibleSteps.forEachIndexed { idx, step ->
+                            key(step.key) {
+                                val position = when {
+                                    isCollapsed -> GroupPosition.None
+                                    visibleSteps.size == 1 -> GroupPosition.None
+                                    idx == 0 -> GroupPosition.First
+                                    idx == visibleSteps.lastIndex -> GroupPosition.Last
+                                    else -> GroupPosition.Middle
+                                }
+                                val drawLineAbove = idx > 0
+                                val drawLineBelow = idx < visibleSteps.lastIndex
+                                when (step) {
+                                    is RunTimelineStep.Message -> RunMessageStepRow(
+                                        message = step.message,
+                                        position = position,
+                                        runIdentityColor = runIdentityColor,
+                                        drawLineAbove = drawLineAbove,
+                                        drawLineBelow = drawLineBelow,
+                                        renderRow = renderRow,
+                                    )
 
-                                is RunTimelineStep.ToolCallGroup -> RunToolCallGroupStepRow(
-                                    step = step,
-                                    runIdentityColor = runIdentityColor,
-                                    drawLineAbove = drawLineAbove,
-                                    drawLineBelow = drawLineBelow,
-                                    animateRows = isStreaming,
-                                    activeApprovalRequestId = activeApprovalRequestId,
-                                    onApprovalDecision = onApprovalDecision,
-                                )
+                                    is RunTimelineStep.ToolCallGroup -> RunToolCallGroupStepRow(
+                                        step = step,
+                                        runIdentityColor = runIdentityColor,
+                                        drawLineAbove = drawLineAbove,
+                                        drawLineBelow = drawLineBelow,
+                                        animateRows = isStreaming,
+                                        activeApprovalRequestId = activeApprovalRequestId,
+                                        onApprovalDecision = onApprovalDecision,
+                                    )
+                                }
                             }
                         }
                     }
