@@ -140,8 +140,27 @@ enum class DeliveryState { SENDING, SENT, FAILED }
  * realistic round-trips through the lettabot WS gateway → SDK → Letta server
  * → reconcile loop and minimising the chance of false positives from the user
  * legitimately sending the same content twice in quick succession.
+ *
+ * Used as-is for assistant / reasoning / tool-call confirmations, whose Local
+ * is created when the first stream chunk arrives — i.e. roughly co-temporal
+ * with the server's run-start `date`, so the absolute delta stays small.
  */
 const val CLIENT_MODE_FUZZY_WINDOW_MS: Long = 10_000
+
+/**
+ * Wider window applied only to USER confirmations (letta-mobile-cdm5). The
+ * USER Local is stamped `sentAt = Instant.now()` the moment the user taps
+ * Send, but the server's `user_message.date` is set when the run STARTS — not
+ * when the WS frame arrives. Lettabot WS gateway processing + Letta-side
+ * scheduling can push that gap to many seconds (24s observed in the cdm5
+ * repro). With the default 10s window the user fuzzy-collapse misses, the
+ * server's user_confirmed is appended at the timeline tail (after the just-
+ * collapsed assistant_confirmed), and the LazyColumn renders the user bubble
+ * BELOW the assistant response instead of above it. 5 minutes accommodates
+ * realistic long-running runs while still bounding false positives from
+ * legitimate same-content double-sends.
+ */
+const val CLIENT_MODE_USER_FUZZY_WINDOW_MS: Long = 300_000
 
 /**
  * Result of a fuzzy-collapse attempt. [collapsed] is null when no match was
@@ -363,14 +382,16 @@ data class Timeline(
         confirmed: TimelineEvent.Confirmed,
         windowMillis: Long = CLIENT_MODE_FUZZY_WINDOW_MS,
     ): FuzzyCollapseResult {
-        // In Client Mode, we must fuzzy-collapse both USER and agent-generated turns 
+        // In Client Mode, we must fuzzy-collapse both USER and agent-generated turns
         // (Assistant, Reasoning, Tool Call) because they are dual-streamed locally and via SSE.
-        if (confirmed.messageType != TimelineMessageType.USER && 
+        if (confirmed.messageType != TimelineMessageType.USER &&
             confirmed.messageType != TimelineMessageType.ASSISTANT &&
             confirmed.messageType != TimelineMessageType.REASONING &&
             confirmed.messageType != TimelineMessageType.TOOL_CALL) {
             return FuzzyCollapseResult(this, null)
         }
+
+        val effectiveWindow = effectiveFuzzyWindow(confirmed.messageType, windowMillis)
 
         val candidate = events.asSequence()
             .filterIsInstance<TimelineEvent.Local>()
@@ -380,7 +401,7 @@ data class Timeline(
                 val deltaMs = kotlin.math.abs(
                     java.time.Duration.between(it.sentAt, confirmed.date).toMillis()
                 )
-                deltaMs <= windowMillis
+                deltaMs <= effectiveWindow
             }
             // Prefer the most recent matching Local, in case the user sent the
             // same content multiple times within the window.
@@ -533,7 +554,7 @@ data class Timeline(
             val deltaMs = kotlin.math.abs(
                 java.time.Duration.between(local.sentAt, confirmed.date).toMillis()
             )
-            deltaMs <= windowMillis
+            deltaMs <= effectiveFuzzyWindow(confirmed.messageType, windowMillis)
         }
 
     /** Mark a Local event as [DeliveryState.SENT]. No-op for Confirmed events. */
@@ -548,6 +569,27 @@ data class Timeline(
         val local = events[idx] as TimelineEvent.Local
         return copy(events = events.toMutableList().also { it[idx] = transform(local) })
     }
+}
+
+/**
+ * Returns the fuzzy time window appropriate for [type]. USER messages get the
+ * wider [CLIENT_MODE_USER_FUZZY_WINDOW_MS] because the local sentAt is set at
+ * Send-time but the server's user_message.date is set at run-start; runs that
+ * take longer than the default 10s window would otherwise miss fuzzy collapse
+ * and produce a duplicate user bubble below the assistant response. For all
+ * other compatible types ([CLIENT_MODE_FUZZY_WINDOW_MS] is appropriate because
+ * the harness writes the Local in lock-step with the first stream chunk.
+ *
+ * Honours an explicit [explicit] override if it is already wider than either
+ * default — keeps test injection of long windows working unchanged.
+ */
+private fun effectiveFuzzyWindow(type: TimelineMessageType, explicit: Long): Long {
+    val base = if (type == TimelineMessageType.USER) {
+        CLIENT_MODE_USER_FUZZY_WINDOW_MS
+    } else {
+        CLIENT_MODE_FUZZY_WINDOW_MS
+    }
+    return maxOf(explicit, base)
 }
 
 private fun TimelineEvent.Local.isCompatibleClientModeCandidateFor(

@@ -392,16 +392,70 @@ class TimelineTest {
     }
 
     @Test
-    fun `collapseClientModeFuzzyMatch ignores match outside window`() {
+    fun `collapseClientModeFuzzyMatch ignores assistant match outside window`() {
         val now = Instant.now()
         val t = Timeline("c1").append(
-            clientModeLocal("cm-1", 1.0, "hello", sentAt = now.minusMillis(15_000))
+            clientModeAssistantLocal(
+                "cm-assist-stale",
+                1.0,
+                "hello",
+                sentAt = now.minusMillis(15_000),
+            )
         )
 
-        val incoming = confirmedUser("server-otid", 99.0, "hello", date = now)
+        // Assistant Locals continue to use the default 10s window — the
+        // harness writes them in lock-step with the first stream chunk so
+        // sentAt should track the server's run-start date closely. A 15s
+        // gap indicates a stale Local that should NOT absorb a fresh
+        // Confirmed.
+        val incoming = confirmedAssistant("server-otid", 99.0, "hello", date = now)
         val result = t.collapseClientModeFuzzyMatch(incoming, windowMillis = 10_000)
 
         assertNull("Match outside the configured window must not be collapsed", result.collapsed)
+    }
+
+    /**
+     * letta-mobile-cdm5: USER messages get a wider fuzzy window than other
+     * types because the Local's sentAt is stamped at Send-time but the
+     * server's user_message.date is set at run-start. Long runs push that
+     * delta well past 10s; the original window made the fuzzy match miss,
+     * leaving the user bubble below the assistant response in the timeline.
+     */
+    @Test
+    fun `collapseClientModeFuzzyMatch user collapses despite multi-second gap within extended window`() {
+        val now = Instant.now()
+        val t = Timeline("c1").append(
+            // Reproduces the cdm5 cold-start trace: local sent ~24s before
+            // server stamped its user_message.date — would miss the legacy
+            // 10s window but lands inside the 5-minute USER window.
+            clientModeLocal("cm-cdm5", 1.0, "pong", sentAt = now.minusMillis(24_000))
+        )
+
+        val incoming = confirmedUser("server-otid", 99.0, "pong", date = now)
+        val result = t.collapseClientModeFuzzyMatch(incoming, windowMillis = 10_000)
+
+        assertNotNull(
+            "User Locals must collapse within the extended USER window even when the explicit windowMillis is smaller",
+            result.collapsed,
+        )
+        assertEquals("cm-cdm5", result.collapsed!!.localOtid)
+    }
+
+    @Test
+    fun `collapseClientModeFuzzyMatch user ignores match outside extended window`() {
+        val now = Instant.now()
+        val t = Timeline("c1").append(
+            // 6 minutes — past the 5-minute USER window.
+            clientModeLocal("cm-stale", 1.0, "pong", sentAt = now.minusMillis(360_000))
+        )
+
+        val incoming = confirmedUser("server-otid", 99.0, "pong", date = now)
+        val result = t.collapseClientModeFuzzyMatch(incoming)
+
+        assertNull(
+            "User Locals more than 5 minutes apart from server timestamp must not be collapsed",
+            result.collapsed,
+        )
     }
 
     @Test
