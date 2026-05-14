@@ -1,7 +1,22 @@
 package com.letta.mobile.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -24,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -50,6 +66,15 @@ import com.letta.mobile.ui.icons.LettaIcons
  *   so Send is enabled with an empty text field.
  * @param leadingContent Optional slot rendered to the left of the text field,
  *   typically an attach button.
+ * @param actionPulse When true, applies a subtle ~800ms heartbeat scale-pulse
+ *   to the action button to communicate that work is in progress (e.g. an
+ *   active assistant stream behind the Stop button). Suppressed entirely when
+ *   the user has reduced motion enabled.
+ * @param actionVisible When false, the trailing action button slides out
+ *   horizontally and the text field expands to fill the freed space. Use this
+ *   to defer to the IME's own Send action while the soft keyboard is open and
+ *   no in-flight work needs to be cancelable. Defaults to true so existing
+ *   call sites keep their current behaviour.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -68,23 +93,50 @@ fun LettaInputBar(
     actionContainerColor: Color? = null,
     actionContentColor: Color? = null,
     actionSizeFraction: Float = 1f,
+    actionPulse: Boolean = false,
+    actionVisible: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
     itemSpacing: Dp = 8.dp,
     leadingContent: (@Composable () -> Unit)? = null,
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val haptic = LocalHapticFeedback.current
+    val reducedMotion = rememberReducedMotionEnabled()
     val canSend = (canSendOverride ?: text.isNotBlank()) && enabled
     val actionButtonSize by animateDpAsState(
         targetValue = 48.dp * actionSizeFraction.coerceIn(0.5f, 1f),
-        animationSpec = tween(durationMillis = 220),
+        animationSpec = tween(durationMillis = if (reducedMotion) 0 else 220),
         label = "inputActionButtonSize",
     )
     val actionIconSize by animateDpAsState(
         targetValue = 20.dp * actionSizeFraction.coerceIn(0.5f, 1f),
-        animationSpec = tween(durationMillis = 220),
+        animationSpec = tween(durationMillis = if (reducedMotion) 0 else 220),
         label = "inputActionIconSize",
     )
+
+    // letta-mobile-d9zy.5 (retry): subtle heartbeat pulse on the action
+    // button. Replaces the 2026-05-12 attempt to ring the button with a
+    // CircularProgressIndicator (rejected for misalignment). A 1.0 → 1.04
+    // → 1.0 scale tween is small enough not to crowd the input row but
+    // still rhythmic enough to read as "active". Skipped under reduced
+    // motion so the button stays static. The pulse uses .scale() rather
+    // than a layout-affecting modifier so the touch target stays the
+    // baseline 48 dp regardless of phase.
+    val actionPulseScale = if (actionPulse && !reducedMotion) {
+        val pulseTransition = rememberInfiniteTransition(label = "actionHeartbeat")
+        val scale by pulseTransition.animateFloat(
+            initialValue = 1f,
+            targetValue = 1.04f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 800, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "actionHeartbeatScale",
+        )
+        scale
+    } else {
+        1f
+    }
 
     Row(
         modifier = modifier
@@ -134,29 +186,85 @@ fun LettaInputBar(
             ),
         )
 
-        FilledIconButton(
-            onClick = {
-                if (canSend) {
-                    haptic.performHapticFeedback(HapticFeedbackType.Confirm)
-                    onSend(text)
-                }
+        // letta-mobile-xtwt: hide the trailing action button when the host
+        // wants to defer to the IME's Send (e.g. soft keyboard is open and
+        // no run is streaming). AnimatedVisibility with horizontal expand /
+        // shrink lets the text field flow into the freed space rather than
+        // leaving a hole. Wrapped around the FilledIconButton (not just its
+        // contents) so the layout actually reclaims the width.
+        AnimatedVisibility(
+            visible = actionVisible,
+            enter = if (reducedMotion) {
+                fadeIn(tween(durationMillis = 0))
+            } else {
+                fadeIn(tween(durationMillis = 180, easing = LinearOutSlowInEasing)) +
+                    expandHorizontally(
+                        animationSpec = tween(durationMillis = 220, easing = LinearOutSlowInEasing),
+                        expandFrom = Alignment.End,
+                    )
             },
-            enabled = canSend,
-            modifier = Modifier
-                .align(Alignment.CenterVertically)
-                .size(actionButtonSize),
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = actionContainerColor ?: colorScheme.primary,
-                contentColor = actionContentColor ?: colorScheme.onPrimary,
-                disabledContainerColor = colorScheme.surfaceContainerHigh,
-                disabledContentColor = colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
-            ),
+            exit = if (reducedMotion) {
+                fadeOut(tween(durationMillis = 0))
+            } else {
+                fadeOut(tween(durationMillis = 140, easing = FastOutSlowInEasing)) +
+                    shrinkHorizontally(
+                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                        shrinkTowards = Alignment.End,
+                    )
+            },
+            modifier = Modifier.align(Alignment.CenterVertically),
+            label = "inputActionVisibility",
         ) {
-            Icon(
-                actionIcon,
-                contentDescription = actionContentDescription,
-                modifier = Modifier.size(actionIconSize),
-            )
+            FilledIconButton(
+                onClick = {
+                    if (canSend) {
+                        haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                        onSend(text)
+                    }
+                },
+                enabled = canSend,
+                modifier = Modifier
+                    .size(actionButtonSize)
+                    .scale(actionPulseScale),
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = actionContainerColor ?: colorScheme.primary,
+                    contentColor = actionContentColor ?: colorScheme.onPrimary,
+                    disabledContainerColor = colorScheme.surfaceContainerHigh,
+                    disabledContentColor = colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                ),
+            ) {
+                // letta-mobile-d9zy.5 (retry): crossfade + scale the action icon
+                // between Send / Stop instead of hard-swapping. AnimatedContent
+                // is keyed on the icon vector so any caller-supplied vector
+                // change drives the morph, not just Send <-> Stop. Reduced
+                // motion bypasses the animation and renders the icon directly.
+                if (reducedMotion) {
+                    Icon(
+                        actionIcon,
+                        contentDescription = actionContentDescription,
+                        modifier = Modifier.size(actionIconSize),
+                    )
+                } else {
+                    AnimatedContent(
+                        targetState = actionIcon,
+                        transitionSpec = {
+                            (fadeIn(tween(durationMillis = 150)) +
+                                scaleIn(initialScale = 0.7f, animationSpec = tween(durationMillis = 150)))
+                                .togetherWith(
+                                    fadeOut(tween(durationMillis = 120)) +
+                                        scaleOut(targetScale = 0.7f, animationSpec = tween(durationMillis = 120)),
+                                )
+                        },
+                        label = "inputActionIconMorph",
+                    ) { icon ->
+                        Icon(
+                            icon,
+                            contentDescription = actionContentDescription,
+                            modifier = Modifier.size(actionIconSize),
+                        )
+                    }
+                }
+            }
         }
     }
 }

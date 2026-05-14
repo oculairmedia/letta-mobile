@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
@@ -23,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -60,6 +63,15 @@ fun ChatComposer(
     val hasSendableContent = inputText.isNotBlank() || pendingAttachments.isNotEmpty()
     val canSend = !isStreaming && canSendMessages && hasSendableContent
 
+    // letta-mobile-xtwt: defer to the IME's own Send action while the soft
+    // keyboard is open and there's nothing in flight. The composer's trailing
+    // button is redundant in that state — Enter on the keyboard already
+    // submits via KeyboardActions.onSend in LettaInputBar. We keep the
+    // button visible while streaming so the morphed Stop affordance stays
+    // reachable even with the keyboard up.
+    val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    val showAction = isStreaming || !keyboardOpen
+
     Column(modifier = modifier.fillMaxWidth()) {
         if (pendingAttachments.isNotEmpty()) {
             AttachmentStrip(
@@ -84,6 +96,8 @@ fun ChatComposer(
             actionContainerColor = if (isStreaming) MaterialTheme.colorScheme.errorContainer else null,
             actionContentColor = if (isStreaming) MaterialTheme.colorScheme.onErrorContainer else null,
             actionSizeFraction = if (isStreaming) 0.7f else 1f,
+            actionPulse = isStreaming,
+            actionVisible = showAction,
             contentPadding = PaddingValues(
                 horizontal = ChatComposerInputHorizontalPadding,
                 vertical = ChatComposerInputVerticalPadding,

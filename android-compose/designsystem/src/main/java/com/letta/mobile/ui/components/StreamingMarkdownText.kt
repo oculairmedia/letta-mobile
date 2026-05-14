@@ -22,11 +22,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
@@ -64,8 +66,12 @@ import kotlinx.coroutines.delay
  *   When false, animateContentSize is applied so the bubble smoothly reaches its
  *   final height in one animation rather than fighting ~50ms-increment jumps that
  *   FastOutSlowInEasing cannot catch.
- * @param cursorText optional standalone cursor glyph rendered when the text
- *   currently ends exactly on a committed boundary.
+ * @param cursorText optional cursor glyph appended after the active tail. Rendered
+ *   in a separate AnnotatedString span so [cursorAlpha] can fade it independently
+ *   of the surrounding text. Pass null to omit the cursor entirely.
+ * @param cursorAlpha alpha applied to the [cursorText] span. Callers tween this from
+ *   1f to 0f to smoothly hand off from streaming to settled rendering instead of a
+ *   hard cut. Values ≤ 0.001f suppress the span (no glyph emitted).
  */
 @Composable
 fun StreamingMarkdownText(
@@ -75,6 +81,7 @@ fun StreamingMarkdownText(
     tailStyle: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.bodyMedium,
     tailTransform: (String) -> String = { it },
     cursorText: String? = null,
+    cursorAlpha: Float = 1f,
     deferUnstableMarkdown: Boolean = true,
     stabilizeTables: Boolean = false,
     isStreaming: Boolean = true,
@@ -268,23 +275,36 @@ fun StreamingMarkdownText(
         )
 
         // Active tail: plain Text. mikepenz NEVER sees this string.
-        // The tailTransform decorator handles cursor injection
-        // (▎) and the markdown-stability clamp
-        // (clampToStableMarkdown) so any unmatched span openers are
-        // clipped from the rendered text.
-        if (transformedTail.isNotEmpty()) {
+        // The tailTransform handles only the markdown-stability clamp
+        // (clampToStableMarkdown) — cursor glyph injection happens here
+        // so we can fade it independently via cursorAlpha. The cursor
+        // lives in a separate AnnotatedString span on the same Text so
+        // it stays flush with the end of the last typed line and does
+        // not introduce a layout shift when alpha drops to zero.
+        val tailHasText = transformedTail.isNotEmpty()
+        val activeCursor = cursorText
+            ?.takeIf {
+                cursorAlpha > 0.001f &&
+                    (tailHasText || committedBlocksForRender.isNotEmpty())
+            }
+        if (tailHasText || activeCursor != null) {
+            val annotatedTail = remember(
+                transformedTail,
+                activeCursor,
+                cursorAlpha,
+                textColor,
+            ) {
+                buildAnnotatedString {
+                    append(transformedTail)
+                    if (activeCursor != null) {
+                        withStyle(SpanStyle(color = textColor.copy(alpha = cursorAlpha))) {
+                            append(activeCursor)
+                        }
+                    }
+                }
+            }
             Text(
-                text = transformedTail,
-                style = tailStyle,
-                color = textColor,
-            )
-        } else if (cursorText != null && committedBlocksForRender.isNotEmpty()) {
-            // Edge case: text ends exactly at a committed boundary
-            // (e.g. just after a paragraph break with no chars typed
-            // yet). Show a standalone cursor so streaming still feels
-            // live.
-            Text(
-                text = cursorText,
+                text = annotatedTail,
                 style = tailStyle,
                 color = textColor,
             )
