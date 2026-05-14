@@ -1,17 +1,21 @@
 package com.letta.mobile.ui.components
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -66,6 +70,11 @@ import com.letta.mobile.ui.icons.LettaIcons
  *   to the action button to communicate that work is in progress (e.g. an
  *   active assistant stream behind the Stop button). Suppressed entirely when
  *   the user has reduced motion enabled.
+ * @param actionVisible When false, the trailing action button slides out
+ *   horizontally and the text field expands to fill the freed space. Use this
+ *   to defer to the IME's own Send action while the soft keyboard is open and
+ *   no in-flight work needs to be cancelable. Defaults to true so existing
+ *   call sites keep their current behaviour.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -85,6 +94,7 @@ fun LettaInputBar(
     actionContentColor: Color? = null,
     actionSizeFraction: Float = 1f,
     actionPulse: Boolean = false,
+    actionVisible: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
     itemSpacing: Dp = 8.dp,
     leadingContent: (@Composable () -> Unit)? = null,
@@ -176,54 +186,83 @@ fun LettaInputBar(
             ),
         )
 
-        FilledIconButton(
-            onClick = {
-                if (canSend) {
-                    haptic.performHapticFeedback(HapticFeedbackType.Confirm)
-                    onSend(text)
-                }
-            },
-            enabled = canSend,
-            modifier = Modifier
-                .align(Alignment.CenterVertically)
-                .size(actionButtonSize)
-                .scale(actionPulseScale),
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = actionContainerColor ?: colorScheme.primary,
-                contentColor = actionContentColor ?: colorScheme.onPrimary,
-                disabledContainerColor = colorScheme.surfaceContainerHigh,
-                disabledContentColor = colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
-            ),
-        ) {
-            // letta-mobile-d9zy.5 (retry): crossfade + scale the action icon
-            // between Send / Stop instead of hard-swapping. AnimatedContent
-            // is keyed on the icon vector so any caller-supplied vector
-            // change drives the morph, not just Send <-> Stop. Reduced
-            // motion bypasses the animation and renders the icon directly.
-            if (reducedMotion) {
-                Icon(
-                    actionIcon,
-                    contentDescription = actionContentDescription,
-                    modifier = Modifier.size(actionIconSize),
-                )
+        // letta-mobile-xtwt: hide the trailing action button when the host
+        // wants to defer to the IME's Send (e.g. soft keyboard is open and
+        // no run is streaming). AnimatedVisibility with horizontal expand /
+        // shrink lets the text field flow into the freed space rather than
+        // leaving a hole. Wrapped around the FilledIconButton (not just its
+        // contents) so the layout actually reclaims the width.
+        AnimatedVisibility(
+            visible = actionVisible,
+            enter = if (reducedMotion) {
+                fadeIn(tween(durationMillis = 0))
             } else {
-                AnimatedContent(
-                    targetState = actionIcon,
-                    transitionSpec = {
-                        (fadeIn(tween(durationMillis = 150)) +
-                            scaleIn(initialScale = 0.7f, animationSpec = tween(durationMillis = 150)))
-                            .togetherWith(
-                                fadeOut(tween(durationMillis = 120)) +
-                                    scaleOut(targetScale = 0.7f, animationSpec = tween(durationMillis = 120)),
-                            )
-                    },
-                    label = "inputActionIconMorph",
-                ) { icon ->
+                fadeIn(tween(durationMillis = 180, easing = LinearOutSlowInEasing)) +
+                    expandHorizontally(
+                        animationSpec = tween(durationMillis = 220, easing = LinearOutSlowInEasing),
+                        expandFrom = Alignment.End,
+                    )
+            },
+            exit = if (reducedMotion) {
+                fadeOut(tween(durationMillis = 0))
+            } else {
+                fadeOut(tween(durationMillis = 140, easing = FastOutSlowInEasing)) +
+                    shrinkHorizontally(
+                        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+                        shrinkTowards = Alignment.End,
+                    )
+            },
+            modifier = Modifier.align(Alignment.CenterVertically),
+            label = "inputActionVisibility",
+        ) {
+            FilledIconButton(
+                onClick = {
+                    if (canSend) {
+                        haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                        onSend(text)
+                    }
+                },
+                enabled = canSend,
+                modifier = Modifier
+                    .size(actionButtonSize)
+                    .scale(actionPulseScale),
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = actionContainerColor ?: colorScheme.primary,
+                    contentColor = actionContentColor ?: colorScheme.onPrimary,
+                    disabledContainerColor = colorScheme.surfaceContainerHigh,
+                    disabledContentColor = colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                ),
+            ) {
+                // letta-mobile-d9zy.5 (retry): crossfade + scale the action icon
+                // between Send / Stop instead of hard-swapping. AnimatedContent
+                // is keyed on the icon vector so any caller-supplied vector
+                // change drives the morph, not just Send <-> Stop. Reduced
+                // motion bypasses the animation and renders the icon directly.
+                if (reducedMotion) {
                     Icon(
-                        icon,
+                        actionIcon,
                         contentDescription = actionContentDescription,
                         modifier = Modifier.size(actionIconSize),
                     )
+                } else {
+                    AnimatedContent(
+                        targetState = actionIcon,
+                        transitionSpec = {
+                            (fadeIn(tween(durationMillis = 150)) +
+                                scaleIn(initialScale = 0.7f, animationSpec = tween(durationMillis = 150)))
+                                .togetherWith(
+                                    fadeOut(tween(durationMillis = 120)) +
+                                        scaleOut(targetScale = 0.7f, animationSpec = tween(durationMillis = 120)),
+                                )
+                        },
+                        label = "inputActionIconMorph",
+                    ) { icon ->
+                        Icon(
+                            icon,
+                            contentDescription = actionContentDescription,
+                            modifier = Modifier.size(actionIconSize),
+                        )
+                    }
                 }
             }
         }
