@@ -1,5 +1,8 @@
 package com.letta.mobile.ui.screens.chat
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
@@ -16,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.components.MarkdownText
 import com.letta.mobile.ui.components.StreamingMarkdownText
+import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.theme.LocalChatFontScale
 import com.letta.mobile.ui.theme.chatTypography
 import com.letta.mobile.ui.theme.scaledBy
@@ -105,7 +109,31 @@ private fun AssistantResponseText(
     } else {
         text
     }
+    // letta-mobile-d9zy.5 (retry): cursor fade-out.
+    // `showCursor` decides whether the cursor SHOULD be visible based on
+    // whether content is still arriving (isStreaming) or the smoother is
+    // still catching up. `cursorAlpha` then tweens 1f → 0f over 500ms when
+    // showCursor flips false so the cursor fades out instead of hard-cutting.
+    // We keep the cursor character in the tree (cursorText non-null) until
+    // the alpha actually reaches zero, otherwise the span would disappear
+    // before the fade finishes.
     val showCursor = isStreaming || smoothedText != text
+    val cursorEligible = shouldShowStreamingCursor(smoothedText)
+    val targetCursorVisible = showCursor && cursorEligible
+    val reducedMotion = rememberReducedMotionEnabled()
+    val cursorAlpha by animateFloatAsState(
+        targetValue = if (targetCursorVisible) 1f else 0f,
+        animationSpec = tween(
+            durationMillis = when {
+                targetCursorVisible -> 0
+                reducedMotion -> 0
+                else -> 500
+            },
+            easing = LinearEasing,
+        ),
+        label = "streaming_cursor_alpha",
+    )
+    val displayCursor = targetCursorVisible || cursorAlpha > 0.001f
     // Keep the same streaming renderer for messages that streamed in this composition even after
     // the smoother catches up. Swapping to settled MarkdownText at stream termination causes a
     // final parsed-subtree/spacing handoff flash; hydrated messages still use MarkdownText because
@@ -115,8 +143,9 @@ private fun AssistantResponseText(
         text = smoothedText,
         textColor = textColor,
         tailStyle = MaterialTheme.chatTypography.messageBody,
-        tailTransform = if (showCursor) ::streamingDisplayText else { value -> value },
-        cursorText = if (showCursor) STREAMING_CURSOR else null,
+        tailTransform = ::streamingDisplayText,
+        cursorText = if (displayCursor) STREAMING_CURSOR else null,
+        cursorAlpha = cursorAlpha,
         deferUnstableMarkdown = showCursor,
         stabilizeTables = hasStreamed || hasTable,
         isStreaming = isStreaming,
@@ -196,36 +225,43 @@ internal fun streamingDisplayText(raw: String): String {
     // in but hasn't been markdownified yet".
     //
     // Mitigation: hold back the trailing region that LOOKS like it's
-    // mid-construct, render only the markdown-stable PREFIX, and
-    // append the cursor at the prefix boundary. The held tail will
-    // be released on the next paint tick (≤50ms) once we can prove
-    // it's either complete or no longer dangling.
+    // mid-construct, render only the markdown-stable PREFIX. The held
+    // tail will be released on the next paint tick (≤50ms) once we can
+    // prove it's either complete or no longer dangling.
     //
     // We are intentionally CONSERVATIVE — we'd rather hold a
     // few extra chars than display unconverted markup. The held
     // region is small (typically <30 chars) so the visual lag is
-    // imperceptible; the cursor still advances within those bounds.
+    // imperceptible.
     //
     // Inside an open ``` fence we skip the clamp entirely (whitespace
     // is meaningful in code, and the parser already renders the
     // partial fence as a code block — no flicker).
-    // letta-mobile-flk2 (revision 11): suppress cursor-only render
-    // before any chunks have arrived. Previously empty text returned
-    // STREAMING_CURSOR, so a fresh assistant bubble flashed a lone
-    // cursor character for one paint tick before content arrived.
-    // Emmanuel reported this as "a flash before streaming starts
-    // when I send a prompt". Returning empty makes
-    // StreamingMarkdownText short-circuit to no render at all
+    //
+    // letta-mobile-d9zy.5: cursor injection moved out of this function.
+    // [StreamingMarkdownText] now owns cursor rendering so the cursor
+    // glyph can fade independently via cursorAlpha. Empty input still
+    // returns empty so the renderer short-circuits to no render at all
     // (the typing indicator already covers the pre-content state).
     if (raw.isEmpty()) return ""
     if (insideOpenCodeFence(raw)) {
-        // Inside an open ``` fence — leave content alone, no cursor
-        // (would render as literal text inside the code block).
         return raw
     }
-    val safe = clampToStableMarkdown(raw)
-    return safe + STREAMING_CURSOR
+    return clampToStableMarkdown(raw)
 }
+
+/**
+ * Whether a streaming cursor glyph is appropriate for the supplied raw
+ * text. Returns false for empty text (would flash a lone cursor before
+ * any chunks arrive) and inside open ``` code fences (would render as
+ * literal content inside the code block).
+ *
+ * Companion to [streamingDisplayText]; callers pair the two so the
+ * markdown-stability clamp and cursor-eligibility decision agree about
+ * the in-fence carve-out.
+ */
+internal fun shouldShowStreamingCursor(raw: String): Boolean =
+    raw.isNotEmpty() && !insideOpenCodeFence(raw)
 
 /**
  * Returns the longest prefix of [raw] that does NOT end inside an
