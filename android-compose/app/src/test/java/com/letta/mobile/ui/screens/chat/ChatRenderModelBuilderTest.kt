@@ -262,6 +262,152 @@ class ChatRenderModelBuilderTest {
         )
     }
 
+    // letta-mobile-a7ij follow-up: optimistic-twin collapse in the render
+    // dedupe layer. These tests pin the safety-net behavior for the SSE
+    // wins-the-race / postHandlerCollapse-misses scenario that produced the
+    // duplicate-initial-message bug reported via screenshot.
+
+    @Test
+    fun `optimistic-twin collapse drops client-prefixed user message when confirmed twin present`() {
+        val grouped = listOf(
+            user("client-abc", content = "hello") to GroupPosition.First,
+            user("server-xyz", content = "hello") to GroupPosition.Last,
+        )
+
+        val deduped = dedupeGroupedMessagesForLazyKeys(grouped)
+
+        assertEquals(listOf("server-xyz"), deduped.map { it.first.id })
+    }
+
+    @Test
+    fun `optimistic-twin collapse drops cm-prefixed assistant message when confirmed twin present`() {
+        val grouped = listOf(
+            assistant("cm-stream-1", content = "answer text") to GroupPosition.First,
+            assistant("server-final-1", content = "answer text") to GroupPosition.Last,
+        )
+
+        val deduped = dedupeGroupedMessagesForLazyKeys(grouped)
+
+        assertEquals(listOf("server-final-1"), deduped.map { it.first.id })
+    }
+
+    @Test
+    fun `optimistic-twin collapse drops bootstrap-initial-duplicate user message`() {
+        val grouped = listOf(
+            user(
+                "client-user-initial-duplicate-1234",
+                content = "What is the meaning of life",
+            ) to GroupPosition.First,
+            user(
+                "server-msg-9000",
+                content = "What is the meaning of life",
+            ) to GroupPosition.Last,
+        )
+
+        val deduped = dedupeGroupedMessagesForLazyKeys(grouped)
+
+        assertEquals(listOf("server-msg-9000"), deduped.map { it.first.id })
+    }
+
+    @Test
+    fun `optimistic-twin collapse preserves legitimate quick-fire repeats from server`() {
+        val grouped = listOf(
+            user("server-a", content = "ping") to GroupPosition.First,
+            user("server-b", content = "ping") to GroupPosition.Last,
+        )
+
+        val deduped = dedupeGroupedMessagesForLazyKeys(grouped)
+
+        // Both server-issued — leave intact. Users do sometimes send the same
+        // message twice (network retry, impatient tap) and that must remain
+        // visible.
+        assertEquals(listOf("server-a", "server-b"), deduped.map { it.first.id })
+    }
+
+    @Test
+    fun `optimistic-twin collapse does not fuse different roles`() {
+        val grouped = listOf(
+            user("client-1", content = "same content") to GroupPosition.First,
+            assistant("server-1", content = "same content") to GroupPosition.Last,
+        )
+
+        val deduped = dedupeGroupedMessagesForLazyKeys(grouped)
+
+        assertEquals(listOf("client-1", "server-1"), deduped.map { it.first.id })
+    }
+
+    @Test
+    fun `optimistic-twin collapse does not fuse reasoning with assistant final`() {
+        val grouped = listOf(
+            reasoning("client-r-1", content = "deliberating") to GroupPosition.First,
+            assistant("server-a-1", content = "deliberating") to GroupPosition.Last,
+        )
+
+        val deduped = dedupeGroupedMessagesForLazyKeys(grouped)
+
+        // Reasoning↔assistant fusion is handled by dedupeReasoningAssistantEchoes,
+        // not the optimistic-twin pass. Keep both so that upstream pass owns
+        // the decision.
+        assertEquals(listOf("client-r-1", "server-a-1"), deduped.map { it.first.id })
+    }
+
+    @Test
+    fun `optimistic-twin collapse keeps earliest when both sides are optimistic`() {
+        val grouped = listOf(
+            assistant("cm-stream-early", content = "answer") to GroupPosition.First,
+            assistant("cm-stream-late", content = "answer") to GroupPosition.Last,
+        )
+
+        val deduped = dedupeGroupedMessagesForLazyKeys(grouped)
+
+        // Stable ordering when neither has a confirmed identity yet — the
+        // earlier emission wins so render keys don't oscillate during a
+        // recompose storm.
+        assertEquals(listOf("cm-stream-early"), deduped.map { it.first.id })
+    }
+
+    @Test
+    fun `optimistic-twin collapse ignores tool-call assistant messages`() {
+        val grouped = listOf(
+            assistantToolCall(id = "client-tc-1") to GroupPosition.First,
+            assistantToolCall(id = "server-tc-1") to GroupPosition.Last,
+        )
+
+        val deduped = dedupeGroupedMessagesForLazyKeys(grouped)
+
+        // Tool-call dedupe is the responsibility of the run/timeline compactor
+        // (compactRunToolCallSteps) — this safety net must not interfere.
+        assertEquals(listOf("client-tc-1", "server-tc-1"), deduped.map { it.first.id })
+    }
+
+    @Test
+    fun `optimistic-twin collapse tolerates whitespace differences`() {
+        val grouped = listOf(
+            user("client-trim-1", content = "  hello world  ") to GroupPosition.First,
+            user("server-trim-1", content = "hello world") to GroupPosition.Last,
+        )
+
+        val deduped = dedupeGroupedMessagesForLazyKeys(grouped)
+
+        assertEquals(listOf("server-trim-1"), deduped.map { it.first.id })
+    }
+
+    @Test
+    fun `optimistic-twin collapse preserves non-adjacent matches`() {
+        val grouped = listOf(
+            user("client-1", content = "hello") to GroupPosition.First,
+            assistant("server-mid", content = "hi back") to GroupPosition.Middle,
+            user("server-1", content = "hello") to GroupPosition.Last,
+        )
+
+        val deduped = dedupeGroupedMessagesForLazyKeys(grouped)
+
+        // Non-adjacent twins are intentional repeats in a real conversation
+        // (user repeating themselves across turns). Only adjacent twins
+        // indicate the optimistic-Local-orphan race.
+        assertEquals(listOf("client-1", "server-mid", "server-1"), deduped.map { it.first.id })
+    }
+
     private fun user(
         id: String,
         content: String = "u-$id",

@@ -201,13 +201,95 @@ fun dedupeGroupedMessagesForLazyKeys(
     // already dedupes by id, but a late streaming tick or reasoning-collapse
     // edge case could still leak duplicates — so guard in the pure pipeline too.
     val seen = HashSet<String>(groupedMessages.size)
-    val result = groupedMessages.filter { (msg, _) -> seen.add(msg.id) }
-    val dropped = groupedMessages.size - result.size
-    if (ChatRenderModelDebugLogging && dropped > 0) {
+    val idDeduped = groupedMessages.filter { (msg, _) -> seen.add(msg.id) }
+    val idDropped = groupedMessages.size - idDeduped.size
+    if (ChatRenderModelDebugLogging && idDropped > 0) {
         android.util.Log.w(
             "ChatRenderModel-DEBUG",
-            "KEY_DEDUP_DROPPED: $dropped duplicate message IDs detected in grouped messages",
+            "KEY_DEDUP_DROPPED: $idDropped duplicate message IDs detected in grouped messages",
         )
     }
-    return result
+
+    // Secondary content-based dedupe — guard against the
+    // optimistic-Local-survives-Confirmed race documented in
+    // ClientModeSendCoordinator.reconcileClientModeConversation (letta-mobile-a7ij).
+    // When SSE wins the race and `postHandlerCollapse` misses fusing the
+    // Confirmed with its matching Local, the two events carry *different*
+    // ids — one server-issued, one optimistic ("client-…" / "cm-…" /
+    // "client-user-initial-duplicate-…") — so the id-based dedupe above
+    // can't catch them and the user sees a duplicated bubble.
+    //
+    // Strategy: only collapse a pair when (a) same role, (b) same trimmed
+    // content (after envelope-reminder stripping done upstream), (c) at
+    // least one side has an optimistic-id prefix. Constraint (c) makes the
+    // pass strictly safer than blanket content-dedup: two server-issued
+    // ids with identical content (legitimate quick-fire repeats) are
+    // preserved.
+    val contentDeduped = dedupeOptimisticContentTwins(idDeduped)
+    val totalDropped = groupedMessages.size - contentDeduped.size
+    if (ChatRenderModelDebugLogging && totalDropped > idDropped) {
+        android.util.Log.w(
+            "ChatRenderModel-DEBUG",
+            "CONTENT_DEDUP_DROPPED: ${totalDropped - idDropped} optimistic content-twins collapsed",
+        )
+    }
+    return contentDeduped
+}
+
+/**
+ * Optimistic-id prefixes minted by the Client Mode timeline reducer
+ * (`ClientModeTimelineStreamReducer`), the conversation coordinator's
+ * fresh-route bootstrap (`ChatConversationCoordinator`), and the
+ * Letta `newOtid()` helper in `core/data/timeline/Timeline.kt`.
+ *
+ * Anything bearing one of these prefixes is a candidate for fuzzy
+ * collapse against an adjacent server-issued twin.
+ */
+private val OptimisticIdPrefixes = listOf("client-", "cm-")
+
+private fun String.isOptimisticUiMessageId(): Boolean =
+    OptimisticIdPrefixes.any { startsWith(it) }
+
+/**
+ * Collapse adjacent (role, content)-identical pairs when at least one
+ * side carries an optimistic id. Preserves the server-issued copy when
+ * available so downstream consumers (notifications, latency metadata)
+ * latch onto the confirmed identity.
+ */
+internal fun dedupeOptimisticContentTwins(
+    grouped: List<Pair<UiMessage, GroupPosition>>,
+): List<Pair<UiMessage, GroupPosition>> {
+    if (grouped.size < 2) return grouped
+    val out = ArrayList<Pair<UiMessage, GroupPosition>>(grouped.size)
+    for (entry in grouped) {
+        val prev = out.lastOrNull()
+        if (prev != null && shouldCollapseOptimisticTwin(prev.first, entry.first)) {
+            // Keep the confirmed (non-optimistic) side; if both are
+            // optimistic keep the earlier one for stable ordering.
+            val keep = when {
+                !prev.first.id.isOptimisticUiMessageId() -> prev
+                !entry.first.id.isOptimisticUiMessageId() -> entry
+                else -> prev
+            }
+            out[out.lastIndex] = keep
+        } else {
+            out.add(entry)
+        }
+    }
+    return out
+}
+
+private fun shouldCollapseOptimisticTwin(a: UiMessage, b: UiMessage): Boolean {
+    if (a.role != b.role) return false
+    if (a.content.isBlank() || b.content.isBlank()) return false
+    if (a.content.trim() != b.content.trim()) return false
+    // Both reasoning or both not — never collapse a reasoning bubble
+    // into a final assistant message; that's a separate dedup pass
+    // (`dedupeReasoningAssistantEchoes`) which handles ordering + truncation.
+    if (a.isReasoning != b.isReasoning) return false
+    if (a.isError != b.isError) return false
+    if (!a.toolCalls.isNullOrEmpty() || !b.toolCalls.isNullOrEmpty()) return false
+    // At least one side must be optimistic — otherwise this is a legitimate
+    // server-confirmed repeat and we leave it alone.
+    return a.id.isOptimisticUiMessageId() || b.id.isOptimisticUiMessageId()
 }
