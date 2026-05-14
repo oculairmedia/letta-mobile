@@ -80,10 +80,10 @@ class ConfigViewModel @Inject constructor(
                 } else {
                     // createNew = true: empty form, fresh UUID at save time.
                     // OR there's no active config yet (first-time setup).
+                    // Mode falls through to ConfigUiState's default (CLOUD)
+                    // — the existing first-time setup expects that default,
+                    // and the user toggles to SELF_HOSTED inline if needed.
                     ConfigUiState(
-                        mode = ServerMode.SELF_HOSTED,
-                        serverUrl = "",
-                        apiToken = "",
                         theme = appTheme,
                         themePreset = themePreset,
                         dynamicColor = dynamicColor,
