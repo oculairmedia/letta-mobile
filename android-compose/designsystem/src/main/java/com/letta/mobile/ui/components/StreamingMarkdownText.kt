@@ -129,11 +129,20 @@ fun StreamingMarkdownText(
 
     // LazyColumn can dispose off-screen message items and recompose them when the user scrolls
     // back. Hydrated/non-streaming table messages must not replay the streaming reveal from an
-    // empty string on every recycle, so initialize them with the current text immediately.
-    val displayedInitialTextKey = if (isStreaming) null else text
-    var displayed by remember(isStreaming, displayedInitialTextKey) {
-        mutableStateOf(if (isStreaming) "" else text)
-    }
+    // empty string on every recycle, so initialize `displayed` with the CURRENT text once and
+    // let the tick loop catch it up from there.
+    //
+    // letta-mobile-yh0c: previously this `remember` was keyed on
+    // `(isStreaming, displayedInitialTextKey)`, which re-initialized
+    // displayed to "" every time isStreaming flipped true. That made any
+    // brief flicker of the upstream `isStreaming` flag (e.g. when
+    // TimelineSendCoordinator sets it before the optimistic user Local
+    // is appended) wipe a fully-rendered prior message and replay it
+    // char-by-char. Initializing only on the FIRST composition means
+    // mid-life flips don't reset displayed; the LaunchedEffect below
+    // catches displayed up to latestText smoothly without going through
+    // an empty intermediate state.
+    var displayed by remember { mutableStateOf(text) }
     LaunchedEffect(isStreaming) {
         if (!isStreaming) return@LaunchedEffect
         // Tick at fixed cadence. Push displayed = latest whenever
@@ -142,11 +151,6 @@ fun StreamingMarkdownText(
         // and the loop idles cheaply (no MarkdownText re-render
         // when value is unchanged — Compose elides via structural
         // equality).
-        //
-        // First push happens within one tick (≤50ms), which is
-        // imperceptible. We don't special-case first-paint anymore
-        // because the cancel/restart logic that needed special-casing
-        // is gone.
         while (true) {
             if (displayed != latestText) {
                 displayed = latestText
