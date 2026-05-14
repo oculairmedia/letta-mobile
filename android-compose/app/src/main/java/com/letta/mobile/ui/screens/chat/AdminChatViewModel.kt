@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -61,6 +62,13 @@ class AdminChatViewModel @Inject constructor(
     companion object {
         private const val MESSAGE_SYNC_INTERVAL_MS = 5_000L
         private const val CLIENT_MODE_CONVERSATION_ID_KEY = "clientModeConversationId"
+        // letta-mobile-h2b8: max age the resume-most-recent flow tolerates
+        // before forcing a synchronous refresh of the conversation list.
+        // 60s is short enough to feel fresh when the user opens the app
+        // after a while, but long enough that warm-launches don't pay the
+        // round-trip on every chat open. Matches the cadence
+        // ChatSessionResolver uses in its own callers.
+        private const val RESUME_CACHE_MAX_AGE_MS = 60_000L
     }
 
     val agentId: String = requireNotNull(savedStateHandle.get<String>("agentId")) {
@@ -76,6 +84,16 @@ class AdminChatViewModel @Inject constructor(
         get() = requestedConversationArg?.takeIf { it.isNotBlank() }
     private val isFreshRoute: Boolean
         get() = freshRouteKey != null || requestedConversationArg?.isBlank() == true
+
+    /**
+     * letta-mobile-h2b8: distinguishes "user actively chose a new chat"
+     * (drawer / conversation-picker "New conversation" path, which always
+     * mints a fresh route key) from "screen opened cold without a specific
+     * conversation" (startDestination, notification deep-link with no convId,
+     * etc.). Only the latter triggers the resume-most-recent flow.
+     */
+    private val explicitNewChat: Boolean
+        get() = freshRouteKey != null
     // letta-mobile-c87t: previously this predicate was
     //   clientModeEnabled.value && (isFreshRoute || explicitConversationId == null)
     // which collapsed to "client mode only fires for fresh routes" — meaning any
@@ -359,6 +377,45 @@ class AdminChatViewModel @Inject constructor(
         if (isFreshRoute) {
             setClientModeConversationId(null)
             currentConversationTracker.setCurrent(null)
+            // letta-mobile-h2b8: resume-most-recent for cold-start /
+            // deep-link entries (explicitNewChat=false) when the feature
+            // flag is on. Drawer / picker "New conversation" taps mint a
+            // fresh route key, which sets explicitNewChat=true here, and
+            // they fall through to the existing create-on-send path.
+            if (!explicitNewChat && agentId.isNotBlank()) {
+                viewModelScope.launch {
+                    val flagEnabled = settingsRepository.observeResumeRecentConversation().first()
+                    if (!flagEnabled) return@launch
+                    Telemetry.event(
+                        "AdminChatVM", "resumeRecent.attempted",
+                        "agentId" to agentId,
+                    )
+                    val resumed = runCatching {
+                        chatSessionResolver.resolveMostRecentConversation(
+                            agentId = agentId,
+                            maxAgeMs = RESUME_CACHE_MAX_AGE_MS,
+                        )
+                    }.getOrNull()
+                    if (resumed != null) {
+                        Telemetry.event(
+                            "AdminChatVM", "resumeRecent.succeeded",
+                            "agentId" to agentId,
+                            "conversationId" to resumed,
+                        )
+                        chatConversationCoordinator.setActiveConversationId(resumed)
+                    } else {
+                        Telemetry.event(
+                            "AdminChatVM", "resumeRecent.noRecent",
+                            "agentId" to agentId,
+                        )
+                    }
+                }
+            } else if (explicitNewChat) {
+                Telemetry.event(
+                    "AdminChatVM", "resumeRecent.explicitNewChat",
+                    "agentId" to agentId,
+                )
+            }
         }
         if (agentId.isBlank()) {
             _uiState.value = _uiState.value.copy(error = "No agent selected")
