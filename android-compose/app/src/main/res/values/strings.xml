@@ -509,6 +509,7 @@
     <string name="common_context_window">Context Window</string>
     <string name="screen_chat_context_window_title">Context utilization</string>
     <string name="screen_chat_context_window_usage">%1$s / %2$s tokens (%3$d%%)</string>
+    <string name="screen_chat_context_window_percent">%1$d%%</string>
     <string name="screen_chat_context_window_messages">Messages</string>
     <string name="screen_chat_context_window_messages_value">%1$s · %2$d msgs</string>
     <string name="screen_chat_context_window_memory">Memory</string>
@@ -655,6 +656,7 @@
     <string name="screen_config_list_empty">No saved configurations</string>
     <string name="screen_config_list_add_server">Add server</string>
     <string name="action_loading">Loading…</string>
+    <string name="screen_drawer_backend_unknown">No backend configured</string>
     <string name="common_active">ACTIVE</string>
     <string name="common_letta_cloud">Letta Cloud</string>
     <string name="screen_conversations_new_action">New Conversation</string>

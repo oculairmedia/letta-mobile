@@ -38,12 +38,12 @@ class AgentScaffoldTest {
     )
 
     @Test
-    fun drawerContentRendersAgentNameAndMessageCount() {
+    fun drawerContentRendersAgentNameAndBackendLabel() {
         composeRule.setLettaTestContent(useChatTheme = false) {
             DrawerContent(
                 agentName = "DrawerBot 42",
                 agentId = "agent-drawer-42",
-                messageCount = 99,
+                activeBackendLabel = "letta.test",
                 contextWindow = emptyContextWindow(),
                 chatMode = "interactive",
                 onChatModeSelected = {},
@@ -59,7 +59,7 @@ class AgentScaffoldTest {
         }
 
         composeRule.onNodeWithText("DrawerBot 42").assertIsDisplayed()
-        composeRule.onNodeWithText("99 messages").assertIsDisplayed()
+        composeRule.onNodeWithText("letta.test").assertIsDisplayed()
     }
 
     @Test
@@ -69,7 +69,7 @@ class AgentScaffoldTest {
             DrawerContent(
                 agentName = "EditBot",
                 agentId = "agent-edit-1",
-                messageCount = 1,
+                activeBackendLabel = "letta.test",
                 contextWindow = emptyContextWindow(),
                 chatMode = "interactive",
                 onChatModeSelected = {},
@@ -94,7 +94,7 @@ class AgentScaffoldTest {
             DrawerContent(
                 agentName = "LeanDrawerBot",
                 agentId = "agent-lean-1",
-                messageCount = 1,
+                activeBackendLabel = "letta.test",
                 contextWindow = emptyContextWindow(),
                 chatMode = "interactive",
                 onChatModeSelected = {},
@@ -120,7 +120,7 @@ class AgentScaffoldTest {
             DrawerContent(
                 agentName = "DrawerBot 42",
                 agentId = "agent-drawer-42",
-                messageCount = 4,
+                activeBackendLabel = "letta.test",
                 contextWindow = emptyContextWindow(),
                 chatMode = "interactive",
                 onChatModeSelected = {},
@@ -152,7 +152,7 @@ class AgentScaffoldTest {
             DrawerContent(
                 agentName = "ModeBot",
                 agentId = "agent-mode-1",
-                messageCount = 1,
+                activeBackendLabel = "letta.test",
                 contextWindow = emptyContextWindow(),
                 chatMode = "interactive",
                 onChatModeSelected = { if (it == "debug") fired = true },
@@ -178,7 +178,7 @@ class AgentScaffoldTest {
             DrawerContent(
                 agentName = "ResetBot",
                 agentId = "agent-reset-1",
-                messageCount = 1,
+                activeBackendLabel = "letta.test",
                 contextWindow = emptyContextWindow(),
                 chatMode = "interactive",
                 onChatModeSelected = {},
@@ -204,7 +204,7 @@ class AgentScaffoldTest {
             DrawerContent(
                 agentName = "CtxBot",
                 agentId = "agent-ctx-1",
-                messageCount = 1,
+                activeBackendLabel = "letta.test",
                 contextWindow = ContextWindowUiState(maxTokens = 1000, currentTokens = 300),
                 chatMode = "interactive",
                 onChatModeSelected = {},
@@ -229,11 +229,11 @@ class AgentScaffoldTest {
             DrawerContent(
                 agentName = "CtxDisplay",
                 agentId = "agent-ctx-display",
-                messageCount = 0,
+                activeBackendLabel = "letta.test",
                 contextWindow = ContextWindowUiState(
                     maxTokens = 1000,
                     currentTokens = 300,
-                    messageCount = 5,
+                    activeBackendLabel = "letta.test",
                 ),
                 chatMode = "interactive",
                 onChatModeSelected = {},
@@ -257,7 +257,7 @@ class AgentScaffoldTest {
             DrawerContent(
                 agentName = "NoCtxBot",
                 agentId = "agent-noctx",
-                messageCount = 0,
+                activeBackendLabel = "letta.test",
                 contextWindow = ContextWindowUiState(),
                 chatMode = "interactive",
                 onChatModeSelected = {},

@@ -3,6 +3,7 @@ package com.letta.mobile.ui.screens.chat
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.letta.mobile.ui.navigation.toBackendLabel
 import com.letta.mobile.bot.chat.ClientModeChatSender
 import com.letta.mobile.bot.protocol.InternalBotClient
 import com.letta.mobile.bot.repository.ClientModeAgentLocationRepository
@@ -28,6 +29,7 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -147,6 +149,17 @@ class AdminChatViewModel @Inject constructor(
 
     val favoriteAgentId: StateFlow<String?> = settingsRepository.favoriteAgentId
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), settingsRepository.favoriteAgentId.value)
+
+    /**
+     * letta-mobile-cdlk follow-up: surface the active backend label in the
+     * agent drawer so the user can tell at a glance which Letta server this
+     * agent is talking to. Mirrors the pill that the home / conversations
+     * surfaces show, computed via the same trim rules
+     * ([com.letta.mobile.ui.navigation.toBackendLabel]).
+     */
+    val activeBackendLabel: StateFlow<String?> = settingsRepository.activeConfig
+        .map { it.toBackendLabel() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val pinnedAgentIds: StateFlow<Set<String>> = settingsRepository.getPinnedAgentIds()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())

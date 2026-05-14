@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -562,6 +563,15 @@ class ConversationPickerViewModel @Inject constructor(
     }
 }
 
+/**
+ * letta-mobile: minimised context-window indicator in the agent drawer. The
+ * full breakdown (per-component token counts, memory counts, raw numerator/
+ * denominator) was visual debt for the common case where the user only
+ * wants to know "how full is the window?". The condensed form keeps the
+ * existing token-progress flow but reduces it to: title, percent, slim
+ * progress bar, and refresh control. Error / unavailable states still
+ * render their hint text inline so degraded states aren't silent.
+ */
 @Composable
 internal fun ContextWindowCard(
     state: ContextWindowUiState,
@@ -573,7 +583,7 @@ internal fun ContextWindowCard(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -582,40 +592,41 @@ internal fun ContextWindowCard(
                     LettaIcons.Database,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(16.dp),
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = stringResource(R.string.screen_chat_context_window_title),
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
                 )
+                if (state.maxTokens > 0) {
+                    Text(
+                        text = stringResource(
+                            R.string.screen_chat_context_window_percent,
+                            state.usagePercent,
+                        ),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
                 if (state.isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                 } else {
-                    IconButton(onClick = onRefresh, modifier = Modifier.size(32.dp)) {
+                    IconButton(onClick = onRefresh, modifier = Modifier.size(28.dp)) {
                         Icon(
                             LettaIcons.Refresh,
                             contentDescription = stringResource(R.string.action_refresh),
-                            modifier = Modifier.size(18.dp),
+                            modifier = Modifier.size(16.dp),
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
             if (state.maxTokens > 0) {
                 val progress = (state.currentTokens.toFloat() / state.maxTokens.toFloat()).coerceIn(0f, 1f)
-                Text(
-                    text = stringResource(
-                        R.string.screen_chat_context_window_usage,
-                        formatDrawerNumber(state.currentTokens),
-                        formatDrawerNumber(state.maxTokens),
-                        state.usagePercent,
-                    ),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
                 Spacer(modifier = Modifier.height(6.dp))
                 LinearProgressIndicator(
                     progress = { progress },
@@ -623,46 +634,15 @@ internal fun ContextWindowCard(
                     color = MaterialTheme.colorScheme.tertiary,
                     trackColor = MaterialTheme.colorScheme.tertiaryContainer,
                 )
-                Spacer(modifier = Modifier.height(10.dp))
-                ContextMetricRow(
-                    label = stringResource(R.string.screen_chat_context_window_messages),
-                    value = stringResource(
-                        R.string.screen_chat_context_window_messages_value,
-                        formatDrawerNumber(state.messageTokens),
-                        state.messageCount,
-                    ),
-                )
-                ContextMetricRow(
-                    label = stringResource(R.string.screen_chat_context_window_memory),
-                    value = formatDrawerNumber(
-                        state.coreMemoryTokens + state.externalMemoryTokens + state.summaryMemoryTokens,
-                    ),
-                )
-                ContextMetricRow(
-                    label = stringResource(R.string.screen_chat_context_window_tools),
-                    value = formatDrawerNumber(state.toolTokens),
-                )
-                ContextMetricRow(
-                    label = stringResource(R.string.screen_chat_context_window_system),
-                    value = formatDrawerNumber(state.systemTokens),
-                )
-                Text(
-                    text = stringResource(
-                        R.string.screen_chat_context_window_memory_counts,
-                        state.recallMemoryCount,
-                        state.archivalMemoryCount,
-                    ),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
             } else if (state.error != null) {
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = state.error,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )
             } else {
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = stringResource(R.string.screen_chat_context_window_unavailable),
                     style = MaterialTheme.typography.bodySmall,
@@ -718,7 +698,7 @@ internal fun contrastDrawerItemColors() =
 internal fun DrawerContent(
     agentName: String,
     agentId: String,
-    messageCount: Int,
+    activeBackendLabel: String?,
     contextWindow: ContextWindowUiState,
     chatMode: String,
     onChatModeSelected: (String) -> Unit,
@@ -741,6 +721,10 @@ internal fun DrawerContent(
             .width(300.dp)
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
+            // letta-mobile: pad past the bottom system bar so the agent-id
+            // tail (and any new items below it) stay visible. Previous layout
+            // clipped the last element under the gesture nav.
+            .navigationBarsPadding()
     ) {
         // letta-mobile-7lyb: Inline the Edit Agent action as a trailing
         // IconButton on the agent header. Removes the giant full-width
@@ -774,11 +758,28 @@ internal fun DrawerContent(
         }
 
         Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = stringResource(R.string.screen_drawer_message_count, messageCount),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        // letta-mobile: replace the running message-count line with a small
+        // backend-identity indicator. Shows which Letta server the agent is
+        // talking to (matches the active-backend pill on the top-level
+        // surfaces). Falls back to a placeholder when no active config is
+        // configured so the slot doesn't collapse.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                LettaIcons.Storage,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = activeBackendLabel
+                    ?: stringResource(R.string.screen_drawer_backend_unknown),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
 
         val drawerItemColors = contrastDrawerItemColors()
         Spacer(modifier = Modifier.height(16.dp))
@@ -836,6 +837,11 @@ internal fun DrawerContent(
                     onClick = { onChatModeSelected(mode) },
                     shape = SegmentedButtonDefaults.itemShape(index = index, count = chatModes.size),
                     modifier = Modifier.testTag(AgentScaffoldTestTags.drawerChatMode(mode)),
+                    // letta-mobile: suppress SegmentedButton's default check
+                    // affordance — the container highlight already conveys
+                    // selection and the icon adds visual noise in a tight
+                    // three-item row.
+                    icon = {},
                     label = {
                         Text(
                             stringResource(labelRes),
@@ -870,7 +876,11 @@ internal fun DrawerContent(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             )
         } else {
-            conversations.forEach { conversation ->
+            // letta-mobile: cap to the 4 most-recent conversations in the
+            // drawer for now — the full list is reachable via the dedicated
+            // conversation picker. Keeps the drawer scannable on small
+            // screens and stops it from running past the bottom system bar.
+            conversations.take(4).forEach { conversation ->
                 val isActive = conversation.id == currentConversationId
                 ConversationMenuItem(
                     conversation = conversation,
