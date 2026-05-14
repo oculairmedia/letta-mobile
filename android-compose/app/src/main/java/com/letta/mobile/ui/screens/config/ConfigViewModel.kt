@@ -1,12 +1,15 @@
 package com.letta.mobile.ui.screens.config
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.navigation.toRoute
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.ui.navigation.ConfigRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,12 +36,20 @@ data class ConfigUiState(
 
 @HiltViewModel
 class ConfigViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
     private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
     companion object {
         const val DEFAULT_CLOUD_URL = "https://api.letta.com"
     }
+
+    // letta-mobile-cdlk: when the route arg signals create-new mode, the
+    // screen opens with an empty form and saveConfig mints a fresh UUID
+    // instead of overwriting the currently active config. Defaults to false
+    // so every existing nav site keeps the original "edit active" behaviour.
+    private val createNew: Boolean =
+        runCatching { savedStateHandle.toRoute<ConfigRoute>().createNew }.getOrDefault(false)
 
     private val _uiState = MutableStateFlow<UiState<ConfigUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<ConfigUiState>> = _uiState.asStateFlow()
@@ -51,23 +62,28 @@ class ConfigViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = UiState.Loading
             try {
-                val config = settingsRepository.activeConfig.value
+                val activeConfig = settingsRepository.activeConfig.value
                 val appTheme = settingsRepository.getTheme().first()
                 val themePreset = settingsRepository.getThemePreset().first()
                 val dynamicColor = settingsRepository.getDynamicColor().first()
                 val enableProjects = settingsRepository.getEnableProjects().first()
-                val configUiState = if (config != null) {
+                val configUiState = if (activeConfig != null && !createNew) {
                     ConfigUiState(
-                        mode = if (config.mode == LettaConfig.Mode.CLOUD) ServerMode.CLOUD else ServerMode.SELF_HOSTED,
-                        serverUrl = config.serverUrl,
-                        apiToken = config.accessToken ?: "",
+                        mode = if (activeConfig.mode == LettaConfig.Mode.CLOUD) ServerMode.CLOUD else ServerMode.SELF_HOSTED,
+                        serverUrl = activeConfig.serverUrl,
+                        apiToken = activeConfig.accessToken ?: "",
                         theme = appTheme,
                         themePreset = themePreset,
                         dynamicColor = dynamicColor,
                         enableProjects = enableProjects,
                     )
                 } else {
+                    // createNew = true: empty form, fresh UUID at save time.
+                    // OR there's no active config yet (first-time setup).
                     ConfigUiState(
+                        mode = ServerMode.SELF_HOSTED,
+                        serverUrl = "",
+                        apiToken = "",
                         theme = appTheme,
                         themePreset = themePreset,
                         dynamicColor = dynamicColor,
@@ -155,9 +171,13 @@ class ConfigViewModel @Inject constructor(
                     if (raw.startsWith("http://") || raw.startsWith("https://")) raw
                     else "https://$raw"
                 }
-                val existingConfig = settingsRepository.activeConfig.value
+                // letta-mobile-cdlk: createNew bypasses the activeConfig
+                // id lookup so '+ Add server' in the backend-switcher sheet
+                // actually creates a new entry instead of overwriting the
+                // currently active backend.
+                val reuseId = if (createNew) null else settingsRepository.activeConfig.value?.id
                 val config = LettaConfig(
-                    id = existingConfig?.id ?: UUID.randomUUID().toString(),
+                    id = reuseId ?: UUID.randomUUID().toString(),
                     mode = if (state.mode == ServerMode.CLOUD) LettaConfig.Mode.CLOUD else LettaConfig.Mode.SELF_HOSTED,
                     serverUrl = url,
                     accessToken = state.apiToken.trim().ifBlank { null }

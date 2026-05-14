@@ -653,6 +653,8 @@
     <string name="action_dismiss">Dismiss</string>
     <string name="common_error">Error</string>
     <string name="screen_config_list_empty">No saved configurations</string>
+    <string name="screen_config_list_add_server">Add server</string>
+    <string name="action_loading">Loading…</string>
     <string name="common_active">ACTIVE</string>
     <string name="common_letta_cloud">Letta Cloud</string>
     <string name="screen_conversations_new_action">New Conversation</string>
