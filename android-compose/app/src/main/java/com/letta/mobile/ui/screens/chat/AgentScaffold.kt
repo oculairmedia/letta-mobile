@@ -163,6 +163,7 @@ fun AgentScaffold(
     val chatBackground by viewModel.chatBackground.collectAsStateWithLifecycle()
     val availableAgents by viewModel.availableAgents.collectAsStateWithLifecycle()
     val favoriteAgentId by viewModel.favoriteAgentId.collectAsStateWithLifecycle()
+    val activeBackendLabel by viewModel.activeBackendLabel.collectAsStateWithLifecycle()
     val pinnedAgentIds by viewModel.pinnedAgentIds.collectAsStateWithLifecycle()
     val haptic = LocalHapticFeedback.current
     var chatMode by rememberSaveable { mutableStateOf("interactive") }
@@ -238,7 +239,7 @@ fun AgentScaffold(
                 DrawerContent(
                     agentName = agentName,
                     agentId = agentId,
-                    messageCount = uiState.messages.size,
+                    activeBackendLabel = activeBackendLabel,
                     contextWindow = uiState.contextWindow,
                     chatMode = chatMode,
                     onChatModeSelected = { chatMode = it },

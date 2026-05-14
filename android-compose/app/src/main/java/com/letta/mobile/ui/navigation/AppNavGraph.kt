@@ -780,7 +780,7 @@ private fun AgentChatRoute.toViewModelKey(): String = buildString {
     append(projectIdentifier.orEmpty())
 }
 
-private fun LettaConfig?.toBackendLabel(): String? {
+internal fun LettaConfig?.toBackendLabel(): String? {
     val config = this ?: return null
     return when (config.mode) {
         LettaConfig.Mode.CLOUD -> "Cloud"
