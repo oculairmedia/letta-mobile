@@ -91,6 +91,7 @@ class AgentScaffoldHiltTest {
         every { viewModel.availableAgents } returns availableAgentsFlow
         every { viewModel.favoriteAgentId } returns MutableStateFlow<String?>(null)
         every { viewModel.pinnedAgentIds } returns MutableStateFlow(emptySet())
+        every { viewModel.activeBackendLabel } returns MutableStateFlow<String?>("letta.test")
         every { viewModel.agentId } returns "agent-hilt-1"
         every { viewModel.conversationId } returns null
         every { viewModel.projectContext } returns null
