@@ -233,7 +233,6 @@ class AgentScaffoldTest {
                 contextWindow = ContextWindowUiState(
                     maxTokens = 1000,
                     currentTokens = 300,
-                    activeBackendLabel = "letta.test",
                 ),
                 chatMode = "interactive",
                 onChatModeSelected = {},
