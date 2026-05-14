@@ -19,6 +19,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import androidx.datastore.preferences.core.floatPreferencesKey
@@ -49,6 +52,23 @@ class SettingsRepository @Inject constructor(
 
     private val _activeConfig = MutableStateFlow<LettaConfig?>(null)
     val activeConfig: StateFlow<LettaConfig?> = _activeConfig.asStateFlow()
+
+    /**
+     * letta-mobile-ze5l: emits whenever the active backend's config id
+     * changes (drops the initial value at subscription time). Top-level
+     * data ViewModels collect this to call their existing refresh entry
+     * points so the currently-visible screen re-fetches against the new
+     * server without requiring the user to navigate away and back.
+     *
+     * The first-emission drop is intentional: subscribers do not need
+     * to refresh on attach, only on subsequent changes. The id-based
+     * distinctness avoids redundant emissions if [_activeConfig] is
+     * re-emitted with the same identity (e.g. token rotation).
+     */
+    val activeConfigChanges: Flow<LettaConfig> = activeConfig
+        .filterNotNull()
+        .distinctUntilChanged { old, new -> old.id == new.id }
+        .drop(1)
 
     private val _favoriteAgentId = MutableStateFlow<String?>(null)
     val favoriteAgentId: StateFlow<String?> = _favoriteAgentId.asStateFlow()

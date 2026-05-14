@@ -115,6 +115,10 @@ class AgentListViewModel @Inject constructor(
         loadAgents()
         loadAvailableTools()
         loadAvailableModels()
+        // letta-mobile-ze5l: refetch on backend switch.
+        viewModelScope.launch {
+            settingsRepository.activeConfigChanges.collect { refresh() }
+        }
     }
 
     fun loadAvailableTools() {

@@ -83,6 +83,13 @@ class ConversationsViewModel @Inject constructor(
                 )
             }
         }
+        // letta-mobile-ze5l: refetch on backend switch so the visible
+        // conversations list reflects the new server without requiring the
+        // user to navigate away. Uses the existing refresh() entry point —
+        // same path as pull-to-refresh.
+        viewModelScope.launch {
+            settingsRepository.activeConfigChanges.collect { refresh() }
+        }
         val cachedAgents = agentRepository.agents.value
         if (cachedAgents.isNotEmpty()) {
             agentNameCache = cachedAgents.associate { it.id.value to it.name }.toMutableMap()

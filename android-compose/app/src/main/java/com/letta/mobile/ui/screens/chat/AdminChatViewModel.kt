@@ -354,6 +354,17 @@ class AdminChatViewModel @Inject constructor(
     }
 
     init {
+        // letta-mobile-ze5l: when the active backend swaps under us, refresh
+        // the agent roster so the drawer / picker reflect the new server's
+        // agents. The conversation we're on may not exist on the new server
+        // (letta-mobile-iow7 covers the cache-invalidation story); for now
+        // we let the timeline observers naturally retry against the new URL.
+        viewModelScope.launch {
+            settingsRepository.activeConfigChanges.collect {
+                refreshAvailableAgents()
+            }
+        }
+
         // letta-mobile-w2hx.6: route arg already pre-populated `activeConversationId`
         // at field init; no shared singleton to seed.
         if (isFreshRoute) {

@@ -103,6 +103,13 @@ class DashboardViewModel @Inject constructor(
         observeFavoriteAndPinned()
         observePinnedShortcuts()
         setupSearch()
+        // letta-mobile-ze5l: refetch dashboard data on backend switch.
+        viewModelScope.launch {
+            settingsRepository.activeConfigChanges.collect {
+                _uiState.value = _uiState.value.copy(serverUrl = settingsRepository.activeConfig.value?.serverUrl.orEmpty())
+                loadProgressively()
+            }
+        }
     }
 
     private fun migrateAdminToFavorite() {

@@ -180,6 +180,10 @@ class ProjectHomeViewModel @Inject constructor(
     init {
         observePinnedProjects()
         loadProjects()
+        // letta-mobile-ze5l: refetch projects on backend switch.
+        viewModelScope.launch {
+            settingsRepository.activeConfigChanges.collect { refresh() }
+        }
     }
 
     private fun observePinnedProjects() {
