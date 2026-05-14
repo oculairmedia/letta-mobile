@@ -3,6 +3,7 @@ package com.letta.mobile.data.repository
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Build
+import com.letta.mobile.core.BuildConfig
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -100,6 +101,14 @@ class SettingsRepository @Inject constructor(
         val PINNED_SHORTCUT_ORDER = stringPreferencesKey("pinned_shortcut_order")
         val CLIENT_MODE_ENABLED = booleanPreferencesKey("client_mode_enabled")
         val CLIENT_MODE_BASE_URL = stringPreferencesKey("client_mode_base_url")
+        // letta-mobile-h2b8: feature flag for the resume-most-recent-conversation
+        // behaviour. When true, opening an agent without an explicit conversation
+        // id picks the most-recent non-archived conversation for that agent.
+        // When false (or unset), falls through to the pre-h2b8 create-on-send
+        // path. Default-on in BuildConfig.DEBUG via observeResumeRecentConversation
+        // so internal builds get the new behaviour automatically; release builds
+        // keep the legacy fresh-chat path until the flag is flipped explicitly.
+        val RESUME_RECENT_CONVERSATION = booleanPreferencesKey("resume_recent_conversation")
     }
 
     init {
@@ -361,6 +370,22 @@ class SettingsRepository @Inject constructor(
 
     fun observeClientModeEnabled(): Flow<Boolean> = dataStore.data.map { prefs ->
         prefs[Keys.CLIENT_MODE_ENABLED] ?: false
+    }
+
+    /**
+     * letta-mobile-h2b8: feature flag governing the resume-most-recent
+     * conversation behaviour. Defaults to [BuildConfig.DEBUG] so internal
+     * builds opt in automatically; release flips when the behaviour has
+     * soaked. Stored value (when present) wins over the default.
+     */
+    fun observeResumeRecentConversation(): Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[Keys.RESUME_RECENT_CONVERSATION] ?: BuildConfig.DEBUG
+    }
+
+    suspend fun setResumeRecentConversation(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[Keys.RESUME_RECENT_CONVERSATION] = enabled
+        }
     }
 
     suspend fun setClientModeEnabled(enabled: Boolean) {
