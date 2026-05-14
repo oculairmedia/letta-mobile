@@ -187,6 +187,23 @@ fun AppNavGraph(
                 startDestination = startDestination
             ) {
         composable<HomeRoute> {
+            // letta-mobile-2ixd: PR #56 hid the Projects tab from the bottom
+            // bar / nav rail on backends without /api/projects, but the same
+            // route is still reachable via startDestination (cold-start
+            // landing), deep-link, and several internal navigate(HomeRoute)
+            // call sites. Intercept here: if the capability probe says
+            // projects are unsupported, redirect to Conversations.
+            val capabilities: CapabilityViewModel = hiltViewModel()
+            val projectsSupported by capabilities.projectsSupported.collectAsStateWithLifecycle()
+            if (!projectsSupported) {
+                LaunchedEffect(Unit) {
+                    navController.navigate(ConversationsRoute) {
+                        popUpTo<HomeRoute> { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+                return@composable
+            }
             ProjectHomeScreen(
                 onNavigateBack = null,
                 onNavigateToProjectChat = { project, projectStartAction ->
@@ -601,6 +618,21 @@ fun AppNavGraph(
             popEnterTransition = drillInPopEnter,
             popExitTransition = drillInPopExit,
         ) {
+            // letta-mobile-2ixd: same capability gate as HomeRoute above —
+            // catches direct deep-links to the explicit projects route.
+            val capabilities: CapabilityViewModel = hiltViewModel()
+            val projectsSupported by capabilities.projectsSupported.collectAsStateWithLifecycle()
+            if (!projectsSupported) {
+                LaunchedEffect(Unit) {
+                    if (!navController.popBackStack()) {
+                        navController.navigate(ConversationsRoute) {
+                            popUpTo<ProjectsRoute> { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                }
+                return@composable
+            }
             ProjectHomeScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToProjectChat = { project, projectStartAction ->
