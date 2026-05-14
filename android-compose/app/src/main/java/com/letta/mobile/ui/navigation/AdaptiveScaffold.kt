@@ -29,6 +29,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusManager
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.style.TextOverflow
@@ -90,6 +92,7 @@ private fun LettaNavigationRail(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val focusManager = LocalFocusManager.current
+    val visibleDestinations = visibleTopLevelDestinations()
 
     NavigationRail(
         modifier = modifier.fillMaxHeight(),
@@ -97,7 +100,7 @@ private fun LettaNavigationRail(
         header = { Spacer(Modifier.width(8.dp)) },
     ) {
         Spacer(Modifier.weight(1f))
-        TopLevelDestination.entries.forEach { destination ->
+        visibleDestinations.forEach { destination ->
             val selected = destination.isSelected(currentDestination)
 
             NavigationRailItem(
@@ -130,18 +133,18 @@ private fun LettaBottomBar(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val focusManager = LocalFocusManager.current
+    val visibleDestinations = visibleTopLevelDestinations()
 
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
     ) {
-        // Each item claims an equal 1/3 of the bar width via Modifier.weight(1f)
-        // so the entire column under the Admin/Chat/Home label is a valid tap
-        // target — not just the ~190dp centered around the icon. Arrangement
-        // previously used SpaceEvenly which made items as narrow as their
-        // content, leaving ~225dp dead zones at each horizontal gap (and in
-        // particular past the Admin label, on the right edge of the screen).
+        // Each item claims an equal slice of the bar width via Modifier.weight(1f)
+        // so the entire column under each label is a valid tap target — not
+        // just the area centered around the icon. The weight automatically
+        // adapts when an entry is filtered out (letta-mobile-2ixd: Projects
+        // hides on backends without project endpoints).
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -149,7 +152,7 @@ private fun LettaBottomBar(
                 .height(56.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TopLevelDestination.entries.forEach { destination ->
+            visibleDestinations.forEach { destination ->
                 LettaBottomBarItem(
                     modifier = Modifier.weight(1f),
                     icon = destination.icon,
@@ -160,6 +163,28 @@ private fun LettaBottomBar(
                     },
                 )
             }
+        }
+    }
+}
+
+/**
+ * letta-mobile-2ixd: filter [TopLevelDestination] entries against the
+ * connected backend's capabilities. Today only the Projects entry is
+ * conditional; future capability gates layer in here.
+ *
+ * Default is "show everything" — when the probe hasn't completed yet, or
+ * fails for a transient reason, we err on the side of visible. Hiding a
+ * feature behind an inconclusive probe is worse UX than showing a
+ * working feature that occasionally hits a 404.
+ */
+@Composable
+private fun visibleTopLevelDestinations(): List<TopLevelDestination> {
+    val capabilities: CapabilityViewModel = hiltViewModel()
+    val projectsSupported by capabilities.projectsSupported.collectAsStateWithLifecycle()
+    return TopLevelDestination.entries.filter { destination ->
+        when (destination) {
+            TopLevelDestination.HOME -> projectsSupported
+            else -> true
         }
     }
 }

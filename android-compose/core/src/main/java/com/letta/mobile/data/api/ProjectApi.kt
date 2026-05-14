@@ -40,6 +40,31 @@ private data class ProjectMutationResponse(
 open class ProjectApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) {
+    /**
+     * letta-mobile-2ixd: lightweight capability probe for the projects API.
+     * Returns true when the connected backend serves `/api/projects` with a
+     * 2xx response (or anything that isn't a definitive 404 / 501 / 405),
+     * false when the server tells us the endpoint isn't supported, and
+     * true (the assume-supported fallback) on transient errors so a flaky
+     * network doesn't silently hide the feature. CapabilityRepository
+     * caches this per-config so we don't probe on every recomposition.
+     */
+    open suspend fun probeAvailability(): Boolean {
+        val client = apiClient.getClient()
+        val baseUrl = apiClient.getBaseUrl().trimEnd('/')
+        return try {
+            val response = client.get("$baseUrl/api/projects?limit=1")
+            when (response.status.value) {
+                404, 405, 501 -> false
+                else -> true
+            }
+        } catch (e: Exception) {
+            // Network / parse / other — assume supported to avoid hiding a
+            // working feature behind transient failures.
+            true
+        }
+    }
+
     open suspend fun listProjects(): ProjectCatalog {
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl().trimEnd('/')
