@@ -38,8 +38,10 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.ui.components.LettaInputBar
 import com.letta.mobile.ui.components.audio.HoldToDictateButton
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.voice.VoiceInputUiState
 import com.letta.mobile.ui.voice.VoiceInputViewModel
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.coroutines.flow.MutableStateFlow
 
 internal val ChatComposerAttachButtonSize = 36.dp
 private val ChatComposerAttachIconSize = 18.dp
@@ -84,9 +86,19 @@ fun ChatComposer(
     // is mounted at ChatScreen level — not here — so it can fill the
     // screen with a dark scrim instead of sitting as a strip above
     // this composer.
-    val voiceVm: VoiceInputViewModel = hiltViewModel()
-    val voiceState by voiceVm.uiState.collectAsState()
-    val useVoice = !isStreaming && canSendMessages && !hasSendableContent
+    //
+    // Resolve the voice VM only when the hosting Activity is actually
+    // Hilt-managed. Compose previews and AgentScaffoldHiltTest host
+    // ChatComposer on a plain ComponentActivity (createComposeRule()
+    // uses ComponentActivity, not HiltTestActivity), so hiltViewModel()
+    // would throw IllegalStateException. In those contexts we silently
+    // skip the voice affordance — production always has the Hilt host.
+    val activity = LocalContext.current as? android.app.Activity
+    val isHiltHost = activity is dagger.hilt.internal.GeneratedComponentManager<*>
+    val voiceVm: VoiceInputViewModel? = if (isHiltHost) hiltViewModel() else null
+    val voiceState by (voiceVm?.uiState ?: remember { MutableStateFlow(VoiceInputUiState()) })
+        .collectAsState()
+    val useVoice = voiceVm != null && !isStreaming && canSendMessages && !hasSendableContent
 
     Column(modifier = modifier.fillMaxWidth()) {
         if (pendingAttachments.isNotEmpty()) {
@@ -114,7 +126,7 @@ fun ChatComposer(
             actionSizeFraction = if (isStreaming) 0.7f else 1f,
             actionPulse = isStreaming,
             actionVisible = showAction || useVoice,
-            customTrailingContent = if (useVoice) {
+            customTrailingContent = if (useVoice && voiceVm != null) {
                 {
                     HoldToDictateButton(
                         isRecognizing = voiceState.recognizing,

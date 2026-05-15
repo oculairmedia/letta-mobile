@@ -215,15 +215,24 @@ fun ChatScreen(
             // + composer while the user holds the mic. Scrim has no
             // pointer-consuming modifier so the HoldToDictateButton's
             // gesture tracking in the composer underneath keeps firing.
-            val voiceVm: com.letta.mobile.ui.voice.VoiceInputViewModel =
-                androidx.hilt.navigation.compose.hiltViewModel()
-            val voiceState by voiceVm.uiState.collectAsStateWithLifecycle()
-            com.letta.mobile.ui.components.audio.VoiceRecognizerOverlay(
-                visible = voiceState.recognizing,
-                recognizedText = voiceState.recognizedText,
-                amplitude = voiceState.amplitude,
-                modifier = Modifier.fillMaxSize(),
-            )
+            //
+            // Same Hilt-host guard as in ChatComposer: AgentScaffoldHiltTest
+            // hosts ChatScreen on a plain ComponentActivity, so we skip the
+            // voice overlay when there's no Hilt host (production always
+            // has one).
+            val voiceActivity = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
+            val voiceIsHiltHost = voiceActivity is dagger.hilt.internal.GeneratedComponentManager<*>
+            if (voiceIsHiltHost) {
+                val voiceVm: com.letta.mobile.ui.voice.VoiceInputViewModel =
+                    androidx.hilt.navigation.compose.hiltViewModel()
+                val voiceState by voiceVm.uiState.collectAsStateWithLifecycle()
+                com.letta.mobile.ui.components.audio.VoiceRecognizerOverlay(
+                    visible = voiceState.recognizing,
+                    recognizedText = voiceState.recognizedText,
+                    amplitude = voiceState.amplitude,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
 
         if (state.clientModeFilesystemPicker.isVisible) {
