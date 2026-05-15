@@ -560,35 +560,48 @@ private fun ProjectConversationSummaryChip(
 @Composable
 private fun ProjectTileMetaRow(
     statusLabel: String,
-    statusColor: Color,
+    statusContainerColor: Color,
+    statusContentColor: Color,
     issueCount: Int,
     isPinned: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    // letta-mobile-cygd: replaced the 8dp status dot + "• N issues"
+    // string concatenation with semantic Surface badges. Status reads
+    // as a colored chip; issue count is its own urgency-tinted chip
+    // (tertiary for a handful, primary as it grows, error past ~20).
+    androidx.compose.foundation.layout.FlowRow(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Surface(
-            modifier = Modifier.size(8.dp),
-            shape = RoundedCornerShape(50),
-            color = statusColor,
-        ) {}
-        Text(
+        StatusBadge(
             text = statusLabel,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            containerColor = statusContainerColor,
+            contentColor = statusContentColor,
         )
         if (issueCount > 0) {
-            Text(
-                text = "• $issueCount issues",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            val urgency = when {
+                issueCount >= 20 -> Triple(
+                    MaterialTheme.colorScheme.errorContainer,
+                    MaterialTheme.colorScheme.onErrorContainer,
+                    "$issueCount issues",
+                )
+                issueCount >= 6 -> Triple(
+                    MaterialTheme.colorScheme.primaryContainer,
+                    MaterialTheme.colorScheme.onPrimaryContainer,
+                    "$issueCount issues",
+                )
+                else -> Triple(
+                    MaterialTheme.colorScheme.tertiaryContainer,
+                    MaterialTheme.colorScheme.onTertiaryContainer,
+                    "$issueCount issues",
+                )
+            }
+            StatusBadge(
+                text = urgency.third,
+                containerColor = urgency.first,
+                contentColor = urgency.second,
             )
         }
         if (isPinned) {
@@ -599,6 +612,27 @@ private fun ProjectTileMetaRow(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+@Composable
+private fun StatusBadge(
+    text: String,
+    containerColor: Color,
+    contentColor: Color,
+) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = containerColor,
+        contentColor = contentColor,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -615,11 +649,30 @@ private fun ProjectTile(
     val lastActivity = project.updatedAt ?: project.lastSyncAt ?: project.lastCheckedAt ?: project.lastScanAt
     val issueCount = project.beadsIssueCount ?: project.issueCount ?: 0
     val statusLabel = project.status?.replaceFirstChar { it.uppercase() } ?: stringResource(R.string.common_unknown)
-    val statusColor = when (project.status?.lowercase()) {
-        "active" -> MaterialTheme.colorScheme.tertiary
-        "archived" -> MaterialTheme.colorScheme.onSurfaceVariant
-        else -> MaterialTheme.colorScheme.primary
+
+    // letta-mobile-cygd: status now drives both the Status badge color
+    // and the tile-level border/wash so users get a glanceable read of
+    // archived vs active. Active = primary border + container; archived
+    // = muted outlineVariant border + softer surface; unknown defaults
+    // to secondary so it doesn't masquerade as active.
+    val (statusContainerColor, statusContentColor, tileBorderColor) = when (project.status?.lowercase()) {
+        "active" -> Triple(
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.onPrimaryContainer,
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+        )
+        "archived" -> Triple(
+            MaterialTheme.colorScheme.surfaceContainerHighest,
+            MaterialTheme.colorScheme.onSurfaceVariant,
+            MaterialTheme.colorScheme.outlineVariant,
+        )
+        else -> Triple(
+            MaterialTheme.colorScheme.secondaryContainer,
+            MaterialTheme.colorScheme.onSecondaryContainer,
+            MaterialTheme.colorScheme.outlineVariant,
+        )
     }
+
     val initials = remember(project.name, project.identifier) {
         project.name
             .split(Regex("\\s+"))
@@ -643,6 +696,10 @@ private fun ProjectTile(
         shape = RoundedCornerShape(16.dp),
         color = LettaCardDefaults.listContainerColor,
         tonalElevation = 3.dp,
+        border = androidx.compose.foundation.BorderStroke(
+            width = 1.dp,
+            color = tileBorderColor,
+        ),
     ) {
         Column(
             modifier = Modifier
@@ -700,7 +757,8 @@ private fun ProjectTile(
                 )
                 ProjectTileMetaRow(
                     statusLabel = statusLabel,
-                    statusColor = statusColor,
+                    statusContainerColor = statusContainerColor,
+                    statusContentColor = statusContentColor,
                     issueCount = issueCount,
                     isPinned = isPinned,
                 )
