@@ -354,6 +354,13 @@ dependencies {
     implementation("com.google.dagger:hilt-android:2.58")
     ksp("com.google.dagger:hilt-compiler:2.58")
 
+    // Molecule — Compose-style presenters that compile StateFlows.
+    // Pilot scope: ConfigListViewModel only (letta-mobile-rl0d). If the
+    // pilot lands well, the runtime dep stays and other VMs migrate
+    // incrementally.
+    implementation("app.cash.molecule:molecule-runtime:2.0.0")
+    testImplementation("app.cash.molecule:molecule-testing:2.0.0")
+
     // Ktor HTTP client
     implementation("io.ktor:ktor-client-core:3.4.2")
     implementation("io.ktor:ktor-client-okhttp:3.4.2")
