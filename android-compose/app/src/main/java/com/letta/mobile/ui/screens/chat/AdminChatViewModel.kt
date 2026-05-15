@@ -25,6 +25,7 @@ import com.letta.mobile.ui.screens.chat.send.ChatSendContext
 import com.letta.mobile.ui.screens.chat.send.ChatSendStrategySelector
 import com.letta.mobile.ui.screens.chat.send.ClientModeChatSendStrategy
 import com.letta.mobile.ui.screens.chat.send.TimelineChatSendStrategy
+import com.letta.mobile.ui.screens.chat.session.ChatSessionInitializer
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.mapErrorToUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -370,6 +371,33 @@ class AdminChatViewModel @Inject constructor(
         setComposerError = { composerController.setError(it) },
         sendMessage = ::sendMessage,
     )
+    private val chatSessionInitializer by lazy {
+        ChatSessionInitializer(
+            scope = viewModelScope,
+            agentId = agentId,
+            isFreshRoute = isFreshRoute,
+            explicitNewChat = explicitNewChat,
+            resumeCacheMaxAgeMs = RESUME_CACHE_MAX_AGE_MS,
+            projectContext = projectContext,
+            settingsRepository = settingsRepository,
+            sessionResolver = chatSessionResolver,
+            conversationCoordinator = chatConversationCoordinator,
+            clientModeCoordinator = clientModeSendCoordinator,
+            runExpansionState = runExpansionState,
+            currentConversationTracker = currentConversationTracker,
+            uiState = _uiState,
+            setClientModeConversationId = ::setClientModeConversationId,
+            refreshAvailableAgents = ::refreshAvailableAgents,
+            observeLastChatSelection = ::observeLastChatSelection,
+            seedAgentNameFromMemoryCache = ::seedAgentNameFromMemoryCache,
+            observeAgentNameCache = ::observeAgentNameCache,
+            refreshClientModeLocation = ::refreshClientModeLocation,
+            loadProjectAgents = ::loadProjectAgents,
+            loadProjectBrief = ::loadProjectBrief,
+            loadRecentBugReports = ::loadRecentBugReports,
+            resolveConversationAndLoad = ::resolveConversationAndLoad,
+        )
+    }
 
     private fun seedAgentNameFromMemoryCache() {
         val cachedName = chatSessionResolver.cachedAgentName(agentId) ?: return
@@ -414,109 +442,7 @@ class AdminChatViewModel @Inject constructor(
     }
 
     init {
-        // letta-mobile-ze5l: when the active backend swaps under us, refresh
-        // the agent roster so the drawer / picker reflect the new server's
-        // agents. The conversation we're on may not exist on the new server
-        // (letta-mobile-iow7 covers the cache-invalidation story); for now
-        // we let the timeline observers naturally retry against the new URL.
-        viewModelScope.launch {
-            settingsRepository.activeConfigChanges.collect {
-                refreshAvailableAgents()
-            }
-        }
-
-        // letta-mobile-w2hx.6: route arg already pre-populated `activeConversationId`
-        // at field init; no shared singleton to seed.
-        if (isFreshRoute) {
-            setClientModeConversationId(null)
-            currentConversationTracker.setCurrent(null)
-            // letta-mobile-h2b8: resume-most-recent for cold-start /
-            // deep-link entries (explicitNewChat=false) when the feature
-            // flag is on. Drawer / picker "New conversation" taps mint a
-            // fresh route key, which sets explicitNewChat=true here, and
-            // they fall through to the existing create-on-send path.
-            if (!explicitNewChat && agentId.isNotBlank()) {
-                viewModelScope.launch {
-                    // Use firstOrNull so a mocked SettingsRepository returning
-                    // emptyFlow() (in unit tests) doesn't throw at VM init.
-                    // Unknown-flag treated as "skip resume" — preserves pre-h2b8
-                    // fresh-route semantics for tests. Real SettingsRepository
-                    // always emits via the BuildConfig.DEBUG default.
-                    val flagEnabled = settingsRepository.observeResumeRecentConversation().firstOrNull() ?: false
-                    if (!flagEnabled) return@launch
-                    Telemetry.event(
-                        "AdminChatVM", "resumeRecent.attempted",
-                        "agentId" to agentId,
-                    )
-                    val resumed = runCatching {
-                        chatSessionResolver.resolveMostRecentConversation(
-                            agentId = agentId,
-                            maxAgeMs = RESUME_CACHE_MAX_AGE_MS,
-                        )
-                    }.getOrNull()
-                    if (resumed != null) {
-                        Telemetry.event(
-                            "AdminChatVM", "resumeRecent.succeeded",
-                            "agentId" to agentId,
-                            "conversationId" to resumed,
-                        )
-                        chatConversationCoordinator.setActiveConversationId(resumed)
-                    } else {
-                        Telemetry.event(
-                            "AdminChatVM", "resumeRecent.noRecent",
-                            "agentId" to agentId,
-                        )
-                    }
-                }
-            } else if (explicitNewChat) {
-                Telemetry.event(
-                    "AdminChatVM", "resumeRecent.explicitNewChat",
-                    "agentId" to agentId,
-                )
-            }
-        }
-        if (agentId.isBlank()) {
-            _uiState.value = _uiState.value.copy(error = "No agent selected")
-        } else {
-            observeLastChatSelection()
-            seedAgentNameFromMemoryCache()
-            observeAgentNameCache()
-            runExpansionState.hydrateUiState()
-            viewModelScope.launch {
-                settingsRepository.observeClientModeEnabled()
-                    .distinctUntilChanged()
-                    .collect { enabled ->
-                        if (!enabled) {
-                            clientModeSendCoordinator.cancelActiveStream()
-                            _uiState.update {
-                                it.copy(
-                                    isClientModeEnabled = false,
-                                    isStreaming = false,
-                                    isAgentTyping = false,
-                                    error = null,
-                                )
-                            }
-                        } else {
-                            _uiState.update {
-                                it.copy(
-                                    isClientModeEnabled = true,
-                                    clientModeLocation = it.clientModeLocation.copy(
-                                        defaultPath = it.clientModeLocation.defaultPath
-                                            ?: projectContext?.filesystemPath,
-                                    ),
-                                )
-                            }
-                            refreshClientModeLocation()
-                        }
-                        resolveConversationAndLoad(useClientModeForResolve = enabled)
-                    }
-            }
-            if (projectContext != null) {
-                loadProjectAgents()
-                loadProjectBrief()
-                loadRecentBugReports()
-            }
-        }
+        chatSessionInitializer.run()
     }
 
     fun refreshClientModeLocation() = projectChatCoordinator.refreshClientModeLocation()
