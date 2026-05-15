@@ -13,6 +13,7 @@ import com.letta.mobile.bot.protocol.InternalBotClient
 import com.letta.mobile.bot.repository.ClientModeAgentLocationRepository
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AppMessage
+import com.letta.mobile.data.health.ShimBackendDetector
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.model.Conversation
@@ -45,6 +46,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.consumeAsFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -90,6 +92,7 @@ class AdminChatViewModelTest {
     private lateinit var clientModeChatSender: ClientModeChatSender
     private lateinit var notificationDeliveryCoordinator: com.letta.mobile.channel.NotificationDeliveryCoordinator
     private lateinit var notificationReplyHandler: com.letta.mobile.bot.channel.NotificationReplyHandler
+    private lateinit var shimBackendDetector: ShimBackendDetector
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var clientModeEnabledFlow: MutableStateFlow<Boolean>
     private var messages: List<AppMessage> = emptyList()
@@ -214,14 +217,21 @@ class AdminChatViewModelTest {
         clientModeChatSender = mockk(relaxed = true)
         notificationDeliveryCoordinator = mockk(relaxed = true)
         notificationReplyHandler = mockk(relaxed = true)
+        shimBackendDetector = mockk(relaxed = true)
         clientModeEnabledFlow = MutableStateFlow(false)
         activeConversationIds.clear()
 
         every { notificationReplyHandler.activeReplyStreams } returns MutableStateFlow(emptySet())
+        every { shimBackendDetector.activeIsShimBackend } returns MutableStateFlow(false)
+        every { shimBackendDetector.cachedActiveIsShimBackend() } returns false
+        coEvery { shimBackendDetector.refreshActive() } returns false
+        coEvery { shimBackendDetector.refresh(any()) } returns false
 
         every { settingsRepository.getChatBackgroundKey() } returns flowOf("default")
         every { settingsRepository.getChatFontScale() } returns flowOf(1f)
         every { settingsRepository.observeClientModeEnabled() } returns clientModeEnabledFlow
+        every { settingsRepository.activeConfig } returns MutableStateFlow(null)
+        every { settingsRepository.activeConfigChanges } returns emptyFlow()
         every { settingsRepository.favoriteAgentId } returns MutableStateFlow<String?>(null)
         every { settingsRepository.getPinnedAgentIds() } returns MutableStateFlow<Set<String>>(emptySet())
         every {
@@ -303,6 +313,7 @@ class AdminChatViewModelTest {
             com.letta.mobile.data.channel.CurrentConversationTracker(),
             notificationDeliveryCoordinator,
             notificationReplyHandler,
+            shimBackendDetector,
         )
     }
 
@@ -1792,6 +1803,7 @@ class AdminChatViewModelTest {
             com.letta.mobile.data.channel.CurrentConversationTracker(),
             notificationDeliveryCoordinator,
             notificationReplyHandler,
+            shimBackendDetector,
         )
         advanceUntilIdle()
 
@@ -1928,6 +1940,7 @@ class AdminChatViewModelTest {
             com.letta.mobile.data.channel.CurrentConversationTracker(),
             notificationDeliveryCoordinator,
             notificationReplyHandler,
+            shimBackendDetector,
         )
 
         val project = vm.projectContext
@@ -2102,6 +2115,7 @@ class AdminChatViewModelTest {
             com.letta.mobile.data.channel.CurrentConversationTracker(),
             notificationDeliveryCoordinator,
             notificationReplyHandler,
+            shimBackendDetector,
         )
         advanceUntilIdle()
 
@@ -2144,6 +2158,7 @@ class AdminChatViewModelTest {
             com.letta.mobile.data.channel.CurrentConversationTracker(),
             notificationDeliveryCoordinator,
             notificationReplyHandler,
+            shimBackendDetector,
         )
         advanceUntilIdle()
 
@@ -2196,6 +2211,7 @@ class AdminChatViewModelTest {
             com.letta.mobile.data.channel.CurrentConversationTracker(),
             notificationDeliveryCoordinator,
             notificationReplyHandler,
+            shimBackendDetector,
         )
         advanceUntilIdle()
 
@@ -2237,6 +2253,7 @@ class AdminChatViewModelTest {
             com.letta.mobile.data.channel.CurrentConversationTracker(),
             notificationDeliveryCoordinator,
             notificationReplyHandler,
+            shimBackendDetector,
         )
         advanceUntilIdle()
 
@@ -2272,6 +2289,7 @@ class AdminChatViewModelTest {
             com.letta.mobile.data.channel.CurrentConversationTracker(),
             notificationDeliveryCoordinator,
             notificationReplyHandler,
+            shimBackendDetector,
         )
 
         assertTrue(vm.tryHandleSlashCommand("/bug"))
@@ -2303,6 +2321,7 @@ class AdminChatViewModelTest {
             com.letta.mobile.data.channel.CurrentConversationTracker(),
             notificationDeliveryCoordinator,
             notificationReplyHandler,
+            shimBackendDetector,
         )
         advanceUntilIdle()
 
@@ -3035,6 +3054,7 @@ class AdminChatViewModelTest {
             tracker,
             notificationDeliveryCoordinator,
             notificationReplyHandler,
+            shimBackendDetector,
         )
         advanceUntilIdle()
         vm.sendMessage("hi")
@@ -3076,6 +3096,7 @@ class AdminChatViewModelTest {
             tracker,
             notificationDeliveryCoordinator,
             notificationReplyHandler,
+            shimBackendDetector,
         )
         advanceUntilIdle()
         vm.sendMessage("hi")
@@ -3127,6 +3148,7 @@ class AdminChatViewModelTest {
             tracker,
             notificationDeliveryCoordinator,
             notificationReplyHandler,
+            shimBackendDetector,
         )
         advanceUntilIdle()
         // Second advance to flush any lingering scoped coroutines

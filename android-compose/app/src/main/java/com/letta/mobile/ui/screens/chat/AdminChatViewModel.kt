@@ -14,6 +14,7 @@ import com.letta.mobile.bot.protocol.InternalBotClient
 import com.letta.mobile.bot.repository.ClientModeAgentLocationRepository
 import com.letta.mobile.bot.channel.NotificationReplyHandler
 import com.letta.mobile.channel.NotificationDeliveryCoordinator
+import com.letta.mobile.data.health.ShimBackendDetector
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.MessageContentPart
@@ -70,6 +71,7 @@ class AdminChatViewModel @Inject constructor(
     private val currentConversationTracker: com.letta.mobile.data.channel.CurrentConversationTracker,
     private val notificationDeliveryCoordinator: NotificationDeliveryCoordinator,
     private val notificationReplyHandler: NotificationReplyHandler,
+    private val shimBackendDetector: ShimBackendDetector,
 ) : ViewModel() {
     companion object {
         private const val MESSAGE_SYNC_INTERVAL_MS = 5_000L
@@ -127,6 +129,8 @@ class AdminChatViewModel @Inject constructor(
     // until resolveConversationAndLoad assigns one.
     private val clientModeEnabled: StateFlow<Boolean> = settingsRepository.observeClientModeEnabled()
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    private val isShimBackend: StateFlow<Boolean> = shimBackendDetector.activeIsShimBackend
+        .stateIn(viewModelScope, SharingStarted.Eagerly, shimBackendDetector.cachedActiveIsShimBackend())
     private var followingDuplicateInitialMessageInFlight = false
     val conversationId: String?
         get() = chatConversationCoordinator.conversationId(shouldUseClientModeForCurrentRoute)
@@ -458,6 +462,12 @@ class AdminChatViewModel @Inject constructor(
     }
 
     init {
+        viewModelScope.launch {
+            shimBackendDetector.refreshActive()
+            settingsRepository.activeConfigChanges.collect { config ->
+                shimBackendDetector.refresh(config)
+            }
+        }
         chatSessionInitializer.run()
     }
 
@@ -617,6 +627,7 @@ class AdminChatViewModel @Inject constructor(
     ) = ChatSendContext(
         isClientModeEnabled = isClientModeEnabled,
         explicitConversationId = explicitConversationId,
+        isShimBackend = isShimBackend.value,
     )
 
     private fun currentClientModeConversationId(): String? =
