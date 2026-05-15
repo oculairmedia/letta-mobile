@@ -407,9 +407,24 @@ private fun MarkdownTextRaw(
             ),
             typography = markdownTypography(
                 text = MaterialTheme.typography.bodyMedium.copy(color = textColor),
-                code = MaterialTheme.typography.labelSmall.copy(
+                // letta-mobile-pcir: code style for fenced blocks. Tuned for
+                // ASCII-art alignment:
+                //   - JetBrains Mono via LettaCodeFont (full Unicode coverage
+                //     including box-drawing glyphs).
+                //   - bodySmall (12sp) instead of labelSmall (11sp) — at 11sp
+                //     subpixel rounding makes adjacent column widths visibly
+                //     drift even with a true monospace font.
+                //   - letterSpacing = 0 so glyph-to-glyph advance stays a
+                //     constant em-width.
+                //   - liga/calt off via fontFeatureSettings — JetBrains Mono
+                //     ligates `=>`, `==`, `!=`, `->`, etc. into composite
+                //     glyphs that don't keep monospace cell width and visibly
+                //     break ASCII art that uses these sequences.
+                code = MaterialTheme.typography.bodySmall.copy(
                     fontFamily = LettaCodeFont,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    letterSpacing = 0.sp,
+                    fontFeatureSettings = "liga 0, calt 0",
                 ),
                 h1 = MaterialTheme.typography.titleLarge.copy(color = textColor),
                 h2 = MaterialTheme.typography.titleMedium.copy(color = textColor),
@@ -486,10 +501,14 @@ private fun CodeFenceWithHeader(
             // "Horizontally scrollable component was measured with an infinity
             // maximum width constraints" (seen when scrolling back to messages
             // that contain fenced code blocks). See letta-mobile-o2v7 followup.
+            // letta-mobile-pcir: center the code surface horizontally so a
+            // narrow ASCII diagram (e.g. a 30-char tree) sits in the middle
+            // of the fence rather than left-anchored against a wide gutter.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                contentAlignment = Alignment.TopCenter,
             ) {
                 MarkdownHighlightedCodeFence(
                     content = content,
