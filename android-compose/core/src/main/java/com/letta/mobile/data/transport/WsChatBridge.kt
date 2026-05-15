@@ -1,6 +1,8 @@
 package com.letta.mobile.data.transport
 
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.buildContentParts
+import com.letta.mobile.data.model.toJsonArray
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -70,13 +72,27 @@ class WsChatBridge @Inject constructor(
      * Returns false if the connection isn't live or a turn is already
      * in flight (mirrors [ChannelTransport.send]). The caller surfaces
      * the failure as appropriate (snackbar, queued retry, etc.).
+     *
+     * lcp-dlj: when [attachments] is non-empty, builds a Letta
+     * `content_parts` array in canonical `[text-if-any, ...images]`
+     * order and sends it alongside [text]. The shim ignores [text]
+     * once content_parts is present, but the field stays on the wire
+     * for compatibility with older shim builds.
      */
     fun send(
         agentId: String,
         conversationId: String,
         text: String,
         otid: String? = null,
-    ): Boolean = transport.send(agentId, conversationId, text, otid)
+        attachments: List<com.letta.mobile.data.model.MessageContentPart.Image> = emptyList(),
+    ): Boolean {
+        val contentParts = if (attachments.isEmpty()) {
+            null
+        } else {
+            buildContentParts(text, attachments).toJsonArray()
+        }
+        return transport.send(agentId, conversationId, text, otid, contentParts)
+    }
 
     fun cancel(): Boolean = transport.cancel()
     fun bye(): Boolean = transport.bye()

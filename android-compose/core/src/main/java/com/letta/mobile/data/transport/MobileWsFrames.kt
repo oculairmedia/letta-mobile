@@ -3,6 +3,7 @@ package com.letta.mobile.data.transport
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonContentPolymorphicSerializer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -68,6 +69,28 @@ data class HelloFrame(
     @SerialName("client_version") val clientVersion: String? = null,
 ) : ClientFrame
 
+/**
+ * lcp-dlj: multimodal sends carry [contentParts] alongside [text].
+ *
+ * Wire shape mirrors REST `MessageCreate.content` — a JSON array of
+ * Letta `LettaMessageContentUnion` parts (text + Anthropic-style
+ * base64 image). When [contentParts] is non-null and non-empty the
+ * shim ignores [text]; [text] stays required for wire compatibility
+ * (older shim builds that don't speak content_parts still need it).
+ *
+ * Ordering on the wire is insertion order. Canonical builder:
+ * `buildContentParts(text, images).toJsonArray()` — `[text-if-any,
+ * ...images]`.
+ *
+ * Image `data` is bare base64 (no `data:` URL prefix); see
+ * [com.letta.mobile.data.model.MessageContentPart] for the schema.
+ *
+ * Shim hard cap: 10 MB JSON-encoded `content_parts` → returns
+ * `protocol_violation` (socket stays open, mobile can retry).
+ * Mobile soft caps (Anthropic guidance): ≤ 4 images per send, ≤
+ * 1568px longest side, ≤ 2 MB raw per image. Downsample on the
+ * client to stay under the hard cap.
+ */
 @Serializable
 data class SendMessageFrame(
     override val v: Int = 1,
@@ -78,6 +101,7 @@ data class SendMessageFrame(
     @SerialName("conversation_id") val conversationId: String,
     val text: String,
     val otid: String? = null,
+    @SerialName("content_parts") val contentParts: JsonArray? = null,
 ) : ClientFrame
 
 /**

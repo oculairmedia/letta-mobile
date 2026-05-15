@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport
 
+import com.letta.mobile.data.model.toJsonArray
 import io.kotest.core.spec.style.WordSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -52,6 +53,51 @@ class MobileWsFramesTest : WordSpec({
             out shouldContain "\"agent_id\":\"agent-x\""
             out shouldContain "\"conversation_id\":\"conv-default-agent-x\""
             out shouldContain "\"otid\":\"cm-android-abc\""
+        }
+
+        "lcp-dlj send_message — content_parts omitted when null" {
+            val frame = SendMessageFrame(
+                id = "fid-2a",
+                ts = "2026-05-15T12:00:00Z",
+                agentId = "agent-x",
+                conversationId = "conv-default-agent-x",
+                text = "hello",
+                otid = "cm-android-abc",
+                contentParts = null,
+            )
+            val out = frame.encodeJson(json)
+            (out.contains("content_parts")) shouldBe false
+        }
+
+        "lcp-dlj send_message — content_parts serializes text-first then image with raw base64" {
+            val parts = com.letta.mobile.data.model.buildContentParts(
+                text = "look",
+                images = listOf(
+                    com.letta.mobile.data.model.MessageContentPart.Image(
+                        base64 = "AAA=",
+                        mediaType = "image/jpeg",
+                    )
+                ),
+            ).toJsonArray()
+            val frame = SendMessageFrame(
+                id = "fid-2b",
+                ts = "2026-05-15T12:00:00Z",
+                agentId = "agent-x",
+                conversationId = "conv-default-agent-x",
+                text = "look",
+                otid = "cm-android-def",
+                contentParts = parts,
+            )
+            val out = frame.encodeJson(json)
+            out shouldContain "\"content_parts\":["
+            // Insertion order: text first, image second.
+            val textIdx = out.indexOf("\"type\":\"text\"")
+            val imageIdx = out.indexOf("\"type\":\"image\"")
+            (textIdx in 0..<imageIdx) shouldBe true
+            // Letta-shape source: base64 + media_type with raw base64 (no `data:` prefix).
+            out shouldContain "\"media_type\":\"image/jpeg\""
+            out shouldContain "\"data\":\"AAA=\""
+            (out.contains("data:image")) shouldBe false
         }
 
         "spec §2.1 cancel — run_id is mandatory and snake_cased" {

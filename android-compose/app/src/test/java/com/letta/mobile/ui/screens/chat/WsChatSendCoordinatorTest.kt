@@ -64,6 +64,53 @@ class WsChatSendCoordinatorTest {
                 conversationId = "conv-default-agent-1",
                 text = "hello",
                 otid = otid.captured,
+                attachments = emptyList(),
+            )
+        }
+    }
+
+    @Test
+    fun `send with image attachments passes them through to the bridge (lcp-dlj)`() = runTest {
+        val wsChatBridge = mockBridge(sendAccepted = true)
+        val timelineRepository = mockk<TimelineRepository>(relaxed = true)
+        val otid = slot<String>()
+        coEvery {
+            timelineRepository.appendExternalTransportLocal("conv-default-agent-1", "look", capture(otid), any())
+        } answers { otid.captured }
+        val image = com.letta.mobile.data.model.MessageContentPart.Image(
+            base64 = "AAA=",
+            mediaType = "image/jpeg",
+        )
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = wsChatBridge,
+            timelineRepository = timelineRepository,
+            uiState = MutableStateFlow(ChatUiState(agentName = "Agent")),
+            clearComposerAfterSend = {},
+            activeConversationId = { null },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+        )
+
+        coordinator.send("look", listOf(image)).join()
+
+        verify(exactly = 1) {
+            wsChatBridge.send(
+                agentId = "agent-1",
+                conversationId = "conv-default-agent-1",
+                text = "look",
+                otid = otid.captured,
+                attachments = listOf(image),
+            )
+        }
+        coVerify(exactly = 1) {
+            timelineRepository.appendExternalTransportLocal(
+                conversationId = "conv-default-agent-1",
+                content = "look",
+                otid = otid.captured,
+                attachments = listOf(image),
             )
         }
     }
@@ -382,6 +429,6 @@ class WsChatSendCoordinatorTest {
             )
         )
         every { events } returns eventFlow
-        every { send(any(), any(), any(), any()) } returns sendAccepted
+        every { send(any(), any(), any(), any(), any()) } returns sendAccepted
     }
 }

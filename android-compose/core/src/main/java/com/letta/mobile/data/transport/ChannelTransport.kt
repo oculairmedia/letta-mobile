@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -200,6 +201,10 @@ class ChannelTransport @Inject constructor() {
         conversationId: String,
         text: String,
         otid: String? = null,
+        // lcp-dlj: multimodal payload. When non-null, the shim ignores [text]
+        // and treats this as the authoritative content. Caller is responsible
+        // for shape — see [SendMessageFrame.contentParts] for the contract.
+        contentParts: JsonArray? = null,
     ): Boolean {
         if (state.value !is State.Connected) return false
         if (inFlight) return false
@@ -214,6 +219,7 @@ class ChannelTransport @Inject constructor() {
                 conversationId = conversationId,
                 text = text,
                 otid = otid,
+                contentParts = contentParts,
             )
         )
     }

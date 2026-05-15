@@ -64,10 +64,13 @@ internal class WsChatSendCoordinator(
             failSend("Admin-shim WebSocket requires an API token")
             return@launch
         }
-        if (attachments.isNotEmpty()) {
-            failSend("Image attachments are not supported over the admin-shim WebSocket yet")
-            return@launch
-        }
+        // lcp-dlj: multimodal sends now flow through content_parts. The
+        // shim hard-caps the JSON-encoded payload at 10 MB; the client-
+        // side downsample (≤ 4 images, ≤ 1568px longest side, ≤ 2 MB raw
+        // each) is enforced at the composer attachment step before we
+        // get here (TODO: letta-mobile-i9zz once filed). If the shim
+        // still trips its cap we surface protocol_violation as a one-
+        // shot toast via the standard Error path.
 
         val conversationId = defaultShimConversationId(agentId)
         activeWsConversationId = conversationId
@@ -87,6 +90,7 @@ internal class WsChatSendCoordinator(
             conversationId = conversationId,
             text = text,
             otid = otid,
+            attachments = attachments,
         )
         if (!accepted) {
             failSend("A WebSocket chat turn is already in flight")
@@ -107,7 +111,12 @@ internal class WsChatSendCoordinator(
             isStreaming = true,
             isAgentTyping = true,
         )
-        timer.stop("accepted" to true, "conversationId" to conversationId, "otid" to otid)
+        timer.stop(
+            "accepted" to true,
+            "conversationId" to conversationId,
+            "otid" to otid,
+            "attachments" to attachments.size,
+        )
     }
 
     fun cancel(): Boolean = wsChatBridge.cancel()
