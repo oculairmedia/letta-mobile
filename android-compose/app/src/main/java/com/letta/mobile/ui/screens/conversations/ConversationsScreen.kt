@@ -79,8 +79,6 @@ import com.letta.mobile.ui.theme.sectionTitle
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.util.formatRelativeTime
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.navigation.agentAvatarSharedElementKey
-import com.letta.mobile.ui.navigation.optionalSharedElement
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -432,42 +430,22 @@ private fun ConversationCard(
 
             if (display.isPinned) {
                 Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = LettaIcons.Star,
-                        contentDescription = "Pinned",
-                        modifier = Modifier.size(LettaIconSizing.Inline),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Pinned",
-                        style = MaterialTheme.typography.listItemMetadata,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
+                Text(
+                    text = "Pinned",
+                    style = MaterialTheme.typography.listItemMetadata,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = LettaIcons.Agent,
-                    contentDescription = "Agent",
-                    modifier = Modifier
-                        .size(LettaIconSizing.Inline)
-                        .optionalSharedElement(agentAvatarSharedElementKey(conversation.agentId)),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = display.agentName,
-                    style = MaterialTheme.typography.listItemSupporting,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            Text(
+                text = display.agentName,
+                style = MaterialTheme.typography.listItemSupporting,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
 
             val timeText = conversationActivityText(conversation)
             if (timeText != null) {
