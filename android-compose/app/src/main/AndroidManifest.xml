@@ -18,6 +18,19 @@
     -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" />
 
+    <!-- letta-mobile-rl0d (audio): hold-to-dictate uses on-device speech
+         recognition (android.speech.SpeechRecognizer). RECORD_AUDIO is
+         requested at runtime by HoldToDictateButton on first tap. The
+         <queries> block lets SpeechRecognizer enumerate installed
+         recognition services on Android 11+ where package visibility
+         is restricted by default. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+
     <application
         android:name=".LettaApplication"
         android:allowBackup="true"

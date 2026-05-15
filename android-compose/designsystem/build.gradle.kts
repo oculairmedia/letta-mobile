@@ -102,6 +102,13 @@ dependencies {
     implementation("com.mikepenz:multiplatform-markdown-renderer-code:0.38.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
+    // letta-mobile-rl0d (audio): required for HoldToDictateButton's
+    // RECORD_AUDIO permission flow (rememberLauncherForActivityResult,
+    // ActivityResultContracts) and ContextCompat.checkSelfPermission.
+    // Designsystem stays Hilt-free — VoiceInputViewModel lives in :app.
+    implementation("androidx.activity:activity-compose:1.10.1")
+    implementation("androidx.core:core-ktx:1.13.1")
+
     testImplementation("junit:junit:4.13.2")
     testImplementation("io.mockk:mockk:1.13.17")
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.5")

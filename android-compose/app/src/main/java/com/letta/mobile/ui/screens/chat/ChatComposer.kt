@@ -19,6 +19,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,9 +33,12 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import com.letta.mobile.R
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.ui.components.LettaInputBar
+import com.letta.mobile.ui.components.audio.HoldToDictateButton
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.voice.VoiceInputViewModel
 import kotlinx.collections.immutable.ImmutableList
 
 internal val ChatComposerAttachButtonSize = 36.dp
@@ -72,6 +77,17 @@ fun ChatComposer(
     val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     val showAction = isStreaming || !keyboardOpen
 
+    // letta-mobile-rl0d (audio): swap the Send/Stop button for a
+    // HoldToDictateButton when the field is empty. Voice path stays
+    // hidden while the user is typing or a stream is in flight.
+    // The shader overlay (letta-mobile-arhd: VoiceRecognizerOverlay)
+    // is mounted at ChatScreen level — not here — so it can fill the
+    // screen with a dark scrim instead of sitting as a strip above
+    // this composer.
+    val voiceVm: VoiceInputViewModel = hiltViewModel()
+    val voiceState by voiceVm.uiState.collectAsState()
+    val useVoice = !isStreaming && canSendMessages && !hasSendableContent
+
     Column(modifier = modifier.fillMaxWidth()) {
         if (pendingAttachments.isNotEmpty()) {
             AttachmentStrip(
@@ -97,7 +113,30 @@ fun ChatComposer(
             actionContentColor = if (isStreaming) MaterialTheme.colorScheme.onErrorContainer else null,
             actionSizeFraction = if (isStreaming) 0.7f else 1f,
             actionPulse = isStreaming,
-            actionVisible = showAction,
+            actionVisible = showAction || useVoice,
+            customTrailingContent = if (useVoice) {
+                {
+                    HoldToDictateButton(
+                        isRecognizing = voiceState.recognizing,
+                        onStart = {
+                            voiceVm.startSpeechRecognition(
+                                onDone = { dictated ->
+                                    if (dictated.isNotBlank()) {
+                                        val merged = if (inputText.isBlank()) {
+                                            dictated
+                                        } else {
+                                            "$inputText $dictated"
+                                        }
+                                        onTextChange(merged)
+                                    }
+                                },
+                            )
+                        },
+                        onStop = voiceVm::stopSpeechRecognition,
+                        onCancel = voiceVm::cancelSpeechRecognition,
+                    )
+                }
+            } else null,
             contentPadding = PaddingValues(
                 horizontal = ChatComposerInputHorizontalPadding,
                 vertical = ChatComposerInputVerticalPadding,
