@@ -9,7 +9,9 @@ import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.testutil.TestData
 import com.letta.mobile.util.EncryptedPrefsHelper
 import com.letta.mobile.ui.common.UiState
+import io.mockk.coEvery
 import io.mockk.every
+import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkObject
 import kotlinx.coroutines.Dispatchers
@@ -50,11 +52,16 @@ class ConfigListViewModelTest {
         mockkObject(EncryptedPrefsHelper)
         every { EncryptedPrefsHelper.getEncryptedPrefs(any()) } returns sharedPreferences
         fakeRepo = FakeSettingsRepo(appContext)
-        // letta-mobile-qmxn: real ServerHealthRepository is fine here —
-        // its probes run on a background IO scope and silently fail
-        // against the synthetic configs without disturbing uiState
-        // assertions, which only inspect the config-mapping path.
-        val healthRepo = ServerHealthRepository(fakeRepo)
+        // letta-mobile-aaxy: stub ServerHealthRepository instead of
+        // constructing the real one. The real repo spins up a background
+        // IO coroutine that fires real HTTP probes against the synthetic
+        // configs, which adds non-determinism (probes can outlive the
+        // test, hit DNS resolution paths, etc.) that has no bearing on
+        // what these tests assert (config-mapping into uiState).
+        val healthRepo = mockk<ServerHealthRepository>()
+        every { healthRepo.states } returns
+            MutableStateFlow<Map<String, ServerHealthRepository.Health>>(emptyMap()).asStateFlow()
+        coEvery { healthRepo.refreshAll() } returns Unit
         viewModel = ConfigListViewModel(fakeRepo, healthRepo, appContext)
     }
 

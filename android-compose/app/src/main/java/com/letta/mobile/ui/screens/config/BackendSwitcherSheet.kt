@@ -189,8 +189,11 @@ private fun BackendSwitcherRow(
     val isOffline = config.health == ServerHealthRepository.Health.OFFLINE
     // letta-mobile-qmxn: tap-on-dead is silent-but-visible. Bumping
     // `refusalTrigger` re-fires the shake+flash animation in HealthRowShell
-    // without switching active backends.
-    var refusalTrigger by remember { mutableIntStateOf(0) }
+    // without switching active backends. Keyed by config.id so the counter
+    // doesn't migrate to a different row when the list is reordered or the
+    // adjacent row is deleted (rows here are not emitted via a keyed list,
+    // so this is the only thing pinning the per-row state to its identity).
+    var refusalTrigger by remember(config.id) { mutableIntStateOf(0) }
 
     val baseContainerColor = if (config.isActive) {
         MaterialTheme.colorScheme.primaryContainer
