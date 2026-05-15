@@ -192,15 +192,19 @@ fun AppNavGraph(
             // route is still reachable via startDestination (cold-start
             // landing), deep-link, and several internal navigate(HomeRoute)
             // call sites. Intercept here: if the capability probe says
-            // projects are unsupported, redirect to Conversations.
+            // projects are unsupported, redirect to Conversations and tell
+            // the user why via the global snackbar.
             val capabilities: CapabilityViewModel = hiltViewModel()
             val projectsSupported by capabilities.projectsSupported.collectAsStateWithLifecycle()
+            val snackbar = com.letta.mobile.ui.common.LocalSnackbarDispatcher.current
+            val unavailableMessage = androidx.compose.ui.res.stringResource(com.letta.mobile.R.string.screen_projects_unavailable_message)
             if (!projectsSupported) {
                 LaunchedEffect(Unit) {
                     navController.navigate(ConversationsRoute) {
                         popUpTo<HomeRoute> { inclusive = true }
                         launchSingleTop = true
                     }
+                    snackbar.dispatch(unavailableMessage)
                 }
                 return@composable
             }
@@ -622,6 +626,8 @@ fun AppNavGraph(
             // catches direct deep-links to the explicit projects route.
             val capabilities: CapabilityViewModel = hiltViewModel()
             val projectsSupported by capabilities.projectsSupported.collectAsStateWithLifecycle()
+            val snackbar = com.letta.mobile.ui.common.LocalSnackbarDispatcher.current
+            val unavailableMessage = androidx.compose.ui.res.stringResource(com.letta.mobile.R.string.screen_projects_unavailable_message)
             if (!projectsSupported) {
                 LaunchedEffect(Unit) {
                     if (!navController.popBackStack()) {
@@ -630,6 +636,7 @@ fun AppNavGraph(
                             launchSingleTop = true
                         }
                     }
+                    snackbar.dispatch(unavailableMessage)
                 }
                 return@composable
             }

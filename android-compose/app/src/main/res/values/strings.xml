@@ -76,6 +76,7 @@
     <string name="screen_home_usage_model_share_label">%1$d%%</string>
 
     <string name="screen_projects_title">Projects</string>
+    <string name="screen_projects_unavailable_message">This backend doesn\'t support projects.</string>
     <string name="screen_projects_empty">No projects yet. Pull to refresh when VibSync is connected.</string>
     <string name="screen_projects_new_project">New project</string>
     <string name="screen_projects_new_project_manual_action">Manual project setup</string>

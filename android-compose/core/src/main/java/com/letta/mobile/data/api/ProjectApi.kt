@@ -41,32 +41,33 @@ open class ProjectApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) {
     /**
-     * letta-mobile-2ixd: capability probe for the projects API. Status code
-     * alone isn't enough — some servers (e.g. the letta-code admin shim)
-     * stub `/api/projects` to return `200 []` so the endpoint exists in
-     * name but doesn't actually serve a project catalog. The empty array
-     * can't be deserialized into [ProjectCatalog] (which requires a
-     * `projects` field), so use successful deserialization as the
-     * supported signal:
+     * letta-mobile-2ixd: capability probe for the projects API.
      *
-     *   - 404 / 405 / 501 → unsupported (definitive)
-     *   - 2xx with parseable [ProjectCatalog] body → supported
-     *   - 2xx with un-parseable body (e.g. shim's `[]`) → unsupported
-     *   - any other status / network error → assume supported, so a
-     *     flaky network doesn't silently hide a working feature
+     *   - 2xx with parseable [ProjectCatalog] body → supported.
+     *   - 2xx with un-parseable body (e.g. shim's `200 []`, which has no
+     *     `projects` field) → unsupported.
+     *   - 404 / 405 / 501 → unsupported (definitive).
+     *   - Any other 4xx/5xx → unsupported (the server actively refused
+     *     the route or is broken; treat as "no projects here today").
+     *   - Network error (ConnectException, timeout, etc.) → unsupported.
+     *     The earlier "assume supported on network error" turned out to
+     *     keep the tab visible against backends that were simply down,
+     *     defeating the gate. CapabilityRepository re-probes on every
+     *     active-config change, so a recovered server flips the flag
+     *     back to true on the next switch.
      */
     open suspend fun probeAvailability(): Boolean {
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl().trimEnd('/')
         return try {
             val response = client.get("$baseUrl/api/projects?limit=1")
-            when (response.status.value) {
-                404, 405, 501 -> false
-                in 200..299 -> runCatching { response.body<ProjectCatalog>() }.isSuccess
-                else -> true
+            if (response.status.value !in 200..299) {
+                false
+            } else {
+                runCatching { response.body<ProjectCatalog>() }.isSuccess
             }
         } catch (e: Exception) {
-            true
+            false
         }
     }
 

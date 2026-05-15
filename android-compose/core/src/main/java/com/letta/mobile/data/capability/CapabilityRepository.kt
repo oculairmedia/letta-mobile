@@ -24,10 +24,11 @@ import javax.inject.Singleton
  * Currently exposes one capability: projects. The probe is the
  * [ProjectApi.probeAvailability] helper, fired once per active-config
  * identity. Result is cached in [_projectsSupported] until the next
- * config change. Defaults to `true` (assume supported) so the feature
- * stays visible while a probe is in flight or while the backend is
- * unreachable — better to show a broken page than to hide a working one
- * behind a flaky probe.
+ * config change. Initial value is `true` so the tab stays visible during
+ * the very first probe of the session (the user added the config, they
+ * almost certainly expect it to work); after that the probe is
+ * authoritative and any failure — including network errors against an
+ * unreachable backend — flips the flag to false.
  *
  * Future capability flags should layer onto the same observer in
  * [observeConfig] rather than spawning parallel one-off jobs; that keeps
