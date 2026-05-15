@@ -66,6 +66,13 @@ import com.letta.mobile.ui.icons.LettaIcons
  *   so Send is enabled with an empty text field.
  * @param leadingContent Optional slot rendered to the left of the text field,
  *   typically an attach button.
+ * @param customTrailingContent Optional override for the trailing action.
+ *   When non-null, this composable replaces the built-in Send/Stop button
+ *   entirely and is responsible for its own sizing, click handling, and
+ *   animations. Used by ChatComposer to swap in the HoldToDictateButton
+ *   when the text field is empty (letta-mobile-rl0d follow-up). The
+ *   built-in actionVisible/pulse/icon logic still applies to the slot's
+ *   container, so the slot inherits show/hide animations for free.
  * @param actionPulse When true, applies a subtle ~800ms heartbeat scale-pulse
  *   to the action button to communicate that work is in progress (e.g. an
  *   active assistant stream behind the Stop button). Suppressed entirely when
@@ -98,6 +105,7 @@ fun LettaInputBar(
     contentPadding: PaddingValues = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
     itemSpacing: Dp = 8.dp,
     leadingContent: (@Composable () -> Unit)? = null,
+    customTrailingContent: (@Composable () -> Unit)? = null,
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val haptic = LocalHapticFeedback.current
@@ -215,6 +223,10 @@ fun LettaInputBar(
             modifier = Modifier.align(Alignment.CenterVertically),
             label = "inputActionVisibility",
         ) {
+            if (customTrailingContent != null) {
+                customTrailingContent()
+                return@AnimatedVisibility
+            }
             FilledIconButton(
                 onClick = {
                     if (canSend) {
