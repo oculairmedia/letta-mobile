@@ -1,8 +1,13 @@
 package com.letta.mobile.ui.screens.config
 
 import android.content.Context
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.cash.molecule.RecompositionMode
+import app.cash.molecule.launchMolecule
 import com.letta.mobile.channel.ChatPushAlarmScheduler
 import com.letta.mobile.data.health.ServerHealthRepository
 import com.letta.mobile.data.model.LettaConfig
@@ -14,10 +19,7 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -35,6 +37,22 @@ data class ConfigListUiState(
     val configs: ImmutableList<ServerConfig> = persistentListOf()
 )
 
+/**
+ * letta-mobile-rl0d: Molecule-pilot rewrite of ConfigListViewModel.
+ *
+ * The previous incarnation built `uiState` from a 4-flow `combine
+ * { ... }.stateIn(WhileSubscribed(5_000L), …)` block — readable but
+ * boilerplate-heavy, especially once the action-error state needed
+ * folding in alongside repository flows. With Molecule the same
+ * derivation is a `@Composable` function that reads each flow with
+ * `collectAsState` and returns the state directly. No combine
+ * arithmetic, no SharingStarted tuning, and the order of operations
+ * is exactly what the screen is going to render.
+ *
+ * Public API is unchanged (same `uiState: StateFlow<UiState<…>>`,
+ * same imperative methods) so the screen and existing
+ * ConfigListViewModelTest continue to work without modification.
+ */
 @HiltViewModel
 class ConfigListViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
@@ -42,47 +60,36 @@ class ConfigListViewModel @Inject constructor(
     @param:ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
-    // letta-mobile-cdlk: observe the underlying flows so the backend-switcher
-    // sheet stays in sync with concurrent edits (e.g. user adds a config via
-    // ConfigScreen, comes back, opens the sheet — the new entry must appear
-    // without a manual reload). The previous one-shot `loadConfigs()` only
-    // refreshed when this VM's setActiveConfig / deleteConfig completed, which
-    // missed cross-screen state changes.
-    //
-    // `_actionError` is folded into the same combined flow so a thrown
-    // setActiveConfig / deleteConfig still surfaces via uiState (matches
-    // the previous explicit-Error-state contract that ConfigListViewModelTest
-    // pins). Set to null after a successful action to clear the banner.
     private val _actionError = MutableStateFlow<String?>(null)
 
     val uiState: StateFlow<UiState<ConfigListUiState>> =
-        combine(
-            settingsRepository.configs,
-            settingsRepository.activeConfig,
-            _actionError,
-            healthRepository.states,
-        ) { configs, active, error, healthStates ->
-            if (error != null) {
-                UiState.Error(error) as UiState<ConfigListUiState>
-            } else {
-                val activeId = active?.id
-                val serverConfigs = configs.map {
-                    ServerConfig(
-                        id = it.id,
-                        mode = if (it.mode == LettaConfig.Mode.CLOUD) ServerMode.CLOUD else ServerMode.SELF_HOSTED,
-                        url = it.serverUrl,
-                        isActive = it.id == activeId,
-                        health = healthStates[it.id] ?: ServerHealthRepository.Health.UNKNOWN,
-                    )
-                }
-                UiState.Success(ConfigListUiState(configs = serverConfigs.toImmutableList()))
-            }
+        viewModelScope.launchMolecule(mode = RecompositionMode.ContextClock) {
+            present()
         }
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5_000L),
-                initialValue = UiState.Loading,
+
+    @Composable
+    private fun present(): UiState<ConfigListUiState> {
+        val configs by settingsRepository.configs.collectAsState()
+        val active by settingsRepository.activeConfig.collectAsState()
+        val healthStates by healthRepository.states.collectAsState()
+        val error by _actionError.collectAsState()
+
+        if (error != null) {
+            return UiState.Error(error!!)
+        }
+
+        val activeId = active?.id
+        val rows = configs.map { c ->
+            ServerConfig(
+                id = c.id,
+                mode = if (c.mode == LettaConfig.Mode.CLOUD) ServerMode.CLOUD else ServerMode.SELF_HOSTED,
+                url = c.serverUrl,
+                isActive = c.id == activeId,
+                health = healthStates[c.id] ?: ServerHealthRepository.Health.UNKNOWN,
             )
+        }
+        return UiState.Success(ConfigListUiState(configs = rows.toImmutableList()))
+    }
 
     /**
      * letta-mobile-qmxn: fire a fresh wake-test pass against every
@@ -98,8 +105,8 @@ class ConfigListViewModel @Inject constructor(
 
     /**
      * Kept for [ConfigListScreen]'s error-retry path: clearing
-     * [_actionError] lets the flow-driven `uiState` recompute to Success
-     * from the current repository snapshot.
+     * [_actionError] lets the presenter recompute to Success from the
+     * current repository snapshot.
      */
     fun loadConfigs() {
         _actionError.value = null
@@ -130,3 +137,4 @@ class ConfigListViewModel @Inject constructor(
         }
     }
 }
+
