@@ -3,13 +3,11 @@ package com.letta.mobile.ui.screens.editagent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ToolId
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.EmbeddingModel
@@ -19,6 +17,7 @@ import com.letta.mobile.ui.test.setLettaTestContent
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -80,19 +79,20 @@ class EditAgentScreenTest {
         composeRule.onNodeWithText("Identity").assertIsDisplayed()
         composeRule.onNodeWithText("Name").assertIsDisplayed()
 
-        composeRule.selectEditAgentSection("Models")
-        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(3)
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(5)
+        composeRule.onNodeWithText("Models").assertIsDisplayed()
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(7)
         composeRule.onNodeWithText("LLM Configuration").assertIsDisplayed()
         composeRule.onAllNodesWithText("Embedding Model").assertCountEquals(1)
 
-        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(0)
-        composeRule.selectEditAgentSection("Runtime")
-        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(2)
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(17)
+        composeRule.onNodeWithText("Runtime").assertIsDisplayed()
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(18)
         composeRule.onNodeWithText("LettaBot Client Mode").assertIsDisplayed()
 
-        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(0)
-        composeRule.selectEditAgentSection("Advanced")
-        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(2)
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(8)
+        composeRule.onNodeWithText("Advanced").assertIsDisplayed()
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(9)
         composeRule.onNodeWithText("Primary Model Advanced").assertIsDisplayed()
         listOf(
             "Provider Name",
@@ -111,9 +111,9 @@ class EditAgentScreenTest {
             composeRule.onAllNodesWithText(label, substring = true).assertCountEquals(1)
         }
 
-        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(0)
-        composeRule.selectEditAgentSection("Memory")
-        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(2)
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(10)
+        composeRule.onNodeWithText("Memory").assertIsDisplayed()
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(11)
         listOf(
             "Compaction Mode",
             "Summarizer Model",
@@ -126,20 +126,22 @@ class EditAgentScreenTest {
             composeRule.onAllNodesWithText(label, substring = true).assertCountEquals(1)
         }
 
-        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(0)
-        composeRule.selectEditAgentSection("Tools")
-        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(3)
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(13)
+        composeRule.onNodeWithText("Tools").assertIsDisplayed()
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(15)
         composeRule.onNodeWithText("Tools (1)").assertIsDisplayed()
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(16)
         composeRule.onNodeWithText("Tool Rules / Approval Policy").assertIsDisplayed()
         composeRule.onNodeWithText("Tool Rules JSON").assertIsDisplayed()
     }
 
     @Test
-    fun validationWarningMarksContainingTabAndTabRemainsNavigable() {
+    fun validationWarningMarksContainingSectionAndSectionRemainsScrollable() {
         val viewModel = mockk<EditAgentViewModel>(relaxed = true)
+        val editState = advancedState().copy(toolRulesJson = "{not-an-array")
         val uiState = MutableStateFlow(
             UiState.Success(
-                advancedState().copy(toolRulesJson = "{not-an-array")
+                editState
             )
         )
         val llmModels = MutableStateFlow(emptyList<LlmModel>())
@@ -155,16 +157,10 @@ class EditAgentScreenTest {
             )
         }
 
-        // letta-mobile-qfn9 / letta-mobile-w3dl: trigger surfaces aggregate
-        // warning count for non-active sections — the colored bullet is now
-        // accompanied by a non-color cue (Icon + contentDescription) for
-        // accessibility, so assert against the count text and accessibility
-        // description rather than a literal "•" glyph.
-        composeRule.onNodeWithText("1").assertIsDisplayed()
-        composeRule.onNodeWithTag(EditAgentTestTags.SECTION_PICKER_TRIGGER).performClick()
-        composeRule.onNodeWithText("Tools •").assertIsDisplayed()
-        composeRule.onNodeWithTag(EditAgentTestTags.tab("Tools")).performClick()
-        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(4)
+        assertTrue(EditAgentConfigTab.Tools.hasValidationWarning(editState))
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(13)
+        composeRule.onNodeWithText("Tools").assertIsDisplayed()
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(16)
         composeRule.onNodeWithText("Tool Rules JSON").assertIsDisplayed()
     }
 
@@ -205,12 +201,4 @@ class EditAgentScreenTest {
         slidingWindowPercentage = 0.35f,
         promptAcknowledgement = true,
     )
-}
-
-// letta-mobile-qfn9: helper for the new section picker. The old PrimaryTabRow
-// exposed each tab as a directly-clickable node; the picker requires opening
-// the bottom sheet first, then tapping the section row inside it.
-private fun ComposeContentTestRule.selectEditAgentSection(label: String) {
-    onNodeWithTag(EditAgentTestTags.SECTION_PICKER_TRIGGER).performClick()
-    onNodeWithTag(EditAgentTestTags.tab(label)).performClick()
 }

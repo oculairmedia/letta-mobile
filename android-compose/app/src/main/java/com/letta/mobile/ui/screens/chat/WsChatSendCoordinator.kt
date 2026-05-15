@@ -140,7 +140,7 @@ internal class WsChatSendCoordinator(
         } ?: false
     }
 
-    private suspend fun handleEvent(event: WsTimelineEvent) {
+    internal suspend fun handleEvent(event: WsTimelineEvent) {
         when (event) {
             is WsTimelineEvent.TurnStarted -> {
                 activeWsConversationId = event.conversationId
