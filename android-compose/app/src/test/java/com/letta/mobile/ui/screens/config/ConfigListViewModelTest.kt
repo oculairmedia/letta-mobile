@@ -3,6 +3,7 @@ package com.letta.mobile.ui.screens.config
 import android.content.Context
 import app.cash.turbine.test
 import androidx.test.core.app.ApplicationProvider
+import com.letta.mobile.data.health.ServerHealthRepository
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.testutil.TestData
@@ -49,7 +50,12 @@ class ConfigListViewModelTest {
         mockkObject(EncryptedPrefsHelper)
         every { EncryptedPrefsHelper.getEncryptedPrefs(any()) } returns sharedPreferences
         fakeRepo = FakeSettingsRepo(appContext)
-        viewModel = ConfigListViewModel(fakeRepo, appContext)
+        // letta-mobile-qmxn: real ServerHealthRepository is fine here —
+        // its probes run on a background IO scope and silently fail
+        // against the synthetic configs without disturbing uiState
+        // assertions, which only inspect the config-mapping path.
+        val healthRepo = ServerHealthRepository(fakeRepo)
+        viewModel = ConfigListViewModel(fakeRepo, healthRepo, appContext)
     }
 
     @After

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.channel.ChatPushAlarmScheduler
+import com.letta.mobile.data.health.ServerHealthRepository
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.ui.common.UiState
@@ -25,7 +26,8 @@ data class ServerConfig(
     val id: String,
     val mode: ServerMode,
     val url: String,
-    val isActive: Boolean
+    val isActive: Boolean,
+    val health: ServerHealthRepository.Health = ServerHealthRepository.Health.UNKNOWN,
 )
 
 @androidx.compose.runtime.Immutable
@@ -36,6 +38,7 @@ data class ConfigListUiState(
 @HiltViewModel
 class ConfigListViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
+    private val healthRepository: ServerHealthRepository,
     @param:ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -57,7 +60,8 @@ class ConfigListViewModel @Inject constructor(
             settingsRepository.configs,
             settingsRepository.activeConfig,
             _actionError,
-        ) { configs, active, error ->
+            healthRepository.states,
+        ) { configs, active, error, healthStates ->
             if (error != null) {
                 UiState.Error(error) as UiState<ConfigListUiState>
             } else {
@@ -68,6 +72,7 @@ class ConfigListViewModel @Inject constructor(
                         mode = if (it.mode == LettaConfig.Mode.CLOUD) ServerMode.CLOUD else ServerMode.SELF_HOSTED,
                         url = it.serverUrl,
                         isActive = it.id == activeId,
+                        health = healthStates[it.id] ?: ServerHealthRepository.Health.UNKNOWN,
                     )
                 }
                 UiState.Success(ConfigListUiState(configs = serverConfigs.toImmutableList()))
@@ -78,6 +83,18 @@ class ConfigListViewModel @Inject constructor(
                 started = SharingStarted.WhileSubscribed(5_000L),
                 initialValue = UiState.Loading,
             )
+
+    /**
+     * letta-mobile-qmxn: fire a fresh wake-test pass against every
+     * configured backend. Picker UIs call this from a `LaunchedEffect`
+     * on open so the dots reflect the current state instead of whatever
+     * was cached the last time the list was probed.
+     */
+    fun refreshHealth() {
+        viewModelScope.launch {
+            healthRepository.refreshAll()
+        }
+    }
 
     /**
      * Kept for [ConfigListScreen]'s error-retry path: clearing

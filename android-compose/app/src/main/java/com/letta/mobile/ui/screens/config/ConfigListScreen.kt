@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
+import com.letta.mobile.data.health.ServerHealthRepository
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
@@ -32,6 +33,9 @@ fun ConfigListScreen(
     viewModel: ConfigListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // letta-mobile-qmxn: re-probe on screen open so the dot is fresh.
+    LaunchedEffect(Unit) { viewModel.refreshHealth() }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
@@ -110,11 +114,14 @@ private fun ConfigCard(
     modifier: Modifier = Modifier
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
+    val isOffline = config.health == ServerHealthRepository.Health.OFFLINE
+    var refusalTrigger by remember { mutableIntStateOf(0) }
 
-    Card(
+    HealthRowShell(
+        baseContainerColor = LettaCardDefaults.listContainerColor,
+        contentColor = LettaCardDefaults.listContentColor,
+        refusalTrigger = refusalTrigger,
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = LettaCardDefaults.listCardColors(),
     ) {
         Row(
             modifier = Modifier
@@ -125,9 +132,13 @@ private fun ConfigCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    HealthDot(
+                        health = config.health,
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
                     AssistChip(
                         onClick = {},
-                        label = { 
+                        label = {
                             Text(
                                 text = config.mode.name,
                                 style = MaterialTheme.typography.labelSmall
@@ -138,7 +149,7 @@ private fun ConfigCard(
                         Spacer(modifier = Modifier.width(8.dp))
                         AssistChip(
                             onClick = {},
-                            label = { 
+                            label = {
                                 Text(
                                     text = stringResource(R.string.common_active),
                                     style = MaterialTheme.typography.labelSmall
@@ -150,11 +161,11 @@ private fun ConfigCard(
                         )
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(8.dp))
-                
+
                 Text(
-                    text = if (config.mode == ServerMode.CLOUD) stringResource(R.string.common_letta_cloud) 
+                    text = if (config.mode == ServerMode.CLOUD) stringResource(R.string.common_letta_cloud)
                            else config.url,
                     style = MaterialTheme.typography.listItemHeadline,
                     maxLines = 1,
@@ -164,12 +175,16 @@ private fun ConfigCard(
 
             Row {
                 if (!config.isActive) {
-                    FilledTonalButton(onClick = onSetActive) {
+                    FilledTonalButton(
+                        onClick = {
+                            if (isOffline) refusalTrigger++ else onSetActive()
+                        },
+                    ) {
                         Text(stringResource(R.string.action_set_active))
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                 }
-                
+
                 IconButton(onClick = { showDeleteDialog = true }) {
                     Icon(LettaIcons.Delete, stringResource(R.string.action_delete))
                 }

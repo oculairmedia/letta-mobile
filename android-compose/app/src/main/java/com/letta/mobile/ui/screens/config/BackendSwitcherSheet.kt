@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,7 +25,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -37,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
+import com.letta.mobile.data.health.ServerHealthRepository
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.icons.LettaIconSizing
@@ -72,6 +76,11 @@ fun BackendSwitcherSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
+
+    // letta-mobile-qmxn: re-probe backend health each time the sheet opens
+    // so the dot reflects current state (e.g. shim came back up between
+    // visits) rather than the last cached probe result.
+    LaunchedEffect(Unit) { viewModel.refreshHealth() }
 
     fun dismissAndThen(after: () -> Unit) {
         scope.launch {
@@ -177,7 +186,13 @@ private fun BackendSwitcherRow(
     onEdit: () -> Unit,
     onLongPress: () -> Unit,
 ) {
-    val containerColor = if (config.isActive) {
+    val isOffline = config.health == ServerHealthRepository.Health.OFFLINE
+    // letta-mobile-qmxn: tap-on-dead is silent-but-visible. Bumping
+    // `refusalTrigger` re-fires the shake+flash animation in HealthRowShell
+    // without switching active backends.
+    var refusalTrigger by remember { mutableIntStateOf(0) }
+
+    val baseContainerColor = if (config.isActive) {
         MaterialTheme.colorScheme.primaryContainer
     } else {
         MaterialTheme.colorScheme.surfaceContainerHighest
@@ -187,26 +202,32 @@ private fun BackendSwitcherRow(
     } else {
         MaterialTheme.colorScheme.onSurface
     }
-    Surface(
+
+    HealthRowShell(
+        baseContainerColor = baseContainerColor,
+        contentColor = contentColor,
+        refusalTrigger = refusalTrigger,
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .combinedClickable(
-                onClick = onSelect,
+                onClick = {
+                    if (isOffline) refusalTrigger++ else onSelect()
+                },
                 onLongClick = onLongPress,
                 onLongClickLabel = stringResource(R.string.action_delete),
             ),
-        shape = RoundedCornerShape(12.dp),
-        color = containerColor,
-        contentColor = contentColor,
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            HealthDot(
+                health = config.health,
+                modifier = Modifier.padding(end = 8.dp),
+            )
             Box(
-                modifier = Modifier
-                    .size(36.dp),
+                modifier = Modifier.size(36.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
