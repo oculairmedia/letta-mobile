@@ -158,6 +158,28 @@ open class TimelineRepository @Inject constructor(
     ): String = getOrCreate(conversationId).appendClientModeLocal(content, attachments)
 
     /**
+     * Append an optimistic user bubble for a non-REST transport that supports
+     * a caller-supplied otid. The admin-shim mobile WS echoes this otid back on
+     * assistant frames and stamps it to disk for reconcile, so this path uses
+     * the standard LETTA_SERVER source rather than the Client Mode fuzzy-match
+     * source.
+     */
+    suspend fun appendExternalTransportLocal(
+        conversationId: String,
+        content: String,
+        otid: String,
+        attachments: List<com.letta.mobile.data.model.MessageContentPart.Image> = emptyList(),
+    ): String = getOrCreate(conversationId).appendExternalTransportLocal(content, otid, attachments)
+
+    /** Ingest a LettaMessage projected from an external live transport. */
+    suspend fun ingestExternalTransportMessage(
+        conversationId: String,
+        message: com.letta.mobile.data.model.LettaMessage,
+    ) {
+        getOrCreate(conversationId).ingestStreamEvent(message)
+    }
+
+    /**
      * letta-mobile-5s1n: upsert a Client Mode assistant-streaming Local.
      * See [TimelineSyncLoop.upsertClientModeLocalAssistantChunk] for full
      * contract.
@@ -202,6 +224,24 @@ open class TimelineRepository @Inject constructor(
     /** Pull recent server messages into an existing or newly-created timeline loop. */
     suspend fun reconcileRecentMessages(conversationId: String, reason: String) {
         getOrCreate(conversationId).reconcileRecentMessages(reason)
+    }
+
+    /**
+     * Reconcile a send that went through the admin-shim mobile WebSocket.
+     * The shim guarantees `turn_done` is emitted after disk stamping, so callers
+     * can invoke this immediately when that frame lands.
+     */
+    suspend fun reconcileExternalTransportSend(
+        conversationId: String,
+        agentId: String,
+        externalConversationId: String,
+        otid: String,
+    ) {
+        getOrCreate(conversationId).reconcileExternalTransportSend(
+            agentId = agentId,
+            externalConversationId = externalConversationId,
+            otid = otid,
+        )
     }
 
     /** Force a reload — clears the cached loop for the conversation. */

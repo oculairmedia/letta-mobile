@@ -348,6 +348,35 @@ class TimelineSyncLoop(
         return localId
     }
 
+    internal suspend fun appendExternalTransportLocal(
+        content: String,
+        otid: String,
+        attachments: List<MessageContentPart.Image> = emptyList(),
+    ): String {
+        val sentAt = Instant.now()
+        writeMutex.withLock {
+            val local = TimelineEvent.Local(
+                position = _state.value.nextLocalPosition(),
+                otid = otid,
+                content = content,
+                role = Role.USER,
+                sentAt = sentAt,
+                deliveryState = DeliveryState.SENT,
+                attachments = attachments,
+                source = MessageSource.LETTA_SERVER,
+            )
+            _state.value = _state.value.append(local)
+        }
+        _events.emit(TimelineSyncEvent.LocalAppended(otid))
+        Telemetry.event(
+            "TimelineSync", "send.externalTransportLocalAppended",
+            "otid" to otid,
+            "conversationId" to conversationId,
+            "contentLength" to content.length,
+        )
+        return otid
+    }
+
     /**
      * letta-mobile-5s1n: insert-or-update a Client Mode Local for assistant
      * streaming through the WS gateway. Identified by [localId] (caller
@@ -601,6 +630,28 @@ class TimelineSyncLoop(
         )
     }
 
+    internal suspend fun reconcileExternalTransportSend(
+        agentId: String,
+        externalConversationId: String,
+        otid: String,
+    ) {
+        reconcileAfterSend(
+            otid = otid,
+            conversationId = conversationId,
+            writeMutex = writeMutex,
+            state = _state,
+            events = _events,
+            pendingLocalStore = pendingLocalStore,
+            listMessagesWithRetry = {
+                listAgentMessagesWithRetry(
+                    agentId = agentId,
+                    externalConversationId = externalConversationId,
+                    otid = otid,
+                )
+            },
+        )
+    }
+
     private suspend fun reconcileRecentMessagesFromServer(
         telemetryName: String,
         telemetryAttrs: Array<Pair<String, Any?>>,
@@ -719,6 +770,38 @@ class TimelineSyncLoop(
         // Unreachable — the loop either returns or rethrows — but the compiler
         // doesn't know that.
         throw lastError ?: IllegalStateException("listMessagesWithRetry exhausted without error")
+    }
+
+    private suspend fun listAgentMessagesWithRetry(
+        agentId: String,
+        externalConversationId: String,
+        otid: String,
+    ): List<LettaMessage> {
+        var lastError: Throwable? = null
+        for (attempt in 0 until RECONCILE_RETRY_ATTEMPTS) {
+            try {
+                return messageApi.listMessages(
+                    agentId = agentId,
+                    limit = RECONCILE_LIMIT,
+                    order = "desc",
+                    conversationId = externalConversationId,
+                )
+            } catch (t: Throwable) {
+                if (!isRetryableReconcileError(t) || attempt == RECONCILE_RETRY_ATTEMPTS - 1) {
+                    throw t
+                }
+                lastError = t
+                Telemetry.error(
+                    "TimelineSync", "reconcile.ws.retry", t,
+                    "otid" to otid,
+                    "agentId" to agentId,
+                    "conversationId" to externalConversationId,
+                    "attempt" to attempt + 1,
+                )
+                delay(RECONCILE_RETRY_BACKOFF_MS shl attempt)
+            }
+        }
+        throw lastError ?: IllegalStateException("listAgentMessagesWithRetry exhausted without error")
     }
 
     companion object {
