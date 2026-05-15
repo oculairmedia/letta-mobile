@@ -1,8 +1,13 @@
 package com.letta.mobile.ui.screens.chat
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.cash.molecule.RecompositionMode.Immediate
+import app.cash.molecule.launchMolecule
 import com.letta.mobile.ui.navigation.toBackendLabel
 import com.letta.mobile.bot.chat.ClientModeChatSender
 import com.letta.mobile.bot.protocol.InternalBotClient
@@ -35,7 +40,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -153,7 +157,17 @@ class AdminChatViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(
         ChatUiState(agentName = initialAgentName.orEmpty())
     )
-    val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+    val uiState: StateFlow<ChatUiState> by lazy(LazyThreadSafetyMode.NONE) {
+        viewModelScope.launchMolecule(mode = Immediate) {
+            present()
+        }
+    }
+
+    @Composable
+    private fun present(): ChatUiState {
+        val state by _uiState.collectAsState()
+        return state
+    }
 
     private val composerController = ChatComposerController()
     private val chatBannerController = ChatBannerController(_uiState, composerController)
