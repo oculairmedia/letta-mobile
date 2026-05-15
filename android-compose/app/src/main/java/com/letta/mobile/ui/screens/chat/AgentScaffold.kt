@@ -176,6 +176,7 @@ fun AgentScaffold(
     val agentId = viewModel.agentId
     val conversationId = viewModel.conversationId
     val projectContext = viewModel.projectContext
+    val projectBindings = viewModel.projectBindings
     var isProjectInfoExpanded by rememberSaveable(projectContext?.identifier) { mutableStateOf(false) }
     val screenTitle = projectContext?.name ?: agentName.ifBlank { stringResource(R.string.screen_chat_title) }
     val currentAgentIsFavorite = agentId == favoriteAgentId
@@ -247,7 +248,7 @@ fun AgentScaffold(
                     clientModeLocation = uiState.clientModeLocation,
                     onOpenLocationPicker = {
                         scope.launch { drawerState.close() }
-                        viewModel.openClientModeLocationPicker()
+                        projectBindings.openClientModeLocationPicker()
                     },
                     conversations = drawerConversations,
                     currentConversationId = conversationId,
@@ -267,7 +268,7 @@ fun AgentScaffold(
                         scope.launch { drawerState.close() }
                         viewModel.resetMessages()
                     },
-                    onRefreshContextWindow = viewModel::refreshContextWindow,
+                    onRefreshContextWindow = projectBindings::refreshContextWindow,
                     onClose = { scope.launch { drawerState.close() } },
                     modifier = Modifier.testTag(AgentScaffoldTestTags.DRAWER_CONTENT),
                 )
@@ -367,7 +368,7 @@ fun AgentScaffold(
                             )
                         }
                         IconButton(onClick = {
-                            viewModel.refreshContextWindow()
+                            projectBindings.refreshContextWindow()
                             scope.launch {
                                 drawerState.open()
                                 runCatching { drawerConversationRepo.refreshConversations(agentId) }
@@ -402,9 +403,9 @@ fun AgentScaffold(
                         bugReports = uiState.bugReports,
                         expanded = isProjectInfoExpanded,
                         onExpandedChange = { isProjectInfoExpanded = it },
-                        onRetryAgents = viewModel::loadProjectAgents,
-                        onRetryBrief = viewModel::loadProjectBrief,
-                        onSaveBriefSection = viewModel::saveProjectBriefSection,
+                        onRetryAgents = projectBindings::loadProjectAgents,
+                        onRetryBrief = projectBindings::loadProjectBrief,
+                        onSaveBriefSection = projectBindings::saveProjectBriefSection,
                         onCreateBugReport = { showBugReportSheet = true },
                         modifier = Modifier.testTag(AgentScaffoldTestTags.PROJECT_CONTEXT_CARD),
                     )
@@ -463,7 +464,7 @@ fun AgentScaffold(
             state = uiState.bugReports,
             onDismiss = { showBugReportSheet = false },
             onSubmit = {
-                viewModel.submitStructuredBugReport(it)
+                projectBindings.submitStructuredBugReport(it)
                 showBugReportSheet = false
             },
         )

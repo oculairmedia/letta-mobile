@@ -63,6 +63,7 @@ fun ChatScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val composerState by viewModel.composerState.collectAsStateWithLifecycle()
     val fontScale by viewModel.chatFontScale.collectAsStateWithLifecycle()
+    val projectBindings = viewModel.projectBindings
 
     var activeFontScale by remember { mutableFloatStateOf(fontScale) }
     LaunchedEffect(fontScale) { activeFontScale = fontScale }
@@ -214,9 +215,9 @@ fun ChatScreen(
         if (state.clientModeFilesystemPicker.isVisible) {
             ClientModeFilesystemPickerSheet(
                 state = state.clientModeFilesystemPicker,
-                onDismiss = viewModel::closeClientModeLocationPicker,
-                onNavigateTo = viewModel::browseClientModeLocation,
-                onSelect = viewModel::selectClientModeLocation,
+                onDismiss = projectBindings::closeClientModeLocationPicker,
+                onNavigateTo = projectBindings::browseClientModeLocation,
+                onSelect = projectBindings::selectClientModeLocation,
             )
         }
     }

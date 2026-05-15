@@ -307,6 +307,22 @@ class AdminChatViewModel @Inject constructor(
         },
         markFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = true },
     )
+    private val projectChatCoordinator = ProjectChatCoordinator(
+        scope = viewModelScope,
+        agentId = agentId,
+        projectContext = projectContext,
+        uiState = _uiState,
+        clientModeEnabled = clientModeEnabled,
+        clientModeAgentLocationRepository = clientModeAgentLocationRepository,
+        agentRepository = agentRepository,
+        blockRepository = blockRepository,
+        bugReportRepository = bugReportRepository,
+        projectAgentActivityLoader = projectAgentActivityLoader,
+        conversationId = { conversationId },
+        setComposerError = chatBannerController::showComposerError,
+        sendMessage = ::sendMessage,
+    )
+    internal val projectBindings: ChatProjectBindings = projectChatCoordinator
     private val clientModeSendCoordinator = ClientModeSendCoordinator(
         scope = viewModelScope,
         agentId = agentId,
@@ -327,7 +343,7 @@ class AdminChatViewModel @Inject constructor(
         showConversationSwap = chatBannerController::showClientModeConversationSwap,
         startTimelineObserver = ::startTimelineObserver,
         stopTimelineObserver = ::stopTimelineObserver,
-        refreshContextWindow = ::refreshContextWindow,
+        refreshContextWindow = projectBindings::refreshContextWindow,
         collapseCompletedRunsIfStreamingFinished = ::collapseCompletedRunsIfStreamingFinished,
     )
     private val timelineSendCoordinator: TimelineSendCoordinator by lazy {
@@ -385,21 +401,6 @@ class AdminChatViewModel @Inject constructor(
             activeConversationId = { chatConversationCoordinator.activeConversationId },
         )
     }
-    private val projectChatCoordinator = ProjectChatCoordinator(
-        scope = viewModelScope,
-        agentId = agentId,
-        projectContext = projectContext,
-        uiState = _uiState,
-        clientModeEnabled = clientModeEnabled,
-        clientModeAgentLocationRepository = clientModeAgentLocationRepository,
-        agentRepository = agentRepository,
-        blockRepository = blockRepository,
-        bugReportRepository = bugReportRepository,
-        projectAgentActivityLoader = projectAgentActivityLoader,
-        conversationId = { conversationId },
-        setComposerError = chatBannerController::showComposerError,
-        sendMessage = ::sendMessage,
-    )
     private val chatSessionInitializer by lazy {
         ChatSessionInitializer(
             scope = viewModelScope,
@@ -420,10 +421,10 @@ class AdminChatViewModel @Inject constructor(
             observeLastChatSelection = ::observeLastChatSelection,
             seedAgentNameFromMemoryCache = ::seedAgentNameFromMemoryCache,
             observeAgentNameCache = ::observeAgentNameCache,
-            refreshClientModeLocation = ::refreshClientModeLocation,
-            loadProjectAgents = ::loadProjectAgents,
-            loadProjectBrief = ::loadProjectBrief,
-            loadRecentBugReports = ::loadRecentBugReports,
+            refreshClientModeLocation = projectBindings::refreshClientModeLocation,
+            loadProjectAgents = projectBindings::loadProjectAgents,
+            loadProjectBrief = projectBindings::loadProjectBrief,
+            loadRecentBugReports = projectBindings::loadRecentBugReports,
             resolveConversationAndLoad = ::resolveConversationAndLoad,
         )
     }
@@ -479,26 +480,6 @@ class AdminChatViewModel @Inject constructor(
         }
         chatSessionInitializer.run()
     }
-
-    fun refreshClientModeLocation() = projectChatCoordinator.refreshClientModeLocation()
-
-    fun sendClientModeLocationChange(path: String) = projectChatCoordinator.sendClientModeLocationChange(path)
-
-    fun openClientModeLocationPicker() = projectChatCoordinator.openClientModeLocationPicker()
-
-    fun closeClientModeLocationPicker() = projectChatCoordinator.closeClientModeLocationPicker()
-
-    fun browseClientModeLocation(path: String?) = projectChatCoordinator.browseClientModeLocation(path)
-
-    fun selectClientModeLocation(path: String) = projectChatCoordinator.selectClientModeLocation(path)
-
-    fun refreshContextWindow() = projectChatCoordinator.refreshContextWindow()
-
-    fun loadProjectAgents() = projectChatCoordinator.loadProjectAgents()
-
-    fun loadRecentBugReports() = projectChatCoordinator.loadRecentBugReports()
-
-    fun submitStructuredBugReport(draft: ProjectBugReportDraft) = projectChatCoordinator.submitStructuredBugReport(draft)
 
     fun tryHandleSlashCommand(text: String): Boolean =
         ChatSlashCommandParser.parse(
@@ -572,13 +553,6 @@ class AdminChatViewModel @Inject constructor(
         .mapNotNull { it.runId }
         .distinct()
         .take(1)
-
-    fun loadProjectBrief() = projectChatCoordinator.loadProjectBrief()
-
-    fun saveProjectBriefSection(
-        key: ProjectBriefSectionKey,
-        content: String,
-    ) = projectChatCoordinator.saveProjectBriefSection(key, content)
 
     private fun resolveConversationAndLoad(
         useClientModeForResolve: Boolean = clientModeEnabled.value,

@@ -32,8 +32,8 @@ internal class ProjectChatCoordinator(
     private val conversationId: () -> String?,
     private val setComposerError: (String) -> Unit,
     private val sendMessage: (String) -> Unit,
-) {
-    fun refreshClientModeLocation() {
+) : ChatProjectBindings {
+    override fun refreshClientModeLocation() {
         if (agentId.isBlank() || !clientModeEnabled.value) return
         scope.launch {
             uiState.update {
@@ -72,7 +72,7 @@ internal class ProjectChatCoordinator(
         }
     }
 
-    fun sendClientModeLocationChange(path: String) {
+    override fun sendClientModeLocationChange(path: String) {
         val normalized = path.trim()
         if (normalized.isBlank()) return
         if (uiState.value.isStreaming) {
@@ -90,7 +90,7 @@ internal class ProjectChatCoordinator(
         sendMessage(buildClientModeLocationPrompt(normalized))
     }
 
-    fun openClientModeLocationPicker() {
+    override fun openClientModeLocationPicker() {
         if (!clientModeEnabled.value) return
         val initialPath = uiState.value.clientModeLocation.currentPath
             ?: uiState.value.clientModeLocation.lastRequestedPath
@@ -106,13 +106,13 @@ internal class ProjectChatCoordinator(
         browseClientModeLocation(initialPath)
     }
 
-    fun closeClientModeLocationPicker() {
+    override fun closeClientModeLocationPicker() {
         uiState.update {
             it.copy(clientModeFilesystemPicker = it.clientModeFilesystemPicker.copy(isVisible = false))
         }
     }
 
-    fun browseClientModeLocation(path: String?) {
+    override fun browseClientModeLocation(path: String?) {
         if (!clientModeEnabled.value) return
         scope.launch {
             uiState.update {
@@ -152,12 +152,12 @@ internal class ProjectChatCoordinator(
         }
     }
 
-    fun selectClientModeLocation(path: String) {
+    override fun selectClientModeLocation(path: String) {
         closeClientModeLocationPicker()
         sendClientModeLocationChange(path)
     }
 
-    fun refreshContextWindow() {
+    override fun refreshContextWindow() {
         if (agentId.isBlank()) return
         scope.launch {
             uiState.update {
@@ -199,7 +199,7 @@ internal class ProjectChatCoordinator(
         }
     }
 
-    fun loadProjectAgents() {
+    override fun loadProjectAgents() {
         val project = projectContext ?: return
         scope.launch {
             uiState.value = uiState.value.copy(
@@ -224,7 +224,7 @@ internal class ProjectChatCoordinator(
         }
     }
 
-    fun loadRecentBugReports() {
+    override fun loadRecentBugReports() {
         val projectIdentifier = projectContext?.identifier ?: return
         scope.launch {
             try {
@@ -245,7 +245,7 @@ internal class ProjectChatCoordinator(
         }
     }
 
-    fun submitStructuredBugReport(draft: ProjectBugReportDraft) {
+    override fun submitStructuredBugReport(draft: ProjectBugReportDraft) {
         val project = projectContext ?: return
         scope.launch {
             uiState.value = uiState.value.copy(
@@ -286,7 +286,7 @@ internal class ProjectChatCoordinator(
         }
     }
 
-    fun loadProjectBrief() {
+    override fun loadProjectBrief() {
         if (projectContext == null) return
         scope.launch {
             uiState.value = uiState.value.copy(
@@ -311,7 +311,7 @@ internal class ProjectChatCoordinator(
         }
     }
 
-    fun saveProjectBriefSection(
+    override fun saveProjectBriefSection(
         key: ProjectBriefSectionKey,
         content: String,
     ) {
