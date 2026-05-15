@@ -3,7 +3,6 @@ package com.letta.mobile.ui.screens.chat
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.cash.molecule.RecompositionMode.Immediate
@@ -32,6 +31,7 @@ import com.letta.mobile.ui.screens.chat.send.ChatSendStrategySelector
 import com.letta.mobile.ui.screens.chat.send.ClientModeChatSendStrategy
 import com.letta.mobile.ui.screens.chat.send.TimelineChatSendStrategy
 import com.letta.mobile.ui.screens.chat.send.WsChatSendStrategy
+import com.letta.mobile.ui.screens.chat.route.ChatRouteArgs
 import com.letta.mobile.ui.screens.chat.session.ChatSessionInitializer
 import com.letta.mobile.ui.screens.chat.state.ChatBannerController
 import com.letta.mobile.data.transport.WsChatBridge
@@ -58,7 +58,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class AdminChatViewModel @Inject constructor(
-    private val savedStateHandle: SavedStateHandle,
+    private val routeArgs: ChatRouteArgs,
     private val messageRepository: MessageRepository,
     private val timelineRepository: com.letta.mobile.data.timeline.TimelineRepository,
     private val agentRepository: AgentRepository,
@@ -83,7 +83,6 @@ class AdminChatViewModel @Inject constructor(
 ) : ViewModel() {
     companion object {
         private const val MESSAGE_SYNC_INTERVAL_MS = 5_000L
-        private const val CLIENT_MODE_CONVERSATION_ID_KEY = "clientModeConversationId"
         // letta-mobile-h2b8: max age the resume-most-recent flow tolerates
         // before forcing a synchronous refresh of the conversation list.
         // 60s is short enough to feel fresh when the user opens the app
@@ -93,19 +92,14 @@ class AdminChatViewModel @Inject constructor(
         private const val RESUME_CACHE_MAX_AGE_MS = 60_000L
     }
 
-    val agentId: String = requireNotNull(savedStateHandle.get<String>("agentId")) {
-        "Missing agentId in AdminChatViewModel navigation arguments"
-    }
-    private val initialAgentName: String? = savedStateHandle.get<String>("agentName")
-        ?.takeIf { it.isNotBlank() }
-    private val initialMessage: String? = savedStateHandle.get<String>("initialMessage")
-    private val requestedConversationArg: String? = savedStateHandle.get<String>("conversationId")
-    private val freshRouteKey: Long? = savedStateHandle.get<Long>("freshRouteKey")
-    val scrollToMessageId: String? = savedStateHandle.get<String>("scrollToMessageId")
+    val agentId: String = routeArgs.agentId
+    private val initialAgentName: String? = routeArgs.initialAgentName
+    private val initialMessage: String? = routeArgs.initialMessage
     private val explicitConversationId: String?
-        get() = requestedConversationArg?.takeIf { it.isNotBlank() }
+        get() = routeArgs.explicitConversationId
     private val isFreshRoute: Boolean
-        get() = freshRouteKey != null || requestedConversationArg?.isBlank() == true
+        get() = routeArgs.isFreshRoute
+    val scrollToMessageId: String? = routeArgs.scrollToMessageId
 
     /**
      * letta-mobile-h2b8: distinguishes "user actively chose a new chat"
@@ -115,7 +109,7 @@ class AdminChatViewModel @Inject constructor(
      * etc.). Only the latter triggers the resume-most-recent flow.
      */
     private val explicitNewChat: Boolean
-        get() = freshRouteKey != null
+        get() = routeArgs.explicitNewChat
     // letta-mobile-c87t: previously this predicate was
     //   clientModeEnabled.value && (isFreshRoute || explicitConversationId == null)
     // which collapsed to "client mode only fires for fresh routes" — meaning any
@@ -142,18 +136,7 @@ class AdminChatViewModel @Inject constructor(
     private var followingDuplicateInitialMessageInFlight = false
     val conversationId: String?
         get() = chatConversationCoordinator.conversationId(shouldUseClientModeForCurrentRoute)
-    val projectContext: ProjectChatContext? = savedStateHandle.get<String>("projectIdentifier")?.let { identifier ->
-        val name = savedStateHandle.get<String>("projectName") ?: identifier
-        ProjectChatContext(
-            identifier = identifier,
-            name = name,
-            lettaFolderId = savedStateHandle.get<String>("projectLettaFolderId"),
-            filesystemPath = savedStateHandle.get<String>("projectFilesystemPath"),
-            gitUrl = savedStateHandle.get<String>("projectGitUrl"),
-            lastSyncAt = savedStateHandle.get<String>("projectLastSyncAt"),
-            activeCodingAgents = savedStateHandle.get<String>("projectActiveCodingAgents"),
-        )
-    }
+    val projectContext: ProjectChatContext? = routeArgs.projectContext
 
     private val chatSessionResolver = ChatSessionResolver(
         agentRepository = agentRepository,
@@ -245,7 +228,7 @@ class AdminChatViewModel @Inject constructor(
         }
     }
 
-    private val runExpansionState = ChatRunExpansionState(savedStateHandle, _uiState)
+    private val runExpansionState = ChatRunExpansionState(routeArgs.savedStateHandle(), _uiState)
 
     private val pendingToolsMap = java.util.concurrent.ConcurrentHashMap<String, PendingToolCall>()
     fun toggleRunCollapsed(runId: String) = runExpansionState.toggleRunCollapsed(runId)
@@ -335,7 +318,7 @@ class AdminChatViewModel @Inject constructor(
         clearComposerAfterSend = { composerController.clearAfterSend() },
         currentClientModeConversationId = ::currentClientModeConversationId,
         setClientModeConversationId = ::setClientModeConversationId,
-        setRouteConversationId = { savedStateHandle["conversationId"] = it },
+        setRouteConversationId = routeArgs::setRouteConversationId,
         setActiveConversationId = chatConversationCoordinator::setActiveConversationId,
         markClientModeBootstrapReady = chatConversationCoordinator::markClientModeBootstrapReady,
         pendingBootstrapMessages = ::pendingClientModeBootstrapMessages,
@@ -669,10 +652,10 @@ class AdminChatViewModel @Inject constructor(
     }
 
     private fun currentClientModeConversationId(): String? =
-        savedStateHandle.get<String>(CLIENT_MODE_CONVERSATION_ID_KEY)?.takeIf { it.isNotBlank() }
+        routeArgs.currentClientModeConversationId()
 
     private fun setClientModeConversationId(conversationId: String?) {
-        savedStateHandle[CLIENT_MODE_CONVERSATION_ID_KEY] = conversationId?.takeIf { it.isNotBlank() }
+        routeArgs.setClientModeConversationId(conversationId)
     }
 
     private fun stopTimelineObserver() {

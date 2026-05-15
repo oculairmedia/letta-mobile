@@ -33,6 +33,7 @@ import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.repository.StreamState
 import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.WsChatBridge
+import com.letta.mobile.ui.screens.chat.route.ChatRouteArgs
 import com.letta.mobile.testutil.FakeBlockApi
 import com.letta.mobile.testutil.FakeFolderApi
 import com.letta.mobile.testutil.TestData
@@ -302,7 +303,7 @@ class AdminChatViewModelTest {
             initialMessage?.let { set("initialMessage", it) }
         }
         return AdminChatViewModel(
-            savedState,
+            ChatRouteArgs(savedState),
             messageRepository,
             timelineRepository,
             agentRepository,
@@ -1793,7 +1794,7 @@ class AdminChatViewModelTest {
             set("conversationId", "")
         }
         val vm = AdminChatViewModel(
-            savedState,
+            ChatRouteArgs(savedState),
             messageRepository,
             timelineRepository,
             agentRepository,
@@ -1931,7 +1932,7 @@ class AdminChatViewModelTest {
         }
 
         val vm = AdminChatViewModel(
-            savedState,
+            ChatRouteArgs(savedState),
             messageRepository,
             timelineRepository,
             agentRepository,
@@ -2107,7 +2108,7 @@ class AdminChatViewModelTest {
         }
 
         val vm = AdminChatViewModel(
-            savedState,
+            ChatRouteArgs(savedState),
             messageRepository,
             timelineRepository,
             agentRepository,
@@ -2151,7 +2152,7 @@ class AdminChatViewModelTest {
         }
 
         val vm = AdminChatViewModel(
-            savedState,
+            ChatRouteArgs(savedState),
             messageRepository,
             timelineRepository,
             agentRepository,
@@ -2205,7 +2206,7 @@ class AdminChatViewModelTest {
         }
 
         val vm = AdminChatViewModel(
-            savedState,
+            ChatRouteArgs(savedState),
             messageRepository,
             timelineRepository,
             agentRepository,
@@ -2248,7 +2249,7 @@ class AdminChatViewModelTest {
         }
 
         val vm = AdminChatViewModel(
-            savedState,
+            ChatRouteArgs(savedState),
             messageRepository,
             timelineRepository,
             agentRepository,
@@ -2285,7 +2286,7 @@ class AdminChatViewModelTest {
         }
 
         val vm = AdminChatViewModel(
-            savedState,
+            ChatRouteArgs(savedState),
             messageRepository,
             timelineRepository,
             agentRepository,
@@ -2318,7 +2319,7 @@ class AdminChatViewModelTest {
         }
 
         val vm = AdminChatViewModel(
-            savedState,
+            ChatRouteArgs(savedState),
             messageRepository,
             timelineRepository,
             agentRepository,
@@ -3056,10 +3057,10 @@ class AdminChatViewModelTest {
         }
 
         val vm = AdminChatViewModel(
-            SavedStateHandle().apply {
+            ChatRouteArgs(SavedStateHandle().apply {
                 set("agentId", "agent-1")
                 set("conversationId", "conv-1")
-            },
+            }),
             messageRepository, timelineRepository, agentRepository, blockRepository,
             bugReportRepository, folderRepository, conversationRepository,
             settingsRepository, internalBotClient, clientModeChatSender,
@@ -3099,10 +3100,10 @@ class AdminChatViewModelTest {
         }
 
         val vm = AdminChatViewModel(
-            SavedStateHandle().apply {
+            ChatRouteArgs(SavedStateHandle().apply {
                 set("agentId", "agent-1")
                 set("conversationId", "conv-1")
-            },
+            }),
             messageRepository, timelineRepository, agentRepository, blockRepository,
             bugReportRepository, folderRepository, conversationRepository,
             settingsRepository, internalBotClient, clientModeChatSender,
@@ -3148,14 +3149,14 @@ class AdminChatViewModelTest {
         val tracker = com.letta.mobile.data.channel.CurrentConversationTracker()
 
         val vm = AdminChatViewModel(
-            SavedStateHandle().apply {
+            ChatRouteArgs(SavedStateHandle().apply {
                 set("agentId", "agent-1")
                 set("conversationId", "conv-1")
                 // In Client Mode, conversationId reads from savedStateHandle
                 // via currentClientModeConversationId(); explicit nav arg
                 // does not auto-populate this key, so we set it explicitly.
                 set("clientModeConversationId", "conv-1")
-            },
+            }),
             messageRepository, timelineRepository, agentRepository, blockRepository,
             bugReportRepository, folderRepository, conversationRepository,
             settingsRepository, internalBotClient, clientModeChatSender,
