@@ -66,7 +66,12 @@ fun VoiceRecognizerOverlay(
             // Shader fills the bottom two thirds; the upper third fades
             // to scrim per the shader's hardcoded fade_start/fade_end.
             AudioAnimation(
-                bgColor = Color.Black.copy(alpha = 0.85f),
+                // letta-mobile-arhd follow-up: lightened scrim from
+                // 0.85 → 0.65. The shader's fade-to-bg still works
+                // because we're staying near-black; just gives a
+                // softer "stays-in-the-app" feel rather than full
+                // theater-mode.
+                bgColor = Color.Black.copy(alpha = 0.65f),
                 amplitude = amplitude,
                 modifier = Modifier.fillMaxSize(),
             )
