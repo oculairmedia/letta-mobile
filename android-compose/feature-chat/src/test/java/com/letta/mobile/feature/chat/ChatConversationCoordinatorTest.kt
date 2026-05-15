@@ -78,6 +78,16 @@ class ChatConversationCoordinatorTest {
     }
 
     @Test
+    fun `loadMessages reconciles recent messages on conversation open (letta-mobile-ork1)`() = runTest {
+        val harness = Harness(scope = this, explicitConversationId = "conv-explicit")
+
+        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        advanceUntilIdle()
+
+        assertEquals(listOf("conv-explicit" to "open"), harness.reconcileCalls)
+    }
+
+    @Test
     fun `duplicate fresh client initial message is mirrored without sending again`() = runTest {
         val first = Harness(scope = this, isFreshRoute = true, initialMessage = "shared prompt")
         every { first.agentRepository.getCachedAgent("agent-1") } returns TestData.agent(id = "agent-1", name = "Ada")
@@ -106,6 +116,7 @@ class ChatConversationCoordinatorTest {
         val currentConversationTracker = CurrentConversationTracker()
         val uiState = MutableStateFlow(ChatUiState())
         val startedObservers = mutableListOf<String>()
+        val reconcileCalls = mutableListOf<Pair<String, String>>()
         val sentClientModeMessages = mutableListOf<String>()
         val sentTimelineMessages = mutableListOf<String>()
         var stoppedObserverCount = 0
@@ -130,6 +141,7 @@ class ChatConversationCoordinatorTest {
             setClientModeConversationId = { clientModeConversationId = it },
             startTimelineObserver = { startedObservers += it },
             stopTimelineObserver = { stoppedObserverCount++ },
+            reconcileRecentMessages = { convId, reason -> reconcileCalls += convId to reason },
             sendMessageViaClientMode = { sentClientModeMessages += it },
             sendMessageViaTimeline = { sentTimelineMessages += it },
             markFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = true },

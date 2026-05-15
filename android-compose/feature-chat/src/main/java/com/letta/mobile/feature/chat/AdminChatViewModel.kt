@@ -289,6 +289,9 @@ internal class AdminChatViewModel @Inject constructor(
         setClientModeConversationId = ::setClientModeConversationId,
         startTimelineObserver = ::startTimelineObserver,
         stopTimelineObserver = ::stopTimelineObserver,
+        reconcileRecentMessages = { convId, reason ->
+            timelineRepository.reconcileRecentMessages(convId, reason)
+        },
         sendMessageViaClientMode = { message ->
             clientModeChatSendStrategy.send(
                 text = message,
