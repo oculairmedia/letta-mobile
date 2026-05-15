@@ -58,6 +58,8 @@ class ArchivalViewModelTest {
         viewModel.loadPassages()
         viewModel.addPassage("New passage text")
         assertTrue(fakeRepo.createCalls.contains("a1:New passage text"))
+        val state = awaitSuccessState()
+        assertTrue(state.passages.any { it.text == "New passage text" })
     }
 
     @Test
@@ -154,29 +156,40 @@ class ArchivalViewModelTest {
 
     private class FakePassageRepo : PassageRepository(mockk(relaxed = true)) {
         private val _passages = mutableMapOf<String, List<Passage>>()
+        private val passageFlows = mutableMapOf<String, MutableStateFlow<List<Passage>>>()
         var shouldFail = false
         var searchResults = emptyList<Passage>()
         val createCalls = mutableListOf<String>()
 
-        fun setPassages(agentId: String, passages: List<Passage>) { _passages[agentId] = passages }
+        fun setPassages(agentId: String, passages: List<Passage>) {
+            _passages[agentId] = passages
+            flowForAgent(agentId).value = passages
+        }
 
         override fun getPassages(agentId: String): StateFlow<List<Passage>> {
-            return MutableStateFlow(_passages[agentId] ?: emptyList())
+            return flowForAgent(agentId)
         }
         override suspend fun refreshPassages(agentId: String) {
             if (shouldFail) throw Exception("Failed")
+            flowForAgent(agentId).value = _passages[agentId].orEmpty()
         }
         override suspend fun createPassage(agentId: String, text: String): Passage {
             createCalls.add("$agentId:$text")
             val p = Passage(id = "new-${createCalls.size}", text = text)
-            _passages[agentId] = (_passages[agentId] ?: emptyList()) + p
+            setPassages(agentId, _passages[agentId].orEmpty() + p)
             return p
         }
         override suspend fun deletePassage(agentId: String, passageId: String) {
-            _passages[agentId] = (_passages[agentId] ?: emptyList()).filter { it.id != passageId }
+            setPassages(agentId, _passages[agentId].orEmpty().filter { it.id != passageId })
         }
         override suspend fun searchArchival(agentId: String, query: String): List<Passage> {
             return searchResults
+        }
+
+        private fun flowForAgent(agentId: String): MutableStateFlow<List<Passage>> {
+            return passageFlows.getOrPut(agentId) {
+                MutableStateFlow(_passages[agentId].orEmpty())
+            }
         }
     }
 }

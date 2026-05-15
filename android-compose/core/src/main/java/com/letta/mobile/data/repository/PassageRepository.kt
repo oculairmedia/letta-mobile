@@ -6,7 +6,6 @@ import com.letta.mobile.data.model.PassageCreateParams
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -14,17 +13,21 @@ import javax.inject.Singleton
 class PassageRepository @Inject constructor(
     private val passageApi: PassageApi,
 ) {
+    private val cacheLock = Any()
     private val _passages = MutableStateFlow<Map<String, List<Passage>>>(emptyMap())
+    private val passageFlowsByAgent = mutableMapOf<String, MutableStateFlow<List<Passage>>>()
 
     fun getPassages(agentId: String): StateFlow<List<Passage>> {
-        return MutableStateFlow(_passages.value[agentId] ?: emptyList())
+        return synchronized(cacheLock) {
+            passageFlowsByAgent
+                .getOrPut(agentId) { MutableStateFlow(_passages.value[agentId].orEmpty()) }
+                .asStateFlow()
+        }
     }
 
     suspend fun refreshPassages(agentId: String) {
         val passages = passageApi.listPassages(agentId, limit = 100)
-        _passages.update { current ->
-            current.toMutableMap().apply { put(agentId, passages) }
-        }
+        replaceCachedPassages(agentId, passages)
     }
 
     suspend fun createPassage(agentId: String, text: String): Passage {
@@ -35,15 +38,20 @@ class PassageRepository @Inject constructor(
 
     suspend fun deletePassage(agentId: String, passageId: String) {
         passageApi.deletePassage(agentId, passageId)
-        _passages.update { current ->
-            current.toMutableMap().apply {
-                val existing = get(agentId) ?: emptyList()
-                put(agentId, existing.filter { it.id != passageId })
-            }
-        }
+        replaceCachedPassages(
+            agentId = agentId,
+            passages = _passages.value[agentId].orEmpty().filter { it.id != passageId },
+        )
     }
 
     suspend fun searchArchival(agentId: String, query: String): List<Passage> {
         return passageApi.searchArchival(agentId, query, limit = 50)
+    }
+
+    private fun replaceCachedPassages(agentId: String, passages: List<Passage>) {
+        synchronized(cacheLock) {
+            _passages.value = _passages.value + (agentId to passages)
+            passageFlowsByAgent[agentId]?.value = passages
+        }
     }
 }
