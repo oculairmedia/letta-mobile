@@ -8,6 +8,8 @@ import com.letta.mobile.ui.screens.chat.ChatSessionResolver
 import com.letta.mobile.ui.screens.chat.ChatUiState
 import com.letta.mobile.ui.screens.chat.ClientModeSendCoordinator
 import com.letta.mobile.ui.screens.chat.ProjectChatContext
+import com.letta.mobile.ui.screens.chat.ChatComposerController
+import com.letta.mobile.ui.screens.chat.state.ChatBannerController
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -103,6 +105,7 @@ class ChatSessionInitializerTest {
         val clientModeCoordinator: ClientModeSendCoordinator = mockk(relaxed = true)
         val uiState = MutableStateFlow(ChatUiState())
         val runExpansionState = mockk<ChatRunExpansionState>(relaxed = true)
+        val bannerController = ChatBannerController(uiState, ChatComposerController())
         val currentConversationTracker = CurrentConversationTracker()
         var clientModeConversationId: String? = "conv-existing"
         var refreshedAgentsCount = 0
@@ -128,7 +131,7 @@ class ChatSessionInitializerTest {
             clientModeCoordinator = clientModeCoordinator,
             runExpansionState = runExpansionState,
             currentConversationTracker = currentConversationTracker,
-            uiState = uiState,
+            bannerController = bannerController,
             setClientModeConversationId = { clientModeConversationId = it },
             refreshAvailableAgents = { refreshedAgentsCount++ },
             observeLastChatSelection = { observedLastSelection = true },

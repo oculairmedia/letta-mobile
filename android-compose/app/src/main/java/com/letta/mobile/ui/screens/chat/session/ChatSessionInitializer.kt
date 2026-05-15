@@ -5,15 +5,13 @@ import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.ui.screens.chat.ChatConversationCoordinator
 import com.letta.mobile.ui.screens.chat.ChatRunExpansionState
 import com.letta.mobile.ui.screens.chat.ChatSessionResolver
-import com.letta.mobile.ui.screens.chat.ChatUiState
 import com.letta.mobile.ui.screens.chat.ClientModeSendCoordinator
 import com.letta.mobile.ui.screens.chat.ProjectChatContext
+import com.letta.mobile.ui.screens.chat.state.ChatBannerController
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** Owns the startup wiring previously embedded in AdminChatViewModel.init. */
@@ -30,7 +28,7 @@ internal class ChatSessionInitializer(
     private val clientModeCoordinator: ClientModeSendCoordinator,
     private val runExpansionState: ChatRunExpansionState,
     private val currentConversationTracker: CurrentConversationTracker,
-    private val uiState: MutableStateFlow<ChatUiState>,
+    private val bannerController: ChatBannerController,
     private val setClientModeConversationId: (String?) -> Unit,
     private val refreshAvailableAgents: () -> Unit,
     private val observeLastChatSelection: () -> Unit,
@@ -46,7 +44,7 @@ internal class ChatSessionInitializer(
         observeActiveConfigChanges()
         prepareFreshRoute()
         if (agentId.isBlank()) {
-            uiState.value = uiState.value.copy(error = "No agent selected")
+            bannerController.showNoAgentSelected()
             return
         }
 
@@ -129,24 +127,9 @@ internal class ChatSessionInitializer(
                 .collect { enabled ->
                     if (!enabled) {
                         clientModeCoordinator.cancelActiveStream()
-                        uiState.update {
-                            it.copy(
-                                isClientModeEnabled = false,
-                                isStreaming = false,
-                                isAgentTyping = false,
-                                error = null,
-                            )
-                        }
+                        bannerController.applyClientModeDisabled()
                     } else {
-                        uiState.update {
-                            it.copy(
-                                isClientModeEnabled = true,
-                                clientModeLocation = it.clientModeLocation.copy(
-                                    defaultPath = it.clientModeLocation.defaultPath
-                                        ?: projectContext?.filesystemPath,
-                                ),
-                            )
-                        }
+                        bannerController.applyClientModeEnabled(projectContext?.filesystemPath)
                         refreshClientModeLocation()
                     }
                     resolveConversationAndLoad(enabled)

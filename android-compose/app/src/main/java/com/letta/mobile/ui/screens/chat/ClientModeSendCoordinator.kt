@@ -44,6 +44,7 @@ internal class ClientModeSendCoordinator(
     private val pendingBootstrapMessages: () -> ImmutableList<UiMessage>,
     private val setBootstrapUserMessage: (UiMessage) -> Unit,
     private val clearBootstrapUserMessage: () -> Unit,
+    private val showConversationSwap: (ClientModeConversationSwap) -> Unit,
     private val startTimelineObserver: (String) -> Unit,
     private val stopTimelineObserver: () -> Unit,
     private val refreshContextWindow: () -> Unit,
@@ -177,14 +178,12 @@ internal class ClientModeSendCoordinator(
                         if (!swapEvaluated) {
                             swapEvaluated = true
                             if (priorConversationId != null && priorConversationId != conversationId) {
-                                uiState.update { state ->
-                                    state.copy(
-                                        clientModeConversationSwap = ClientModeConversationSwap(
-                                            requestedConversationId = priorConversationId,
-                                            newConversationId = conversationId,
-                                        ),
+                                showConversationSwap(
+                                    ClientModeConversationSwap(
+                                        requestedConversationId = priorConversationId,
+                                        newConversationId = conversationId,
                                     )
-                                }
+                                )
                                 setRouteConversationId(conversationId)
 
                                 runCatching {

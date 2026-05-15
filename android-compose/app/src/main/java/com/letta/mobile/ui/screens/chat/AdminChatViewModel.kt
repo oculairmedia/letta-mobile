@@ -26,8 +26,8 @@ import com.letta.mobile.ui.screens.chat.send.ChatSendStrategySelector
 import com.letta.mobile.ui.screens.chat.send.ClientModeChatSendStrategy
 import com.letta.mobile.ui.screens.chat.send.TimelineChatSendStrategy
 import com.letta.mobile.ui.screens.chat.session.ChatSessionInitializer
+import com.letta.mobile.ui.screens.chat.state.ChatBannerController
 import com.letta.mobile.util.Telemetry
-import com.letta.mobile.util.mapErrorToUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -156,6 +156,7 @@ class AdminChatViewModel @Inject constructor(
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
     private val composerController = ChatComposerController()
+    private val chatBannerController = ChatBannerController(_uiState, composerController)
     val composerState: StateFlow<ChatComposerState> = composerController.state
     val inputText: StateFlow<String> = composerState
         .map { it.inputText }
@@ -314,6 +315,7 @@ class AdminChatViewModel @Inject constructor(
         pendingBootstrapMessages = ::pendingClientModeBootstrapMessages,
         setBootstrapUserMessage = { pendingClientModeBootstrapUserMessage = it },
         clearBootstrapUserMessage = ::clearPendingClientModeBootstrapUserMessage,
+        showConversationSwap = chatBannerController::showClientModeConversationSwap,
         startTimelineObserver = ::startTimelineObserver,
         stopTimelineObserver = ::stopTimelineObserver,
         refreshContextWindow = ::refreshContextWindow,
@@ -368,7 +370,7 @@ class AdminChatViewModel @Inject constructor(
         bugReportRepository = bugReportRepository,
         projectAgentActivityLoader = projectAgentActivityLoader,
         conversationId = { conversationId },
-        setComposerError = { composerController.setError(it) },
+        setComposerError = chatBannerController::showComposerError,
         sendMessage = ::sendMessage,
     )
     private val chatSessionInitializer by lazy {
@@ -385,7 +387,7 @@ class AdminChatViewModel @Inject constructor(
             clientModeCoordinator = clientModeSendCoordinator,
             runExpansionState = runExpansionState,
             currentConversationTracker = currentConversationTracker,
-            uiState = _uiState,
+            bannerController = chatBannerController,
             setClientModeConversationId = ::setClientModeConversationId,
             refreshAvailableAgents = ::refreshAvailableAgents,
             observeLastChatSelection = ::observeLastChatSelection,
@@ -513,19 +515,11 @@ class AdminChatViewModel @Inject constructor(
         }
         viewModelScope.launch {
             val runIds = activeRunIds().takeIf { it.isNotEmpty() }
-            _uiState.update {
-                it.copy(
-                    isStreaming = false,
-                    isAgentTyping = false,
-                    error = null,
-                )
-            }
+            chatBannerController.clearStreamingAfterInterrupt()
             runCatching {
                 messageRepository.cancelMessage(agentId = agentId, runIds = runIds)
             }.onFailure { e ->
-                _uiState.update {
-                    it.copy(error = mapErrorToUserMessage(e.asException(), "Failed to stop run"))
-                }
+                chatBannerController.showMappedError(e.asException(), "Failed to stop run")
             }
             runCatching { internalBotClient.abort() }
             clientModeSendCoordinator.cancelActiveStream("User interrupted active run")
@@ -564,11 +558,11 @@ class AdminChatViewModel @Inject constructor(
     fun sendMessage(text: String) {
         when (_uiState.value.conversationState) {
             ConversationState.Loading -> {
-                _uiState.value = _uiState.value.copy(error = "Conversation is still loading")
+                chatBannerController.showConversationStillLoading()
                 return
             }
             is ConversationState.Error -> {
-                _uiState.value = _uiState.value.copy(error = "Retry conversation loading before sending a message")
+                chatBannerController.showRetryConversationLoadBeforeSend()
                 return
             }
             ConversationState.NoConversation,
@@ -623,11 +617,11 @@ class AdminChatViewModel @Inject constructor(
     }
 
     fun reportComposerError(message: String) {
-        composerController.setError(message)
+        chatBannerController.showComposerError(message)
     }
 
     fun clearComposerError() {
-        composerController.clearError()
+        chatBannerController.clearComposerError()
     }
 
     /**
@@ -636,8 +630,7 @@ class AdminChatViewModel @Inject constructor(
      * See `letta-mobile-c87t` and [ClientModeConversationSwap].
      */
     fun dismissClientModeConversationSwap() {
-        if (_uiState.value.clientModeConversationSwap == null) return
-        _uiState.update { it.copy(clientModeConversationSwap = null) }
+        chatBannerController.dismissClientModeConversationSwap()
     }
 
     fun addAttachment(image: com.letta.mobile.data.model.MessageContentPart.Image): Boolean =
@@ -647,13 +640,6 @@ class AdminChatViewModel @Inject constructor(
         composerController.removeAttachment(index)
     }
 
-    /**
-     * Timeline-sync send path. Handles optimistic append, streaming, and
-     * reconciliation via [timelineRepository]. The timeline observer
-     * ([startTimelineObserver]) mirrors state changes into [_uiState.messages]
-     * automatically. Returns immediately after enqueueing the send — all
-     * visible state transitions flow through the single sync loop.
-     */
     /**
      * Subscribe to the [TimelineRepository]'s StateFlow for the given
      * conversation and mirror its events into [_uiState.messages].
@@ -702,19 +688,19 @@ class AdminChatViewModel @Inject constructor(
                 }
                 ChatApprovalResult.MissingActiveConversation -> {
                     _uiState.value = _uiState.value.copy(
-                        error = "No active conversation available for approval",
                         isStreaming = false,
                         isAgentTyping = false,
                         activeApprovalRequestId = null,
                     )
+                    chatBannerController.showError("No active conversation available for approval")
                 }
                 is ChatApprovalResult.Failed -> {
                     _uiState.value = _uiState.value.copy(
-                        error = result.message,
                         isStreaming = false,
                         isAgentTyping = false,
                         activeApprovalRequestId = null,
                     )
+                    chatBannerController.showError(result.message)
                 }
             }
         }
@@ -728,7 +714,7 @@ class AdminChatViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val convId = chatConversationCoordinator.activeConversationId ?: run {
-                    _uiState.value = _uiState.value.copy(error = "No active conversation to reset")
+                    chatBannerController.showNoActiveConversationToReset()
                     return@launch
                 }
                 messageRepository.resetMessages(agentId, convId)

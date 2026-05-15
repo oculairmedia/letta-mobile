@@ -26,6 +26,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -200,6 +201,7 @@ class ClientModeSendCoordinatorTest {
             pendingBootstrapMessages = { pendingBootstrapMessages },
             setBootstrapUserMessage = { pendingBootstrapMessages = listOf(it).toImmutableList() },
             clearBootstrapUserMessage = { pendingBootstrapMessages = persistentListOf() },
+            showConversationSwap = { swap -> uiState.update { it.copy(clientModeConversationSwap = swap) } },
             startTimelineObserver = { startedObservers += it },
             stopTimelineObserver = { stopObserverCount++ },
             refreshContextWindow = { refreshContextWindowCount++ },
