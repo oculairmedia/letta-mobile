@@ -8,6 +8,7 @@ import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -17,6 +18,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -112,13 +114,22 @@ class ServerHealthRepository @Inject constructor(
     private suspend fun probe(config: LettaConfig) {
         val baseUrl = config.serverUrl.trim().trimEnd('/')
         val target = "$baseUrl/v1/health/"
-        val outcome = runCatching {
-            probeClient.get(target) {
-                val token = config.accessToken?.trim()
-                if (!token.isNullOrEmpty()) {
-                    header("Authorization", "Bearer $token")
+        // Bare try/catch (not runCatching) so a CancellationException
+        // — e.g. parent scope cancelled while a probe is mid-flight —
+        // propagates up instead of being misclassified as OFFLINE.
+        val outcome: Result<io.ktor.client.statement.HttpResponse> = try {
+            Result.success(
+                probeClient.get(target) {
+                    val token = config.accessToken?.trim()
+                    if (!token.isNullOrEmpty()) {
+                        header("Authorization", "Bearer $token")
+                    }
                 }
-            }
+            )
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (t: Throwable) {
+            Result.failure(t)
         }
         val health = if (outcome.isSuccess) Health.ONLINE else Health.OFFLINE
         _states.update { it + (config.id to health) }

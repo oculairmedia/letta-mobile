@@ -115,7 +115,9 @@ private fun ConfigCard(
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     val isOffline = config.health == ServerHealthRepository.Health.OFFLINE
-    var refusalTrigger by remember { mutableIntStateOf(0) }
+    // letta-mobile-aaxy: keyed by config.id so the per-row refusal animation
+    // counter doesn't carry across to a different row after a reorder/delete.
+    var refusalTrigger by remember(config.id) { mutableIntStateOf(0) }
 
     HealthRowShell(
         baseContainerColor = LettaCardDefaults.listContainerColor,

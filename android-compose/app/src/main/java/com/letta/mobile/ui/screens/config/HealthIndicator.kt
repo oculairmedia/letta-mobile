@@ -37,15 +37,34 @@ import kotlinx.coroutines.launch
  *   - UNKNOWN → muted outline (no probe yet, or unreachable from
  *     the current scope)
  */
+/**
+ * Single source of truth for the health-dot palette. Pulled out of the
+ * composable so the colors can be tuned (or themed) in one place rather
+ * than scattered as inline literals.
+ *
+ * `online` stays as a fixed green because Material 3's color scheme has
+ * no semantic "success" token; `offline` uses `colorScheme.error` so it
+ * tracks light/dark theming correctly.
+ */
+private object HealthDotColors {
+    val online: Color = Color(0xFF34C759)
+
+    val offline: Color
+        @Composable get() = MaterialTheme.colorScheme.error
+
+    val unknown: Color
+        @Composable get() = MaterialTheme.colorScheme.outlineVariant
+}
+
 @Composable
 fun HealthDot(
     health: Health,
     modifier: Modifier = Modifier,
 ) {
     val color = when (health) {
-        Health.ONLINE -> Color(0xFF34C759)   // iOS-style fresh green
-        Health.OFFLINE -> Color(0xFFE53935)  // material red 600
-        Health.PROBING, Health.UNKNOWN -> MaterialTheme.colorScheme.outlineVariant
+        Health.ONLINE -> HealthDotColors.online
+        Health.OFFLINE -> HealthDotColors.offline
+        Health.PROBING, Health.UNKNOWN -> HealthDotColors.unknown
     }
     Box(
         modifier = modifier
