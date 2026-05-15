@@ -124,6 +124,8 @@ internal fun EditAgentContent(
     onClientModeBaseUrlChange: (String) -> Unit,
     onClientModeApiKeyChange: (String) -> Unit,
     onTestClientModeConnection: () -> Unit,
+    onResetMessages: () -> Unit,
+    onDeleteAgent: () -> Unit,
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
 ) {
@@ -171,10 +173,12 @@ internal fun EditAgentContent(
         ?: state.agent?.llmConfig?.contextWindow?.takeIf { it > 0 }
         ?: state.agent?.contextWindowLimit?.takeIf { it > 0 }
 
-    var selectedTab by rememberSaveable { mutableStateOf(EditAgentConfigTab.Basics) }
-    val tabs = remember { EditAgentConfigTab.entries.toList() }
-    var showSectionPicker by rememberSaveable { mutableStateOf(false) }
-    val sectionPickerSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // letta-mobile-cygd: tab gating + section picker bottom sheet
+    // removed. All sections (Basics, Models, Memory, Tools, Runtime,
+    // Advanced) render unconditionally in the LazyColumn below; the
+    // user scrolls between them. CardGroup titles act as in-line
+    // section headers. A future follow-up can re-introduce a
+    // jump-to-section index from the screen title.
 
     LaunchedEffect(maxContextWindow, state.contextWindow) {
         if (maxContextWindow != null && state.contextWindow > maxContextWindow) {
@@ -230,94 +234,16 @@ internal fun EditAgentContent(
             }
         }
 
-        // letta-mobile-qfn9: PrimaryTabRow with 6 fixed-width tabs wraps
-        // text mid-word on 360–411dp screens (Basic\ns, Mode\ls, Runti\nme).
-        item(key = "tabs") {
-            Surface(
-                onClick = { showSectionPicker = true },
-                shape = LettaCardDefaults.listShape,
-                color = LettaCardDefaults.listContainerColor,
-                contentColor = MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag(EditAgentTestTags.SECTION_PICKER_TRIGGER),
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.screen_agent_edit_section_label),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        val activeHasWarning = selectedTab.hasValidationWarning(state)
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = selectedTab.label,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = if (activeHasWarning) {
-                                    MaterialTheme.colorScheme.error
-                                } else {
-                                    MaterialTheme.colorScheme.primary
-                                },
-                            )
-                            if (activeHasWarning) {
-                                // letta-mobile-w3dl: non-color accessible cue.
-                                // The '•' glyph alone fails screen readers and
-                                // color-perception users — pair it with an
-                                // Icon that carries a contentDescription.
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Icon(
-                                    LettaIcons.Error,
-                                    contentDescription = stringResource(R.string.screen_agent_edit_validation_warning),
-                                    tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(16.dp),
-                                )
-                            }
-                        }
-                    }
-                    // letta-mobile-qfn9: aggregate validation indicator. When
-                    // a section other than the active one has a warning, the
-                    // user could previously see the '•' on the affected tab.
-                    // Surface that via a label here so warnings remain visible
-                    // even when the affected section isn't selected.
-                    val otherWarnings = tabs.count { it != selectedTab && it.hasValidationWarning(state) }
-                    if (otherWarnings > 0) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(end = 8.dp),
-                        ) {
-                            Icon(
-                                LettaIcons.Error,
-                                contentDescription = stringResource(
-                                    R.string.screen_agent_edit_validation_warning_count,
-                                    otherWarnings,
-                                ),
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(14.dp),
-                            )
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Text(
-                                text = otherWarnings.toString(),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        }
-                    }
-                    Icon(
-                        LettaIcons.ExpandMore,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
+        // letta-mobile-cygd: section-picker Surface (qfn9) removed.
+        // All sections render inline below; no more "Section: X" jump
+        // affordance. A future PR can resurface validation warnings via
+        // an aggregate banner here if/when needed.
 
-        if (selectedTab == EditAgentConfigTab.Basics) {
+        // ── Basics ──
+        // letta-mobile-cygd: tab gating removed; all sections render
+        // sequentially so the user can scroll the entire agent config
+        // without bouncing through the section picker.
+        run {
             // ── Identity ──
             item(key = "identity") {
                 CardGroup(title = { Text(stringResource(R.string.screen_agent_edit_identity_section)) }) {
@@ -417,7 +343,8 @@ internal fun EditAgentContent(
             }
         }
 
-        if (selectedTab == EditAgentConfigTab.Models) {
+        // ── Models ──
+        run {
             // ── Model ──
             item(key = "model") {
                 CardGroup(title = { Text(stringResource(R.string.common_model)) }) {
@@ -517,7 +444,8 @@ internal fun EditAgentContent(
             }
         }
 
-        if (selectedTab == EditAgentConfigTab.Advanced) {
+        // ── Advanced ──
+        run {
             item(key = "primary_model_advanced") {
                 PrimaryModelAdvancedSection(
                     state = state,
@@ -540,7 +468,8 @@ internal fun EditAgentContent(
             }
         }
 
-        if (selectedTab == EditAgentConfigTab.Memory) {
+        // ── Memory ──
+        run {
             item(key = "advanced_compaction") {
                 AdvancedCompactionSection(
                     state = state,
@@ -588,7 +517,8 @@ internal fun EditAgentContent(
             }
         }
 
-        if (selectedTab == EditAgentConfigTab.Tools) {
+        // ── Tools ──
+        run {
             item(key = "tool_environment") {
                 ToolEnvironmentSection(
                     state = state,
@@ -659,7 +589,8 @@ internal fun EditAgentContent(
             }
         }
 
-        if (selectedTab == EditAgentConfigTab.Runtime) {
+        // ── Runtime ──
+        run {
             item(key = "client_mode") {
                 EditAgentClientModeSection(
                     state = state,
@@ -669,6 +600,19 @@ internal fun EditAgentContent(
                     onTestClientModeConnection = onTestClientModeConnection,
                 )
             }
+        }
+
+        // ── Danger Zone ──
+        // letta-mobile-cygd: Reset Messages and Delete Agent moved here
+        // from the top-bar action sheet so destructive actions live in a
+        // single, unmistakable spot at the bottom of the scroll surface
+        // (errorContainer styling). Confirm dialogs are still owned by
+        // EditAgentScreen, hooked via onResetMessages / onDeleteAgent.
+        item(key = "danger_zone") {
+            DangerZoneSection(
+                onResetMessages = onResetMessages,
+                onDeleteAgent = onDeleteAgent,
+            )
         }
     }
 
@@ -759,66 +703,69 @@ internal fun EditAgentContent(
         )
     }
 
-    // letta-mobile-qfn9: section picker bottom sheet. Replaces the wrapping
-    // PrimaryTabRow with a one-line trigger and a sheet that lists every
-    // section. Same validation warning marker ('•') applied per row.
-    if (showSectionPicker) {
-        ModalBottomSheet(
-            onDismissRequest = { showSectionPicker = false },
-            sheetState = sectionPickerSheetState,
-            modifier = Modifier.testTag(EditAgentTestTags.SECTION_PICKER_SHEET),
-        ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = stringResource(R.string.screen_agent_edit_sections_title),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                )
-                tabs.forEach { tab ->
-                    val hasWarning = tab.hasValidationWarning(state)
-                    val isSelected = tab == selectedTab
-                    ListItem(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                selectedTab = tab
-                                showSectionPicker = false
-                            }
-                            .testTag(EditAgentTestTags.tab(tab.label)),
-                        headlineContent = {
-                            Text(
-                                text = if (hasWarning) "${tab.label} •" else tab.label,
-                                color = when {
-                                    hasWarning -> MaterialTheme.colorScheme.error
-                                    isSelected -> MaterialTheme.colorScheme.primary
-                                    else -> MaterialTheme.colorScheme.onSurface
-                                },
-                            )
-                        },
-                        leadingContent = {
-                            if (isSelected) {
-                                Icon(
-                                    LettaIcons.Check,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                            } else {
-                                Spacer(modifier = Modifier.size(24.dp))
-                            }
-                        },
-                        colors = ListItemDefaults.colors(
-                            containerColor = if (isSelected) {
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                            } else {
-                                androidx.compose.ui.graphics.Color.Transparent
-                            },
-                        ),
+    // letta-mobile-cygd: section-picker bottom sheet (qfn9) removed.
+    // All sections render inline above. The hasValidationWarning helper
+    // is kept below for future re-introduction of an aggregate warning
+    // banner.
+}
+
+@Composable
+private fun DangerZoneSection(
+    onResetMessages: () -> Unit,
+    onDeleteAgent: () -> Unit,
+) {
+    Spacer(modifier = Modifier.height(24.dp))
+    CardGroup(
+        title = {
+            Text(
+                text = stringResource(R.string.screen_create_project_danger_zone_title),
+                color = MaterialTheme.colorScheme.error,
+            )
+        },
+    ) {
+        item(
+            headlineContent = {
+                androidx.compose.material3.OutlinedButton(
+                    onClick = onResetMessages,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error,
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.error,
+                    ),
+                ) {
+                    Icon(
+                        LettaIcons.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.action_reset_messages))
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-        }
+            },
+        )
+        item(
+            headlineContent = {
+                androidx.compose.material3.Button(
+                    onClick = onDeleteAgent,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    ),
+                ) {
+                    Icon(
+                        LettaIcons.Delete,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.screen_agents_dialog_delete_title))
+                }
+            },
+        )
     }
 }
 

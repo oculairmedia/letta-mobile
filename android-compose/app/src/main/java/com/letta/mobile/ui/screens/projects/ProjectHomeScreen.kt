@@ -22,6 +22,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -82,6 +84,7 @@ fun ProjectHomeScreen(
     onNavigateToProjectChat: (project: ProjectSummary, projectStartAction: String?) -> Unit,
     onNavigateToProjectIssues: (project: ProjectSummary) -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToCreateProject: () -> Unit,
     activeBackendLabel: String? = null,
     onNavigateToBackendSwitcher: (() -> Unit)? = null,
     viewModel: ProjectHomeViewModel = hiltViewModel(),
@@ -107,16 +110,29 @@ fun ProjectHomeScreen(
     val projectSettingsPathKnown = stringResource(R.string.screen_projects_settings_path_known_project)
     val projectSettingsPathUnknown = stringResource(R.string.screen_projects_settings_path_unknown_access)
     val projectSettingsSuggestedTitle = stringResource(R.string.screen_projects_settings_suggested_paths_title)
-    val conversationalGoalLabel = stringResource(R.string.screen_projects_new_project_goal_label)
-    val conversationalGoalHelper = stringResource(R.string.screen_projects_new_project_goal_helper)
-    val conversationalNameLabel = stringResource(R.string.screen_projects_new_project_name_label)
-    val conversationalNameHelper = stringResource(R.string.screen_projects_new_project_name_helper)
-    val conversationalPathLabel = stringResource(R.string.screen_projects_new_project_path_label)
-    val conversationalPathHelper = stringResource(R.string.screen_projects_new_project_path_helper)
-    val conversationalPathMissing = stringResource(R.string.screen_projects_settings_path_missing)
-    val conversationalPathAbsolute = stringResource(R.string.screen_projects_settings_path_must_be_absolute)
-    val conversationalGitUrlLabel = stringResource(R.string.screen_projects_new_project_git_url_label)
-    val conversationalGitUrlHelper = stringResource(R.string.screen_projects_new_project_git_url_helper)
+
+    // letta-mobile-cygd: refresh on return from CreateProjectRoute. The
+    // create screen sets PROJECT_CREATED_REFRESH_KEY=true on the previous
+    // entry's saved-state handle when it pops on success; we observe
+    // that flag here, refresh, and clear it. The hilt-injected VM is
+    // scoped to the hosting NavBackStackEntry, so the same entry is
+    // also a SavedStateRegistryOwner — pull the SavedStateHandle from
+    // it via LocalViewModelStoreOwner.
+    val viewModelStoreOwner = androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner.current
+    val savedStateHandle = (viewModelStoreOwner as? androidx.navigation.NavBackStackEntry)?.savedStateHandle
+    LaunchedEffect(savedStateHandle) {
+        savedStateHandle ?: return@LaunchedEffect
+        savedStateHandle
+            .getStateFlow(com.letta.mobile.ui.navigation.PROJECT_CREATED_REFRESH_KEY, false)
+            .collect { needsRefresh ->
+                if (needsRefresh) {
+                    savedStateHandle[com.letta.mobile.ui.navigation.PROJECT_CREATED_REFRESH_KEY] = false
+                    viewModel.refresh()
+                }
+            }
+    }
+
+    var showOverflow by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -159,17 +175,36 @@ fun ProjectHomeScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(LettaIcons.Settings, contentDescription = stringResource(R.string.common_settings))
+                    IconButton(onClick = { showOverflow = true }) {
+                        Icon(LettaIcons.MoreVert, contentDescription = stringResource(R.string.action_more))
+                    }
+                    DropdownMenu(
+                        expanded = showOverflow,
+                        onDismissRequest = { showOverflow = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.screen_create_project_overflow_manual)) },
+                            leadingIcon = { Icon(LettaIcons.Edit, contentDescription = null) },
+                            onClick = {
+                                showOverflow = false
+                                viewModel.startManualProjectCreation()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.common_settings)) },
+                            leadingIcon = { Icon(LettaIcons.Settings, contentDescription = null) },
+                            onClick = {
+                                showOverflow = false
+                                onNavigateToSettings()
+                            },
+                        )
                     }
                 },
             )
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = {
-                    viewModel.showCreateProjectOptions()
-                }
+                onClick = onNavigateToCreateProject,
             ) {
                 Icon(LettaIcons.Add, contentDescription = stringResource(R.string.screen_projects_new_project))
             }
@@ -263,22 +298,10 @@ fun ProjectHomeScreen(
                 }
 
                 val selectedProject = viewModel.currentProject()
-                ActionSheet(
-                    show = state.data.showCreateOptions,
-                    onDismiss = viewModel::dismissCreateProjectOptions,
-                    title = stringResource(R.string.screen_projects_new_project),
-                ) {
-                    ActionSheetItem(
-                        text = stringResource(R.string.screen_projects_new_project_manual_action),
-                        icon = LettaIcons.Edit,
-                        onClick = viewModel::startManualProjectCreation,
-                    )
-                    ActionSheetItem(
-                        text = stringResource(R.string.screen_projects_new_project_conversational_action),
-                        icon = LettaIcons.Chat,
-                        onClick = viewModel::startConversationalProjectCreation,
-                    )
-                }
+                // letta-mobile-cygd: the FAB Manual/Conversational ActionSheet
+                // is gone. FAB now navigates directly to CreateProjectRoute
+                // (conversational); Manual lives in the top-app-bar overflow
+                // and reuses the MultiFieldInputDialog below.
 
                 MultiFieldInputDialog(
                     show = state.data.showManualCreateDialog,
@@ -321,187 +344,9 @@ fun ProjectHomeScreen(
                     }
                 }
 
-                MultiFieldInputDialog(
-                    show = state.data.showConversationalCreateDialog,
-                    title = stringResource(
-                        when (state.data.conversationalProjectStep) {
-                            ConversationalProjectStep.Goal -> R.string.screen_projects_new_project_conversational_goal_title
-                            ConversationalProjectStep.Name -> R.string.screen_projects_new_project_conversational_name_title
-                            ConversationalProjectStep.FilesystemPath -> R.string.screen_projects_new_project_conversational_path_title
-                            ConversationalProjectStep.GitUrl -> R.string.screen_projects_new_project_conversational_git_url_title
-                            ConversationalProjectStep.Review -> R.string.screen_projects_new_project_conversational_review_title
-                        }
-                    ),
-                    confirmText = stringResource(
-                        when (state.data.conversationalProjectStep) {
-                            ConversationalProjectStep.Review -> R.string.action_create
-                            else -> R.string.screen_projects_new_project_conversational_continue
-                        }
-                    ),
-                    dismissText = stringResource(
-                        when (state.data.conversationalProjectStep) {
-                            ConversationalProjectStep.Goal -> R.string.action_cancel
-                            else -> R.string.action_back
-                        }
-                    ),
-                    onDismiss = viewModel::dismissConversationalProjectCreation,
-                    confirmEnabled = state.data.conversationalProjectDraft.isReadyFor(state.data.conversationalProjectStep) && !state.data.isSubmittingConversationalCreate,
-                    onConfirm = viewModel::submitConversationalProjectCreation,
-                ) {
-                    val draft = state.data.conversationalProjectDraft
-                    val scrollState = rememberScrollState()
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .fillMaxHeight()
-                            .verticalScroll(scrollState),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        Text(
-                            text = stringResource(
-                                when (state.data.conversationalProjectStep) {
-                                    ConversationalProjectStep.Goal -> R.string.screen_projects_new_project_conversational_goal_prompt
-                                    ConversationalProjectStep.Name -> R.string.screen_projects_new_project_conversational_name_prompt
-                                    ConversationalProjectStep.FilesystemPath -> R.string.screen_projects_new_project_conversational_path_prompt
-                                    ConversationalProjectStep.GitUrl -> R.string.screen_projects_new_project_conversational_git_url_prompt
-                                    ConversationalProjectStep.Review -> R.string.screen_projects_new_project_conversational_review_prompt
-                                }
-                            ),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-
-                        when (state.data.conversationalProjectStep) {
-                            ConversationalProjectStep.Goal -> {
-                                FormItem(
-                                    label = { Text(conversationalGoalLabel) },
-                                    description = { Text(conversationalGoalHelper) },
-                                ) {
-                                    OutlinedTextField(
-                                        value = draft.goal,
-                                        onValueChange = {
-                                            viewModel.updateConversationalProjectDraft(draft.copy(goal = it))
-                                        },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        minLines = 4,
-                                    )
-                                }
-                            }
-
-                            ConversationalProjectStep.Name -> {
-                                if (draft.goal.isNotBlank()) {
-                                    ProjectConversationSummaryChip(
-                                        label = stringResource(R.string.common_description),
-                                        value = draft.goal,
-                                    )
-                                }
-                                FormItem(
-                                    label = { Text(conversationalNameLabel) },
-                                    description = { Text(conversationalNameHelper) },
-                                ) {
-                                    OutlinedTextField(
-                                        value = draft.name,
-                                        onValueChange = {
-                                            viewModel.updateConversationalProjectDraft(draft.copy(name = it))
-                                        },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        singleLine = true,
-                                    )
-                                }
-                            }
-
-                            ConversationalProjectStep.FilesystemPath -> {
-                                val pathValidation = draft.filesystemPathValidation()
-                                if (draft.goal.isNotBlank()) {
-                                    ProjectConversationSummaryChip(
-                                        label = stringResource(R.string.common_description),
-                                        value = draft.goal,
-                                    )
-                                }
-                                if (draft.name.isNotBlank()) {
-                                    ProjectConversationSummaryChip(
-                                        label = conversationalNameLabel,
-                                        value = draft.name,
-                                    )
-                                }
-                                FormItem(
-                                    label = { Text(conversationalPathLabel) },
-                                    description = {
-                                        Text(
-                                            when (pathValidation) {
-                                                ConversationalProjectDraft.FilesystemPathValidation.Missing -> conversationalPathMissing
-                                                ConversationalProjectDraft.FilesystemPathValidation.MustBeAbsolute -> conversationalPathAbsolute
-                                                ConversationalProjectDraft.FilesystemPathValidation.Valid -> conversationalPathHelper
-                                            }
-                                        )
-                                    },
-                                ) {
-                                    OutlinedTextField(
-                                        value = draft.filesystemPath,
-                                        onValueChange = {
-                                            viewModel.updateConversationalProjectDraft(draft.copy(filesystemPath = it))
-                                        },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        isError = pathValidation != ConversationalProjectDraft.FilesystemPathValidation.Valid,
-                                        singleLine = true,
-                                    )
-                                }
-                            }
-
-                            ConversationalProjectStep.GitUrl -> {
-                                ProjectConversationSummaryChip(
-                                    label = conversationalNameLabel,
-                                    value = draft.name,
-                                )
-                                ProjectConversationSummaryChip(
-                                    label = conversationalPathLabel,
-                                    value = draft.filesystemPath,
-                                )
-                                FormItem(
-                                    label = { Text(conversationalGitUrlLabel) },
-                                    description = { Text(conversationalGitUrlHelper) },
-                                ) {
-                                    OutlinedTextField(
-                                        value = draft.gitUrl,
-                                        onValueChange = {
-                                            viewModel.updateConversationalProjectDraft(draft.copy(gitUrl = it))
-                                        },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        singleLine = true,
-                                    )
-                                }
-                            }
-
-                            ConversationalProjectStep.Review -> {
-                                if (draft.goal.isNotBlank()) {
-                                    ProjectConversationSummaryChip(
-                                        label = conversationalGoalLabel,
-                                        value = draft.goal,
-                                    )
-                                }
-                                ProjectConversationSummaryChip(
-                                    label = conversationalNameLabel,
-                                    value = draft.name,
-                                )
-                                ProjectConversationSummaryChip(
-                                    label = conversationalPathLabel,
-                                    value = draft.filesystemPath,
-                                )
-                                ProjectConversationSummaryChip(
-                                    label = conversationalGitUrlLabel,
-                                    value = draft.gitUrl.ifBlank {
-                                        stringResource(R.string.screen_projects_new_project_git_url_none)
-                                    },
-                                )
-                                Text(
-                                    text = stringResource(R.string.screen_projects_new_project_conversational_review_helper),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
-                }
+                // letta-mobile-cygd: conversational creation dialog moved
+                // to its own full-screen route (CreateProjectScreen). The
+                // FAB navigates there directly via onNavigateToCreateProject.
 
                 MultiFieldInputDialog(
                     show = state.data.showProjectSettingsDialog,
@@ -715,35 +560,48 @@ private fun ProjectConversationSummaryChip(
 @Composable
 private fun ProjectTileMetaRow(
     statusLabel: String,
-    statusColor: Color,
+    statusContainerColor: Color,
+    statusContentColor: Color,
     issueCount: Int,
     isPinned: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    // letta-mobile-cygd: replaced the 8dp status dot + "• N issues"
+    // string concatenation with semantic Surface badges. Status reads
+    // as a colored chip; issue count is its own urgency-tinted chip
+    // (tertiary for a handful, primary as it grows, error past ~20).
+    androidx.compose.foundation.layout.FlowRow(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Surface(
-            modifier = Modifier.size(8.dp),
-            shape = RoundedCornerShape(50),
-            color = statusColor,
-        ) {}
-        Text(
+        StatusBadge(
             text = statusLabel,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            containerColor = statusContainerColor,
+            contentColor = statusContentColor,
         )
         if (issueCount > 0) {
-            Text(
-                text = "• $issueCount issues",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            val urgency = when {
+                issueCount >= 20 -> Triple(
+                    MaterialTheme.colorScheme.errorContainer,
+                    MaterialTheme.colorScheme.onErrorContainer,
+                    "$issueCount issues",
+                )
+                issueCount >= 6 -> Triple(
+                    MaterialTheme.colorScheme.primaryContainer,
+                    MaterialTheme.colorScheme.onPrimaryContainer,
+                    "$issueCount issues",
+                )
+                else -> Triple(
+                    MaterialTheme.colorScheme.tertiaryContainer,
+                    MaterialTheme.colorScheme.onTertiaryContainer,
+                    "$issueCount issues",
+                )
+            }
+            StatusBadge(
+                text = urgency.third,
+                containerColor = urgency.first,
+                contentColor = urgency.second,
             )
         }
         if (isPinned) {
@@ -754,6 +612,27 @@ private fun ProjectTileMetaRow(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+@Composable
+private fun StatusBadge(
+    text: String,
+    containerColor: Color,
+    contentColor: Color,
+) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = containerColor,
+        contentColor = contentColor,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -770,11 +649,30 @@ private fun ProjectTile(
     val lastActivity = project.updatedAt ?: project.lastSyncAt ?: project.lastCheckedAt ?: project.lastScanAt
     val issueCount = project.beadsIssueCount ?: project.issueCount ?: 0
     val statusLabel = project.status?.replaceFirstChar { it.uppercase() } ?: stringResource(R.string.common_unknown)
-    val statusColor = when (project.status?.lowercase()) {
-        "active" -> MaterialTheme.colorScheme.tertiary
-        "archived" -> MaterialTheme.colorScheme.onSurfaceVariant
-        else -> MaterialTheme.colorScheme.primary
+
+    // letta-mobile-cygd: status now drives both the Status badge color
+    // and the tile-level border/wash so users get a glanceable read of
+    // archived vs active. Active = primary border + container; archived
+    // = muted outlineVariant border + softer surface; unknown defaults
+    // to secondary so it doesn't masquerade as active.
+    val (statusContainerColor, statusContentColor, tileBorderColor) = when (project.status?.lowercase()) {
+        "active" -> Triple(
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.onPrimaryContainer,
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+        )
+        "archived" -> Triple(
+            MaterialTheme.colorScheme.surfaceContainerHighest,
+            MaterialTheme.colorScheme.onSurfaceVariant,
+            MaterialTheme.colorScheme.outlineVariant,
+        )
+        else -> Triple(
+            MaterialTheme.colorScheme.secondaryContainer,
+            MaterialTheme.colorScheme.onSecondaryContainer,
+            MaterialTheme.colorScheme.outlineVariant,
+        )
     }
+
     val initials = remember(project.name, project.identifier) {
         project.name
             .split(Regex("\\s+"))
@@ -798,6 +696,10 @@ private fun ProjectTile(
         shape = RoundedCornerShape(16.dp),
         color = LettaCardDefaults.listContainerColor,
         tonalElevation = 3.dp,
+        border = androidx.compose.foundation.BorderStroke(
+            width = 1.dp,
+            color = tileBorderColor,
+        ),
     ) {
         Column(
             modifier = Modifier
@@ -855,7 +757,8 @@ private fun ProjectTile(
                 )
                 ProjectTileMetaRow(
                     statusLabel = statusLabel,
-                    statusColor = statusColor,
+                    statusContainerColor = statusContainerColor,
+                    statusContentColor = statusContentColor,
                     issueCount = issueCount,
                     isPinned = isPinned,
                 )

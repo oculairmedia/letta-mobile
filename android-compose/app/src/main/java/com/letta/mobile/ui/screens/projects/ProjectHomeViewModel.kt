@@ -702,19 +702,20 @@ class ProjectHomeViewModel @Inject constructor(
         isSubmittingProjectSettings = false,
     )
 
-    private fun ConversationalProjectStep.next(): ConversationalProjectStep = when (this) {
-        ConversationalProjectStep.Goal -> ConversationalProjectStep.Name
-        ConversationalProjectStep.Name -> ConversationalProjectStep.FilesystemPath
-        ConversationalProjectStep.FilesystemPath -> ConversationalProjectStep.GitUrl
-        ConversationalProjectStep.GitUrl -> ConversationalProjectStep.Review
-        ConversationalProjectStep.Review -> ConversationalProjectStep.Review
-    }
+}
 
-    private fun ConversationalProjectStep.previous(): ConversationalProjectStep = when (this) {
-        ConversationalProjectStep.Goal -> ConversationalProjectStep.Goal
-        ConversationalProjectStep.Name -> ConversationalProjectStep.Goal
-        ConversationalProjectStep.FilesystemPath -> ConversationalProjectStep.Name
-        ConversationalProjectStep.GitUrl -> ConversationalProjectStep.FilesystemPath
-        ConversationalProjectStep.Review -> ConversationalProjectStep.GitUrl
-    }
+internal fun ConversationalProjectStep.next(): ConversationalProjectStep = when (this) {
+    ConversationalProjectStep.Goal -> ConversationalProjectStep.Name
+    ConversationalProjectStep.Name -> ConversationalProjectStep.FilesystemPath
+    ConversationalProjectStep.FilesystemPath -> ConversationalProjectStep.GitUrl
+    ConversationalProjectStep.GitUrl -> ConversationalProjectStep.Review
+    ConversationalProjectStep.Review -> ConversationalProjectStep.Review
+}
+
+internal fun ConversationalProjectStep.previous(): ConversationalProjectStep = when (this) {
+    ConversationalProjectStep.Goal -> ConversationalProjectStep.Goal
+    ConversationalProjectStep.Name -> ConversationalProjectStep.Goal
+    ConversationalProjectStep.FilesystemPath -> ConversationalProjectStep.Name
+    ConversationalProjectStep.GitUrl -> ConversationalProjectStep.FilesystemPath
+    ConversationalProjectStep.Review -> ConversationalProjectStep.GitUrl
 }

@@ -170,6 +170,8 @@ fun EditAgentScreen(
                     onClientModeBaseUrlChange = { viewModel.updateClientModeBaseUrl(it) },
                     onClientModeApiKeyChange = { viewModel.updateClientModeApiKey(it) },
                     onTestClientModeConnection = { viewModel.testClientModeConnection() },
+                    onResetMessages = { showResetDialog = true },
+                    onDeleteAgent = { showDeleteDialog = true },
                     contentPadding = paddingValues,
                 )
 
@@ -212,24 +214,10 @@ fun EditAgentScreen(
                             showCloneDialog = true
                         },
                     )
-                    ActionSheetItem(
-                        text = stringResource(R.string.action_reset_messages),
-                        icon = LettaIcons.Refresh,
-                        onClick = {
-                            showActionSheet = false
-                            showResetDialog = true
-                        },
-                        destructive = true,
-                    )
-                    ActionSheetItem(
-                        text = stringResource(R.string.screen_agents_dialog_delete_title),
-                        icon = LettaIcons.Delete,
-                        onClick = {
-                            showActionSheet = false
-                            showDeleteDialog = true
-                        },
-                        destructive = true,
-                    )
+                    // letta-mobile-cygd: Reset Messages and Delete Agent
+                    // moved to EditAgentContent's bottom Danger Zone so
+                    // destructive actions live in one unmistakable spot
+                    // instead of being a long-press away in the overflow.
                 }
 
                 // Confirm dialogs

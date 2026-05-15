@@ -33,6 +33,7 @@ import com.letta.mobile.NotificationNavigationTarget
 import com.letta.mobile.channel.ChatPushAlarmScheduler
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.SettingsRepository
+import com.letta.mobile.ui.screens.projects.CreateProjectScreen
 import com.letta.mobile.ui.screens.projects.ProjectHomeScreen
 import com.letta.mobile.ui.screens.projects.ProjectIssueDetailScreen
 import com.letta.mobile.ui.screens.projects.ProjectIssuesScreen
@@ -79,6 +80,15 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 private const val DrillTransitionDurationMs = 320
+
+/**
+ * letta-mobile-cygd: signal flag set on the previous backstack entry's
+ * SavedStateHandle when CreateProjectRoute pops on success. Both
+ * HomeRoute and ProjectsRoute (the two routes that host
+ * ProjectHomeScreen) read this flag in a LaunchedEffect on resume and
+ * trigger a refresh + clear so the new project shows up immediately.
+ */
+const val PROJECT_CREATED_REFRESH_KEY: String = "project_created_refresh"
 
 private val drillInEnter: AnimatedContentTransitionScope<*>.() -> EnterTransition = {
     slideIntoContainer(
@@ -234,6 +244,7 @@ fun AppNavGraph(
                     )
                 },
                 onNavigateToSettings = { navController.navigate(ConfigRoute()) },
+                onNavigateToCreateProject = { navController.navigate(CreateProjectRoute) },
                 activeBackendLabel = activeBackendLabel,
                 onNavigateToBackendSwitcher = openBackendSwitcher,
             )
@@ -666,6 +677,28 @@ fun AppNavGraph(
                     )
                 },
                 onNavigateToSettings = { navController.navigate(ConfigRoute()) },
+                onNavigateToCreateProject = { navController.navigate(CreateProjectRoute) },
+            )
+        }
+
+        composable<CreateProjectRoute>(
+            enterTransition = drillInEnter,
+            exitTransition = drillInExit,
+            popEnterTransition = drillInPopEnter,
+            popExitTransition = drillInPopExit,
+        ) {
+            CreateProjectScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onProjectCreated = { _ ->
+                    // letta-mobile-cygd: signal the previous backstack
+                    // entry (HomeRoute or ProjectsRoute) that it should
+                    // refresh on resume so the freshly-created project
+                    // shows up without a manual pull-to-refresh.
+                    navController.previousBackStackEntry
+                        ?.savedStateHandle
+                        ?.set(PROJECT_CREATED_REFRESH_KEY, true)
+                    navController.popBackStack()
+                },
             )
         }
 
