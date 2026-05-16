@@ -17,11 +17,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
-import com.letta.mobile.ui.navigation.AgentChatRoute
+import com.letta.mobile.feature.chat.AgentChatRoute
+import com.letta.mobile.feature.chat.AgentScaffold
+import com.letta.mobile.feature.chat.toViewModelKey
 import com.letta.mobile.ui.navigation.ArchivalRoute
 import com.letta.mobile.ui.navigation.EditAgentRoute
 import com.letta.mobile.ui.navigation.AllToolsRoute
-import com.letta.mobile.ui.screens.chat.AgentScaffold
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.isWideWidth
 
@@ -138,12 +139,4 @@ fun TwoPaneConversationsLayout(
             )
         }
     }
-}
-
-private fun AgentChatRoute.toViewModelKey(): String = buildString {
-    append(agentId)
-    append(':')
-    append(conversationId.orEmpty())
-    append(':')
-    append(freshRouteKey?.toString().orEmpty())
 }

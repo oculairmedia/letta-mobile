@@ -1,4 +1,4 @@
-package com.letta.mobile.ui.navigation
+﻿package com.letta.mobile.ui.navigation
 
 import android.content.Context
 import androidx.compose.animation.AnimatedContentTransitionScope
@@ -31,8 +31,10 @@ import androidx.navigation.toRoute
 import com.letta.mobile.AppLaunchTarget
 import com.letta.mobile.NotificationNavigationTarget
 import com.letta.mobile.channel.ChatPushAlarmScheduler
-import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.toBackendLabel
 import com.letta.mobile.data.repository.SettingsRepository
+import com.letta.mobile.feature.chat.AgentChatRoute
+import com.letta.mobile.feature.chat.chatGraph
 import com.letta.mobile.ui.screens.projects.CreateProjectScreen
 import com.letta.mobile.ui.screens.projects.ProjectHomeScreen
 import com.letta.mobile.ui.screens.projects.ProjectIssueDetailScreen
@@ -46,7 +48,6 @@ import com.letta.mobile.ui.screens.agentlist.AgentListScreen
 import com.letta.mobile.ui.screens.archives.ArchiveAdminScreen
 import com.letta.mobile.ui.screens.archival.ArchivalScreen
 import com.letta.mobile.ui.screens.blocks.BlockLibraryScreen
-import com.letta.mobile.ui.screens.chat.AgentScaffold
 import com.letta.mobile.ui.screens.config.BackendSwitcherSheet
 import com.letta.mobile.ui.screens.config.ConfigListScreen
 import com.letta.mobile.ui.screens.config.ConfigScreen
@@ -97,7 +98,6 @@ private val drillInEnter: AnimatedContentTransitionScope<*>.() -> EnterTransitio
         initialOffset = { distance -> distance / 8 },
     ) + fadeIn(animationSpec = tween(DrillTransitionDurationMs))
 }
-
 private val drillInExit: AnimatedContentTransitionScope<*>.() -> ExitTransition = {
     fadeOut(animationSpec = tween(DrillTransitionDurationMs / 2))
 }
@@ -702,63 +702,39 @@ fun AppNavGraph(
             )
         }
 
-        composable<AgentChatRoute>(
+        chatGraph(
             enterTransition = drillInEnter,
             exitTransition = drillInExit,
             popEnterTransition = drillInPopEnter,
             popExitTransition = drillInPopExit,
-        ) { backStackEntry ->
-            val route = backStackEntry.toRoute<AgentChatRoute>()
-            CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
-                AgentScaffold(
-                    initialProjectStartAction = route.projectStartAction,
-                    // letta-mobile: when AgentChatRoute is the cold-start
-                    // landing (lastChatSelection or fallbackAgentId picked
-                    // it as the startDestination), the back stack is empty
-                    // — popBackStack() returns false and would exit the
-                    // app. Fall back to the conversations list so back-
-                    // from-default-chat takes the user somewhere useful
-                    // instead. For the drilled-in case (chat opened from
-                    // another screen) popBackStack succeeds and the
-                    // existing behaviour is unchanged.
-                    onNavigateBack = {
-                        if (!navController.popBackStack()) {
-                            navController.navigate(ConversationsRoute) {
-                                popUpTo(0) { inclusive = true }
-                                launchSingleTop = true
-                            }
-                        }
-                    },
-                    onNavigateToSettings = { agentId ->
-                        navController.navigate(EditAgentRoute(agentId))
-                    },
-                    onNavigateToArchival = { agentId ->
-                        navController.navigate(ArchivalRoute(agentId))
-                    },
-                    onNavigateToTools = {
-                        navController.navigate(AllToolsRoute)
-                    },
-                    onSwitchConversation = { agentId, conversationId, agentName ->
-                        val normalizedConversationId = conversationId?.takeIf { it.isNotBlank() }
-                        navController.navigate(
-                            AgentChatRoute(
-                                agentId = agentId,
-                                agentName = agentName,
-                                conversationId = normalizedConversationId,
-                                freshRouteKey = if (normalizedConversationId == null) System.currentTimeMillis() else null,
-                            )
-                        ) {
-                            popUpTo<AgentChatRoute> { inclusive = true }
-                        }
-                    },
-                    viewModel = hiltViewModel(
-                        backStackEntry,
-                        key = route.toViewModelKey(),
-                    ),
-                )
-            }
-        }
-
+            // letta-mobile: when AgentChatRoute is the cold-start landing
+            // (lastChatSelection or fallbackAgentId picked it as the
+            // startDestination), the back stack is empty. Fall back to the
+            // conversations list so back-from-default-chat takes the user
+            // somewhere useful instead.
+            onNavigateBack = {
+                if (!navController.popBackStack()) {
+                    navController.navigate(ConversationsRoute) {
+                        popUpTo(0) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+            },
+            onNavigateToSettings = { agentId ->
+                navController.navigate(EditAgentRoute(agentId))
+            },
+            onNavigateToArchival = { agentId ->
+                navController.navigate(ArchivalRoute(agentId))
+            },
+            onNavigateToTools = {
+                navController.navigate(AllToolsRoute)
+            },
+            onSwitchConversation = { route ->
+                navController.navigate(route) {
+                    popUpTo<AgentChatRoute> { inclusive = true }
+                }
+            },
+        )
         composable<EditAgentRoute> {
             EditAgentScreen(
                 onNavigateBack = { navController.popBackStack() }
@@ -839,27 +815,5 @@ fun AppNavGraph(
                 navController.navigate(ConfigRoute())
             },
         )
-    }
-}
-
-private fun AgentChatRoute.toViewModelKey(): String = buildString {
-    append(agentId)
-    append(':')
-    append(conversationId.orEmpty())
-    append(':')
-    append(freshRouteKey?.toString().orEmpty())
-    append(':')
-    append(projectIdentifier.orEmpty())
-}
-
-internal fun LettaConfig?.toBackendLabel(): String? {
-    val config = this ?: return null
-    return when (config.mode) {
-        LettaConfig.Mode.CLOUD -> "Cloud"
-        LettaConfig.Mode.SELF_HOSTED -> config.serverUrl
-            .removePrefix("https://")
-            .removePrefix("http://")
-            .substringBefore('/')
-            .ifBlank { "Server" }
     }
 }

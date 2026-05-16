@@ -69,7 +69,7 @@ import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.ShimmerBox
 import com.letta.mobile.ui.components.TextInputDialog
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.screens.chat.ChatMotion
+import com.letta.mobile.feature.chat.ChatMotion
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.util.formatRelativeTime
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost

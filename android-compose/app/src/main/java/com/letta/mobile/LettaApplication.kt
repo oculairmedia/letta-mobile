@@ -19,8 +19,8 @@ import com.letta.mobile.crash.CrashReporter
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.performance.DebugPerformanceMonitor
 import com.letta.mobile.performance.ProductionJankStatsMonitor
-import com.letta.mobile.ui.screens.chat.GeneratedUiRegistry
-import com.letta.mobile.ui.screens.chat.ToolDisplayRegistry
+import com.letta.mobile.feature.chat.GeneratedUiRegistry
+import com.letta.mobile.feature.chat.ToolDisplayRegistry
 import com.letta.mobile.util.EncryptedPrefsHelper
 import dagger.Lazy
 import dagger.hilt.android.HiltAndroidApp

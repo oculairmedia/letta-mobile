@@ -1,9 +1,11 @@
 package com.letta.mobile.di
 
 import com.letta.mobile.channel.NotificationDeliveryCoordinator
+import com.letta.mobile.chat.BuildConfigChatClientVersionProvider
 import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
+import com.letta.mobile.feature.chat.ChatClientVersionProvider
 import com.letta.mobile.platform.storage.AndroidAppPrivateStorageRootProvider
 import com.letta.mobile.platform.storage.AndroidSafStorageGrantStore
 import com.letta.mobile.platform.storage.AppPrivateStorageRootProvider
@@ -48,4 +50,10 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindNotificationDelivery(impl: NotificationDeliveryCoordinator): NotificationDelivery
+
+    @Binds
+    @Singleton
+    abstract fun bindChatClientVersionProvider(
+        impl: BuildConfigChatClientVersionProvider,
+    ): ChatClientVersionProvider
 }
