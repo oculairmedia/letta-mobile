@@ -44,6 +44,12 @@ internal class ChatConversationCoordinator(
     private val setClientModeConversationId: (String?) -> Unit,
     private val startTimelineObserver: (String) -> Unit,
     private val stopTimelineObserver: () -> Unit,
+    // letta-mobile-ork1: invoked from loadMessagesInternal so opening a
+    // conversation pulls fresh recent messages from the server. Without
+    // this the cached TimelineSyncLoop (warm-started by resume-most-
+    // recent / notification paths) serves stale state until the user's
+    // first send triggers the post-turn_done reconcile.
+    private val reconcileRecentMessages: suspend (String, String) -> Unit,
     private val sendMessageViaClientMode: (String) -> Unit,
     private val sendMessageViaTimeline: (String) -> Unit,
     private val markFollowingDuplicateInitialMessageInFlight: () -> Unit,
@@ -256,6 +262,23 @@ internal class ChatConversationCoordinator(
                 hasMoreOlderMessages = false,
             )
             startTimelineObserver(requestedConversationId)
+            // letta-mobile-ork1: kick off a server pull so the cached
+            // TimelineSyncLoop catches up on any messages that landed
+            // outside this process (other devices, agent runs between
+            // sessions). Fire-and-forget — the observer above will pick
+            // up the updated state when the reconcile lands. We don't
+            // await it here because the user can still send / scroll
+            // against the cached view while the fetch is in flight.
+            scope.launch {
+                runCatching {
+                    reconcileRecentMessages(requestedConversationId, "open")
+                }.onFailure {
+                    Telemetry.error(
+                        "AdminChatVM", "loadMessages.reconcileOnOpenFailed", it,
+                        "conversationId" to requestedConversationId,
+                    )
+                }
+            }
             loadTimer.stop(
                 "conversationId" to requestedConversationId,
                 "mode" to "timeline",
