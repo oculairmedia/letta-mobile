@@ -227,6 +227,18 @@ open class TimelineRepository @Inject constructor(
     }
 
     /**
+     * letta-mobile-9hcg: flip the external-transport user-bubble Local
+     * to SENT. Called from WsChatSendCoordinator on every TurnDone so
+     * the Local appended via [appendExternalTransportLocal] doesn't sit
+     * in SENDING state past the turn — which would otherwise keep
+     * ChatTimelineObserver's `isStreaming` gate latched and flap the
+     * typing indicator on subsequent timeline emits.
+     */
+    suspend fun markExternalTransportLocalSent(conversationId: String, otid: String) {
+        getOrCreate(conversationId).markExternalTransportLocalSent(otid)
+    }
+
+    /**
      * Reconcile a send that went through the admin-shim mobile WebSocket.
      * The shim guarantees `turn_done` is emitted after disk stamping, so callers
      * can invoke this immediately when that frame lands.

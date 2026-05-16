@@ -219,15 +219,19 @@ private fun AttachmentThumbnail(
             mediaType = image.mediaType,
         )
     }
-    val dataUrl = remember(image.base64, image.mediaType) {
-        chatAttachmentImageDataUrl(
-            base64 = image.base64,
-            mediaType = image.mediaType,
-        )
+    // letta-mobile-shiy: decode base64 → ByteArray and hand the bytes
+    // directly to Coil. The previous path passed a `data:image/...;
+    // base64,...` URL via ImageRequest.data(dataUrl), but coil3 dropped
+    // the built-in data: URI fetcher that coil2 had, so the request
+    // silently failed and the user only ever saw the Surface
+    // placeholder. ByteArray is a first-class ImageRequest input — no
+    // extra fetcher registration needed.
+    val bytes = remember(image.base64) {
+        runCatching { android.util.Base64.decode(image.base64, android.util.Base64.NO_WRAP) }.getOrNull()
     }
-    val request = remember(context, dataUrl, cacheKey) {
+    val request = remember(context, bytes, cacheKey) {
         ImageRequest.Builder(context)
-            .data(dataUrl)
+            .data(bytes)
             .memoryCacheKey(cacheKey)
             .diskCacheKey(cacheKey)
             .build()

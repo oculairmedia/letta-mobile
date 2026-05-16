@@ -210,6 +210,16 @@ internal class WsChatSendCoordinator(
             }
             is WsTimelineEvent.TurnDone -> {
                 val conversationId = activeWsConversationId ?: defaultShimConversationId(agentId)
+                // letta-mobile-9hcg: flip the user-bubble Local from SENDING
+                // to SENT now that the turn is finished. We mark SENDING in
+                // appendExternalTransportLocal so the streaming UI gate
+                // stays latched — without this flip the Local would stay
+                // SENDING forever after a clean turn and the next send
+                // would see a stale in-flight marker. Cheap in-memory
+                // update; no network.
+                activeWsOtid?.let { otid ->
+                    timelineRepository.markExternalTransportLocalSent(conversationId, otid)
+                }
                 // lcp-srk: reconcile from disk only when the shim signals it
                 // dropped frames. Clean turns can skip the round-trip.
                 if (event.lossy) {

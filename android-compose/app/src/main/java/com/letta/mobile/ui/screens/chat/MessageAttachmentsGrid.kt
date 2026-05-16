@@ -78,15 +78,14 @@ private fun AttachmentImage(
             mediaType = attachment.mediaType,
         )
     }
-    val dataUrl = remember(attachment.base64, attachment.mediaType) {
-        chatAttachmentImageDataUrl(
-            base64 = attachment.base64,
-            mediaType = attachment.mediaType,
-        )
+    // letta-mobile-shiy: same fix as the composer's AttachmentThumbnail —
+    // coil3 doesn't auto-handle data: URIs, so decode to ByteArray here.
+    val bytes = remember(attachment.base64) {
+        runCatching { android.util.Base64.decode(attachment.base64, android.util.Base64.NO_WRAP) }.getOrNull()
     }
-    val request = remember(context, dataUrl, cacheKey) {
+    val request = remember(context, bytes, cacheKey) {
         ImageRequest.Builder(context)
-            .data(dataUrl)
+            .data(bytes)
             .memoryCacheKey(cacheKey)
             .diskCacheKey(cacheKey)
             .build()

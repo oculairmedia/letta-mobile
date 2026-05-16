@@ -361,7 +361,16 @@ class TimelineSyncLoop(
                 content = content,
                 role = Role.USER,
                 sentAt = sentAt,
-                deliveryState = DeliveryState.SENT,
+                // letta-mobile-9hcg: mark SENDING (not SENT) while the
+                // admin-shim turn is in flight. ChatTimelineObserver's
+                // nextIsStreaming gate keys off a "any LETTA_SERVER Local
+                // in SENDING state" check; if we mark SENT here the
+                // observer flips isStreaming back to false on every
+                // assistant-delta timeline emit, the typing item
+                // appears/disappears in the LazyColumn, and the user
+                // sees the chat flash + reflow per chunk. The post-
+                // TurnDone reconcile flips us to SENT.
+                deliveryState = DeliveryState.SENDING,
                 attachments = attachments,
                 source = MessageSource.LETTA_SERVER,
             )
@@ -628,6 +637,20 @@ class TimelineSyncLoop(
             telemetryName = "recentReconcile",
             telemetryAttrs = arrayOf("reason" to reason),
         )
+    }
+
+    /**
+     * letta-mobile-9hcg: flip an externally-tracked Local to
+     * [DeliveryState.SENT]. Called from the WS coordinator on TurnDone
+     * (any status), so the Local appended via
+     * [appendExternalTransportLocal] doesn't stay SENDING forever after
+     * a clean turn. Cheap — no network — the next reconcile still
+     * fuzzy-collapses the Local against the disk-confirmed user message.
+     */
+    internal suspend fun markExternalTransportLocalSent(otid: String) {
+        writeMutex.withLock {
+            _state.value = _state.value.markSent(otid)
+        }
     }
 
     internal suspend fun reconcileExternalTransportSend(
