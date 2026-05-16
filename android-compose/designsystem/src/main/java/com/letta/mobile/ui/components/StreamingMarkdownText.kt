@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import com.letta.mobile.ui.theme.LocalChatIsPinching
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -247,7 +248,14 @@ fun StreamingMarkdownText(
     } else {
         Modifier
     }
-    val heightAnimation = if (isStreaming) {
+    // letta-mobile-9hcg.b: also skip animateContentSize while the user is
+    // pinching. The graphicsLayer scale runs at the compositor and never
+    // mutates layout sizes, but if a content append happens to land while
+    // the gesture is active animateContentSize would tween that delta on
+    // top of the compositor scale and reproduce the choppy "phase-2"
+    // judder we ship-blocked on in d9zy.5.
+    val isPinching = LocalChatIsPinching.current
+    val heightAnimation = if (isStreaming || isPinching) {
         Modifier
     } else {
         Modifier.animateContentSize(
