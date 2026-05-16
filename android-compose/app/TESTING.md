@@ -1,15 +1,21 @@
 # App snapshot testing
 
-Run the RunBlock snapshot suite with Roborazzi:
+App-owned screenshot tests use Roborazzi. Run the app screenshot tier with:
 
 ```bash
-./gradlew :app:verifyRoborazziDebug --tests com.letta.mobile.ui.screens.chat.RunBlockScreenshotTest --max-workers=1
+./gradlew :app:testScreenshot --max-workers=1
 ```
 
-Regenerate baselines after intentional visual changes:
+RunBlock snapshots moved with the composable into `:feature-chat`. Use:
 
 ```bash
-./gradlew :app:recordRoborazziDebug --tests com.letta.mobile.ui.screens.chat.RunBlockScreenshotTest --max-workers=1
+./gradlew :feature-chat:verifyRoborazziDebug --tests com.letta.mobile.feature.chat.RunBlockScreenshotTest --max-workers=1
 ```
 
-This bead pivoted away from Paparazzi because Paparazzi is currently not functional in this repo environment; see `letta-mobile-zwsk` for the tooling follow-up (tracks the investigate-or-commit-to-Roborazzi decision for `:designsystem` Paparazzi tests and the broader tooling question).
+Regenerate feature-chat baselines after intentional RunBlock visual changes:
+
+```bash
+./gradlew :feature-chat:recordRoborazziDebug --tests com.letta.mobile.feature.chat.RunBlockScreenshotTest --max-workers=1
+```
+
+This project uses Roborazzi for app/feature screenshots. Paparazzi is currently not functional in this repo environment; see `letta-mobile-zwsk` for the broader tooling follow-up.

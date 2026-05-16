@@ -1,5 +1,6 @@
 plugins {
     id("com.android.library")
+    id("io.github.takahirom.roborazzi")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
@@ -130,6 +131,8 @@ dependencies {
     testImplementation("io.kotest:kotest-assertions-core:5.9.1")
     testImplementation("org.robolectric:robolectric:4.16.1")
     testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.10.0")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.10.0")
     testImplementation("androidx.test:core-ktx:1.7.0")
     testImplementation("androidx.test.ext:junit-ktx:1.3.0")
     testImplementation("com.google.dagger:hilt-android-testing:2.58")
@@ -168,4 +171,19 @@ tasks.register<Test>("testIntegration") {
     }
 
     systemProperty("kotest.tags.include", "integration")
+}
+
+tasks.register<Test>("testScreenshot") {
+    description = "Runs screenshot-tier tests (Roborazzi visual regression)"
+    group = "verification"
+
+    val testTask = tasks.named("testDebugUnitTest", Test::class).get()
+    testClassesDirs = testTask.testClassesDirs
+    classpath = testTask.classpath
+
+    useJUnitPlatform {
+        includeTags("screenshot")
+    }
+
+    systemProperty("kotest.tags.include", "screenshot")
 }
