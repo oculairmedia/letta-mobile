@@ -9,26 +9,13 @@ import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
 import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.crossfade
-import com.letta.mobile.channel.ChannelHeartbeatScheduler
-import com.letta.mobile.channel.ChannelNotificationPublisher
-import com.letta.mobile.bot.clientmode.ClientModeController
-import com.letta.mobile.debug.AutomationAuthBootstrap
-import com.letta.mobile.bot.heartbeat.BotHeartbeatScheduler
-import com.letta.mobile.bot.service.BotServiceAutoStarter
 import com.letta.mobile.crash.CrashReporter
-import com.letta.mobile.data.repository.SettingsRepository
-import com.letta.mobile.performance.DebugPerformanceMonitor
-import com.letta.mobile.performance.ProductionJankStatsMonitor
+import com.letta.mobile.startup.AppStartupCoordinator
 import com.letta.mobile.util.EncryptedPrefsHelper
-import dagger.Lazy
 import dagger.hilt.android.HiltAndroidApp
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 import okio.Path.Companion.toOkioPath
 import okhttp3.ConnectionPool
 import javax.inject.Inject
@@ -36,25 +23,10 @@ import javax.inject.Inject
 @HiltAndroidApp
 class LettaApplication : Application(), SingletonImageLoader.Factory {
     @Inject
-    lateinit var channelHeartbeatScheduler: ChannelHeartbeatScheduler
-
-    @Inject
-    lateinit var channelNotificationPublisher: ChannelNotificationPublisher
-
-    @Inject
-    lateinit var botServiceAutoStarter: BotServiceAutoStarter
-
-    @Inject
-    lateinit var botHeartbeatScheduler: BotHeartbeatScheduler
-
-    @Inject
     lateinit var crashReporter: CrashReporter
 
     @Inject
-    lateinit var settingsRepository: Lazy<SettingsRepository>
-
-    @Inject
-    lateinit var clientModeController: Lazy<ClientModeController>
+    internal lateinit var appStartupCoordinator: AppStartupCoordinator
 
     /**
      * Eagerly inject the legacy static-bridge singleton (syf4 migration) so
@@ -70,8 +42,6 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
     @Inject
     lateinit var encryptedPrefsHelper: EncryptedPrefsHelper
 
-    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-
     private val imageHttpClient: HttpClient by lazy {
         val cacheDir = java.io.File(cacheDir, "coil_http_cache")
         val cacheSize = 20L * 1024 * 1024
@@ -82,7 +52,7 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
                     followRedirects(true)
                     followSslRedirects(true)
                     cache(okhttp3.Cache(cacheDir, cacheSize))
-                    // 5 idle connections, 120s keep-alive — image loads in
+                    // 5 idle connections, 120s keep-alive. Image loads in
                     // chat are bursty (multiple attachments per message)
                     // so pooling prevents repeated TLS handshakes.
                     connectionPool(ConnectionPool(5, 120, java.util.concurrent.TimeUnit.SECONDS))
@@ -106,60 +76,7 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
         if (isRobolectricRuntime()) {
             return
         }
-        // Notification channel registration must happen before the app can post
-        // any notifications, but not before first frame — safe to defer.
-        applicationScope.launch {
-            channelNotificationPublisher.ensureChannel()
-        }
-        applicationScope.launch {
-            runCatching {
-                AutomationAuthBootstrap.importPendingConfig(this@LettaApplication, settingsRepository.get())
-            }.onFailure { error ->
-                Log.w("LettaApp", "Skipping automation auth bootstrap", error)
-            }
-        }
-        applicationScope.launch {
-            runCatching {
-                clientModeController.get().initialize()
-            }.onFailure { error ->
-                Log.w("LettaApp", "Skipping client mode init", error)
-            }
-        }
-        applicationScope.launch {
-            runCatching {
-                ProductionJankStatsMonitor.install(this@LettaApplication)
-            }.onFailure { error ->
-                Log.w("LettaApp", "Skipping production jank monitor", error)
-            }
-        }
-        applicationScope.launch {
-            runCatching {
-                DebugPerformanceMonitor.install(this@LettaApplication)
-            }.onFailure { error ->
-                Log.w("LettaApp", "Skipping debug performance monitor", error)
-            }
-        }
-        applicationScope.launch {
-            runCatching {
-                channelHeartbeatScheduler.schedule()
-            }.onFailure { error ->
-                Log.w("LettaApp", "Skipping heartbeat scheduling", error)
-            }
-        }
-        applicationScope.launch {
-            runCatching {
-                botServiceAutoStarter.restoreIfConfigured()
-            }.onFailure { error ->
-                Log.w("LettaApp", "Skipping bot auto-start restore", error)
-            }
-        }
-        applicationScope.launch {
-            runCatching {
-                botHeartbeatScheduler.schedule()
-            }.onFailure { error ->
-                Log.w("LettaApp", "Skipping bot heartbeat scheduling", error)
-            }
-        }
+        appStartupCoordinator.start(this)
     }
 
     override fun newImageLoader(context: coil3.PlatformContext): ImageLoader {
@@ -182,7 +99,7 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
                     .maxSizeBytes(50L * 1024 * 1024)
                     .build()
             }
-            // 200ms crossfade — fast enough for list scrolling, visible enough
+            // 200ms crossfade: fast enough for list scrolling, visible enough
             // to mask the swap from placeholder to real image.
             .crossfade(200)
             .build()

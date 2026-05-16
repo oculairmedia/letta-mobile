@@ -14,6 +14,8 @@ import com.letta.mobile.platform.systemaccess.AndroidSystemAccessEnvironment
 import com.letta.mobile.platform.systemaccess.DefaultSystemAccessCapabilityRegistry
 import com.letta.mobile.platform.systemaccess.SystemAccessCapabilityRegistry
 import com.letta.mobile.platform.systemaccess.SystemAccessEnvironment
+import com.letta.mobile.startup.AppStartupActions
+import com.letta.mobile.startup.DefaultAppStartupActions
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -56,4 +58,8 @@ abstract class AppModule {
     abstract fun bindChatClientVersionProvider(
         impl: BuildConfigChatClientVersionProvider,
     ): ChatClientVersionProvider
+
+    @Binds
+    @Singleton
+    internal abstract fun bindAppStartupActions(impl: DefaultAppStartupActions): AppStartupActions
 }
