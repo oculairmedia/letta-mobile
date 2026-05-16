@@ -3,7 +3,6 @@ package com.letta.mobile.feature.chat
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
@@ -43,10 +42,7 @@ fun NavGraphBuilder.chatGraph(
                     )
                 )
             },
-            viewModel = hiltViewModel(
-                backStackEntry,
-                key = route.toViewModelKey(),
-            ),
+            viewModelKey = route.toViewModelKey(),
         )
     }
 }

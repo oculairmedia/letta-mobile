@@ -34,7 +34,7 @@ import java.io.ByteArrayOutputStream
  * Returns a `() -> Unit` that launches the picker when invoked.
  */
 @Composable
-fun rememberImageAttachmentPicker(
+internal fun rememberImageAttachmentPicker(
     onPicked: (MessageContentPart.Image) -> Unit,
     onError: (String) -> Unit = {},
     limits: AttachmentLimits = AttachmentLimits.Default,

@@ -20,7 +20,7 @@ import com.letta.mobile.data.model.UiMessage
  *
  * letta-mobile-m772.5
  */
-enum class StepDotIcon {
+internal enum class StepDotIcon {
     /** Assistant chain-of-thought message ([UiMessage.isReasoning] == true). */
     Reasoning,
 
@@ -41,7 +41,7 @@ enum class StepDotIcon {
  * Classify [this] for the run-timeline gutter. Pure function, safe to call
  * outside a Compose scope.
  */
-fun UiMessage.runStepDotIcon(): StepDotIcon = when {
+internal fun UiMessage.runStepDotIcon(): StepDotIcon = when {
     isReasoning -> StepDotIcon.Reasoning
     approvalRequest != null -> StepDotIcon.Approval
     !toolCalls.isNullOrEmpty() -> StepDotIcon.ToolCall
@@ -55,7 +55,7 @@ fun UiMessage.runStepDotIcon(): StepDotIcon = when {
  */
 @Composable
 @ReadOnlyComposable
-fun UiMessage.runStepDotColor(): Color = when (runStepDotIcon()) {
+internal fun UiMessage.runStepDotColor(): Color = when (runStepDotIcon()) {
     StepDotIcon.Reasoning -> MaterialTheme.colorScheme.tertiary
     StepDotIcon.ToolCall -> MaterialTheme.colorScheme.primary
     StepDotIcon.Approval -> MaterialTheme.colorScheme.secondary

@@ -94,7 +94,7 @@ private val CompactToolCallGroupStepDotCenterY = 18.dp
  * / m772.10 (single-message short circuit handled at grouping layer).
  */
 @Composable
-fun RunBlock(
+internal fun RunBlock(
     messages: List<UiMessage>,
     collapsed: Boolean,
     onToggleCollapsed: () -> Unit,

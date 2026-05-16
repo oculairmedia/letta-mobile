@@ -29,7 +29,7 @@ const val MAX_COMPOSER_ATTACHMENTS = 4
 const val MAX_COMPOSER_TOTAL_BYTES = 8 * 1024 * 1024
 
 @Immutable
-data class ChatComposerState(
+internal data class ChatComposerState(
     val inputText: String = "",
     val pendingAttachments: ImmutableList<MessageContentPart.Image> = persistentListOf(),
     val inputHistory: ImmutableList<String> = persistentListOf(),
@@ -39,20 +39,20 @@ data class ChatComposerState(
         get() = inputText.isNotBlank() || pendingAttachments.isNotEmpty()
 }
 
-data class ComposerSendPayload(
+internal data class ComposerSendPayload(
     val text: String,
     val attachments: List<MessageContentPart.Image>,
 )
 
-sealed interface ChatComposerEffect {
+internal sealed interface ChatComposerEffect {
     data object OpenBugReport : ChatComposerEffect
 }
 
-enum class ChatSlashCommand {
+internal enum class ChatSlashCommand {
     Bug,
 }
 
-object ChatSlashCommandParser {
+internal object ChatSlashCommandParser {
     fun parse(
         text: String,
         projectContextAvailable: Boolean,
@@ -65,11 +65,11 @@ object ChatSlashCommandParser {
     }
 }
 
-fun interface ChatComposerTelemetry {
+internal fun interface ChatComposerTelemetry {
     fun event(name: String, vararg attrs: Pair<String, Any?>)
 }
 
-class ChatComposerController(
+internal class ChatComposerController(
     private val telemetry: ChatComposerTelemetry = ChatComposerTelemetry { name, attrs ->
         Telemetry.event("AdminChatVM", name, *attrs)
     },

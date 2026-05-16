@@ -4,7 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import com.letta.mobile.feature.chat.ProjectChatContext
 import javax.inject.Inject
 
-class ChatRouteArgs @Inject constructor(
+internal class ChatRouteArgs @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
 ) {
     val agentId: String = requireNotNull(savedStateHandle.get<String>(AGENT_ID_KEY)) {

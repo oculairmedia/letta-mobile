@@ -30,14 +30,14 @@ private const val AUDIO_METER_MAX_DB = 100.0f
  *                         AudioAnimation normalizes this internally
  *                         (letta-mobile-57t5).
  */
-data class VoiceInputUiState(
+internal data class VoiceInputUiState(
     val recognizing: Boolean = false,
     val recognizedText: String = "",
     val amplitude: Int = 0,
 )
 
 @HiltViewModel
-class VoiceInputViewModel @Inject constructor(@ApplicationContext private val context: Context) :
+internal class VoiceInputViewModel @Inject constructor(@ApplicationContext private val context: Context) :
     ViewModel(), RecognitionListener {
     private val _uiState = MutableStateFlow(VoiceInputUiState())
     val uiState = _uiState.asStateFlow()

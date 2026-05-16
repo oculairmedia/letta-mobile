@@ -19,12 +19,10 @@ import com.letta.mobile.ui.theme.scaledBy
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import javax.inject.Inject
-import javax.inject.Singleton
 
 private val generatedUiJson = Json { ignoreUnknownKeys = true }
 
-interface GeneratedUiComponentRenderer {
+internal interface GeneratedUiComponentRenderer {
     val componentName: String
 
     @Composable
@@ -35,8 +33,7 @@ interface GeneratedUiComponentRenderer {
     )
 }
 
-@Singleton
-class GeneratedUiRegistry @Inject constructor() {
+internal class GeneratedUiRegistry {
     init {
         // letta-mobile-rnyg: do not fail on reassignment — tests construct
         // multiple instances. Last writer wins.
@@ -56,11 +53,8 @@ class GeneratedUiRegistry @Inject constructor() {
         private var INSTANCE: GeneratedUiRegistry? = null
 
         /**
-         * Static bridge for existing callers. Delegates to the Hilt-managed
-         * singleton. `LettaApplication` eagerly injects the instance so the
-         * production path goes through the Hilt-built singleton; tests and
-         * other callers that reach this before Hilt has built the registry
-         * get a lazily-created default instance.
+         * Static bridge for generated UI rendering. The registry is stateless,
+         * so callers can safely get a lazily-created default instance.
          */
         fun resolve(componentName: String): GeneratedUiComponentRenderer? {
             val instance = INSTANCE ?: synchronized(this) {
@@ -71,7 +65,7 @@ class GeneratedUiRegistry @Inject constructor() {
     }
 }
 
-object SummaryCardRenderer : GeneratedUiComponentRenderer {
+internal object SummaryCardRenderer : GeneratedUiComponentRenderer {
     override val componentName: String = "summary_card"
 
     @Composable
@@ -106,7 +100,7 @@ object SummaryCardRenderer : GeneratedUiComponentRenderer {
     }
 }
 
-object MetricCardRenderer : GeneratedUiComponentRenderer {
+internal object MetricCardRenderer : GeneratedUiComponentRenderer {
     override val componentName: String = "metric_card"
 
     @Composable
@@ -145,7 +139,7 @@ object MetricCardRenderer : GeneratedUiComponentRenderer {
     }
 }
 
-object SuggestionChipsRenderer : GeneratedUiComponentRenderer {
+internal object SuggestionChipsRenderer : GeneratedUiComponentRenderer {
     override val componentName: String = "suggestion_chips"
 
     @Composable
@@ -236,28 +230,28 @@ private fun GeneratedUiFallback(component: UiGeneratedComponent) {
 }
 
 @Serializable
-data class SummaryCardProps(
+internal data class SummaryCardProps(
     val title: String,
     val body: String? = null,
     val items: List<String> = emptyList(),
 )
 
 @Serializable
-data class MetricCardProps(
+internal data class MetricCardProps(
     val label: String,
     val value: String,
     @SerialName("supporting_text") val supportingText: String? = null,
 )
 
 @Serializable
-data class SuggestionChipsProps(
+internal data class SuggestionChipsProps(
     val title: String? = null,
     val body: String? = null,
     val suggestions: List<SuggestionChipAction> = emptyList(),
 )
 
 @Serializable
-data class SuggestionChipAction(
+internal data class SuggestionChipAction(
     val label: String,
     val message: String? = null,
 )

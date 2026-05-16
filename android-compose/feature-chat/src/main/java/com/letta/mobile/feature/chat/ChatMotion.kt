@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.IntSize
  * token chunks do not stack into wobble; user-triggered expansion gets the
  * slower Material easing used for readable local state changes.
  */
-object ChatMotion {
+internal object ChatMotion {
     const val StreamingSizeMillis = 60
     const val ContentSizeMillis = 220
     const val EnterMillis = 190

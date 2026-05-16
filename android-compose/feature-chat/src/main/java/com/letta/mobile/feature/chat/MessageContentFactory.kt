@@ -25,7 +25,7 @@ import com.letta.mobile.ui.theme.chatTypography
 import com.letta.mobile.ui.theme.scaledBy
 import kotlinx.collections.immutable.toImmutableList
 
-object GeneratedUiRenderer : MessageContentRenderer {
+internal object GeneratedUiRenderer : MessageContentRenderer {
     override fun canRender(message: UiMessage): Boolean = message.generatedUi != null
 
     @Composable
@@ -64,7 +64,7 @@ object GeneratedUiRenderer : MessageContentRenderer {
     }
 }
 
-interface MessageContentRenderer {
+internal interface MessageContentRenderer {
     fun canRender(message: UiMessage): Boolean
 
     @Composable
@@ -432,7 +432,7 @@ private fun insideOpenCodeFence(text: String): Boolean {
     return count % 2 == 1
 }
 
-object TextMessageRenderer : MessageContentRenderer {
+internal object TextMessageRenderer : MessageContentRenderer {
     override fun canRender(message: UiMessage) =
         message.role == "user" || (message.role == "assistant" && message.toolCalls.isNullOrEmpty())
 
@@ -463,7 +463,7 @@ object TextMessageRenderer : MessageContentRenderer {
     }
 }
 
-object ToolCallRenderer : MessageContentRenderer {
+internal object ToolCallRenderer : MessageContentRenderer {
     override fun canRender(message: UiMessage) =
         !message.toolCalls.isNullOrEmpty()
 
@@ -523,8 +523,8 @@ private fun GeneratedUiFallbackCard(component: com.letta.mobile.data.model.UiGen
     }
 }
 
-val defaultRenderers = listOf(GeneratedUiRenderer, ToolCallRenderer, TextMessageRenderer)
+internal val defaultRenderers = listOf(GeneratedUiRenderer, ToolCallRenderer, TextMessageRenderer)
 
-fun resolveRenderer(message: UiMessage): MessageContentRenderer {
+internal fun resolveRenderer(message: UiMessage): MessageContentRenderer {
     return defaultRenderers.firstOrNull { it.canRender(message) } ?: TextMessageRenderer
 }

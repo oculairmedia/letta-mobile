@@ -18,7 +18,7 @@ import com.letta.mobile.ui.common.GroupPosition
  *
  * letta-mobile-m772.2
  */
-sealed interface ChatRenderItem {
+internal sealed interface ChatRenderItem {
     /** Stable LazyColumn `key` — must be unique across the whole list. */
     val key: String
 
@@ -112,7 +112,7 @@ sealed interface ChatRenderItem {
  *
  * letta-mobile-m772.2
  */
-fun groupMessagesForRender(
+internal fun groupMessagesForRender(
     reversed: List<Pair<UiMessage, GroupPosition>>,
 ): List<ChatRenderItem> {
     if (reversed.isEmpty()) return emptyList()

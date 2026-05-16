@@ -58,7 +58,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
 @Composable
-fun ChatMessageList(
+internal fun ChatMessageList(
     state: ChatUiState,
     renderItems: List<ChatRenderItem>,
     chatMode: String,
@@ -531,7 +531,7 @@ internal fun newestMessageAutoScrollSignature(messages: List<UiMessage>): ChatAu
     )
 }
 
-fun calculateLazyIndexForRenderItem(
+internal fun calculateLazyIndexForRenderItem(
     targetRenderIndex: Int,
     renderItems: List<ChatRenderItem>,
 ): Int {

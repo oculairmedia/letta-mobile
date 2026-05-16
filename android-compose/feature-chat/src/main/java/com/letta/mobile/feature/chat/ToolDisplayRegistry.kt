@@ -1,16 +1,12 @@
 package com.letta.mobile.feature.chat
 
-import javax.inject.Inject
-import javax.inject.Singleton
-
-data class ToolDisplayInfo(
+internal data class ToolDisplayInfo(
     val emoji: String,
     val label: String,
     val detailLine: String? = null,
 )
 
-@Singleton
-class ToolDisplayRegistry @Inject constructor() {
+internal class ToolDisplayRegistry {
     init {
         // letta-mobile-rnyg: do not fail on reassignment — tests construct
         // multiple instances. Last writer wins.
@@ -118,11 +114,8 @@ class ToolDisplayRegistry @Inject constructor() {
         private var INSTANCE: ToolDisplayRegistry? = null
 
         /**
-         * Static bridge for existing callers. Delegates to the Hilt-managed
-         * singleton. `LettaApplication` eagerly injects the instance so the
-         * production path goes through the Hilt-built singleton; tests and
-         * other callers that reach this before Hilt has built the registry
-         * get a lazily-created default instance (same shape, no @Inject deps).
+         * Static bridge for chat tool display. The registry is stateless, so
+         * callers can safely get a lazily-created default instance.
          */
         fun resolve(toolName: String, args: String? = null): ToolDisplayInfo {
             val instance = INSTANCE ?: synchronized(this) {

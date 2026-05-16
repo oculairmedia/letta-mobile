@@ -9,7 +9,7 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentSetOf
 
 @androidx.compose.runtime.Immutable
-data class ProjectChatContext(
+internal data class ProjectChatContext(
     val identifier: String,
     val name: String,
     val lettaFolderId: String? = null,
@@ -20,13 +20,13 @@ data class ProjectChatContext(
 )
 
 @androidx.compose.runtime.Immutable
-data class PendingToolCall(
+internal data class PendingToolCall(
     val id: String,
     val name: String,
     val startedAt: Long = System.currentTimeMillis(),
 )
 
-enum class ProjectBriefSectionKey {
+internal enum class ProjectBriefSectionKey {
     Description,
     KeyDecisions,
     TechStack,
@@ -35,7 +35,7 @@ enum class ProjectBriefSectionKey {
 }
 
 @androidx.compose.runtime.Immutable
-data class ProjectBriefSection(
+internal data class ProjectBriefSection(
     val key: ProjectBriefSectionKey,
     val blockLabel: String,
     val content: String,
@@ -43,7 +43,7 @@ data class ProjectBriefSection(
 )
 
 @androidx.compose.runtime.Immutable
-data class ProjectBriefUiState(
+internal data class ProjectBriefUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     // ImmutableMap so Compose treats this whole state as stable — raw
@@ -54,7 +54,7 @@ data class ProjectBriefUiState(
     val error: String? = null,
 )
 
-enum class BugSeverity(val wireValue: String) {
+internal enum class BugSeverity(val wireValue: String) {
     Critical("critical"),
     High("high"),
     Medium("medium"),
@@ -62,7 +62,7 @@ enum class BugSeverity(val wireValue: String) {
 }
 
 @androidx.compose.runtime.Immutable
-data class ProjectBugReportDraft(
+internal data class ProjectBugReportDraft(
     val title: String = "",
     val description: String = "",
     val severity: BugSeverity = BugSeverity.Medium,
@@ -71,14 +71,14 @@ data class ProjectBugReportDraft(
 )
 
 @androidx.compose.runtime.Immutable
-data class ProjectBugReportUiState(
+internal data class ProjectBugReportUiState(
     val isSubmitting: Boolean = false,
     val recentReports: ImmutableList<ProjectBugReport> = persistentListOf(),
     val lastSubmittedPrompt: String? = null,
     val error: String? = null,
 )
 
-enum class ProjectAgentStatusTone {
+internal enum class ProjectAgentStatusTone {
     Neutral,
     Good,
     Busy,
@@ -86,7 +86,7 @@ enum class ProjectAgentStatusTone {
 }
 
 @androidx.compose.runtime.Immutable
-data class ProjectAgentActivity(
+internal data class ProjectAgentActivity(
     val id: String,
     val name: String,
     val statusLabel: String,
@@ -97,14 +97,14 @@ data class ProjectAgentActivity(
 )
 
 @androidx.compose.runtime.Immutable
-data class ProjectAgentsUiState(
+internal data class ProjectAgentsUiState(
     val isLoading: Boolean = false,
     val agents: ImmutableList<ProjectAgentActivity> = persistentListOf(),
     val error: String? = null,
 )
 
 @androidx.compose.runtime.Immutable
-data class ClientModeLocationUiState(
+internal data class ClientModeLocationUiState(
     val isLoading: Boolean = false,
     val currentPath: String? = null,
     val defaultPath: String? = null,
@@ -113,7 +113,7 @@ data class ClientModeLocationUiState(
 )
 
 @androidx.compose.runtime.Immutable
-data class ClientModeFilesystemPickerUiState(
+internal data class ClientModeFilesystemPickerUiState(
     val isVisible: Boolean = false,
     val isLoading: Boolean = false,
     val path: String? = null,
@@ -124,7 +124,7 @@ data class ClientModeFilesystemPickerUiState(
 )
 
 @androidx.compose.runtime.Immutable
-data class ContextWindowUiState(
+internal data class ContextWindowUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val maxTokens: Int = 0,
@@ -143,7 +143,7 @@ data class ContextWindowUiState(
         get() = if (maxTokens > 0) ((currentTokens.toFloat() / maxTokens.toFloat()) * 100).toInt().coerceIn(0, 100) else 0
 }
 
-sealed interface ConversationState {
+internal sealed interface ConversationState {
     @androidx.compose.runtime.Immutable
     data object Loading : ConversationState
 
@@ -158,7 +158,7 @@ sealed interface ConversationState {
 }
 
 @androidx.compose.runtime.Immutable
-data class ChatUiState(
+internal data class ChatUiState(
     val conversationState: ConversationState = ConversationState.Loading,
     val messages: ImmutableList<UiMessage> = persistentListOf(),
     val isLoadingMessages: Boolean = true,
@@ -202,7 +202,7 @@ data class ChatUiState(
  * Emitted by `AdminChatViewModel` when `session_init.conversation_id` differs
  * from the conversation we asked the gateway to resume.
  */
-data class ClientModeConversationSwap(
+internal data class ClientModeConversationSwap(
     val requestedConversationId: String,
     val newConversationId: String,
 )

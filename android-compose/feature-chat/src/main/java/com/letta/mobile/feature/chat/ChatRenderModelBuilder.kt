@@ -12,7 +12,7 @@ import java.time.Instant
  * Debug currently uses the same message set as Interactive; it only changes
  * the per-message renderer in ChatScreen.
  */
-enum class ChatDisplayMode {
+internal enum class ChatDisplayMode {
     Simple,
     Interactive,
     Debug,
@@ -20,7 +20,7 @@ enum class ChatDisplayMode {
 
 private const val ChatRenderModelDebugLogging = false
 
-fun String.toChatDisplayMode(): ChatDisplayMode = when (this) {
+internal fun String.toChatDisplayMode(): ChatDisplayMode = when (this) {
     "simple" -> ChatDisplayMode.Simple
     "debug" -> ChatDisplayMode.Debug
     else -> ChatDisplayMode.Interactive
@@ -32,13 +32,13 @@ fun String.toChatDisplayMode(): ChatDisplayMode = when (this) {
  * [visibleMessages] and [groupedMessages] are in chronological chat order.
  * [renderItems] is newest-first, matching LazyColumn(reverseLayout = true).
  */
-data class ChatRenderModel(
+internal data class ChatRenderModel(
     val visibleMessages: List<UiMessage>,
     val groupedMessages: List<Pair<UiMessage, GroupPosition>>,
     val renderItems: List<ChatRenderItem>,
 )
 
-fun buildChatRenderModel(
+internal fun buildChatRenderModel(
     messages: List<UiMessage>,
     mode: ChatDisplayMode,
 ): ChatRenderModel {
@@ -146,7 +146,7 @@ private fun UiMessage.isTurnLatencyTarget(): Boolean =
         approvalResponse == null &&
         attachments.isEmpty()
 
-fun dedupeReasoningAssistantEchoes(messages: List<UiMessage>): List<UiMessage> {
+internal fun dedupeReasoningAssistantEchoes(messages: List<UiMessage>): List<UiMessage> {
     val result = ArrayList<UiMessage>(messages.size)
     var lastReasoningContent: String? = null
     for (msg in messages) {
@@ -175,7 +175,7 @@ private fun UiMessage.isPlainAssistantTextEchoOf(lastReasoningContent: String?):
         attachments.isEmpty()
 }
 
-fun filterMessagesForMode(
+internal fun filterMessagesForMode(
     messages: List<UiMessage>,
     mode: ChatDisplayMode,
 ): List<UiMessage> = when (mode) {
@@ -194,7 +194,7 @@ fun filterMessagesForMode(
     ChatDisplayMode.Debug -> messages
 }
 
-fun dedupeGroupedMessagesForLazyKeys(
+internal fun dedupeGroupedMessagesForLazyKeys(
     groupedMessages: List<Pair<UiMessage, GroupPosition>>,
 ): List<Pair<UiMessage, GroupPosition>> {
     // Defensive: LazyColumn crashes on duplicate item keys. mergeOlderMessages

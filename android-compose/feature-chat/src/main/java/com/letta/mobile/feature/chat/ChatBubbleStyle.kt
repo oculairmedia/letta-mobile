@@ -4,7 +4,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-data class ChatBubbleStyle(
+internal data class ChatBubbleStyle(
     val alignEnd: Boolean,
     val containerColor: Color,
     val roleColor: Color,
@@ -12,7 +12,7 @@ data class ChatBubbleStyle(
 )
 
 @Composable
-fun bubbleStyle(role: String, isStreaming: Boolean = false, isError: Boolean = false): ChatBubbleStyle {
+internal fun bubbleStyle(role: String, isStreaming: Boolean = false, isError: Boolean = false): ChatBubbleStyle {
     val colorScheme = MaterialTheme.colorScheme
     val accent = colorScheme.primary
 

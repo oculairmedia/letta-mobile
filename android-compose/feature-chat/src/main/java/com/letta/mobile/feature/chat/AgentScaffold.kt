@@ -122,7 +122,7 @@ import com.letta.mobile.ui.theme.listItemHeadline
 import kotlinx.collections.immutable.toImmutableList
 import java.util.Locale
 
-object AgentScaffoldTestTags {
+internal object AgentScaffoldTestTags {
     const val MENU_BUTTON = "agent_scaffold_menu_button"
     const val DRAWER_CONTENT = "agent_scaffold_drawer_content"
     const val CONVERSATION_PICKER_TRIGGER = "agent_scaffold_conversation_picker_trigger"
@@ -149,8 +149,31 @@ fun AgentScaffold(
     onNavigateToArchival: ((String) -> Unit)? = null,
     onNavigateToTools: (() -> Unit)? = null,
     onSwitchConversation: ((String, String?, String?) -> Unit)? = null,
+    viewModelKey: String? = null,
+) {
+    AgentScaffoldContent(
+        initialProjectStartAction = initialProjectStartAction,
+        onNavigateBack = onNavigateBack,
+        onNavigateToSettings = onNavigateToSettings,
+        onNavigateToArchival = onNavigateToArchival,
+        onNavigateToTools = onNavigateToTools,
+        onSwitchConversation = onSwitchConversation,
+        conversationRepository = null,
+        viewModel = hiltViewModel(key = viewModelKey),
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+internal fun AgentScaffoldContent(
+    initialProjectStartAction: String? = null,
+    onNavigateBack: () -> Unit,
+    onNavigateToSettings: (String) -> Unit,
+    onNavigateToArchival: ((String) -> Unit)? = null,
+    onNavigateToTools: (() -> Unit)? = null,
+    onSwitchConversation: ((String, String?, String?) -> Unit)? = null,
     conversationRepository: ConversationRepository? = null,
-    viewModel: AdminChatViewModel = hiltViewModel()
+    viewModel: AdminChatViewModel,
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()

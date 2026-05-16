@@ -22,7 +22,7 @@ package com.letta.mobile.feature.chat
  *  - When the stream ends, it keeps the current/tweened velocity instead of draining faster, so the
  *    remaining buffered tail does not race in and flicker.
  */
-class StreamingDisplayTextSmoother(
+internal class StreamingDisplayTextSmoother(
     private val initialCharsPerMs: Float = DEFAULT_CHARS_PER_MS,
 ) {
     private var target: String = ""

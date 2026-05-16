@@ -25,7 +25,7 @@ import com.letta.mobile.data.model.UiImageAttachment
  * Compose/UI thread and can be downsampled/cached by the image pipeline.
  */
 @Composable
-fun MessageAttachmentsGrid(
+internal fun MessageAttachmentsGrid(
     attachments: kotlinx.collections.immutable.ImmutableList<UiImageAttachment>,
     modifier: Modifier = Modifier,
 ) {

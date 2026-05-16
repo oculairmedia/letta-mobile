@@ -4,6 +4,14 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -69,7 +77,6 @@ import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.ShimmerBox
 import com.letta.mobile.ui.components.TextInputDialog
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.feature.chat.ChatMotion
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.util.formatRelativeTime
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
@@ -533,13 +540,11 @@ private fun ProjectIssueCompletedTimelineCard(
     modifier: Modifier = Modifier,
 ) {
     // letta-mobile: collapsed by default to match the tool-call card pattern
-    // (see ChatToolCallCards). Reusing ChatMotion design tokens for the
-    // chevron rotation + content size animation keeps motion consistent
-    // across the app.
+    // while keeping project-screen motion local to the app module.
     var expanded by rememberSaveable(items) { mutableStateOf(false) }
     val chevronRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
-        animationSpec = ChatMotion.chipCrossfadeSpec,
+        animationSpec = projectTimelineChipCrossfadeSpec,
         label = "ProjectTimelineChevronRotation",
     )
 
@@ -602,8 +607,8 @@ private fun ProjectIssueCompletedTimelineCard(
             } else {
                 AnimatedVisibility(
                     visible = expanded,
-                    enter = ChatMotion.expandEnter(),
-                    exit = ChatMotion.expandExit(),
+                    enter = projectTimelineExpandEnter(),
+                    exit = projectTimelineExpandExit(),
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         val timelineHeight = ((items.size.coerceAtMost(4) * 96) + 24).dp
@@ -656,6 +661,23 @@ private fun ProjectIssueCompletedTimelineCard(
         }
     }
 }
+
+private val projectTimelineChipCrossfadeSpec =
+    tween<Float>(durationMillis = 150, easing = FastOutSlowInEasing)
+
+private fun projectTimelineExpandEnter() =
+    fadeIn(animationSpec = tween(durationMillis = 190, easing = LinearOutSlowInEasing)) +
+        expandVertically(
+            animationSpec = tween(durationMillis = 190, easing = LinearOutSlowInEasing),
+            expandFrom = Alignment.Top,
+        )
+
+private fun projectTimelineExpandExit() =
+    fadeOut(animationSpec = tween(durationMillis = 90, easing = FastOutLinearInEasing)) +
+        shrinkVertically(
+            animationSpec = tween(durationMillis = 130, easing = FastOutLinearInEasing),
+            shrinkTowards = Alignment.Top,
+        )
 
 @Composable
 private fun ProjectIssueTimelineEvent(

@@ -94,7 +94,7 @@ class AgentScaffoldHiltTest {
     @Test
     fun drawerOpensWhenMenuIconTapped() {
         composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
-            AgentScaffold(
+            AgentScaffoldContent(
                 onNavigateBack = {},
                 onNavigateToSettings = {},
                 conversationRepository = conversationRepository,
@@ -110,7 +110,7 @@ class AgentScaffoldHiltTest {
     fun drawerEditAgentFiresCallback() {
         var settingsCalledWith = ""
         composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
-            AgentScaffold(
+            AgentScaffoldContent(
                 onNavigateBack = {},
                 onNavigateToSettings = { settingsCalledWith = it },
                 conversationRepository = conversationRepository,
@@ -128,7 +128,7 @@ class AgentScaffoldHiltTest {
     @Test
     fun drawerResetMessagesCallsViewModel() {
         composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
-            AgentScaffold(
+            AgentScaffoldContent(
                 onNavigateBack = {},
                 onNavigateToSettings = {},
                 conversationRepository = conversationRepository,
@@ -144,7 +144,7 @@ class AgentScaffoldHiltTest {
     @Test
     fun menuClickRefreshesContextWindowAndOpensDrawer() {
         composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
-            AgentScaffold(
+            AgentScaffoldContent(
                 onNavigateBack = {},
                 onNavigateToSettings = {},
                 conversationRepository = conversationRepository,
@@ -160,7 +160,7 @@ class AgentScaffoldHiltTest {
     @Test
     fun searchActionShowsGlobalSearchFieldAndForwardsQuery() {
         composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
-            AgentScaffold(
+            AgentScaffoldContent(
                 onNavigateBack = {},
                 onNavigateToSettings = {},
                 conversationRepository = conversationRepository,
@@ -202,7 +202,7 @@ class AgentScaffoldHiltTest {
         )
 
         composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
-            AgentScaffold(
+            AgentScaffoldContent(
                 onNavigateBack = {},
                 onNavigateToSettings = {},
                 conversationRepository = conversationRepository,
@@ -232,7 +232,7 @@ class AgentScaffoldHiltTest {
         )
 
         composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
-            AgentScaffold(
+            AgentScaffoldContent(
                 onNavigateBack = {},
                 onNavigateToSettings = {},
                 conversationRepository = conversationRepository,
@@ -257,7 +257,7 @@ class AgentScaffoldHiltTest {
         )
 
         composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
-            AgentScaffold(
+            AgentScaffoldContent(
                 onNavigateBack = {},
                 onNavigateToSettings = {},
                 conversationRepository = conversationRepository,
@@ -274,7 +274,7 @@ class AgentScaffoldHiltTest {
         every { viewModel.projectContext } returns null
 
         composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
-            AgentScaffold(
+            AgentScaffoldContent(
                 onNavigateBack = {},
                 onNavigateToSettings = {},
                 conversationRepository = conversationRepository,

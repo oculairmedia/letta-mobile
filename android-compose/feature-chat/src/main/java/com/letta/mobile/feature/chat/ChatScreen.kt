@@ -53,7 +53,7 @@ import com.letta.mobile.ui.theme.isExpandedWidth
 import kotlin.math.max
 
 @Composable
-fun ChatScreen(
+internal fun ChatScreen(
     modifier: Modifier = Modifier,
     chatBackground: ChatBackground = ChatBackground.Default,
     chatMode: String = "interactive",

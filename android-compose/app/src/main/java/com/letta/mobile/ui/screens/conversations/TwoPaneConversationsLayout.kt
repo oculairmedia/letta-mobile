@@ -124,10 +124,7 @@ fun TwoPaneConversationsLayout(
                                 popUpTo(AgentChatRoute::class) { inclusive = true }
                             }
                         },
-                        viewModel = androidx.hilt.navigation.compose.hiltViewModel(
-                            backStackEntry,
-                            key = route.toViewModelKey(),
-                        ),
+                        viewModelKey = route.toViewModelKey(),
                     )
                 }
             }

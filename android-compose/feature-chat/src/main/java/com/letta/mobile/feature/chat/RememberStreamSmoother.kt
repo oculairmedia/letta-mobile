@@ -31,7 +31,7 @@ import kotlinx.coroutines.isActive
  * wasted frames at rest.
  */
 @Composable
-fun rememberSmoothedStreamingText(
+internal fun rememberSmoothedStreamingText(
     rawText: String,
     isStreaming: Boolean,
 ): String {

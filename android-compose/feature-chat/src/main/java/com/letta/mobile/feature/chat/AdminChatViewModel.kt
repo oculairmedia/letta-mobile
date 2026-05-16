@@ -57,7 +57,7 @@ import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
 @HiltViewModel
-class AdminChatViewModel @Inject constructor(
+internal class AdminChatViewModel @Inject constructor(
     private val routeArgs: ChatRouteArgs,
     private val messageRepository: MessageRepository,
     private val timelineRepository: com.letta.mobile.data.timeline.TimelineRepository,

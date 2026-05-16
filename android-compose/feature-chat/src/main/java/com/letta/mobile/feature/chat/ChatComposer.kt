@@ -55,7 +55,7 @@ private val ChatComposerInputItemSpacing = 6.dp
  * focused and to make the composer independently testable.
  */
 @Composable
-fun ChatComposer(
+internal fun ChatComposer(
     inputText: String,
     pendingAttachments: ImmutableList<MessageContentPart.Image>,
     isStreaming: Boolean,

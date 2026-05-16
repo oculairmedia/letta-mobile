@@ -518,7 +518,7 @@ internal fun conversationActivityText(conversation: Conversation): String? {
     }
 }
 
-sealed interface ConversationSwitchAction {
+internal sealed interface ConversationSwitchAction {
     val conversationId: String?
 
     data object NewConversation : ConversationSwitchAction {
@@ -529,7 +529,7 @@ sealed interface ConversationSwitchAction {
 }
 
 @HiltViewModel
-class ConversationPickerViewModel @Inject constructor(
+internal class ConversationPickerViewModel @Inject constructor(
     val conversationRepository: ConversationRepository,
 ) : ViewModel() {
 
