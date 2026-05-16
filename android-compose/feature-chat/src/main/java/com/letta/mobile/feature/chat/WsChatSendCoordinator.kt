@@ -2,6 +2,7 @@ package com.letta.mobile.feature.chat
 
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.WsChatBridge
@@ -23,6 +24,7 @@ internal class WsChatSendCoordinator(
     private val activeConfig: () -> LettaConfig?,
     private val wsChatBridge: WsChatBridge,
     private val timelineRepository: TimelineRepository,
+    private val conversationRepository: ConversationRepository,
     private val uiState: MutableStateFlow<ChatUiState>,
     private val clearComposerAfterSend: () -> Unit,
     private val activeConversationId: () -> String?,
@@ -72,7 +74,28 @@ internal class WsChatSendCoordinator(
         // still trips its cap we surface protocol_violation as a one-
         // shot toast via the standard Error path.
 
-        val conversationId = defaultShimConversationId(agentId)
+        // letta-mobile-vcky: respect the route's active conversation id.
+        // The old hardcoded `conv-default-<agentId>` collapsed every WS send
+        // (and every picker selection) into a single agent-wide bucket, so
+        // "new conversation" silently resumed the agent's full history.
+        //
+        // - If the user picked an existing conversation: activeConversationId()
+        //   carries the real `conv-<uuid>` from the picker.
+        // - If this is a fresh route (no active conversation yet): mint a new
+        //   conversation via REST. The shim's POST /v1/conversations writes
+        //   a real `conv-<uuid>` to disk that subsequent listings surface, so
+        //   the new chat shows up in the picker AFTER the first send.
+        //   (letta-mobile-wdrc tracks moving this mint into the WS protocol
+        //   so first-send avoids the extra REST round-trip; until then this
+        //   path also serves as the fallback for "WS not connected yet".)
+        val conversationId = activeConversationId() ?: runCatching {
+            conversationRepository.createConversation(agentId).id
+        }.getOrElse { err ->
+            Telemetry.error("AdminChatVM", "ws.send.createConversationFailed", err)
+            failSend("Failed to create a new conversation: ${err.message ?: "unknown"}")
+            timer.stop("accepted" to false, "reason" to "create_failed")
+            return@launch
+        }
         activeWsConversationId = conversationId
         setActiveConversationId(conversationId)
         startTimelineObserver(conversationId)
