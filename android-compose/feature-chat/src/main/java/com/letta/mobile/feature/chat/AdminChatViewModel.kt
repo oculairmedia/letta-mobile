@@ -604,16 +604,6 @@ internal class AdminChatViewModel @Inject constructor(
         attachments: List<MessageContentPart.Image>,
     ) {
         val context = chatSendContext()
-        // letta-mobile-flk.6 debug: log the route + freshness predicates so
-        // we can correlate device taps with the lettabot gateway's
-        // Auto-resuming vs Forced-new outcome. Remove once verified.
-        android.util.Log.i(
-            "AdminChatViewModel",
-            "flk6.sendMessage agent=$agentId via=${context.debugRouteName()} " +
-                "isFreshRoute=$isFreshRoute explicitConv=$explicitConversationId " +
-                "clientModeConv=${currentClientModeConversationId()} " +
-                "active=${chatConversationCoordinator.activeConversationId}",
-        )
         chatSendStrategySelector.send(text, attachments, context)
     }
 
@@ -624,12 +614,6 @@ internal class AdminChatViewModel @Inject constructor(
         explicitConversationId = explicitConversationId,
         isShimBackend = isShimBackend.value,
     )
-
-    private fun ChatSendContext.debugRouteName(): String = when {
-        isClientModeEnabled -> "client_mode"
-        isShimBackend -> "ws"
-        else -> "timeline"
-    }
 
     private fun currentClientModeConversationId(): String? =
         routeArgs.currentClientModeConversationId()
@@ -724,7 +708,6 @@ internal class AdminChatViewModel @Inject constructor(
         }
 
     fun onScreenPaused() {
-        android.util.Log.w("AdminChatVM-LIFECYCLE", "onScreenPaused clearing tracker prev=${currentConversationTracker.current}")
         currentConversationTracker.setCurrent(null)
     }
 
@@ -739,7 +722,6 @@ internal class AdminChatViewModel @Inject constructor(
         val now = android.os.SystemClock.elapsedRealtime()
         if (now - lastScreenResumedAtMs < 200) return
         lastScreenResumedAtMs = now
-        android.util.Log.w("AdminChatVM-LIFECYCLE", "onScreenResumed restoring tracker to convId=$conversationId")
         conversationId?.let { currentConversationTracker.setCurrent(it) }
     }
 

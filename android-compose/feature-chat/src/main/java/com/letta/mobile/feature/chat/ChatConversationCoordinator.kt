@@ -77,10 +77,6 @@ internal class ChatConversationCoordinator(
         hasResolvedConversationOnce = true
         if (isFreshRoute && isFirstResolve && explicitConversationId == null) {
             activeConversationId = null
-            android.util.Log.i(
-                "AdminChatViewModel",
-                "flk6.clearActive agent=$agentId reason=freshRouteInitialResolve",
-            )
         }
         scope.launch {
             uiState.value = uiState.value.copy(
