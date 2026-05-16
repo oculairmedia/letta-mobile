@@ -160,6 +160,11 @@ private fun AssistantResponseText(
     // final parsed-subtree/spacing handoff flash; hydrated messages still use MarkdownText because
     // hasStreamed is false for them. Once caught up after stream end, hide the cursor while keeping
     // the stable streaming layout.
+    // letta-mobile-9hcg.b: pass an effectively-streaming bit that stays
+    // true while the smoother is still catching up. Without this, the
+    // moment `isStreaming` flips false the height animation collapses
+    // mid-catch-up and the bubble flashes back to the smoothed length.
+    val effectivelyStreaming = isStreaming || smoothedText != text
     StreamingMarkdownText(
         text = smoothedText,
         textColor = textColor,
@@ -169,7 +174,7 @@ private fun AssistantResponseText(
         cursorAlpha = cursorAlpha,
         deferUnstableMarkdown = showCursor,
         stabilizeTables = hasStreamed || hasTable,
-        isStreaming = isStreaming,
+        isStreaming = effectivelyStreaming,
         modifier = modifier,
     )
 }

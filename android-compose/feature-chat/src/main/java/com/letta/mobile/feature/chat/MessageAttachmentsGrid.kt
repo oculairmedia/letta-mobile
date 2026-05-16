@@ -78,15 +78,17 @@ private fun AttachmentImage(
             mediaType = attachment.mediaType,
         )
     }
-    val dataUrl = remember(attachment.base64, attachment.mediaType) {
-        chatAttachmentImageDataUrl(
-            base64 = attachment.base64,
-            mediaType = attachment.mediaType,
-        )
+    // letta-mobile-axb2: feed Coil3 a ByteArray rather than a data: URI.
+    // Coil3 dropped the Coil2 data:-URI fetcher, so the URI path resolves
+    // to a null Bitmap and the AsyncImage renders blank.
+    val bytes = remember(attachment.base64) {
+        runCatching {
+            android.util.Base64.decode(attachment.base64, android.util.Base64.DEFAULT)
+        }.getOrDefault(ByteArray(0))
     }
-    val request = remember(context, dataUrl, cacheKey) {
+    val request = remember(context, bytes, cacheKey) {
         ImageRequest.Builder(context)
-            .data(dataUrl)
+            .data(bytes)
             .memoryCacheKey(cacheKey)
             .diskCacheKey(cacheKey)
             .build()

@@ -228,6 +228,15 @@ internal class WsChatSendCoordinator(
                         )
                     }
                 }
+                // letta-mobile-9hcg: flip the optimistic Local user bubble
+                // from SENDING→SENT on every TurnDone. Without this, the
+                // Local appended in [appendExternalTransportLocal] stays
+                // SENDING for the lifetime of the cached timeline, which
+                // keeps ChatTimelineObserver's isStreaming gate latched
+                // and produces a typing-indicator flap on the next emit.
+                activeWsOtid?.let { otid ->
+                    timelineRepository.markExternalTransportLocalSent(conversationId, otid)
+                }
                 // lcp-axv: error-then-turn_done arrives in lock-step on failed
                 // turns. Prefer the buffered error message from the preceding
                 // Error frame when status="failed"; fall back to a generic

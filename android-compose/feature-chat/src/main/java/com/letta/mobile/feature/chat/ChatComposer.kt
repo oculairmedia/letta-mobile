@@ -219,15 +219,19 @@ private fun AttachmentThumbnail(
             mediaType = image.mediaType,
         )
     }
-    val dataUrl = remember(image.base64, image.mediaType) {
-        chatAttachmentImageDataUrl(
-            base64 = image.base64,
-            mediaType = image.mediaType,
-        )
+    // letta-mobile-axb2: Coil3 dropped the data: URI fetcher that Coil2
+    // shipped, so passing `data:image/jpeg;base64,<...>` resolves to a
+    // null Bitmap and the AsyncImage renders an empty square. Feed Coil
+    // the decoded ByteArray instead — Coil3's BitmapFetcher handles it
+    // directly and the memory/disk cache keys still scope correctly.
+    val bytes = remember(image.base64) {
+        runCatching {
+            android.util.Base64.decode(image.base64, android.util.Base64.DEFAULT)
+        }.getOrDefault(ByteArray(0))
     }
-    val request = remember(context, dataUrl, cacheKey) {
+    val request = remember(context, bytes, cacheKey) {
         ImageRequest.Builder(context)
-            .data(dataUrl)
+            .data(bytes)
             .memoryCacheKey(cacheKey)
             .diskCacheKey(cacheKey)
             .build()
