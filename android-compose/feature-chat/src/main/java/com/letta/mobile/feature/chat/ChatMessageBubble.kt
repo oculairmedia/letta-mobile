@@ -7,32 +7,23 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.feature.chat.R
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.LatencyText
 import com.letta.mobile.ui.components.MessageBubbleShape
-import com.letta.mobile.ui.icons.LettaIconSizing
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LocalChatIsPinching
 import com.letta.mobile.ui.theme.chatColors
 import com.letta.mobile.ui.theme.chatDimens
@@ -165,39 +156,18 @@ internal fun MessageBubbleSurface(
             // approvals, generated UI) keep the label so the kind of content
             // is obvious.
             if ((groupPosition == GroupPosition.First || groupPosition == GroupPosition.None) && !bubbleLess) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Text(
-                        text = message.displayRoleLabel(style.roleLabel),
-                        style = typo.roleLabel,
-                        color = style.roleColor,
-                    )
-                    if (message.isPending) {
-                        Icon(
-                            imageVector = LettaIcons.AccessTime,
-                            contentDescription = stringResource(R.string.screen_chat_pending_content_description),
-                            modifier = Modifier
-                                .size(LettaIconSizing.Inline)
-                                .alpha(0.7f),
-                            tint = style.roleColor,
-                        )
-                    }
-                }
-            } else if (bubbleLess && message.isPending) {
-                // Still surface the pending indicator for bubble-less
-                // messages — render as a standalone small icon row above the
-                // prose so it doesn't disappear silently.
-                Icon(
-                    imageVector = LettaIcons.AccessTime,
-                    contentDescription = stringResource(R.string.screen_chat_pending_content_description),
-                    modifier = Modifier
-                        .size(LettaIconSizing.Inline)
-                        .alpha(0.6f),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                Text(
+                    text = message.displayRoleLabel(style.roleLabel),
+                    style = typo.roleLabel,
+                    color = style.roleColor,
                 )
             }
+            // letta-mobile-vcky.b: dropped the AccessTime clock icon next to
+            // pending-message role labels. The bottom-of-list ThinkingShader
+            // is now the single in-flight indicator — per-bubble pending
+            // chrome doubled up with it and added visual noise (especially
+            // on bubble-less assistant prose where the icon floated above
+            // the body with no anchor).
 
             val approvalRequest = message.approvalRequest
             if (approvalRequest != null) {

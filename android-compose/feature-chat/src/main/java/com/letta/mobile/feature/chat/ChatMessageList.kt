@@ -47,7 +47,8 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.DateSeparator
 import com.letta.mobile.ui.components.ScrollToBottomFab
-import com.letta.mobile.ui.components.TypingIndicator
+import com.letta.mobile.ui.components.ThinkingShader
+import com.letta.mobile.ui.theme.chatColors
 import com.letta.mobile.ui.theme.LocalChatIsPinching
 import com.letta.mobile.ui.theme.chatDimens
 import java.time.LocalDate
@@ -323,12 +324,19 @@ internal fun ChatMessageList(
                 },
             ) {
                 item(key = "typing") {
+                    // letta-mobile-vcky.b: replaced the bordered "Thinking…"
+                    // chip with a thin AGSL wave band tinted by the agent
+                    // role color. The band has soft top/bottom alpha so it
+                    // dissolves into the list background — no hard edges.
                     AnimatedVisibility(
                         visible = state.isStreaming,
                         enter = ChatMotion.expandEnter(),
                         exit = ChatMotion.expandExit(),
                     ) {
-                        TypingIndicator(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+                        ThinkingShader(
+                            tint = MaterialTheme.chatColors.agentRoleLabel,
+                            bgColor = MaterialTheme.colorScheme.surface,
+                        )
                     }
                 }
 
