@@ -1,4 +1,4 @@
-package com.letta.mobile.ui.screens.editagent
+package com.letta.mobile.feature.editagent
 
 import com.letta.mobile.ui.theme.LettaCodeFont
 
@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,24 +43,19 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.letta.mobile.R
+import com.letta.mobile.feature.editagent.R
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockId
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.Tool
-import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.Accordions
 import com.letta.mobile.ui.components.EmptyState
-import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ExpandableTitleSearch
 import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.highlightSearchMatches
 import com.letta.mobile.ui.components.rememberSearchHighlightColors
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.screens.blocks.BlockLibraryViewModel
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 
 @Composable
@@ -427,11 +421,10 @@ internal fun SelectableToolCard(
 @Composable
 internal fun FullScreenBlockPickerDialog(
     excludedBlockIds: List<String>,
+    availableBlocks: List<Block>,
     onDismiss: () -> Unit,
     onConfirm: (List<String>) -> Unit,
-    viewModel: BlockLibraryViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf("") }
     var searchExpanded by rememberSaveable { mutableStateOf(true) }
     var selection by remember(excludedBlockIds) { mutableStateOf(emptySet<String>()) }
@@ -472,74 +465,45 @@ internal fun FullScreenBlockPickerDialog(
                 )
             },
         ) { paddingValues ->
-            when (val state = uiState) {
-                is UiState.Loading -> {
-                    Box(
-                        modifier = Modifier
-                            .padding(paddingValues)
-                            .fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            CircularProgressIndicator()
-                            Text(
-                                text = stringResource(R.string.common_loading),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+            val filteredBlocks = remember(availableBlocks, excludedBlockIds, query) {
+                val normalizedQuery = query.trim().lowercase()
+                val excluded = excludedBlockIds.mapTo(HashSet()) { BlockId(it) }
+                availableBlocks
+                    .filter { it.id !in excluded }
+                    .filter { block ->
+                        normalizedQuery.isBlank() ||
+                            (block.label?.lowercase()?.contains(normalizedQuery) == true) ||
+                            (block.description?.lowercase()?.contains(normalizedQuery) == true) ||
+                            block.value.lowercase().contains(normalizedQuery)
                     }
-                }
-                is UiState.Error -> ErrorContent(
-                    message = state.message,
-                    onRetry = { },
-                    modifier = Modifier.padding(paddingValues),
+            }
+            if (filteredBlocks.isEmpty()) {
+                EmptyState(
+                    icon = LettaIcons.Search,
+                    message = stringResource(R.string.screen_blocks_empty_available),
+                    modifier = Modifier.padding(paddingValues).fillMaxSize(),
                 )
-                is UiState.Success -> {
-                    val availableBlocks = remember(state.data.blocks, excludedBlockIds, query) {
-                        val normalizedQuery = query.trim().lowercase()
-                        val excluded = excludedBlockIds.mapTo(HashSet()) { BlockId(it) }
-                        state.data.blocks
-                            .filter { it.id !in excluded }
-                            .filter { block ->
-                                normalizedQuery.isBlank() ||
-                                    (block.label?.lowercase()?.contains(normalizedQuery) == true) ||
-                                    (block.description?.lowercase()?.contains(normalizedQuery) == true) ||
-                                    block.value.lowercase().contains(normalizedQuery)
-                            }
-                    }
-                    if (availableBlocks.isEmpty()) {
-                        EmptyState(
-                            icon = LettaIcons.Search,
-                            message = stringResource(R.string.screen_blocks_empty_available),
-                            modifier = Modifier.padding(paddingValues).fillMaxSize(),
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = paddingValues.calculateTopPadding() + 8.dp,
+                        bottom = paddingValues.calculateBottomPadding() + 24.dp,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(filteredBlocks, key = { it.id.value }) { block ->
+                        val isSelected = block.id.value in selection
+                        SelectableBlockCard(
+                            block = block,
+                            query = query,
+                            selected = isSelected,
+                            onClick = {
+                                selection = if (isSelected) selection - block.id.value else selection + block.id.value
+                            },
                         )
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(
-                                start = 16.dp,
-                                end = 16.dp,
-                                top = paddingValues.calculateTopPadding() + 8.dp,
-                                bottom = paddingValues.calculateBottomPadding() + 24.dp,
-                            ),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            items(availableBlocks, key = { it.id.value }) { block ->
-                                val isSelected = block.id.value in selection
-                                SelectableBlockCard(
-                                    block = block,
-                                    query = query,
-                                    selected = isSelected,
-                                    onClick = {
-                                        selection = if (isSelected) selection - block.id.value else selection + block.id.value
-                                    },
-                                )
-                            }
-                        }
                     }
                 }
             }

@@ -3,6 +3,7 @@ package com.letta.mobile.ui.screens.settings
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.BlockId
 import androidx.lifecycle.SavedStateHandle
+import com.letta.mobile.bot.connection.ClientModeConnectionTester
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.Block

@@ -1,4 +1,4 @@
-package com.letta.mobile.ui.screens.editagent
+package com.letta.mobile.feature.editagent
 
 import com.letta.mobile.data.model.BlockId
 import com.letta.mobile.data.model.AgentId
@@ -27,8 +27,8 @@ import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeBlockApi
 import com.letta.mobile.testutil.FakeToolApi
 import com.letta.mobile.testutil.TestData
-import com.letta.mobile.ui.screens.settings.ClientModeConnectionState
-import com.letta.mobile.ui.screens.settings.ClientModeConnectionTester
+import com.letta.mobile.bot.connection.ClientModeConnectionState
+import com.letta.mobile.bot.connection.ClientModeConnectionTester
 import io.mockk.coEvery
 import io.mockk.mockk
 import io.mockk.every

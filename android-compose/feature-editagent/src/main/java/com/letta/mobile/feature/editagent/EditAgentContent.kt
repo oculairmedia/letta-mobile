@@ -1,4 +1,4 @@
-package com.letta.mobile.ui.screens.editagent
+package com.letta.mobile.feature.editagent
 
 import com.letta.mobile.ui.theme.LettaCodeFont
 
@@ -51,7 +51,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.R
+import com.letta.mobile.feature.editagent.R
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.Tool
@@ -670,6 +670,7 @@ internal fun EditAgentContent(
     if (showAttachBlockDialog) {
         FullScreenBlockPickerDialog(
             excludedBlockIds = state.blocks.map { it.id },
+            availableBlocks = state.availableBlocks,
             onDismiss = { showAttachBlockDialog = false },
             onConfirm = { selectedIds ->
                 onAttachExistingBlocks(selectedIds)
@@ -751,7 +752,7 @@ internal fun EditAgentContent(
  * "danger" without polluting [EditAgentConfigTab], which still drives
  * validation reporting elsewhere.
  */
-object SectionAnchors {
+internal object SectionAnchors {
     const val BASICS: String = "section_header_basics"
     const val MODELS: String = "section_header_models"
     const val MEMORY: String = "section_header_memory"

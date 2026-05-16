@@ -3,6 +3,8 @@ package com.letta.mobile.ui.screens.settings
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.letta.mobile.bot.connection.ClientModeConnectionState
+import com.letta.mobile.bot.connection.ClientModeConnectionTester
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.BlockUpdateParams
@@ -47,13 +49,6 @@ data class AgentSettingsUiState(
     val clientModeApiKey: String = "",
     val clientModeConnectionState: ClientModeConnectionState = ClientModeConnectionState.Idle,
 )
-
-sealed interface ClientModeConnectionState {
-    data object Idle : ClientModeConnectionState
-    data object Testing : ClientModeConnectionState
-    data class Success(val testedAtMillis: Long) : ClientModeConnectionState
-    data class Failure(val message: String, val testedAtMillis: Long) : ClientModeConnectionState
-}
 
 @HiltViewModel
 class AgentSettingsViewModel @Inject constructor(

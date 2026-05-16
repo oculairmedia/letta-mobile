@@ -3,6 +3,7 @@ package com.letta.mobile.ui.screens.settings
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.letta.mobile.bot.connection.ClientModeConnectionState
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.ui.theme.LettaTheme

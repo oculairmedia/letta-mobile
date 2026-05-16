@@ -1,9 +1,16 @@
-package com.letta.mobile.ui.screens.settings
+package com.letta.mobile.bot.connection
 
 import com.letta.mobile.bot.protocol.WsBotClient
 import dagger.hilt.android.scopes.ViewModelScoped
 import javax.inject.Inject
 import kotlinx.coroutines.withTimeout
+
+sealed interface ClientModeConnectionState {
+    data object Idle : ClientModeConnectionState
+    data object Testing : ClientModeConnectionState
+    data class Success(val testedAtMillis: Long) : ClientModeConnectionState
+    data class Failure(val message: String, val testedAtMillis: Long) : ClientModeConnectionState
+}
 
 /**
  * letta-mobile-w2hx.4: Connection tester no longer resolves a "default

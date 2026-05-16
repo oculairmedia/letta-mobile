@@ -1,14 +1,15 @@
-package com.letta.mobile.ui.screens.editagent
+package com.letta.mobile.feature.editagent
 
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentEnvironmentVariable
+import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.Tool
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 
 @androidx.compose.runtime.Immutable
-data class EditableBlock(
+internal data class EditableBlock(
     val id: String,
     val label: String,
     val value: String,
@@ -19,7 +20,7 @@ data class EditableBlock(
 )
 
 @androidx.compose.runtime.Immutable
-data class EditableAgentEnvironmentVariable(
+internal data class EditableAgentEnvironmentVariable(
     val key: String = "",
     val value: String = "",
     val originalKey: String? = null,
@@ -27,7 +28,7 @@ data class EditableAgentEnvironmentVariable(
     val hasStoredValue: Boolean = false,
 )
 
-data class EditAgentUiState(
+internal data class EditAgentUiState(
     val agent: Agent? = null,
     val agentId: String = "",
     val name: String = "",
@@ -39,6 +40,7 @@ data class EditAgentUiState(
     val tags: ImmutableList<String> = persistentListOf(),
     val attachedTools: ImmutableList<Tool> = persistentListOf(),
     val availableTools: ImmutableList<Tool> = persistentListOf(),
+    val availableBlocks: ImmutableList<Block> = persistentListOf(),
     val toolRulesJson: String = "",
     val agentSecrets: ImmutableList<EditableAgentEnvironmentVariable> = persistentListOf(),
     val toolEnvironmentVariables: ImmutableList<EditableAgentEnvironmentVariable> = persistentListOf(),
@@ -70,7 +72,7 @@ data class EditAgentUiState(
     val clientModeEnabled: Boolean = false,
     val clientModeBaseUrl: String = "",
     val clientModeApiKey: String = "",
-    val clientModeConnectionState: com.letta.mobile.ui.screens.settings.ClientModeConnectionState = com.letta.mobile.ui.screens.settings.ClientModeConnectionState.Idle,
+    val clientModeConnectionState: com.letta.mobile.bot.connection.ClientModeConnectionState = com.letta.mobile.bot.connection.ClientModeConnectionState.Idle,
     val summarizationPrompt: String = "",
     val compactionClipChars: Int = 50_000,
     val slidingWindowPercentage: Float = 0.3f,

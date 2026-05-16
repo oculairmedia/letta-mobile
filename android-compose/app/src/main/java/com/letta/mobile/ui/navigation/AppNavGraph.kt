@@ -55,7 +55,7 @@ import com.letta.mobile.ui.screens.conversations.ConversationsScreen
 import com.letta.mobile.ui.screens.conversations.TwoPaneConversationsLayout
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.isExpandedWidth
-import com.letta.mobile.ui.screens.editagent.EditAgentScreen
+import com.letta.mobile.feature.editagent.EditAgentScreen
 import com.letta.mobile.ui.screens.folders.FolderAdminScreen
 import com.letta.mobile.ui.screens.groups.GroupAdminScreen
 import com.letta.mobile.ui.screens.identities.IdentityListScreen

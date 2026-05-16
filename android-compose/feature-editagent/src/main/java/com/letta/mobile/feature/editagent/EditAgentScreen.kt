@@ -1,4 +1,4 @@
-package com.letta.mobile.ui.screens.editagent
+package com.letta.mobile.feature.editagent
 
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -30,7 +30,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.letta.mobile.R
+import com.letta.mobile.feature.editagent.R
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
@@ -53,7 +53,7 @@ internal enum class EditAgentConfigTab(val label: String) {
     Advanced("Advanced"),
 }
 
-object EditAgentTestTags {
+internal object EditAgentTestTags {
     const val CONTENT_LIST = "edit_agent_content_list"
     const val TAB_PREFIX = "edit_agent_tab_"
     const val SECTION_PICKER_TRIGGER = "edit_agent_section_picker_trigger"
@@ -66,7 +66,18 @@ object EditAgentTestTags {
 @Composable
 fun EditAgentScreen(
     onNavigateBack: () -> Unit,
-    viewModel: EditAgentViewModel = hiltViewModel()
+) {
+    EditAgentScreenContent(
+        onNavigateBack = onNavigateBack,
+        viewModel = hiltViewModel(),
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun EditAgentScreenContent(
+    onNavigateBack: () -> Unit,
+    viewModel: EditAgentViewModel,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val llmModels by viewModel.llmModels.collectAsStateWithLifecycle()

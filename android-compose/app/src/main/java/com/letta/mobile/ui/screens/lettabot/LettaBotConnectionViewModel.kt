@@ -4,8 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.ui.common.UiState
-import com.letta.mobile.ui.screens.settings.ClientModeConnectionState
-import com.letta.mobile.ui.screens.settings.ClientModeConnectionTester
+import com.letta.mobile.bot.connection.ClientModeConnectionState
+import com.letta.mobile.bot.connection.ClientModeConnectionTester
 import com.letta.mobile.util.mapErrorToUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay

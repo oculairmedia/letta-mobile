@@ -1,4 +1,4 @@
-package com.letta.mobile.ui.screens.editagent
+package com.letta.mobile.feature.editagent
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,10 +17,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.R
+import com.letta.mobile.feature.editagent.R
 import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.FormItem
-import com.letta.mobile.ui.screens.settings.ClientModeConnectionState
+import com.letta.mobile.bot.connection.ClientModeConnectionState
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter

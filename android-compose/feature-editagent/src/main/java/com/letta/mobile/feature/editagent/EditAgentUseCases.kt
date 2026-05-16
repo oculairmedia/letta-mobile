@@ -1,4 +1,4 @@
-package com.letta.mobile.ui.screens.editagent
+package com.letta.mobile.feature.editagent
 
 import com.letta.mobile.data.model.AgentEnvironmentVariable
 import com.letta.mobile.data.model.AgentUpdateParams

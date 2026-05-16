@@ -1,4 +1,4 @@
-package com.letta.mobile.ui.screens.editagent
+package com.letta.mobile.feature.editagent
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -12,8 +12,8 @@ import com.letta.mobile.data.repository.ModelRepository
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.ui.common.UiState
-import com.letta.mobile.ui.screens.settings.ClientModeConnectionState
-import com.letta.mobile.ui.screens.settings.ClientModeConnectionTester
+import com.letta.mobile.bot.connection.ClientModeConnectionState
+import com.letta.mobile.bot.connection.ClientModeConnectionTester
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.delay
@@ -29,7 +29,7 @@ import kotlinx.serialization.json.jsonArray
 import javax.inject.Inject
 
 @HiltViewModel
-class EditAgentViewModel @Inject constructor(
+internal class EditAgentViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val agentRepository: AgentRepository,
     private val blockRepository: BlockRepository,
@@ -95,6 +95,9 @@ class EditAgentViewModel @Inject constructor(
                 }
                 toolRepository.refreshTools()
                 val availableTools = toolRepository.getTools().value
+                val availableBlocks = runCatching { blockRepository.listAllBlocks() }
+                    .onFailure { android.util.Log.w("EditAgentVM", "Failed to load available blocks", it) }
+                    .getOrDefault(emptyList())
                 originalBlocks = editableBlocks.associateBy { it.label }
                 val resolvedEmbedding = agent.embedding
                     ?: agent.embeddingConfig?.handle
@@ -139,6 +142,7 @@ class EditAgentViewModel @Inject constructor(
                         tags = agent.tags.toImmutableList(),
                         attachedTools = agent.tools.toImmutableList(),
                         availableTools = availableTools.toImmutableList(),
+                        availableBlocks = availableBlocks.toImmutableList(),
                         toolRulesJson = agent.toolRules
                             .takeIf { it.isNotEmpty() }
                             ?.let { JsonArray(it).toSettingsJson() }

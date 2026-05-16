@@ -326,6 +326,7 @@ dependencies {
     implementation(project(":designsystem"))
     implementation(project(":bot"))
     implementation(project(":feature-chat"))
+    implementation(project(":feature-editagent"))
 
     val composeBom = platform("androidx.compose:compose-bom:2026.03.01")
     implementation(composeBom)

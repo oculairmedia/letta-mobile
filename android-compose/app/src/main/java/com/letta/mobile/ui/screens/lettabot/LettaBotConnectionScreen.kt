@@ -36,7 +36,7 @@ import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.screens.settings.ClientModeConnectionState
+import com.letta.mobile.bot.connection.ClientModeConnectionState
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 import com.letta.mobile.ui.theme.listItemSupporting
 import java.time.Instant

@@ -2,8 +2,8 @@ package com.letta.mobile.ui.screens.lettabot
 
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.ui.common.UiState
-import com.letta.mobile.ui.screens.settings.ClientModeConnectionState
-import com.letta.mobile.ui.screens.settings.ClientModeConnectionTester
+import com.letta.mobile.bot.connection.ClientModeConnectionState
+import com.letta.mobile.bot.connection.ClientModeConnectionTester
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
