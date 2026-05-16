@@ -45,6 +45,10 @@ import com.letta.mobile.feature.chat.R
 import com.letta.mobile.ui.components.FloatingBanner
 import com.letta.mobile.ui.components.MessageSkeletonList
 import com.letta.mobile.ui.components.StarterPrompts
+import com.letta.mobile.ui.components.ThinkingShader
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.draw.alpha
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.ui.theme.LettaChatTheme
@@ -104,6 +108,34 @@ internal fun ChatScreen(
                 .then(backgroundModifier)
                 .padding(bottom = bottomInsetDp),
         ) {
+            // letta-mobile-vcky.b3: thinking glow declared BEFORE the
+            // Column so it paints first (behind everything). Aligned to
+            // BottomCenter — strip bottom hugs the bottom of the chat
+            // region (top of nav bar / IME). The shader peak (uv.y=0.92
+            // of a 216dp strip → ~17dp above the strip bottom) lands
+            // inside the composer's painted area; the composer (opaque
+            // Surface) covers the peak. What's visible above the composer
+            // is the long diffuse upper tail. Half-opacity vs. the
+            // previous typing-slot strip (0.39 vs 0.78 in the shader).
+            val thinkingAlpha by animateFloatAsState(
+                targetValue = if (state.isStreaming) 1f else 0f,
+                animationSpec = tween(durationMillis = 400),
+                label = "thinkingAlpha",
+            )
+            if (thinkingAlpha > 0.001f) {
+                ThinkingShader(
+                    // vcky.b4: tertiary is the most vibrant accent in
+                    // the theme (default Color(0xFF0091EA) blue light,
+                    // CyanAccent dark, per-theme variants). Picks up the
+                    // user's currently-active theme color rather than
+                    // the muted role-label tone.
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    bgColor = MaterialTheme.colorScheme.surface,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .alpha(thinkingAlpha),
+                )
+            }
             Column(modifier = Modifier.fillMaxSize()) {
                 // letta-mobile-c87t: surfaces a non-modal banner when the
                 // lettabot WS gateway substituted a fresh conversation for the
@@ -202,6 +234,7 @@ internal fun ChatScreen(
                     onAttachImage = launchPicker,
                 )
             }
+
 
             FloatingBanner(
                 visible = floatingBannerMessage.isNotBlank(),

@@ -57,35 +57,59 @@ uniform float iTime;
 uniform vec4 tint;
 uniform vec4 bgColor;
 
-// Slow, low-amplitude sine displacement on a vertical strip.
-// fragCoord.y travels [0, height]; we map to vertical uv in [0,1].
+// vcky.b4: organic-noise variant. The brightness baseline still
+// anchors at uv.y=0.92 (just inside the strip bottom — composer
+// hides it) but is now perturbed by a slow horizontal sine AND a
+// low-amplitude 1D perlin layer for texture. Audio-shader-style
+// perlin, scaled WAY down so it grains the glow without becoming a
+// visualizer.
+float hash(float i) {
+  float h = i * 127.1;
+  return -1.0 + 2.0 * fract(sin(h) * 43758.1453123);
+}
+float perlin_noise_1d(float d) {
+  float i = floor(d);
+  float f = d - i;
+  float y = f * f * f * (6.0 * f * f - 15.0 * f + 10.0);
+  float slope1 = hash(i);
+  float slope2 = hash(i + 1.0);
+  float v1 = f;
+  float v2 = f - 1.0;
+  float r = mix(slope1 * v1, slope2 * v2, y);
+  return r * 0.5 + 0.5;
+}
+
 half4 main(float2 fragCoord) {
   float2 uv = fragCoord / iResolution.xy;
 
-  // Horizontal sine wave centered on the strip's mid-line.
-  // wave_strength=0.18 of the strip height — visible but subtle.
+  // Slow horizontal sine — the macro motion the user called the
+  // "slightly moving" effect. Kept gentle.
   float wave_speed = 0.9;
   float wave_frequency = 3.2;
-  float wave = sin(uv.x * wave_frequency + iTime * wave_speed) * 0.18;
+  float wave = sin(uv.x * wave_frequency + iTime * wave_speed) * 0.06;
 
-  // Distance from the wave's current y-position (0.5 baseline + wave).
-  float baseline = 0.5 + wave;
-  float dist = abs(uv.y - baseline);
+  // vcky.b4: perlin texture layer. Sampled along uv.x (spatial) and
+  // shifted by iTime (temporal). Amplitude 0.025 ≈ ~5.4dp on a 216dp
+  // strip — visible as grain on the glow's upper tail but small
+  // enough to never dominate the macro sine motion.
+  float noise = perlin_noise_1d(uv.x * 2.8 + iTime * 0.45);
+  float noise_offset = (noise - 0.5) * 0.025;
 
-  // Glow falls off over ~0.35 of the strip height.
-  float glow = 1.0 - smoothstep(0.0, 0.35, dist);
+  float baseline = 0.92 + wave + noise_offset;
+  float dist = clamp(baseline - uv.y, 0.0, 1.0);
+  float glow = pow(1.0 - clamp(dist / 0.90, 0.0, 1.0), 1.6);
 
-  // Edge fade: both top (uv.y near 0) and bottom (uv.y near 1) dissolve
-  // into bgColor over the outermost 22% of the strip. No hard borders.
-  float top_fade    = smoothstep(0.0, 0.22, uv.y);
-  float bottom_fade = 1.0 - smoothstep(0.78, 1.0, uv.y);
-  float edge_alpha  = top_fade * bottom_fade;
+  // Top alpha fade over the outermost 30% so the glow dissolves into
+  // bgColor with zero hard line at the upper edge.
+  float top_fade = smoothstep(0.0, 0.30, uv.y);
 
-  // Wave color blended with bgColor by glow, then alpha-faded at edges.
-  vec3 col = mix(bgColor.rgb, tint.rgb, glow * tint.a);
-  float a   = edge_alpha * (0.18 + glow * 0.55);
+  // vcky.b5: at 50% alpha against a light surface, srcOver
+  // (result = src·a + dst·(1-a)) produced too much white from the
+  // surface contribution, washing the tint. Drop to 10% — keeps the
+  // texture/motion visible but the tint reads through cleanly.
+  float a = top_fade * glow * 0.10 * tint.a;
 
-  return vec4(col, a);
+  return vec4(tint.rgb, a);
 }
 """
 
@@ -94,7 +118,7 @@ fun ThinkingShader(
     tint: Color,
     bgColor: Color,
     modifier: Modifier = Modifier,
-    heightDp: Int = 24,
+    heightDp: Int = 216,
 ) {
     // letta-mobile-vcky.b: API ≥ 33 gets the AGSL path; older devices fall
     // back to the Compose-native gradient so we don't ship a dead rectangle.
@@ -147,53 +171,54 @@ private fun ThinkingShaderFallback(
     tint: Color,
     bgColor: Color,
     modifier: Modifier = Modifier,
-    heightDp: Int = 24,
+    heightDp: Int = 216,
 ) {
     val transition = rememberInfiniteTransition(label = "thinkingShaderFallback")
     val phase by transition.animateFloat(
         initialValue = 0f,
         targetValue = (2 * PI).toFloat(),
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2200, easing = LinearEasing),
+            animation = tween(durationMillis = 2400, easing = LinearEasing),
             repeatMode = RepeatMode.Restart,
         ),
         label = "phase",
     )
 
-    // Cheap "moving" effect on the fallback: a soft horizontal gradient
-    // whose tint stop shifts left↔right with the phase. Same fade-to-bg
-    // discipline at top and bottom enforced via vertical-gradient compose
-    // of brushes (handled by the wave-tinted color alpha already being
-    // mixed against bgColor at the edges).
-    val center = 0.5f + 0.32f * sin(phase)
-    val mixed = tint.copy(alpha = 0.65f).compositeOver(bgColor)
-    val brush = Brush.horizontalGradient(
-        colorStops = arrayOf(
-            0f to bgColor.copy(alpha = 0f),
-            (center - 0.18f).coerceIn(0.05f, 0.95f) to bgColor.copy(alpha = 0f),
-            center.coerceIn(0.05f, 0.95f) to mixed,
-            (center + 0.18f).coerceIn(0.05f, 0.95f) to bgColor.copy(alpha = 0f),
-            1f to bgColor.copy(alpha = 0f),
-        ),
-    )
+    // vcky.b2 fallback: glow anchored at the bottom of the strip (matches
+    // the AGSL path's intent — the composer covers this and the visible
+    // tail fades upward into the chat list). Horizontal phase shift gives
+    // the "slightly moving" sensation without a runtime shader.
+    val center = 0.5f + 0.30f * sin(phase)
+    // vcky.b5: matches the AGSL path's 10% opacity drop.
+    val mixed = tint.copy(alpha = 0.10f)
 
     Canvas(
         modifier = modifier
             .fillMaxWidth()
             .height(heightDp.dp),
     ) {
-        // Top/bottom fade is enforced by sampling a vertical alpha mask:
-        // we draw the horizontal-gradient brush at full alpha, then
-        // composite a vertical alpha-ramp on top via DstIn. Use a soft
-        // 22% inset to mirror the AGSL path.
-        drawRect(brush = brush)
-        val verticalFade = Brush.verticalGradient(
-            0.0f to bgColor.copy(alpha = 1f),
-            0.22f to bgColor.copy(alpha = 0f),
-            0.78f to bgColor.copy(alpha = 0f),
-            1.0f to bgColor.copy(alpha = 1f),
+        // Horizontal gradient: brightest in the wave center, fades to
+        // bgColor (alpha=0) at left/right edges.
+        val horizontal = Brush.horizontalGradient(
+            colorStops = arrayOf(
+                0f to bgColor.copy(alpha = 0f),
+                (center - 0.30f).coerceIn(0.02f, 0.98f) to bgColor.copy(alpha = 0f),
+                center.coerceIn(0.02f, 0.98f) to mixed,
+                (center + 0.30f).coerceIn(0.02f, 0.98f) to bgColor.copy(alpha = 0f),
+                1f to bgColor.copy(alpha = 0f),
+            ),
         )
-        drawRect(brush = verticalFade)
+        drawRect(brush = horizontal)
+
+        // Vertical mask: bright bottom, fade to transparent at top so
+        // the glow "emanates" upward. The very bottom is intentionally
+        // NOT faded — the composer overlays it.
+        val verticalMask = Brush.verticalGradient(
+            0.00f to bgColor.copy(alpha = 1f),
+            0.30f to bgColor.copy(alpha = 0f),
+            1.00f to bgColor.copy(alpha = 0f),
+        )
+        drawRect(brush = verticalMask)
     }
 }
 

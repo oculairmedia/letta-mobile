@@ -2,7 +2,6 @@ package com.letta.mobile.feature.chat
 
 import com.letta.mobile.ui.theme.LettaCodeFont
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -47,8 +46,6 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.DateSeparator
 import com.letta.mobile.ui.components.ScrollToBottomFab
-import com.letta.mobile.ui.components.ThinkingShader
-import com.letta.mobile.ui.theme.chatColors
 import com.letta.mobile.ui.theme.LocalChatIsPinching
 import com.letta.mobile.ui.theme.chatDimens
 import java.time.LocalDate
@@ -323,22 +320,11 @@ internal fun ChatMessageList(
                     transformOrigin = TransformOrigin(0.5f, 0.5f)
                 },
             ) {
-                item(key = "typing") {
-                    // letta-mobile-vcky.b: replaced the bordered "Thinking…"
-                    // chip with a thin AGSL wave band tinted by the agent
-                    // role color. The band has soft top/bottom alpha so it
-                    // dissolves into the list background — no hard edges.
-                    AnimatedVisibility(
-                        visible = state.isStreaming,
-                        enter = ChatMotion.expandEnter(),
-                        exit = ChatMotion.expandExit(),
-                    ) {
-                        ThinkingShader(
-                            tint = MaterialTheme.chatColors.agentRoleLabel,
-                            bgColor = MaterialTheme.colorScheme.surface,
-                        )
-                    }
-                }
+                // letta-mobile-vcky.b2: the thinking glow moved out of the
+                // list and into a Box overlay above the ChatComposer (see
+                // ChatScreen). It now appears to emanate from behind the
+                // top edge of the message field rather than sitting as a
+                // discrete strip in the list.
 
                 renderItems.forEachIndexed { index, renderItem ->
                     val prevDate = renderItems.getOrNull(index + 1)?.boundaryTimestamp?.take(10)
