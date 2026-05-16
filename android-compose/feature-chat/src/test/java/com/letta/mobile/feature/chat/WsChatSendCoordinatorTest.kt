@@ -1,6 +1,8 @@
 ﻿package com.letta.mobile.feature.chat
 
+import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.WsChatBridge
@@ -47,6 +49,7 @@ class WsChatSendCoordinatorTest {
             activeConfig = settingsRepository,
             wsChatBridge = wsChatBridge,
             timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
             uiState = uiState,
             clearComposerAfterSend = { cleared = true },
             activeConversationId = { activeConversation },
@@ -91,6 +94,7 @@ class WsChatSendCoordinatorTest {
             activeConfig = settingsRepository(),
             wsChatBridge = wsChatBridge,
             timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
             uiState = MutableStateFlow(ChatUiState(agentName = "Agent")),
             clearComposerAfterSend = {},
             activeConversationId = { null },
@@ -132,6 +136,7 @@ class WsChatSendCoordinatorTest {
             activeConfig = settingsRepository(),
             wsChatBridge = wsChatBridge,
             timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
             uiState = uiState,
             clearComposerAfterSend = { cleared = true },
             activeConversationId = { "conv-1" },
@@ -157,6 +162,7 @@ class WsChatSendCoordinatorTest {
             activeConfig = settingsRepository(),
             wsChatBridge = wsChatBridge,
             timelineRepository = mockk<TimelineRepository>(relaxed = true),
+            conversationRepository = stubConversationRepository(),
             uiState = uiState,
             clearComposerAfterSend = {},
             activeConversationId = { null },
@@ -211,6 +217,7 @@ class WsChatSendCoordinatorTest {
             activeConfig = settingsRepository(),
             wsChatBridge = wsChatBridge,
             timelineRepository = mockk<TimelineRepository>(relaxed = true),
+            conversationRepository = stubConversationRepository(),
             uiState = uiState,
             clearComposerAfterSend = {},
             activeConversationId = { null },
@@ -252,6 +259,7 @@ class WsChatSendCoordinatorTest {
             activeConfig = settingsRepository(),
             wsChatBridge = wsChatBridge,
             timelineRepository = mockk<TimelineRepository>(relaxed = true),
+            conversationRepository = stubConversationRepository(),
             uiState = uiState,
             clearComposerAfterSend = {},
             activeConversationId = { null },
@@ -278,6 +286,7 @@ class WsChatSendCoordinatorTest {
             activeConfig = settingsRepository(),
             wsChatBridge = wsChatBridge,
             timelineRepository = mockk<TimelineRepository>(relaxed = true),
+            conversationRepository = stubConversationRepository(),
             uiState = uiState,
             clearComposerAfterSend = {},
             activeConversationId = { null },
@@ -308,6 +317,7 @@ class WsChatSendCoordinatorTest {
             activeConfig = settingsRepository(),
             wsChatBridge = wsChatBridge,
             timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
             uiState = MutableStateFlow(ChatUiState(agentName = "Agent")),
             clearComposerAfterSend = {},
             activeConversationId = { null },
@@ -339,6 +349,7 @@ class WsChatSendCoordinatorTest {
             activeConfig = settingsRepository(),
             wsChatBridge = wsChatBridge,
             timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
             uiState = MutableStateFlow(ChatUiState(agentName = "Agent")),
             clearComposerAfterSend = {},
             activeConversationId = { null },
@@ -376,6 +387,7 @@ class WsChatSendCoordinatorTest {
             activeConfig = settingsRepository(),
             wsChatBridge = wsChatBridge,
             timelineRepository = mockk<TimelineRepository>(relaxed = true),
+            conversationRepository = stubConversationRepository(),
             uiState = uiState,
             clearComposerAfterSend = {},
             activeConversationId = { null },
@@ -412,6 +424,27 @@ class WsChatSendCoordinatorTest {
             mode = LettaConfig.Mode.SELF_HOSTED,
             serverUrl = "http://localhost:8291",
             accessToken = "token",
+        )
+    }
+
+    /**
+     * letta-mobile-vcky: WsChatSendCoordinator now mints a fresh conversation
+     * via the repository when activeConversation is null. Tests that were
+     * written for the old `conv-default-<agentId>` hardcode keep their
+     * assertions by stubbing the repo to return a Conversation with the same
+     * id; tests that exercise picker-selected ids pre-set activeConversation
+     * and never hit the create path.
+     */
+    private fun stubConversationRepository(
+        conversationId: String = "conv-default-agent-1",
+        agentId: String = "agent-1",
+    ): ConversationRepository = mockk(relaxed = true) {
+        coEvery { createConversation(agentId, any()) } returns Conversation(
+            id = conversationId,
+            agentId = agentId,
+            createdAt = "1970-01-01T00:00:00Z",
+            updatedAt = "1970-01-01T00:00:00Z",
+            lastMessageAt = "1970-01-01T00:00:00Z",
         )
     }
 

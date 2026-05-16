@@ -363,6 +363,7 @@ internal class AdminChatViewModel @Inject constructor(
             activeConfig = { settingsRepository.activeConfig.value },
             wsChatBridge = wsChatBridge,
             timelineRepository = timelineRepository,
+            conversationRepository = conversationRepository,
             uiState = _uiState,
             clearComposerAfterSend = { composerController.clearAfterSend() },
             activeConversationId = { chatConversationCoordinator.activeConversationId },
