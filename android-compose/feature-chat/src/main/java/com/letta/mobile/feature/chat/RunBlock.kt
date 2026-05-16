@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiMessage
@@ -71,6 +72,10 @@ private val ToolCallStepDotCenterY = 25.5f.dp
  */
 private val CompactToolCallGroupStepDotCenterY = 18.dp
 
+internal object RunBlockTestTags {
+    fun dot(stepKey: String) = "run-dot-$stepKey"
+}
+
 /**
  * Renders a contiguous run of assistant messages sharing a `runId` as a
  * single grouped block with a timeline gutter on the left. The gutter holds
@@ -89,6 +94,11 @@ private val CompactToolCallGroupStepDotCenterY = 18.dp
  * @param renderRow factory that renders one message inside the run with
  *        the supplied [GroupPosition] and a row-level [Modifier] that the
  *        caller should apply to its bubble container so the gutter aligns.
+ *
+ * Measurement strategy: each row owns its gutter dot and line segments using
+ * deterministic per-role anchors. The block deliberately avoids an overlay
+ * `onGloballyPositioned` map, so streaming appends cannot produce a first-frame
+ * y=0 dot or remeasure existing step positions.
  *
  * letta-mobile-m772.2 / m772.3 / m772.4 (collapse) / m772.9 (gutter centring)
  * / m772.10 (single-message short circuit handled at grouping layer).
@@ -391,6 +401,7 @@ private fun RunMessageStepRow(
         message.runStepDotIcon()
     }
     RunStepRow(
+        stepKey = message.id,
         dotColor = dotColor,
         stepDotCenterY = message.runStepDotCenterY(),
         runIdentityColor = runIdentityColor,
@@ -421,6 +432,7 @@ private fun RunToolCallGroupStepRow(
         MaterialTheme.colorScheme.primary
     }
     RunStepRow(
+        stepKey = step.key,
         dotColor = dotColor,
         stepDotCenterY = CompactToolCallGroupStepDotCenterY,
         runIdentityColor = runIdentityColor,
@@ -442,6 +454,7 @@ private fun RunToolCallGroupStepRow(
 
 @Composable
 private fun RunStepRow(
+    stepKey: String,
     dotColor: androidx.compose.ui.graphics.Color,
     stepDotCenterY: androidx.compose.ui.unit.Dp,
     runIdentityColor: androidx.compose.ui.graphics.Color,
@@ -499,6 +512,7 @@ private fun RunStepRow(
                 Box(
                     modifier = Modifier
                         .size(StepDotSize)
+                        .testTag(RunBlockTestTags.dot(stepKey))
                         .background(dotColor, CircleShape),
                 )
             }
