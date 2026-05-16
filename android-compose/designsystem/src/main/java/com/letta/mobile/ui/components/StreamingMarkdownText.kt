@@ -247,7 +247,16 @@ fun StreamingMarkdownText(
     } else {
         Modifier
     }
-    val heightAnimation = if (isStreaming) {
+    // letta-mobile-9hcg follow-up: also suppress animateContentSize while
+    // the user is pinch-to-zooming. Pinch changes the font scale, which
+    // reflows every Text in the chat and changes column heights. With
+    // animateContentSize active that fires a 260ms tween on EVERY
+    // gesture frame — the tweens stack and the chat visibly flickers.
+    // ChatMessageBubble already gates on LocalChatIsPinching for the
+    // same reason; StreamingMarkdownText needs to honour it too because
+    // ChatMessageList wraps the whole list in CompositionLocalProvider.
+    val isPinching = com.letta.mobile.ui.theme.LocalChatIsPinching.current
+    val heightAnimation = if (isStreaming || isPinching) {
         Modifier
     } else {
         Modifier.animateContentSize(
