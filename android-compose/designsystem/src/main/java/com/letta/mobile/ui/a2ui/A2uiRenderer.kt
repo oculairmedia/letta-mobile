@@ -44,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
@@ -512,21 +513,33 @@ private fun A2uiTextField(
 ) {
     val binding = component.raw["value"] ?: component.raw["text"]
     val path = binding.bindingPath()
-    val value = component.resolveInputValue(surface, binding)
+    val boundValue = component.resolveInputValue(surface, binding)
     val label = resolveBindingText(component.raw["label"], surface)
     val placeholder = resolveBindingText(component.raw["placeholder"], surface)
     val fieldType = component.raw.stringValue("textFieldType", "variant", "type").orEmpty()
     val validation = component.raw.stringValue("validationRegexp")
+
+    // letta-mobile-ykkl: when the payload omits `value: {path: …}` the
+    // field used to be silently controlled by an unchanging data-model
+    // entry — typed characters fired onValueChange but the rendered
+    // value stayed empty, so the field looked unresponsive. Fall back
+    // to local Compose state so unbound fields still echo user input
+    // and remain editable; bound fields keep round-tripping through
+    // the surface dataModel.
+    var localValue by remember(component.id) { mutableStateOf(boundValue) }
+    val value = if (path != null) boundValue else localValue
     val isError = validation != null && value.isNotBlank() && !value.matchesValidation(validation)
 
     OutlinedTextField(
         value = value,
         onValueChange = { next ->
-            path?.let {
+            if (path != null) {
                 surface.dataModel.applyPatch(
-                    path = it,
+                    path = path,
                     value = component.inputValue(next, fieldType),
                 )
+            } else {
+                localValue = next
             }
         },
         modifier = modifier
@@ -590,9 +603,13 @@ private fun A2uiDateTimeInput(
             singleLine = true,
             placeholder = { Text(component.dateTimePlaceholder(enableDate, enableTime)) },
         )
+        // letta-mobile-ykkl: lift overlay above the OutlinedTextField's
+        // internal Surface so taps reliably hit the picker-launch
+        // clickable, not the (readOnly) field's focus handler.
         Box(
             modifier = Modifier
                 .matchParentSize()
+                .zIndex(1f)
                 .clickable {
                     if (enableDate) {
                         showDatePicker = true
@@ -848,7 +865,26 @@ private fun A2uiButton(
     val label = component.resolveButtonLabel(surface)
     val action = component.action(surface)
     Button(
-        onClick = { component.action(surface)?.let(onAction) },
+        onClick = {
+            // letta-mobile-ykkl diagnostic: log the dispatch hop so the
+            // chain "Compose onClick → onAction → WsChatBridge → wire"
+            // is traceable in adb logcat without a debugger attached.
+            val resolved = component.action(surface)
+            if (resolved == null) {
+                android.util.Log.w(
+                    "A2UI",
+                    "Button onClick: action unresolved surfaceId=${surface.surfaceId} " +
+                        "componentId=${component.id} raw=${component.raw["action"] ?: component.raw["onClick"]}",
+                )
+            } else {
+                android.util.Log.i(
+                    "A2UI",
+                    "Button onClick: dispatching surfaceId=${surface.surfaceId} " +
+                        "componentId=${component.id} event=${resolved.name}",
+                )
+                onAction(resolved)
+            }
+        },
         enabled = label != null && action != null,
         modifier = modifier,
     ) {
@@ -931,8 +967,14 @@ private fun A2uiComponent.resolveText(surface: A2uiSurfaceState): String? {
 
 @Composable
 private fun A2uiComponent.resolveButtonLabel(surface: A2uiSurfaceState): String? {
-    raw.stringValue("labelComponentId", "labelId")?.let { labelId ->
-        return surface.components[labelId]?.resolveText(surface)
+    // letta-mobile-njzb: A2UI v0.9 Basic Catalog defines Button.child as
+    // "the ID of the child component. Use a Text component for a labeled
+    // button." Resolve `child` first — that's the canonical spec field
+    // and what the shim emits. `labelComponentId` / `labelId` / `label`
+    // (string-id) are pre-spec aliases we keep for back-compat with any
+    // payload still using the older field names.
+    raw.stringValue("child", "labelComponentId", "labelId")?.let { childId ->
+        surface.components[childId]?.resolveText(surface)?.let { return it }
     }
     val label = raw["label"]
     if (label is JsonPrimitive) {
@@ -970,8 +1012,19 @@ private fun A2uiComponent.resolveInputValue(
 
 private fun A2uiComponent.action(surface: A2uiSurfaceState): A2uiAction? {
     val action = (raw["action"] ?: raw["onClick"]) as? JsonObject ?: return null
-    val name = action.stringValue("name", "actionName", "type", "action") ?: return null
-    val context = resolveA2uiActionContext(action["context"] ?: action["data"], surface.dataModel)
+    // letta-mobile-ykkl: A2UI v0.9 Basic Catalog declares Button.action
+    // as `Action` whose payload is nested under `event` (Action.event).
+    // The pre-spec shape was `action: { name: … }` which we still accept
+    // as an alias. Look both at the action root and under `event`
+    // before giving up so payloads from either generation are clickable.
+    val eventBlock = (action["event"] as? JsonObject)
+    val name = action.stringValue("name", "actionName", "type", "action")
+        ?: eventBlock?.stringValue("name", "actionName", "type", "action")
+        ?: return null
+    val contextSource = (eventBlock?.get("context") ?: eventBlock?.get("data"))
+        ?: action["context"]
+        ?: action["data"]
+    val context = resolveA2uiActionContext(contextSource, surface.dataModel)
     val raw = buildJsonObject {
         action.forEach { (key, value) -> put(key, value) }
         put("actionName", name)

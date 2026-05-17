@@ -167,6 +167,39 @@ class A2uiRendererTest {
     }
 
     @Test
+    fun buttonResolvesChildIdToSiblingTextLabel() {
+        // letta-mobile-njzb regression guard: Button.child is the
+        // canonical A2UI v0.9 Basic Catalog field for the label-by-id
+        // reference. The renderer must look the id up in the
+        // per-surface registry and render the sibling Text's content
+        // inside the button slot. A renderer that ignores `child`
+        // (the original njzb bug) produces an empty pill.
+        val manager = A2uiSurfaceManager()
+        manager.applyMessages(
+            decodeA2uiMessages(
+                A2uiProtocolJson.Default,
+                A2uiProtocolJson.Default.parseToJsonElement(
+                    """
+                    [
+                      {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"basic"}},
+                      {"version":"v0.9","updateComponents":{"surfaceId":"$SurfaceId","root":"ok-btn","components":[
+                        {"id":"ok-btn","component":"Button","child":"ok-label","action":{"name":"ok"}},
+                        {"id":"ok-label","component":"Text","text":"It works"}
+                      ]}}
+                    ]
+                    """.trimIndent(),
+                ),
+            )
+        )
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+        }
+
+        composeRule.onNodeWithText("It works").assertIsDisplayed()
+    }
+
+    @Test
     fun buttonWithoutResolvedActionIsDisabled() {
         val manager = A2uiSurfaceManager()
         manager.applyMessages(
@@ -448,7 +481,7 @@ internal fun confirmationSurfaceManager(): A2uiSurfaceManager {
             A2uiProtocolJson.Default.parseToJsonElement(
                 """
                 [
-                  {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"https://a2ui.org/specification/v0_9/basic_catalog.json"}},
+                  {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"basic"}},
                   {"version":"v0.9","updateComponents":{"surfaceId":"$SurfaceId","root":"card","components":[
                     {"id":"card","component":"Card","child":"content","cornerRadius":16,"elevation":2},
                     {"id":"content","component":"Column","children":["title","body","approve"],"spacing":"md"},
@@ -524,7 +557,7 @@ internal fun phase4WidgetsSurfaceManager(
             A2uiProtocolJson.Default.parseToJsonElement(
                 """
                 [
-                  {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"https://a2ui.org/specification/v0_9/basic_catalog.json"}},
+                  {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"basic"}},
                   {"version":"v0.9","updateComponents":{"surfaceId":"$SurfaceId","root":"card","components":[
                     {"id":"card","component":"Card","child":"content","cornerRadius":16,"elevation":1},
                     {"id":"content","component":"Column","children":["title","seats","partySize","reservationTime","divider","image"],"spacing":"sm"},
