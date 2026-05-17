@@ -251,6 +251,15 @@ internal fun ChatScreen(
                     .padding(16.dp),
             )
 
+            if (chatMode == "debug" && state.a2uiDebugFrames.isNotEmpty()) {
+                A2uiDebugOverlay(
+                    frames = state.a2uiDebugFrames,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                )
+            }
+
             // letta-mobile-arhd: full-screen voice recognition overlay.
             // Sibling of the Column so it floats above the chat content
             // + composer while the user holds the mic. Scrim has no
@@ -283,6 +292,44 @@ internal fun ChatScreen(
                 onNavigateTo = projectBindings::browseClientModeLocation,
                 onSelect = projectBindings::selectClientModeLocation,
             )
+        }
+    }
+}
+
+@Composable
+private fun A2uiDebugOverlay(
+    frames: List<A2uiDebugFrameUi>,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+                shape = MaterialTheme.shapes.small,
+            )
+            .padding(8.dp),
+    ) {
+        Text(
+            text = "A2UI frames",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.tertiary,
+        )
+        HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
+        LazyColumn(modifier = Modifier.height(132.dp)) {
+            items(frames.takeLast(8).asReversed(), key = { it.id }) { frame ->
+                Text(
+                    text = buildString {
+                        append(frame.messageType)
+                        frame.surfaceId?.let { append(" / ").append(it) }
+                        frame.conversationId?.takeLast(6)?.let { append(" / conv:").append(it) }
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

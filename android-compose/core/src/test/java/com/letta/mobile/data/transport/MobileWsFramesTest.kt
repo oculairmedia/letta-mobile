@@ -1,6 +1,8 @@
 package com.letta.mobile.data.transport
 
 import com.letta.mobile.data.model.toJsonArray
+import com.letta.mobile.data.a2ui.A2uiMessage
+import com.letta.mobile.data.a2ui.LETTA_TOOL_APPROVAL_WIDGET_ID
 import io.kotest.core.spec.style.WordSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -38,6 +40,10 @@ class MobileWsFramesTest : WordSpec({
             out shouldContain "\"token\":\"secret\""
             out shouldContain "\"device_id\":\"android-1\""
             out shouldContain "\"client_version\":\"letta-mobile/0.6.1\""
+            out shouldContain "\"a2ui_capability\""
+            out shouldContain "\"a2ui_version\":\"v0.9\""
+            out shouldContain "\"supported_catalogs\""
+            out shouldContain LETTA_TOOL_APPROVAL_WIDGET_ID
         }
 
         "spec §2.1 send_message — round-trips otid via snake_case" {
@@ -125,6 +131,19 @@ class MobileWsFramesTest : WordSpec({
             parsed.deviceId shouldBe "d-1"
         }
 
+        "letta-mobile-51xm.2 welcome — parses A2UI negotiation ack" {
+            val payload = """
+                {"v":1,"type":"welcome","id":"f1","ts":"t",
+                 "server_id":"S","session_id":"sess-1",
+                 "a2ui_negotiation":{"a2ui_enabled":true,"negotiated_catalog":"com.letta.mobile:tool-approval/v1","negotiated_widgets":["ToolApprovalCard"]}}
+            """.trimIndent()
+            val parsed = json.decodeFromString(ServerFrameSerializer, payload)
+            parsed.shouldBeInstanceOf<ServerFrame.Welcome>()
+            parsed.a2uiNegotiation?.a2uiEnabled shouldBe true
+            parsed.a2uiNegotiation?.negotiatedCatalog shouldBe "com.letta.mobile:tool-approval/v1"
+            parsed.a2uiNegotiation?.negotiatedWidgets shouldBe listOf("ToolApprovalCard")
+        }
+
         "spec §4.7 stop_reason — inner field is `stop_reason`, NOT `reason`" {
             val payload = """
                 {"v":1,"type":"stop_reason","id":"f","ts":"t",
@@ -157,6 +176,19 @@ class MobileWsFramesTest : WordSpec({
             parsed.shouldBeInstanceOf<ServerFrame.ToolCallMessage>()
             parsed.toolCall?.toolCallId shouldBe "tc-1"
             parsed.toolCall?.name shouldBe "Bash"
+        }
+
+        "letta-mobile-51xm.2 a2ui — routes typed A2UI messages separately" {
+            val payload = """
+                {"v":1,"type":"a2ui","id":"a2ui-1","ts":"t",
+                 "agent_id":"a","conversation_id":"c","turn_id":"T","run_id":"R",
+                 "message":{"version":"v0.9","createSurface":{"surfaceId":"approval-1","catalogId":"com.letta.mobile:tool-approval/v1"}}}
+            """.trimIndent()
+            val parsed = json.decodeFromString(ServerFrameSerializer, payload)
+            parsed.shouldBeInstanceOf<ServerFrame.A2ui>()
+            parsed.runId shouldBe "R"
+            parsed.messages.single().shouldBeInstanceOf<A2uiMessage.CreateSurface>()
+            parsed.messages.single().surfaceId shouldBe "approval-1"
         }
 
         "spec §2 forward-compat — unknown type lands as ServerFrame.Unknown" {

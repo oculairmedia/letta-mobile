@@ -1,10 +1,14 @@
 package com.letta.mobile.bot.protocol
 
+import com.letta.mobile.data.a2ui.A2uiCapabilityDeclaration
+import com.letta.mobile.data.a2ui.A2uiMessage
+import com.letta.mobile.data.a2ui.A2uiNegotiation
 import com.letta.mobile.data.model.ToolCall
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Per-request state shared between the WS reader coroutine and the
@@ -47,6 +51,7 @@ internal data class WsSessionStart(
     @SerialName("agent_id") val agentId: String,
     @SerialName("conversation_id") val conversationId: String? = null,
     @SerialName("force_new") val forceNew: Boolean = false,
+    @SerialName("a2ui_capability") val a2uiCapability: A2uiCapabilityDeclaration? = A2uiCapabilityDeclaration(),
 )
 
 @Serializable
@@ -80,6 +85,17 @@ internal data class WsSessionInit(
     @SerialName("agent_id") val agentId: String,
     @SerialName("conversation_id") val conversationId: String,
     @SerialName("session_id") val sessionId: String,
+    @SerialName("a2ui_negotiation") val a2uiNegotiation: A2uiNegotiation? = null,
+) : WsInboundMessage
+
+internal data class WsA2uiMessage(
+    val type: String = "a2ui",
+    val messages: List<A2uiMessage>,
+    @SerialName("agent_id") val agentId: String? = null,
+    @SerialName("conversation_id") val conversationId: String? = null,
+    @SerialName("request_id") val requestId: String? = null,
+    @SerialName("session_id") val sessionId: String? = null,
+    val raw: JsonObject,
 ) : WsInboundMessage
 
 @Serializable

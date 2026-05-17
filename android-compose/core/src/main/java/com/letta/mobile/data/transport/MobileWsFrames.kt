@@ -1,5 +1,9 @@
 package com.letta.mobile.data.transport
 
+import com.letta.mobile.data.a2ui.A2uiCapabilityDeclaration
+import com.letta.mobile.data.a2ui.A2uiMessage
+import com.letta.mobile.data.a2ui.A2uiNegotiation
+import com.letta.mobile.data.a2ui.decodeA2uiMessages
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -67,6 +71,7 @@ data class HelloFrame(
     val token: String,
     @SerialName("device_id") val deviceId: String? = null,
     @SerialName("client_version") val clientVersion: String? = null,
+    @SerialName("a2ui_capability") val a2uiCapability: A2uiCapabilityDeclaration? = A2uiCapabilityDeclaration(),
 ) : ClientFrame
 
 /**
@@ -155,6 +160,24 @@ sealed interface ServerFrame {
         @SerialName("server_id") val serverId: String,
         @SerialName("session_id") val sessionId: String,
         @SerialName("device_id") val deviceId: String? = null,
+        @SerialName("a2ui_negotiation") val a2uiNegotiation: A2uiNegotiation? = null,
+    ) : ServerFrame
+
+    /**
+     * A2UI payloads are routed to the surface manager, not projected
+     * through the LettaMessage timeline mapper.
+     */
+    data class A2ui(
+        override val v: Int = 1,
+        val type: String = "a2ui",
+        override val id: String,
+        override val ts: String,
+        @SerialName("agent_id") val agentId: String? = null,
+        @SerialName("conversation_id") val conversationId: String? = null,
+        @SerialName("turn_id") val turnId: String? = null,
+        @SerialName("run_id") val runId: String? = null,
+        val messages: List<A2uiMessage>,
+        val raw: JsonObject,
     ) : ServerFrame
 
     /**
@@ -383,9 +406,42 @@ object ServerFrameSerializer : JsonContentPolymorphicSerializer<ServerFrame>(Ser
             "tool_call_message",
             "approval_request_message" -> ServerFrame.ToolCallMessage.serializer()
             "tool_return_message" -> ServerFrame.ToolReturnMessage.serializer()
+            "a2ui" -> A2uiFrameDeserializer
             else -> UnknownFrameDeserializer
         }
     }
+}
+
+private object A2uiFrameDeserializer : kotlinx.serialization.KSerializer<ServerFrame> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ServerFrame.A2ui")
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ServerFrame {
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: error("A2uiFrameDeserializer requires a JsonDecoder")
+        val element = jsonDecoder.decodeJsonElement().jsonObject
+        val payload = element["message"]
+            ?: element["messages"]
+            ?: element["payload"]
+            ?: element["data"]
+            ?: throw kotlinx.serialization.SerializationException("A2UI frame missing message payload")
+        return ServerFrame.A2ui(
+            v = element["v"]?.jsonPrimitive?.content?.toIntOrNull() ?: 1,
+            id = element["id"]?.jsonPrimitive?.content.orEmpty(),
+            ts = element["ts"]?.jsonPrimitive?.content.orEmpty(),
+            agentId = element["agent_id"]?.jsonPrimitive?.content,
+            conversationId = element["conversation_id"]?.jsonPrimitive?.content,
+            turnId = element["turn_id"]?.jsonPrimitive?.content,
+            runId = element["run_id"]?.jsonPrimitive?.content,
+            messages = decodeA2uiMessages(jsonDecoder.json, payload),
+            raw = element,
+        )
+    }
+
+    override fun serialize(
+        encoder: kotlinx.serialization.encoding.Encoder,
+        value: ServerFrame,
+    ): Unit = error("ServerFrame.A2ui is inbound-only; encoding it is never valid")
 }
 
 /**

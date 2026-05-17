@@ -1,5 +1,6 @@
 package com.letta.mobile.bot.protocol
 
+import com.letta.mobile.data.a2ui.decodeA2uiMessages
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -59,6 +60,23 @@ internal fun parseIncoming(json: Json, text: String): WsInboundMessage {
         "stream" -> json.decodeFromJsonElement(WsStreamEventMessage.serializer(), element)
         "result" -> json.decodeFromJsonElement(WsResultMessage.serializer(), element)
         "error" -> json.decodeFromJsonElement(WsErrorMessage.serializer(), element)
+        "a2ui" -> parseA2uiIncoming(json, obj)
         else -> throw SerializationException("Unknown WebSocket message type: $type")
     }
+}
+
+private fun parseA2uiIncoming(json: Json, obj: JsonObject): WsA2uiMessage {
+    val payload = obj["message"]
+        ?: obj["messages"]
+        ?: obj["payload"]
+        ?: obj["data"]
+        ?: throw SerializationException("A2UI WebSocket message missing message payload")
+    return WsA2uiMessage(
+        messages = decodeA2uiMessages(json, payload),
+        agentId = obj["agent_id"]?.jsonPrimitive?.content,
+        conversationId = obj["conversation_id"]?.jsonPrimitive?.content,
+        requestId = obj["request_id"]?.jsonPrimitive?.content,
+        sessionId = obj["session_id"]?.jsonPrimitive?.content,
+        raw = obj,
+    )
 }

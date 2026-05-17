@@ -5,9 +5,12 @@ import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import com.letta.mobile.data.a2ui.A2uiMessage
+import com.letta.mobile.data.a2ui.LETTA_TOOL_APPROVAL_WIDGET_ID
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
@@ -79,6 +82,116 @@ class WsBotClientTest : WordSpec({
                 chunks[2].toolCallId shouldBe null
 
                 runBlocking { client.close() }
+            }
+        }
+
+        "include A2UI capability declaration in session_start" {
+            var capabilityVersion: String? = null
+            var supportedWidgets: List<String> = emptyList()
+
+            val server = websocketServer { socket, text ->
+                val payload = json.parseToJsonElement(text).jsonObject
+                when (payload["type"]!!.jsonPrimitive.content) {
+                    "session_start" -> {
+                        val capability = payload["a2ui_capability"]!!.jsonObject
+                        capabilityVersion = capability["a2ui_version"]!!.jsonPrimitive.content
+                        supportedWidgets = capability["supported_widgets"]!!.jsonArray
+                            .map { it.jsonPrimitive.content }
+                        socket.send(
+                            """
+                            {"type":"session_init","agent_id":"agent-a2ui","conversation_id":"conv-a2ui","session_id":"sess-a2ui","a2ui_negotiation":{"a2ui_enabled":true,"negotiated_catalog":"com.letta.mobile:tool-approval/v1","negotiated_widgets":["ToolApprovalCard"]}}
+                            """.trimIndent()
+                        )
+                    }
+
+                    "message" -> {
+                        val requestId = payload["request_id"]!!.jsonPrimitive.content
+                        socket.send(
+                            """
+                            {"type":"result","success":true,"conversation_id":"conv-a2ui","request_id":"$requestId","duration_ms":1}
+                            """.trimIndent()
+                        )
+                    }
+                }
+            }
+
+            server.use {
+                val client = WsBotClient(gatewayUrl(server), "secret")
+                runBlocking {
+                    withTimeout(5_000) {
+                        client.streamMessage(
+                            BotChatRequest(message = "hi", agentId = "agent-a2ui", chatId = "chat-a2ui")
+                        ).toList()
+                    }
+                }
+
+                capabilityVersion shouldBe "v0.9"
+                supportedWidgets shouldContainExactly listOf(
+                    "Text",
+                    "Column",
+                    "Row",
+                    "Card",
+                    "Button",
+                    "Divider",
+                    LETTA_TOOL_APPROVAL_WIDGET_ID,
+                )
+                client.close()
+            }
+        }
+
+        "route A2UI frames to the separate A2UI event stream" {
+            val server = websocketServer { socket, text ->
+                val payload = json.parseToJsonElement(text).jsonObject
+                when (payload["type"]!!.jsonPrimitive.content) {
+                    "session_start" -> socket.send(
+                        """
+                        {"type":"session_init","agent_id":"agent-a2ui","conversation_id":"conv-a2ui","session_id":"sess-a2ui"}
+                        """.trimIndent()
+                    )
+
+                    "message" -> {
+                        val requestId = payload["request_id"]!!.jsonPrimitive.content
+                        socket.send(
+                            """
+                            {"type":"a2ui","conversation_id":"conv-a2ui","request_id":"$requestId","message":{"version":"v0.9","createSurface":{"surfaceId":"approval-1","catalogId":"com.letta.mobile:tool-approval/v1"}}}
+                            """.trimIndent()
+                        )
+                        socket.send("{" +
+                            "\"type\":\"stream\",\"event\":\"assistant\",\"content\":\"still text\",\"conversation_id\":\"conv-a2ui\",\"request_id\":\"$requestId\"}")
+                        socket.send(
+                            """
+                            {"type":"result","success":true,"conversation_id":"conv-a2ui","request_id":"$requestId","duration_ms":1}
+                            """.trimIndent()
+                        )
+                    }
+                }
+            }
+
+            server.use {
+                val client = WsBotClient(gatewayUrl(server), "secret")
+
+                val (chunks, event) = runBlocking {
+                    val eventDeferred = async {
+                        withTimeout(5_000) {
+                            client.a2uiEvents.first()
+                        }
+                    }
+                    val collectedChunks = withTimeout(5_000) {
+                        client.streamMessage(
+                            BotChatRequest(message = "hi", agentId = "agent-a2ui", chatId = "chat-a2ui")
+                        ).toList()
+                    }
+                    collectedChunks to eventDeferred.await()
+                }
+
+                chunks shouldHaveSize 2
+                chunks[0].text shouldBe "still text"
+                chunks[1].done shouldBe true
+                event.conversationId shouldBe "conv-a2ui"
+                event.requestId shouldBe chunks[0].requestId
+                event.messages.single().shouldBeInstanceOf<A2uiMessage.CreateSurface>()
+                event.messages.single().surfaceId shouldBe "approval-1"
+                client.close()
             }
         }
 

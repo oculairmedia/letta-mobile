@@ -1,12 +1,11 @@
 package com.letta.mobile.data.transport
 
+import com.letta.mobile.data.a2ui.A2uiFrameEvent
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.buildContentParts
 import com.letta.mobile.data.model.toJsonArray
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
@@ -60,6 +59,11 @@ class WsChatBridge @Inject constructor(
                 WsTimelineEvent.Disconnected(d.code, d.reason)
             },
     )
+
+    /** A2UI frame stream, kept separate from text/tool timeline events. */
+    val a2uiEvents: Flow<A2uiFrameEvent> = transport.events.mapNotNull { frame ->
+        (frame as? ServerFrame.A2ui)?.toA2uiEvent()
+    }
 
     suspend fun connect(
         baseShimUrl: String,
@@ -200,8 +204,21 @@ private fun ServerFrame.toTimelineEvent(): WsTimelineEvent? = when (this) {
         WsTimelineEvent.MessageDelta(it)
     }
     // Welcome carries connection metadata, not chat content; surface via state.
-    // Ping / Unknown are silent for chat consumers.
+    // Ping / A2UI / Unknown are silent for chat consumers.
     is ServerFrame.Welcome,
     is ServerFrame.Ping,
+    is ServerFrame.A2ui,
     is ServerFrame.Unknown -> null
 }
+
+private fun ServerFrame.A2ui.toA2uiEvent(): A2uiFrameEvent = A2uiFrameEvent(
+    transport = "admin-shim",
+    frameId = id,
+    timestamp = ts,
+    agentId = agentId,
+    conversationId = conversationId,
+    turnId = turnId,
+    runId = runId,
+    requestId = null,
+    messages = messages,
+)
