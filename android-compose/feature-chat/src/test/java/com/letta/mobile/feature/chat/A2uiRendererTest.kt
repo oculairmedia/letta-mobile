@@ -191,6 +191,115 @@ class A2uiRendererTest {
     }
 
     @Test
+    fun toolApprovalCardRendersAndMasksSensitiveArguments() {
+        val manager = toolApprovalSurfaceManager()
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+        }
+
+        composeRule.onNodeWithTag(A2uiTestTags.ToolApprovalCard).assertIsDisplayed()
+        composeRule.onNodeWithText("bash").assertIsDisplayed()
+        composeRule.onNodeWithText("Run a shell command").assertIsDisplayed()
+        composeRule.onNodeWithText("Destructive").assertIsDisplayed()
+        composeRule.onNodeWithText("Needed to clear generated files.").assertIsDisplayed()
+        composeRule.onNodeWithText("command").assertIsDisplayed()
+        composeRule.onNodeWithText("rm -rf /tmp/build").assertIsDisplayed()
+        composeRule.onNodeWithText("token").assertIsDisplayed()
+        composeRule.onAllNodesWithText("sk-test-secret").assertCountEquals(0)
+        composeRule.onNodeWithText("********").assertIsDisplayed()
+        composeRule.onNodeWithText("Once").assertIsDisplayed()
+        composeRule.onNodeWithText("This chat").assertIsDisplayed()
+        composeRule.onNodeWithText("Always").assertIsDisplayed()
+        composeRule.onNodeWithText("Deny").assertIsDisplayed()
+    }
+
+    @Test
+    fun toolApprovalSensitiveArgumentRevealsOnTap() {
+        val manager = toolApprovalSurfaceManager()
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+        }
+
+        composeRule.onNodeWithTag(A2uiTestTags.ToolApprovalSensitiveValue).performClick()
+        composeRule.onNodeWithText("sk-test-secret").assertIsDisplayed()
+    }
+
+    @Test
+    fun toolApprovalOnceAffordanceDispatchesAction() {
+        assertToolApprovalAffordance(
+            label = "Once",
+            affordance = "once",
+            callId = "call-once",
+            decision = "approve",
+            scope = "once",
+        )
+    }
+
+    @Test
+    fun toolApprovalSessionAffordanceDispatchesAction() {
+        assertToolApprovalAffordance(
+            label = "This chat",
+            affordance = "session",
+            callId = "call-session",
+            decision = "approve",
+            scope = "session",
+        )
+    }
+
+    @Test
+    fun toolApprovalForeverAffordanceDispatchesAction() {
+        assertToolApprovalAffordance(
+            label = "Always",
+            affordance = "forever",
+            callId = "call-forever",
+            decision = "approve",
+            scope = "forever",
+        )
+    }
+
+    @Test
+    fun toolApprovalDenyAffordanceDispatchesAction() {
+        assertToolApprovalAffordance(
+            label = "Deny",
+            affordance = "deny",
+            callId = "call-deny",
+            decision = "deny",
+            scope = "deny",
+        )
+    }
+
+    @Test
+    fun toolApprovalTimeoutDispatchesAction() {
+        composeRule.mainClock.autoAdvance = false
+        val manager = toolApprovalSurfaceManager(timeoutSeconds = 1)
+        val actions = mutableListOf<A2uiAction>()
+
+        try {
+            composeRule.setLettaTestContent(useChatTheme = false) {
+                A2uiRenderer(
+                    surfaceId = SurfaceId,
+                    surfaceManager = manager,
+                    onAction = actions::add,
+                )
+            }
+
+            composeRule.onNodeWithText("Auto-denies in 1s").assertIsDisplayed()
+            composeRule.mainClock.advanceTimeBy(1_100)
+            composeRule.waitForIdle()
+
+            composeRule.onNodeWithText("Timed out").assertIsDisplayed()
+            composeRule.runOnIdle {
+                assertEquals(1, actions.size)
+                actions.assertToolApprovalAction("call-approval-1", decision = "timeout", scope = "timeout")
+            }
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+    }
+
+    @Test
     fun rendersPhase4Widgets() {
         val manager = phase4WidgetsSurfaceManager()
 
@@ -246,6 +355,35 @@ class A2uiRendererTest {
         composeRule.onNodeWithTag(A2uiTestTags.DateTimeInput).performClick()
         composeRule.onAllNodesWithText("Select date").assertCountEquals(2)
     }
+
+    private fun assertToolApprovalAffordance(
+        label: String,
+        affordance: String,
+        callId: String,
+        decision: String,
+        scope: String,
+    ) {
+        val manager = toolApprovalSurfaceManager(
+            affordances = listOf(affordance),
+            callId = callId,
+            riskLevel = "medium",
+        )
+        val actions = mutableListOf<A2uiAction>()
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(
+                surfaceId = SurfaceId,
+                surfaceManager = manager,
+                onAction = actions::add,
+            )
+        }
+
+        composeRule.onNodeWithText(label).performClick()
+        composeRule.runOnIdle {
+            assertEquals(1, actions.size)
+            actions.assertToolApprovalAction(callId, decision = decision, scope = scope)
+        }
+    }
 }
 
 @Composable
@@ -271,6 +409,19 @@ private fun ObservedPointerText(
 }
 
 internal const val SurfaceId = "confirmation-surface"
+
+private fun List<A2uiAction>.assertToolApprovalAction(
+    callId: String,
+    decision: String,
+    scope: String,
+) {
+    val action = single { it.context!!["callId"]!!.jsonPrimitive.content == callId }
+    assertEquals("tool_approval_response", action.name)
+    assertEquals("tool_approval_response", action.raw["actionName"]!!.jsonPrimitive.content)
+    assertEquals(SurfaceId, action.raw["surfaceId"]!!.jsonPrimitive.content)
+    assertEquals(decision, action.context!!["decision"]!!.jsonPrimitive.content)
+    assertEquals(scope, action.context!!["scope"]!!.jsonPrimitive.content)
+}
 
 internal fun confirmationSurfaceManager(): A2uiSurfaceManager {
     val manager = A2uiSurfaceManager()
@@ -300,6 +451,43 @@ internal fun confirmationSurfaceManager(): A2uiSurfaceManager {
             manager.surface(SurfaceId)!!.dataModel,
             "/title",
         )!!.jsonPrimitive.content == "Review tool call"
+    )
+    return manager
+}
+
+internal fun toolApprovalSurfaceManager(
+    timeoutSeconds: Int = 30,
+    affordances: List<String> = listOf("once", "session", "forever", "deny"),
+    callId: String = "call-approval-1",
+    riskLevel: String = "destructive",
+): A2uiSurfaceManager {
+    val affordanceJson = affordances.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }
+    val manager = A2uiSurfaceManager()
+    manager.applyMessages(
+        decodeA2uiMessages(
+            A2uiProtocolJson.Default,
+            A2uiProtocolJson.Default.parseToJsonElement(
+                """
+                [
+                  {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"com.letta.mobile:tool-approval/v1"}},
+                  {"version":"v0.9","updateComponents":{"surfaceId":"$SurfaceId","root":"approval","components":[
+                    {"id":"approval","component":"ToolApprovalCard",
+                     "toolName":"bash",
+                     "toolDescription":"Run a shell command",
+                     "arguments":[
+                       {"key":"command","value":"rm -rf /tmp/build","isSensitive":false},
+                       {"key":"token","value":"sk-test-secret","isSensitive":true}
+                     ],
+                     "riskLevel":"$riskLevel",
+                     "rationale":"Needed to clear generated files.",
+                     "affordances":$affordanceJson,
+                     "timeoutSeconds":$timeoutSeconds,
+                     "callId":"$callId"}
+                  ]}}
+                ]
+                """.trimIndent(),
+            ),
+        )
     )
     return manager
 }
