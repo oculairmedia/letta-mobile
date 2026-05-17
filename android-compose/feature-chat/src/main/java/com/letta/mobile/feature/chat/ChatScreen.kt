@@ -46,6 +46,7 @@ import com.letta.mobile.ui.components.FloatingBanner
 import com.letta.mobile.ui.components.MessageSkeletonList
 import com.letta.mobile.ui.components.StarterPrompts
 import com.letta.mobile.ui.components.ThinkingShader
+import androidx.compose.animation.core.EaseInOutCubic
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.draw.alpha
@@ -117,9 +118,15 @@ internal fun ChatScreen(
             // Surface) covers the peak. What's visible above the composer
             // is the long diffuse upper tail. Half-opacity vs. the
             // previous typing-slot strip (0.39 vs 0.78 in the shader).
+            // vcky.b6: ease the glow in/out instead of the default
+            // FastOutSlowIn curve (which front-loads the change and
+            // looks like a pop). EaseInOutCubic spends the same time
+            // accelerating and decelerating, so the glow grows from
+            // invisible to full smoothly; doubled the duration to 900ms
+            // for a gentle build.
             val thinkingAlpha by animateFloatAsState(
                 targetValue = if (state.isStreaming) 1f else 0f,
-                animationSpec = tween(durationMillis = 400),
+                animationSpec = tween(durationMillis = 900, easing = EaseInOutCubic),
                 label = "thinkingAlpha",
             )
             if (thinkingAlpha > 0.001f) {

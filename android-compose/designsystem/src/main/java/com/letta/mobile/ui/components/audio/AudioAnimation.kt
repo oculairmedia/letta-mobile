@@ -114,9 +114,13 @@ half4 main(float2 fragCoord) {
 
   vec3 col = mix4(uv);
 
-  // Define the fade parameters
+  // Define the fade parameters.
+  // letta-mobile-vcky.c: fade band lengthened 8x (was 0.10, now 0.80) so
+  // the wave color dissolves gradually across the upper portion of the
+  // overlay instead of cutting off in a tight 10% band. fade_start kept
+  // at 0.24 so the wave still has a solid bottom region.
   float fade_start = 0.24;
-  float fade_end = 0.34;
+  float fade_end = 1.04;
 
   // Calculate the blend factor using smoothstep for a smooth transition
   float fade_factor = smoothstep(fade_start, fade_end, uv.y);
