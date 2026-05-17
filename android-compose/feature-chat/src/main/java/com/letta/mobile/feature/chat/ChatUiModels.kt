@@ -26,6 +26,16 @@ internal data class PendingToolCall(
     val startedAt: Long = System.currentTimeMillis(),
 )
 
+@androidx.compose.runtime.Immutable
+internal data class A2uiDebugFrameUi(
+    val id: String,
+    val transport: String,
+    val messageType: String,
+    val surfaceId: String?,
+    val conversationId: String?,
+    val requestId: String?,
+)
+
 internal enum class ProjectBriefSectionKey {
     Description,
     KeyDecisions,
@@ -186,6 +196,7 @@ internal data class ChatUiState(
     val isSearchActive: Boolean = false,
     val isSearching: Boolean = false,
     val searchResults: ImmutableList<ParsedSearchMessage> = persistentListOf(),
+    val a2uiDebugFrames: ImmutableList<A2uiDebugFrameUi> = persistentListOf(),
     /**
      * Surfaced when the LettaBot harness substituted a fresh conversation ID for
      * the one we requested (i.e. our requested conv was unrecoverable on the

@@ -73,6 +73,7 @@ object WsFrameMapper {
         is ServerFrame.TurnDone,
         is ServerFrame.StopReason,
         is ServerFrame.UsageStatistics,
+        is ServerFrame.A2ui,
         is ServerFrame.Unknown -> null
     }
 

@@ -1,6 +1,7 @@
 package com.letta.mobile.bot.protocol
 
 import android.util.Log
+import com.letta.mobile.data.a2ui.A2uiFrameEvent
 import com.letta.mobile.data.model.ToolCall
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -26,10 +27,14 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
@@ -102,6 +107,13 @@ class WsBotClient(
 
     private val _connectionState = MutableStateFlow(ConnectionState.CLOSED)
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
+
+    private val _a2uiEvents = MutableSharedFlow<A2uiFrameEvent>(
+        replay = 0,
+        extraBufferCapacity = 64,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val a2uiEvents: SharedFlow<A2uiFrameEvent> = _a2uiEvents.asSharedFlow()
 
     @Volatile
     private var socket: WebSocket? = null
@@ -701,8 +713,24 @@ class WsBotClient(
 
             is WsStreamEventMessage,
             is WsResultMessage -> routeInbound(message)
+
+            is WsA2uiMessage -> {
+                _a2uiEvents.tryEmit(message.toA2uiEvent())
+            }
         }
     }
+
+    private fun WsA2uiMessage.toA2uiEvent(): A2uiFrameEvent = A2uiFrameEvent(
+        transport = "lettabot-gateway",
+        frameId = null,
+        timestamp = null,
+        agentId = agentId ?: activeAgentId,
+        conversationId = conversationId ?: activeConversationId,
+        turnId = null,
+        runId = null,
+        requestId = requestId,
+        messages = messages,
+    )
 
     /**
      * letta-mobile-w2hx.8: demux an inbound frame to the right

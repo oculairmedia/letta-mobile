@@ -60,7 +60,12 @@ class ChannelTransport @Inject constructor() {
     sealed interface State {
         data object Idle : State
         data object Connecting : State
-        data class Connected(val serverId: String, val sessionId: String, val deviceId: String?) : State
+        data class Connected(
+            val serverId: String,
+            val sessionId: String,
+            val deviceId: String?,
+            val a2uiNegotiation: com.letta.mobile.data.a2ui.A2uiNegotiation? = null,
+        ) : State
 
         /**
          * Closed cleanly or due to failure. `code`/`reason` come from
@@ -290,6 +295,7 @@ class ChannelTransport @Inject constructor() {
                     serverId = frame.serverId,
                     sessionId = frame.sessionId,
                     deviceId = frame.deviceId,
+                    a2uiNegotiation = frame.a2uiNegotiation,
                 )
             }
 
@@ -355,6 +361,7 @@ class ChannelTransport @Inject constructor() {
             is ServerFrame.UsageStatistics -> runId
             is ServerFrame.TurnDone -> runId
             is ServerFrame.Error -> runId
+            is ServerFrame.A2ui -> runId
             else -> null
         }
     }

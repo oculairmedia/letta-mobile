@@ -11,6 +11,7 @@ import com.letta.mobile.bot.chat.ClientModeChatSender
 import com.letta.mobile.bot.protocol.InternalBotClient
 import com.letta.mobile.bot.repository.ClientModeAgentLocationRepository
 import com.letta.mobile.bot.channel.NotificationReplyHandler
+import com.letta.mobile.data.a2ui.A2uiFrameEvent
 import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.health.ShimBackendDetector
 import com.letta.mobile.data.model.Agent
@@ -89,6 +90,7 @@ internal class AdminChatViewModel @Inject constructor(
         // round-trip on every chat open. Matches the cadence
         // ChatSessionResolver uses in its own callers.
         private const val RESUME_CACHE_MAX_AGE_MS = 60_000L
+        private const val MAX_A2UI_DEBUG_FRAMES = 12
     }
 
     val agentId: String = routeArgs.agentId
@@ -488,7 +490,35 @@ internal class AdminChatViewModel @Inject constructor(
                 shimBackendDetector.refresh(config)
             }
         }
+        observeA2uiDebugFrames()
         chatSessionInitializer.run()
+    }
+
+    private fun observeA2uiDebugFrames() {
+        viewModelScope.launch {
+            wsChatBridge.a2uiEvents.collect { event ->
+                val frames = event.toDebugFrames()
+                if (frames.isEmpty()) return@collect
+                _uiState.update { current ->
+                    current.copy(
+                        a2uiDebugFrames = (current.a2uiDebugFrames + frames)
+                            .takeLast(MAX_A2UI_DEBUG_FRAMES)
+                            .toImmutableList(),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun A2uiFrameEvent.toDebugFrames(): List<A2uiDebugFrameUi> = messages.mapIndexed { index, message ->
+        A2uiDebugFrameUi(
+            id = listOfNotNull(frameId, requestId, message.surfaceId, index.toString()).joinToString(":"),
+            transport = transport,
+            messageType = message.messageType,
+            surfaceId = message.surfaceId.takeIf { it.isNotBlank() },
+            conversationId = conversationId,
+            requestId = requestId,
+        )
     }
 
     fun tryHandleSlashCommand(text: String): Boolean =
