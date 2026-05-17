@@ -41,7 +41,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.feature.chat.R
+import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
 import com.letta.mobile.ui.components.FloatingBanner
 import com.letta.mobile.ui.components.MessageSkeletonList
 import com.letta.mobile.ui.components.StarterPrompts
@@ -335,7 +337,7 @@ private fun A2uiDebugOverlay(
 }
 
 internal fun shouldShowStarterPromptsForNoConversation(state: ChatUiState): Boolean =
-    state.messages.isEmpty() && !state.isStreaming
+    state.messages.isEmpty() && !state.isStreaming && state.a2uiSurfaces.isEmpty()
 
 @Composable
 internal fun NoConversationChatContent(
@@ -407,7 +409,7 @@ private fun ChatContent(
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        if (state.messages.isEmpty() && !state.isStreaming) {
+        if (state.messages.isEmpty() && !state.isStreaming && state.a2uiSurfaces.isEmpty()) {
             StarterPrompts(
                 onPromptClick = onSendMessage,
                 modifier = Modifier.weight(1f),
@@ -415,24 +417,54 @@ private fun ChatContent(
         } else {
             val renderItems = renderModel.renderItems
 
-            ChatMessageList(
-                state = state,
-                renderItems = renderItems,
-                chatMode = chatMode,
-                scrollToMessageId = scrollToMessageId,
-                activeFontScale = activeFontScale,
-                onActiveFontScaleChange = onActiveFontScaleChange,
-                onFontScaleChange = onFontScaleChange,
-                onLoadOlderMessages = onLoadOlderMessages,
-                onSendMessage = onSendMessage,
-                onRerunMessage = onRerunMessage,
-                onSubmitApproval = onSubmitApproval,
-                onToggleRunCollapsed = onToggleRunCollapsed,
-                onToggleReasoningExpanded = onToggleReasoningExpanded,
-                modifier = Modifier.weight(1f),
+            if (state.messages.isEmpty() && !state.isStreaming) {
+                Spacer(modifier = Modifier.weight(1f))
+            } else {
+                ChatMessageList(
+                    state = state,
+                    renderItems = renderItems,
+                    chatMode = chatMode,
+                    scrollToMessageId = scrollToMessageId,
+                    activeFontScale = activeFontScale,
+                    onActiveFontScaleChange = onActiveFontScaleChange,
+                    onFontScaleChange = onFontScaleChange,
+                    onLoadOlderMessages = onLoadOlderMessages,
+                    onSendMessage = onSendMessage,
+                    onRerunMessage = onRerunMessage,
+                    onSubmitApproval = onSubmitApproval,
+                    onToggleRunCollapsed = onToggleRunCollapsed,
+                    onToggleReasoningExpanded = onToggleReasoningExpanded,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            A2uiSurfaceStack(
+                surfaces = state.a2uiSurfaces.values,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
             )
         }
 
+    }
+}
+
+@Composable
+private fun A2uiSurfaceStack(
+    surfaces: Collection<A2uiSurfaceState>,
+    modifier: Modifier = Modifier,
+) {
+    if (surfaces.isEmpty()) return
+    val orderedSurfaces = remember(surfaces) { surfaces.sortedBy(A2uiSurfaceState::surfaceId) }
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        orderedSurfaces.forEach { surface ->
+            A2uiSurfaceRenderer(
+                surface = surface,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 

@@ -12,6 +12,7 @@ import com.letta.mobile.bot.protocol.InternalBotClient
 import com.letta.mobile.bot.repository.ClientModeAgentLocationRepository
 import com.letta.mobile.bot.channel.NotificationReplyHandler
 import com.letta.mobile.data.a2ui.A2uiFrameEvent
+import com.letta.mobile.data.a2ui.A2uiSurfaceManager
 import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.health.ShimBackendDetector
 import com.letta.mobile.data.model.Agent
@@ -39,6 +40,7 @@ import com.letta.mobile.util.Telemetry
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.collections.immutable.toPersistentMap
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -153,6 +155,7 @@ internal class AdminChatViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(
         ChatUiState(agentName = initialAgentName.orEmpty())
     )
+    private val a2uiSurfaceManager = A2uiSurfaceManager()
     val uiState: StateFlow<ChatUiState> by lazy(LazyThreadSafetyMode.NONE) {
         viewModelScope.launchMolecule(mode = Immediate) {
             present()
@@ -490,20 +493,25 @@ internal class AdminChatViewModel @Inject constructor(
                 shimBackendDetector.refresh(config)
             }
         }
-        observeA2uiDebugFrames()
+        observeA2uiEvents()
         chatSessionInitializer.run()
     }
 
-    private fun observeA2uiDebugFrames() {
+    private fun observeA2uiEvents() {
         viewModelScope.launch {
             wsChatBridge.a2uiEvents.collect { event ->
+                a2uiSurfaceManager.apply(event)
                 val frames = event.toDebugFrames()
-                if (frames.isEmpty()) return@collect
                 _uiState.update { current ->
                     current.copy(
-                        a2uiDebugFrames = (current.a2uiDebugFrames + frames)
-                            .takeLast(MAX_A2UI_DEBUG_FRAMES)
-                            .toImmutableList(),
+                        a2uiSurfaces = a2uiSurfaceManager.surfaces.value.toPersistentMap(),
+                        a2uiDebugFrames = if (frames.isEmpty()) {
+                            current.a2uiDebugFrames
+                        } else {
+                            (current.a2uiDebugFrames + frames)
+                                .takeLast(MAX_A2UI_DEBUG_FRAMES)
+                                .toImmutableList()
+                        },
                     )
                 }
             }
