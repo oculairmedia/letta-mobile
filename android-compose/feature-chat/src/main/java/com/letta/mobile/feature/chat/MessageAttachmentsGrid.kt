@@ -1,5 +1,7 @@
 package com.letta.mobile.feature.chat
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,11 +13,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
-import coil3.request.ImageRequest
 import com.letta.mobile.data.model.UiImageAttachment
 
 /**
@@ -71,27 +71,16 @@ private fun AttachmentImage(
     attachment: UiImageAttachment,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
-    val cacheKey = remember(attachment.base64, attachment.mediaType) {
-        chatAttachmentImageCacheKey(
-            base64 = attachment.base64,
-            mediaType = attachment.mediaType,
-        )
-    }
-    // letta-mobile-axb2: feed Coil3 a ByteArray rather than a data: URI.
-    // Coil3 dropped the Coil2 data:-URI fetcher, so the URI path resolves
-    // to a null Bitmap and the AsyncImage renders blank.
-    val bytes = remember(attachment.base64) {
+    // letta-mobile-v4f9: Coil 3.4's BitmapFetcher silently returns null
+    // for `data(ByteArray)`, so AsyncImage paints an empty square. The
+    // base64 payload is already in memory and bounded by the composer's
+    // attachment caps — decode straight to a Bitmap and use Compose's
+    // native Image.
+    val imageBitmap = remember(attachment.base64) {
         runCatching {
-            android.util.Base64.decode(attachment.base64, android.util.Base64.DEFAULT)
-        }.getOrDefault(ByteArray(0))
-    }
-    val request = remember(context, bytes, cacheKey) {
-        ImageRequest.Builder(context)
-            .data(bytes)
-            .memoryCacheKey(cacheKey)
-            .diskCacheKey(cacheKey)
-            .build()
+            val bytes = android.util.Base64.decode(attachment.base64, android.util.Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+        }.getOrNull()
     }
 
     Surface(
@@ -99,12 +88,14 @@ private fun AttachmentImage(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(8.dp),
     ) {
-        AsyncImage(
-            model = request,
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop,
-        )
+        if (imageBitmap != null) {
+            Image(
+                bitmap = imageBitmap,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        }
     }
 }
 
