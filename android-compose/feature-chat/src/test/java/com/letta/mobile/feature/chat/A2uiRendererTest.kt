@@ -425,17 +425,6 @@ private fun ObservedPointerText(
     Text(value?.let(A2uiBindingResolver::displayText).orEmpty())
 }
 
-@Composable
-private fun ObservedPointerText(
-    model: A2uiDataModel,
-    path: String,
-    onComposed: () -> Unit,
-) {
-    val value by model.observe(path)
-    SideEffect(onComposed)
-    Text(value?.let(A2uiBindingResolver::displayText).orEmpty())
-}
-
 internal const val SurfaceId = "confirmation-surface"
 
 private fun List<A2uiAction>.assertToolApprovalAction(
