@@ -542,8 +542,8 @@ internal class AdminChatViewModel @Inject constructor(
                     is ChannelTransport.State.Idle -> ChatTransport.WsIdle
                     is ChannelTransport.State.Connecting -> ChatTransport.WsConnecting
                     is ChannelTransport.State.Connected -> ChatTransport.WsConnected(
-                        a2uiEnabled = wsState.a2uiNegotiation?.a2uiEnabled == true,
-                        catalog = wsState.a2uiNegotiation?.negotiatedCatalog,
+                        a2uiEnabled = wsState.a2uiEnabled,
+                        catalog = wsState.a2uiCatalog,
                     )
                     is ChannelTransport.State.Disconnected -> ChatTransport.WsDisconnected(
                         code = wsState.code,
@@ -568,7 +568,15 @@ internal class AdminChatViewModel @Inject constructor(
     }
 
     fun submitA2uiAction(action: A2uiAction) {
-        when (wsChatBridge.sendA2uiAction(action)) {
+        val result = wsChatBridge.sendA2uiAction(action)
+        // letta-mobile-ykkl: log the dispatch outcome so a missing
+        // user_action on the wire is diagnosable from adb logcat
+        // (which side dropped it: VM, bridge, transport).
+        android.util.Log.i(
+            "A2UI",
+            "submitA2uiAction surfaceId=${action.surfaceId} event=${action.name} result=$result",
+        )
+        when (result) {
             A2uiActionDispatchResult.Sent -> Unit
             A2uiActionDispatchResult.Queued -> {
                 chatBannerController.showComposerError("Action queued until the chat connection returns")
