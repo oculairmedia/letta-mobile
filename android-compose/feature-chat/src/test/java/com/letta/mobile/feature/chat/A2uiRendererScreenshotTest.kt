@@ -47,11 +47,29 @@ class A2uiRendererScreenshotTest {
         )
     }
 
+    @Test
+    fun phase4WidgetsLightTheme() {
+        captureA2uiSurface(
+            name = "a2ui_phase4_widgets_light",
+            appTheme = AppTheme.LIGHT,
+            manager = phase4WidgetsSurfaceManager(imageUrl = null),
+        )
+    }
+
+    @Test
+    fun phase4WidgetsDarkTheme() {
+        captureA2uiSurface(
+            name = "a2ui_phase4_widgets_dark",
+            appTheme = AppTheme.DARK,
+            manager = phase4WidgetsSurfaceManager(imageUrl = null),
+        )
+    }
+
     private fun captureA2uiSurface(
         name: String,
         appTheme: AppTheme,
+        manager: com.letta.mobile.data.a2ui.A2uiSurfaceManager = confirmationSurfaceManager(),
     ) {
-        val manager = confirmationSurfaceManager()
         val surface = manager.surface(SurfaceId)
 
         captureRoboImage("src/test/snapshots/images/$name.png", ScreenshotOptions) {

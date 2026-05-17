@@ -5,12 +5,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import com.letta.mobile.data.a2ui.A2uiBindingResolver
 import com.letta.mobile.data.a2ui.A2uiDataModel
 import com.letta.mobile.data.a2ui.A2uiMessage
@@ -185,6 +189,63 @@ class A2uiRendererTest {
 
         composeRule.onNodeWithText("Waiting").assertIsNotEnabled()
     }
+
+    @Test
+    fun rendersPhase4Widgets() {
+        val manager = phase4WidgetsSurfaceManager()
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+        }
+
+        composeRule.onNodeWithText("Booking details").assertIsDisplayed()
+        composeRule.onNodeWithText("Window").assertIsDisplayed()
+        composeRule.onNodeWithText("Aisle").assertIsDisplayed()
+        composeRule.onNodeWithText("2").assertIsDisplayed()
+        composeRule.onNodeWithText("Reservation time").assertIsDisplayed()
+        composeRule.onNodeWithText("2026-05-17T18:30").assertIsDisplayed()
+        composeRule.onNodeWithTag(A2uiTestTags.Divider).assertIsDisplayed()
+    }
+
+    @Test
+    fun imageWithResolvedUrlExposesContentDescription() {
+        val manager = imageSurfaceManager()
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+        }
+
+        composeRule.onNodeWithContentDescription("Hotel room").assertIsDisplayed()
+    }
+
+    @Test
+    fun textFieldWritesBoundDataModelPath() {
+        val manager = textFieldSurfaceManager()
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+        }
+
+        composeRule.onNodeWithTag(A2uiTestTags.TextField).performTextInput("4")
+        composeRule.runOnIdle {
+            assertEquals(
+                "4",
+                manager.surface(SurfaceId)!!.dataModel.resolve("/partySize")!!.jsonPrimitive.content,
+            )
+        }
+    }
+
+    @Test
+    fun dateTimeInputOpensDatePicker() {
+        val manager = dateTimeSurfaceManager()
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+        }
+
+        composeRule.onNodeWithTag(A2uiTestTags.DateTimeInput).performClick()
+        composeRule.onAllNodesWithText("Select date").assertCountEquals(2)
+    }
 }
 
 @Composable
@@ -228,6 +289,106 @@ internal fun confirmationSurfaceManager(): A2uiSurfaceManager {
             manager.surface(SurfaceId)!!.dataModel,
             "/title",
         )!!.jsonPrimitive.content == "Review tool call"
+    )
+    return manager
+}
+
+internal fun phase4WidgetsSurfaceManager(
+    imageUrl: String? = "https://example.com/room.png",
+): A2uiSurfaceManager {
+    val imagePatch = imageUrl?.let {
+        """,
+                  {"version":"v0.9","updateDataModel":{"surfaceId":"$SurfaceId","path":"/imageUrl","value":"$it"}}
+        """.trimIndent()
+    }.orEmpty()
+    val manager = A2uiSurfaceManager()
+    manager.applyMessages(
+        decodeA2uiMessages(
+            A2uiProtocolJson.Default,
+            A2uiProtocolJson.Default.parseToJsonElement(
+                """
+                [
+                  {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"https://a2ui.org/specification/v0_9/basic_catalog.json"}},
+                  {"version":"v0.9","updateComponents":{"surfaceId":"$SurfaceId","root":"card","components":[
+                    {"id":"card","component":"Card","child":"content","cornerRadius":16,"elevation":1},
+                    {"id":"content","component":"Column","children":["title","seats","partySize","reservationTime","divider","image"],"spacing":"sm"},
+                    {"id":"title","component":"Text","variant":"h5","text":{"literalString":"Booking details"}},
+                    {"id":"seats","component":"Row","children":["windowSeat","aisleSeat"],"spacing":"sm","align":"center"},
+                    {"id":"windowSeat","component":"Text","text":{"literalString":"Window"}},
+                    {"id":"aisleSeat","component":"Text","text":{"literalString":"Aisle"}},
+                    {"id":"partySize","component":"TextField","label":{"literalString":"Party size"},"value":{"path":"/partySize"},"textFieldType":"number"},
+                    {"id":"reservationTime","component":"DateTimeInput","label":{"literalString":"Reservation time"},"value":{"path":"/reservationTime"},"enableDate":true,"enableTime":true},
+                    {"id":"divider","component":"Divider"},
+                    {"id":"image","component":"Image","url":{"path":"/imageUrl"},"alt":{"literalString":"Hotel room"},"height":48,"fit":"cover"}
+                  ]}},
+                  {"version":"v0.9","updateDataModel":{"surfaceId":"$SurfaceId","path":"/partySize","value":2}},
+                  {"version":"v0.9","updateDataModel":{"surfaceId":"$SurfaceId","path":"/reservationTime","value":"2026-05-17T18:30"}}
+                  $imagePatch
+                ]
+                """.trimIndent(),
+            ),
+        )
+    )
+    return manager
+}
+
+private fun imageSurfaceManager(): A2uiSurfaceManager {
+    val manager = A2uiSurfaceManager()
+    manager.applyMessages(
+        decodeA2uiMessages(
+            A2uiProtocolJson.Default,
+            A2uiProtocolJson.Default.parseToJsonElement(
+                """
+                [
+                  {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"basic"}},
+                  {"version":"v0.9","updateComponents":{"surfaceId":"$SurfaceId","root":"image","components":[
+                    {"id":"image","component":"Image","url":{"path":"/imageUrl"},"alt":{"literalString":"Hotel room"},"height":48,"fit":"cover"}
+                  ]}},
+                  {"version":"v0.9","updateDataModel":{"surfaceId":"$SurfaceId","path":"/imageUrl","value":"https://example.com/room.png"}}
+                ]
+                """.trimIndent(),
+            ),
+        )
+    )
+    return manager
+}
+
+private fun textFieldSurfaceManager(): A2uiSurfaceManager {
+    val manager = A2uiSurfaceManager()
+    manager.applyMessages(
+        decodeA2uiMessages(
+            A2uiProtocolJson.Default,
+            A2uiProtocolJson.Default.parseToJsonElement(
+                """
+                [
+                  {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"basic"}},
+                  {"version":"v0.9","updateComponents":{"surfaceId":"$SurfaceId","root":"partySize","components":[
+                    {"id":"partySize","component":"TextField","label":{"literalString":"Party size"},"value":{"path":"/partySize"},"textFieldType":"number"}
+                  ]}}
+                ]
+                """.trimIndent(),
+            ),
+        )
+    )
+    return manager
+}
+
+private fun dateTimeSurfaceManager(): A2uiSurfaceManager {
+    val manager = A2uiSurfaceManager()
+    manager.applyMessages(
+        decodeA2uiMessages(
+            A2uiProtocolJson.Default,
+            A2uiProtocolJson.Default.parseToJsonElement(
+                """
+                [
+                  {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"basic"}},
+                  {"version":"v0.9","updateComponents":{"surfaceId":"$SurfaceId","root":"reservationTime","components":[
+                    {"id":"reservationTime","component":"DateTimeInput","label":{"literalString":"Reservation time"},"value":{"path":"/reservationTime"},"enableDate":true,"enableTime":false}
+                  ]}}
+                ]
+                """.trimIndent(),
+            ),
+        )
     )
     return manager
 }

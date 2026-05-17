@@ -40,6 +40,9 @@ val A2UI_DEFAULT_SUPPORTED_WIDGETS: List<String> = listOf(
     "Card",
     "Button",
     "Divider",
+    "TextField",
+    "DateTimeInput",
+    "Image",
     LETTA_TOOL_APPROVAL_WIDGET_ID,
 )
 
