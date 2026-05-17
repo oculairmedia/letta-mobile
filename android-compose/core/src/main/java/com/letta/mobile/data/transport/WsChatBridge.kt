@@ -1,6 +1,7 @@
 package com.letta.mobile.data.transport
 
 import com.letta.mobile.data.a2ui.A2uiFrameEvent
+import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.buildContentParts
 import com.letta.mobile.data.model.toJsonArray
@@ -100,6 +101,7 @@ class WsChatBridge @Inject constructor(
 
     fun cancel(): Boolean = transport.cancel()
     fun bye(): Boolean = transport.bye()
+    fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult = transport.sendA2uiAction(action)
     suspend fun disconnect(): Unit = transport.disconnect()
 }
 

@@ -1,6 +1,7 @@
 package com.letta.mobile.data.transport
 
 import android.util.Log
+import com.letta.mobile.data.a2ui.A2uiAction
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -31,6 +32,12 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
+
+enum class A2uiActionDispatchResult {
+    Sent,
+    Queued,
+    Failed,
+}
 
 /**
  * letta-mobile-9vgk: client for the admin-shim's `/shim/v1/mobile`
@@ -131,6 +138,8 @@ class ChannelTransport @Inject constructor() {
     private val socketRef = AtomicReference<WebSocket?>(null)
     private val socketMutex = Mutex()
     private var listenerJob: Job? = null
+    private val pendingA2uiActionLock = Any()
+    private val pendingA2uiActions = ArrayDeque<A2uiAction>()
 
     /**
      * Open the WebSocket and send `hello`. Suspends until the request
@@ -297,6 +306,7 @@ class ChannelTransport @Inject constructor() {
                     deviceId = frame.deviceId,
                     a2uiNegotiation = frame.a2uiNegotiation,
                 )
+                drainPendingA2uiActions()
             }
 
             is ServerFrame.TurnStarted -> {
@@ -339,9 +349,60 @@ class ChannelTransport @Inject constructor() {
         return send(frame.encodeJson(json))
     }
 
+    fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult {
+        val socket = socketRef.get()
+        if (state.value is State.Connected && socket != null) {
+            return if (socket.sendFrame(action.toUserActionFrame())) {
+                A2uiActionDispatchResult.Sent
+            } else {
+                enqueueA2uiAction(action)
+            }
+        }
+        return enqueueA2uiAction(action)
+    }
+
+    private fun enqueueA2uiAction(action: A2uiAction): A2uiActionDispatchResult =
+        synchronized(pendingA2uiActionLock) {
+            if (pendingA2uiActions.size >= MAX_PENDING_A2UI_ACTIONS) {
+                A2uiActionDispatchResult.Failed
+            } else {
+                pendingA2uiActions.addLast(action)
+                A2uiActionDispatchResult.Queued
+            }
+        }
+
+    private fun requeueA2uiActionFirst(action: A2uiAction) {
+        synchronized(pendingA2uiActionLock) {
+            pendingA2uiActions.addFirst(action)
+        }
+    }
+
+    private fun drainPendingA2uiActions() {
+        while (true) {
+            val action = synchronized(pendingA2uiActionLock) {
+                if (pendingA2uiActions.isEmpty()) null else pendingA2uiActions.removeFirst()
+            } ?: return
+            val socket = socketRef.get()
+            if (state.value !is State.Connected || socket == null || !socket.sendFrame(action.toUserActionFrame())) {
+                requeueA2uiActionFirst(action)
+                return
+            }
+        }
+    }
+
+    private fun A2uiAction.toUserActionFrame(): UserActionFrame =
+        UserActionFrame(
+            id = UUID.randomUUID().toString(),
+            ts = nowIso(),
+            actionName = name,
+            surfaceId = surfaceId,
+            context = context,
+        )
+
     companion object {
         private const val TAG = "ChannelTransport"
         private const val NORMAL_CLOSE = 1000
+        private const val MAX_PENDING_A2UI_ACTIONS = 16
 
         internal fun nowIso(): String = Instant.now().toString()
 

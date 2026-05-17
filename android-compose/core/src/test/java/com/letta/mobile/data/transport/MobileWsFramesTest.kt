@@ -8,6 +8,8 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Tag
 
 /**
@@ -115,6 +117,25 @@ class MobileWsFramesTest : WordSpec({
             val out = frame.encodeJson(json)
             out shouldContain "\"type\":\"cancel\""
             out shouldContain "\"run_id\":\"run-7\""
+        }
+
+        "letta-mobile-51xm.7 userAction sends actionName surfaceId and resolved context" {
+            val frame = UserActionFrame(
+                id = "fid-action",
+                ts = "2026-05-17T12:00:00Z",
+                actionName = "submit_booking",
+                surfaceId = "booking-1",
+                context = buildJsonObject {
+                    put("partySize", 4)
+                    put("reservationTime", "2026-05-17T18:30")
+                },
+            )
+            val out = frame.encodeJson(json)
+            out shouldContain "\"type\":\"userAction\""
+            out shouldContain "\"actionName\":\"submit_booking\""
+            out shouldContain "\"surfaceId\":\"booking-1\""
+            out shouldContain "\"partySize\":4"
+            out shouldContain "\"reservationTime\":\"2026-05-17T18:30\""
         }
     }
 

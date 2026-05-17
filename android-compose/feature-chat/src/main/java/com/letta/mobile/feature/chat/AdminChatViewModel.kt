@@ -11,6 +11,7 @@ import com.letta.mobile.bot.chat.ClientModeChatSender
 import com.letta.mobile.bot.protocol.InternalBotClient
 import com.letta.mobile.bot.repository.ClientModeAgentLocationRepository
 import com.letta.mobile.bot.channel.NotificationReplyHandler
+import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.a2ui.A2uiFrameEvent
 import com.letta.mobile.data.a2ui.A2uiSurfaceManager
 import com.letta.mobile.data.channel.NotificationDelivery
@@ -35,6 +36,7 @@ import com.letta.mobile.feature.chat.send.WsChatSendStrategy
 import com.letta.mobile.feature.chat.route.ChatRouteArgs
 import com.letta.mobile.feature.chat.session.ChatSessionInitializer
 import com.letta.mobile.feature.chat.state.ChatBannerController
+import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.util.Telemetry
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -527,6 +529,18 @@ internal class AdminChatViewModel @Inject constructor(
             conversationId = conversationId,
             requestId = requestId,
         )
+    }
+
+    fun submitA2uiAction(action: A2uiAction) {
+        when (wsChatBridge.sendA2uiAction(action)) {
+            A2uiActionDispatchResult.Sent -> Unit
+            A2uiActionDispatchResult.Queued -> {
+                chatBannerController.showComposerError("Action queued until the chat connection returns")
+            }
+            A2uiActionDispatchResult.Failed -> {
+                chatBannerController.showComposerError("Couldn't send action. Check the chat connection and try again.")
+            }
+        }
     }
 
     fun tryHandleSlashCommand(text: String): Boolean =
