@@ -26,7 +26,7 @@ class A2uiSurfaceManagerTest : WordSpec({
                     json.parseToJsonElement(
                         """
                         [
-                          {"version":"v0.9","createSurface":{"surfaceId":"s1","catalogId":"https://a2ui.org/specification/v0_9/basic_catalog.json","theme":{"density":"compact"}}},
+                          {"version":"v0.9","createSurface":{"surfaceId":"s1","catalogId":"basic","theme":{"density":"compact"}}},
                           {"version":"v0.9","updateComponents":{"surfaceId":"s1","root":"card","components":[
                             {"id":"card","component":"Card","child":"body"},
                             {"id":"body","component":"Text","text":{"path":"/message"}}
