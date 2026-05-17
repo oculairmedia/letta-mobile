@@ -133,6 +133,9 @@ class WsBotClientTest : WordSpec({
                     "Card",
                     "Button",
                     "Divider",
+                    "TextField",
+                    "DateTimeInput",
+                    "Image",
                     LETTA_TOOL_APPROVAL_WIDGET_ID,
                 )
                 client.close()

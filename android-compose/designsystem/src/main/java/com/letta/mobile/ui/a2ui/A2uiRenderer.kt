@@ -1,29 +1,56 @@
 package com.letta.mobile.ui.a2ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimeInput
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.painter.ColorPainter
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
 import com.letta.mobile.data.a2ui.A2uiBindingResolver
 import com.letta.mobile.data.a2ui.A2uiComponent
 import com.letta.mobile.data.a2ui.A2uiResolvedBinding
@@ -33,6 +60,11 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 @Immutable
 data class A2uiAction(
@@ -90,6 +122,10 @@ object A2uiTestTags {
     const val SurfacePending = "a2ui_surface_pending"
     const val MissingComponent = "a2ui_missing_component"
     const val MissingText = "a2ui_missing_text"
+    const val MissingImage = "a2ui_missing_image"
+    const val TextField = "a2ui_text_field"
+    const val DateTimeInput = "a2ui_date_time_input"
+    const val Divider = "a2ui_divider"
 }
 
 @Composable
@@ -107,7 +143,18 @@ private fun A2uiComponentNode(
     val nextVisited = visited + component.id
     when (component.component) {
         "Text" -> A2uiText(component = component, surface = surface, modifier = modifier)
+        "TextField" -> A2uiTextField(component = component, surface = surface, modifier = modifier)
+        "DateTimeInput" -> A2uiDateTimeInput(component = component, surface = surface, modifier = modifier)
+        "Image" -> A2uiImage(component = component, surface = surface, modifier = modifier)
+        "Divider" -> A2uiDivider(component = component, modifier = modifier)
         "Column" -> A2uiColumn(
+            component = component,
+            surface = surface,
+            modifier = modifier,
+            visited = nextVisited,
+            onAction = onAction,
+        )
+        "Row" -> A2uiRow(
             component = component,
             surface = surface,
             modifier = modifier,
@@ -151,6 +198,237 @@ private fun A2uiText(
 }
 
 @Composable
+private fun A2uiTextField(
+    component: A2uiComponent,
+    surface: A2uiSurfaceState,
+    modifier: Modifier = Modifier,
+) {
+    val binding = component.raw["value"] ?: component.raw["text"]
+    val path = binding.bindingPath()
+    val value = component.resolveInputValue(surface, binding)
+    val label = resolveBindingText(component.raw["label"], surface)
+    val placeholder = resolveBindingText(component.raw["placeholder"], surface)
+    val fieldType = component.raw.stringValue("textFieldType", "variant", "type").orEmpty()
+    val validation = component.raw.stringValue("validationRegexp")
+    val isError = validation != null && value.isNotBlank() && !value.matchesValidation(validation)
+
+    OutlinedTextField(
+        value = value,
+        onValueChange = { next ->
+            path?.let {
+                surface.dataModel.applyPatch(
+                    path = it,
+                    value = component.inputValue(next, fieldType),
+                )
+            }
+        },
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(A2uiTestTags.TextField),
+        label = label?.let { { Text(it) } },
+        placeholder = placeholder?.let { { Text(it) } },
+        isError = isError,
+        supportingText = if (isError) {
+            { Text("Invalid value") }
+        } else {
+            null
+        },
+        singleLine = fieldType != "longText",
+        minLines = if (fieldType == "longText") 3 else 1,
+        keyboardOptions = KeyboardOptions(
+            keyboardType = when (fieldType) {
+                "number" -> KeyboardType.Number
+                "obscured" -> KeyboardType.Password
+                else -> KeyboardType.Text
+            },
+        ),
+        visualTransformation = if (fieldType == "obscured") {
+            PasswordVisualTransformation()
+        } else {
+            VisualTransformation.None
+        },
+    )
+}
+
+@Composable
+private fun A2uiDateTimeInput(
+    component: A2uiComponent,
+    surface: A2uiSurfaceState,
+    modifier: Modifier = Modifier,
+) {
+    val binding = component.raw["value"] ?: component.raw["text"]
+    val path = binding.bindingPath()
+    val value = component.resolveInputValue(surface, binding)
+    val label = resolveBindingText(component.raw["label"], surface) ?: "Date and time"
+    val enableDate = component.raw.booleanValue("enableDate") ?: true
+    val enableTime = component.raw.booleanValue("enableTime") ?: false
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+    var pendingDateMillis by remember { mutableStateOf(value.toDateMillis()) }
+    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = value.toDateMillis())
+    val initialTime = value.toLocalTime() ?: LocalTime.NOON
+    val timePickerState = rememberTimePickerState(
+        initialHour = initialTime.hour,
+        initialMinute = initialTime.minute,
+        is24Hour = true,
+    )
+
+    Box(modifier = modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(label) },
+            readOnly = true,
+            singleLine = true,
+            placeholder = { Text(component.dateTimePlaceholder(enableDate, enableTime)) },
+        )
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .clickable {
+                    if (enableDate) {
+                        showDatePicker = true
+                    } else {
+                        showTimePicker = true
+                    }
+                }
+                .testTag(A2uiTestTags.DateTimeInput),
+        )
+    }
+
+    if (showDatePicker) {
+        AlertDialog(
+            onDismissRequest = { showDatePicker = false },
+            title = { Text("Select date") },
+            text = {
+                DatePicker(state = datePickerState)
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingDateMillis = datePickerState.selectedDateMillis ?: pendingDateMillis
+                        showDatePicker = false
+                        if (enableTime) {
+                            showTimePicker = true
+                        } else {
+                            path?.let {
+                                surface.dataModel.applyPatch(
+                                    path = it,
+                                    value = JsonPrimitive(formatDateTime(pendingDateMillis, null, enableDate, false)),
+                                )
+                            }
+                        }
+                    },
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+
+    if (showTimePicker) {
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            title = { Text("Select time") },
+            text = { TimeInput(state = timePickerState) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showTimePicker = false
+                        path?.let {
+                            surface.dataModel.applyPatch(
+                                path = it,
+                                value = JsonPrimitive(
+                                    formatDateTime(
+                                        dateMillis = pendingDateMillis,
+                                        time = LocalTime.of(timePickerState.hour, timePickerState.minute),
+                                        enableDate = enableDate,
+                                        enableTime = enableTime,
+                                    ),
+                                ),
+                            )
+                        }
+                    },
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun A2uiImage(
+    component: A2uiComponent,
+    surface: A2uiSurfaceState,
+    modifier: Modifier = Modifier,
+) {
+    val imageUrl = resolveBindingText(component.raw["url"] ?: component.raw["src"], surface)
+    if (imageUrl.isNullOrBlank()) {
+        A2uiSkeletonImage(modifier = modifier.testTag(A2uiTestTags.MissingImage))
+        return
+    }
+
+    val context = LocalContext.current
+    val request = remember(context, imageUrl) {
+        ImageRequest.Builder(context)
+            .data(imageUrl)
+            .memoryCacheKey("a2ui-image:$imageUrl")
+            .diskCacheKey("a2ui-image:$imageUrl")
+            .build()
+    }
+    val placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceVariant)
+    val error = ColorPainter(MaterialTheme.colorScheme.errorContainer)
+    AsyncImage(
+        model = request,
+        contentDescription = resolveBindingText(
+            component.raw["alt"] ?: component.raw["contentDescription"],
+            surface,
+        ),
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = component.height() ?: 96.dp)
+            .then(component.aspectRatioModifier()),
+        placeholder = placeholder,
+        error = error,
+        contentScale = component.contentScale(),
+    )
+}
+
+@Composable
+private fun A2uiDivider(
+    component: A2uiComponent,
+    modifier: Modifier = Modifier,
+) {
+    if (component.raw.stringValue("axis", "orientation") == "vertical") {
+        VerticalDivider(
+            modifier = modifier
+                .height(component.height() ?: 32.dp)
+                .testTag(A2uiTestTags.Divider),
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
+    } else {
+        HorizontalDivider(
+            modifier = modifier
+                .fillMaxWidth()
+                .testTag(A2uiTestTags.Divider),
+            color = MaterialTheme.colorScheme.outlineVariant,
+        )
+    }
+}
+
+@Composable
 private fun A2uiColumn(
     component: A2uiComponent,
     surface: A2uiSurfaceState,
@@ -174,6 +452,40 @@ private fun A2uiColumn(
                 A2uiComponentNode(
                     component = child,
                     surface = surface,
+                    visited = visited,
+                    onAction = onAction,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun A2uiRow(
+    component: A2uiComponent,
+    surface: A2uiSurfaceState,
+    modifier: Modifier = Modifier,
+    visited: Set<String>,
+    onAction: (A2uiAction) -> Unit,
+) {
+    val children = component.children
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = component.horizontalArrangement(),
+        verticalAlignment = component.verticalAlignment(),
+    ) {
+        if (children.isEmpty()) {
+            A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MissingComponent))
+        }
+        children.forEach { childId ->
+            val child = surface.components[childId]
+            if (child == null) {
+                A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MissingComponent))
+            } else {
+                A2uiComponentNode(
+                    component = child,
+                    surface = surface,
+                    modifier = if (component.weightRowChildren()) Modifier.weight(1f) else Modifier,
                     visited = visited,
                     onAction = onAction,
                 )
@@ -281,6 +593,17 @@ private fun A2uiSkeletonLine(
 }
 
 @Composable
+private fun A2uiSkeletonImage(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(120.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+    )
+}
+
+@Composable
 private fun A2uiComponent.textStyle(): TextStyle = when (raw.stringValue("variant")) {
     "h1" -> MaterialTheme.typography.displaySmall
     "h2" -> MaterialTheme.typography.headlineLarge
@@ -324,6 +647,20 @@ private fun resolveBindingText(binding: JsonElement?, surface: A2uiSurfaceState)
         }
     }
 
+@Composable
+private fun A2uiComponent.resolveInputValue(
+    surface: A2uiSurfaceState,
+    binding: JsonElement?,
+): String {
+    val path = binding.bindingPath()
+    return if (path != null) {
+        val value by surface.dataModel.observe(path)
+        value?.let(A2uiBindingResolver::displayText).orEmpty()
+    } else {
+        resolveBindingText(binding, surface).orEmpty()
+    }
+}
+
 private fun A2uiComponent.action(): A2uiAction? {
     val action = (raw["action"] ?: raw["onClick"]) as? JsonObject ?: return null
     val name = action.stringValue("name", "type", "action") ?: return null
@@ -342,11 +679,75 @@ private fun A2uiComponent.spacing(): Dp =
         else -> 8.dp
     }
 
+private fun A2uiComponent.horizontalArrangement(): Arrangement.Horizontal =
+    when (raw.stringValue("justify", "distribution")) {
+        "center" -> Arrangement.Center
+        "end" -> Arrangement.End
+        "spaceBetween" -> Arrangement.SpaceBetween
+        "spaceAround" -> Arrangement.SpaceAround
+        "spaceEvenly" -> Arrangement.SpaceEvenly
+        else -> Arrangement.spacedBy(spacing())
+    }
+
+private fun A2uiComponent.verticalAlignment(): Alignment.Vertical =
+    when (raw.stringValue("align", "alignment")) {
+        "top", "start" -> Alignment.Top
+        "bottom", "end" -> Alignment.Bottom
+        else -> Alignment.CenterVertically
+    }
+
+private fun A2uiComponent.weightRowChildren(): Boolean =
+    raw.booleanValue("equalWidth") ?: (raw.stringValue("justify", "distribution") !in setOf(
+        "spaceBetween",
+        "spaceAround",
+        "spaceEvenly",
+    ))
+
 private fun A2uiComponent.cornerRadius(): Dp =
     raw.dpValue("cornerRadius", "corner_radius") ?: 12.dp
 
 private fun A2uiComponent.elevation(): Dp =
     raw.dpValue("elevation") ?: 1.dp
+
+private fun A2uiComponent.height(): Dp? =
+    raw.dpValue("height")
+
+private fun A2uiComponent.aspectRatioModifier(): Modifier =
+    raw.stringValue("aspectRatio")
+        ?.toFloatOrNull()
+        ?.takeIf { it > 0f }
+        ?.let { Modifier.aspectRatio(it) }
+        ?: Modifier
+
+private fun A2uiComponent.contentScale(): ContentScale =
+    when (raw.stringValue("fit", "contentScale")) {
+        "contain", "fit" -> ContentScale.Fit
+        "fill", "stretch" -> ContentScale.FillBounds
+        "none" -> ContentScale.None
+        else -> ContentScale.Crop
+    }
+
+private fun A2uiComponent.inputValue(
+    value: String,
+    fieldType: String,
+): JsonPrimitive =
+    if (fieldType == "number") {
+        value.toLongOrNull()?.let(::JsonPrimitive)
+            ?: value.toDoubleOrNull()?.let(::JsonPrimitive)
+            ?: JsonPrimitive(value)
+    } else {
+        JsonPrimitive(value)
+    }
+
+private fun A2uiComponent.dateTimePlaceholder(
+    enableDate: Boolean,
+    enableTime: Boolean,
+): String =
+    when {
+        enableDate && enableTime -> "YYYY-MM-DD HH:mm"
+        enableDate -> "YYYY-MM-DD"
+        else -> "HH:mm"
+    }
 
 private fun JsonObject.stringValue(vararg keys: String): String? =
     keys.firstNotNullOfOrNull { key -> this[key]?.jsonPrimitiveOrNull?.contentOrNull }
@@ -354,7 +755,53 @@ private fun JsonObject.stringValue(vararg keys: String): String? =
 private fun JsonObject.dpValue(vararg keys: String): Dp? =
     stringValue(*keys)?.toFloatOrNull()?.coerceIn(0f, 64f)?.dp
 
+private fun JsonObject.booleanValue(vararg keys: String): Boolean? =
+    stringValue(*keys)?.toBooleanStrictOrNull()
+
+private fun JsonElement?.bindingPath(): String? =
+    (this as? JsonObject)?.stringValue("path")
+
+private fun String.matchesValidation(pattern: String): Boolean =
+    runCatching { Regex(pattern).matches(this) }.getOrDefault(true)
+
+private fun String.toDateMillis(): Long? =
+    runCatching {
+        LocalDate.parse(take(DateIsoLength), DateTimeFormatter.ISO_LOCAL_DATE)
+            .atStartOfDay()
+            .toInstant(ZoneOffset.UTC)
+            .toEpochMilli()
+    }.getOrNull()
+
+private fun String.toLocalTime(): LocalTime? {
+    val timeText = substringAfter('T', missingDelimiterValue = substringAfter(' ', missingDelimiterValue = this))
+    return runCatching {
+        LocalTime.parse(timeText.take(TimeIsoLength), DateTimeFormatter.ISO_LOCAL_TIME)
+    }.getOrNull()
+}
+
+private fun formatDateTime(
+    dateMillis: Long?,
+    time: LocalTime?,
+    enableDate: Boolean,
+    enableTime: Boolean,
+): String {
+    val date = dateMillis
+        ?.let { Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate() }
+        ?: LocalDate.now(ZoneOffset.UTC)
+    return when {
+        enableDate && enableTime -> "${date.format(DateTimeFormatter.ISO_LOCAL_DATE)}T${time.orNow().format(TimeFormatter)}"
+        enableDate -> date.format(DateTimeFormatter.ISO_LOCAL_DATE)
+        else -> time.orNow().format(TimeFormatter)
+    }
+}
+
+private fun LocalTime?.orNow(): LocalTime =
+    this ?: LocalTime.now(ZoneOffset.UTC).withSecond(0).withNano(0)
+
 private val JsonElement.jsonPrimitiveOrNull: JsonPrimitive?
     get() = this as? JsonPrimitive
 
+private const val DateIsoLength = 10
+private const val TimeIsoLength = 5
+private val TimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 private const val MaxRenderDepth = 32
