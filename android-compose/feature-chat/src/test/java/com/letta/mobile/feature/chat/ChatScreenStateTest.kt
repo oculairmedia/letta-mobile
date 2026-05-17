@@ -1,7 +1,9 @@
 package com.letta.mobile.feature.chat
 
+import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.model.UiMessage
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.persistentMapOf
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -50,6 +52,20 @@ class ChatScreenStateTest {
                     conversationState = ConversationState.NoConversation,
                     messages = persistentListOf(),
                     isStreaming = true,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun `active a2ui surface renders chat content without starter prompts`() {
+        assertFalse(
+            shouldShowStarterPromptsForNoConversation(
+                ChatUiState(
+                    conversationState = ConversationState.NoConversation,
+                    messages = persistentListOf(),
+                    isStreaming = false,
+                    a2uiSurfaces = persistentMapOf("surface" to A2uiSurfaceState(surfaceId = "surface")),
                 ),
             ),
         )
