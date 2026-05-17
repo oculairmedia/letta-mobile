@@ -42,10 +42,14 @@ class MobileWsFramesTest : WordSpec({
             out shouldContain "\"token\":\"secret\""
             out shouldContain "\"device_id\":\"android-1\""
             out shouldContain "\"client_version\":\"letta-mobile/0.6.1\""
-            out shouldContain "\"a2ui_capability\""
-            out shouldContain "\"a2ui_version\":\"v0.9\""
+            // Spec §2.1: capability fields are top-level on the
+            // hello envelope, NOT nested under `a2ui_capability`.
+            out shouldContain "\"a2ui_version\":\"0.9\""
             out shouldContain "\"supported_catalogs\""
+            out shouldContain "\"supported_widgets\""
+            out shouldContain "\"theme_hints\""
             out shouldContain LETTA_TOOL_APPROVAL_WIDGET_ID
+            (out.contains("\"a2ui_capability\"")) shouldBe false
         }
 
         "spec §2.1 send_message — round-trips otid via snake_case" {
@@ -119,11 +123,11 @@ class MobileWsFramesTest : WordSpec({
             out shouldContain "\"run_id\":\"run-7\""
         }
 
-        "letta-mobile-51xm.7 userAction sends actionName surfaceId and resolved context" {
+        "letta-mobile-51xm.7 user_action sends name surface_id and resolved context" {
             val frame = UserActionFrame(
                 id = "fid-action",
                 ts = "2026-05-17T12:00:00Z",
-                actionName = "submit_booking",
+                name = "submit_booking",
                 surfaceId = "booking-1",
                 context = buildJsonObject {
                     put("partySize", 4)
@@ -131,9 +135,9 @@ class MobileWsFramesTest : WordSpec({
                 },
             )
             val out = frame.encodeJson(json)
-            out shouldContain "\"type\":\"userAction\""
-            out shouldContain "\"actionName\":\"submit_booking\""
-            out shouldContain "\"surfaceId\":\"booking-1\""
+            out shouldContain "\"type\":\"user_action\""
+            out shouldContain "\"name\":\"submit_booking\""
+            out shouldContain "\"surface_id\":\"booking-1\""
             out shouldContain "\"partySize\":4"
             out shouldContain "\"reservationTime\":\"2026-05-17T18:30\""
         }
@@ -152,17 +156,44 @@ class MobileWsFramesTest : WordSpec({
             parsed.deviceId shouldBe "d-1"
         }
 
-        "letta-mobile-51xm.2 welcome — parses A2UI negotiation ack" {
+        "letta-mobile-51xm.2 welcome — parses A2UI negotiation ack (§2.2)" {
             val payload = """
                 {"v":1,"type":"welcome","id":"f1","ts":"t",
                  "server_id":"S","session_id":"sess-1",
-                 "a2ui_negotiation":{"a2ui_enabled":true,"negotiated_catalog":"com.letta.mobile:tool-approval/v1","negotiated_widgets":["ToolApprovalCard"]}}
+                 "a2ui_negotiated":true,
+                 "a2ui":{"version":"0.9","catalog_id":"basic"}}
             """.trimIndent()
             val parsed = json.decodeFromString(ServerFrameSerializer, payload)
             parsed.shouldBeInstanceOf<ServerFrame.Welcome>()
-            parsed.a2uiNegotiation?.a2uiEnabled shouldBe true
-            parsed.a2uiNegotiation?.negotiatedCatalog shouldBe "com.letta.mobile:tool-approval/v1"
-            parsed.a2uiNegotiation?.negotiatedWidgets shouldBe listOf("ToolApprovalCard")
+            parsed.a2uiNegotiated shouldBe true
+            parsed.a2ui?.version shouldBe "0.9"
+            parsed.a2ui?.catalogId shouldBe "basic"
+        }
+
+        "spec §2.2 a2ui_capabilities — captures server-advertised catalog + widgets" {
+            val payload = """
+                {"v":1,"type":"a2ui_capabilities","id":"caps-1","ts":"t",
+                 "version":"0.9","catalog_id":"basic",
+                 "supported_catalogs":["basic"],
+                 "supported_widgets":["Text","Button","ToolApprovalCard"]}
+            """.trimIndent()
+            val parsed = json.decodeFromString(ServerFrameSerializer, payload)
+            parsed.shouldBeInstanceOf<ServerFrame.A2uiCapabilities>()
+            parsed.version shouldBe "0.9"
+            parsed.catalogId shouldBe "basic"
+            parsed.supportedWidgets shouldBe listOf("Text", "Button", "ToolApprovalCard")
+        }
+
+        "spec §2.2 user_action_ack — accepted has null reason" {
+            val payload = """
+                {"v":1,"type":"user_action_ack","id":"f","ts":"t",
+                 "action_id":"act-1","status":"accepted"}
+            """.trimIndent()
+            val parsed = json.decodeFromString(ServerFrameSerializer, payload)
+            parsed.shouldBeInstanceOf<ServerFrame.UserActionAck>()
+            parsed.actionId shouldBe "act-1"
+            parsed.status shouldBe "accepted"
+            parsed.reason shouldBe null
         }
 
         "spec §4.7 stop_reason — inner field is `stop_reason`, NOT `reason`" {
@@ -199,17 +230,33 @@ class MobileWsFramesTest : WordSpec({
             parsed.toolCall?.name shouldBe "Bash"
         }
 
-        "letta-mobile-51xm.2 a2ui — routes typed A2UI messages separately" {
+        "letta-mobile-51xm.2 a2ui_frame — routes typed A2UI messages from `a2ui` payload (§2.2)" {
             val payload = """
-                {"v":1,"type":"a2ui","id":"a2ui-1","ts":"t",
+                {"v":1,"type":"a2ui_frame","id":"a2ui-1","ts":"t",
                  "agent_id":"a","conversation_id":"c","turn_id":"T","run_id":"R",
-                 "message":{"version":"v0.9","createSurface":{"surfaceId":"approval-1","catalogId":"com.letta.mobile:tool-approval/v1"}}}
+                 "otid":"cm-android-x","ok":true,
+                 "a2ui":{"version":"v0.9","createSurface":{"surfaceId":"approval-1","catalogId":"com.letta.mobile:tool-approval/v1"}}}
             """.trimIndent()
             val parsed = json.decodeFromString(ServerFrameSerializer, payload)
             parsed.shouldBeInstanceOf<ServerFrame.A2ui>()
             parsed.runId shouldBe "R"
+            parsed.otid shouldBe "cm-android-x"
+            parsed.ok shouldBe true
             parsed.messages.single().shouldBeInstanceOf<A2uiMessage.CreateSurface>()
             parsed.messages.single().surfaceId shouldBe "approval-1"
+        }
+
+        "spec §2.2 a2ui_frame — ok=false surfaces parse_error without payload" {
+            val payload = """
+                {"v":1,"type":"a2ui_frame","id":"a2ui-bad","ts":"t",
+                 "turn_id":"T","run_id":"R","ok":false,
+                 "parse_error":"Unexpected token } in JSON at position 42"}
+            """.trimIndent()
+            val parsed = json.decodeFromString(ServerFrameSerializer, payload)
+            parsed.shouldBeInstanceOf<ServerFrame.A2ui>()
+            parsed.ok shouldBe false
+            parsed.parseError shouldBe "Unexpected token } in JSON at position 42"
+            parsed.messages shouldBe emptyList()
         }
 
         "spec §2 forward-compat — unknown type lands as ServerFrame.Unknown" {

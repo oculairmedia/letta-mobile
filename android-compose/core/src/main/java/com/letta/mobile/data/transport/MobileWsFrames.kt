@@ -1,8 +1,11 @@
 package com.letta.mobile.data.transport
 
-import com.letta.mobile.data.a2ui.A2uiCapabilityDeclaration
+import com.letta.mobile.data.a2ui.A2UI_DEFAULT_SUPPORTED_CATALOGS
+import com.letta.mobile.data.a2ui.A2UI_DEFAULT_SUPPORTED_WIDGETS
+import com.letta.mobile.data.a2ui.A2UI_HELLO_VERSION
+import com.letta.mobile.data.a2ui.A2uiHandshakeAck
 import com.letta.mobile.data.a2ui.A2uiMessage
-import com.letta.mobile.data.a2ui.A2uiNegotiation
+import com.letta.mobile.data.a2ui.A2uiThemeHints
 import com.letta.mobile.data.a2ui.decodeA2uiMessages
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -63,6 +66,14 @@ fun ClientFrame.encodeJson(json: Json): String = when (this) {
     is PongFrame -> json.encodeToString(PongFrame.serializer(), this)
 }
 
+/**
+ * Spec §2.1 hello — capability fields are TOP-LEVEL, not nested.
+ * The shim does string-equality on `a2ui_version` against its
+ * server-side A2UI_VERSION env (no `v` prefix). `supported_catalogs`
+ * must include `"basic"` (the shim's only v1 catalog handle, NOT
+ * the upstream `$id` URL). `supported_widgets` is informational —
+ * send the union of what the renderer actually mounts.
+ */
 @Serializable
 data class HelloFrame(
     override val v: Int = 1,
@@ -72,7 +83,10 @@ data class HelloFrame(
     val token: String,
     @SerialName("device_id") val deviceId: String? = null,
     @SerialName("client_version") val clientVersion: String? = null,
-    @SerialName("a2ui_capability") val a2uiCapability: A2uiCapabilityDeclaration? = A2uiCapabilityDeclaration(),
+    @SerialName("a2ui_version") val a2uiVersion: String = A2UI_HELLO_VERSION,
+    @SerialName("supported_catalogs") val supportedCatalogs: List<String> = A2UI_DEFAULT_SUPPORTED_CATALOGS,
+    @SerialName("supported_widgets") val supportedWidgets: List<String> = A2UI_DEFAULT_SUPPORTED_WIDGETS,
+    @SerialName("theme_hints") val themeHints: A2uiThemeHints = A2uiThemeHints(),
 ) : ClientFrame
 
 /**
@@ -111,18 +125,27 @@ data class SendMessageFrame(
 ) : ClientFrame
 
 /**
- * A2UI user interaction frame. The renderer resolves every declared
- * context binding before this reaches the wire.
+ * A2UI user interaction frame (§2.1). The renderer resolves every
+ * declared context binding before this reaches the wire.
+ *
+ * Wire shape matches shim's MOBILE_WS_PROTOCOL.md:
+ *   { type:"user_action", name:"…", context:{…},
+ *     run_id?:…, turn_id?:…, surface_id?:…, action_id?:… }
+ *
+ * `context` MUST be a JsonObject — the shim rejects arrays/primitives.
  */
 @Serializable
 data class UserActionFrame(
     override val v: Int = 1,
-    override val type: String = "userAction",
+    override val type: String = "user_action",
     override val id: String,
     override val ts: String,
-    @SerialName("actionName") val actionName: String,
-    @SerialName("surfaceId") val surfaceId: String,
+    val name: String,
     val context: JsonObject = JsonObject(emptyMap()),
+    @SerialName("run_id") val runId: String? = null,
+    @SerialName("turn_id") val turnId: String? = null,
+    @SerialName("surface_id") val surfaceId: String? = null,
+    @SerialName("action_id") val actionId: String? = null,
 ) : ClientFrame
 
 /**
@@ -176,24 +199,72 @@ sealed interface ServerFrame {
         @SerialName("server_id") val serverId: String,
         @SerialName("session_id") val sessionId: String,
         @SerialName("device_id") val deviceId: String? = null,
-        @SerialName("a2ui_negotiation") val a2uiNegotiation: A2uiNegotiation? = null,
+        // Shim emits both fields independently (§2.2). `a2uiNegotiated`
+        // is the boolean gate; `a2ui` carries the resolved version +
+        // catalog and is non-null only when negotiation succeeded.
+        @SerialName("a2ui_negotiated") val a2uiNegotiated: Boolean = false,
+        @SerialName("a2ui") val a2ui: A2uiHandshakeAck? = null,
     ) : ServerFrame
 
     /**
-     * A2UI payloads are routed to the surface manager, not projected
-     * through the LettaMessage timeline mapper.
+     * A2UI payload frame (§2.2 `a2ui_frame`). Emitted between
+     * assistant_message deltas when an `<a2ui-json>` block was
+     * extracted from the stream. Payloads route to the surface
+     * manager, not the LettaMessage timeline mapper.
+     *
+     * On parse/validation failure the shim emits `ok=false` with
+     * `parse_error` / `validation_error` populated — the renderer
+     * should skip the frame but keep the socket alive.
      */
     data class A2ui(
         override val v: Int = 1,
-        val type: String = "a2ui",
+        val type: String = "a2ui_frame",
         override val id: String,
         override val ts: String,
         @SerialName("agent_id") val agentId: String? = null,
         @SerialName("conversation_id") val conversationId: String? = null,
         @SerialName("turn_id") val turnId: String? = null,
         @SerialName("run_id") val runId: String? = null,
+        val otid: String? = null,
+        val ok: Boolean = true,
+        @SerialName("parse_error") val parseError: String? = null,
+        @SerialName("validation_error") val validationError: String? = null,
         val messages: List<A2uiMessage>,
         val raw: JsonObject,
+    ) : ServerFrame
+
+    /**
+     * Server-advertised A2UI capabilities (§2.2 `a2ui_capabilities`).
+     * Sent immediately after `welcome` when negotiation succeeded;
+     * useful for clamping the renderer registry to what the server
+     * supports. Informational — don't block welcome handling on it.
+     */
+    @Serializable
+    data class A2uiCapabilities(
+        override val v: Int = 1,
+        val type: String = "a2ui_capabilities",
+        override val id: String,
+        override val ts: String,
+        val version: String,
+        @SerialName("catalog_id") val catalogId: String,
+        @SerialName("supported_catalogs") val supportedCatalogs: List<String> = emptyList(),
+        @SerialName("supported_widgets") val supportedWidgets: List<String> = emptyList(),
+    ) : ServerFrame
+
+    /**
+     * Server ack for client `user_action` (§2.2). `status` is opaque
+     * for forward-compat (`accepted`, `rejected`, future `queued`).
+     * `reason` is populated only when `status == "rejected"`.
+     */
+    @Serializable
+    data class UserActionAck(
+        override val v: Int = 1,
+        val type: String = "user_action_ack",
+        override val id: String,
+        override val ts: String,
+        @SerialName("action_id") val actionId: String,
+        val status: String,
+        val reason: String? = null,
     ) : ServerFrame
 
     /**
@@ -422,7 +493,9 @@ object ServerFrameSerializer : JsonContentPolymorphicSerializer<ServerFrame>(Ser
             "tool_call_message",
             "approval_request_message" -> ServerFrame.ToolCallMessage.serializer()
             "tool_return_message" -> ServerFrame.ToolReturnMessage.serializer()
-            "a2ui" -> A2uiFrameDeserializer
+            "a2ui_frame" -> A2uiFrameDeserializer
+            "a2ui_capabilities" -> ServerFrame.A2uiCapabilities.serializer()
+            "user_action_ack" -> ServerFrame.UserActionAck.serializer()
             else -> UnknownFrameDeserializer
         }
     }
@@ -436,11 +509,11 @@ private object A2uiFrameDeserializer : kotlinx.serialization.KSerializer<ServerF
         val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
             ?: error("A2uiFrameDeserializer requires a JsonDecoder")
         val element = jsonDecoder.decodeJsonElement().jsonObject
-        val payload = element["message"]
-            ?: element["messages"]
-            ?: element["payload"]
-            ?: element["data"]
-            ?: throw kotlinx.serialization.SerializationException("A2UI frame missing message payload")
+        // Shim §2.2: payload lives under `a2ui` (single object or array
+        // of v0.9 messages). On `ok=false` the field may be absent.
+        val payload = element["a2ui"]
+        val ok = element["ok"]?.jsonPrimitive?.content?.toBooleanStrictOrNull() ?: true
+        val messages = payload?.let { decodeA2uiMessages(jsonDecoder.json, it) }.orEmpty()
         return ServerFrame.A2ui(
             v = element["v"]?.jsonPrimitive?.content?.toIntOrNull() ?: 1,
             id = element["id"]?.jsonPrimitive?.content.orEmpty(),
@@ -449,7 +522,11 @@ private object A2uiFrameDeserializer : kotlinx.serialization.KSerializer<ServerF
             conversationId = element["conversation_id"]?.jsonPrimitive?.content,
             turnId = element["turn_id"]?.jsonPrimitive?.content,
             runId = element["run_id"]?.jsonPrimitive?.content,
-            messages = decodeA2uiMessages(jsonDecoder.json, payload),
+            otid = element["otid"]?.jsonPrimitive?.content,
+            ok = ok,
+            parseError = element["parse_error"]?.jsonPrimitive?.content,
+            validationError = element["validation_error"]?.jsonPrimitive?.content,
+            messages = messages,
             raw = element,
         )
     }
