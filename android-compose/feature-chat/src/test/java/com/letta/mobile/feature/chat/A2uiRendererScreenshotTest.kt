@@ -65,6 +65,24 @@ class A2uiRendererScreenshotTest {
         )
     }
 
+    @Test
+    fun toolApprovalLightTheme() {
+        captureA2uiSurface(
+            name = "a2ui_tool_approval_light",
+            appTheme = AppTheme.LIGHT,
+            manager = toolApprovalSurfaceManager(timeoutSeconds = 30),
+        )
+    }
+
+    @Test
+    fun toolApprovalDarkTheme() {
+        captureA2uiSurface(
+            name = "a2ui_tool_approval_dark",
+            appTheme = AppTheme.DARK,
+            manager = toolApprovalSurfaceManager(timeoutSeconds = 30),
+        )
+    }
+
     private fun captureA2uiSurface(
         name: String,
         appTheme: AppTheme,
