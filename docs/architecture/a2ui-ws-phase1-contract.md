@@ -105,6 +105,27 @@ LettaBot gateway envelope:
 
 Android accepts `message`, `messages`, `payload`, or `data` as the A2UI payload key. The payload may be a single A2UI object or an array. This keeps Phase 1 tolerant of ResponsePart/DataPart batching while still exposing typed `A2uiMessage` objects downstream.
 
+## User Actions
+
+Outgoing widget interactions use the same admin-shim WebSocket session with `type: "userAction"`. Android resolves each declared action context value before sending, so `path` bindings are replaced with the current local data-model value.
+
+```json
+{
+  "v": 1,
+  "type": "userAction",
+  "id": "action-1",
+  "ts": "2026-05-17T00:00:00Z",
+  "actionName": "submit_booking",
+  "surfaceId": "booking-1",
+  "context": {
+    "partySize": 4,
+    "reservationTime": "2026-05-17T18:30"
+  }
+}
+```
+
+Android emits actions only for explicit user actions such as button taps. Input widgets update the local data model immediately; the current values are included in the next emitted action. If the WebSocket is disconnected, Android keeps a small FIFO retry queue and surfaces a banner if the queue is full.
+
 ## Parsed Message Set
 
 The Phase 1 parser supports official v0.9 server-to-client envelopes:

@@ -34,7 +34,6 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -68,6 +67,7 @@ import com.letta.mobile.data.a2ui.A2uiComponent
 import com.letta.mobile.data.a2ui.A2uiResolvedBinding
 import com.letta.mobile.data.a2ui.A2uiSurfaceManager
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
+import com.letta.mobile.data.a2ui.resolveA2uiActionContext
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -81,13 +81,6 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
-
-@Immutable
-data class A2uiAction(
-    val name: String,
-    val context: JsonObject? = null,
-    val raw: JsonObject,
-)
 
 @Composable
 fun A2uiRenderer(
@@ -853,9 +846,9 @@ private fun A2uiButton(
     onAction: (A2uiAction) -> Unit,
 ) {
     val label = component.resolveButtonLabel(surface)
-    val action = component.action()
+    val action = component.action(surface)
     Button(
-        onClick = { action?.let(onAction) },
+        onClick = { component.action(surface)?.let(onAction) },
         enabled = label != null && action != null,
         modifier = modifier,
     ) {
@@ -975,11 +968,23 @@ private fun A2uiComponent.resolveInputValue(
     }
 }
 
-private fun A2uiComponent.action(): A2uiAction? {
+private fun A2uiComponent.action(surface: A2uiSurfaceState): A2uiAction? {
     val action = (raw["action"] ?: raw["onClick"]) as? JsonObject ?: return null
-    val name = action.stringValue("name", "type", "action") ?: return null
-    val context = (action["context"] ?: action["data"]) as? JsonObject
-    return A2uiAction(name = name, context = context, raw = action)
+    val name = action.stringValue("name", "actionName", "type", "action") ?: return null
+    val context = resolveA2uiActionContext(action["context"] ?: action["data"], surface.dataModel)
+    val raw = buildJsonObject {
+        action.forEach { (key, value) -> put(key, value) }
+        put("actionName", name)
+        put("name", name)
+        put("surfaceId", surface.surfaceId)
+        put("context", context)
+    }
+    return A2uiAction(
+        name = name,
+        surfaceId = surface.surfaceId,
+        context = context,
+        raw = raw,
+    )
 }
 
 private fun A2uiComponent.spacing(): Dp =
@@ -1112,6 +1117,7 @@ private fun toolApprovalAction(
     }
     return A2uiAction(
         name = ToolApprovalResponseAction,
+        surfaceId = surfaceId,
         context = context,
         raw = raw,
     )

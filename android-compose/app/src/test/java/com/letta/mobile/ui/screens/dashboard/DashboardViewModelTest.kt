@@ -311,7 +311,7 @@ class DashboardViewModelTest {
     }
 
     @Test
-    fun `search returns results across agents tools and blocks simultaneously`() = runTest {
+    fun `search returns results across agents tools and blocks simultaneously`() = runTest(testDispatcher) {
         // Setup data with overlapping name "test" across categories
         every { agentRepository.agents } returns MutableStateFlow(
             listOf(

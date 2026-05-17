@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Mirror of the design-system color tokens used by the system splash
+      and the activity window background. The splash window runs before
+      Compose, so it cannot read LettaTheme.Color values at runtime; these
+      XML resources must match the LightBackground / DarkBackground and
+      LightOnSurface / DarkOnSurface tokens defined in
+      designsystem/.../theme/Color.kt. Keep them in sync.
+    -->
+    <color name="letta_background">#FFFFFFFF</color>
+    <color name="letta_on_background">#FF1A1A1A</color>
+</resources>

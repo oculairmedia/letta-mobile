@@ -345,6 +345,34 @@ class A2uiRendererTest {
     }
 
     @Test
+    fun buttonActionResolvesBoundContextAgainstCurrentDataModel() {
+        val manager = bookingFormSurfaceManager()
+        val actions = mutableListOf<A2uiAction>()
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(
+                surfaceId = SurfaceId,
+                surfaceManager = manager,
+                onAction = actions::add,
+            )
+        }
+
+        composeRule.onNodeWithTag(A2uiTestTags.TextField).performTextInput("4")
+        composeRule.onNodeWithText("Submit").performClick()
+
+        composeRule.runOnIdle {
+            val action = actions.single()
+            assertEquals("submit_booking", action.name)
+            assertEquals(SurfaceId, action.surfaceId)
+            assertEquals("4", action.context["partySize"]!!.jsonPrimitive.content)
+            assertEquals("2026-05-17T18:30", action.context["reservationTime"]!!.jsonPrimitive.content)
+            assertEquals("window", action.context["seat"]!!.jsonPrimitive.content)
+            assertEquals("submit_booking", action.raw["actionName"]!!.jsonPrimitive.content)
+            assertEquals(SurfaceId, action.raw["surfaceId"]!!.jsonPrimitive.content)
+        }
+    }
+
+    @Test
     fun dateTimeInputOpensDatePicker() {
         val manager = dateTimeSurfaceManager()
 
@@ -553,6 +581,33 @@ private fun textFieldSurfaceManager(): A2uiSurfaceManager {
                   {"version":"v0.9","updateComponents":{"surfaceId":"$SurfaceId","root":"partySize","components":[
                     {"id":"partySize","component":"TextField","label":{"literalString":"Party size"},"value":{"path":"/partySize"},"textFieldType":"number"}
                   ]}}
+                ]
+                """.trimIndent(),
+            ),
+        )
+    )
+    return manager
+}
+
+private fun bookingFormSurfaceManager(): A2uiSurfaceManager {
+    val manager = A2uiSurfaceManager()
+    manager.applyMessages(
+        decodeA2uiMessages(
+            A2uiProtocolJson.Default,
+            A2uiProtocolJson.Default.parseToJsonElement(
+                """
+                [
+                  {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"basic"}},
+                  {"version":"v0.9","updateComponents":{"surfaceId":"$SurfaceId","root":"form","components":[
+                    {"id":"form","component":"Column","children":["partySize","submit"],"spacing":"sm"},
+                    {"id":"partySize","component":"TextField","label":{"literalString":"Party size"},"value":{"path":"/partySize"},"textFieldType":"number"},
+                    {"id":"submit","component":"Button","label":{"literalString":"Submit"},"action":{"name":"submit_booking","context":[
+                      {"key":"partySize","value":{"path":"/partySize"}},
+                      {"key":"reservationTime","value":{"path":"/reservationTime"}},
+                      {"key":"seat","value":{"literalString":"window"}}
+                    ]}}
+                  ]}},
+                  {"version":"v0.9","updateDataModel":{"surfaceId":"$SurfaceId","path":"/reservationTime","value":"2026-05-17T18:30"}}
                 ]
                 """.trimIndent(),
             ),

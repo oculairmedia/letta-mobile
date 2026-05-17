@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
@@ -179,6 +180,7 @@ internal fun ChatScreen(
                             },
                             onToggleRunCollapsed = viewModel::toggleRunCollapsed,
                             onToggleReasoningExpanded = viewModel::toggleReasoningExpanded,
+                            onA2uiAction = viewModel::submitA2uiAction,
                             activeFontScale = activeFontScale,
                             onActiveFontScaleChange = { activeFontScale = it },
                             onFontScaleChange = { viewModel.setChatFontScale(it) },
@@ -208,6 +210,7 @@ internal fun ChatScreen(
                                 },
                                 onToggleRunCollapsed = viewModel::toggleRunCollapsed,
                                 onToggleReasoningExpanded = viewModel::toggleReasoningExpanded,
+                                onA2uiAction = viewModel::submitA2uiAction,
                                 activeFontScale = activeFontScale,
                                 onActiveFontScaleChange = { activeFontScale = it },
                                 onFontScaleChange = { viewModel.setChatFontScale(it) },
@@ -349,6 +352,7 @@ internal fun NoConversationChatContent(
     onSubmitApproval: (String, List<String>, Boolean, String?) -> Unit,
     onToggleRunCollapsed: (String) -> Unit,
     onToggleReasoningExpanded: (String) -> Unit,
+    onA2uiAction: (A2uiAction) -> Unit = {},
     activeFontScale: Float = 1f,
     onActiveFontScaleChange: (Float) -> Unit = {},
     onFontScaleChange: (Float) -> Unit = {},
@@ -376,6 +380,7 @@ internal fun NoConversationChatContent(
             onSubmitApproval = onSubmitApproval,
             onToggleRunCollapsed = onToggleRunCollapsed,
             onToggleReasoningExpanded = onToggleReasoningExpanded,
+            onA2uiAction = onA2uiAction,
             activeFontScale = activeFontScale,
             onActiveFontScaleChange = onActiveFontScaleChange,
             onFontScaleChange = onFontScaleChange,
@@ -395,6 +400,7 @@ private fun ChatContent(
     onSubmitApproval: (String, List<String>, Boolean, String?) -> Unit,
     onToggleRunCollapsed: (String) -> Unit,
     onToggleReasoningExpanded: (String) -> Unit,
+    onA2uiAction: (A2uiAction) -> Unit = {},
     activeFontScale: Float = 1f,
     onActiveFontScaleChange: (Float) -> Unit = {},
     onFontScaleChange: (Float) -> Unit = {},
@@ -439,6 +445,7 @@ private fun ChatContent(
             }
             A2uiSurfaceStack(
                 surfaces = state.a2uiSurfaces.values,
+                onAction = onA2uiAction,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -451,6 +458,7 @@ private fun ChatContent(
 @Composable
 private fun A2uiSurfaceStack(
     surfaces: Collection<A2uiSurfaceState>,
+    onAction: (A2uiAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (surfaces.isEmpty()) return
@@ -463,6 +471,7 @@ private fun A2uiSurfaceStack(
             A2uiSurfaceRenderer(
                 surface = surface,
                 modifier = Modifier.fillMaxWidth(),
+                onAction = onAction,
             )
         }
     }
