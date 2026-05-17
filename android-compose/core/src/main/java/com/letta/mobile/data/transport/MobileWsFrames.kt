@@ -57,6 +57,7 @@ sealed interface ClientFrame {
 fun ClientFrame.encodeJson(json: Json): String = when (this) {
     is HelloFrame -> json.encodeToString(HelloFrame.serializer(), this)
     is SendMessageFrame -> json.encodeToString(SendMessageFrame.serializer(), this)
+    is UserActionFrame -> json.encodeToString(UserActionFrame.serializer(), this)
     is CancelFrame -> json.encodeToString(CancelFrame.serializer(), this)
     is ByeFrame -> json.encodeToString(ByeFrame.serializer(), this)
     is PongFrame -> json.encodeToString(PongFrame.serializer(), this)
@@ -107,6 +108,21 @@ data class SendMessageFrame(
     val text: String,
     val otid: String? = null,
     @SerialName("content_parts") val contentParts: JsonArray? = null,
+) : ClientFrame
+
+/**
+ * A2UI user interaction frame. The renderer resolves every declared
+ * context binding before this reaches the wire.
+ */
+@Serializable
+data class UserActionFrame(
+    override val v: Int = 1,
+    override val type: String = "userAction",
+    override val id: String,
+    override val ts: String,
+    @SerialName("actionName") val actionName: String,
+    @SerialName("surfaceId") val surfaceId: String,
+    val context: JsonObject = JsonObject(emptyMap()),
 ) : ClientFrame
 
 /**
