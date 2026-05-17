@@ -1,5 +1,10 @@
 package com.letta.mobile.feature.chat
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -7,15 +12,20 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.letta.mobile.data.a2ui.A2uiBindingResolver
+import com.letta.mobile.data.a2ui.A2uiDataModel
+import com.letta.mobile.data.a2ui.A2uiMessage
 import com.letta.mobile.data.a2ui.A2uiProtocolJson
 import com.letta.mobile.data.a2ui.A2uiSurfaceManager
+import com.letta.mobile.data.a2ui.A2uiUpdateDataModelPayload
 import com.letta.mobile.data.a2ui.decodeA2uiMessages
 import com.letta.mobile.ui.a2ui.A2uiAction
 import com.letta.mobile.ui.a2ui.A2uiRenderer
 import com.letta.mobile.ui.a2ui.A2uiTestTags
 import com.letta.mobile.ui.test.setLettaTestContent
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -77,6 +87,82 @@ class A2uiRendererTest {
     }
 
     @Test
+    fun pathBoundTextProgressesFromSkeletonToContentWhenDataArrivesLater() {
+        val manager = A2uiSurfaceManager()
+        manager.applyMessages(
+            decodeA2uiMessages(
+                A2uiProtocolJson.Default,
+                A2uiProtocolJson.Default.parseToJsonElement(
+                    """
+                    [
+                      {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"basic"}},
+                      {"version":"v0.9","updateComponents":{"surfaceId":"$SurfaceId","root":"title","components":[{"id":"title","component":"Text","text":{"path":"/title"}}]}}
+                    ]
+                    """.trimIndent(),
+                ),
+            )
+        )
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+        }
+
+        composeRule.onNodeWithTag(A2uiTestTags.MissingText).assertIsDisplayed()
+        composeRule.runOnIdle {
+            manager.applyMessage(
+                A2uiMessage.UpdateDataModel(
+                    updateDataModel = A2uiUpdateDataModelPayload(
+                        surfaceId = SurfaceId,
+                        path = "/title",
+                        value = JsonPrimitive("Booking confirmed"),
+                    ),
+                )
+            )
+        }
+
+        composeRule.onNodeWithText("Booking confirmed").assertIsDisplayed()
+    }
+
+    @Test
+    fun dataModelUpdatesChangedPointerWithoutChangingOtherPointerValue() {
+        val model = A2uiDataModel()
+        model.applyPatch("/title", JsonPrimitive("Pending"))
+        model.applyPatch("/body", JsonPrimitive("Stable"))
+        var titleCompositions = 0
+        var bodyCompositions = 0
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            Column {
+                ObservedPointerText(
+                    model = model,
+                    path = "/title",
+                    onComposed = { titleCompositions++ },
+                )
+                ObservedPointerText(
+                    model = model,
+                    path = "/body",
+                    onComposed = { bodyCompositions++ },
+                )
+            }
+        }
+
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            titleCompositions = 0
+            bodyCompositions = 0
+        }
+        composeRule.runOnIdle {
+            model.applyPatch("/title", JsonPrimitive("Confirmed"))
+        }
+        composeRule.waitForIdle()
+
+        assertTrue(titleCompositions > 0)
+        assertTrue(bodyCompositions <= 1)
+        composeRule.onNodeWithText("Confirmed").assertIsDisplayed()
+        composeRule.onNodeWithText("Stable").assertIsDisplayed()
+    }
+
+    @Test
     fun buttonWithoutResolvedActionIsDisabled() {
         val manager = A2uiSurfaceManager()
         manager.applyMessages(
@@ -99,6 +185,17 @@ class A2uiRendererTest {
 
         composeRule.onNodeWithText("Waiting").assertIsNotEnabled()
     }
+}
+
+@Composable
+private fun ObservedPointerText(
+    model: A2uiDataModel,
+    path: String,
+    onComposed: () -> Unit,
+) {
+    val value by model.observe(path)
+    SideEffect(onComposed)
+    Text(value?.let(A2uiBindingResolver::displayText).orEmpty())
 }
 
 internal const val SurfaceId = "confirmation-surface"

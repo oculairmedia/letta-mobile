@@ -293,11 +293,13 @@ private fun A2uiComponent.textStyle(): TextStyle = when (raw.stringValue("varian
     else -> MaterialTheme.typography.bodyMedium
 }
 
+@Composable
 private fun A2uiComponent.resolveText(surface: A2uiSurfaceState): String? {
     val binding = raw["text"] ?: raw["content"] ?: raw["value"]
     return resolveBindingText(binding, surface)
 }
 
+@Composable
 private fun A2uiComponent.resolveButtonLabel(surface: A2uiSurfaceState): String? {
     raw.stringValue("labelComponentId", "labelId")?.let { labelId ->
         return surface.components[labelId]?.resolveText(surface)
@@ -309,10 +311,17 @@ private fun A2uiComponent.resolveButtonLabel(surface: A2uiSurfaceState): String?
     return resolveBindingText(label ?: raw["text"], surface)
 }
 
+@Composable
 private fun resolveBindingText(binding: JsonElement?, surface: A2uiSurfaceState): String? =
-    when (val resolved = A2uiBindingResolver.resolve(binding, surface.dataModel)) {
-        A2uiResolvedBinding.Missing -> null
-        is A2uiResolvedBinding.Value -> A2uiBindingResolver.displayText(resolved.value)
+    when {
+        binding is JsonObject && binding.stringValue("path") != null -> {
+            val value by surface.dataModel.observe(binding.stringValue("path").orEmpty())
+            value?.let(A2uiBindingResolver::displayText)
+        }
+        else -> when (val resolved = A2uiBindingResolver.resolve(binding, surface.dataModel)) {
+            A2uiResolvedBinding.Missing -> null
+            is A2uiResolvedBinding.Value -> A2uiBindingResolver.displayText(resolved.value)
+        }
     }
 
 private fun A2uiComponent.action(): A2uiAction? {

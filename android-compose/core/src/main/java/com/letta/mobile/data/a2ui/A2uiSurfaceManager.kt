@@ -1,6 +1,6 @@
 package com.letta.mobile.data.a2ui
 
-import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -10,10 +10,9 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 
-@Immutable
+@Stable
 data class A2uiSurfaceState(
     val surfaceId: String,
     val catalogId: String? = null,
@@ -21,7 +20,7 @@ data class A2uiSurfaceState(
     val sendDataModel: Boolean = false,
     val rootComponentId: String? = null,
     val components: Map<String, A2uiComponent> = emptyMap(),
-    val dataModel: JsonElement = EmptyJsonObject,
+    val dataModel: A2uiDataModel = A2uiDataModel(),
 ) {
     val rootComponent: A2uiComponent?
         get() = rootComponentId?.let(components::get)
@@ -51,6 +50,13 @@ class A2uiSurfaceManager(
 }
 
 object A2uiBindingResolver {
+    fun resolve(binding: JsonElement?, dataModel: A2uiDataModel): A2uiResolvedBinding = when (binding) {
+        null -> A2uiResolvedBinding.Missing
+        is JsonPrimitive -> A2uiResolvedBinding.Value(binding)
+        is JsonArray -> A2uiResolvedBinding.Value(binding)
+        is JsonObject -> resolveObjectBinding(binding, dataModel)
+    }
+
     fun resolve(binding: JsonElement?, dataModel: JsonElement): A2uiResolvedBinding = when (binding) {
         null -> A2uiResolvedBinding.Missing
         is JsonPrimitive -> A2uiResolvedBinding.Value(binding)
@@ -58,43 +64,43 @@ object A2uiBindingResolver {
         is JsonObject -> resolveObjectBinding(binding, dataModel)
     }
 
+    fun resolvePath(dataModel: A2uiDataModel, path: String): JsonElement? =
+        dataModel.resolve(path)
+
     fun resolvePath(dataModel: JsonElement, path: String): JsonElement? {
-        if (path.isBlank() || path == "/") return dataModel
-        val segments = pathSegments(path)
-        if (segments.isEmpty()) return dataModel
-        return segments.fold<JsonPointerSegment, JsonElement?>(dataModel) { current, segment ->
-            when (current) {
-                is JsonObject -> current[segment.value]
-                is JsonArray -> segment.value.toIntOrNull()?.let(current::getOrNull)
-                else -> null
-            }
-        }
+        return A2uiJsonPointer.resolve(dataModel, path)
     }
+
+    fun applyDataModelPatch(
+        dataModel: A2uiDataModel,
+        path: String,
+        value: JsonElement?,
+    ): A2uiDataModel = dataModel.apply { applyPatch(path, value) }
 
     fun applyDataModelPatch(
         dataModel: JsonElement,
         path: String,
         value: JsonElement?,
-    ): JsonElement {
-        val normalizedPath = path.ifBlank { "/" }
-        if (normalizedPath == "/") {
-            return value ?: EmptyJsonObject
-        }
-        val segments = pathSegments(normalizedPath)
-        if (segments.isEmpty()) {
-            return value ?: EmptyJsonObject
-        }
-        return if (value == null) {
-            removeAtPath(dataModel, segments)
-        } else {
-            setAtPath(dataModel, segments, value)
-        }
-    }
+    ): JsonElement = A2uiJsonPointer.applyPatch(dataModel, path, value)
 
     fun displayText(value: JsonElement): String = when (value) {
         JsonNull -> ""
         is JsonPrimitive -> value.contentOrNull ?: value.toString()
         else -> value.toString()
+    }
+
+    private fun resolveObjectBinding(
+        binding: JsonObject,
+        dataModel: A2uiDataModel,
+    ): A2uiResolvedBinding {
+        binding["path"]?.jsonPrimitiveOrNull?.contentOrNull?.let { path ->
+            return dataModel.resolve(path)?.let(A2uiResolvedBinding::Value)
+                ?: A2uiResolvedBinding.Missing
+        }
+        binding["literalString"]?.let { return A2uiResolvedBinding.Value(it) }
+        binding["literal"]?.let { return A2uiResolvedBinding.Value(it) }
+        binding["value"]?.let { return A2uiResolvedBinding.Value(it) }
+        return A2uiResolvedBinding.Missing
     }
 
     private fun resolveObjectBinding(
@@ -109,47 +115,6 @@ object A2uiBindingResolver {
         binding["literal"]?.let { return A2uiResolvedBinding.Value(it) }
         binding["value"]?.let { return A2uiResolvedBinding.Value(it) }
         return A2uiResolvedBinding.Missing
-    }
-
-    private fun pathSegments(path: String): List<JsonPointerSegment> =
-        path.trim()
-            .removePrefix("/")
-            .split("/")
-            .filter { it.isNotEmpty() }
-            .map { JsonPointerSegment(it.replace("~1", "/").replace("~0", "~")) }
-
-    private fun setAtPath(
-        current: JsonElement,
-        segments: List<JsonPointerSegment>,
-        value: JsonElement,
-    ): JsonElement {
-        if (segments.isEmpty()) return value
-        val key = segments.first().value
-        val currentObject = current as? JsonObject ?: EmptyJsonObject
-        val next = currentObject[key] ?: EmptyJsonObject
-        val updatedChild = setAtPath(next, segments.drop(1), value)
-        return buildJsonObject {
-            currentObject.entries.forEach { (entryKey, entryValue) ->
-                if (entryKey != key) put(entryKey, entryValue)
-            }
-            put(key, updatedChild)
-        }
-    }
-
-    private fun removeAtPath(
-        current: JsonElement,
-        segments: List<JsonPointerSegment>,
-    ): JsonElement {
-        val currentObject = current as? JsonObject ?: return current
-        val key = segments.first().value
-        return buildJsonObject {
-            currentObject.entries.forEach { (entryKey, entryValue) ->
-                when {
-                    entryKey != key -> put(entryKey, entryValue)
-                    segments.size > 1 -> put(entryKey, removeAtPath(entryValue, segments.drop(1)))
-                }
-            }
-        }
     }
 }
 
@@ -203,17 +168,13 @@ private fun Map<String, A2uiSurfaceState>.updateDataModel(
 ): Map<String, A2uiSurfaceState> {
     val payload = message.updateDataModel
     val existing = this[payload.surfaceId] ?: A2uiSurfaceState(surfaceId = payload.surfaceId)
-    val nextDataModel = A2uiBindingResolver.applyDataModelPatch(
+    A2uiBindingResolver.applyDataModelPatch(
         dataModel = existing.dataModel,
         path = payload.path,
         value = payload.value,
     )
-    return plus(payload.surfaceId to existing.copy(dataModel = nextDataModel))
+    return plus(payload.surfaceId to existing)
 }
-
-private data class JsonPointerSegment(val value: String)
-
-private val EmptyJsonObject = JsonObject(emptyMap())
 
 private val JsonElement.jsonPrimitiveOrNull: JsonPrimitive?
     get() = this as? JsonPrimitive
