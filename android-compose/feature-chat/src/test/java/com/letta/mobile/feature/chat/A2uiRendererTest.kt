@@ -19,6 +19,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import com.letta.mobile.data.a2ui.A2uiBindingResolver
 import com.letta.mobile.data.a2ui.A2uiDataModel
+import com.letta.mobile.data.a2ui.A2uiDeleteSurfacePayload
 import com.letta.mobile.data.a2ui.A2uiMessage
 import com.letta.mobile.data.a2ui.A2uiProtocolJson
 import com.letta.mobile.data.a2ui.A2uiSurfaceManager
@@ -261,6 +262,74 @@ class A2uiRendererTest {
 
         composeRule.onNodeWithTag(A2uiTestTags.ToolApprovalSensitiveValue).performClick()
         composeRule.onNodeWithText("sk-test-secret").assertIsDisplayed()
+    }
+
+    @Test
+    fun toolApprovalLocalStateDefaultsCanStartArgumentsCollapsed() {
+        val manager = toolApprovalSurfaceManager(argumentsExpanded = false)
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+        }
+
+        composeRule.onNodeWithText("Show").assertIsDisplayed()
+        composeRule.onAllNodesWithText("rm -rf /tmp/build").assertCountEquals(0)
+        composeRule.onAllNodesWithText("********").assertCountEquals(0)
+    }
+
+    @Test
+    fun toolApprovalLocalStateSurvivesDataModelRecomposition() {
+        val manager = toolApprovalSurfaceManager()
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+        }
+
+        composeRule.onNodeWithText("Hide").performClick()
+        composeRule.onNodeWithText("Show").assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            manager.applyMessage(
+                A2uiMessage.UpdateDataModel(
+                    updateDataModel = A2uiUpdateDataModelPayload(
+                        surfaceId = SurfaceId,
+                        path = "/unrelated",
+                        value = JsonPrimitive("updated"),
+                    ),
+                )
+            )
+        }
+
+        composeRule.onNodeWithText("Show").assertIsDisplayed()
+        composeRule.onAllNodesWithText("rm -rf /tmp/build").assertCountEquals(0)
+    }
+
+    @Test
+    fun toolApprovalLocalStateResetsWhenSurfaceIsDeletedAndRecreated() {
+        val manager = toolApprovalSurfaceManager()
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+        }
+
+        composeRule.onNodeWithText("Hide").performClick()
+        composeRule.onNodeWithText("Show").assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            manager.applyMessage(
+                A2uiMessage.DeleteSurface(
+                    deleteSurface = A2uiDeleteSurfacePayload(surfaceId = SurfaceId),
+                )
+            )
+        }
+        composeRule.onNodeWithTag(A2uiTestTags.SurfaceMissing).assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            manager.applyToolApprovalSurface()
+        }
+
+        composeRule.onNodeWithText("Hide").assertIsDisplayed()
+        composeRule.onNodeWithText("rm -rf /tmp/build").assertIsDisplayed()
     }
 
     @Test
@@ -680,10 +749,33 @@ internal fun toolApprovalSurfaceManager(
     affordances: List<String> = listOf("once", "session", "forever", "deny"),
     callId: String = "call-approval-1",
     riskLevel: String = "destructive",
+    argumentsExpanded: Boolean? = null,
 ): A2uiSurfaceManager {
-    val affordanceJson = affordances.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }
     val manager = A2uiSurfaceManager()
-    manager.applyMessages(
+    manager.applyToolApprovalSurface(
+        timeoutSeconds = timeoutSeconds,
+        affordances = affordances,
+        callId = callId,
+        riskLevel = riskLevel,
+        argumentsExpanded = argumentsExpanded,
+    )
+    return manager
+}
+
+private fun A2uiSurfaceManager.applyToolApprovalSurface(
+    timeoutSeconds: Int = 30,
+    affordances: List<String> = listOf("once", "session", "forever", "deny"),
+    callId: String = "call-approval-1",
+    riskLevel: String = "destructive",
+    argumentsExpanded: Boolean? = null,
+) {
+    val affordanceJson = affordances.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }
+    val localStateJson = argumentsExpanded?.let {
+        """
+                      "localState":{"argumentsExpanded":$it},
+        """.trimIndent()
+    }.orEmpty()
+    applyMessages(
         decodeA2uiMessages(
             A2uiProtocolJson.Default,
             A2uiProtocolJson.Default.parseToJsonElement(
@@ -692,9 +784,10 @@ internal fun toolApprovalSurfaceManager(
                   {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"com.letta.mobile:tool-approval/v1"}},
                   {"version":"v0.9","updateComponents":{"surfaceId":"$SurfaceId","root":"approval","components":[
                     {"id":"approval","component":"ToolApprovalCard",
-                     "toolName":"bash",
-                     "toolDescription":"Run a shell command",
-                     "arguments":[
+                      "toolName":"bash",
+                      "toolDescription":"Run a shell command",
+                      $localStateJson
+                      "arguments":[
                        {"key":"command","value":"rm -rf /tmp/build","isSensitive":false},
                        {"key":"token","value":"sk-test-secret","isSensitive":true}
                      ],
@@ -709,7 +802,6 @@ internal fun toolApprovalSurfaceManager(
             ),
         )
     )
-    return manager
 }
 
 internal fun phase4WidgetsSurfaceManager(
