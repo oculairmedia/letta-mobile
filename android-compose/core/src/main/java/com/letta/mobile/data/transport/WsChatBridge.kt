@@ -172,6 +172,10 @@ sealed interface WsTimelineEvent {
         val actionId: String?,
         val reason: String?,
         val idempotent: Boolean,
+        val agentId: String?,
+        val conversationId: String?,
+        val turnId: String?,
+        val runId: String?,
     ) : WsTimelineEvent
 }
 
@@ -213,6 +217,10 @@ private fun ServerFrame.toTimelineEvent(): WsTimelineEvent? = when (this) {
         actionId = actionId,
         reason = reason,
         idempotent = idempotent,
+        agentId = agentId,
+        conversationId = conversationId,
+        turnId = turnId,
+        runId = runId,
     )
     is ServerFrame.AssistantMessage,
     is ServerFrame.ReasoningMessage,

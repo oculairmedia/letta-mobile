@@ -355,6 +355,10 @@ class AdminChatViewModelTest {
                 actionId = "action-1",
                 reason = null,
                 idempotent = false,
+                agentId = "agent-1",
+                conversationId = "conv-1",
+                turnId = "turn-1",
+                runId = "run-1",
             )
         )
         advanceUntilIdle()
@@ -385,6 +389,10 @@ class AdminChatViewModelTest {
                 actionId = "action-1",
                 reason = "approval expired",
                 idempotent = true,
+                agentId = "agent-1",
+                conversationId = "conv-1",
+                turnId = "turn-1",
+                runId = "run-1",
             )
         )
         advanceUntilIdle()
@@ -409,6 +417,10 @@ class AdminChatViewModelTest {
                 actionId = null,
                 reason = null,
                 idempotent = false,
+                agentId = null,
+                conversationId = null,
+                turnId = null,
+                runId = null,
             )
         )
         advanceUntilIdle()
