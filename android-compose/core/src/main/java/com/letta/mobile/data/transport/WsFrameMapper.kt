@@ -76,6 +76,7 @@ object WsFrameMapper {
         is ServerFrame.A2ui,
         is ServerFrame.A2uiCapabilities,
         is ServerFrame.UserActionAck,
+        is ServerFrame.UserActionOutcome,
         is ServerFrame.Unknown -> null
     }
 

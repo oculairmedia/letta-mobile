@@ -165,6 +165,14 @@ sealed interface WsTimelineEvent {
     ) : WsTimelineEvent
 
     data class Disconnected(val code: Int, val reason: String) : WsTimelineEvent
+
+    data class UserActionOutcome(
+        val frameId: String,
+        val outcome: String,
+        val actionId: String?,
+        val reason: String?,
+        val idempotent: Boolean,
+    ) : WsTimelineEvent
 }
 
 private fun ServerFrame.toTimelineEvent(): WsTimelineEvent? = when (this) {
@@ -198,6 +206,13 @@ private fun ServerFrame.toTimelineEvent(): WsTimelineEvent? = when (this) {
         message = message,
         turnId = turnId,
         runId = runId,
+    )
+    is ServerFrame.UserActionOutcome -> WsTimelineEvent.UserActionOutcome(
+        frameId = frameId,
+        outcome = outcome,
+        actionId = actionId,
+        reason = reason,
+        idempotent = idempotent,
     )
     is ServerFrame.AssistantMessage,
     is ServerFrame.ReasoningMessage,

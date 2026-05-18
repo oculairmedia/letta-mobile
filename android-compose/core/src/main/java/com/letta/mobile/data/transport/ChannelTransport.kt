@@ -33,10 +33,10 @@ import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
 
-enum class A2uiActionDispatchResult {
-    Sent,
-    Queued,
-    Failed,
+sealed interface A2uiActionDispatchResult {
+    data class Sent(val frameId: String) : A2uiActionDispatchResult
+    data object Queued : A2uiActionDispatchResult
+    data object Failed : A2uiActionDispatchResult
 }
 
 /**
@@ -365,6 +365,14 @@ class ChannelTransport @Inject constructor() {
                 }
             }
 
+            is ServerFrame.UserActionOutcome -> {
+                Log.i(
+                    TAG,
+                    "user_action outcome frameId=${frame.frameId} outcome=${frame.outcome} " +
+                        "reason=${frame.reason ?: "<none>"}",
+                )
+            }
+
             is ServerFrame.TurnStarted -> {
                 // lcp-99a: the shim now pre-creates the Run synchronously
                 // before emitting turn_started, so run_id is always present
@@ -416,7 +424,7 @@ class ChannelTransport @Inject constructor() {
                     TAG,
                     "user_action sent surfaceId=${action.surfaceId} event=${action.name} frameId=${frame.id}",
                 )
-                return A2uiActionDispatchResult.Sent
+                return A2uiActionDispatchResult.Sent(frame.id)
             }
             Log.w(
                 TAG,
