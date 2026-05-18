@@ -39,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -66,7 +67,9 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import com.letta.mobile.data.a2ui.A2uiBindingResolver
+import com.letta.mobile.data.a2ui.A2UI_LIST_VIEW_WIDGET_ID
 import com.letta.mobile.data.a2ui.A2uiComponent
+import com.letta.mobile.data.a2ui.A2uiJsonPointer
 import com.letta.mobile.data.a2ui.A2uiResolvedBinding
 import com.letta.mobile.data.a2ui.A2uiSurfaceManager
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
@@ -152,6 +155,7 @@ object A2uiTestTags {
     const val ToolApprovalSensitiveValue = "a2ui_tool_approval_sensitive_value"
     const val ToolApprovalCountdown = "a2ui_tool_approval_countdown"
     const val ButtonProgress = "a2ui_button_progress"
+    const val ListView = "a2ui_list_view"
 }
 
 @Composable
@@ -164,6 +168,7 @@ private fun A2uiComponentNode(
     surfaceSubmitting: Boolean,
     onPendingActionDelta: (Int) -> Unit,
     actionResolutionToken: Int,
+    renderScope: A2uiRenderScope = A2uiRenderScope.Root,
 ) {
     if (component.id in visited || visited.size > MaxRenderDepth) {
         A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
@@ -171,16 +176,33 @@ private fun A2uiComponentNode(
     }
     val nextVisited = visited + component.id
     when (component.component) {
-        "Text" -> A2uiText(component = component, surface = surface, modifier = modifier)
+        "Text" -> A2uiText(component = component, surface = surface, modifier = modifier, renderScope = renderScope)
         "TextField" -> A2uiTextField(
             component = component,
             surface = surface,
             modifier = modifier,
             surfaceSubmitting = surfaceSubmitting,
+            renderScope = renderScope,
         )
-        "DateTimeInput" -> A2uiDateTimeInput(component = component, surface = surface, modifier = modifier)
-        "Image" -> A2uiImage(component = component, surface = surface, modifier = modifier)
+        "DateTimeInput" -> A2uiDateTimeInput(
+            component = component,
+            surface = surface,
+            modifier = modifier,
+            renderScope = renderScope,
+        )
+        "Image" -> A2uiImage(component = component, surface = surface, modifier = modifier, renderScope = renderScope)
         "Divider" -> A2uiDivider(component = component, modifier = modifier)
+        A2UI_LIST_VIEW_WIDGET_ID -> A2uiListView(
+            component = component,
+            surface = surface,
+            modifier = modifier,
+            visited = nextVisited,
+            onAction = onAction,
+            surfaceSubmitting = surfaceSubmitting,
+            onPendingActionDelta = onPendingActionDelta,
+            actionResolutionToken = actionResolutionToken,
+            renderScope = renderScope,
+        )
         "ToolApprovalCard" -> A2uiToolApprovalCard(
             component = component,
             surface = surface,
@@ -196,6 +218,7 @@ private fun A2uiComponentNode(
             surfaceSubmitting = surfaceSubmitting,
             onPendingActionDelta = onPendingActionDelta,
             actionResolutionToken = actionResolutionToken,
+            renderScope = renderScope,
         )
         "Row" -> A2uiRow(
             component = component,
@@ -206,6 +229,7 @@ private fun A2uiComponentNode(
             surfaceSubmitting = surfaceSubmitting,
             onPendingActionDelta = onPendingActionDelta,
             actionResolutionToken = actionResolutionToken,
+            renderScope = renderScope,
         )
         "Card" -> A2uiCard(
             component = component,
@@ -216,6 +240,7 @@ private fun A2uiComponentNode(
             surfaceSubmitting = surfaceSubmitting,
             onPendingActionDelta = onPendingActionDelta,
             actionResolutionToken = actionResolutionToken,
+            renderScope = renderScope,
         )
         "Button" -> A2uiButton(
             component = component,
@@ -224,6 +249,7 @@ private fun A2uiComponentNode(
             onAction = onAction,
             onPendingActionDelta = onPendingActionDelta,
             actionResolutionToken = actionResolutionToken,
+            renderScope = renderScope,
         )
         else -> A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
     }
@@ -523,8 +549,9 @@ private fun A2uiText(
     component: A2uiComponent,
     surface: A2uiSurfaceState,
     modifier: Modifier = Modifier,
+    renderScope: A2uiRenderScope,
 ) {
-    val text = component.resolveText(surface)
+    val text = component.resolveText(surface, renderScope)
     if (text == null) {
         A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingText))
         return
@@ -543,12 +570,13 @@ private fun A2uiTextField(
     surface: A2uiSurfaceState,
     modifier: Modifier = Modifier,
     surfaceSubmitting: Boolean,
+    renderScope: A2uiRenderScope,
 ) {
     val binding = component.raw["value"] ?: component.raw["text"]
-    val path = binding.bindingPath()
-    val boundValue = component.resolveInputValue(surface, binding)
-    val label = resolveBindingText(component.raw["label"], surface)
-    val placeholder = resolveBindingText(component.raw["placeholder"], surface)
+    val path = binding.bindingPath()?.let(renderScope::resolvePath)
+    val boundValue = component.resolveInputValue(surface, binding, renderScope)
+    val label = resolveBindingText(component.raw["label"], surface, renderScope)
+    val placeholder = resolveBindingText(component.raw["placeholder"], surface, renderScope)
     val fieldType = component.raw.stringValue("textFieldType", "variant", "type").orEmpty()
     val validation = component.raw.stringValue("validationRegexp")
 
@@ -609,11 +637,12 @@ private fun A2uiDateTimeInput(
     component: A2uiComponent,
     surface: A2uiSurfaceState,
     modifier: Modifier = Modifier,
+    renderScope: A2uiRenderScope,
 ) {
     val binding = component.raw["value"] ?: component.raw["text"]
-    val path = binding.bindingPath()
-    val value = component.resolveInputValue(surface, binding)
-    val label = resolveBindingText(component.raw["label"], surface) ?: "Date and time"
+    val path = binding.bindingPath()?.let(renderScope::resolvePath)
+    val value = component.resolveInputValue(surface, binding, renderScope)
+    val label = resolveBindingText(component.raw["label"], surface, renderScope) ?: "Date and time"
     val enableDate = component.raw.booleanValue("enableDate") ?: true
     val enableTime = component.raw.booleanValue("enableTime") ?: false
     var showDatePicker by remember { mutableStateOf(false) }
@@ -731,8 +760,9 @@ private fun A2uiImage(
     component: A2uiComponent,
     surface: A2uiSurfaceState,
     modifier: Modifier = Modifier,
+    renderScope: A2uiRenderScope,
 ) {
-    val imageUrl = resolveBindingText(component.raw["url"] ?: component.raw["src"], surface)
+    val imageUrl = resolveBindingText(component.raw["url"] ?: component.raw["src"], surface, renderScope)
     if (imageUrl.isNullOrBlank()) {
         A2uiSkeletonImage(modifier = modifier.testTag(A2uiTestTags.MissingImage))
         return
@@ -753,6 +783,7 @@ private fun A2uiImage(
         contentDescription = resolveBindingText(
             component.raw["alt"] ?: component.raw["contentDescription"],
             surface,
+            renderScope,
         ),
         modifier = modifier
             .fillMaxWidth()
@@ -796,6 +827,7 @@ private fun A2uiColumn(
     surfaceSubmitting: Boolean,
     onPendingActionDelta: (Int) -> Unit,
     actionResolutionToken: Int,
+    renderScope: A2uiRenderScope,
 ) {
     val children = component.children
     Column(
@@ -818,6 +850,7 @@ private fun A2uiColumn(
                     surfaceSubmitting = surfaceSubmitting,
                     onPendingActionDelta = onPendingActionDelta,
                     actionResolutionToken = actionResolutionToken,
+                    renderScope = renderScope,
                 )
             }
         }
@@ -834,6 +867,7 @@ private fun A2uiRow(
     surfaceSubmitting: Boolean,
     onPendingActionDelta: (Int) -> Unit,
     actionResolutionToken: Int,
+    renderScope: A2uiRenderScope,
 ) {
     val children = component.children
     Row(
@@ -858,6 +892,59 @@ private fun A2uiRow(
                     surfaceSubmitting = surfaceSubmitting,
                     onPendingActionDelta = onPendingActionDelta,
                     actionResolutionToken = actionResolutionToken,
+                    renderScope = renderScope,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun A2uiListView(
+    component: A2uiComponent,
+    surface: A2uiSurfaceState,
+    modifier: Modifier = Modifier,
+    visited: Set<String>,
+    onAction: (A2uiAction) -> Unit,
+    surfaceSubmitting: Boolean,
+    onPendingActionDelta: (Int) -> Unit,
+    actionResolutionToken: Int,
+    renderScope: A2uiRenderScope,
+) {
+    val template = component.listTemplate
+    if (template == null) {
+        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
+        return
+    }
+
+    val itemsPath = renderScope.resolvePath(template.itemsPath)
+    val itemsValue by surface.dataModel.observe(itemsPath)
+    val items = itemsValue as? JsonArray
+    val templateComponent = surface.components[template.itemTemplateComponentId]
+    if (items == null || templateComponent == null) {
+        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
+        return
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(A2uiTestTags.ListView),
+        verticalArrangement = Arrangement.spacedBy(component.spacing()),
+    ) {
+        items.forEachIndexed { index, item ->
+            val itemScope = A2uiRenderScope(basePath = itemsPath.appendJsonPointerSegment(index.toString()))
+            val itemKey = item.resolveItemKey(template.itemKeyPath) ?: index.toString()
+            key(component.id, itemKey, index) {
+                A2uiComponentNode(
+                    component = templateComponent,
+                    surface = surface,
+                    visited = visited,
+                    onAction = onAction,
+                    surfaceSubmitting = surfaceSubmitting,
+                    onPendingActionDelta = onPendingActionDelta,
+                    actionResolutionToken = actionResolutionToken,
+                    renderScope = itemScope,
                 )
             }
         }
@@ -874,6 +961,7 @@ private fun A2uiCard(
     surfaceSubmitting: Boolean,
     onPendingActionDelta: (Int) -> Unit,
     actionResolutionToken: Int,
+    renderScope: A2uiRenderScope,
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -900,6 +988,7 @@ private fun A2uiCard(
                         surfaceSubmitting = surfaceSubmitting,
                         onPendingActionDelta = onPendingActionDelta,
                         actionResolutionToken = actionResolutionToken,
+                        renderScope = renderScope,
                     )
                 }
             }
@@ -915,9 +1004,10 @@ private fun A2uiButton(
     onAction: (A2uiAction) -> Unit,
     onPendingActionDelta: (Int) -> Unit,
     actionResolutionToken: Int,
+    renderScope: A2uiRenderScope,
 ) {
-    val label = component.resolveButtonLabel(surface)
-    val action = component.action(surface)
+    val label = component.resolveButtonLabel(surface, renderScope)
+    val action = component.action(surface, renderScope)
     val haptic = LocalHapticFeedback.current
     var inFlight by remember(surface.surfaceId, component.id) { mutableStateOf(false) }
 
@@ -941,7 +1031,7 @@ private fun A2uiButton(
             // letta-mobile-ykkl diagnostic: log the dispatch hop so the
             // chain "Compose onClick → onAction → WsChatBridge → wire"
             // is traceable in adb logcat without a debugger attached.
-            val resolved = component.action(surface)
+            val resolved = component.action(surface, renderScope)
             if (resolved == null) {
                 android.util.Log.w(
                     "A2UI",
@@ -1055,13 +1145,13 @@ private fun A2uiComponent.textStyle(): TextStyle = when (raw.stringValue("varian
 }
 
 @Composable
-private fun A2uiComponent.resolveText(surface: A2uiSurfaceState): String? {
+private fun A2uiComponent.resolveText(surface: A2uiSurfaceState, renderScope: A2uiRenderScope): String? {
     val binding = raw["text"] ?: raw["content"] ?: raw["value"]
-    return resolveBindingText(binding, surface)
+    return resolveBindingText(binding, surface, renderScope)
 }
 
 @Composable
-private fun A2uiComponent.resolveButtonLabel(surface: A2uiSurfaceState): String? {
+private fun A2uiComponent.resolveButtonLabel(surface: A2uiSurfaceState, renderScope: A2uiRenderScope): String? {
     // letta-mobile-njzb: A2UI v0.9 Basic Catalog defines Button.child as
     // "the ID of the child component. Use a Text component for a labeled
     // button." Resolve `child` first — that's the canonical spec field
@@ -1069,23 +1159,27 @@ private fun A2uiComponent.resolveButtonLabel(surface: A2uiSurfaceState): String?
     // (string-id) are pre-spec aliases we keep for back-compat with any
     // payload still using the older field names.
     raw.stringValue("child", "labelComponentId", "labelId")?.let { childId ->
-        surface.components[childId]?.resolveText(surface)?.let { return it }
+        surface.components[childId]?.resolveText(surface, renderScope)?.let { return it }
     }
     val label = raw["label"]
     if (label is JsonPrimitive) {
-        surface.components[label.contentOrNull]?.resolveText(surface)?.let { return it }
+        surface.components[label.contentOrNull]?.resolveText(surface, renderScope)?.let { return it }
     }
-    return resolveBindingText(label ?: raw["text"], surface)
+    return resolveBindingText(label ?: raw["text"], surface, renderScope)
 }
 
 @Composable
-private fun resolveBindingText(binding: JsonElement?, surface: A2uiSurfaceState): String? =
+private fun resolveBindingText(
+    binding: JsonElement?,
+    surface: A2uiSurfaceState,
+    renderScope: A2uiRenderScope,
+): String? =
     when {
         binding is JsonObject && binding.stringValue("path") != null -> {
-            val value by surface.dataModel.observe(binding.stringValue("path").orEmpty())
+            val value by surface.dataModel.observe(renderScope.resolvePath(binding.stringValue("path").orEmpty()))
             value?.let(A2uiBindingResolver::displayText)
         }
-        else -> when (val resolved = A2uiBindingResolver.resolve(binding, surface.dataModel)) {
+        else -> when (val resolved = A2uiBindingResolver.resolve(binding?.withScopedPaths(renderScope), surface.dataModel)) {
             A2uiResolvedBinding.Missing -> null
             is A2uiResolvedBinding.Value -> A2uiBindingResolver.displayText(resolved.value)
         }
@@ -1095,17 +1189,18 @@ private fun resolveBindingText(binding: JsonElement?, surface: A2uiSurfaceState)
 private fun A2uiComponent.resolveInputValue(
     surface: A2uiSurfaceState,
     binding: JsonElement?,
+    renderScope: A2uiRenderScope,
 ): String {
-    val path = binding.bindingPath()
+    val path = binding.bindingPath()?.let(renderScope::resolvePath)
     return if (path != null) {
         val value by surface.dataModel.observe(path)
         value?.let(A2uiBindingResolver::displayText).orEmpty()
     } else {
-        resolveBindingText(binding, surface).orEmpty()
+        resolveBindingText(binding, surface, renderScope).orEmpty()
     }
 }
 
-private fun A2uiComponent.action(surface: A2uiSurfaceState): A2uiAction? {
+private fun A2uiComponent.action(surface: A2uiSurfaceState, renderScope: A2uiRenderScope): A2uiAction? {
     val action = (raw["action"] ?: raw["onClick"]) as? JsonObject ?: return null
     // letta-mobile-ykkl: A2UI v0.9 Basic Catalog declares Button.action
     // as `Action` whose payload is nested under `event` (Action.event).
@@ -1121,7 +1216,7 @@ private fun A2uiComponent.action(surface: A2uiSurfaceState): A2uiAction? {
     val contextSource = (eventBlock?.get("context") ?: eventBlock?.get("data"))
         ?: action["context"]
         ?: action["data"]
-    val context = resolveA2uiActionContext(contextSource, surface.dataModel)
+    val context = resolveA2uiActionContext(contextSource?.withScopedPaths(renderScope), surface.dataModel)
     val raw = buildJsonObject {
         action.forEach { (key, value) -> put(key, value) }
         put("actionName", name)
@@ -1401,6 +1496,50 @@ private fun JsonObject.booleanValue(vararg keys: String): Boolean? =
 
 private fun JsonElement?.bindingPath(): String? =
     (this as? JsonObject)?.stringValue("path")
+
+private data class A2uiRenderScope(
+    val basePath: String? = null,
+) {
+    fun resolvePath(path: String): String {
+        val normalized = A2uiJsonPointer.normalize(path)
+        val base = basePath ?: return normalized
+        return if (path.trim().startsWith("/")) {
+            normalized
+        } else {
+            base.appendJsonPointerSegment(path)
+        }
+    }
+
+    companion object {
+        val Root = A2uiRenderScope()
+    }
+}
+
+private fun JsonElement.withScopedPaths(renderScope: A2uiRenderScope): JsonElement =
+    when (this) {
+        is JsonArray -> JsonArray(map { it.withScopedPaths(renderScope) })
+        is JsonObject -> JsonObject(
+            mapValues { (key, value) ->
+                if (key == "path" && value is JsonPrimitive) {
+                    JsonPrimitive(renderScope.resolvePath(value.contentOrNull.orEmpty()))
+                } else {
+                    value.withScopedPaths(renderScope)
+                }
+            }
+        )
+        else -> this
+    }
+
+private fun String.appendJsonPointerSegment(segment: String): String =
+    A2uiJsonPointer.normalize(this).trimEnd('/') + "/" + segment.escapeJsonPointerSegment()
+
+private fun String.escapeJsonPointerSegment(): String =
+    replace("~", "~0").replace("/", "~1")
+
+private fun JsonElement.resolveItemKey(path: String): String? =
+    A2uiJsonPointer.resolve(this, path)
+        ?.let(A2uiBindingResolver::displayText)
+        ?.takeIf { it.isNotBlank() }
 
 private fun String.matchesValidation(pattern: String): Boolean =
     runCatching { Regex(pattern).matches(this) }.getOrDefault(true)

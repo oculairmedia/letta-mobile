@@ -67,7 +67,7 @@ class A2uiRendererTest {
 
         val action = requireNotNull(clicked)
         assertEquals("approve", action.name)
-        assertEquals("req-1", action.context!!["requestId"]!!.jsonPrimitive.content)
+        assertEquals("req-1", action.context["requestId"]!!.jsonPrimitive.content)
     }
 
     @Test
@@ -354,6 +354,66 @@ class A2uiRendererTest {
     }
 
     @Test
+    fun listViewRendersTemplateForEachItemWithPerItemScope() {
+        val manager = listViewSurfaceManager()
+        val actions = mutableListOf<A2uiAction>()
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(
+                surfaceId = SurfaceId,
+                surfaceManager = manager,
+                onAction = actions::add,
+            )
+        }
+
+        composeRule.onNodeWithTag(A2uiTestTags.ListView).assertIsDisplayed()
+        composeRule.onNodeWithText("Alpha issue").assertIsDisplayed()
+        composeRule.onNodeWithText("Needs review").assertIsDisplayed()
+        composeRule.onNodeWithText("Beta issue").assertIsDisplayed()
+        composeRule.onNodeWithText("Ready to merge").assertIsDisplayed()
+
+        composeRule.onNodeWithText("Open Beta").performClick()
+        composeRule.runOnIdle {
+            val action = actions.single()
+            assertEquals("issue.open", action.name)
+            assertEquals("issue-2", action.context["issueId"]!!.jsonPrimitive.content)
+            assertEquals("Beta issue", action.context["title"]!!.jsonPrimitive.content)
+        }
+    }
+
+    @Test
+    fun listViewProgressesFromSkeletonToItemsWhenDataArrivesLater() {
+        val manager = listViewSurfaceManager(includeItems = false)
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+        }
+
+        composeRule.onNodeWithTag(A2uiTestTags.MissingComponent).assertIsDisplayed()
+        composeRule.runOnIdle {
+            manager.applyMessage(
+                A2uiMessage.UpdateDataModel(
+                    updateDataModel = A2uiUpdateDataModelPayload(
+                        surfaceId = SurfaceId,
+                        path = "/issues",
+                        value = A2uiProtocolJson.Default.parseToJsonElement(
+                            """
+                            [
+                              {"id":"issue-1","title":"Alpha issue","subtitle":"Needs review","actionLabel":"Open Alpha"},
+                              {"id":"issue-2","title":"Beta issue","subtitle":"Ready to merge","actionLabel":"Open Beta"}
+                            ]
+                            """.trimIndent(),
+                        ),
+                    ),
+                )
+            )
+        }
+
+        composeRule.onNodeWithText("Alpha issue").assertIsDisplayed()
+        composeRule.onNodeWithText("Beta issue").assertIsDisplayed()
+    }
+
+    @Test
     fun imageWithResolvedUrlExposesContentDescription() {
         val manager = imageSurfaceManager()
 
@@ -575,12 +635,12 @@ private fun List<A2uiAction>.assertToolApprovalAction(
     decision: String,
     scope: String,
 ) {
-    val action = single { it.context!!["callId"]!!.jsonPrimitive.content == callId }
+    val action = single { it.context["callId"]!!.jsonPrimitive.content == callId }
     assertEquals("tool_approval_response", action.name)
     assertEquals("tool_approval_response", action.raw["actionName"]!!.jsonPrimitive.content)
     assertEquals(SurfaceId, action.raw["surfaceId"]!!.jsonPrimitive.content)
-    assertEquals(decision, action.context!!["decision"]!!.jsonPrimitive.content)
-    assertEquals(scope, action.context!!["scope"]!!.jsonPrimitive.content)
+    assertEquals(decision, action.context["decision"]!!.jsonPrimitive.content)
+    assertEquals(scope, action.context["scope"]!!.jsonPrimitive.content)
 }
 
 internal fun confirmationSurfaceManager(): A2uiSurfaceManager {
@@ -771,6 +831,45 @@ private fun dateTimeSurfaceManager(): A2uiSurfaceManager {
                   {"version":"v0.9","updateComponents":{"surfaceId":"$SurfaceId","root":"reservationTime","components":[
                     {"id":"reservationTime","component":"DateTimeInput","label":{"literalString":"Reservation time"},"value":{"path":"/reservationTime"},"enableDate":true,"enableTime":false}
                   ]}}
+                ]
+                """.trimIndent(),
+            ),
+        )
+    )
+    return manager
+}
+
+private fun listViewSurfaceManager(includeItems: Boolean = true): A2uiSurfaceManager {
+    val itemsPatch = if (includeItems) {
+        """,
+                  {"version":"v0.9","updateDataModel":{"surfaceId":"$SurfaceId","path":"/issues","value":[
+                    {"id":"issue-1","title":"Alpha issue","subtitle":"Needs review","actionLabel":"Open Alpha"},
+                    {"id":"issue-2","title":"Beta issue","subtitle":"Ready to merge","actionLabel":"Open Beta"}
+                  ]}}
+        """.trimIndent()
+    } else {
+        ""
+    }
+    val manager = A2uiSurfaceManager()
+    manager.applyMessages(
+        decodeA2uiMessages(
+            A2uiProtocolJson.Default,
+            A2uiProtocolJson.Default.parseToJsonElement(
+                """
+                [
+                  {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"basic"}},
+                  {"version":"v0.9","updateComponents":{"surfaceId":"$SurfaceId","root":"issuesList","components":[
+                    {"id":"issuesList","component":"ListView","itemTemplate":"issueCard","items":{"path":"/issues"},"itemKey":"id","spacing":"sm"},
+                    {"id":"issueCard","component":"Card","child":"issueContent","cornerRadius":12,"elevation":1},
+                    {"id":"issueContent","component":"Column","children":["issueTitle","issueSubtitle","openIssue"],"spacing":"xs"},
+                    {"id":"issueTitle","component":"Text","variant":"h5","text":{"path":"title"}},
+                    {"id":"issueSubtitle","component":"Text","text":{"path":"subtitle"}},
+                    {"id":"openIssue","component":"Button","label":{"path":"actionLabel"},"action":{"name":"issue.open","context":[
+                      {"key":"issueId","value":{"path":"id"}},
+                      {"key":"title","value":{"path":"title"}}
+                    ]}}
+                  ]}}
+                  $itemsPatch
                 ]
                 """.trimIndent(),
             ),
