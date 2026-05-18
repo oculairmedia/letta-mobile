@@ -37,6 +37,7 @@ const val A2UI_HELLO_VERSION = "0.9"
 // matches on. NOT the upstream catalog $id URL — the shim does
 // string-equality against its registered handle list.
 const val A2UI_BASIC_CATALOG_ID = "basic"
+const val A2UI_LIST_VIEW_WIDGET_ID = "ListView"
 
 const val LETTA_TOOL_APPROVAL_CATALOG_ID = "com.letta.mobile:tool-approval/v1"
 const val LETTA_TOOL_APPROVAL_WIDGET_ID = "ToolApprovalCard"
@@ -56,6 +57,7 @@ val A2UI_DEFAULT_SUPPORTED_WIDGETS: List<String> = listOf(
     "TextField",
     "DateTimeInput",
     "Image",
+    A2UI_LIST_VIEW_WIDGET_ID,
     LETTA_TOOL_APPROVAL_WIDGET_ID,
 )
 
@@ -176,6 +178,47 @@ data class A2uiComponent(
         get() = (raw["children"] as? JsonArray)
             ?.mapNotNull { it.jsonPrimitiveOrNull?.contentOrNull }
             .orEmpty()
+
+    /**
+     * A2UI v2 list-template metadata. The component remains raw-preserving for
+     * forward compatibility; this typed view exposes the fields renderer work
+     * needs without making ListView a separate envelope format.
+     */
+    val listTemplate: A2uiListTemplatePayload?
+        get() = A2uiListTemplatePayload.from(raw).takeIf { component == A2UI_LIST_VIEW_WIDGET_ID }
+}
+
+/**
+ * Template/repeat primitive for rendering a component once per item in a data
+ * model array. Bindings inside [itemTemplateComponentId] resolve relative to
+ * each item at [itemsPath]/<index>, so `{ "path": "title" }` resolves against
+ * `/issues/0/title` for the first item instead of the surface root.
+ *
+ * Per-item actions should include item identity in their emitted context, e.g.
+ * `{ "type": "user_action", "name": "issue.open", "context": { "itemId": "..." } }`.
+ */
+@Immutable
+data class A2uiListTemplatePayload(
+    val itemTemplateComponentId: String,
+    val itemsPath: String,
+    val itemKeyPath: String = "id",
+) {
+    companion object {
+        fun from(raw: JsonObject): A2uiListTemplatePayload? {
+            val itemTemplate = raw.stringValue("itemTemplate", "itemTemplateId", "templateComponentId")
+                ?.takeIf { it.isNotBlank() }
+                ?: return null
+            val itemsPath = raw.bindingPath("items")
+                ?.takeIf { it.isNotBlank() }
+                ?: return null
+            val itemKey = raw.stringValue("itemKey", "itemKeyPath")?.takeIf { it.isNotBlank() } ?: "id"
+            return A2uiListTemplatePayload(
+                itemTemplateComponentId = itemTemplate,
+                itemsPath = itemsPath,
+                itemKeyPath = itemKey,
+            )
+        }
+    }
 }
 
 @Immutable
@@ -330,3 +373,13 @@ private val JsonElement.jsonPrimitiveOrNull: JsonPrimitive?
 
 private val JsonPrimitive.contentOrNull: String?
     get() = runCatching { content }.getOrNull()
+
+private fun JsonObject.stringValue(vararg keys: String): String? = keys.firstNotNullOfOrNull { key ->
+    this[key]?.jsonPrimitiveOrNull?.contentOrNull
+}
+
+private fun JsonObject.bindingPath(key: String): String? = when (val value = this[key]) {
+    is JsonPrimitive -> value.contentOrNull
+    is JsonObject -> value.stringValue("path")
+    else -> null
+}

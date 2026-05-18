@@ -30,6 +30,7 @@ class A2uiProtocolTest : WordSpec({
             out shouldContain A2UI_BASIC_CATALOG_ID
             out shouldContain LETTA_TOOL_APPROVAL_CATALOG_ID
             out shouldContain "\"supported_widgets\""
+            out shouldContain A2UI_LIST_VIEW_WIDGET_ID
             out shouldContain LETTA_TOOL_APPROVAL_WIDGET_ID
             out shouldContain "\"theme_hints\""
         }
@@ -69,6 +70,56 @@ class A2uiProtocolTest : WordSpec({
             val approval = parsed.updateComponents.components[1]
             approval.component shouldBe LETTA_TOOL_APPROVAL_WIDGET_ID
             approval.raw["requestId"]!!.jsonPrimitive.content shouldBe "req-1"
+        }
+
+        "round-trip ListView item template metadata" {
+            val parsed = decodeA2uiMessages(
+                json,
+                json.parseToJsonElement(
+                    """
+                    {"version":"v0.9","updateComponents":{"surfaceId":"s1","root":"list","components":[
+                      {"id":"list","component":"ListView","itemTemplate":"issue-row","items":{"path":"/issues"},"itemKey":"id"},
+                      {"id":"issue-row","component":"Row","children":["title","state"]},
+                      {"id":"title","component":"Text","text":{"path":"title"}},
+                      {"id":"state","component":"Text","text":{"path":"state"}}
+                    ]}}
+                    """.trimIndent(),
+                ),
+            ).single()
+
+            parsed.shouldBeInstanceOf<A2uiMessage.UpdateComponents>()
+            val list = parsed.updateComponents.components.first { it.id == "list" }
+            list.component shouldBe A2UI_LIST_VIEW_WIDGET_ID
+            list.listTemplate!!.itemTemplateComponentId shouldBe "issue-row"
+            list.listTemplate!!.itemsPath shouldBe "/issues"
+            list.listTemplate!!.itemKeyPath shouldBe "id"
+
+            val encoded = json.encodeToString(A2uiMessageSerializer, parsed)
+            val roundTripped = decodeA2uiMessages(json, json.parseToJsonElement(encoded)).single()
+            roundTripped.shouldBeInstanceOf<A2uiMessage.UpdateComponents>()
+            val roundTrippedList = roundTripped.updateComponents.components.first { it.id == "list" }
+            roundTrippedList.raw["itemTemplate"]!!.jsonPrimitive.content shouldBe "issue-row"
+            roundTrippedList.raw["items"]!!.jsonObject["path"]!!.jsonPrimitive.content shouldBe "/issues"
+            roundTrippedList.raw["itemKey"]!!.jsonPrimitive.content shouldBe "id"
+        }
+
+        "parse ListView shorthand item key and template aliases" {
+            val parsed = decodeA2uiMessages(
+                json,
+                json.parseToJsonElement(
+                    """
+                    {"version":"v0.9","updateComponents":{"surfaceId":"s1","components":[
+                      {"id":"list","component":"ListView","templateComponentId":"entry","items":"/entries"}
+                    ]}}
+                    """.trimIndent(),
+                ),
+            ).single()
+
+            parsed.shouldBeInstanceOf<A2uiMessage.UpdateComponents>()
+            val list = parsed.updateComponents.components.single()
+            list.listTemplate!!.itemTemplateComponentId shouldBe "entry"
+            list.listTemplate!!.itemsPath shouldBe "/entries"
+            list.listTemplate!!.itemKeyPath shouldBe "id"
         }
 
         "parse updateDataModel with omitted value as delete marker" {
