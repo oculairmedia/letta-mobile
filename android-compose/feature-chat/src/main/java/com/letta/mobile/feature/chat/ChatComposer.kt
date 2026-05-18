@@ -1,11 +1,14 @@
 package com.letta.mobile.feature.chat
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
@@ -25,13 +28,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
-import coil3.request.ImageRequest
 import com.letta.mobile.feature.chat.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.letta.mobile.data.model.MessageContentPart
@@ -212,29 +214,18 @@ private fun AttachmentThumbnail(
     image: MessageContentPart.Image,
     onRemove: () -> Unit,
 ) {
-    val context = LocalContext.current
-    val cacheKey = remember(image.base64, image.mediaType) {
-        chatAttachmentImageCacheKey(
-            base64 = image.base64,
-            mediaType = image.mediaType,
-        )
-    }
-    // letta-mobile-axb2: Coil3 dropped the data: URI fetcher that Coil2
-    // shipped, so passing `data:image/jpeg;base64,<...>` resolves to a
-    // null Bitmap and the AsyncImage renders an empty square. Feed Coil
-    // the decoded ByteArray instead — Coil3's BitmapFetcher handles it
-    // directly and the memory/disk cache keys still scope correctly.
-    val bytes = remember(image.base64) {
+    // letta-mobile-v4f9: the axb2 ByteArray fix regressed under Coil 3.4 —
+    // the BitmapFetcher returns null for `data(byteArray)` in this build,
+    // so AsyncImage paints an empty square. The composer attachment is
+    // already in memory as base64; decode straight to a Bitmap and use
+    // Compose's native Image. No Coil round-trip, no async state to
+    // mis-resolve, identical caching scope (the parent composition holds
+    // the bitmap via remember keyed on the base64 string).
+    val imageBitmap = remember(image.base64) {
         runCatching {
-            android.util.Base64.decode(image.base64, android.util.Base64.DEFAULT)
-        }.getOrDefault(ByteArray(0))
-    }
-    val request = remember(context, bytes, cacheKey) {
-        ImageRequest.Builder(context)
-            .data(bytes)
-            .memoryCacheKey(cacheKey)
-            .diskCacheKey(cacheKey)
-            .build()
+            val bytes = android.util.Base64.decode(image.base64, android.util.Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+        }.getOrNull()
     }
 
     Box(modifier = Modifier.size(64.dp)) {
@@ -243,12 +234,14 @@ private fun AttachmentThumbnail(
             shape = RoundedCornerShape(8.dp),
             color = MaterialTheme.colorScheme.surfaceVariant,
         ) {
-            AsyncImage(
-                model = request,
-                contentDescription = null,
-                modifier = Modifier.fillMaxWidth().size(64.dp),
-                contentScale = ContentScale.Crop,
-            )
+            if (imageBitmap != null) {
+                Image(
+                    bitmap = imageBitmap,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+            }
         }
         // Remove button overlay (top-right)
         Surface(

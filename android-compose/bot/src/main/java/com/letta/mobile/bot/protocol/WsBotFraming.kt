@@ -60,13 +60,19 @@ internal fun parseIncoming(json: Json, text: String): WsInboundMessage {
         "stream" -> json.decodeFromJsonElement(WsStreamEventMessage.serializer(), element)
         "result" -> json.decodeFromJsonElement(WsResultMessage.serializer(), element)
         "error" -> json.decodeFromJsonElement(WsErrorMessage.serializer(), element)
-        "a2ui" -> parseA2uiIncoming(json, obj)
+        // Shim §2.2 emits `a2ui_frame`; older gateway builds emit
+        // `a2ui` — accept both for forward/backward compat.
+        "a2ui_frame", "a2ui" -> parseA2uiIncoming(json, obj)
         else -> throw SerializationException("Unknown WebSocket message type: $type")
     }
 }
 
 private fun parseA2uiIncoming(json: Json, obj: JsonObject): WsA2uiMessage {
-    val payload = obj["message"]
+    // Shim §2.2 puts the payload under `a2ui`; older gateway builds
+    // used `message` / `messages` / `payload` / `data`. Try the new
+    // field first, then fall back.
+    val payload = obj["a2ui"]
+        ?: obj["message"]
         ?: obj["messages"]
         ?: obj["payload"]
         ?: obj["data"]

@@ -5,8 +5,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -24,11 +26,13 @@ import com.letta.mobile.data.a2ui.A2uiUpdateDataModelPayload
 import com.letta.mobile.data.a2ui.decodeA2uiMessages
 import com.letta.mobile.ui.a2ui.A2uiAction
 import com.letta.mobile.ui.a2ui.A2uiRenderer
+import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
 import com.letta.mobile.ui.a2ui.A2uiTestTags
 import com.letta.mobile.ui.test.setLettaTestContent
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -164,6 +168,39 @@ class A2uiRendererTest {
         assertTrue(bodyCompositions <= 1)
         composeRule.onNodeWithText("Confirmed").assertIsDisplayed()
         composeRule.onNodeWithText("Stable").assertIsDisplayed()
+    }
+
+    @Test
+    fun buttonResolvesChildIdToSiblingTextLabel() {
+        // letta-mobile-njzb regression guard: Button.child is the
+        // canonical A2UI v0.9 Basic Catalog field for the label-by-id
+        // reference. The renderer must look the id up in the
+        // per-surface registry and render the sibling Text's content
+        // inside the button slot. A renderer that ignores `child`
+        // (the original njzb bug) produces an empty pill.
+        val manager = A2uiSurfaceManager()
+        manager.applyMessages(
+            decodeA2uiMessages(
+                A2uiProtocolJson.Default,
+                A2uiProtocolJson.Default.parseToJsonElement(
+                    """
+                    [
+                      {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"basic"}},
+                      {"version":"v0.9","updateComponents":{"surfaceId":"$SurfaceId","root":"ok-btn","components":[
+                        {"id":"ok-btn","component":"Button","child":"ok-label","action":{"name":"ok"}},
+                        {"id":"ok-label","component":"Text","text":"It works"}
+                      ]}}
+                    ]
+                    """.trimIndent(),
+                ),
+            )
+        )
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+        }
+
+        composeRule.onNodeWithText("It works").assertIsDisplayed()
     }
 
     @Test
@@ -373,6 +410,112 @@ class A2uiRendererTest {
     }
 
     @Test
+    fun buttonTapShowsLocalSubmittingStateAndCoalescesRepeatedTaps() {
+        val manager = bookingFormSurfaceManager()
+        val actions = mutableListOf<A2uiAction>()
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(
+                surfaceId = SurfaceId,
+                surfaceManager = manager,
+                onAction = actions::add,
+            )
+        }
+
+        composeRule.onNodeWithText("Submit").performClick()
+        composeRule.onNodeWithTag(A2uiTestTags.ButtonProgress).assertIsDisplayed()
+        composeRule.onNodeWithText("Submit").assertIsNotEnabled()
+        composeRule.onNodeWithText("submitting...").assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            assertEquals(1, actions.size)
+        }
+    }
+
+    @Test
+    fun siblingTextFieldIsReadOnlyWhileButtonActionIsSubmitting() {
+        val manager = bookingFormSurfaceManager()
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(
+                surfaceId = SurfaceId,
+                surfaceManager = manager,
+                onAction = {},
+            )
+        }
+
+        composeRule.onNodeWithTag(A2uiTestTags.TextField).performTextInput("4")
+        composeRule.onNodeWithText("Submit").performClick()
+        composeRule.onNodeWithText("submitting...").assertIsDisplayed()
+        assertThrows(AssertionError::class.java) {
+            composeRule.onNodeWithTag(A2uiTestTags.TextField).performTextInput("2")
+        }
+
+        composeRule.runOnIdle {
+            assertEquals(
+                "4",
+                manager.surface(SurfaceId)!!.dataModel.resolve("/partySize")!!.jsonPrimitive.content,
+            )
+        }
+    }
+
+    @Test
+    fun buttonLocalSubmittingStateClearsAfterTimeout() {
+        val manager = bookingFormSurfaceManager()
+
+        try {
+            composeRule.setLettaTestContent(useChatTheme = false) {
+                A2uiRenderer(
+                    surfaceId = SurfaceId,
+                    surfaceManager = manager,
+                    onAction = {},
+                )
+            }
+
+            composeRule.onNodeWithText("Submit").performClick()
+            composeRule.onNodeWithTag(A2uiTestTags.ButtonProgress).assertIsDisplayed()
+            composeRule.onNodeWithText("Submit").assertIsNotEnabled()
+
+            composeRule.mainClock.autoAdvance = false
+            composeRule.mainClock.advanceTimeBy(10_100)
+            composeRule.waitForIdle()
+
+            composeRule.onNodeWithText("Submit").assertIsEnabled()
+            composeRule.onNodeWithText("submitting...").assertDoesNotExist()
+            composeRule.onNodeWithTag(A2uiTestTags.ButtonProgress).assertDoesNotExist()
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+        }
+    }
+
+    @Test
+    fun buttonLocalSubmittingStateClearsWhenActionResolutionTokenChanges() {
+        val manager = bookingFormSurfaceManager()
+        val resolutionToken = mutableIntStateOf(0)
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiSurfaceRenderer(
+                surface = manager.surface(SurfaceId),
+                actionResolutionToken = resolutionToken.intValue,
+                onAction = {},
+            )
+        }
+
+        composeRule.onNodeWithText("Submit").performClick()
+        composeRule.onNodeWithTag(A2uiTestTags.ButtonProgress).assertIsDisplayed()
+        composeRule.onNodeWithText("Submit").assertIsNotEnabled()
+
+        composeRule.runOnIdle {
+            resolutionToken.intValue += 1
+        }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("Submit").assertIsEnabled()
+        composeRule.onNodeWithText("submitting...").assertDoesNotExist()
+        composeRule.onNodeWithTag(A2uiTestTags.ButtonProgress).assertDoesNotExist()
+    }
+
+    @Test
     fun dateTimeInputOpensDatePicker() {
         val manager = dateTimeSurfaceManager()
 
@@ -448,7 +591,7 @@ internal fun confirmationSurfaceManager(): A2uiSurfaceManager {
             A2uiProtocolJson.Default.parseToJsonElement(
                 """
                 [
-                  {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"https://a2ui.org/specification/v0_9/basic_catalog.json"}},
+                  {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"basic"}},
                   {"version":"v0.9","updateComponents":{"surfaceId":"$SurfaceId","root":"card","components":[
                     {"id":"card","component":"Card","child":"content","cornerRadius":16,"elevation":2},
                     {"id":"content","component":"Column","children":["title","body","approve"],"spacing":"md"},
@@ -524,7 +667,7 @@ internal fun phase4WidgetsSurfaceManager(
             A2uiProtocolJson.Default.parseToJsonElement(
                 """
                 [
-                  {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"https://a2ui.org/specification/v0_9/basic_catalog.json"}},
+                  {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"basic"}},
                   {"version":"v0.9","updateComponents":{"surfaceId":"$SurfaceId","root":"card","components":[
                     {"id":"card","component":"Card","child":"content","cornerRadius":16,"elevation":1},
                     {"id":"content","component":"Column","children":["title","seats","partySize","reservationTime","divider","image"],"spacing":"sm"},

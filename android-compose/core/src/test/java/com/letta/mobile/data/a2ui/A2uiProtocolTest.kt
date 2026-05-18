@@ -25,7 +25,7 @@ class A2uiProtocolTest : WordSpec({
         "serialize the Phase 1 handshake payload" {
             val out = json.encodeToString(A2uiCapabilityDeclaration())
 
-            out shouldContain "\"a2ui_version\":\"v0.9\""
+            out shouldContain "\"a2ui_version\":\"0.9\""
             out shouldContain "\"supported_catalogs\""
             out shouldContain A2UI_BASIC_CATALOG_ID
             out shouldContain LETTA_TOOL_APPROVAL_CATALOG_ID
@@ -102,7 +102,7 @@ class A2uiProtocolTest : WordSpec({
                 json.parseToJsonElement(
                     """
                     {"messages":[
-                      {"version":"v0.9","createSurface":{"surfaceId":"s1","catalogId":"https://a2ui.org/specification/v0_9/basic_catalog.json"}},
+                      {"version":"v0.9","createSurface":{"surfaceId":"s1","catalogId":"basic"}},
                       {"version":"v0.9","deleteSurface":{"surfaceId":"s1"}}
                     ]}
                     """.trimIndent(),

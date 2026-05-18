@@ -264,6 +264,87 @@ class A2uiToolApprovalRoundTripTest {
         )
     }
 
+    @Test
+    fun toolApprovalWithoutSurfaceRunIdUsesActiveTurnRouting() = runTest {
+        val server = openServer()
+        val transport = openTransport()
+        val bridge = WsChatBridge(transport)
+        val manager = A2uiSurfaceManager()
+        connect(transport, bridge, server)
+
+        server.sendTurnStarted()
+        val surfaceArrived = async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+            bridge.a2uiEvents.first { event ->
+                event.messages.any { it.surfaceId == "fallback-active-surface" }
+            }
+        }
+        server.sendToolApprovalSurface(
+            surfaceId = "fallback-active-surface",
+            callId = "call-fallback-active",
+            affordances = listOf("once"),
+            includeRouting = false,
+        )
+        manager.apply(withRealTimeout { surfaceArrived.await() })
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiSurfaceRenderer(
+                surface = manager.surface("fallback-active-surface"),
+                onAction = { bridge.sendA2uiAction(it) },
+            )
+        }
+
+        composeRule.onNodeWithText("Once").performClick()
+        val action = withRealTimeout { server.actions.receive() }
+        action.assertToolApprovalAction(
+            surfaceId = "fallback-active-surface",
+            callId = "call-fallback-active",
+            decision = "approve",
+            scope = "once",
+        )
+    }
+
+    @Test
+    fun toolApprovalWithoutSurfaceRunIdQueuesUntilTurnRoutingArrives() = runTest {
+        val server = openServer()
+        val transport = openTransport()
+        val bridge = WsChatBridge(transport)
+        val manager = A2uiSurfaceManager()
+        connect(transport, bridge, server)
+
+        val surfaceArrived = async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+            bridge.a2uiEvents.first { event ->
+                event.messages.any { it.surfaceId == "fallback-queued-surface" }
+            }
+        }
+        server.sendToolApprovalSurface(
+            surfaceId = "fallback-queued-surface",
+            callId = "call-fallback-queued",
+            affordances = listOf("once"),
+            includeRouting = false,
+        )
+        manager.apply(withRealTimeout { surfaceArrived.await() })
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiSurfaceRenderer(
+                surface = manager.surface("fallback-queued-surface"),
+                onAction = { bridge.sendA2uiAction(it) },
+            )
+        }
+
+        composeRule.onNodeWithText("Once").performClick()
+        composeRule.onNodeWithText("Approved once").assertIsDisplayed()
+        assertTrue(server.actions.tryReceive().isFailure)
+
+        server.sendTurnStarted()
+        val action = withRealTimeout { server.actions.receive() }
+        action.assertToolApprovalAction(
+            surfaceId = "fallback-queued-surface",
+            callId = "call-fallback-queued",
+            decision = "approve",
+            scope = "once",
+        )
+    }
+
     private fun openServer(): A2uiShimServer =
         A2uiShimServer().also(openServers::add)
 
@@ -301,9 +382,12 @@ private fun JsonObject.assertToolApprovalAction(
     decision: String,
     scope: String,
 ) {
-    assertEquals("userAction", stringValue("type"))
-    assertEquals("tool_approval_response", stringValue("actionName"))
-    assertEquals(surfaceId, stringValue("surfaceId"))
+    assertEquals("user_action", stringValue("type"))
+    assertEquals("tool_approval_response", stringValue("name"))
+    assertEquals(surfaceId, stringValue("surface_id"))
+    assertEquals("run-e2e", stringValue("run_id"))
+    assertEquals("turn-e2e", stringValue("turn_id"))
+    assertEquals(callId, stringValue("action_id"))
     val context = this["context"]!!.jsonObject
     assertEquals(callId, context.stringValue("callId"))
     assertEquals(decision, context.stringValue("decision"))
@@ -349,7 +433,7 @@ private class A2uiShimServer {
                             val obj = json.parseToJsonElement(text).jsonObject
                             when (obj.stringValue("type")) {
                                 "hello" -> webSocket.send(welcomeFrame())
-                                "userAction" -> {
+                                "user_action" -> {
                                     actionCounter += 1
                                     actions.trySend(obj)
                                     webSocket.send(confirmationFrame())
@@ -375,8 +459,26 @@ private class A2uiShimServer {
         callId: String,
         affordances: List<String>,
         timeoutSeconds: Int = 30,
+        includeRouting: Boolean = true,
     ) {
-        (activeSocket ?: firstSocket.await()).send(toolApprovalFrame(surfaceId, callId, affordances, timeoutSeconds))
+        (activeSocket ?: firstSocket.await()).send(
+            toolApprovalFrame(
+                surfaceId = surfaceId,
+                callId = callId,
+                affordances = affordances,
+                timeoutSeconds = timeoutSeconds,
+                includeRouting = includeRouting,
+            )
+        )
+    }
+
+    suspend fun sendTurnStarted() {
+        (activeSocket ?: firstSocket.await()).send(
+            """
+            {"v":1,"type":"turn_started","id":"turn-started-e2e","ts":"2026-05-17T00:00:00Z",
+             "agent_id":"agent-e2e","conversation_id":"conv-e2e","turn_id":"turn-e2e","run_id":"run-e2e"}
+            """.trimIndent()
+        )
     }
 
     fun closeActiveSocket() {
@@ -406,12 +508,19 @@ private class A2uiShimServer {
         callId: String,
         affordances: List<String>,
         timeoutSeconds: Int,
+        includeRouting: Boolean,
     ): String {
         val affordancesJson = affordances.joinToString(prefix = "[", postfix = "]") { """"$it"""" }
+        val routingFields = if (includeRouting) {
+            "\"agent_id\":\"agent-e2e\",\"conversation_id\":\"conv-e2e\",\"turn_id\":\"turn-e2e\",\"run_id\":\"run-e2e\","
+        } else {
+            "\"agent_id\":\"agent-e2e\",\"conversation_id\":\"conv-e2e\","
+        }
         return """
-            {"v":1,"type":"a2ui","id":"a2ui-$surfaceId","ts":"2026-05-17T00:00:01Z",
-             "agent_id":"agent-e2e","conversation_id":"conv-e2e","turn_id":"turn-e2e","run_id":"run-e2e",
-             "messages":[
+            {"v":1,"type":"a2ui_frame","id":"a2ui-$surfaceId","ts":"2026-05-17T00:00:01Z",
+             $routingFields
+             "ok":true,
+             "a2ui":[
                {"version":"v0.9","createSurface":{
                  "surfaceId":"$surfaceId",
                  "catalogId":"com.letta.mobile:tool-approval/v1"

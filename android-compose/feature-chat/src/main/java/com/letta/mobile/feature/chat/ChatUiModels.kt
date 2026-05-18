@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat
 
+import androidx.compose.material3.SnackbarDuration
 import com.letta.mobile.bot.repository.ClientModeDirectoryEntry
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.model.ParsedSearchMessage
@@ -37,6 +38,15 @@ internal data class A2uiDebugFrameUi(
     val surfaceId: String?,
     val conversationId: String?,
     val requestId: String?,
+)
+
+@androidx.compose.runtime.Immutable
+internal data class A2uiActionSnackbarUi(
+    val id: Long,
+    val message: String,
+    val actionLabel: String? = null,
+    val duration: SnackbarDuration = SnackbarDuration.Short,
+    val retryAction: com.letta.mobile.data.a2ui.A2uiAction? = null,
 )
 
 internal enum class ProjectBriefSectionKey {
@@ -229,6 +239,8 @@ internal data class ChatUiState(
     val searchResults: ImmutableList<ParsedSearchMessage> = persistentListOf(),
     val a2uiDebugFrames: ImmutableList<A2uiDebugFrameUi> = persistentListOf(),
     val a2uiSurfaces: ImmutableMap<String, A2uiSurfaceState> = persistentMapOf(),
+    val a2uiResolvedActionCounters: ImmutableMap<String, Int> = persistentMapOf(),
+    val a2uiActionSnackbar: A2uiActionSnackbarUi? = null,
     val transport: ChatTransport = ChatTransport.Rest,
     val a2uiFrameCount: Int = 0,
     /**

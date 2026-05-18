@@ -1,5 +1,7 @@
 package com.letta.mobile.feature.chat
 
+import android.util.Log
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -39,6 +41,7 @@ import com.letta.mobile.feature.chat.state.ChatBannerController
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.WsChatBridge
+import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.util.Telemetry
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.persistentListOf
@@ -59,6 +62,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.flow.update
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import javax.inject.Inject
 
 @HiltViewModel
@@ -97,6 +102,7 @@ internal class AdminChatViewModel @Inject constructor(
         // ChatSessionResolver uses in its own callers.
         private const val RESUME_CACHE_MAX_AGE_MS = 60_000L
         private const val MAX_A2UI_DEBUG_FRAMES = 12
+        private const val TAG = "AdminChatViewModel"
     }
 
     val agentId: String = routeArgs.agentId
@@ -160,6 +166,8 @@ internal class AdminChatViewModel @Inject constructor(
         ChatUiState(agentName = initialAgentName.orEmpty())
     )
     private val a2uiSurfaceManager = A2uiSurfaceManager()
+    private val pendingA2uiActions = mutableMapOf<String, PendingA2uiAction>()
+    private var nextA2uiSnackbarId = 0L
     val uiState: StateFlow<ChatUiState> by lazy(LazyThreadSafetyMode.NONE) {
         viewModelScope.launchMolecule(mode = Immediate) {
             present()
@@ -498,6 +506,7 @@ internal class AdminChatViewModel @Inject constructor(
             }
         }
         observeA2uiEvents()
+        observeA2uiActionOutcomes()
         observeTransportState()
         chatSessionInitializer.run()
     }
@@ -542,8 +551,8 @@ internal class AdminChatViewModel @Inject constructor(
                     is ChannelTransport.State.Idle -> ChatTransport.WsIdle
                     is ChannelTransport.State.Connecting -> ChatTransport.WsConnecting
                     is ChannelTransport.State.Connected -> ChatTransport.WsConnected(
-                        a2uiEnabled = wsState.a2uiNegotiation?.a2uiEnabled == true,
-                        catalog = wsState.a2uiNegotiation?.negotiatedCatalog,
+                        a2uiEnabled = wsState.a2uiEnabled,
+                        catalog = wsState.a2uiCatalog,
                     )
                     is ChannelTransport.State.Disconnected -> ChatTransport.WsDisconnected(
                         code = wsState.code,
@@ -567,10 +576,86 @@ internal class AdminChatViewModel @Inject constructor(
         )
     }
 
+    private fun observeA2uiActionOutcomes() {
+        viewModelScope.launch {
+            wsChatBridge.events.collect { event ->
+                val outcome = event as? WsTimelineEvent.UserActionOutcome ?: return@collect
+                handleA2uiActionOutcome(outcome)
+            }
+        }
+    }
+
+    private fun handleA2uiActionOutcome(outcome: WsTimelineEvent.UserActionOutcome) {
+        val pending = pendingA2uiActions.remove(outcome.frameId)
+        if (pending == null) {
+            Log.w(TAG, "Dropping stale A2UI action outcome frameId=${outcome.frameId} outcome=${outcome.outcome}")
+            return
+        }
+        _uiState.update { current ->
+            val nextCount = (current.a2uiResolvedActionCounters[pending.action.surfaceId] ?: 0) + 1
+            current.copy(
+                a2uiResolvedActionCounters = current.a2uiResolvedActionCounters
+                    .toPersistentMap()
+                    .put(pending.action.surfaceId, nextCount),
+                a2uiActionSnackbar = outcome.toSnackbar(pending.action),
+            )
+        }
+    }
+
+    private data class PendingA2uiAction(
+        val action: A2uiAction,
+        val createdAtMillis: Long = System.currentTimeMillis(),
+    )
+
+    private fun WsTimelineEvent.UserActionOutcome.toSnackbar(action: A2uiAction): A2uiActionSnackbarUi {
+        val normalized = outcome.lowercase()
+        val decision = action.context["decision"]?.jsonPrimitive?.contentOrNull
+        val message = when (normalized) {
+            "matched_approval" -> when (decision) {
+                "deny", "rejected", "timeout" -> "Denied"
+                else -> "Approved"
+            }
+            "injected_as_input" -> "Sent"
+            "recorded_only" -> "Saved"
+            "rejected" -> reason?.takeIf { it.isNotBlank() }?.let { "Could not send: $it" } ?: "Could not send"
+            "error" -> reason?.takeIf { it.isNotBlank() }?.let { "Something went wrong: $it" } ?: "Something went wrong"
+            else -> "Action updated"
+        }
+        val retryable = normalized in setOf("rejected", "error") && idempotent
+        return A2uiActionSnackbarUi(
+            id = ++nextA2uiSnackbarId,
+            message = message,
+            actionLabel = if (retryable) "Retry" else null,
+            duration = if (retryable) SnackbarDuration.Indefinite else SnackbarDuration.Short,
+            retryAction = action.takeIf { retryable },
+        )
+    }
+
+    fun markA2uiActionSnackbarShown(id: Long) {
+        _uiState.update { current ->
+            if (current.a2uiActionSnackbar?.id == id) {
+                current.copy(a2uiActionSnackbar = null)
+            } else {
+                current
+            }
+        }
+    }
+
     fun submitA2uiAction(action: A2uiAction) {
-        when (wsChatBridge.sendA2uiAction(action)) {
-            A2uiActionDispatchResult.Sent -> Unit
-            A2uiActionDispatchResult.Queued -> {
+        val result = wsChatBridge.sendA2uiAction(action)
+        // letta-mobile-ykkl: log the dispatch outcome so a missing
+        // user_action on the wire is diagnosable from adb logcat
+        // (which side dropped it: VM, bridge, transport).
+        android.util.Log.i(
+            "A2UI",
+            "submitA2uiAction surfaceId=${action.surfaceId} event=${action.name} result=$result",
+        )
+        when (result) {
+            is A2uiActionDispatchResult.Sent -> {
+                pendingA2uiActions[result.frameId] = PendingA2uiAction(action = action)
+            }
+            is A2uiActionDispatchResult.Queued -> {
+                pendingA2uiActions[result.frameId] = PendingA2uiAction(action = action)
                 chatBannerController.showComposerError("Action queued until the chat connection returns")
             }
             A2uiActionDispatchResult.Failed -> {

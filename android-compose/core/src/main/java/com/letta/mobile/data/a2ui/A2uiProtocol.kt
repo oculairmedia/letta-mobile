@@ -23,8 +23,21 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+// Inner A2UI message version (createSurface / updateComponents / …).
+// Wire-format protocol revision — leading "v" matches spec §3.
 const val A2UI_PROTOCOL_VERSION = "v0.9"
-const val A2UI_BASIC_CATALOG_ID = "https://a2ui.org/specification/v0_9/basic_catalog.json"
+
+// Hello-frame `a2ui_version` field. The shim does *string equality*
+// against its server-side A2UI_VERSION env (no "v" prefix), so this
+// must stay distinct from [A2UI_PROTOCOL_VERSION] — a leading "v" gets
+// rejected and the handshake silently drops a2ui_negotiated.
+const val A2UI_HELLO_VERSION = "0.9"
+
+// Short catalog handle the shim's `supported_catalogs` negotiation
+// matches on. NOT the upstream catalog $id URL — the shim does
+// string-equality against its registered handle list.
+const val A2UI_BASIC_CATALOG_ID = "basic"
+
 const val LETTA_TOOL_APPROVAL_CATALOG_ID = "com.letta.mobile:tool-approval/v1"
 const val LETTA_TOOL_APPROVAL_WIDGET_ID = "ToolApprovalCard"
 
@@ -48,7 +61,7 @@ val A2UI_DEFAULT_SUPPORTED_WIDGETS: List<String> = listOf(
 
 @Serializable
 data class A2uiCapabilityDeclaration(
-    @SerialName("a2ui_version") val a2uiVersion: String = A2UI_PROTOCOL_VERSION,
+    @SerialName("a2ui_version") val a2uiVersion: String = A2UI_HELLO_VERSION,
     @SerialName("supported_catalogs") val supportedCatalogs: List<String> = A2UI_DEFAULT_SUPPORTED_CATALOGS,
     @SerialName("supported_widgets") val supportedWidgets: List<String> = A2UI_DEFAULT_SUPPORTED_WIDGETS,
     @SerialName("theme_hints") val themeHints: A2uiThemeHints = A2uiThemeHints(),
@@ -62,11 +75,15 @@ data class A2uiThemeHints(
     @SerialName("supports_dynamic_color") val supportsDynamicColor: Boolean = true,
 )
 
+/**
+ * Per shim §2.2: nested `a2ui` object on the welcome frame, present
+ * only when `a2ui_negotiated == true`. `catalog_id` is the shim's
+ * short catalog handle (not the upstream `$id` URL).
+ */
 @Serializable
-data class A2uiNegotiation(
-    @SerialName("a2ui_enabled") val a2uiEnabled: Boolean = false,
-    @SerialName("negotiated_catalog") val negotiatedCatalog: String? = null,
-    @SerialName("negotiated_widgets") val negotiatedWidgets: List<String> = emptyList(),
+data class A2uiHandshakeAck(
+    val version: String,
+    @SerialName("catalog_id") val catalogId: String,
 )
 
 @Serializable(with = A2uiMessageSerializer::class)

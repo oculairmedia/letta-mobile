@@ -169,7 +169,7 @@ class A2uiDataModelTest : WordSpec({
                 json.parseToJsonElement(
                     """
                     [
-                      {"version":"v0.9","createSurface":{"surfaceId":"booking","catalogId":"https://a2ui.org/specification/v0_9/basic_catalog.json"}},
+                      {"version":"v0.9","createSurface":{"surfaceId":"booking","catalogId":"basic"}},
                       {"version":"v0.9","updateComponents":{"surfaceId":"booking","root":"card","components":[
                         {"id":"card","component":"Card","child":"content"},
                         {"id":"content","component":"Column","children":["title","room"]},

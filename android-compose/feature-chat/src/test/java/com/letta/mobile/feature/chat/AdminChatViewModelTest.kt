@@ -2,6 +2,7 @@
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.BlockId
+import androidx.compose.material3.SnackbarDuration
 import androidx.lifecycle.SavedStateHandle
 import com.letta.mobile.bot.core.BotSession
 import com.letta.mobile.bot.chat.ClientModeChatSender
@@ -11,6 +12,7 @@ import com.letta.mobile.bot.protocol.BotStreamChunk
 import com.letta.mobile.bot.protocol.BotChatResponse
 import com.letta.mobile.bot.protocol.InternalBotClient
 import com.letta.mobile.bot.repository.ClientModeAgentLocationRepository
+import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AppMessage
@@ -33,7 +35,9 @@ import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.repository.StreamState
 import com.letta.mobile.data.transport.ChannelTransport
+import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.WsChatBridge
+import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.feature.chat.route.ChatRouteArgs
 import com.letta.mobile.testutil.FakeBlockApi
 import com.letta.mobile.testutil.FakeFolderApi
@@ -68,9 +72,11 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -326,6 +332,101 @@ class AdminChatViewModelTest {
             wsChatBridge,
             clientVersionProvider,
         )
+    }
+
+    @Test
+    fun a2uiUserActionOutcomeShowsSnackbarAndClearsSurfaceSubmittingState() = runTest {
+        val wsEvents = Channel<WsTimelineEvent>(Channel.BUFFERED)
+        every { wsChatBridge.events } returns wsEvents.consumeAsFlow()
+        every { wsChatBridge.sendA2uiAction(any()) } returns A2uiActionDispatchResult.Sent("frame-1")
+        val vm = createViewModel(conversationId = "conv-1")
+
+        vm.submitA2uiAction(
+            A2uiAction(
+                name = "a2ui.test.send",
+                surfaceId = "surface-1",
+                context = buildJsonObject { put("decision", "approve") },
+            )
+        )
+        wsEvents.trySend(
+            WsTimelineEvent.UserActionOutcome(
+                frameId = "frame-1",
+                outcome = "matched_approval",
+                actionId = "action-1",
+                reason = null,
+                idempotent = false,
+                agentId = "agent-1",
+                conversationId = "conv-1",
+                turnId = "turn-1",
+                runId = "run-1",
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals("Approved", vm.uiState.value.a2uiActionSnackbar?.message)
+        assertEquals(SnackbarDuration.Short, vm.uiState.value.a2uiActionSnackbar?.duration)
+        assertEquals(1, vm.uiState.value.a2uiResolvedActionCounters["surface-1"])
+    }
+
+    @Test
+    fun retryableA2uiUserActionFailureUsesIndefiniteSnackbar() = runTest {
+        val wsEvents = Channel<WsTimelineEvent>(Channel.BUFFERED)
+        every { wsChatBridge.events } returns wsEvents.consumeAsFlow()
+        every { wsChatBridge.sendA2uiAction(any()) } returns A2uiActionDispatchResult.Sent("frame-1")
+        val vm = createViewModel(conversationId = "conv-1")
+
+        vm.submitA2uiAction(
+            A2uiAction(
+                name = "a2ui.test.send",
+                surfaceId = "surface-1",
+                context = JsonObject(emptyMap()),
+            )
+        )
+        wsEvents.trySend(
+            WsTimelineEvent.UserActionOutcome(
+                frameId = "frame-1",
+                outcome = "rejected",
+                actionId = "action-1",
+                reason = "approval expired",
+                idempotent = true,
+                agentId = "agent-1",
+                conversationId = "conv-1",
+                turnId = "turn-1",
+                runId = "run-1",
+            )
+        )
+        advanceUntilIdle()
+
+        val snackbar = vm.uiState.value.a2uiActionSnackbar
+        assertEquals("Could not send: approval expired", snackbar?.message)
+        assertEquals("Retry", snackbar?.actionLabel)
+        assertEquals(SnackbarDuration.Indefinite, snackbar?.duration)
+        assertNotNull(snackbar?.retryAction)
+    }
+
+    @Test
+    fun staleA2uiUserActionOutcomeIsDropped() = runTest {
+        val wsEvents = Channel<WsTimelineEvent>(Channel.BUFFERED)
+        every { wsChatBridge.events } returns wsEvents.consumeAsFlow()
+        val vm = createViewModel(conversationId = "conv-1")
+
+        wsEvents.trySend(
+            WsTimelineEvent.UserActionOutcome(
+                frameId = "missing-frame",
+                outcome = "injected_as_input",
+                actionId = null,
+                reason = null,
+                idempotent = false,
+                agentId = null,
+                conversationId = null,
+                turnId = null,
+                runId = null,
+            )
+        )
+        advanceUntilIdle()
+
+        assertNull(vm.uiState.value.a2uiActionSnackbar)
+        assertTrue(vm.uiState.value.a2uiResolvedActionCounters.isEmpty())
     }
 
     /**
