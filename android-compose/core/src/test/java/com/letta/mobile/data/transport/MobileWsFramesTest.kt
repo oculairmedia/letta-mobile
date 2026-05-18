@@ -123,12 +123,15 @@ class MobileWsFramesTest : WordSpec({
             out shouldContain "\"run_id\":\"run-7\""
         }
 
-        "letta-mobile-51xm.7 user_action sends name surface_id and resolved context" {
+        "letta-mobile-51xm.7 user_action sends routing ids name surface_id and resolved context" {
             val frame = UserActionFrame(
                 id = "fid-action",
                 ts = "2026-05-17T12:00:00Z",
                 name = "submit_booking",
                 surfaceId = "booking-1",
+                runId = "run-1",
+                turnId = "turn-1",
+                actionId = "action-1",
                 context = buildJsonObject {
                     put("partySize", 4)
                     put("reservationTime", "2026-05-17T18:30")
@@ -138,6 +141,9 @@ class MobileWsFramesTest : WordSpec({
             out shouldContain "\"type\":\"user_action\""
             out shouldContain "\"name\":\"submit_booking\""
             out shouldContain "\"surface_id\":\"booking-1\""
+            out shouldContain "\"run_id\":\"run-1\""
+            out shouldContain "\"turn_id\":\"turn-1\""
+            out shouldContain "\"action_id\":\"action-1\""
             out shouldContain "\"partySize\":4"
             out shouldContain "\"reservationTime\":\"2026-05-17T18:30\""
         }

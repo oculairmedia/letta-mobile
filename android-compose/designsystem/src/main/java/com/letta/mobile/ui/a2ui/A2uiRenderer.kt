@@ -261,7 +261,7 @@ private fun A2uiToolApprovalCard(
         if (props.risk == ToolApprovalRisk.Destructive || affordance == ToolApprovalAffordance.Deny) {
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         }
-        onAction(toolApprovalAction(surface.surfaceId, props.callId, next))
+                onAction(toolApprovalAction(surface, props.callId, next))
     }
 
     LaunchedEffect(component.id, props.callId, props.timeoutSeconds, result) {
@@ -273,7 +273,7 @@ private fun A2uiToolApprovalCard(
         if (remainingSeconds == 0 && result == null) {
             val timeout = ToolApprovalResult(decision = "timeout", scope = "timeout")
             result = timeout
-            onAction(toolApprovalAction(surface.surfaceId, props.callId, timeout))
+            onAction(toolApprovalAction(surface, props.callId, timeout))
         }
     }
 
@@ -1116,6 +1116,8 @@ private fun A2uiComponent.action(surface: A2uiSurfaceState): A2uiAction? {
     val name = action.stringValue("name", "actionName", "type", "action")
         ?: eventBlock?.stringValue("name", "actionName", "type", "action")
         ?: return null
+    val actionId = action.stringValue("actionId", "action_id", "id")
+        ?: eventBlock?.stringValue("actionId", "action_id", "id")
     val contextSource = (eventBlock?.get("context") ?: eventBlock?.get("data"))
         ?: action["context"]
         ?: action["data"]
@@ -1126,11 +1128,17 @@ private fun A2uiComponent.action(surface: A2uiSurfaceState): A2uiAction? {
         put("name", name)
         put("surfaceId", surface.surfaceId)
         put("context", context)
+        surface.runId?.let { put("runId", it) }
+        surface.turnId?.let { put("turnId", it) }
+        actionId?.let { put("actionId", it) }
     }
     return A2uiAction(
         name = name,
         surfaceId = surface.surfaceId,
         context = context,
+        runId = surface.runId,
+        turnId = surface.turnId,
+        actionId = actionId,
         raw = raw,
     )
 }
@@ -1248,7 +1256,7 @@ private fun A2uiComponent.toolApprovalProps(): ToolApprovalProps? {
 }
 
 private fun toolApprovalAction(
-    surfaceId: String,
+    surface: A2uiSurfaceState,
     callId: String,
     result: ToolApprovalResult,
 ): A2uiAction {
@@ -1260,13 +1268,19 @@ private fun toolApprovalAction(
     val raw = buildJsonObject {
         put("actionName", ToolApprovalResponseAction)
         put("name", ToolApprovalResponseAction)
-        put("surfaceId", surfaceId)
+        put("surfaceId", surface.surfaceId)
         put("context", context)
+        surface.runId?.let { put("runId", it) }
+        surface.turnId?.let { put("turnId", it) }
+        put("actionId", callId)
     }
     return A2uiAction(
         name = ToolApprovalResponseAction,
-        surfaceId = surfaceId,
+        surfaceId = surface.surfaceId,
         context = context,
+        runId = surface.runId,
+        turnId = surface.turnId,
+        actionId = callId,
         raw = raw,
     )
 }

@@ -304,6 +304,9 @@ private fun JsonObject.assertToolApprovalAction(
     assertEquals("user_action", stringValue("type"))
     assertEquals("tool_approval_response", stringValue("name"))
     assertEquals(surfaceId, stringValue("surface_id"))
+    assertEquals("run-e2e", stringValue("run_id"))
+    assertEquals("turn-e2e", stringValue("turn_id"))
+    assertEquals(callId, stringValue("action_id"))
     val context = this["context"]!!.jsonObject
     assertEquals(callId, context.stringValue("callId"))
     assertEquals(decision, context.stringValue("decision"))
