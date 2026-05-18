@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -21,6 +22,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -118,12 +120,20 @@ fun A2uiSurfaceRenderer(
         return
     }
 
+    var pendingActionCount by remember(surface.surfaceId) { mutableStateOf(0) }
+    val submitting = pendingActionCount > 0
+    fun updatePendingActionCount(delta: Int) {
+        pendingActionCount = (pendingActionCount + delta).coerceAtLeast(0)
+    }
+
     A2uiComponentNode(
         component = root,
         surface = surface,
         modifier = modifier,
         visited = emptySet(),
         onAction = onAction,
+        surfaceSubmitting = submitting,
+        onPendingActionDelta = ::updatePendingActionCount,
     )
 }
 
@@ -139,6 +149,7 @@ object A2uiTestTags {
     const val ToolApprovalCard = "a2ui_tool_approval_card"
     const val ToolApprovalSensitiveValue = "a2ui_tool_approval_sensitive_value"
     const val ToolApprovalCountdown = "a2ui_tool_approval_countdown"
+    const val ButtonProgress = "a2ui_button_progress"
 }
 
 @Composable
@@ -148,6 +159,8 @@ private fun A2uiComponentNode(
     modifier: Modifier = Modifier,
     visited: Set<String>,
     onAction: (A2uiAction) -> Unit,
+    surfaceSubmitting: Boolean,
+    onPendingActionDelta: (Int) -> Unit,
 ) {
     if (component.id in visited || visited.size > MaxRenderDepth) {
         A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
@@ -156,7 +169,12 @@ private fun A2uiComponentNode(
     val nextVisited = visited + component.id
     when (component.component) {
         "Text" -> A2uiText(component = component, surface = surface, modifier = modifier)
-        "TextField" -> A2uiTextField(component = component, surface = surface, modifier = modifier)
+        "TextField" -> A2uiTextField(
+            component = component,
+            surface = surface,
+            modifier = modifier,
+            surfaceSubmitting = surfaceSubmitting,
+        )
         "DateTimeInput" -> A2uiDateTimeInput(component = component, surface = surface, modifier = modifier)
         "Image" -> A2uiImage(component = component, surface = surface, modifier = modifier)
         "Divider" -> A2uiDivider(component = component, modifier = modifier)
@@ -172,6 +190,8 @@ private fun A2uiComponentNode(
             modifier = modifier,
             visited = nextVisited,
             onAction = onAction,
+            surfaceSubmitting = surfaceSubmitting,
+            onPendingActionDelta = onPendingActionDelta,
         )
         "Row" -> A2uiRow(
             component = component,
@@ -179,6 +199,8 @@ private fun A2uiComponentNode(
             modifier = modifier,
             visited = nextVisited,
             onAction = onAction,
+            surfaceSubmitting = surfaceSubmitting,
+            onPendingActionDelta = onPendingActionDelta,
         )
         "Card" -> A2uiCard(
             component = component,
@@ -186,12 +208,15 @@ private fun A2uiComponentNode(
             modifier = modifier,
             visited = nextVisited,
             onAction = onAction,
+            surfaceSubmitting = surfaceSubmitting,
+            onPendingActionDelta = onPendingActionDelta,
         )
         "Button" -> A2uiButton(
             component = component,
             surface = surface,
             modifier = modifier,
             onAction = onAction,
+            onPendingActionDelta = onPendingActionDelta,
         )
         else -> A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
     }
@@ -510,6 +535,7 @@ private fun A2uiTextField(
     component: A2uiComponent,
     surface: A2uiSurfaceState,
     modifier: Modifier = Modifier,
+    surfaceSubmitting: Boolean,
 ) {
     val binding = component.raw["value"] ?: component.raw["text"]
     val path = binding.bindingPath()
@@ -548,10 +574,11 @@ private fun A2uiTextField(
         label = label?.let { { Text(it) } },
         placeholder = placeholder?.let { { Text(it) } },
         isError = isError,
-        supportingText = if (isError) {
-            { Text("Invalid value") }
-        } else {
-            null
+        readOnly = surfaceSubmitting,
+        supportingText = when {
+            surfaceSubmitting -> ({ Text("submitting...") })
+            isError -> ({ Text("Invalid value") })
+            else -> null
         },
         singleLine = fieldType != "longText",
         minLines = if (fieldType == "longText") 3 else 1,
@@ -759,6 +786,8 @@ private fun A2uiColumn(
     modifier: Modifier = Modifier,
     visited: Set<String>,
     onAction: (A2uiAction) -> Unit,
+    surfaceSubmitting: Boolean,
+    onPendingActionDelta: (Int) -> Unit,
 ) {
     val children = component.children
     Column(
@@ -778,6 +807,8 @@ private fun A2uiColumn(
                     surface = surface,
                     visited = visited,
                     onAction = onAction,
+                    surfaceSubmitting = surfaceSubmitting,
+                    onPendingActionDelta = onPendingActionDelta,
                 )
             }
         }
@@ -791,6 +822,8 @@ private fun A2uiRow(
     modifier: Modifier = Modifier,
     visited: Set<String>,
     onAction: (A2uiAction) -> Unit,
+    surfaceSubmitting: Boolean,
+    onPendingActionDelta: (Int) -> Unit,
 ) {
     val children = component.children
     Row(
@@ -812,6 +845,8 @@ private fun A2uiRow(
                     modifier = if (component.weightRowChildren()) Modifier.weight(1f) else Modifier,
                     visited = visited,
                     onAction = onAction,
+                    surfaceSubmitting = surfaceSubmitting,
+                    onPendingActionDelta = onPendingActionDelta,
                 )
             }
         }
@@ -825,6 +860,8 @@ private fun A2uiCard(
     modifier: Modifier = Modifier,
     visited: Set<String>,
     onAction: (A2uiAction) -> Unit,
+    surfaceSubmitting: Boolean,
+    onPendingActionDelta: (Int) -> Unit,
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -848,6 +885,8 @@ private fun A2uiCard(
                         surface = surface,
                         visited = visited,
                         onAction = onAction,
+                        surfaceSubmitting = surfaceSubmitting,
+                        onPendingActionDelta = onPendingActionDelta,
                     )
                 }
             }
@@ -861,11 +900,23 @@ private fun A2uiButton(
     surface: A2uiSurfaceState,
     modifier: Modifier = Modifier,
     onAction: (A2uiAction) -> Unit,
+    onPendingActionDelta: (Int) -> Unit,
 ) {
     val label = component.resolveButtonLabel(surface)
     val action = component.action(surface)
+    val haptic = LocalHapticFeedback.current
+    var inFlight by remember(surface.surfaceId, component.id) { mutableStateOf(false) }
+
+    LaunchedEffect(inFlight) {
+        if (!inFlight) return@LaunchedEffect
+        delay(A2uiButtonLocalTimeoutMillis)
+        inFlight = false
+        onPendingActionDelta(-1)
+    }
+
     Button(
         onClick = {
+            if (inFlight) return@Button
             // letta-mobile-ykkl diagnostic: log the dispatch hop so the
             // chain "Compose onClick → onAction → WsChatBridge → wire"
             // is traceable in adb logcat without a debugger attached.
@@ -882,10 +933,13 @@ private fun A2uiButton(
                     "Button onClick: dispatching surfaceId=${surface.surfaceId} " +
                         "componentId=${component.id} event=${resolved.name}",
                 )
+                haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                inFlight = true
+                onPendingActionDelta(1)
                 onAction(resolved)
             }
         },
-        enabled = label != null && action != null,
+        enabled = label != null && action != null && !inFlight,
         modifier = modifier,
     ) {
         if (label == null) {
@@ -896,7 +950,27 @@ private fun A2uiButton(
                 height = 12.dp,
             )
         } else {
-            Text(text = label)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (inFlight) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .size(16.dp)
+                            .testTag(A2uiTestTags.ButtonProgress),
+                        strokeWidth = 2.dp,
+                    )
+                }
+                Text(
+                    text = label,
+                    color = if (inFlight) {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
+                    } else {
+                        Color.Unspecified
+                    },
+                )
+            }
         }
     }
 }
@@ -1338,6 +1412,7 @@ private const val TimeIsoLength = 5
 private val TimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 private const val MaxRenderDepth = 32
 private const val DefaultToolApprovalTimeoutSeconds = 30
+private const val A2uiButtonLocalTimeoutMillis = 10_000L
 private const val SensitiveMask = "********"
 private const val ToolApprovalResponseAction = "tool_approval_response"
 private const val ToolApprovalButtonsPerRow = 2

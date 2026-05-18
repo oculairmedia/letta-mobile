@@ -7,6 +7,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -29,6 +30,7 @@ import com.letta.mobile.ui.test.setLettaTestContent
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -402,6 +404,85 @@ class A2uiRendererTest {
             assertEquals("window", action.context["seat"]!!.jsonPrimitive.content)
             assertEquals("submit_booking", action.raw["actionName"]!!.jsonPrimitive.content)
             assertEquals(SurfaceId, action.raw["surfaceId"]!!.jsonPrimitive.content)
+        }
+    }
+
+    @Test
+    fun buttonTapShowsLocalSubmittingStateAndCoalescesRepeatedTaps() {
+        val manager = bookingFormSurfaceManager()
+        val actions = mutableListOf<A2uiAction>()
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(
+                surfaceId = SurfaceId,
+                surfaceManager = manager,
+                onAction = actions::add,
+            )
+        }
+
+        composeRule.onNodeWithText("Submit").performClick()
+        composeRule.onNodeWithTag(A2uiTestTags.ButtonProgress).assertIsDisplayed()
+        composeRule.onNodeWithText("Submit").assertIsNotEnabled()
+        composeRule.onNodeWithText("submitting...").assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            assertEquals(1, actions.size)
+        }
+    }
+
+    @Test
+    fun siblingTextFieldIsReadOnlyWhileButtonActionIsSubmitting() {
+        val manager = bookingFormSurfaceManager()
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(
+                surfaceId = SurfaceId,
+                surfaceManager = manager,
+                onAction = {},
+            )
+        }
+
+        composeRule.onNodeWithTag(A2uiTestTags.TextField).performTextInput("4")
+        composeRule.onNodeWithText("Submit").performClick()
+        composeRule.onNodeWithText("submitting...").assertIsDisplayed()
+        assertThrows(AssertionError::class.java) {
+            composeRule.onNodeWithTag(A2uiTestTags.TextField).performTextInput("2")
+        }
+
+        composeRule.runOnIdle {
+            assertEquals(
+                "4",
+                manager.surface(SurfaceId)!!.dataModel.resolve("/partySize")!!.jsonPrimitive.content,
+            )
+        }
+    }
+
+    @Test
+    fun buttonLocalSubmittingStateClearsAfterTimeout() {
+        val manager = bookingFormSurfaceManager()
+
+        try {
+            composeRule.setLettaTestContent(useChatTheme = false) {
+                A2uiRenderer(
+                    surfaceId = SurfaceId,
+                    surfaceManager = manager,
+                    onAction = {},
+                )
+            }
+
+            composeRule.onNodeWithText("Submit").performClick()
+            composeRule.onNodeWithTag(A2uiTestTags.ButtonProgress).assertIsDisplayed()
+            composeRule.onNodeWithText("Submit").assertIsNotEnabled()
+
+            composeRule.mainClock.autoAdvance = false
+            composeRule.mainClock.advanceTimeBy(10_100)
+            composeRule.waitForIdle()
+
+            composeRule.onNodeWithText("Submit").assertIsEnabled()
+            composeRule.onNodeWithText("submitting...").assertDoesNotExist()
+            composeRule.onNodeWithTag(A2uiTestTags.ButtonProgress).assertDoesNotExist()
+        } finally {
+            composeRule.mainClock.autoAdvance = true
         }
     }
 
