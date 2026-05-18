@@ -45,10 +45,13 @@ import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
+import com.letta.mobile.ui.common.LocalSnackbarDispatcher
+import com.letta.mobile.ui.common.SnackbarMessage
 import com.letta.mobile.ui.components.FloatingBanner
 import com.letta.mobile.ui.components.MessageSkeletonList
 import com.letta.mobile.ui.components.StarterPrompts
 import com.letta.mobile.ui.components.ThinkingShader
+import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import androidx.compose.animation.core.EaseInOutCubic
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -86,7 +89,9 @@ internal fun ChatScreen(
 
     LettaChatTheme(fontScale = activeFontScale) {
         var floatingBannerMessage by remember { mutableStateOf("") }
+        val snackbarDispatcher = LocalSnackbarDispatcher.current
         val density = LocalDensity.current
+        val reducedMotion = rememberReducedMotionEnabled()
         val windowSizeClass = LocalWindowSizeClass.current
         val imeBottomPx = WindowInsets.ime.getBottom(density)
         val navBottomPx = WindowInsets.navigationBars.getBottom(density)
@@ -104,6 +109,27 @@ internal fun ChatScreen(
                 kotlinx.coroutines.delay(2600)
                 floatingBannerMessage = ""
             }
+        }
+
+        LaunchedEffect(state.a2uiActionSnackbar) {
+            val snackbar = state.a2uiActionSnackbar ?: return@LaunchedEffect
+            snackbarDispatcher.dispatch(
+                SnackbarMessage(
+                    message = snackbar.message,
+                    actionLabel = snackbar.actionLabel,
+                    duration = snackbar.duration,
+                    onAction = snackbar.retryAction?.let { retry ->
+                        { viewModel.submitA2uiAction(retry) }
+                    },
+                )
+            )
+            viewModel.markA2uiActionSnackbarShown(snackbar.id)
+        }
+
+        LaunchedEffect(state.a2uiThinkingDelayMessage) {
+            val message = state.a2uiThinkingDelayMessage ?: return@LaunchedEffect
+            floatingBannerMessage = message
+            viewModel.markA2uiThinkingDelayMessageShown()
         }
 
         Box(
@@ -129,7 +155,7 @@ internal fun ChatScreen(
             // for a gentle build.
             val thinkingAlpha by animateFloatAsState(
                 targetValue = if (state.isStreaming) 1f else 0f,
-                animationSpec = tween(durationMillis = 900, easing = EaseInOutCubic),
+                animationSpec = tween(durationMillis = if (reducedMotion) 0 else 900, easing = EaseInOutCubic),
                 label = "thinkingAlpha",
             )
             if (thinkingAlpha > 0.001f) {
@@ -141,6 +167,7 @@ internal fun ChatScreen(
                     // the muted role-label tone.
                     tint = MaterialTheme.colorScheme.tertiary,
                     bgColor = MaterialTheme.colorScheme.surface,
+                    animate = !reducedMotion,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .alpha(thinkingAlpha),
@@ -445,6 +472,7 @@ private fun ChatContent(
             }
             A2uiSurfaceStack(
                 surfaces = state.a2uiSurfaces.values,
+                resolvedActionCounters = state.a2uiResolvedActionCounters,
                 onAction = onA2uiAction,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -458,6 +486,7 @@ private fun ChatContent(
 @Composable
 private fun A2uiSurfaceStack(
     surfaces: Collection<A2uiSurfaceState>,
+    resolvedActionCounters: Map<String, Int>,
     onAction: (A2uiAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -472,6 +501,7 @@ private fun A2uiSurfaceStack(
                 surface = surface,
                 modifier = Modifier.fillMaxWidth(),
                 onAction = onAction,
+                actionResolutionToken = resolvedActionCounters[surface.surfaceId] ?: 0,
             )
         }
     }

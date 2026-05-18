@@ -33,10 +33,10 @@ import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
 
-enum class A2uiActionDispatchResult {
-    Sent,
-    Queued,
-    Failed,
+sealed interface A2uiActionDispatchResult {
+    data class Sent(val frameId: String) : A2uiActionDispatchResult
+    data class Queued(val frameId: String) : A2uiActionDispatchResult
+    data object Failed : A2uiActionDispatchResult
 }
 
 /**
@@ -71,7 +71,16 @@ class ChannelTransport @Inject constructor() {
             val serverId: String,
             val sessionId: String,
             val deviceId: String?,
-            val a2uiNegotiation: com.letta.mobile.data.a2ui.A2uiNegotiation? = null,
+            // Welcome (§2.2) reports a2uiNegotiated independently from
+            // the resolved version/catalog handle; chip wiring reads
+            // these directly without unwrapping a nullable container.
+            val a2uiEnabled: Boolean = false,
+            val a2uiVersion: String? = null,
+            val a2uiCatalog: String? = null,
+            // Populated when the post-welcome a2ui_capabilities frame
+            // arrives (§2.2). Informational — null until then.
+            val a2uiSupportedCatalogs: List<String> = emptyList(),
+            val a2uiSupportedWidgets: List<String> = emptyList(),
         ) : State
 
         /**
@@ -134,12 +143,19 @@ class ChannelTransport @Inject constructor() {
      * by [cancel] which requires `run_id` per §2.1.
      */
     private val currentRunId = AtomicReference<String?>(null)
+    private val currentTurnId = AtomicReference<String?>(null)
 
     private val socketRef = AtomicReference<WebSocket?>(null)
     private val socketMutex = Mutex()
     private var listenerJob: Job? = null
     private val pendingA2uiActionLock = Any()
-    private val pendingA2uiActions = ArrayDeque<A2uiAction>()
+    private val pendingA2uiActions = ArrayDeque<UserActionFrame>()
+
+    // letta-mobile-ns5l: tracks who triggered the close so onClosed can
+    // log initiator alongside the wire code. Set true in disconnect()
+    // and teardownLocked() before the close call; cleared in
+    // onClosed/onFailure after the disposed state lands.
+    @Volatile private var clientInitiatedClose: Boolean = false
 
     /**
      * Open the WebSocket and send `hello`. Suspends until the request
@@ -159,6 +175,7 @@ class ChannelTransport @Inject constructor() {
         teardownLocked(reason = "reconnect")
         _state.value = State.Connecting
         currentRunId.set(null)
+        currentTurnId.set(null)
         inFlight = false
 
         val wsUrl = baseShimUrl.trimEnd('/').toWsUrl() + "/shim/v1/mobile"
@@ -182,21 +199,39 @@ class ChannelTransport @Inject constructor() {
             }
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                // letta-mobile-ns5l: server-initiated close. Log before
+                // we ack so the timing window between server FIN and
+                // client ack is visible in adb logcat for diagnosis.
+                Log.i(
+                    TAG,
+                    "WS closing (server-initiated) code=$code reason=${reason.ifEmpty { "<empty>" }} " +
+                        "inFlight=$inFlight runId=${currentRunId.get()}",
+                )
                 webSocket.close(code, reason)
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                val initiator = if (clientInitiatedClose) "client" else "server"
+                Log.i(
+                    TAG,
+                    "WS closed code=$code reason=${reason.ifEmpty { "<empty>" }} initiator=$initiator " +
+                        "inFlight=$inFlight runId=${currentRunId.get()}",
+                )
                 _state.value = State.Disconnected(code, reason)
                 inFlight = false
                 currentRunId.set(null)
+                currentTurnId.set(null)
+                clientInitiatedClose = false
                 socketRef.compareAndSet(webSocket, null)
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                Log.w(TAG, "WS failure: ${t.message}", t)
+                Log.w(TAG, "WS failure: ${t.message} (httpCode=${response?.code})", t)
                 _state.value = State.Disconnected(-1, t.message ?: t::class.java.simpleName)
                 inFlight = false
                 currentRunId.set(null)
+                currentTurnId.set(null)
+                clientInitiatedClose = false
                 socketRef.compareAndSet(webSocket, null)
             }
         }
@@ -225,6 +260,7 @@ class ChannelTransport @Inject constructor() {
         val socket = socketRef.get() ?: return false
         inFlight = true
         currentRunId.set(null)
+        currentTurnId.set(null)
         return socket.sendFrame(
             SendMessageFrame(
                 id = UUID.randomUUID().toString(),
@@ -280,6 +316,8 @@ class ChannelTransport @Inject constructor() {
     }
 
     private fun teardownLocked(reason: String) {
+        clientInitiatedClose = true
+        Log.i(TAG, "WS teardown (client-initiated) reason=$reason inFlight=$inFlight runId=${currentRunId.get()}")
         socketRef.getAndSet(null)?.close(NORMAL_CLOSE, reason)
         listenerJob?.cancel()
         listenerJob = null
@@ -288,6 +326,7 @@ class ChannelTransport @Inject constructor() {
         }
         inFlight = false
         currentRunId.set(null)
+        currentTurnId.set(null)
     }
 
     private fun handleInbound(text: String) {
@@ -304,9 +343,40 @@ class ChannelTransport @Inject constructor() {
                     serverId = frame.serverId,
                     sessionId = frame.sessionId,
                     deviceId = frame.deviceId,
-                    a2uiNegotiation = frame.a2uiNegotiation,
+                    a2uiEnabled = frame.a2uiNegotiated,
+                    a2uiVersion = frame.a2ui?.version,
+                    a2uiCatalog = frame.a2ui?.catalogId,
                 )
                 drainPendingA2uiActions()
+            }
+
+            is ServerFrame.A2uiCapabilities -> {
+                // Fold the post-welcome capability advertisement into
+                // the existing Connected state so the renderer registry
+                // can clamp itself.
+                (_state.value as? State.Connected)?.let { current ->
+                    _state.value = current.copy(
+                        a2uiSupportedCatalogs = frame.supportedCatalogs,
+                        a2uiSupportedWidgets = frame.supportedWidgets,
+                    )
+                }
+            }
+
+            is ServerFrame.UserActionAck -> {
+                // Inbound ack — no state mutation needed today. Logging
+                // for visibility; surface to the renderer when the UX
+                // requires it (queued/rejected feedback, etc.).
+                if (frame.status != "accepted") {
+                    Log.w(TAG, "user_action ${frame.actionId} status=${frame.status} reason=${frame.reason}")
+                }
+            }
+
+            is ServerFrame.UserActionOutcome -> {
+                Log.i(
+                    TAG,
+                    "user_action outcome frameId=${frame.frameId} outcome=${frame.outcome} " +
+                        "reason=${frame.reason ?: "<none>"}",
+                )
             }
 
             is ServerFrame.TurnStarted -> {
@@ -317,11 +387,14 @@ class ChannelTransport @Inject constructor() {
                 // without the "between turn_started and first run-bearing
                 // frame" dead zone.
                 currentRunId.set(frame.runId)
+                currentTurnId.set(frame.turnId)
+                drainPendingA2uiActions()
             }
 
             is ServerFrame.TurnDone -> {
                 inFlight = false
                 currentRunId.set(null)
+                currentTurnId.set(null)
             }
 
             is ServerFrame.Error -> {
@@ -339,6 +412,13 @@ class ChannelTransport @Inject constructor() {
                 if (rid != null && currentRunId.get() == null) {
                     currentRunId.set(rid)
                 }
+                val tid = frame.turnIdOrNull()
+                if (tid != null && currentTurnId.get() == null) {
+                    currentTurnId.set(tid)
+                }
+                if (rid != null) {
+                    drainPendingA2uiActions()
+                }
             }
         }
 
@@ -351,40 +431,68 @@ class ChannelTransport @Inject constructor() {
 
     fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult {
         val socket = socketRef.get()
-        if (state.value is State.Connected && socket != null) {
-            return if (socket.sendFrame(action.toUserActionFrame())) {
-                A2uiActionDispatchResult.Sent
-            } else {
-                enqueueA2uiAction(action)
-            }
+        val stateNow = state.value
+        val frame = action.toUserActionFrame().withActiveRoutingFallback()
+        if (frame.runId == null) {
+            Log.w(
+                TAG,
+                "user_action missing run_id; queueing until active run is known " +
+                    "surfaceId=${action.surfaceId} event=${action.name} frameId=${frame.id}",
+            )
+            return enqueueA2uiAction(frame)
         }
-        return enqueueA2uiAction(action)
+        if (stateNow is State.Connected && socket != null) {
+            val ok = socket.sendFrame(frame)
+            if (ok) {
+                Log.i(
+                    TAG,
+                    "user_action sent surfaceId=${action.surfaceId} event=${action.name} frameId=${frame.id}",
+                )
+                return A2uiActionDispatchResult.Sent(frame.id)
+            }
+            Log.w(
+                TAG,
+                "user_action sendFrame returned false; queueing surfaceId=${action.surfaceId} event=${action.name}",
+            )
+            return enqueueA2uiAction(frame)
+        }
+        Log.w(
+            TAG,
+            "user_action no live socket (state=${stateNow::class.simpleName} socketNull=${socket == null}); " +
+                "queueing surfaceId=${action.surfaceId} event=${action.name}",
+        )
+        return enqueueA2uiAction(frame)
     }
 
-    private fun enqueueA2uiAction(action: A2uiAction): A2uiActionDispatchResult =
+    private fun enqueueA2uiAction(frame: UserActionFrame): A2uiActionDispatchResult =
         synchronized(pendingA2uiActionLock) {
             if (pendingA2uiActions.size >= MAX_PENDING_A2UI_ACTIONS) {
                 A2uiActionDispatchResult.Failed
             } else {
-                pendingA2uiActions.addLast(action)
-                A2uiActionDispatchResult.Queued
+                pendingA2uiActions.addLast(frame)
+                A2uiActionDispatchResult.Queued(frame.id)
             }
         }
 
-    private fun requeueA2uiActionFirst(action: A2uiAction) {
+    private fun requeueA2uiActionFirst(frame: UserActionFrame) {
         synchronized(pendingA2uiActionLock) {
-            pendingA2uiActions.addFirst(action)
+            pendingA2uiActions.addFirst(frame)
         }
     }
 
     private fun drainPendingA2uiActions() {
         while (true) {
-            val action = synchronized(pendingA2uiActionLock) {
+            val queuedFrame = synchronized(pendingA2uiActionLock) {
                 if (pendingA2uiActions.isEmpty()) null else pendingA2uiActions.removeFirst()
             } ?: return
+            val frame = queuedFrame.withActiveRoutingFallback()
+            if (frame.runId == null) {
+                requeueA2uiActionFirst(frame)
+                return
+            }
             val socket = socketRef.get()
-            if (state.value !is State.Connected || socket == null || !socket.sendFrame(action.toUserActionFrame())) {
-                requeueA2uiActionFirst(action)
+            if (state.value !is State.Connected || socket == null || !socket.sendFrame(frame)) {
+                requeueA2uiActionFirst(frame)
                 return
             }
         }
@@ -394,10 +502,18 @@ class ChannelTransport @Inject constructor() {
         UserActionFrame(
             id = UUID.randomUUID().toString(),
             ts = nowIso(),
-            actionName = name,
+            name = name,
             surfaceId = surfaceId,
             context = context,
+            runId = runId,
+            turnId = turnId,
+            actionId = actionId,
         )
+
+    private fun UserActionFrame.withActiveRoutingFallback(): UserActionFrame = copy(
+        runId = runId ?: currentRunId.get(),
+        turnId = turnId ?: currentTurnId.get(),
+    )
 
     companion object {
         private const val TAG = "ChannelTransport"
@@ -423,6 +539,20 @@ class ChannelTransport @Inject constructor() {
             is ServerFrame.TurnDone -> runId
             is ServerFrame.Error -> runId
             is ServerFrame.A2ui -> runId
+            else -> null
+        }
+
+        private fun ServerFrame.turnIdOrNull(): String? = when (this) {
+            is ServerFrame.TurnStarted -> turnId
+            is ServerFrame.AssistantMessage -> turnId
+            is ServerFrame.ReasoningMessage -> turnId
+            is ServerFrame.ToolCallMessage -> turnId
+            is ServerFrame.ToolReturnMessage -> turnId
+            is ServerFrame.StopReason -> turnId
+            is ServerFrame.UsageStatistics -> turnId
+            is ServerFrame.TurnDone -> turnId
+            is ServerFrame.Error -> turnId
+            is ServerFrame.A2ui -> turnId
             else -> null
         }
     }

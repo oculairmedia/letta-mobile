@@ -43,7 +43,13 @@ internal fun ChatTransportChip(
     modifier: Modifier = Modifier,
 ) {
     val (label, container, content) = chipStyle(transport, a2uiFrameCount)
-    val description = "Chat transport: $label"
+    val description = when (transport) {
+        is ChatTransport.WsDisconnected -> {
+            val closeKind = if (transport.code == 1000) "clean close" else "abnormal close"
+            "Chat transport: $label, $closeKind"
+        }
+        else -> "Chat transport: $label"
+    }
     Box(
         modifier = modifier
             .semantics { contentDescription = description }
@@ -95,7 +101,16 @@ private fun chipStyle(transport: ChatTransport, a2uiFrameCount: Int): ChipStyle 
             val content = if (transport.a2uiEnabled) cs.onTertiaryContainer else cs.onPrimaryContainer
             ChipStyle(label, container, content)
         }
-        is ChatTransport.WsDisconnected ->
-            ChipStyle("WS off (${transport.code})", cs.errorContainer, cs.onErrorContainer)
+        is ChatTransport.WsDisconnected -> {
+            // letta-mobile-ns5l: 1000 (clean close) tints muted so the
+            // chip doesn't shout error for expected lifecycle events
+            // (idle close, app background). Abnormal codes (1006 wire
+            // drop, 1011 server error, 4xxx app-defined) keep the red
+            // error tint so a real failure stays visually loud.
+            val isCleanClose = transport.code == 1000
+            val container = if (isCleanClose) cs.surfaceContainerHighest else cs.errorContainer
+            val content = if (isCleanClose) cs.onSurfaceVariant else cs.onErrorContainer
+            ChipStyle("WS off (${transport.code})", container, content)
+        }
     }
 }

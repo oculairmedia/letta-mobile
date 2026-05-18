@@ -97,6 +97,41 @@ class ChatTimelineObserverTest {
     }
 
     @Test
+    fun `a2ui thinking stays active until first assistant response`() = runTest {
+        var a2uiStartCount: Int? = 1
+        var clearCount = 0
+        val harness = Harness(
+            scope = backgroundScope,
+            a2uiThinkingStartMessageCount = { a2uiStartCount },
+            clearA2uiThinkingOnResponse = {
+                a2uiStartCount = null
+                clearCount++
+            },
+        )
+        val flow = harness.seedTimeline("conv-1", listOf(confirmed("user-1", "approved")))
+
+        harness.observer.start("conv-1")
+        runCurrent()
+
+        assertTrue(harness.uiState.value.isStreaming)
+        assertTrue(harness.uiState.value.isAgentTyping)
+        assertEquals(0, clearCount)
+
+        flow.value = Timeline(
+            "conv-1",
+            events = listOf(
+                confirmed("user-1", "approved"),
+                confirmed("assistant-2", "working", TimelineMessageType.REASONING),
+            ),
+        )
+        runCurrent()
+
+        assertEquals(1, clearCount)
+        assertFalse(harness.uiState.value.isStreaming)
+        assertFalse(harness.uiState.value.isAgentTyping)
+    }
+
+    @Test
     fun `confirmed assistant tail clears duplicate initial message in flight`() = runTest {
         var duplicateInFlight = true
         var clearCount = 0
@@ -122,6 +157,8 @@ class ChatTimelineObserverTest {
     private class Harness(
         scope: CoroutineScope,
         activeReplyConversationIds: Set<String> = emptySet(),
+        a2uiThinkingStartMessageCount: () -> Int? = { null },
+        clearA2uiThinkingOnResponse: () -> Unit = {},
         isFollowingDuplicateInitialMessageInFlight: () -> Boolean = { false },
         clearFollowingDuplicateInitialMessageInFlight: () -> Unit = {},
     ) {
@@ -141,6 +178,8 @@ class ChatTimelineObserverTest {
             activeReplyStreams = activeReplyStreams,
             uiState = uiState,
             isClientModeStreamInFlight = { false },
+            a2uiThinkingStartMessageCount = a2uiThinkingStartMessageCount,
+            clearA2uiThinkingOnResponse = clearA2uiThinkingOnResponse,
             isFollowingDuplicateInitialMessageInFlight = isFollowingDuplicateInitialMessageInFlight,
             clearFollowingDuplicateInitialMessageInFlight = clearFollowingDuplicateInitialMessageInFlight,
             collapseCompletedRunsIfStreamingFinished = { _, next -> next },

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -21,6 +22,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -44,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
@@ -102,6 +105,7 @@ fun A2uiSurfaceRenderer(
     surface: A2uiSurfaceState?,
     modifier: Modifier = Modifier,
     onAction: (A2uiAction) -> Unit = {},
+    actionResolutionToken: Int = 0,
 ) {
     if (surface == null) {
         A2uiSkeletonCard(modifier = modifier.testTag(A2uiTestTags.SurfaceMissing))
@@ -117,12 +121,21 @@ fun A2uiSurfaceRenderer(
         return
     }
 
+    var pendingActionCount by remember(surface.surfaceId) { mutableStateOf(0) }
+    val submitting = pendingActionCount > 0
+    fun updatePendingActionCount(delta: Int) {
+        pendingActionCount = (pendingActionCount + delta).coerceAtLeast(0)
+    }
+
     A2uiComponentNode(
         component = root,
         surface = surface,
         modifier = modifier,
         visited = emptySet(),
         onAction = onAction,
+        surfaceSubmitting = submitting,
+        onPendingActionDelta = ::updatePendingActionCount,
+        actionResolutionToken = actionResolutionToken,
     )
 }
 
@@ -138,6 +151,7 @@ object A2uiTestTags {
     const val ToolApprovalCard = "a2ui_tool_approval_card"
     const val ToolApprovalSensitiveValue = "a2ui_tool_approval_sensitive_value"
     const val ToolApprovalCountdown = "a2ui_tool_approval_countdown"
+    const val ButtonProgress = "a2ui_button_progress"
 }
 
 @Composable
@@ -147,6 +161,9 @@ private fun A2uiComponentNode(
     modifier: Modifier = Modifier,
     visited: Set<String>,
     onAction: (A2uiAction) -> Unit,
+    surfaceSubmitting: Boolean,
+    onPendingActionDelta: (Int) -> Unit,
+    actionResolutionToken: Int,
 ) {
     if (component.id in visited || visited.size > MaxRenderDepth) {
         A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
@@ -155,7 +172,12 @@ private fun A2uiComponentNode(
     val nextVisited = visited + component.id
     when (component.component) {
         "Text" -> A2uiText(component = component, surface = surface, modifier = modifier)
-        "TextField" -> A2uiTextField(component = component, surface = surface, modifier = modifier)
+        "TextField" -> A2uiTextField(
+            component = component,
+            surface = surface,
+            modifier = modifier,
+            surfaceSubmitting = surfaceSubmitting,
+        )
         "DateTimeInput" -> A2uiDateTimeInput(component = component, surface = surface, modifier = modifier)
         "Image" -> A2uiImage(component = component, surface = surface, modifier = modifier)
         "Divider" -> A2uiDivider(component = component, modifier = modifier)
@@ -171,6 +193,9 @@ private fun A2uiComponentNode(
             modifier = modifier,
             visited = nextVisited,
             onAction = onAction,
+            surfaceSubmitting = surfaceSubmitting,
+            onPendingActionDelta = onPendingActionDelta,
+            actionResolutionToken = actionResolutionToken,
         )
         "Row" -> A2uiRow(
             component = component,
@@ -178,6 +203,9 @@ private fun A2uiComponentNode(
             modifier = modifier,
             visited = nextVisited,
             onAction = onAction,
+            surfaceSubmitting = surfaceSubmitting,
+            onPendingActionDelta = onPendingActionDelta,
+            actionResolutionToken = actionResolutionToken,
         )
         "Card" -> A2uiCard(
             component = component,
@@ -185,12 +213,17 @@ private fun A2uiComponentNode(
             modifier = modifier,
             visited = nextVisited,
             onAction = onAction,
+            surfaceSubmitting = surfaceSubmitting,
+            onPendingActionDelta = onPendingActionDelta,
+            actionResolutionToken = actionResolutionToken,
         )
         "Button" -> A2uiButton(
             component = component,
             surface = surface,
             modifier = modifier,
             onAction = onAction,
+            onPendingActionDelta = onPendingActionDelta,
+            actionResolutionToken = actionResolutionToken,
         )
         else -> A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
     }
@@ -228,7 +261,7 @@ private fun A2uiToolApprovalCard(
         if (props.risk == ToolApprovalRisk.Destructive || affordance == ToolApprovalAffordance.Deny) {
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         }
-        onAction(toolApprovalAction(surface.surfaceId, props.callId, next))
+                onAction(toolApprovalAction(surface, props.callId, next))
     }
 
     LaunchedEffect(component.id, props.callId, props.timeoutSeconds, result) {
@@ -240,7 +273,7 @@ private fun A2uiToolApprovalCard(
         if (remainingSeconds == 0 && result == null) {
             val timeout = ToolApprovalResult(decision = "timeout", scope = "timeout")
             result = timeout
-            onAction(toolApprovalAction(surface.surfaceId, props.callId, timeout))
+            onAction(toolApprovalAction(surface, props.callId, timeout))
         }
     }
 
@@ -509,24 +542,37 @@ private fun A2uiTextField(
     component: A2uiComponent,
     surface: A2uiSurfaceState,
     modifier: Modifier = Modifier,
+    surfaceSubmitting: Boolean,
 ) {
     val binding = component.raw["value"] ?: component.raw["text"]
     val path = binding.bindingPath()
-    val value = component.resolveInputValue(surface, binding)
+    val boundValue = component.resolveInputValue(surface, binding)
     val label = resolveBindingText(component.raw["label"], surface)
     val placeholder = resolveBindingText(component.raw["placeholder"], surface)
     val fieldType = component.raw.stringValue("textFieldType", "variant", "type").orEmpty()
     val validation = component.raw.stringValue("validationRegexp")
+
+    // letta-mobile-ykkl: when the payload omits `value: {path: …}` the
+    // field used to be silently controlled by an unchanging data-model
+    // entry — typed characters fired onValueChange but the rendered
+    // value stayed empty, so the field looked unresponsive. Fall back
+    // to local Compose state so unbound fields still echo user input
+    // and remain editable; bound fields keep round-tripping through
+    // the surface dataModel.
+    var localValue by remember(component.id) { mutableStateOf(boundValue) }
+    val value = if (path != null) boundValue else localValue
     val isError = validation != null && value.isNotBlank() && !value.matchesValidation(validation)
 
     OutlinedTextField(
         value = value,
         onValueChange = { next ->
-            path?.let {
+            if (path != null) {
                 surface.dataModel.applyPatch(
-                    path = it,
+                    path = path,
                     value = component.inputValue(next, fieldType),
                 )
+            } else {
+                localValue = next
             }
         },
         modifier = modifier
@@ -535,10 +581,11 @@ private fun A2uiTextField(
         label = label?.let { { Text(it) } },
         placeholder = placeholder?.let { { Text(it) } },
         isError = isError,
-        supportingText = if (isError) {
-            { Text("Invalid value") }
-        } else {
-            null
+        readOnly = surfaceSubmitting,
+        supportingText = when {
+            surfaceSubmitting -> ({ Text("submitting...") })
+            isError -> ({ Text("Invalid value") })
+            else -> null
         },
         singleLine = fieldType != "longText",
         minLines = if (fieldType == "longText") 3 else 1,
@@ -590,9 +637,13 @@ private fun A2uiDateTimeInput(
             singleLine = true,
             placeholder = { Text(component.dateTimePlaceholder(enableDate, enableTime)) },
         )
+        // letta-mobile-ykkl: lift overlay above the OutlinedTextField's
+        // internal Surface so taps reliably hit the picker-launch
+        // clickable, not the (readOnly) field's focus handler.
         Box(
             modifier = Modifier
                 .matchParentSize()
+                .zIndex(1f)
                 .clickable {
                     if (enableDate) {
                         showDatePicker = true
@@ -742,6 +793,9 @@ private fun A2uiColumn(
     modifier: Modifier = Modifier,
     visited: Set<String>,
     onAction: (A2uiAction) -> Unit,
+    surfaceSubmitting: Boolean,
+    onPendingActionDelta: (Int) -> Unit,
+    actionResolutionToken: Int,
 ) {
     val children = component.children
     Column(
@@ -761,6 +815,9 @@ private fun A2uiColumn(
                     surface = surface,
                     visited = visited,
                     onAction = onAction,
+                    surfaceSubmitting = surfaceSubmitting,
+                    onPendingActionDelta = onPendingActionDelta,
+                    actionResolutionToken = actionResolutionToken,
                 )
             }
         }
@@ -774,6 +831,9 @@ private fun A2uiRow(
     modifier: Modifier = Modifier,
     visited: Set<String>,
     onAction: (A2uiAction) -> Unit,
+    surfaceSubmitting: Boolean,
+    onPendingActionDelta: (Int) -> Unit,
+    actionResolutionToken: Int,
 ) {
     val children = component.children
     Row(
@@ -795,6 +855,9 @@ private fun A2uiRow(
                     modifier = if (component.weightRowChildren()) Modifier.weight(1f) else Modifier,
                     visited = visited,
                     onAction = onAction,
+                    surfaceSubmitting = surfaceSubmitting,
+                    onPendingActionDelta = onPendingActionDelta,
+                    actionResolutionToken = actionResolutionToken,
                 )
             }
         }
@@ -808,6 +871,9 @@ private fun A2uiCard(
     modifier: Modifier = Modifier,
     visited: Set<String>,
     onAction: (A2uiAction) -> Unit,
+    surfaceSubmitting: Boolean,
+    onPendingActionDelta: (Int) -> Unit,
+    actionResolutionToken: Int,
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -831,6 +897,9 @@ private fun A2uiCard(
                         surface = surface,
                         visited = visited,
                         onAction = onAction,
+                        surfaceSubmitting = surfaceSubmitting,
+                        onPendingActionDelta = onPendingActionDelta,
+                        actionResolutionToken = actionResolutionToken,
                     )
                 }
             }
@@ -844,12 +913,54 @@ private fun A2uiButton(
     surface: A2uiSurfaceState,
     modifier: Modifier = Modifier,
     onAction: (A2uiAction) -> Unit,
+    onPendingActionDelta: (Int) -> Unit,
+    actionResolutionToken: Int,
 ) {
     val label = component.resolveButtonLabel(surface)
     val action = component.action(surface)
+    val haptic = LocalHapticFeedback.current
+    var inFlight by remember(surface.surfaceId, component.id) { mutableStateOf(false) }
+
+    LaunchedEffect(inFlight) {
+        if (!inFlight) return@LaunchedEffect
+        delay(A2uiButtonLocalTimeoutMillis)
+        inFlight = false
+        onPendingActionDelta(-1)
+    }
+
+    LaunchedEffect(actionResolutionToken) {
+        if (actionResolutionToken > 0 && inFlight) {
+            inFlight = false
+            onPendingActionDelta(-1)
+        }
+    }
+
     Button(
-        onClick = { component.action(surface)?.let(onAction) },
-        enabled = label != null && action != null,
+        onClick = {
+            if (inFlight) return@Button
+            // letta-mobile-ykkl diagnostic: log the dispatch hop so the
+            // chain "Compose onClick → onAction → WsChatBridge → wire"
+            // is traceable in adb logcat without a debugger attached.
+            val resolved = component.action(surface)
+            if (resolved == null) {
+                android.util.Log.w(
+                    "A2UI",
+                    "Button onClick: action unresolved surfaceId=${surface.surfaceId} " +
+                        "componentId=${component.id} raw=${component.raw["action"] ?: component.raw["onClick"]}",
+                )
+            } else {
+                android.util.Log.i(
+                    "A2UI",
+                    "Button onClick: dispatching surfaceId=${surface.surfaceId} " +
+                        "componentId=${component.id} event=${resolved.name}",
+                )
+                haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                inFlight = true
+                onPendingActionDelta(1)
+                onAction(resolved)
+            }
+        },
+        enabled = label != null && action != null && !inFlight,
         modifier = modifier,
     ) {
         if (label == null) {
@@ -860,7 +971,27 @@ private fun A2uiButton(
                 height = 12.dp,
             )
         } else {
-            Text(text = label)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (inFlight) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .size(16.dp)
+                            .testTag(A2uiTestTags.ButtonProgress),
+                        strokeWidth = 2.dp,
+                    )
+                }
+                Text(
+                    text = label,
+                    color = if (inFlight) {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
+                    } else {
+                        Color.Unspecified
+                    },
+                )
+            }
         }
     }
 }
@@ -931,8 +1062,14 @@ private fun A2uiComponent.resolveText(surface: A2uiSurfaceState): String? {
 
 @Composable
 private fun A2uiComponent.resolveButtonLabel(surface: A2uiSurfaceState): String? {
-    raw.stringValue("labelComponentId", "labelId")?.let { labelId ->
-        return surface.components[labelId]?.resolveText(surface)
+    // letta-mobile-njzb: A2UI v0.9 Basic Catalog defines Button.child as
+    // "the ID of the child component. Use a Text component for a labeled
+    // button." Resolve `child` first — that's the canonical spec field
+    // and what the shim emits. `labelComponentId` / `labelId` / `label`
+    // (string-id) are pre-spec aliases we keep for back-compat with any
+    // payload still using the older field names.
+    raw.stringValue("child", "labelComponentId", "labelId")?.let { childId ->
+        surface.components[childId]?.resolveText(surface)?.let { return it }
     }
     val label = raw["label"]
     if (label is JsonPrimitive) {
@@ -970,19 +1107,38 @@ private fun A2uiComponent.resolveInputValue(
 
 private fun A2uiComponent.action(surface: A2uiSurfaceState): A2uiAction? {
     val action = (raw["action"] ?: raw["onClick"]) as? JsonObject ?: return null
-    val name = action.stringValue("name", "actionName", "type", "action") ?: return null
-    val context = resolveA2uiActionContext(action["context"] ?: action["data"], surface.dataModel)
+    // letta-mobile-ykkl: A2UI v0.9 Basic Catalog declares Button.action
+    // as `Action` whose payload is nested under `event` (Action.event).
+    // The pre-spec shape was `action: { name: … }` which we still accept
+    // as an alias. Look both at the action root and under `event`
+    // before giving up so payloads from either generation are clickable.
+    val eventBlock = (action["event"] as? JsonObject)
+    val name = action.stringValue("name", "actionName", "type", "action")
+        ?: eventBlock?.stringValue("name", "actionName", "type", "action")
+        ?: return null
+    val actionId = action.stringValue("actionId", "action_id", "id")
+        ?: eventBlock?.stringValue("actionId", "action_id", "id")
+    val contextSource = (eventBlock?.get("context") ?: eventBlock?.get("data"))
+        ?: action["context"]
+        ?: action["data"]
+    val context = resolveA2uiActionContext(contextSource, surface.dataModel)
     val raw = buildJsonObject {
         action.forEach { (key, value) -> put(key, value) }
         put("actionName", name)
         put("name", name)
         put("surfaceId", surface.surfaceId)
         put("context", context)
+        surface.runId?.let { put("runId", it) }
+        surface.turnId?.let { put("turnId", it) }
+        actionId?.let { put("actionId", it) }
     }
     return A2uiAction(
         name = name,
         surfaceId = surface.surfaceId,
         context = context,
+        runId = surface.runId,
+        turnId = surface.turnId,
+        actionId = actionId,
         raw = raw,
     )
 }
@@ -1100,7 +1256,7 @@ private fun A2uiComponent.toolApprovalProps(): ToolApprovalProps? {
 }
 
 private fun toolApprovalAction(
-    surfaceId: String,
+    surface: A2uiSurfaceState,
     callId: String,
     result: ToolApprovalResult,
 ): A2uiAction {
@@ -1112,13 +1268,19 @@ private fun toolApprovalAction(
     val raw = buildJsonObject {
         put("actionName", ToolApprovalResponseAction)
         put("name", ToolApprovalResponseAction)
-        put("surfaceId", surfaceId)
+        put("surfaceId", surface.surfaceId)
         put("context", context)
+        surface.runId?.let { put("runId", it) }
+        surface.turnId?.let { put("turnId", it) }
+        put("actionId", callId)
     }
     return A2uiAction(
         name = ToolApprovalResponseAction,
-        surfaceId = surfaceId,
+        surfaceId = surface.surfaceId,
         context = context,
+        runId = surface.runId,
+        turnId = surface.turnId,
+        actionId = callId,
         raw = raw,
     )
 }
@@ -1285,6 +1447,7 @@ private const val TimeIsoLength = 5
 private val TimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 private const val MaxRenderDepth = 32
 private const val DefaultToolApprovalTimeoutSeconds = 30
+private const val A2uiButtonLocalTimeoutMillis = 10_000L
 private const val SensitiveMask = "********"
 private const val ToolApprovalResponseAction = "tool_approval_response"
 private const val ToolApprovalButtonsPerRow = 2

@@ -2,7 +2,7 @@ package com.letta.mobile.bot.protocol
 
 import com.letta.mobile.data.a2ui.A2uiCapabilityDeclaration
 import com.letta.mobile.data.a2ui.A2uiMessage
-import com.letta.mobile.data.a2ui.A2uiNegotiation
+import com.letta.mobile.data.a2ui.A2uiHandshakeAck
 import com.letta.mobile.data.model.ToolCall
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.serialization.SerialName
@@ -85,7 +85,8 @@ internal data class WsSessionInit(
     @SerialName("agent_id") val agentId: String,
     @SerialName("conversation_id") val conversationId: String,
     @SerialName("session_id") val sessionId: String,
-    @SerialName("a2ui_negotiation") val a2uiNegotiation: A2uiNegotiation? = null,
+    @SerialName("a2ui_negotiated") val a2uiNegotiated: Boolean = false,
+    @SerialName("a2ui") val a2ui: A2uiHandshakeAck? = null,
 ) : WsInboundMessage
 
 internal data class WsA2uiMessage(

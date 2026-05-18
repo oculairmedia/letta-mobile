@@ -119,6 +119,7 @@ fun ThinkingShader(
     bgColor: Color,
     modifier: Modifier = Modifier,
     heightDp: Int = 216,
+    animate: Boolean = true,
 ) {
     // letta-mobile-vcky.b: API ≥ 33 gets the AGSL path; older devices fall
     // back to the Compose-native gradient so we don't ship a dead rectangle.
@@ -127,9 +128,11 @@ fun ThinkingShader(
         val shaderBrush = remember { ShaderBrush(shader) }
         var iTime by remember { mutableFloatStateOf(0f) }
 
-        LaunchedEffect(Unit) {
-            while (true) {
-                withFrameMillis { frameTimeMs -> iTime = frameTimeMs / 1000f }
+        LaunchedEffect(animate) {
+            if (animate) {
+                while (true) {
+                    withFrameMillis { frameTimeMs -> iTime = frameTimeMs / 1000f }
+                }
             }
         }
 
@@ -162,6 +165,7 @@ fun ThinkingShader(
             bgColor = bgColor,
             modifier = modifier,
             heightDp = heightDp,
+            animate = animate,
         )
     }
 }
@@ -172,17 +176,23 @@ private fun ThinkingShaderFallback(
     bgColor: Color,
     modifier: Modifier = Modifier,
     heightDp: Int = 216,
+    animate: Boolean = true,
 ) {
-    val transition = rememberInfiniteTransition(label = "thinkingShaderFallback")
-    val phase by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = (2 * PI).toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 2400, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "phase",
-    )
+    val phase = if (animate) {
+        val transition = rememberInfiniteTransition(label = "thinkingShaderFallback")
+        val animatedPhase by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = (2 * PI).toFloat(),
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 2400, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "phase",
+        )
+        animatedPhase
+    } else {
+        0f
+    }
 
     // vcky.b2 fallback: glow anchored at the bottom of the strip (matches
     // the AGSL path's intent — the composer covers this and the visible

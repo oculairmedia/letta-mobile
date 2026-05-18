@@ -29,6 +29,8 @@ internal class ChatTimelineObserver(
     private val activeReplyStreams: StateFlow<Set<String>>,
     private val uiState: MutableStateFlow<ChatUiState>,
     private val isClientModeStreamInFlight: () -> Boolean,
+    private val a2uiThinkingStartMessageCount: () -> Int?,
+    private val clearA2uiThinkingOnResponse: () -> Unit,
     private val isFollowingDuplicateInitialMessageInFlight: () -> Boolean,
     private val clearFollowingDuplicateInitialMessageInFlight: () -> Unit,
     private val collapseCompletedRunsIfStreamingFinished: (previous: ChatUiState, next: ChatUiState) -> ChatUiState,
@@ -131,12 +133,22 @@ internal class ChatTimelineObserver(
                     val prev = uiState.value
                     val isReplyStreaming = activeReplyStreams.value.contains(conversationId)
                     val streamInFlight = isClientModeStreamInFlight()
+                    val a2uiStartMessageCount = a2uiThinkingStartMessageCount()
+                    val a2uiResponseArrived = a2uiStartMessageCount != null && ui
+                        .drop(a2uiStartMessageCount)
+                        .any { it.role == "assistant" }
+                    if (a2uiResponseArrived) {
+                        clearA2uiThinkingOnResponse()
+                    }
+                    val a2uiThinkingActive = a2uiStartMessageCount != null && !a2uiResponseArrived
                     val nextIsStreaming = if (streamInFlight) prev.isStreaming
                         else if (isReplyStreaming) true
+                        else if (a2uiThinkingActive) true
                         else if (duplicateInitialMessageInFlight) true
                         else anyLettaServerLocalPending
                     val nextIsAgentTyping = if (streamInFlight) prev.isAgentTyping
                         else if (isReplyStreaming) true
+                        else if (a2uiThinkingActive) true
                         else if (duplicateInitialMessageInFlight) true
                         else (anyLettaServerLocalPending && !tailIsAssistant)
 

@@ -18,6 +18,10 @@ data class A2uiSurfaceState(
     val catalogId: String? = null,
     val theme: JsonObject? = null,
     val sendDataModel: Boolean = false,
+    val agentId: String? = null,
+    val conversationId: String? = null,
+    val turnId: String? = null,
+    val runId: String? = null,
     val rootComponentId: String? = null,
     val components: Map<String, A2uiComponent> = emptyMap(),
     val dataModel: A2uiDataModel = A2uiDataModel(),
@@ -33,7 +37,10 @@ class A2uiSurfaceManager(
     val surfaces: StateFlow<Map<String, A2uiSurfaceState>> = _surfaces.asStateFlow()
 
     fun apply(event: A2uiFrameEvent) {
-        applyMessages(event.messages)
+        _surfaces.update { current ->
+            val updated = event.messages.fold(current) { surfaces, message -> surfaces.applyMessage(message) }
+            updated.withEnvelopeMetadata(event)
+        }
     }
 
     fun applyMessages(messages: Iterable<A2uiMessage>) {
@@ -131,6 +138,25 @@ private fun Map<String, A2uiSurfaceState>.applyMessage(message: A2uiMessage): Ma
         is A2uiMessage.DeleteSurface -> minus(message.surfaceId)
         is A2uiMessage.Unknown -> this
     }
+
+private fun Map<String, A2uiSurfaceState>.withEnvelopeMetadata(
+    event: A2uiFrameEvent,
+): Map<String, A2uiSurfaceState> {
+    val surfaceIds = event.messages.mapNotNull { it.surfaceId.takeIf(String::isNotBlank) }.toSet()
+    if (surfaceIds.isEmpty()) return this
+    return mapValues { (surfaceId, surface) ->
+        if (surfaceId !in surfaceIds) {
+            surface
+        } else {
+            surface.copy(
+                agentId = event.agentId ?: surface.agentId,
+                conversationId = event.conversationId ?: surface.conversationId,
+                turnId = event.turnId ?: surface.turnId,
+                runId = event.runId ?: surface.runId,
+            )
+        }
+    }
+}
 
 private fun Map<String, A2uiSurfaceState>.upsertSurface(
     message: A2uiMessage.CreateSurface,

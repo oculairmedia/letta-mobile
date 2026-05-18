@@ -26,7 +26,7 @@ class A2uiSurfaceManagerTest : WordSpec({
                     json.parseToJsonElement(
                         """
                         [
-                          {"version":"v0.9","createSurface":{"surfaceId":"s1","catalogId":"https://a2ui.org/specification/v0_9/basic_catalog.json","theme":{"density":"compact"}}},
+                          {"version":"v0.9","createSurface":{"surfaceId":"s1","catalogId":"basic","theme":{"density":"compact"}}},
                           {"version":"v0.9","updateComponents":{"surfaceId":"s1","root":"card","components":[
                             {"id":"card","component":"Card","child":"body"},
                             {"id":"body","component":"Text","text":{"path":"/message"}}
@@ -98,6 +98,40 @@ class A2uiSurfaceManagerTest : WordSpec({
             val dataModel = manager.surface("s1")!!.dataModel
             A2uiBindingResolver.resolvePath(dataModel, "/approval/status").shouldBeNull()
             A2uiBindingResolver.resolvePath(dataModel, "/approval/reason") shouldBe JsonNull
+        }
+
+        "attach envelope routing metadata to touched surfaces" {
+            val manager = A2uiSurfaceManager()
+
+            manager.apply(
+                A2uiFrameEvent(
+                    transport = "admin-shim",
+                    frameId = "frame-1",
+                    timestamp = "2026-05-17T12:00:00Z",
+                    agentId = "agent-1",
+                    conversationId = "conv-1",
+                    turnId = "turn-1",
+                    runId = "run-1",
+                    requestId = null,
+                    messages = decodeA2uiMessages(
+                        json,
+                        json.parseToJsonElement(
+                            """
+                            [
+                              {"version":"v0.9","createSurface":{"surfaceId":"s1","catalogId":"basic"}},
+                              {"version":"v0.9","updateComponents":{"surfaceId":"s1","root":"root","components":[{"id":"root","component":"Text","text":"Ready"}]}}
+                            ]
+                            """.trimIndent(),
+                        ),
+                    ),
+                )
+            )
+
+            val surface = manager.surface("s1")!!
+            surface.agentId shouldBe "agent-1"
+            surface.conversationId shouldBe "conv-1"
+            surface.turnId shouldBe "turn-1"
+            surface.runId shouldBe "run-1"
         }
     }
 

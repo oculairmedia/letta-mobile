@@ -12,18 +12,25 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
+import io.mockk.clearAllMocks
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ShimBackendDetectorTest {
+    @After
+    fun tearDown() {
+        clearAllMocks()
+    }
+
     @Test
     fun `refreshActive detects letta-code admin shim health marker`() = runTest {
         val config = config(id = "shim")
@@ -94,7 +101,7 @@ class ShimBackendDetectorTest {
         return ShimBackendDetector(settingsRepository, apiClient)
     }
 
-    private fun settingsRepository(config: LettaConfig): SettingsRepository = mockk {
+    private fun settingsRepository(config: LettaConfig): SettingsRepository = mockk(relaxed = true) {
         every { activeConfig } returns MutableStateFlow(config)
     }
 
