@@ -109,13 +109,14 @@ jobs:
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
           # Self-hosted Sentry config. The Sentry Gradle plugin's upload
           # tasks (uploadSentryProguardMappingsRelease, sentryBundleSources*)
-          # read these from the environment. We gate the upload on the
-          # auth token being present via build.gradle.kts so forks / local
-          # builds without secrets continue to succeed.
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
-          SENTRY_URL: ${{ secrets.SENTRY_URL }}
+          # read these from the environment. PR builds validate that the APK
+          # assembles, but they must not depend on remote Sentry uploads or on
+          # a non-expired production token. Main-branch builds still receive
+          # the secrets and upload mappings/source context.
+          SENTRY_AUTH_TOKEN: ${{ github.event_name != 'pull_request' && secrets.SENTRY_AUTH_TOKEN || '' }}
+          SENTRY_ORG: ${{ github.event_name != 'pull_request' && secrets.SENTRY_ORG || '' }}
+          SENTRY_PROJECT: ${{ github.event_name != 'pull_request' && secrets.SENTRY_PROJECT || '' }}
+          SENTRY_URL: ${{ github.event_name != 'pull_request' && secrets.SENTRY_URL || '' }}
         run: ./gradlew ${{ matrix.gradle_task }} --no-daemon --build-cache
 
       - name: Remove signing keystore
