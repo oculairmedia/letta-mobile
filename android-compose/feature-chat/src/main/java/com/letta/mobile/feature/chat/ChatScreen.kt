@@ -45,6 +45,8 @@ import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
+import com.letta.mobile.ui.common.LocalSnackbarDispatcher
+import com.letta.mobile.ui.common.SnackbarMessage
 import com.letta.mobile.ui.components.FloatingBanner
 import com.letta.mobile.ui.components.MessageSkeletonList
 import com.letta.mobile.ui.components.StarterPrompts
@@ -86,6 +88,7 @@ internal fun ChatScreen(
 
     LettaChatTheme(fontScale = activeFontScale) {
         var floatingBannerMessage by remember { mutableStateOf("") }
+        val snackbarDispatcher = LocalSnackbarDispatcher.current
         val density = LocalDensity.current
         val windowSizeClass = LocalWindowSizeClass.current
         val imeBottomPx = WindowInsets.ime.getBottom(density)
@@ -104,6 +107,21 @@ internal fun ChatScreen(
                 kotlinx.coroutines.delay(2600)
                 floatingBannerMessage = ""
             }
+        }
+
+        LaunchedEffect(state.a2uiActionSnackbar) {
+            val snackbar = state.a2uiActionSnackbar ?: return@LaunchedEffect
+            snackbarDispatcher.dispatch(
+                SnackbarMessage(
+                    message = snackbar.message,
+                    actionLabel = snackbar.actionLabel,
+                    duration = snackbar.duration,
+                    onAction = snackbar.retryAction?.let { retry ->
+                        { viewModel.submitA2uiAction(retry) }
+                    },
+                )
+            )
+            viewModel.markA2uiActionSnackbarShown(snackbar.id)
         }
 
         Box(
@@ -445,6 +463,7 @@ private fun ChatContent(
             }
             A2uiSurfaceStack(
                 surfaces = state.a2uiSurfaces.values,
+                resolvedActionCounters = state.a2uiResolvedActionCounters,
                 onAction = onA2uiAction,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -458,6 +477,7 @@ private fun ChatContent(
 @Composable
 private fun A2uiSurfaceStack(
     surfaces: Collection<A2uiSurfaceState>,
+    resolvedActionCounters: Map<String, Int>,
     onAction: (A2uiAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -472,6 +492,7 @@ private fun A2uiSurfaceStack(
                 surface = surface,
                 modifier = Modifier.fillMaxWidth(),
                 onAction = onAction,
+                actionResolutionToken = resolvedActionCounters[surface.surfaceId] ?: 0,
             )
         }
     }

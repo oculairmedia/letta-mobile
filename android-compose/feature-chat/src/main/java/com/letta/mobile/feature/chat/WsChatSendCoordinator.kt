@@ -311,6 +311,7 @@ internal class WsChatSendCoordinator(
                     isAgentTyping = false,
                 )
             }
+            is WsTimelineEvent.UserActionOutcome -> Unit
         }
     }
 
