@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.common
 
+import androidx.compose.material3.SnackbarDuration
 import io.kotest.core.spec.style.WordSpec
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
@@ -25,10 +26,11 @@ class SnackbarDispatcherTest : WordSpec({
             runTest {
                 val dispatcher = SnackbarDispatcher()
                 var actionCalled = false
-                dispatcher.dispatch(SnackbarMessage("Deleted", "Undo") { actionCalled = true })
+                dispatcher.dispatch(SnackbarMessage("Deleted", "Undo", onAction = { actionCalled = true }))
                 val msg = dispatcher.messages.first()
                 msg.message shouldBe "Deleted"
                 msg.actionLabel shouldBe "Undo"
+                msg.duration shouldBe SnackbarDuration.Short
                 msg.onAction?.invoke()
                 actionCalled shouldBe true
             }
