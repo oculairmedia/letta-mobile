@@ -36,8 +36,12 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -125,21 +129,24 @@ fun A2uiSurfaceRenderer(
     }
 
     var pendingActionCount by remember(surface.surfaceId) { mutableStateOf(0) }
+    val localStateScope = remember(surface.surfaceId) { A2uiLocalStateScope.root(surface.surfaceId) }
     val submitting = pendingActionCount > 0
     fun updatePendingActionCount(delta: Int) {
         pendingActionCount = (pendingActionCount + delta).coerceAtLeast(0)
     }
 
-    A2uiComponentNode(
-        component = root,
-        surface = surface,
-        modifier = modifier,
-        visited = emptySet(),
-        onAction = onAction,
-        surfaceSubmitting = submitting,
-        onPendingActionDelta = ::updatePendingActionCount,
-        actionResolutionToken = actionResolutionToken,
-    )
+    CompositionLocalProvider(LocalA2uiLocalState provides localStateScope) {
+        A2uiComponentNode(
+            component = root,
+            surface = surface,
+            modifier = modifier,
+            visited = emptySet(),
+            onAction = onAction,
+            surfaceSubmitting = submitting,
+            onPendingActionDelta = ::updatePendingActionCount,
+            actionResolutionToken = actionResolutionToken,
+        )
+    }
 }
 
 object A2uiTestTags {
@@ -158,6 +165,63 @@ object A2uiTestTags {
     const val ListView = "a2ui_list_view"
 }
 
+/**
+ * Local-only state scope for A2UI widgets.
+ *
+ * Catalog authors may provide a component-level `localState` object, for example
+ * `{ "localState": { "isExpanded": false, "tabIndex": 1 } }`, to seed UI
+ * state that should stay on-device. Slots are keyed by `(surfaceId,
+ * componentId, key)`: they survive recomposition and data-model updates, but are
+ * intentionally forgotten when the surface leaves composition after deletion.
+ */
+@Stable
+class A2uiLocalStateScope private constructor(
+    val surfaceId: String,
+    val componentId: String,
+    private val booleanStates: MutableMap<A2uiLocalStateKey, MutableState<Boolean>>,
+    private val intStates: MutableMap<A2uiLocalStateKey, MutableState<Int>>,
+    private val defaults: JsonObject,
+) {
+    fun child(
+        componentId: String,
+        defaults: JsonObject = JsonObject(emptyMap()),
+    ): A2uiLocalStateScope = A2uiLocalStateScope(
+        surfaceId = surfaceId,
+        componentId = componentId,
+        booleanStates = booleanStates,
+        intStates = intStates,
+        defaults = defaults,
+    )
+
+    fun booleanState(key: String, initialValue: Boolean): MutableState<Boolean> =
+        booleanStates.getOrPut(A2uiLocalStateKey(surfaceId, componentId, key)) {
+            mutableStateOf(defaults[key]?.jsonPrimitiveOrNull?.contentOrNull?.toBooleanStrictOrNull() ?: initialValue)
+        }
+
+    fun intState(key: String, initialValue: Int): MutableState<Int> =
+        intStates.getOrPut(A2uiLocalStateKey(surfaceId, componentId, key)) {
+            mutableStateOf(defaults[key]?.jsonPrimitiveOrNull?.contentOrNull?.toIntOrNull() ?: initialValue)
+        }
+
+    companion object {
+        fun root(surfaceId: String): A2uiLocalStateScope = A2uiLocalStateScope(
+            surfaceId = surfaceId,
+            componentId = A2uiLocalStateRootComponentId,
+            booleanStates = mutableMapOf(),
+            intStates = mutableMapOf(),
+            defaults = JsonObject(emptyMap()),
+        )
+    }
+}
+
+val LocalA2uiLocalState = compositionLocalOf<A2uiLocalStateScope?> { null }
+
+private data class A2uiLocalStateKey(
+    val surfaceId: String,
+    val componentId: String,
+    val key: String,
+)
+
 @Composable
 private fun A2uiComponentNode(
     component: A2uiComponent,
@@ -174,6 +238,54 @@ private fun A2uiComponentNode(
         A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
         return
     }
+    val parentLocalState = LocalA2uiLocalState.current
+    val componentLocalState = remember(parentLocalState, component.id, component.raw["localState"]) {
+        parentLocalState?.child(
+            componentId = component.id,
+            defaults = component.localStateDefaults(),
+        )
+    }
+    if (componentLocalState != null) {
+        CompositionLocalProvider(LocalA2uiLocalState provides componentLocalState) {
+            A2uiComponentNodeContent(
+                component = component,
+                surface = surface,
+                modifier = modifier,
+                visited = visited,
+                onAction = onAction,
+                surfaceSubmitting = surfaceSubmitting,
+                onPendingActionDelta = onPendingActionDelta,
+                actionResolutionToken = actionResolutionToken,
+                renderScope = renderScope,
+            )
+        }
+    } else {
+        A2uiComponentNodeContent(
+            component = component,
+            surface = surface,
+            modifier = modifier,
+            visited = visited,
+            onAction = onAction,
+            surfaceSubmitting = surfaceSubmitting,
+            onPendingActionDelta = onPendingActionDelta,
+            actionResolutionToken = actionResolutionToken,
+            renderScope = renderScope,
+        )
+    }
+}
+
+@Composable
+private fun A2uiComponentNodeContent(
+    component: A2uiComponent,
+    surface: A2uiSurfaceState,
+    modifier: Modifier = Modifier,
+    visited: Set<String>,
+    onAction: (A2uiAction) -> Unit,
+    surfaceSubmitting: Boolean,
+    onPendingActionDelta: (Int) -> Unit,
+    actionResolutionToken: Int,
+    renderScope: A2uiRenderScope,
+) {
     val nextVisited = visited + component.id
     when (component.component) {
         "Text" -> A2uiText(component = component, surface = surface, modifier = modifier, renderScope = renderScope)
@@ -274,7 +386,7 @@ private fun A2uiToolApprovalCard(
     var remainingSeconds by remember(component.id, props.callId, props.timeoutSeconds) {
         mutableStateOf(props.timeoutSeconds)
     }
-    var argumentsExpanded by remember(component.id, props.callId) { mutableStateOf(true) }
+    var argumentsExpanded by rememberA2uiLocalBooleanState("argumentsExpanded", true)
     var revealedSensitiveKeys by remember(component.id, props.callId) { mutableStateOf(emptySet<String>()) }
 
     fun dispatch(affordance: ToolApprovalAffordance) {
@@ -1497,6 +1609,18 @@ private fun JsonObject.booleanValue(vararg keys: String): Boolean? =
 private fun JsonElement?.bindingPath(): String? =
     (this as? JsonObject)?.stringValue("path")
 
+@Composable
+private fun rememberA2uiLocalBooleanState(
+    key: String,
+    initialValue: Boolean,
+): MutableState<Boolean> {
+    val scope = LocalA2uiLocalState.current
+    return scope?.booleanState(key, initialValue) ?: remember(key) { mutableStateOf(initialValue) }
+}
+
+private fun A2uiComponent.localStateDefaults(): JsonObject =
+    raw["localState"] as? JsonObject ?: JsonObject(emptyMap())
+
 private data class A2uiRenderScope(
     val basePath: String? = null,
 ) {
@@ -1587,6 +1711,7 @@ private val TimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:m
 private const val MaxRenderDepth = 32
 private const val DefaultToolApprovalTimeoutSeconds = 30
 private const val A2uiButtonLocalTimeoutMillis = 10_000L
+private const val A2uiLocalStateRootComponentId = "__surface__"
 private const val SensitiveMask = "********"
 private const val ToolApprovalResponseAction = "tool_approval_response"
 private const val ToolApprovalButtonsPerRow = 2
