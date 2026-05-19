@@ -12,6 +12,8 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -36,6 +38,7 @@ import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
 import com.letta.mobile.ui.a2ui.A2uiTestTags
 import com.letta.mobile.ui.test.setLettaTestContent
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -898,6 +901,119 @@ class A2uiRendererTest {
     }
 
     @Test
+    fun scheduleListViewRendersCardsWithPerItemScopeAndDispatchesActions() {
+        val manager = scheduleSurfaceManager(root = "scheduleList")
+        val actions = mutableListOf<A2uiAction>()
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(
+                surfaceId = SurfaceId,
+                surfaceManager = manager,
+                onAction = actions::add,
+            )
+        }
+
+        composeRule.onNodeWithTag(A2uiTestTags.ListView).assertIsDisplayed()
+        composeRule.onAllNodesWithTag(A2uiTestTags.ScheduleCard).assertCountEquals(5)
+        composeRule.onNodeWithText("Morning check-in").assertIsDisplayed()
+        composeRule.onNodeWithText("Weekly summary").assertIsDisplayed()
+
+        composeRule.onAllNodes(hasText("Run now") and hasClickAction())[0].performClick()
+        composeRule.runOnIdle {
+            val action = actions.single()
+            assertEquals("schedule.run_now", action.name)
+            assertEquals("sched-1", action.context["id"]!!.jsonPrimitive.content)
+        }
+    }
+
+    @Test
+    fun scheduleCardDispatchesPauseAndDeleteActions() {
+        val pauseManager = scheduleSurfaceManager(root = "activeCard")
+        val pauseActions = mutableListOf<A2uiAction>()
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(
+                surfaceId = SurfaceId,
+                surfaceManager = pauseManager,
+                onAction = pauseActions::add,
+            )
+        }
+
+        composeRule.onNodeWithText("Pause").performClick()
+        composeRule.onNodeWithText("Delete").performClick()
+        composeRule.runOnIdle {
+            assertEquals("schedule.pause", pauseActions[0].name)
+            assertEquals("sched-active", pauseActions[0].context["id"]!!.jsonPrimitive.content)
+            assertEquals("schedule.delete", pauseActions[1].name)
+            assertEquals("sched-active", pauseActions[1].context["id"]!!.jsonPrimitive.content)
+        }
+    }
+
+    @Test
+    fun scheduleCardDispatchesResumeAction() {
+        val resumeManager = scheduleSurfaceManager(root = "pausedCard")
+        val resumeActions = mutableListOf<A2uiAction>()
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(
+                surfaceId = SurfaceId,
+                surfaceManager = resumeManager,
+                onAction = resumeActions::add,
+            )
+        }
+
+        composeRule.onNodeWithText("Resume").performClick()
+        composeRule.runOnIdle {
+            val action = resumeActions.single()
+            assertEquals("schedule.resume", action.name)
+            assertEquals("sched-paused", action.context["id"]!!.jsonPrimitive.content)
+        }
+    }
+
+    @Test
+    fun scheduleSelectorSupportsCronEveryAtModesAndSaveAction() {
+        val manager = scheduleSurfaceManager(root = "selector")
+        val actions = mutableListOf<A2uiAction>()
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(
+                surfaceId = SurfaceId,
+                surfaceManager = manager,
+                onAction = actions::add,
+            )
+        }
+
+        composeRule.onNodeWithTag(A2uiTestTags.ScheduleSelectorInput).assertIsDisplayed()
+        composeRule.onNodeWithText("Runs on cron: 0 8 * * *").assertIsDisplayed()
+        composeRule.onNodeWithText("Cron").performClick()
+        composeRule.onNodeWithText("Every").performClick()
+        composeRule.onNodeWithText("Runs every 15 minutes").assertIsDisplayed()
+        composeRule.runOnIdle {
+            val draft = manager.surface(SurfaceId)!!.dataModel.resolve("/draftSchedule")!!.jsonObject
+            assertEquals("every", draft["mode"]!!.jsonPrimitive.content)
+            assertEquals("15", draft["value"]!!.jsonPrimitive.content)
+        }
+
+        composeRule.onNodeWithText("Every").performClick()
+        composeRule.onNodeWithText("At").performClick()
+        composeRule.onNodeWithText("Runs once at a Unix timestamp").assertIsDisplayed()
+        composeRule.onNodeWithText("At").performClick()
+        composeRule.onNodeWithText("Cron").performClick()
+        composeRule.onNodeWithText("Save schedule").performClick()
+
+        composeRule.runOnIdle {
+            val action = actions.single()
+            assertEquals("schedule.save", action.name)
+            val createParams = action.context["create_params"]!!.jsonObject
+            assertEquals("agent-1", createParams["agent_id"]!!.jsonPrimitive.content)
+            assertEquals(
+                "0 9 * * 1",
+                createParams["schedule"]!!.jsonObject["cron_expression"]!!.jsonPrimitive.content,
+            )
+        }
+    }
+
+    @Test
     fun buttonActionResolvesBoundContextAgainstCurrentDataModel() {
         val manager = bookingFormSurfaceManager()
         val actions = mutableListOf<A2uiAction>()
@@ -1417,6 +1533,38 @@ private fun tabsAccordionSurfaceManager(root: String): A2uiSurfaceManager {
                     ]},
                     {"id":"summaryBody","component":"Text","text":{"literalString":"Summary body"}},
                     {"id":"detailsBody","component":"Text","text":{"literalString":"Details body"}}
+                  ]}}
+                ]
+                """.trimIndent(),
+            ),
+        )
+    )
+    return manager
+}
+
+private fun scheduleSurfaceManager(root: String): A2uiSurfaceManager {
+    val manager = A2uiSurfaceManager()
+    manager.applyMessages(
+        decodeA2uiMessages(
+            A2uiProtocolJson.Default,
+            A2uiProtocolJson.Default.parseToJsonElement(
+                """
+                [
+                  {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"com.letta.mobile:schedule/v1"}},
+                  {"version":"v0.9","updateComponents":{"surfaceId":"$SurfaceId","root":"$root","components":[
+                    {"id":"scheduleList","component":"ListView","itemTemplate":"scheduleTemplate","items":{"path":"/schedules"},"itemKey":"id","spacing":"sm"},
+                    {"id":"scheduleTemplate","component":"ScheduleCard","scheduleId":{"path":"id"},"name":{"path":"name"},"agentName":{"path":"agentName"},"status":{"path":"status"},"summary":{"path":"summary"},"cronExpression":{"path":"cron"},"nextScheduledTime":{"path":"nextRun"},"lastRun":{"path":"lastRun"}},
+                    {"id":"activeCard","component":"ScheduleCard","scheduleId":"sched-active","name":"Morning check-in","agentName":"Ada","status":"active","summary":"Ask for a standup update","cronExpression":"0 8 * * *","nextScheduledTime":"2026-05-20T08:00:00Z"},
+                    {"id":"pausedCard","component":"ScheduleCard","scheduleId":"sched-paused","name":"Paused digest","agentName":"Ada","status":"paused","summary":"Paused schedule","every":"30 minutes","nextScheduledTime":"2026-05-20T09:00:00Z"},
+                    {"id":"selector","component":"ScheduleSelectorInput","label":{"literalString":"Schedule cadence"},"value":{"path":"/draftSchedule"},"agentId":{"literalString":"agent-1"},"message":{"literalString":"Send me a digest"}}
+                  ]}},
+                  {"version":"v0.9","updateDataModel":{"surfaceId":"$SurfaceId","path":"/draftSchedule","value":{"mode":"cron","value":"0 8 * * *"}}},
+                  {"version":"v0.9","updateDataModel":{"surfaceId":"$SurfaceId","path":"/schedules","value":[
+                    {"id":"sched-1","name":"Morning check-in","agentName":"Ada","status":"active","summary":"Ask for a standup update","cron":"0 8 * * *","nextRun":"2026-05-20T08:00:00Z","lastRun":"2026-05-19T08:00:00Z"},
+                    {"id":"sched-2","name":"Weekly summary","agentName":"Byron","status":"active","summary":"Summarize project progress","cron":"0 9 * * 1","nextRun":"2026-05-25T09:00:00Z"},
+                    {"id":"sched-3","name":"One-time reminder","agentName":"Curie","status":"idle","summary":"Remind me once","at":"1790000000","nextRun":"2026-09-21T00:00:00Z"},
+                    {"id":"sched-4","name":"Paused follow-up","agentName":"Darwin","status":"paused","summary":"Paused follow-up","every":"30 minutes"},
+                    {"id":"sched-5","name":"Failed run","agentName":"Emmy","status":"failed","summary":"Investigate failure","cron":"*/15 * * * *"}
                   ]}}
                 ]
                 """.trimIndent(),
