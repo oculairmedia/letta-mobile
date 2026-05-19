@@ -17,7 +17,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -30,6 +32,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -175,6 +178,9 @@ object A2uiTestTags {
     const val StepperDecrement = "a2ui_stepper_decrement"
     const val StepperIncrement = "a2ui_stepper_increment"
     const val Dropdown = "a2ui_dropdown"
+    const val Chip = "a2ui_chip"
+    const val FilterChip = "a2ui_filter_chip"
+    const val Badge = "a2ui_badge"
     const val Divider = "a2ui_divider"
     const val ToolApprovalCard = "a2ui_tool_approval_card"
     const val ToolApprovalSensitiveValue = "a2ui_tool_approval_sensitive_value"
@@ -362,6 +368,27 @@ private fun A2uiComponentNodeContent(
             surface = surface,
             modifier = modifier,
             surfaceSubmitting = surfaceSubmitting,
+            renderScope = renderScope,
+        )
+        "Chip" -> A2uiChip(
+            component = component,
+            surface = surface,
+            modifier = modifier,
+            onAction = onAction,
+            surfaceSubmitting = surfaceSubmitting,
+            renderScope = renderScope,
+        )
+        "FilterChip" -> A2uiFilterChip(
+            component = component,
+            surface = surface,
+            modifier = modifier,
+            surfaceSubmitting = surfaceSubmitting,
+            renderScope = renderScope,
+        )
+        "Badge" -> A2uiBadge(
+            component = component,
+            surface = surface,
+            modifier = modifier,
             renderScope = renderScope,
         )
         "Image" -> A2uiImage(component = component, surface = surface, modifier = modifier, renderScope = renderScope)
@@ -1473,6 +1500,88 @@ private fun A2uiComponent.resolveButtonLabel(surface: A2uiSurfaceState, renderSc
 @Composable
 private fun A2uiComponent.resolveControlLabel(surface: A2uiSurfaceState, renderScope: A2uiRenderScope): String? =
     resolveBindingText(raw["label"] ?: raw["text"] ?: raw["title"], surface, renderScope)
+
+@Composable
+private fun A2uiChip(
+    component: A2uiComponent,
+    surface: A2uiSurfaceState,
+    modifier: Modifier = Modifier,
+    onAction: (A2uiAction) -> Unit,
+    surfaceSubmitting: Boolean,
+    renderScope: A2uiRenderScope,
+) {
+    val label = component.resolveControlLabel(surface, renderScope)
+    val action = component.action(surface, renderScope)
+    if (label == null) {
+        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingText))
+        return
+    }
+
+    AssistChip(
+        onClick = { action?.let(onAction) },
+        enabled = action != null && !surfaceSubmitting,
+        label = { Text(label) },
+        modifier = modifier.testTag(A2uiTestTags.Chip),
+    )
+}
+
+@Composable
+private fun A2uiFilterChip(
+    component: A2uiComponent,
+    surface: A2uiSurfaceState,
+    modifier: Modifier = Modifier,
+    surfaceSubmitting: Boolean,
+    renderScope: A2uiRenderScope,
+) {
+    val binding = component.raw["value"] ?: component.raw["checked"] ?: component.raw["selected"]
+    val path = binding.bindingPath()?.let(renderScope::resolvePath)
+    val boundSelected = component.resolveInputValue(surface, binding, renderScope).toBooleanStrictOrNull() ?: false
+    val localSelected = rememberA2uiLocalBooleanState("value", boundSelected)
+    val selected = if (path != null) boundSelected else localSelected.value
+    val label = component.resolveControlLabel(surface, renderScope)
+    if (label == null) {
+        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingText))
+        return
+    }
+
+    fun update(next: Boolean) {
+        if (path != null) {
+            surface.dataModel.applyPatch(path = path, value = JsonPrimitive(next))
+        } else {
+            localSelected.value = next
+        }
+    }
+
+    FilterChip(
+        selected = selected,
+        onClick = { update(!selected) },
+        enabled = !surfaceSubmitting,
+        label = { Text(label) },
+        modifier = modifier.testTag(A2uiTestTags.FilterChip),
+    )
+}
+
+@Composable
+private fun A2uiBadge(
+    component: A2uiComponent,
+    surface: A2uiSurfaceState,
+    modifier: Modifier = Modifier,
+    renderScope: A2uiRenderScope,
+) {
+    val text = resolveBindingText(
+        component.raw["count"] ?: component.raw["text"] ?: component.raw["label"] ?: component.raw["value"],
+        surface,
+        renderScope,
+    )
+    if (text == null) {
+        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingText))
+        return
+    }
+
+    Badge(modifier = modifier.testTag(A2uiTestTags.Badge)) {
+        Text(text)
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
