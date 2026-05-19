@@ -153,6 +153,8 @@ class ChannelTransport @Inject constructor() {
     private val socketRef = AtomicReference<WebSocket?>(null)
     private val socketMutex = Mutex()
     private var listenerJob: Job? = null
+    private var reconnectJob: Job? = null
+    private var lastConnectionConfig: ConnectionConfig? = null
     private val pendingA2uiActionLock = Any()
     private val pendingA2uiActions = ArrayDeque<UserActionFrame>()
 
@@ -181,6 +183,12 @@ class ChannelTransport @Inject constructor() {
         deviceId: String,
         clientVersion: String,
     ): Unit = socketMutex.withLock {
+        lastConnectionConfig = ConnectionConfig(
+            baseShimUrl = baseShimUrl,
+            token = token,
+            deviceId = deviceId,
+            clientVersion = clientVersion,
+        )
         // Drop any previous socket — caller is allowed to call
         // connect() repeatedly (e.g. after a switch); each call
         // supersedes the prior one.
@@ -229,23 +237,29 @@ class ChannelTransport @Inject constructor() {
                     "WS closed code=$code reason=${reason.ifEmpty { "<empty>" }} initiator=$initiator " +
                         "inFlight=$inFlight runId=${currentRunId.get()}",
                 )
+                if (!socketRef.compareAndSet(webSocket, null)) {
+                    Log.i(TAG, "Ignoring close from superseded WS socket")
+                    return
+                }
                 _state.value = State.Disconnected(code, reason)
                 inFlight = false
                 currentRunId.set(null)
                 currentTurnId.set(null)
                 clientInitiatedClose = false
-                socketRef.compareAndSet(webSocket, null)
                 cancelPendingCronRequests("WS closed: code=$code reason=$reason")
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 Log.w(TAG, "WS failure: ${t.message} (httpCode=${response?.code})", t)
+                if (!socketRef.compareAndSet(webSocket, null)) {
+                    Log.i(TAG, "Ignoring failure from superseded WS socket")
+                    return
+                }
                 _state.value = State.Disconnected(-1, t.message ?: t::class.java.simpleName)
                 inFlight = false
                 currentRunId.set(null)
                 currentTurnId.set(null)
                 clientInitiatedClose = false
-                socketRef.compareAndSet(webSocket, null)
                 cancelPendingCronRequests("WS failure: ${t.message ?: t::class.java.simpleName}")
             }
         }
@@ -296,6 +310,7 @@ class ChannelTransport @Inject constructor() {
      * so we surface the failure locally instead.
      */
     fun cancel(): Boolean {
+        clearPendingA2uiActions(reason = "user cancel")
         val socket = socketRef.get() ?: return false
         val rid = currentRunId.get() ?: return false
         return socket.sendFrame(
@@ -478,6 +493,7 @@ class ChannelTransport @Inject constructor() {
      * (e.g. process exit, account switch).
      */
     suspend fun disconnect(): Unit = socketMutex.withLock {
+        clearPendingA2uiActions(reason = "client disconnect")
         teardownLocked(reason = "client disconnect")
     }
 
@@ -620,7 +636,11 @@ class ChannelTransport @Inject constructor() {
                 "user_action missing run_id; queueing until active run is known " +
                     "surfaceId=${action.surfaceId} event=${action.name} frameId=${frame.id}",
             )
-            return enqueueA2uiAction(frame)
+            return enqueueA2uiAction(frame).also { result ->
+                if (stateNow !is State.Connected || socket == null) {
+                    requestReconnectIfQueued(result, "missing run_id and no live socket")
+                }
+            }
         }
         if (stateNow is State.Connected && socket != null) {
             val ok = socket.sendFrame(frame)
@@ -638,14 +658,14 @@ class ChannelTransport @Inject constructor() {
                 TAG,
                 "user_action sendFrame returned false; queueing surfaceId=${action.surfaceId} event=${action.name}",
             )
-            return enqueueA2uiAction(frame)
+            return enqueueA2uiAction(frame).also { requestReconnectIfQueued(it, "sendFrame returned false") }
         }
         Log.w(
             TAG,
             "user_action no live socket (state=${stateNow::class.simpleName} socketNull=${socket == null}); " +
                 "queueing surfaceId=${action.surfaceId} event=${action.name}",
         )
-        return enqueueA2uiAction(frame)
+        return enqueueA2uiAction(frame).also { requestReconnectIfQueued(it, "no live socket") }
     }
 
     private fun enqueueA2uiAction(frame: UserActionFrame): A2uiActionDispatchResult =
@@ -661,6 +681,41 @@ class ChannelTransport @Inject constructor() {
     private fun requeueA2uiActionFirst(frame: UserActionFrame) {
         synchronized(pendingA2uiActionLock) {
             pendingA2uiActions.addFirst(frame)
+        }
+    }
+
+    private fun clearPendingA2uiActions(reason: String) {
+        val dropped = synchronized(pendingA2uiActionLock) {
+            val size = pendingA2uiActions.size
+            pendingA2uiActions.clear()
+            size
+        }
+        if (dropped > 0) {
+            Log.i(TAG, "dropped $dropped queued user_action frame(s): $reason")
+        }
+    }
+
+    private fun requestReconnectIfQueued(result: A2uiActionDispatchResult, reason: String) {
+        if (result !is A2uiActionDispatchResult.Queued) return
+        requestReconnect(reason)
+    }
+
+    private fun requestReconnect(reason: String) {
+        val config = lastConnectionConfig
+        if (config == null) {
+            Log.w(TAG, "user_action queued but reconnect unavailable: no prior connection config")
+            return
+        }
+        if (state.value is State.Connecting) return
+        if (reconnectJob?.isActive == true) return
+        reconnectJob = scope.launch {
+            Log.i(TAG, "redialing WS for queued user_action: $reason")
+            connect(
+                baseShimUrl = config.baseShimUrl,
+                token = config.token,
+                deviceId = config.deviceId,
+                clientVersion = config.clientVersion,
+            )
         }
     }
 
@@ -697,6 +752,13 @@ class ChannelTransport @Inject constructor() {
     private fun UserActionFrame.withActiveRoutingFallback(): UserActionFrame = copy(
         runId = runId ?: currentRunId.get(),
         turnId = turnId ?: currentTurnId.get(),
+    )
+
+    private data class ConnectionConfig(
+        val baseShimUrl: String,
+        val token: String,
+        val deviceId: String,
+        val clientVersion: String,
     )
 
     companion object {
