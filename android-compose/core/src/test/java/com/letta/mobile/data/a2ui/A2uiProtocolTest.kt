@@ -29,9 +29,12 @@ class A2uiProtocolTest : WordSpec({
             out shouldContain "\"supported_catalogs\""
             out shouldContain A2UI_BASIC_CATALOG_ID
             out shouldContain LETTA_TOOL_APPROVAL_CATALOG_ID
+            out shouldContain LETTA_SCHEDULE_CATALOG_ID
             out shouldContain "\"supported_widgets\""
             out shouldContain A2UI_LIST_VIEW_WIDGET_ID
             out shouldContain LETTA_TOOL_APPROVAL_WIDGET_ID
+            out shouldContain LETTA_SCHEDULE_CARD_WIDGET_ID
+            out shouldContain LETTA_SCHEDULE_SELECTOR_WIDGET_ID
             out shouldContain "\"theme_hints\""
         }
     }

@@ -2,6 +2,8 @@ package com.letta.mobile.feature.chat
 
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -115,6 +117,41 @@ class A2uiToolApprovalRoundTripTest {
         )
         assertTrue("Approval tap should emit promptly", elapsedMs(tapAt) < 1_000)
         withRealTimeout { confirmation.await() }
+    }
+
+    @Test
+    fun scheduleCatalogActionsRoundTripOverAdminShimWebSocket() = runTest {
+        val server = openServer()
+        val transport = openTransport()
+        val bridge = WsChatBridge(transport)
+        val manager = A2uiSurfaceManager()
+        connect(transport, bridge, server)
+
+        val surfaceArrived = async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+            bridge.a2uiEvents.first { event ->
+                event.messages.any { it.surfaceId == "schedule-surface" }
+            }
+        }
+        server.sendScheduleSurface(surfaceId = "schedule-surface")
+        manager.apply(withRealTimeout { surfaceArrived.await() })
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiSurfaceRenderer(
+                surface = manager.surface("schedule-surface"),
+                onAction = { bridge.sendA2uiAction(it) },
+            )
+        }
+
+        composeRule.onNodeWithTag(A2uiTestTags.ScheduleCard).assertIsDisplayed()
+        composeRule.onNodeWithText("Morning check-in").assertIsDisplayed()
+        composeRule.onNodeWithTag(A2uiTestTags.ScheduleSelectorInput).assertIsDisplayed()
+
+        composeRule.onAllNodes(hasText("Run now") and hasClickAction())[0].performClick()
+        withRealTimeout { server.actions.receive() }.assertScheduleAction(
+            surfaceId = "schedule-surface",
+            name = "schedule.run_now",
+            scheduleId = "sched-e2e",
+        )
     }
 
     @Test
@@ -394,6 +431,22 @@ private fun JsonObject.assertToolApprovalAction(
     assertEquals(scope, context.stringValue("scope"))
 }
 
+private fun JsonObject.assertScheduleAction(
+    surfaceId: String,
+    name: String,
+    scheduleId: String?,
+) {
+    assertEquals("user_action", stringValue("type"))
+    assertEquals(name, stringValue("name"))
+    assertEquals(surfaceId, stringValue("surface_id"))
+    assertEquals("run-e2e", stringValue("run_id"))
+    assertEquals("turn-e2e", stringValue("turn_id"))
+    val context = this["context"]!!.jsonObject
+    if (scheduleId != null) {
+        assertEquals(scheduleId, context.stringValue("id"))
+    }
+}
+
 private fun JsonObject.stringValue(key: String): String =
     this[key]?.jsonPrimitive?.contentOrNull ?: error("Missing string field $key")
 
@@ -472,6 +525,10 @@ private class A2uiShimServer {
         )
     }
 
+    suspend fun sendScheduleSurface(surfaceId: String) {
+        (activeSocket ?: firstSocket.await()).send(scheduleFrame(surfaceId))
+    }
+
     suspend fun sendTurnStarted() {
         (activeSocket ?: firstSocket.await()).send(
             """
@@ -539,6 +596,36 @@ private class A2uiShimServer {
              ]}
         """.trimIndent()
     }
+
+    private fun scheduleFrame(surfaceId: String): String =
+        """
+            {"v":1,"type":"a2ui_frame","id":"a2ui-$surfaceId","ts":"2026-05-17T00:00:01Z",
+             "agent_id":"agent-e2e","conversation_id":"conv-e2e","turn_id":"turn-e2e","run_id":"run-e2e",
+             "ok":true,
+             "a2ui":[
+               {"version":"v0.9","createSurface":{
+                 "surfaceId":"$surfaceId",
+                 "catalogId":"com.letta.mobile:schedule/v1"
+               }},
+               {"version":"v0.9","updateComponents":{"surfaceId":"$surfaceId","root":"scheduleRoot","components":[
+                 {"id":"scheduleRoot","component":"Column","children":["scheduleCard","selector"],"spacing":"sm"},
+                 {"id":"scheduleCard","component":"ScheduleCard",
+                  "scheduleId":"sched-e2e",
+                  "name":"Morning check-in",
+                  "agentName":"Ada",
+                  "status":"active",
+                  "summary":"Ask for a standup update",
+                  "cronExpression":"0 8 * * *",
+                  "nextScheduledTime":"2026-05-20T08:00:00Z"},
+                 {"id":"selector","component":"ScheduleSelectorInput",
+                  "label":{"literalString":"Schedule cadence"},
+                  "value":{"path":"/draftSchedule"},
+                  "agentId":{"literalString":"agent-e2e"},
+                  "message":{"literalString":"Send me a digest"}}
+               ]}},
+               {"version":"v0.9","updateDataModel":{"surfaceId":"$surfaceId","path":"/draftSchedule","value":{"mode":"cron","value":"0 8 * * *"}}}
+             ]}
+        """.trimIndent()
 }
 
 private fun ChannelTransport.disconnectForTest() {

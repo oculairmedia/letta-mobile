@@ -42,9 +42,14 @@ const val A2UI_LIST_VIEW_WIDGET_ID = "ListView"
 const val LETTA_TOOL_APPROVAL_CATALOG_ID = "com.letta.mobile:tool-approval/v1"
 const val LETTA_TOOL_APPROVAL_WIDGET_ID = "ToolApprovalCard"
 
+const val LETTA_SCHEDULE_CATALOG_ID = "com.letta.mobile:schedule/v1"
+const val LETTA_SCHEDULE_CARD_WIDGET_ID = "ScheduleCard"
+const val LETTA_SCHEDULE_SELECTOR_WIDGET_ID = "ScheduleSelectorInput"
+
 val A2UI_DEFAULT_SUPPORTED_CATALOGS: List<String> = listOf(
     A2UI_BASIC_CATALOG_ID,
     LETTA_TOOL_APPROVAL_CATALOG_ID,
+    LETTA_SCHEDULE_CATALOG_ID,
 )
 
 val A2UI_DEFAULT_SUPPORTED_WIDGETS: List<String> = listOf(
@@ -71,6 +76,8 @@ val A2UI_DEFAULT_SUPPORTED_WIDGETS: List<String> = listOf(
     "Image",
     A2UI_LIST_VIEW_WIDGET_ID,
     LETTA_TOOL_APPROVAL_WIDGET_ID,
+    LETTA_SCHEDULE_CARD_WIDGET_ID,
+    LETTA_SCHEDULE_SELECTOR_WIDGET_ID,
 )
 
 @Serializable
