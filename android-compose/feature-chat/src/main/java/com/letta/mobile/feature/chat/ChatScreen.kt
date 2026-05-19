@@ -51,6 +51,7 @@ import com.letta.mobile.ui.components.FloatingBanner
 import com.letta.mobile.ui.components.MessageSkeletonList
 import com.letta.mobile.ui.components.StarterPrompts
 import com.letta.mobile.ui.components.ThinkingShader
+import com.letta.mobile.ui.components.ThinkingTextToken
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import androidx.compose.animation.core.EaseInOutCubic
 import androidx.compose.animation.core.animateFloatAsState
@@ -126,11 +127,11 @@ internal fun ChatScreen(
             viewModel.markA2uiActionSnackbarShown(snackbar.id)
         }
 
-        LaunchedEffect(state.a2uiThinkingDelayMessage) {
-            val message = state.a2uiThinkingDelayMessage ?: return@LaunchedEffect
-            floatingBannerMessage = message
-            viewModel.markA2uiThinkingDelayMessageShown()
-        }
+        // letta-mobile-ndtc.3: the 60s delay subtitle is rendered inline by
+        // ThinkingTextToken below (not as a snackbar/banner). The ViewModel
+        // keeps `a2uiThinkingDelayMessage` set until the next thinking start
+        // clears it (see startA2uiThinkingIndicator), so the operator sees
+        // the subtitle until they take their next action.
 
         Box(
             modifier = modifier
@@ -247,6 +248,17 @@ internal fun ChatScreen(
                         }
                     }
                 }
+
+                // letta-mobile-ndtc.3: gradient "thinking" text token —
+                // ephemeral subtitle that appears between the message list /
+                // A2UI surfaces and the composer while awaiting the agent's
+                // first frame. Driven by `isAgentTyping`; switches to the
+                // delay subtitle on the 60s A2UI timeout.
+                ThinkingTextToken(
+                    visible = state.isAgentTyping,
+                    delayMessage = state.a2uiThinkingDelayMessage,
+                    reducedMotion = reducedMotion,
+                )
 
                 val launchPicker = rememberImageAttachmentPicker(
                     onPicked = { viewModel.addAttachment(it) },
