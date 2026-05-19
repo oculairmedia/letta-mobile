@@ -77,6 +77,12 @@ object WsFrameMapper {
         is ServerFrame.A2uiCapabilities,
         is ServerFrame.UserActionAck,
         is ServerFrame.UserActionOutcome,
+        is ServerFrame.CronListResponse,
+        is ServerFrame.CronAddResponse,
+        is ServerFrame.CronGetResponse,
+        is ServerFrame.CronDeleteResponse,
+        is ServerFrame.CronDeleteAllResponse,
+        is ServerFrame.CronsUpdated,
         is ServerFrame.Unknown -> null
     }
 

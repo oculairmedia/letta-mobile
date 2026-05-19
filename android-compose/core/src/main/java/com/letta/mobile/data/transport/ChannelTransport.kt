@@ -2,10 +2,13 @@ package com.letta.mobile.data.transport
 
 import android.util.Log
 import com.letta.mobile.data.a2ui.A2uiAction
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -18,6 +21,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeout
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -151,6 +156,13 @@ class ChannelTransport @Inject constructor() {
     private val pendingA2uiActionLock = Any()
     private val pendingA2uiActions = ArrayDeque<UserActionFrame>()
 
+    // letta-mobile-d52f.1: request_id correlation for cron WS round-trips.
+    // Each suspend send helper installs a CompletableDeferred keyed by
+    // request_id; the inbound handler completes the matching deferred
+    // when the response arrives. On disconnect the pending map is
+    // cancelled so callers don't wait forever.
+    private val pendingCronRequests = ConcurrentHashMap<String, CompletableDeferred<ServerFrame>>()
+
     // letta-mobile-ns5l: tracks who triggered the close so onClosed can
     // log initiator alongside the wire code. Set true in disconnect()
     // and teardownLocked() before the close call; cleared in
@@ -223,6 +235,7 @@ class ChannelTransport @Inject constructor() {
                 currentTurnId.set(null)
                 clientInitiatedClose = false
                 socketRef.compareAndSet(webSocket, null)
+                cancelPendingCronRequests("WS closed: code=$code reason=$reason")
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
@@ -233,6 +246,7 @@ class ChannelTransport @Inject constructor() {
                 currentTurnId.set(null)
                 clientInitiatedClose = false
                 socketRef.compareAndSet(webSocket, null)
+                cancelPendingCronRequests("WS failure: ${t.message ?: t::class.java.simpleName}")
             }
         }
 
@@ -306,6 +320,158 @@ class ChannelTransport @Inject constructor() {
         )
     }
 
+    // ─── Cron WS helpers (letta-mobile-d52f.1, sister to lcp-d5g) ────
+    //
+    // Each helper generates a request_id, sends the frame, and suspends
+    // until the matching response arrives (or the socket disconnects /
+    // the [DEFAULT_CRON_TIMEOUT_MS] elapses). The completed response
+    // also flows through [events] so observers — including the repo
+    // layer — see the same frame.
+
+    /**
+     * List scheduled tasks. Filters are optional; pass null to receive
+     * every task the shim knows about.
+     */
+    suspend fun sendCronList(
+        agentId: String? = null,
+        conversationId: String? = null,
+        timeoutMs: Long = DEFAULT_CRON_TIMEOUT_MS,
+    ): ServerFrame.CronListResponse {
+        val requestId = newCronRequestId()
+        val frame = CronListFrame(
+            id = UUID.randomUUID().toString(),
+            ts = nowIso(),
+            requestId = requestId,
+            agentId = agentId,
+            conversationId = conversationId,
+        )
+        return awaitCronResponse(requestId, frame, timeoutMs) as ServerFrame.CronListResponse
+    }
+
+    /**
+     * Add a scheduled prompt. The selector (`cron` / `every` / `at`) is
+     * decided by the caller — exactly one should be non-null. The shim
+     * normalizes all three into the persisted task's `cron` field.
+     */
+    suspend fun sendCronAdd(
+        agentId: String,
+        name: String,
+        description: String,
+        prompt: String,
+        recurring: Boolean,
+        cron: String? = null,
+        every: String? = null,
+        at: String? = null,
+        timezone: String? = null,
+        conversationId: String? = null,
+        timeoutMs: Long = DEFAULT_CRON_TIMEOUT_MS,
+    ): ServerFrame.CronAddResponse {
+        val requestId = newCronRequestId()
+        val frame = CronAddFrame(
+            id = UUID.randomUUID().toString(),
+            ts = nowIso(),
+            requestId = requestId,
+            agentId = agentId,
+            name = name,
+            description = description,
+            prompt = prompt,
+            recurring = recurring,
+            cron = cron,
+            every = every,
+            at = at,
+            timezone = timezone,
+            conversationId = conversationId,
+        )
+        return awaitCronResponse(requestId, frame, timeoutMs) as ServerFrame.CronAddResponse
+    }
+
+    suspend fun sendCronGet(
+        taskId: String,
+        timeoutMs: Long = DEFAULT_CRON_TIMEOUT_MS,
+    ): ServerFrame.CronGetResponse {
+        val requestId = newCronRequestId()
+        val frame = CronGetFrame(
+            id = UUID.randomUUID().toString(),
+            ts = nowIso(),
+            requestId = requestId,
+            taskId = taskId,
+        )
+        return awaitCronResponse(requestId, frame, timeoutMs) as ServerFrame.CronGetResponse
+    }
+
+    suspend fun sendCronDelete(
+        taskId: String,
+        timeoutMs: Long = DEFAULT_CRON_TIMEOUT_MS,
+    ): ServerFrame.CronDeleteResponse {
+        val requestId = newCronRequestId()
+        val frame = CronDeleteFrame(
+            id = UUID.randomUUID().toString(),
+            ts = nowIso(),
+            requestId = requestId,
+            taskId = taskId,
+        )
+        return awaitCronResponse(requestId, frame, timeoutMs) as ServerFrame.CronDeleteResponse
+    }
+
+    suspend fun sendCronDeleteAll(
+        agentId: String,
+        timeoutMs: Long = DEFAULT_CRON_TIMEOUT_MS,
+    ): ServerFrame.CronDeleteAllResponse {
+        val requestId = newCronRequestId()
+        val frame = CronDeleteAllFrame(
+            id = UUID.randomUUID().toString(),
+            ts = nowIso(),
+            requestId = requestId,
+            agentId = agentId,
+        )
+        return awaitCronResponse(requestId, frame, timeoutMs) as ServerFrame.CronDeleteAllResponse
+    }
+
+    /** Generate a fresh UUID-prefixed request_id for cron correlation. */
+    private fun newCronRequestId(): String = "cron-${UUID.randomUUID()}"
+
+    /**
+     * Register a deferred for the request_id, send the frame, and wait
+     * for the response (or the configured timeout). Failures (socket
+     * down, send returned false) surface as [IllegalStateException] so
+     * callers can branch on offline vs success/error-response.
+     */
+    private suspend fun awaitCronResponse(
+        requestId: String,
+        frame: ClientFrame,
+        timeoutMs: Long,
+    ): ServerFrame {
+        val socket = socketRef.get()
+            ?: throw IllegalStateException("Cron send failed: no socket")
+        if (state.value !is State.Connected) {
+            throw IllegalStateException("Cron send failed: state=${state.value::class.simpleName}")
+        }
+        val deferred = CompletableDeferred<ServerFrame>()
+        val previous = pendingCronRequests.put(requestId, deferred)
+        previous?.cancel()
+        try {
+            val ok = socket.sendFrame(frame)
+            if (!ok) {
+                pendingCronRequests.remove(requestId, deferred)
+                throw IllegalStateException("Cron send failed: sendFrame returned false")
+            }
+            return withTimeout(timeoutMs) { deferred.await() }
+        } catch (e: TimeoutCancellationException) {
+            pendingCronRequests.remove(requestId, deferred)
+            throw e
+        } catch (e: Throwable) {
+            pendingCronRequests.remove(requestId, deferred)
+            throw e
+        }
+    }
+
+    private fun cancelPendingCronRequests(reason: String) {
+        val snapshot = pendingCronRequests.keys.toList()
+        snapshot.forEach { requestId ->
+            pendingCronRequests.remove(requestId)?.cancel(CancellationException(reason))
+        }
+    }
+
     /**
      * Tear down without sending `bye`. Intended for shutdown paths
      * where the caller doesn't care about a clean server-side close
@@ -327,6 +493,7 @@ class ChannelTransport @Inject constructor() {
         inFlight = false
         currentRunId.set(null)
         currentTurnId.set(null)
+        cancelPendingCronRequests("WS teardown: $reason")
     }
 
     private fun handleInbound(text: String) {
@@ -403,6 +570,20 @@ class ChannelTransport @Inject constructor() {
                 // soft-error case (single-flight, missing fields,
                 // run_not_found) we keep the connection up; just
                 // forward the frame so the caller can surface it.
+            }
+
+            is ServerFrame.CronListResponse,
+            is ServerFrame.CronAddResponse,
+            is ServerFrame.CronGetResponse,
+            is ServerFrame.CronDeleteResponse,
+            is ServerFrame.CronDeleteAllResponse -> {
+                // letta-mobile-d52f.1: route to the awaiting suspend
+                // helper keyed by request_id. The frame still falls
+                // through to the broadcast emit below so observers see
+                // it too.
+                frame.cronRequestIdOrNull()?.let { rid ->
+                    pendingCronRequests.remove(rid)?.complete(frame)
+                }
             }
 
             else -> {
@@ -520,6 +701,13 @@ class ChannelTransport @Inject constructor() {
         private const val NORMAL_CLOSE = 1000
         private const val MAX_PENDING_A2UI_ACTIONS = 16
 
+        /**
+         * Default await-window for a cron WS round-trip. Matches the
+         * 5s ceiling the shim's own integration tests use; tunable
+         * per-call via the helper's `timeoutMs` parameter.
+         */
+        const val DEFAULT_CRON_TIMEOUT_MS: Long = 5_000L
+
         internal fun nowIso(): String = Instant.now().toString()
 
         internal fun String.toWsUrl(): String = when {
@@ -553,6 +741,18 @@ class ChannelTransport @Inject constructor() {
             is ServerFrame.TurnDone -> turnId
             is ServerFrame.Error -> turnId
             is ServerFrame.A2ui -> turnId
+            else -> null
+        }
+
+        // letta-mobile-d52f.1: pull the request_id off whichever cron
+        // response variant arrived so [awaitCronResponse] can complete
+        // the matching deferred.
+        private fun ServerFrame.cronRequestIdOrNull(): String? = when (this) {
+            is ServerFrame.CronListResponse -> requestId
+            is ServerFrame.CronAddResponse -> requestId
+            is ServerFrame.CronGetResponse -> requestId
+            is ServerFrame.CronDeleteResponse -> requestId
+            is ServerFrame.CronDeleteAllResponse -> requestId
             else -> null
         }
     }

@@ -7,6 +7,7 @@ import com.letta.mobile.data.a2ui.A2uiHandshakeAck
 import com.letta.mobile.data.a2ui.A2uiMessage
 import com.letta.mobile.data.a2ui.A2uiThemeHints
 import com.letta.mobile.data.a2ui.decodeA2uiMessages
+import com.letta.mobile.data.model.CronTask
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -66,6 +67,11 @@ fun ClientFrame.encodeJson(json: Json): String = when (this) {
     is CancelFrame -> json.encodeToString(CancelFrame.serializer(), this)
     is ByeFrame -> json.encodeToString(ByeFrame.serializer(), this)
     is PongFrame -> json.encodeToString(PongFrame.serializer(), this)
+    is CronListFrame -> json.encodeToString(CronListFrame.serializer(), this)
+    is CronAddFrame -> json.encodeToString(CronAddFrame.serializer(), this)
+    is CronGetFrame -> json.encodeToString(CronGetFrame.serializer(), this)
+    is CronDeleteFrame -> json.encodeToString(CronDeleteFrame.serializer(), this)
+    is CronDeleteAllFrame -> json.encodeToString(CronDeleteAllFrame.serializer(), this)
 }
 
 /**
@@ -178,6 +184,94 @@ data class PongFrame(
     override val type: String = "pong",
     override val id: String,
     override val ts: String,
+) : ClientFrame
+
+// ─── Cron client frames (letta-mobile-d52f.1, sister to lcp-d5g) ───
+//
+// All cron client frames carry a `request_id` field that is independent
+// of the envelope `id`. The server echoes the same `request_id` on the
+// matching response so the repo layer can route an awaited continuation
+// to its caller instead of broadcasting to every observer. Generate via
+// UUID alongside the envelope id.
+
+/**
+ * Read-only enumeration of cron tasks. Both filters are optional: when
+ * `agentId` is null the server returns every task; when non-null, only
+ * tasks for that agent. `conversationId` further narrows within an
+ * agent.
+ */
+@Serializable
+data class CronListFrame(
+    override val v: Int = 1,
+    override val type: String = "cron_list",
+    override val id: String,
+    override val ts: String,
+    @SerialName("request_id") val requestId: String,
+    @SerialName("agent_id") val agentId: String? = null,
+    @SerialName("conversation_id") val conversationId: String? = null,
+) : ClientFrame
+
+/**
+ * Add a scheduled prompt. `recurring` distinguishes a once-only task
+ * from a repeating one. Exactly one of `cron` / `every` / `at` should be
+ * populated:
+ *   - `cron` — raw 5-field cron expression (e.g. `"0 9 * * 1-5"`).
+ *   - `every` — human-friendly interval shorthand (e.g. `"5m"`, `"1h"`).
+ *   - `at` — one-shot time (e.g. `"3:00pm"`, `"in 45m"`).
+ * The shim normalizes all three into the persisted `cron` field; the
+ * client picks whichever form the user expressed.
+ */
+@Serializable
+data class CronAddFrame(
+    override val v: Int = 1,
+    override val type: String = "cron_add",
+    override val id: String,
+    override val ts: String,
+    @SerialName("request_id") val requestId: String,
+    @SerialName("agent_id") val agentId: String,
+    val name: String,
+    val description: String,
+    val prompt: String,
+    val recurring: Boolean,
+    val cron: String? = null,
+    val every: String? = null,
+    val at: String? = null,
+    val timezone: String? = null,
+    @SerialName("conversation_id") val conversationId: String? = null,
+) : ClientFrame
+
+@Serializable
+data class CronGetFrame(
+    override val v: Int = 1,
+    override val type: String = "cron_get",
+    override val id: String,
+    override val ts: String,
+    @SerialName("request_id") val requestId: String,
+    @SerialName("task_id") val taskId: String,
+) : ClientFrame
+
+@Serializable
+data class CronDeleteFrame(
+    override val v: Int = 1,
+    override val type: String = "cron_delete",
+    override val id: String,
+    override val ts: String,
+    @SerialName("request_id") val requestId: String,
+    @SerialName("task_id") val taskId: String,
+) : ClientFrame
+
+/**
+ * Delete every task for a given agent. The shim returns a count of
+ * removed rows on the response.
+ */
+@Serializable
+data class CronDeleteAllFrame(
+    override val v: Int = 1,
+    override val type: String = "cron_delete_all",
+    override val id: String,
+    override val ts: String,
+    @SerialName("request_id") val requestId: String,
+    @SerialName("agent_id") val agentId: String,
 ) : ClientFrame
 
 // ─── Server → client ───────────────────────────────────────────────
@@ -471,6 +565,94 @@ sealed interface ServerFrame {
         val stderr: List<String>? = null,
     ) : ServerFrame
 
+    // ─── Cron server frames (letta-mobile-d52f.1) ───────────────────
+    //
+    // `request_id` echoes the client's outbound request so the repo
+    // layer can route the response to the awaiting continuation. The
+    // shim returns `null` for `request_id` when the inbound frame
+    // didn't carry one; CronRepository handles that by treating the
+    // response as broadcast-only.
+
+    @Serializable
+    data class CronListResponse(
+        override val v: Int = 1,
+        val type: String = "cron_list_response",
+        override val id: String,
+        override val ts: String,
+        @SerialName("request_id") val requestId: String? = null,
+        val success: Boolean,
+        val tasks: List<CronTask> = emptyList(),
+        val error: String? = null,
+    ) : ServerFrame
+
+    @Serializable
+    data class CronAddResponse(
+        override val v: Int = 1,
+        val type: String = "cron_add_response",
+        override val id: String,
+        override val ts: String,
+        @SerialName("request_id") val requestId: String? = null,
+        val success: Boolean,
+        val task: CronTask? = null,
+        val error: String? = null,
+        val warning: String? = null,
+    ) : ServerFrame
+
+    @Serializable
+    data class CronGetResponse(
+        override val v: Int = 1,
+        val type: String = "cron_get_response",
+        override val id: String,
+        override val ts: String,
+        @SerialName("request_id") val requestId: String? = null,
+        val success: Boolean,
+        val task: CronTask? = null,
+        val error: String? = null,
+    ) : ServerFrame
+
+    @Serializable
+    data class CronDeleteResponse(
+        override val v: Int = 1,
+        val type: String = "cron_delete_response",
+        override val id: String,
+        override val ts: String,
+        @SerialName("request_id") val requestId: String? = null,
+        val success: Boolean,
+        val error: String? = null,
+    ) : ServerFrame
+
+    @Serializable
+    data class CronDeleteAllResponse(
+        override val v: Int = 1,
+        val type: String = "cron_delete_all_response",
+        override val id: String,
+        override val ts: String,
+        @SerialName("request_id") val requestId: String? = null,
+        val success: Boolean,
+        val count: Long = 0L,
+        val error: String? = null,
+    ) : ServerFrame
+
+    /**
+     * Push notification emitted whenever the shim's `crons.json` changes
+     * (a task fired, an external write moved mtime, a peer client did a
+     * mutation). Carries only the post-event active count — the
+     * canonical state lives in `crons.json` and the client re-runs
+     * `cron_list` on receipt. `reason` is informational only:
+     *   `scheduler_write`, `external_write`, `client_mutation`,
+     *   `scheduler_started`, `scheduler_stopped`. Treat the set as open.
+     */
+    @Serializable
+    data class CronsUpdated(
+        override val v: Int = 1,
+        val type: String = "crons_updated",
+        override val id: String,
+        override val ts: String,
+        val reason: String,
+        @SerialName("tasks_active") val tasksActive: Long = 0L,
+        val at: String,
+    ) : ServerFrame
+
     /**
      * Forward-compat sink for unknown `type` values. Spec §2 mandates
      * silent-ignore; surfacing as a typed value (rather than throwing)
@@ -527,6 +709,12 @@ object ServerFrameSerializer : JsonContentPolymorphicSerializer<ServerFrame>(Ser
             "a2ui_capabilities" -> ServerFrame.A2uiCapabilities.serializer()
             "user_action_ack" -> ServerFrame.UserActionAck.serializer()
             "user_action_outcome" -> ServerFrame.UserActionOutcome.serializer()
+            "cron_list_response" -> ServerFrame.CronListResponse.serializer()
+            "cron_add_response" -> ServerFrame.CronAddResponse.serializer()
+            "cron_get_response" -> ServerFrame.CronGetResponse.serializer()
+            "cron_delete_response" -> ServerFrame.CronDeleteResponse.serializer()
+            "cron_delete_all_response" -> ServerFrame.CronDeleteAllResponse.serializer()
+            "crons_updated" -> ServerFrame.CronsUpdated.serializer()
             else -> UnknownFrameDeserializer
         }
     }

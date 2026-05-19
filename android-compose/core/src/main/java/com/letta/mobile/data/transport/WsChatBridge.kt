@@ -230,11 +230,19 @@ private fun ServerFrame.toTimelineEvent(): WsTimelineEvent? = when (this) {
     }
     // Welcome carries connection metadata, not chat content; surface via state.
     // Ping / A2UI frames / capabilities / acks / Unknown are silent for chat consumers.
+    // Cron frames (letta-mobile-d52f.1) are observed directly off
+    // ChannelTransport.events by the cron repository — not chat content.
     is ServerFrame.Welcome,
     is ServerFrame.Ping,
     is ServerFrame.A2ui,
     is ServerFrame.A2uiCapabilities,
     is ServerFrame.UserActionAck,
+    is ServerFrame.CronListResponse,
+    is ServerFrame.CronAddResponse,
+    is ServerFrame.CronGetResponse,
+    is ServerFrame.CronDeleteResponse,
+    is ServerFrame.CronDeleteAllResponse,
+    is ServerFrame.CronsUpdated,
     is ServerFrame.Unknown -> null
 }
 

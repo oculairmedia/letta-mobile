@@ -313,4 +313,153 @@ class MobileWsFramesTest : WordSpec({
             parsed.type shouldBe "some_future_type"
         }
     }
+
+    "Cron frame serialization (letta-mobile-d52f.1, sister to lcp-d5g)" should {
+        "cron_list — encodes request_id and omits null filters" {
+            val frame = CronListFrame(
+                id = "f-list",
+                ts = "2026-05-19T00:00:00Z",
+                requestId = "req-1",
+            )
+            val out = frame.encodeJson(json)
+            out shouldContain "\"type\":\"cron_list\""
+            out shouldContain "\"request_id\":\"req-1\""
+            (out.contains("\"agent_id\"")) shouldBe false
+            (out.contains("\"conversation_id\"")) shouldBe false
+        }
+
+        "cron_list — includes filters when set" {
+            val frame = CronListFrame(
+                id = "f-list-2",
+                ts = "2026-05-19T00:00:00Z",
+                requestId = "req-2",
+                agentId = "agent-x",
+                conversationId = "conv-default-agent-x",
+            )
+            val out = frame.encodeJson(json)
+            out shouldContain "\"agent_id\":\"agent-x\""
+            out shouldContain "\"conversation_id\":\"conv-default-agent-x\""
+        }
+
+        "cron_add — round-trips every selector and recurring flag" {
+            val frame = CronAddFrame(
+                id = "f-add",
+                ts = "2026-05-19T00:00:00Z",
+                requestId = "req-add-1",
+                agentId = "agent-x",
+                name = "daily-brief",
+                description = "Morning brief",
+                prompt = "Summarize overnight",
+                recurring = true,
+                cron = "0 9 * * 1-5",
+                timezone = "America/Toronto",
+            )
+            val out = frame.encodeJson(json)
+            out shouldContain "\"type\":\"cron_add\""
+            out shouldContain "\"request_id\":\"req-add-1\""
+            out shouldContain "\"agent_id\":\"agent-x\""
+            out shouldContain "\"name\":\"daily-brief\""
+            out shouldContain "\"recurring\":true"
+            out shouldContain "\"cron\":\"0 9 * * 1-5\""
+            out shouldContain "\"timezone\":\"America/Toronto\""
+            // The three selectors are mutually exclusive in practice but
+            // serialization just omits the unset ones (explicitNulls=false).
+            (out.contains("\"every\"")) shouldBe false
+            (out.contains("\"at\"")) shouldBe false
+        }
+
+        "cron_get / cron_delete — carry task_id" {
+            val get = CronGetFrame(id = "f-g", ts = "t", requestId = "rg", taskId = "task-1").encodeJson(json)
+            get shouldContain "\"type\":\"cron_get\""
+            get shouldContain "\"task_id\":\"task-1\""
+
+            val del = CronDeleteFrame(id = "f-d", ts = "t", requestId = "rd", taskId = "task-1").encodeJson(json)
+            del shouldContain "\"type\":\"cron_delete\""
+            del shouldContain "\"task_id\":\"task-1\""
+        }
+
+        "cron_delete_all — carries agent_id" {
+            val out = CronDeleteAllFrame(id = "f", ts = "t", requestId = "rda", agentId = "agent-x").encodeJson(json)
+            out shouldContain "\"type\":\"cron_delete_all\""
+            out shouldContain "\"agent_id\":\"agent-x\""
+        }
+
+        "cron_list_response — parses tasks array and request_id" {
+            val payload = """
+                {"v":1,"type":"cron_list_response","id":"r-1","ts":"t","request_id":"req-1",
+                 "success":true,
+                 "tasks":[
+                   {"id":"t1","agent_id":"a","conversation_id":"c","name":"n","description":"d",
+                    "cron":"*/5 * * * *","timezone":"UTC","recurring":true,"prompt":"p","status":"active",
+                    "created_at":"2026-01-01T00:00:00Z","expires_at":null,"last_fired_at":null,
+                    "fire_count":0,"cancel_reason":null,"jitter_offset_ms":0,
+                    "scheduled_for":null,"fired_at":null,"missed_at":null}
+                 ]}
+            """.trimIndent()
+            val parsed = json.decodeFromString(ServerFrameSerializer, payload)
+            parsed.shouldBeInstanceOf<ServerFrame.CronListResponse>()
+            parsed.requestId shouldBe "req-1"
+            parsed.success shouldBe true
+            parsed.tasks.size shouldBe 1
+            parsed.tasks.first().id shouldBe "t1"
+            parsed.tasks.first().agentId shouldBe "a"
+            parsed.tasks.first().cron shouldBe "*/5 * * * *"
+            parsed.tasks.first().recurring shouldBe true
+        }
+
+        "cron_add_response — carries task and warning when success" {
+            val payload = """
+                {"v":1,"type":"cron_add_response","id":"r","ts":"t","request_id":"r1",
+                 "success":true,"warning":"resolved every→cron",
+                 "task":{"id":"t1","agent_id":"a","conversation_id":"c","name":"n","description":"d",
+                   "cron":"0 9 * * *","timezone":"UTC","recurring":true,"prompt":"p","status":"active",
+                   "created_at":"2026-01-01T00:00:00Z","fire_count":0,"jitter_offset_ms":0}}
+            """.trimIndent()
+            val parsed = json.decodeFromString(ServerFrameSerializer, payload)
+            parsed.shouldBeInstanceOf<ServerFrame.CronAddResponse>()
+            parsed.success shouldBe true
+            parsed.task?.id shouldBe "t1"
+            parsed.warning shouldBe "resolved every→cron"
+            parsed.error shouldBe null
+        }
+
+        "cron_add_response — surfaces error on failure" {
+            val payload = """
+                {"v":1,"type":"cron_add_response","id":"r","ts":"t","request_id":"r1",
+                 "success":false,"error":"invalid cron expression"}
+            """.trimIndent()
+            val parsed = json.decodeFromString(ServerFrameSerializer, payload)
+            parsed.shouldBeInstanceOf<ServerFrame.CronAddResponse>()
+            parsed.success shouldBe false
+            parsed.error shouldBe "invalid cron expression"
+            parsed.task shouldBe null
+        }
+
+        "cron_delete_response / cron_delete_all_response — minimal shapes" {
+            val del = json.decodeFromString(
+                ServerFrameSerializer,
+                """{"v":1,"type":"cron_delete_response","id":"r","ts":"t","request_id":"r","success":true}""",
+            )
+            del.shouldBeInstanceOf<ServerFrame.CronDeleteResponse>()
+            del.success shouldBe true
+
+            val all = json.decodeFromString(
+                ServerFrameSerializer,
+                """{"v":1,"type":"cron_delete_all_response","id":"r","ts":"t","request_id":"r","success":true,"count":3}""",
+            )
+            all.shouldBeInstanceOf<ServerFrame.CronDeleteAllResponse>()
+            all.count shouldBe 3L
+        }
+
+        "crons_updated — parses push event with reason and active count" {
+            val payload = """
+                {"v":1,"type":"crons_updated","id":"u-1","ts":"2026-05-19T00:00:00Z",
+                 "reason":"client_mutation","tasks_active":2,"at":"2026-05-19T00:00:00Z"}
+            """.trimIndent()
+            val parsed = json.decodeFromString(ServerFrameSerializer, payload)
+            parsed.shouldBeInstanceOf<ServerFrame.CronsUpdated>()
+            parsed.reason shouldBe "client_mutation"
+            parsed.tasksActive shouldBe 2L
+        }
+    }
 })
