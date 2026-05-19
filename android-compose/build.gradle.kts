@@ -30,6 +30,24 @@ tasks.register<Delete>("cleanKotlinIC") {
 }
 
 // ---------------------------------------------------------------------------
+// Build cache policy
+// ---------------------------------------------------------------------------
+// letta-mobile-pywa: Keep Gradle's build cache enabled for the broad set of
+// cacheable Kotlin, Java, test, and Android tasks, but avoid caching AGP's main
+// manifest processing outputs. This narrows the previous global
+// org.gradle.caching=false workaround to the task family that produced cache
+// packing flakes such as processDebugMainManifest.
+subprojects {
+    tasks.configureEach {
+        if (name.startsWith("process") && name.endsWith("MainManifest")) {
+            outputs.cacheIf("AGP main manifest processing cache packing is disabled; see letta-mobile-pywa") {
+                false
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Kover — aggregated code coverage reports (HTML for humans, XML for CI)
 //
 //   ./gradlew koverHtmlReportRootDebugCoverage
