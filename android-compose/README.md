@@ -165,7 +165,7 @@ GitHub Actions already knows how to build a release APK in `.github/workflows/an
 
 - decodes `SIGNING_KEYSTORE_BASE64`
 - sets `SIGNING_*` env vars
-- runs `./gradlew :app:assemblePlayRelease --no-daemon --build-cache`
+- runs `./gradlew :app:assemblePlayRelease --build-cache`
 - uploads `android-compose/app/build/outputs/apk/play/release/*.apk` as an artifact
 
 If local release builds fail, compare your setup with the workflow first.
@@ -256,5 +256,5 @@ The repo defaults to `org.gradle.daemon=true` (validated by
 speedup) while keeping `org.gradle.parallel=false` and
 `org.gradle.caching=false`, because overlapped project work and cache-entry
 packing each caused reproducible Android verification failures in this
-codebase. CI continues to pass `--no-daemon` explicitly because runners are
-ephemeral and the daemon win is zero there.
+codebase. CI reuses the Gradle daemon within each ephemeral runner so repeated
+invocations in the same job do not pay the cold-start tax.

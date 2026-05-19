@@ -64,7 +64,7 @@ jobs:
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
           SENTRY_URL: ${{ secrets.SENTRY_URL }}
-        run: ./gradlew :app:assemblePlayRelease --no-daemon --build-cache
+        run: ./gradlew :app:assemblePlayRelease --build-cache
 
       - name: Remove signing keystore
         # Runner is ephemeral, but don't leave the decoded keystore on disk
