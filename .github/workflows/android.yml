@@ -44,9 +44,27 @@ jobs:
         with:
           # Let same-repo PRs write Gradle User Home caches so the build-apk
           # jobs can restore task outputs produced by the test job. Fork PRs
-          # stay read-only to avoid untrusted cache writes. This does not cache
-          # project-local .gradle/.kotlin/KSP intermediates.
+          # stay read-only to avoid untrusted Gradle User Home cache writes.
+          # Project-local state is handled by the separate same-repo-only cache
+          # step below.
           cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+
+      - name: Cache project-local Gradle state
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/cache@v4
+        with:
+          # This complements setup-gradle's Gradle User Home cache with the
+          # project-local state it intentionally does not persist. Fork PRs skip
+          # this cache entirely so untrusted builds cannot poison incremental
+          # Kotlin/KSP/AGP state used by trusted branches.
+          path: |
+            android-compose/.gradle
+            android-compose/.kotlin
+            android-compose/**/build/intermediates/ksp
+            android-compose/**/build/intermediates/incremental
+          key: ${{ runner.os }}-gradle-project-v1-${{ hashFiles('android-compose/gradle/wrapper/gradle-wrapper.properties', 'android-compose/settings.gradle.kts', 'android-compose/**/*.gradle.kts', 'android-compose/gradle/libs.versions.toml', 'android-compose/gradle.properties') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-project-v1-${{ hashFiles('android-compose/gradle/wrapper/gradle-wrapper.properties', 'android-compose/settings.gradle.kts', 'android-compose/**/*.gradle.kts', 'android-compose/gradle/libs.versions.toml', 'android-compose/gradle.properties') }}-
 
       - name: Compile all debug variants
         run: ./gradlew :core:compileDebugKotlin :app:compileRootDebugKotlin :app:compileSideloadDebugKotlin :app:compilePlayDebugKotlin
@@ -92,8 +110,24 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           # Restore the Gradle User Home entry written by the test job; keep
-          # fork PRs read-only and leave project-local caches uncached.
+          # fork PRs read-only and leave project-local state to the separate
+          # same-repo-only cache below.
           cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+
+      - name: Cache project-local Gradle state
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/cache@v4
+        with:
+          # Same key as the test job: build-apk can restore the project-local
+          # state produced by test after the dependency edge completes.
+          path: |
+            android-compose/.gradle
+            android-compose/.kotlin
+            android-compose/**/build/intermediates/ksp
+            android-compose/**/build/intermediates/incremental
+          key: ${{ runner.os }}-gradle-project-v1-${{ hashFiles('android-compose/gradle/wrapper/gradle-wrapper.properties', 'android-compose/settings.gradle.kts', 'android-compose/**/*.gradle.kts', 'android-compose/gradle/libs.versions.toml', 'android-compose/gradle.properties') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-project-v1-${{ hashFiles('android-compose/gradle/wrapper/gradle-wrapper.properties', 'android-compose/settings.gradle.kts', 'android-compose/**/*.gradle.kts', 'android-compose/gradle/libs.versions.toml', 'android-compose/gradle.properties') }}-
 
       - name: Decode signing keystore
         if: matrix.variant == 'play-release'
