@@ -32,6 +32,8 @@ class A2uiProtocolTest : WordSpec({
             out shouldContain LETTA_SCHEDULE_CATALOG_ID
             out shouldContain "\"supported_widgets\""
             out shouldContain A2UI_LIST_VIEW_WIDGET_ID
+            out shouldContain "LinearProgress"
+            out shouldContain "CircularProgress"
             out shouldContain LETTA_TOOL_APPROVAL_WIDGET_ID
             out shouldContain LETTA_SCHEDULE_CARD_WIDGET_ID
             out shouldContain LETTA_SCHEDULE_SELECTOR_WIDGET_ID

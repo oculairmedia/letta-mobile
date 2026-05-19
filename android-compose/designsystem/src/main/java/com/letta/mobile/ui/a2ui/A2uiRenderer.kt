@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -37,6 +38,7 @@ import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -198,6 +200,8 @@ object A2uiTestTags {
     const val ToolApprovalSensitiveValue = "a2ui_tool_approval_sensitive_value"
     const val ToolApprovalCountdown = "a2ui_tool_approval_countdown"
     const val ButtonProgress = "a2ui_button_progress"
+    const val LinearProgress = "a2ui_linear_progress"
+    const val CircularProgress = "a2ui_circular_progress"
     const val ListView = "a2ui_list_view"
 }
 
@@ -373,6 +377,18 @@ private fun A2uiComponentNodeContent(
             surface = surface,
             modifier = modifier,
             surfaceSubmitting = surfaceSubmitting,
+            renderScope = renderScope,
+        )
+        "LinearProgress" -> A2uiLinearProgress(
+            component = component,
+            surface = surface,
+            modifier = modifier,
+            renderScope = renderScope,
+        )
+        "CircularProgress" -> A2uiCircularProgress(
+            component = component,
+            surface = surface,
+            modifier = modifier,
             renderScope = renderScope,
         )
         "Dropdown", "Select" -> A2uiDropdown(
@@ -1555,6 +1571,10 @@ private fun A2uiComponent.resolveControlLabel(surface: A2uiSurfaceState, renderS
     resolveBindingText(raw["label"] ?: raw["text"] ?: raw["title"], surface, renderScope)
 
 @Composable
+private fun A2uiComponent.resolveProgressLabel(surface: A2uiSurfaceState, renderScope: A2uiRenderScope): String? =
+    resolveBindingText(raw["label"] ?: raw["text"] ?: raw["title"], surface, renderScope)
+
+@Composable
 private fun A2uiScheduleCard(
     component: A2uiComponent,
     surface: A2uiSurfaceState,
@@ -2251,6 +2271,129 @@ private fun A2uiStepper(
     }
 }
 
+
+@Composable
+private fun A2uiLinearProgress(
+    component: A2uiComponent,
+    surface: A2uiSurfaceState,
+    modifier: Modifier = Modifier,
+    renderScope: A2uiRenderScope,
+) {
+    val binding = component.raw["progress"]
+    val path = binding.bindingPath()?.let(renderScope::resolvePath)
+    val progressValue by surface.dataModel.observe(path.orEmpty())
+    val progress = progressValue.progressFractionOrNull()
+    val label = component.resolveProgressLabel(surface, renderScope)
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        label?.let {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = it,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                progress?.let { value ->
+                    Text(
+                        text = value.progressPercentLabel(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        if (path != null && progress != null) {
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics {
+                        contentDescription = "Linear progress ${progress.progressPercentLabel()}"
+                        stateDescription = progress.progressPercentLabel()
+                    }
+                    .testTag(A2uiTestTags.LinearProgress),
+            )
+        } else {
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics {
+                        contentDescription = "Linear progress indeterminate"
+                        stateDescription = "Indeterminate"
+                    }
+                    .testTag(A2uiTestTags.LinearProgress),
+            )
+        }
+    }
+}
+
+@Composable
+private fun A2uiCircularProgress(
+    component: A2uiComponent,
+    surface: A2uiSurfaceState,
+    modifier: Modifier = Modifier,
+    renderScope: A2uiRenderScope,
+) {
+    val binding = component.raw["progress"]
+    val path = binding.bindingPath()?.let(renderScope::resolvePath)
+    val progressValue by surface.dataModel.observe(path.orEmpty())
+    val progress = progressValue.progressFractionOrNull()
+    val label = component.resolveProgressLabel(surface, renderScope)
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        label?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (path != null && progress != null) {
+            Box(
+                modifier = Modifier.size(48.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .semantics {
+                            contentDescription = "Circular progress ${progress.progressPercentLabel()}"
+                            stateDescription = progress.progressPercentLabel()
+                        }
+                        .testTag(A2uiTestTags.CircularProgress),
+                )
+                Text(
+                    text = progress.progressPercentLabel(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            CircularProgressIndicator(
+                modifier = Modifier
+                    .semantics {
+                        contentDescription = "Circular progress indeterminate"
+                        stateDescription = "Indeterminate"
+                    }
+                    .testTag(A2uiTestTags.CircularProgress),
+            )
+        }
+    }
+}
+
 @Composable
 private fun A2uiComponent.resolveRadioOptions(
     surface: A2uiSurfaceState,
@@ -2539,6 +2682,12 @@ private fun Double.numericJsonPrimitive(integral: Boolean): JsonPrimitive =
 
 private fun Double.numericDisplay(integral: Boolean): String =
     if (integral) roundToInt().toString() else toString().trimEnd('0').trimEnd('.')
+
+
+private fun JsonElement?.progressFractionOrNull(): Float? =
+    this?.let(A2uiBindingResolver::displayText)?.toFloatOrNull()?.coerceIn(0f, 1f)
+
+private fun Float.progressPercentLabel(): String = "${(this * 100f).roundToInt()}%"
 
 private fun A2uiComponent.dateTimePlaceholder(
     enableDate: Boolean,

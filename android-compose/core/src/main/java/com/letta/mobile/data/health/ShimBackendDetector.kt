@@ -32,10 +32,16 @@ import javax.inject.Singleton
  * routing decision after the first probe.
  */
 @Singleton
-class ShimBackendDetector @Inject constructor(
-    private val settingsRepository: ISettingsRepository,
+class ShimBackendDetector internal constructor(
+    private val activeConfig: StateFlow<LettaConfig?>,
     private val apiClient: LettaApiClient,
 ) {
+    @Inject
+    constructor(
+        settingsRepository: SettingsRepository,
+        apiClient: LettaApiClient,
+    ) : this(settingsRepository.activeConfig, apiClient)
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val probeMutex = Mutex()
     private val _states = MutableStateFlow<Map<String, Boolean>>(emptyMap())
@@ -43,14 +49,14 @@ class ShimBackendDetector @Inject constructor(
     val states: StateFlow<Map<String, Boolean>> = _states.asStateFlow()
 
     val activeIsShimBackend: StateFlow<Boolean> = combine(
-        settingsRepository.activeConfig,
+        activeConfig,
         states,
     ) { config, states ->
         config?.let { states[it.id] } ?: false
     }.stateIn(scope, SharingStarted.Eagerly, false)
 
     suspend fun refreshActive(): Boolean {
-        val config = settingsRepository.activeConfig.value ?: return false
+        val config = activeConfig.value ?: return false
         return refresh(config)
     }
 
