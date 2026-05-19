@@ -2,6 +2,7 @@ package com.letta.mobile.data.transport
 
 import android.util.Log
 import com.letta.mobile.data.a2ui.A2uiAction
+import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -67,7 +68,7 @@ sealed interface A2uiActionDispatchResult {
  * auto-redials.
  */
 @Singleton
-class ChannelTransport @Inject constructor() {
+class ChannelTransport @Inject constructor() : IChannelTransport {
 
     sealed interface State {
         data object Idle : State
@@ -119,7 +120,7 @@ class ChannelTransport @Inject constructor() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val _state = MutableStateFlow<State>(State.Idle)
-    val state: StateFlow<State> = _state.asStateFlow()
+    override val state: StateFlow<State> = _state.asStateFlow()
 
     /**
      * Hot stream of every parsed server frame. SharedFlow with replay=0
@@ -132,7 +133,7 @@ class ChannelTransport @Inject constructor() {
         extraBufferCapacity = 64,
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
-    val events: SharedFlow<ServerFrame> = _events.asSharedFlow()
+    override val events: SharedFlow<ServerFrame> = _events.asSharedFlow()
 
     /**
      * Single-flight guard. Set true on accepted [send], cleared by
@@ -177,7 +178,7 @@ class ChannelTransport @Inject constructor() {
      * observable on [state] (Connected on welcome, Disconnected on
      * close).
      */
-    suspend fun connect(
+    override suspend fun connect(
         baseShimUrl: String,
         token: String,
         deviceId: String,
@@ -273,15 +274,15 @@ class ChannelTransport @Inject constructor() {
      * don't burn a round trip on a guaranteed error). Returns false
      * before [State.Connected] for the same reason.
      */
-    fun send(
+    override fun send(
         agentId: String,
         conversationId: String,
         text: String,
-        otid: String? = null,
+        otid: String?,
         // lcp-dlj: multimodal payload. When non-null, the shim ignores [text]
         // and treats this as the authoritative content. Caller is responsible
         // for shape — see [SendMessageFrame.contentParts] for the contract.
-        contentParts: JsonArray? = null,
+        contentParts: JsonArray?,
     ): Boolean {
         if (state.value !is State.Connected) return false
         if (inFlight) return false
@@ -309,7 +310,7 @@ class ChannelTransport @Inject constructor() {
      * sending without `run_id` is a guaranteed `protocol_violation`,
      * so we surface the failure locally instead.
      */
-    fun cancel(): Boolean {
+    override fun cancel(): Boolean {
         clearPendingA2uiActions(reason = "user cancel")
         val socket = socketRef.get() ?: return false
         val rid = currentRunId.get() ?: return false
@@ -325,7 +326,7 @@ class ChannelTransport @Inject constructor() {
     /**
      * Polite shutdown: send `bye` and let the server close.
      */
-    fun bye(): Boolean {
+    override fun bye(): Boolean {
         val socket = socketRef.get() ?: return false
         return socket.sendFrame(
             ByeFrame(
@@ -347,10 +348,10 @@ class ChannelTransport @Inject constructor() {
      * List scheduled tasks. Filters are optional; pass null to receive
      * every task the shim knows about.
      */
-    suspend fun sendCronList(
-        agentId: String? = null,
-        conversationId: String? = null,
-        timeoutMs: Long = DEFAULT_CRON_TIMEOUT_MS,
+    override suspend fun sendCronList(
+        agentId: String?,
+        conversationId: String?,
+        timeoutMs: Long,
     ): ServerFrame.CronListResponse {
         val requestId = newCronRequestId()
         val frame = CronListFrame(
@@ -368,18 +369,18 @@ class ChannelTransport @Inject constructor() {
      * decided by the caller — exactly one should be non-null. The shim
      * normalizes all three into the persisted task's `cron` field.
      */
-    suspend fun sendCronAdd(
+    override suspend fun sendCronAdd(
         agentId: String,
         name: String,
         description: String,
         prompt: String,
         recurring: Boolean,
-        cron: String? = null,
-        every: String? = null,
-        at: String? = null,
-        timezone: String? = null,
-        conversationId: String? = null,
-        timeoutMs: Long = DEFAULT_CRON_TIMEOUT_MS,
+        cron: String?,
+        every: String?,
+        at: String?,
+        timezone: String?,
+        conversationId: String?,
+        timeoutMs: Long,
     ): ServerFrame.CronAddResponse {
         val requestId = newCronRequestId()
         val frame = CronAddFrame(
@@ -400,9 +401,9 @@ class ChannelTransport @Inject constructor() {
         return awaitCronResponse(requestId, frame, timeoutMs) as ServerFrame.CronAddResponse
     }
 
-    suspend fun sendCronGet(
+    override suspend fun sendCronGet(
         taskId: String,
-        timeoutMs: Long = DEFAULT_CRON_TIMEOUT_MS,
+        timeoutMs: Long,
     ): ServerFrame.CronGetResponse {
         val requestId = newCronRequestId()
         val frame = CronGetFrame(
@@ -414,9 +415,9 @@ class ChannelTransport @Inject constructor() {
         return awaitCronResponse(requestId, frame, timeoutMs) as ServerFrame.CronGetResponse
     }
 
-    suspend fun sendCronDelete(
+    override suspend fun sendCronDelete(
         taskId: String,
-        timeoutMs: Long = DEFAULT_CRON_TIMEOUT_MS,
+        timeoutMs: Long,
     ): ServerFrame.CronDeleteResponse {
         val requestId = newCronRequestId()
         val frame = CronDeleteFrame(
@@ -428,9 +429,9 @@ class ChannelTransport @Inject constructor() {
         return awaitCronResponse(requestId, frame, timeoutMs) as ServerFrame.CronDeleteResponse
     }
 
-    suspend fun sendCronDeleteAll(
+    override suspend fun sendCronDeleteAll(
         agentId: String,
-        timeoutMs: Long = DEFAULT_CRON_TIMEOUT_MS,
+        timeoutMs: Long,
     ): ServerFrame.CronDeleteAllResponse {
         val requestId = newCronRequestId()
         val frame = CronDeleteAllFrame(
@@ -492,7 +493,7 @@ class ChannelTransport @Inject constructor() {
      * where the caller doesn't care about a clean server-side close
      * (e.g. process exit, account switch).
      */
-    suspend fun disconnect(): Unit = socketMutex.withLock {
+    override suspend fun disconnect(): Unit = socketMutex.withLock {
         clearPendingA2uiActions(reason = "client disconnect")
         teardownLocked(reason = "client disconnect")
     }
@@ -626,7 +627,7 @@ class ChannelTransport @Inject constructor() {
         return send(frame.encodeJson(json))
     }
 
-    fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult {
+    override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult {
         val socket = socketRef.get()
         val stateNow = state.value
         val frame = action.toUserActionFrame().withActiveRoutingFallback()
