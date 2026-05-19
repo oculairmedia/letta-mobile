@@ -8,9 +8,9 @@ import com.letta.mobile.data.channel.NotificationCandidateSource
 import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.channel.NotificationDeliveryCandidate
 import com.letta.mobile.data.channel.NotificationDeliveryDecision
-import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.timeline.TimelineEvent
 import com.letta.mobile.data.timeline.TimelineRepository
+import com.letta.mobile.testutil.FakeAgentRepository
 import com.letta.mobile.testutil.TestData
 import io.mockk.coEvery
 import io.mockk.every
@@ -32,12 +32,13 @@ class NotificationReplyHandlerTest {
     fun `notification reply stream submits final assistant response to coordinator`() = runTest {
         val chatSender = mockk<ClientModeChatSender>()
         val timelineRepository = mockk<TimelineRepository>()
-        val agentRepository = mockk<AgentRepository>()
+        val agentRepository = FakeAgentRepository(
+            initialAgents = listOf(TestData.agent(id = "agent-1", name = "Ada")),
+        )
         val coordinator = mockk<NotificationDelivery>()
         val coordinatorProvider = Provider { coordinator }
         val captured = slot<NotificationDeliveryCandidate>()
 
-        every { agentRepository.getCachedAgent("agent-1") } returns TestData.agent(id = "agent-1", name = "Ada")
         every { coordinator.submit(capture(captured)) } returns NotificationDeliveryDecision.Published("reply-message")
         coEvery { timelineRepository.appendClientModeLocal(any(), any(), any()) } returns "local-user"
         coEvery { timelineRepository.upsertClientModeLocalAssistantChunk(any(), any(), any(), any()) } answers {

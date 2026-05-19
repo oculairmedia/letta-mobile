@@ -6,15 +6,13 @@ import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.api.ConversationApi
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.ConversationInspectorMessage
 import com.letta.mobile.data.repository.MessageRepository
+import com.letta.mobile.testutil.FakeAgentRepository
 import com.letta.mobile.testutil.FakeSettingsRepository
 import io.mockk.coEvery
 import io.mockk.every
-import io.mockk.just
 import io.mockk.mockk
-import io.mockk.runs
 import io.mockk.verify
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -116,7 +114,7 @@ class ChannelHeartbeatSyncTest {
     private fun createFixture(): Fixture {
         val conversationApi = mockk<ConversationApi>()
         val messageRepository = mockk<MessageRepository>()
-        val agentRepository = mockk<AgentRepository>()
+        val agentRepository = FakeAgentRepository()
         val stateStore = mockk<ChannelSyncStateStore>()
         val publisher = mockk<ChannelNotificationPublisher>()
         val replyHandler = mockk<NotificationReplyHandler>()
@@ -151,8 +149,6 @@ class ChannelHeartbeatSyncTest {
         coEvery { messageRepository.fetchConversationInspectorMessages(any()) } answers {
             messagesByConversation[firstArg<String>()].orEmpty()
         }
-        coEvery { agentRepository.refreshAgents() } just runs
-        every { agentRepository.agents } returns MutableStateFlow(emptyList())
         every { stateStore.getProcessedLastActivityAt(any()) } answers { processed[firstArg()] }
         every { stateStore.setProcessedLastActivityAt(any(), any()) } answers {
             processed[firstArg()] = secondArg()
