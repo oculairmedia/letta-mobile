@@ -942,30 +942,42 @@ class TimelineSyncLoopTest {
     }
 
     @Test
-    fun `recent reconcile skips REST polling while stream subscriber is active`() = runBlocking {
-        val api = OpenStreamApi()
-        val scope = CoroutineScope(Dispatchers.IO)
-        val sync = TimelineSyncLoop(api, "conv-stream-owned", scope)
+    fun `recent reconcile on reopen appends server user messages without otid`() = runBlocking {
+        val api = FakeSyncApi()
+        api.addStoredMessage(
+            UserMessage(
+                id = "older-user",
+                contentRaw = JsonPrimitive("already hydrated"),
+                otid = "known-otid",
+                date = "2026-05-19T06:00:00Z",
+            )
+        )
 
-        withTimeout(5_000) {
-            api.streamOpened.await()
-            while (!sync.streamSubscriberActive.value) delay(10)
-        }
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val sync = TimelineSyncLoop(api, "conv-reopen", scope)
+        sync.hydrate()
+
+        api.addStoredMessage(
+            UserMessage(
+                id = "fresh-user-no-otid",
+                contentRaw = JsonPrimitive("fresh server prompt"),
+                date = "2026-05-19T06:25:00Z",
+            )
+        )
 
         sync.reconcileRecentMessages("open")
 
+        val fresh = sync.state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .firstOrNull { it.serverId == "fresh-user-no-otid" }
+        assertNotNull("reopen reconcile must append fresh server user prompts that have no otid", fresh)
+        assertEquals(TimelineMessageType.USER, fresh!!.messageType)
+        assertEquals("fresh server prompt", fresh.content)
         assertEquals(
-            "recent reconcile must not call /messages while the SSE subscriber owns visible state",
-            0,
-            api.listMessagesCalls,
+            "hydrate and reopen reconcile should use the same recent-message fetch window",
+            listOf(250, 250),
+            api.conversationLimits,
         )
-        val skipEvent = com.letta.mobile.util.Telemetry.snapshot().firstOrNull {
-            it.tag == "TimelineSync" &&
-                it.name == "recentReconcile.skipped" &&
-                it.attrs["conversationId"] == "conv-stream-owned"
-        }
-        assertNotNull("expected skip telemetry for stream-owned reconcile", skipEvent)
-
+        assertEquals(listOf("desc", "desc"), api.conversationOrders)
         scope.coroutineContext.job.cancel()
     }
 
@@ -1857,6 +1869,8 @@ private class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
     var listMessagesFailure: Throwable? = null
     var listMessagesCalls: Int = 0
     var lastConversationLimit: Int? = null
+    val conversationLimits = mutableListOf<Int?>()
+    val conversationOrders = mutableListOf<String?>()
 
     fun addStoredMessage(msg: LettaMessage) {
         stored.add(msg)
@@ -1880,6 +1894,8 @@ private class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
     ): List<LettaMessage> {
         listMessagesCalls++
         lastConversationLimit = limit
+        conversationLimits += limit
+        conversationOrders += order
         if (listMessagesFailuresBeforeSuccess > 0) {
             listMessagesFailuresBeforeSuccess--
             throw listMessagesFailure

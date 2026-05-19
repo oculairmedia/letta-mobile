@@ -732,7 +732,6 @@ class TimelineSyncLoop(
     ): Int {
         var appended = 0
         serverMessages.forEach { msg ->
-            msg.otid ?: return@forEach
             // Never append a standalone TOOL_RETURN event — they
             // attach to their TOOL_CALL below. letta-mobile-mge5.21.
             val pos = _state.value.nextLocalPosition()
@@ -859,7 +858,7 @@ class TimelineSyncLoop(
         // Batch tool runs can persist dozens of tool_call/tool_return records
         // after a single approval. Keep reconcile wide enough to attach every
         // return to its call instead of only the most recent handful.
-        private const val RECONCILE_LIMIT = 200
+        private const val RECONCILE_LIMIT = 250
 
         // letta-mobile-j44j: bounded retry on transient reconcile failures.
         // 3 attempts → ~200+400+800ms ≈ 1.4s worst-case before surfacing

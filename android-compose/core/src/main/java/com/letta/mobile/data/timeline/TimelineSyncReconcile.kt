@@ -63,10 +63,12 @@ internal suspend fun reconcileAfterSend(
 
             // 2. Pull in any server messages we don't yet have (missed stream events)
             serverMessages.forEach { msg ->
-                val msgOtid = msg.otid ?: return@forEach
-                if (state.value.findByOtid(msgOtid) == null) {
-                    val pos = state.value.nextLocalPosition()
-                    val confirmed = msg.toTimelineEvent(position = pos) ?: return@forEach
+                val pos = state.value.nextLocalPosition()
+                val confirmed = msg.toTimelineEvent(position = pos) ?: return@forEach
+                if (confirmed.messageType == TimelineMessageType.TOOL_RETURN) return@forEach
+                val byOtid = state.value.findByOtid(confirmed.otid)
+                val byServerId = state.value.findByServerId(msg.id, confirmed.messageType)
+                if (byOtid == null && byServerId == null) {
                     // letta-mobile-c87t: before falling through to the standard
                     // append, attempt a Client-Mode fuzzy collapse. If the user
                     // sent this message via Client Mode, there's a `cm-<uuid>`
