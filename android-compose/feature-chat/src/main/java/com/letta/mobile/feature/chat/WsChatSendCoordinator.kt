@@ -10,6 +10,7 @@ import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -45,6 +46,8 @@ internal class WsChatSendCoordinator(
     // TurnDone arrives, so the "agent typing" indicator clears in sync with
     // the actual end-of-turn signal.
     @Volatile private var bufferedErrorMessage: String? = null
+    private val pendingSendLock = Any()
+    private val pendingSends = ArrayDeque<PendingWsSend>()
 
     init {
         scope.launch {
@@ -107,42 +110,149 @@ internal class WsChatSendCoordinator(
             return@launch
         }
 
-        val otid = "cm-android-${UUID.randomUUID()}"
-        val accepted = wsChatBridge.send(
-            agentId = agentId,
+        val pending = PendingWsSend(
             conversationId = conversationId,
             text = text,
-            otid = otid,
             attachments = attachments,
+            otid = "cm-android-${UUID.randomUUID()}",
         )
-        if (!accepted) {
-            failSend("A WebSocket chat turn is already in flight")
+        val accepted = dispatchPendingSend(pending, appendOptimisticLocal = true)
+        if (!accepted && !enqueuePendingSend(pending)) {
+            uiState.value = uiState.value.copy(
+                error = "WebSocket send queue is full; wait for the current turn to finish",
+            )
             timer.stop("accepted" to false, "reason" to "busy")
             return@launch
         }
-        activeWsOtid = otid
-
-        timelineRepository.appendExternalTransportLocal(
-            conversationId = conversationId,
-            content = text,
-            otid = otid,
-            attachments = attachments,
-        )
-        clearComposerAfterSend()
-        uiState.value = uiState.value.copy(
-            conversationState = ConversationState.Ready(conversationId),
-            isStreaming = true,
-            isAgentTyping = true,
-        )
         timer.stop(
             "accepted" to true,
             "conversationId" to conversationId,
-            "otid" to otid,
+            "otid" to pending.otid,
             "attachments" to attachments.size,
+            "queued" to !accepted,
         )
     }
 
-    fun cancel(): Boolean = wsChatBridge.cancel()
+    fun cancel(): Boolean {
+        scope.launch { clearPendingSends("cancel") }
+        return wsChatBridge.cancel()
+    }
+
+    private suspend fun dispatchPendingSend(
+        pending: PendingWsSend,
+        appendOptimisticLocal: Boolean,
+    ): Boolean {
+        val accepted = wsChatBridge.send(
+            agentId = agentId,
+            conversationId = pending.conversationId,
+            text = pending.text,
+            otid = pending.otid,
+            attachments = pending.attachments,
+        )
+        if (!accepted) return false
+
+        activeWsOtid = pending.otid
+        activeWsConversationId = pending.conversationId
+        if (appendOptimisticLocal) {
+            timelineRepository.appendExternalTransportLocal(
+                conversationId = pending.conversationId,
+                content = pending.text,
+                otid = pending.otid,
+                attachments = pending.attachments,
+            )
+            clearComposerAfterSend()
+        }
+        uiState.value = uiState.value.copy(
+            conversationState = ConversationState.Ready(pending.conversationId),
+            isStreaming = true,
+            isAgentTyping = true,
+            error = null,
+        )
+        return true
+    }
+
+    private suspend fun enqueuePendingSend(pending: PendingWsSend): Boolean {
+        val queued = synchronized(pendingSendLock) {
+            if (pendingSends.size >= MAX_PENDING_SENDS) {
+                false
+            } else {
+                pendingSends.addLast(pending)
+                true
+            }
+        }
+        if (!queued) {
+            Telemetry.event(
+                "AdminChatVM", "ws.queue.dropped",
+                "conversationId" to pending.conversationId,
+                "otid" to pending.otid,
+                "capacity" to MAX_PENDING_SENDS,
+            )
+            return false
+        }
+        timelineRepository.appendExternalTransportLocal(
+            conversationId = pending.conversationId,
+            content = pending.text,
+            otid = pending.otid,
+            attachments = pending.attachments,
+        )
+        clearComposerAfterSend()
+        uiState.value = uiState.value.copy(
+            conversationState = ConversationState.Ready(pending.conversationId),
+            isStreaming = true,
+            isAgentTyping = true,
+            error = null,
+        )
+        Telemetry.event(
+            "AdminChatVM", "ws.send.enqueued",
+            "conversationId" to pending.conversationId,
+            "otid" to pending.otid,
+            "queueDepth" to pendingQueueDepth(),
+        )
+        return true
+    }
+
+    private suspend fun drainPendingSend() {
+        val pending = synchronized(pendingSendLock) { pendingSends.removeFirstOrNull() } ?: return
+        Telemetry.event(
+            "AdminChatVM", "ws.send.dequeued",
+            "conversationId" to pending.conversationId,
+            "otid" to pending.otid,
+            "queueDepth" to pendingQueueDepth(),
+        )
+        if (!dispatchPendingSend(pending, appendOptimisticLocal = false)) {
+            synchronized(pendingSendLock) { pendingSends.addFirst(pending) }
+            Telemetry.event(
+                "AdminChatVM", "ws.send.dequeueBlocked",
+                "conversationId" to pending.conversationId,
+                "otid" to pending.otid,
+                "queueDepth" to pendingQueueDepth(),
+            )
+            // Avoid a tight loop if TurnDone and the transport in-flight flag race.
+            delay(DEQUEUE_RETRY_DELAY_MS)
+        }
+    }
+
+    private suspend fun clearPendingSends(reason: String) {
+        val dropped = synchronized(pendingSendLock) {
+            val drained = mutableListOf<PendingWsSend>()
+            while (true) {
+                val pending = pendingSends.removeFirstOrNull() ?: break
+                drained.add(pending)
+            }
+            drained
+        }
+        if (dropped.isEmpty()) return
+        dropped.forEach { pending ->
+            timelineRepository.markExternalTransportLocalFailed(pending.conversationId, pending.otid)
+        }
+        Telemetry.event(
+            "AdminChatVM", "ws.queue.cleared",
+            "reason" to reason,
+            "count" to dropped.size,
+        )
+    }
+
+    private fun pendingQueueDepth(): Int = synchronized(pendingSendLock) { pendingSends.size }
 
     private suspend fun ensureConnected(config: LettaConfig): Boolean {
         if (wsChatBridge.state.value is ChannelTransport.State.Connected) return true
@@ -289,6 +399,7 @@ internal class WsChatSendCoordinator(
                 stopReasonForTurn = null
                 usageRecordedForTurn = false
                 bufferedErrorMessage = null
+                drainPendingSend()
             }
             is WsTimelineEvent.Error -> {
                 // lcp-axv: stash the error and wait for the immediately-
@@ -305,6 +416,7 @@ internal class WsChatSendCoordinator(
                 )
             }
             is WsTimelineEvent.Disconnected -> {
+                clearPendingSends("disconnect")
                 uiState.value = uiState.value.copy(
                     error = event.reason.ifBlank { "WebSocket disconnected" },
                     isStreaming = false,
@@ -325,6 +437,15 @@ internal class WsChatSendCoordinator(
 
     private companion object {
         private const val CONNECT_WAIT_MS = 1_500L
+        private const val MAX_PENDING_SENDS = 10
+        private const val DEQUEUE_RETRY_DELAY_MS = 50L
         private fun defaultShimConversationId(agentId: String): String = "conv-default-$agentId"
     }
+
+    private data class PendingWsSend(
+        val conversationId: String,
+        val text: String,
+        val attachments: List<MessageContentPart.Image>,
+        val otid: String,
+    )
 }

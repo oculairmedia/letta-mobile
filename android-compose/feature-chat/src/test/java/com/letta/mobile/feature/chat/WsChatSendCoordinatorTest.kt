@@ -20,6 +20,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -125,8 +126,8 @@ class WsChatSendCoordinatorTest {
     }
 
     @Test
-    fun `send false is surfaced as busy without appending optimistic local`() = runTest {
-        val wsChatBridge = mockBridge(sendAccepted = false)
+    fun `busy send is queued with optimistic local and drains on turn done`() = runTest {
+        val wsChatBridge = mockBridge(sendResults = listOf(false, true))
         val timelineRepository = mockk<TimelineRepository>(relaxed = true)
         var cleared = false
         val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
@@ -147,9 +148,83 @@ class WsChatSendCoordinatorTest {
 
         coordinator.send("hello").join()
 
-        assertEquals("A WebSocket chat turn is already in flight", uiState.value.error)
-        assertEquals(false, cleared)
-        coVerify(exactly = 0) { timelineRepository.appendExternalTransportLocal(any(), any(), any(), any()) }
+        assertNull(uiState.value.error)
+        assertTrue(cleared)
+        assertTrue(uiState.value.isStreaming)
+        coVerify(exactly = 1) {
+            timelineRepository.appendExternalTransportLocal("conv-1", "hello", any(), emptyList())
+        }
+
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "completed"))
+        advanceUntilIdle()
+
+        verify(exactly = 2) {
+            wsChatBridge.send(
+                agentId = "agent-1",
+                conversationId = "conv-1",
+                text = "hello",
+                otid = any(),
+                attachments = emptyList(),
+            )
+        }
+    }
+
+    @Test
+    fun `busy send queue drops overflow without appending optimistic local`() = runTest {
+        val wsChatBridge = mockBridge(sendAccepted = false)
+        val timelineRepository = mockk<TimelineRepository>(relaxed = true)
+        val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = wsChatBridge,
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = uiState,
+            clearComposerAfterSend = {},
+            activeConversationId = { "conv-1" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+
+        repeat(11) { index -> coordinator.send("message-$index").join() }
+
+        assertEquals("WebSocket send queue is full; wait for the current turn to finish", uiState.value.error)
+        coVerify(exactly = 10) { timelineRepository.appendExternalTransportLocal("conv-1", any(), any(), emptyList()) }
+    }
+
+    @Test
+    fun `disconnect clears queued sends and marks optimistic locals failed`() = runTest {
+        val wsChatBridge = mockBridge(sendAccepted = false)
+        val timelineRepository = mockk<TimelineRepository>(relaxed = true)
+        val uiState = MutableStateFlow(ChatUiState(agentName = "Agent", isStreaming = true, isAgentTyping = true))
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = wsChatBridge,
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = uiState,
+            clearComposerAfterSend = {},
+            activeConversationId = { "conv-1" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+
+        coordinator.send("one").join()
+        coordinator.send("two").join()
+
+        coordinator.handleEvent(WsTimelineEvent.Disconnected(code = 1006, reason = "network lost"))
+        advanceUntilIdle()
+
+        assertEquals("network lost", uiState.value.error)
+        assertEquals(false, uiState.value.isStreaming)
+        assertEquals(false, uiState.value.isAgentTyping)
+        coVerify(exactly = 2) { timelineRepository.markExternalTransportLocalFailed("conv-1", any()) }
     }
 
     @Test
@@ -451,6 +526,14 @@ class WsChatSendCoordinatorTest {
     private fun mockBridge(
         sendAccepted: Boolean,
         eventFlow: kotlinx.coroutines.flow.Flow<WsTimelineEvent> = emptyFlow(),
+    ): WsChatBridge = mockBridge(
+        sendResults = listOf(sendAccepted),
+        eventFlow = eventFlow,
+    )
+
+    private fun mockBridge(
+        sendResults: List<Boolean>,
+        eventFlow: kotlinx.coroutines.flow.Flow<WsTimelineEvent> = emptyFlow(),
     ): WsChatBridge = mockk(relaxed = true) {
         every { state } returns MutableStateFlow(
             ChannelTransport.State.Connected(
@@ -460,6 +543,6 @@ class WsChatSendCoordinatorTest {
             )
         )
         every { events } returns eventFlow
-        every { send(any(), any(), any(), any(), any()) } returns sendAccepted
+        every { send(any(), any(), any(), any(), any()) } returnsMany sendResults
     }
 }
