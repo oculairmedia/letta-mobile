@@ -166,6 +166,7 @@ internal suspend fun runStreamSubscriber(
                                     }
                                 }
                             }
+                            is SseFrame.RawEvent -> Unit
                             SseFrame.Done -> Unit
                         }
                     }
