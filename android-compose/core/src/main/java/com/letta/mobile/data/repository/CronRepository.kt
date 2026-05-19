@@ -4,6 +4,7 @@ import android.util.Log
 import com.letta.mobile.data.model.CronTask
 import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.ServerFrame
+import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -54,7 +55,7 @@ internal fun defaultCronScope(): CoroutineScope =
  */
 @Singleton
 open class CronRepository(
-    private val transport: ChannelTransport,
+    private val transport: IChannelTransport,
     private val scope: CoroutineScope,
 ) {
     /**
@@ -63,7 +64,7 @@ open class CronRepository(
      * primary constructor.
      */
     @Inject
-    constructor(transport: ChannelTransport) : this(transport, defaultCronScope())
+    constructor(transport: IChannelTransport) : this(transport, defaultCronScope())
 
     private val stateByAgent = ConcurrentHashMap<String, MutableStateFlow<List<CronTask>>>()
     private val inFlightRefresh = ConcurrentHashMap<String, CompletableDeferred<Result<List<CronTask>>>>()

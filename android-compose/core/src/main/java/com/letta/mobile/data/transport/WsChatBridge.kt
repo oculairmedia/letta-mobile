@@ -5,6 +5,7 @@ import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.buildContentParts
 import com.letta.mobile.data.model.toJsonArray
+import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.filter
@@ -42,7 +43,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class WsChatBridge @Inject constructor(
-    private val transport: ChannelTransport,
+    private val transport: IChannelTransport,
 ) {
     /** Re-export the connection state without forcing callers to know about ChannelTransport. */
     val state: StateFlow<ChannelTransport.State> = transport.state

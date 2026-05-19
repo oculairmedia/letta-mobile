@@ -7,6 +7,8 @@ import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.transport.ChannelTransport
+import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.feature.chat.ChatClientVersionProvider
 import com.letta.mobile.platform.storage.AndroidAppPrivateStorageRootProvider
 import com.letta.mobile.platform.storage.AndroidSafStorageGrantStore
@@ -34,6 +36,10 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindSettingsRepository(impl: SettingsRepository): ISettingsRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindChannelTransport(impl: ChannelTransport): IChannelTransport
 
     @Binds
     @Singleton
