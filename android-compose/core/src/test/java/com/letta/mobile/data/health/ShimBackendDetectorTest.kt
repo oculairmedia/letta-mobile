@@ -2,8 +2,6 @@ package com.letta.mobile.data.health
 
 import com.letta.mobile.data.api.LettaApiClient
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.repository.api.ISettingsRepository
-import com.letta.mobile.testutil.FakeSettingsRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -15,6 +13,9 @@ import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import io.mockk.coEvery
 import io.mockk.mockk
+import io.mockk.unmockkAll
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -28,7 +29,7 @@ class ShimBackendDetectorTest {
     fun `refreshActive detects letta-code admin shim health marker`() = runTest {
         val config = config(id = "shim")
         val detector = detector(
-            settingsRepository = FakeSettingsRepository(initialActiveConfig = config),
+            activeConfig = MutableStateFlow(config),
             responseBody = """
                 {
                   "version":"shim-0.2.0",
@@ -47,7 +48,7 @@ class ShimBackendDetectorTest {
     fun `refreshActive keeps vanilla backend on REST path`() = runTest {
         val config = config(id = "vanilla")
         val detector = detector(
-            settingsRepository = FakeSettingsRepository(initialActiveConfig = config),
+            activeConfig = MutableStateFlow(config),
             responseBody = """
                 { "version":"0.11.0", "status":"ok", "backend":"letta-server" }
             """.trimIndent(),
@@ -62,7 +63,7 @@ class ShimBackendDetectorTest {
         var requests = 0
         val config = config(id = "cached")
         val detector = detector(
-            settingsRepository = FakeSettingsRepository(initialActiveConfig = config),
+            activeConfig = MutableStateFlow(config),
             responseBody = """{ "version":"shim-0.2.0", "backend":"letta-code-local" }""",
             onRequest = { requests++ },
         )
@@ -73,7 +74,7 @@ class ShimBackendDetectorTest {
     }
 
     private fun detector(
-        settingsRepository: ISettingsRepository,
+        activeConfig: StateFlow<LettaConfig?>,
         responseBody: String,
         status: HttpStatusCode = HttpStatusCode.OK,
         onRequest: () -> Unit = {},
@@ -90,7 +91,7 @@ class ShimBackendDetectorTest {
         val apiClient = mockk<LettaApiClient> {
             coEvery { getClient() } returns client
         }
-        return ShimBackendDetector(settingsRepository, apiClient)
+        return ShimBackendDetector(activeConfig, apiClient)
     }
 
     private fun config(id: String) = LettaConfig(
