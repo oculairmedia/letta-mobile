@@ -2,7 +2,7 @@ package com.letta.mobile.data.health
 
 import com.letta.mobile.data.api.LettaApiClient
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.util.Telemetry
 import io.ktor.client.call.body
 import io.ktor.client.request.get
