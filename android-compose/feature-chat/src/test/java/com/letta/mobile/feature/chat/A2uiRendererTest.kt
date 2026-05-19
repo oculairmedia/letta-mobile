@@ -10,6 +10,8 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -511,6 +513,97 @@ class A2uiRendererTest {
     }
 
     @Test
+    fun checkboxWritesBoundDataModelPath() {
+        val manager = formWidgetSurfaceManager(root = "acceptTerms")
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+        }
+
+        composeRule.onNodeWithTag(A2uiTestTags.Checkbox).assertIsOff().performClick()
+        composeRule.runOnIdle {
+            assertEquals(
+                "true",
+                manager.surface(SurfaceId)!!.dataModel.resolve("/accepted")!!.jsonPrimitive.content,
+            )
+        }
+    }
+
+    @Test
+    fun switchUsesLocalStateWhenUnbound() {
+        val manager = formWidgetSurfaceManager(root = "notifications")
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+        }
+
+        composeRule.onNodeWithTag(A2uiTestTags.Switch).assertIsOn().performClick()
+        composeRule.onNodeWithTag(A2uiTestTags.Switch).assertIsOff()
+        composeRule.runOnIdle {
+            assertEquals(null, manager.surface(SurfaceId)!!.dataModel.resolve("/notifications"))
+        }
+    }
+
+    @Test
+    fun radioWritesStaticOptionToBoundDataModelPath() {
+        val manager = formWidgetSurfaceManager(root = "seatChoice")
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+        }
+
+        composeRule.onNodeWithTag(A2uiTestTags.Radio).assertIsDisplayed()
+        composeRule.onNodeWithText("Aisle").performClick()
+        composeRule.runOnIdle {
+            assertEquals(
+                "aisle",
+                manager.surface(SurfaceId)!!.dataModel.resolve("/seat")!!.jsonPrimitive.content,
+            )
+        }
+    }
+
+    @Test
+    fun radioRendersItemsPathOptionsAndKeepsUnboundSelectionLocal() {
+        val manager = formWidgetSurfaceManager(root = "mealChoice")
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+        }
+
+        composeRule.onNodeWithText("Pasta").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("Pasta").assertIsDisplayed()
+        composeRule.runOnIdle {
+            assertEquals(null, manager.surface(SurfaceId)!!.dataModel.resolve("/meal"))
+        }
+    }
+
+    @Test
+    fun formWidgetsAreDisabledWhileSiblingActionIsSubmitting() {
+        val manager = formWidgetSurfaceManager(root = "form")
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(
+                surfaceId = SurfaceId,
+                surfaceManager = manager,
+                onAction = {},
+            )
+        }
+
+        composeRule.onNodeWithText("Submit").performClick()
+        composeRule.onNodeWithTag(A2uiTestTags.ButtonProgress).assertIsDisplayed()
+        composeRule.onNodeWithTag(A2uiTestTags.Checkbox).assertIsNotEnabled()
+        composeRule.onNodeWithTag(A2uiTestTags.Switch).assertIsNotEnabled()
+
+        composeRule.onNodeWithText("Aisle").performClick()
+        composeRule.runOnIdle {
+            assertEquals(
+                "window",
+                manager.surface(SurfaceId)!!.dataModel.resolve("/seat")!!.jsonPrimitive.content,
+            )
+        }
+    }
+
+    @Test
     fun buttonActionResolvesBoundContextAgainstCurrentDataModel() {
         val manager = bookingFormSurfaceManager()
         val actions = mutableListOf<A2uiAction>()
@@ -875,6 +968,39 @@ private fun textFieldSurfaceManager(): A2uiSurfaceManager {
                   {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"basic"}},
                   {"version":"v0.9","updateComponents":{"surfaceId":"$SurfaceId","root":"partySize","components":[
                     {"id":"partySize","component":"TextField","label":{"literalString":"Party size"},"value":{"path":"/partySize"},"textFieldType":"number"}
+                  ]}}
+                ]
+                """.trimIndent(),
+            ),
+        )
+    )
+    return manager
+}
+
+private fun formWidgetSurfaceManager(root: String): A2uiSurfaceManager {
+    val manager = A2uiSurfaceManager()
+    manager.applyMessages(
+        decodeA2uiMessages(
+            A2uiProtocolJson.Default,
+            A2uiProtocolJson.Default.parseToJsonElement(
+                """
+                [
+                  {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"basic"}},
+                  {"version":"v0.9","updateComponents":{"surfaceId":"$SurfaceId","root":"$root","components":[
+                    {"id":"form","component":"Column","children":["acceptTerms","notifications","seatChoice","submit"],"spacing":"sm"},
+                    {"id":"acceptTerms","component":"Checkbox","label":{"literalString":"Accept terms"},"value":{"path":"/accepted"}},
+                    {"id":"notifications","component":"Switch","label":{"literalString":"Notifications"},"value":true},
+                    {"id":"seatChoice","component":"Radio","label":{"literalString":"Seat preference"},"value":{"path":"/seat"},"options":[
+                      {"key":"window","label":{"literalString":"Window"}},
+                      {"key":"aisle","label":{"literalString":"Aisle"}}
+                    ]},
+                    {"id":"mealChoice","component":"Radio","label":{"literalString":"Meal preference"},"value":{"literalString":"salad"},"items":{"path":"/meals"}},
+                    {"id":"submit","component":"Button","label":{"literalString":"Submit"},"action":{"name":"submit_form"}}
+                  ]}},
+                  {"version":"v0.9","updateDataModel":{"surfaceId":"$SurfaceId","path":"/seat","value":"window"}},
+                  {"version":"v0.9","updateDataModel":{"surfaceId":"$SurfaceId","path":"/meals","value":[
+                    {"key":"salad","label":"Salad"},
+                    {"key":"pasta","label":"Pasta"}
                   ]}}
                 ]
                 """.trimIndent(),

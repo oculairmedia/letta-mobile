@@ -22,13 +22,16 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimeInput
@@ -157,6 +160,9 @@ object A2uiTestTags {
     const val MissingImage = "a2ui_missing_image"
     const val TextField = "a2ui_text_field"
     const val DateTimeInput = "a2ui_date_time_input"
+    const val Checkbox = "a2ui_checkbox"
+    const val Switch = "a2ui_switch"
+    const val Radio = "a2ui_radio"
     const val Divider = "a2ui_divider"
     const val ToolApprovalCard = "a2ui_tool_approval_card"
     const val ToolApprovalSensitiveValue = "a2ui_tool_approval_sensitive_value"
@@ -300,6 +306,29 @@ private fun A2uiComponentNodeContent(
             component = component,
             surface = surface,
             modifier = modifier,
+            renderScope = renderScope,
+        )
+        "Checkbox" -> A2uiBooleanInput(
+            component = component,
+            surface = surface,
+            modifier = modifier,
+            surfaceSubmitting = surfaceSubmitting,
+            renderScope = renderScope,
+            kind = A2uiBooleanInputKind.Checkbox,
+        )
+        "Switch" -> A2uiBooleanInput(
+            component = component,
+            surface = surface,
+            modifier = modifier,
+            surfaceSubmitting = surfaceSubmitting,
+            renderScope = renderScope,
+            kind = A2uiBooleanInputKind.Switch,
+        )
+        "Radio" -> A2uiRadio(
+            component = component,
+            surface = surface,
+            modifier = modifier,
+            surfaceSubmitting = surfaceSubmitting,
             renderScope = renderScope,
         )
         "Image" -> A2uiImage(component = component, surface = surface, modifier = modifier, renderScope = renderScope)
@@ -742,6 +771,134 @@ private fun A2uiTextField(
             VisualTransformation.None
         },
     )
+}
+
+@Composable
+private fun A2uiBooleanInput(
+    component: A2uiComponent,
+    surface: A2uiSurfaceState,
+    modifier: Modifier = Modifier,
+    surfaceSubmitting: Boolean,
+    renderScope: A2uiRenderScope,
+    kind: A2uiBooleanInputKind,
+) {
+    val binding = component.raw["value"] ?: component.raw["checked"] ?: component.raw["selected"]
+    val path = binding.bindingPath()?.let(renderScope::resolvePath)
+    val boundChecked = component.resolveInputValue(surface, binding, renderScope).toBooleanStrictOrNull() ?: false
+    val localChecked = rememberA2uiLocalBooleanState("value", boundChecked)
+    val checked = if (path != null) boundChecked else localChecked.value
+    val label = component.resolveControlLabel(surface, renderScope)
+
+    fun update(next: Boolean) {
+        if (path != null) {
+            surface.dataModel.applyPatch(path = path, value = JsonPrimitive(next))
+        } else {
+            localChecked.value = next
+        }
+    }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(enabled = !surfaceSubmitting) { update(!checked) },
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        when (kind) {
+            A2uiBooleanInputKind.Checkbox -> Checkbox(
+                checked = checked,
+                onCheckedChange = { update(it) },
+                enabled = !surfaceSubmitting,
+                modifier = Modifier.testTag(kind.testTag),
+            )
+            A2uiBooleanInputKind.Switch -> Switch(
+                checked = checked,
+                onCheckedChange = { update(it) },
+                enabled = !surfaceSubmitting,
+                modifier = Modifier.testTag(kind.testTag),
+            )
+        }
+        label?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (surfaceSubmitting) {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun A2uiRadio(
+    component: A2uiComponent,
+    surface: A2uiSurfaceState,
+    modifier: Modifier = Modifier,
+    surfaceSubmitting: Boolean,
+    renderScope: A2uiRenderScope,
+) {
+    val binding = component.raw["value"] ?: component.raw["selected"]
+    val path = binding.bindingPath()?.let(renderScope::resolvePath)
+    val boundValue = component.resolveInputValue(surface, binding, renderScope)
+    var localValue by remember(component.id) { mutableStateOf(boundValue) }
+    val value = if (path != null) boundValue else localValue
+    val label = component.resolveControlLabel(surface, renderScope)
+    val options = component.resolveRadioOptions(surface, renderScope)
+
+    if (options.isEmpty()) {
+        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
+        return
+    }
+
+    fun update(next: String) {
+        if (path != null) {
+            surface.dataModel.applyPatch(path = path, value = JsonPrimitive(next))
+        } else {
+            localValue = next
+        }
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(A2uiTestTags.Radio),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        label?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        options.forEach { option ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = !surfaceSubmitting) { update(option.key) },
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(
+                    selected = value == option.key,
+                    onClick = { update(option.key) },
+                    enabled = !surfaceSubmitting,
+                )
+                Text(
+                    text = option.label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (surfaceSubmitting) {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -1281,6 +1438,62 @@ private fun A2uiComponent.resolveButtonLabel(surface: A2uiSurfaceState, renderSc
 }
 
 @Composable
+private fun A2uiComponent.resolveControlLabel(surface: A2uiSurfaceState, renderScope: A2uiRenderScope): String? =
+    resolveBindingText(raw["label"] ?: raw["text"] ?: raw["title"], surface, renderScope)
+
+@Composable
+private fun A2uiComponent.resolveRadioOptions(
+    surface: A2uiSurfaceState,
+    renderScope: A2uiRenderScope,
+): List<A2uiRadioOption> {
+    val staticOptions = raw["options"] as? JsonArray
+    if (staticOptions != null) {
+        return staticOptions.mapIndexedNotNull { index, option ->
+            radioOptionFromElement(option, index, surface, renderScope)
+        }
+    }
+
+    val itemsPath = (raw["items"] ?: raw["options"]).bindingPath()?.let(renderScope::resolvePath) ?: return emptyList()
+    val itemsValue by surface.dataModel.observe(itemsPath)
+    val items = itemsValue as? JsonArray ?: return emptyList()
+    return items.mapIndexedNotNull { index, item ->
+        radioOptionFromElement(
+            element = item,
+            index = index,
+            surface = surface,
+            renderScope = A2uiRenderScope(basePath = itemsPath.appendJsonPointerSegment(index.toString())),
+        )
+    }
+}
+
+@Composable
+private fun A2uiComponent.radioOptionFromElement(
+    element: JsonElement,
+    index: Int,
+    surface: A2uiSurfaceState,
+    renderScope: A2uiRenderScope,
+): A2uiRadioOption? {
+    val option = element as? JsonObject
+    if (option == null) {
+        val text = A2uiBindingResolver.displayText(element).takeIf { it.isNotBlank() } ?: return null
+        return A2uiRadioOption(key = text, label = text)
+    }
+
+    val keyField = raw.stringValue("optionKey", "itemKey", "keyPath") ?: "key"
+    val labelField = raw.stringValue("optionLabel", "itemLabel", "labelPath") ?: "label"
+    val key = option.stringValue(keyField, "key", "value", "id")
+        ?: element.resolveItemKey(keyField)
+        ?: index.toString()
+    val labelBinding = option[labelField]
+        ?: option["label"]
+        ?: option["text"]
+        ?: option["title"]
+        ?: option["name"]
+    val label = resolveBindingText(labelBinding ?: JsonPrimitive(key), surface, renderScope) ?: key
+    return A2uiRadioOption(key = key, label = label)
+}
+
+@Composable
 private fun resolveBindingText(
     binding: JsonElement?,
     surface: A2uiSurfaceState,
@@ -1501,6 +1714,16 @@ private data class ToolApprovalProps(
     val affordances: List<ToolApprovalAffordance>,
     val timeoutSeconds: Int,
     val callId: String,
+)
+
+private enum class A2uiBooleanInputKind(val testTag: String) {
+    Checkbox(A2uiTestTags.Checkbox),
+    Switch(A2uiTestTags.Switch),
+}
+
+private data class A2uiRadioOption(
+    val key: String,
+    val label: String,
 )
 
 private data class ToolApprovalArgument(
