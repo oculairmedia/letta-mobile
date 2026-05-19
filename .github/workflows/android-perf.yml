@@ -1,11 +1,6 @@
 name: Android Perf Gate
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - ".github/workflows/android-perf.yml"
-      - "android-compose/**"
   push:
     branches: [main]
     paths:
