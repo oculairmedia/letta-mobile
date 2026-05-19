@@ -66,6 +66,8 @@ val A2UI_DEFAULT_SUPPORTED_WIDGETS: List<String> = listOf(
     "Radio",
     "Slider",
     "Stepper",
+    "LinearProgress",
+    "CircularProgress",
     "Dropdown",
     "Select",
     "Chip",
