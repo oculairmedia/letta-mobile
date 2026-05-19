@@ -2,7 +2,7 @@ package com.letta.mobile.feature.chat
 
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.repository.ConversationRepository
+import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.WsChatBridge
@@ -25,7 +25,7 @@ internal class WsChatSendCoordinator(
     private val activeConfig: () -> LettaConfig?,
     private val wsChatBridge: WsChatBridge,
     private val timelineRepository: TimelineRepository,
-    private val conversationRepository: ConversationRepository,
+    private val conversationRepository: IConversationRepository,
     private val uiState: MutableStateFlow<ChatUiState>,
     private val clearComposerAfterSend: () -> Unit,
     private val activeConversationId: () -> String?,

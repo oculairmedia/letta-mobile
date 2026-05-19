@@ -20,6 +20,7 @@ import com.letta.mobile.data.health.ShimBackendDetector
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.MessageSearchRequest
 import com.letta.mobile.data.model.MessageSearchResult
 import com.letta.mobile.data.model.MessageType
@@ -895,7 +896,7 @@ class AdminChatViewModelTest {
         advanceUntilIdle()
 
         every {
-            clientModeChatSender.streamMessage(any(), any(), any())
+            clientModeChatSender.streamMessage(any(), any(), any(), any())
         } returns flowOf(
             BotStreamChunk(
                 text = "ok",
@@ -917,21 +918,19 @@ class AdminChatViewModelTest {
         advanceUntilIdle()
 
         val outbound = slot<String>()
+        val outboundAttachments = slot<List<MessageContentPart.Image>>()
         verify {
             clientModeChatSender.streamMessage(
                 screenAgentId = "agent-1",
                 text = capture(outbound),
                 conversationId = "conv-attach",
+                attachments = capture(outboundAttachments),
             )
         }
-        val parts = Json.parseToJsonElement(outbound.captured).jsonArray
-        assertEquals("text", parts[0].jsonObject["type"]?.jsonPrimitive?.content)
-        assertEquals("hello", parts[0].jsonObject["text"]?.jsonPrimitive?.content)
-        assertEquals("image", parts[1].jsonObject["type"]?.jsonPrimitive?.content)
-        val source = parts[1].jsonObject["source"]!!.jsonObject
-        assertEquals("base64", source["type"]?.jsonPrimitive?.content)
-        assertEquals("image/png", source["media_type"]?.jsonPrimitive?.content)
-        assertEquals("ZmFrZQ==", source["data"]?.jsonPrimitive?.content)
+        assertEquals("hello", outbound.captured)
+        assertEquals(1, outboundAttachments.captured.size)
+        assertEquals("image/png", outboundAttachments.captured.single().mediaType)
+        assertEquals("ZmFrZQ==", outboundAttachments.captured.single().base64)
         assertNull(vm.composerState.value.error)
         assertEquals(1, vm.uiState.value.messages.first { it.role == "user" }.attachments.size)
     }

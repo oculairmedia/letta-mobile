@@ -67,7 +67,7 @@ import com.letta.mobile.feature.chat.R
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ParsedSearchMessage
-import com.letta.mobile.data.repository.ConversationRepository
+import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.LettaSearchBar
@@ -530,7 +530,7 @@ internal sealed interface ConversationSwitchAction {
 
 @HiltViewModel
 internal class ConversationPickerViewModel @Inject constructor(
-    val conversationRepository: ConversationRepository,
+    val conversationRepository: IConversationRepository,
 ) : ViewModel() {
 
     private val _selectedIds = MutableStateFlow<Set<String>>(emptySet())
