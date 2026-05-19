@@ -837,6 +837,67 @@ class A2uiRendererTest {
     }
 
     @Test
+    fun tabsSwitchVisibleChildUsingLocalState() {
+        val manager = tabsAccordionSurfaceManager(root = "projectTabs")
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+        }
+
+        composeRule.onNodeWithTag(A2uiTestTags.Tabs).assertIsDisplayed()
+        composeRule.onNodeWithText("Overview body").assertIsDisplayed()
+        composeRule.onNodeWithText("Activity").performClick()
+        composeRule.onNodeWithText("Activity body").assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            manager.applyMessage(
+                A2uiMessage.UpdateDataModel(
+                    updateDataModel = A2uiUpdateDataModelPayload(
+                        surfaceId = SurfaceId,
+                        path = "/unrelated",
+                        value = JsonPrimitive("updated"),
+                    ),
+                )
+            )
+        }
+
+        composeRule.onNodeWithText("Activity body").assertIsDisplayed()
+        composeRule.runOnIdle {
+            assertEquals(null, manager.surface(SurfaceId)!!.dataModel.resolve("/selectedTab"))
+        }
+    }
+
+    @Test
+    fun accordionItemsExpandIndependentlyAndSurviveRecomposition() {
+        val manager = tabsAccordionSurfaceManager(root = "faqAccordion")
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+        }
+
+        composeRule.onNodeWithTag(A2uiTestTags.Accordion).assertIsDisplayed()
+        composeRule.onNodeWithText("Summary body").assertIsDisplayed()
+        composeRule.onNodeWithText("Details body").assertDoesNotExist()
+        composeRule.onNodeWithText("Details").performClick()
+        composeRule.onNodeWithText("Details body").assertIsDisplayed()
+        composeRule.onNodeWithText("Summary body").assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            manager.applyMessage(
+                A2uiMessage.UpdateDataModel(
+                    updateDataModel = A2uiUpdateDataModelPayload(
+                        surfaceId = SurfaceId,
+                        path = "/unrelated",
+                        value = JsonPrimitive("updated"),
+                    ),
+                )
+            )
+        }
+
+        composeRule.onNodeWithText("Details body").assertIsDisplayed()
+    }
+
+    @Test
     fun buttonActionResolvesBoundContextAgainstCurrentDataModel() {
         val manager = bookingFormSurfaceManager()
         val actions = mutableListOf<A2uiAction>()
@@ -1326,6 +1387,37 @@ private fun chipSurfaceManager(root: String): A2uiSurfaceManager {
                   ]}},
                   {"version":"v0.9","updateDataModel":{"surfaceId":"$SurfaceId","path":"/filters/done","value":false}},
                   {"version":"v0.9","updateDataModel":{"surfaceId":"$SurfaceId","path":"/unreadCount","value":2}}
+                ]
+                """.trimIndent(),
+            ),
+        )
+    )
+    return manager
+}
+
+private fun tabsAccordionSurfaceManager(root: String): A2uiSurfaceManager {
+    val manager = A2uiSurfaceManager()
+    manager.applyMessages(
+        decodeA2uiMessages(
+            A2uiProtocolJson.Default,
+            A2uiProtocolJson.Default.parseToJsonElement(
+                """
+                [
+                  {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"basic"}},
+                  {"version":"v0.9","updateComponents":{"surfaceId":"$SurfaceId","root":"$root","components":[
+                    {"id":"projectTabs","component":"Tabs","default":"overview","items":[
+                      {"key":"overview","label":{"literalString":"Overview"},"child":"overviewBody"},
+                      {"key":"activity","label":{"literalString":"Activity"},"child":"activityBody"}
+                    ]},
+                    {"id":"overviewBody","component":"Text","text":{"literalString":"Overview body"}},
+                    {"id":"activityBody","component":"Text","text":{"literalString":"Activity body"}},
+                    {"id":"faqAccordion","component":"Accordion","localState":{"expanded_summary":true},"items":[
+                      {"key":"summary","title":{"literalString":"Summary"},"child":"summaryBody"},
+                      {"key":"details","title":{"literalString":"Details"},"child":"detailsBody"}
+                    ]},
+                    {"id":"summaryBody","component":"Text","text":{"literalString":"Summary body"}},
+                    {"id":"detailsBody","component":"Text","text":{"literalString":"Details body"}}
+                  ]}}
                 ]
                 """.trimIndent(),
             ),

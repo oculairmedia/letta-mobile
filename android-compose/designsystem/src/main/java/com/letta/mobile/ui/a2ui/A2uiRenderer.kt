@@ -1,5 +1,8 @@
 package com.letta.mobile.ui.a2ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -37,10 +40,12 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimeInput
@@ -181,6 +186,8 @@ object A2uiTestTags {
     const val Chip = "a2ui_chip"
     const val FilterChip = "a2ui_filter_chip"
     const val Badge = "a2ui_badge"
+    const val Tabs = "a2ui_tabs"
+    const val Accordion = "a2ui_accordion"
     const val Divider = "a2ui_divider"
     const val ToolApprovalCard = "a2ui_tool_approval_card"
     const val ToolApprovalSensitiveValue = "a2ui_tool_approval_sensitive_value"
@@ -389,6 +396,28 @@ private fun A2uiComponentNodeContent(
             component = component,
             surface = surface,
             modifier = modifier,
+            renderScope = renderScope,
+        )
+        "Tabs" -> A2uiTabs(
+            component = component,
+            surface = surface,
+            modifier = modifier,
+            visited = nextVisited,
+            onAction = onAction,
+            surfaceSubmitting = surfaceSubmitting,
+            onPendingActionDelta = onPendingActionDelta,
+            actionResolutionToken = actionResolutionToken,
+            renderScope = renderScope,
+        )
+        "Accordion" -> A2uiAccordion(
+            component = component,
+            surface = surface,
+            modifier = modifier,
+            visited = nextVisited,
+            onAction = onAction,
+            surfaceSubmitting = surfaceSubmitting,
+            onPendingActionDelta = onPendingActionDelta,
+            actionResolutionToken = actionResolutionToken,
             renderScope = renderScope,
         )
         "Image" -> A2uiImage(component = component, surface = surface, modifier = modifier, renderScope = renderScope)
@@ -1585,6 +1614,146 @@ private fun A2uiBadge(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+private fun A2uiTabs(
+    component: A2uiComponent,
+    surface: A2uiSurfaceState,
+    modifier: Modifier = Modifier,
+    visited: Set<String>,
+    onAction: (A2uiAction) -> Unit,
+    surfaceSubmitting: Boolean,
+    onPendingActionDelta: (Int) -> Unit,
+    actionResolutionToken: Int,
+    renderScope: A2uiRenderScope,
+) {
+    val items = component.resolveTabs(surface, renderScope)
+    if (items.isEmpty()) {
+        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
+        return
+    }
+    val defaultIndex = component.defaultTabIndex(items)
+    val selectedIndexState = rememberA2uiLocalIntState("selectedTabIndex", defaultIndex)
+    val selectedIndex = selectedIndexState.value.coerceIn(0, items.lastIndex)
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(A2uiTestTags.Tabs),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        PrimaryTabRow(selectedTabIndex = selectedIndex) {
+            items.forEachIndexed { index, item ->
+                Tab(
+                    selected = selectedIndex == index,
+                    onClick = { selectedIndexState.value = index },
+                    text = { Text(item.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                )
+            }
+        }
+        Crossfade(targetState = selectedIndex, label = "a2ui-tab-content") { index ->
+            val child = surface.components[items[index].childId]
+            if (child == null) {
+                A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MissingComponent))
+            } else {
+                A2uiComponentNode(
+                    component = child,
+                    surface = surface,
+                    visited = visited,
+                    onAction = onAction,
+                    surfaceSubmitting = surfaceSubmitting,
+                    onPendingActionDelta = onPendingActionDelta,
+                    actionResolutionToken = actionResolutionToken,
+                    renderScope = renderScope,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun A2uiAccordion(
+    component: A2uiComponent,
+    surface: A2uiSurfaceState,
+    modifier: Modifier = Modifier,
+    visited: Set<String>,
+    onAction: (A2uiAction) -> Unit,
+    surfaceSubmitting: Boolean,
+    onPendingActionDelta: (Int) -> Unit,
+    actionResolutionToken: Int,
+    renderScope: A2uiRenderScope,
+) {
+    val items = component.resolveAccordionItems(surface, renderScope)
+    if (items.isEmpty()) {
+        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
+        return
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .animateContentSize()
+            .testTag(A2uiTestTags.Accordion),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items.forEach { item ->
+            val expandedState = rememberA2uiLocalBooleanState("expanded_${item.key}", item.defaultOpen)
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(component.cornerRadius()),
+                tonalElevation = component.elevation(),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .animateContentSize(),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { expandedState.value = !expandedState.value }
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = item.title,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = if (expandedState.value) "−" else "+",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    AnimatedVisibility(visible = expandedState.value) {
+                        Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
+                            val child = surface.components[item.childId]
+                            if (child == null) {
+                                A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MissingComponent))
+                            } else {
+                                A2uiComponentNode(
+                                    component = child,
+                                    surface = surface,
+                                    visited = visited,
+                                    onAction = onAction,
+                                    surfaceSubmitting = surfaceSubmitting,
+                                    onPendingActionDelta = onPendingActionDelta,
+                                    actionResolutionToken = actionResolutionToken,
+                                    renderScope = renderScope,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 private fun A2uiDropdown(
     component: A2uiComponent,
     surface: A2uiSurfaceState,
@@ -1808,6 +1977,58 @@ private fun A2uiComponent.resolveRadioOptions(
             index = index,
             surface = surface,
             renderScope = A2uiRenderScope(basePath = itemsPath.appendJsonPointerSegment(index.toString())),
+        )
+    }
+}
+
+@Composable
+private fun A2uiComponent.resolveTabs(
+    surface: A2uiSurfaceState,
+    renderScope: A2uiRenderScope,
+): List<A2uiTabItem> {
+    val itemElements = raw["items"] as? JsonArray ?: raw["tabs"] as? JsonArray ?: return emptyList()
+    return itemElements.mapIndexedNotNull { index, element ->
+        val item = element as? JsonObject ?: return@mapIndexedNotNull null
+        val key = item.stringValue("key", "id", "value") ?: index.toString()
+        val label = resolveBindingText(
+            item["label"] ?: item["title"] ?: item["text"] ?: JsonPrimitive(key),
+            surface,
+            renderScope,
+        ) ?: key
+        val childId = item.stringValue("child", "content", "component", "childId")
+            ?: raw.stringValue("childTemplate", "childTemplateId", "itemTemplate")
+            ?: return@mapIndexedNotNull null
+        A2uiTabItem(key = key, label = label, childId = childId)
+    }
+}
+
+private fun A2uiComponent.defaultTabIndex(items: List<A2uiTabItem>): Int {
+    val default = raw.stringValue("default", "defaultKey", "selected", "value") ?: return 0
+    return default.toIntOrNull()?.coerceIn(0, items.lastIndex)
+        ?: items.indexOfFirst { it.key == default }.takeIf { it >= 0 }
+        ?: 0
+}
+
+@Composable
+private fun A2uiComponent.resolveAccordionItems(
+    surface: A2uiSurfaceState,
+    renderScope: A2uiRenderScope,
+): List<A2uiAccordionItem> {
+    val itemElements = raw["items"] as? JsonArray ?: return emptyList()
+    return itemElements.mapIndexedNotNull { index, element ->
+        val item = element as? JsonObject ?: return@mapIndexedNotNull null
+        val key = item.stringValue("key", "id", "value") ?: index.toString()
+        val title = resolveBindingText(
+            item["title"] ?: item["label"] ?: item["text"] ?: JsonPrimitive(key),
+            surface,
+            renderScope,
+        ) ?: key
+        val childId = item.stringValue("child", "content", "component", "childId") ?: return@mapIndexedNotNull null
+        A2uiAccordionItem(
+            key = key,
+            title = title,
+            childId = childId,
+            defaultOpen = item.booleanValue("defaultOpen", "open", "expanded") ?: false,
         )
     }
 }
@@ -2101,6 +2322,19 @@ private data class A2uiRadioOption(
     val label: String,
 )
 
+private data class A2uiTabItem(
+    val key: String,
+    val label: String,
+    val childId: String,
+)
+
+private data class A2uiAccordionItem(
+    val key: String,
+    val title: String,
+    val childId: String,
+    val defaultOpen: Boolean,
+)
+
 private data class A2uiNumericRange(
     val min: Double,
     val max: Double,
@@ -2218,6 +2452,15 @@ private fun JsonObject.booleanValue(vararg keys: String): Boolean? =
 
 private fun JsonElement?.bindingPath(): String? =
     (this as? JsonObject)?.stringValue("path")
+
+@Composable
+private fun rememberA2uiLocalIntState(
+    key: String,
+    initialValue: Int,
+): MutableState<Int> {
+    val scope = LocalA2uiLocalState.current
+    return scope?.intState(key, initialValue) ?: remember(key) { mutableStateOf(initialValue) }
+}
 
 @Composable
 private fun rememberA2uiLocalBooleanState(
