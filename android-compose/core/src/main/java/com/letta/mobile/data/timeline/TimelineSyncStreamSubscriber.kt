@@ -36,6 +36,7 @@ internal suspend fun runStreamSubscriber(
     streamSilenceTimeoutMs: Long,
     reconcileForExternalRun: suspend (String) -> Unit,
     ingestStreamEvent: suspend (LettaMessage) -> Unit,
+    setStreamActive: suspend (Boolean) -> Unit,
 ) {
     // Note: no foreground/subscriptionCount gate. The subscriber runs for
     // the full lifetime of this TimelineSyncLoop (which is a @Singleton-
@@ -61,6 +62,7 @@ internal suspend fun runStreamSubscriber(
                 runEventsCount = 0
                 runHeartbeatCount = 0
                 var lastHeartbeatTelemetryAtMs = 0L
+                setStreamActive(true)
                 events.emit(TimelineSyncEvent.StreamSubscriberOpened)
                 // letta-mobile-mge5.6/jmzq.4: per-phase telemetry for
                 // observability, including active persistent stream count
@@ -173,6 +175,7 @@ internal suspend fun runStreamSubscriber(
                 }
             } finally {
                 activeStreamCountAfterClose = activeStreamCount.decrementAndGet()
+                setStreamActive(false)
             }
             if (streamTimedOut) {
                 val reconnectDelayMs = STREAM_BACKOFF_START_MS + Random.nextLong(STREAM_BACKOFF_START_MS)

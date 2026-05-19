@@ -942,6 +942,34 @@ class TimelineSyncLoopTest {
     }
 
     @Test
+    fun `recent reconcile skips REST polling while stream subscriber is active`() = runBlocking {
+        val api = OpenStreamApi()
+        val scope = CoroutineScope(Dispatchers.IO)
+        val sync = TimelineSyncLoop(api, "conv-stream-owned", scope)
+
+        withTimeout(5_000) {
+            api.streamOpened.await()
+            while (!sync.streamSubscriberActive.value) delay(10)
+        }
+
+        sync.reconcileRecentMessages("open")
+
+        assertEquals(
+            "recent reconcile must not call /messages while the SSE subscriber owns visible state",
+            0,
+            api.listMessagesCalls,
+        )
+        val skipEvent = com.letta.mobile.util.Telemetry.snapshot().firstOrNull {
+            it.tag == "TimelineSync" &&
+                it.name == "recentReconcile.skipped" &&
+                it.attrs["conversationId"] == "conv-stream-owned"
+        }
+        assertNotNull("expected skip telemetry for stream-owned reconcile", skipEvent)
+
+        scope.coroutineContext.job.cancel()
+    }
+
+    @Test
     fun `reconcile does not retry on 4xx permanent errors`() = runBlocking {
         // letta-mobile-j44j: 4xx responses (auth, validation) won't become
         // true on retry, so we fail fast to avoid wasting up to 1.4s of
@@ -1693,6 +1721,26 @@ private class BlockingListApi : MessageApi(mockk(relaxed = true)) {
     ): List<LettaMessage> {
         listStarted.complete(Unit)
         return releaseList.await()
+    }
+}
+
+private class OpenStreamApi : MessageApi(mockk(relaxed = true)) {
+    val streamOpened = CompletableDeferred<Unit>()
+    @Volatile var listMessagesCalls: Int = 0
+
+    override suspend fun streamConversation(conversationId: String): ByteReadChannel {
+        streamOpened.complete(Unit)
+        return ByteChannel(autoFlush = true)
+    }
+
+    override suspend fun listConversationMessages(
+        conversationId: String,
+        limit: Int?,
+        after: String?,
+        order: String?,
+    ): List<LettaMessage> {
+        listMessagesCalls++
+        return emptyList()
     }
 }
 
