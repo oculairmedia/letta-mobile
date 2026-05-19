@@ -10,12 +10,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
 import com.letta.mobile.data.model.Conversation
-import com.letta.mobile.data.repository.ConversationRepository
+import com.letta.mobile.testutil.FakeConversationRepository
 import com.letta.mobile.ui.test.setLettaTestContent
-import io.mockk.coEvery
-import io.mockk.every
-import io.mockk.mockk
-import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Rule
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -41,13 +37,10 @@ class ConversationPickerSheetTest {
 
     @Test
     fun openingPickerShowsRepositoryConversations() {
-        val repo = mockk<ConversationRepository>(relaxed = true)
-        val conversations = MutableStateFlow(listOf(
+        val repo = FakeConversationRepository(listOf(
             conversation("conv-1", "First conversation"),
             conversation("conv-2", "Second conversation"),
         ))
-        coEvery { repo.refreshConversations(any()) } returns Unit
-        every { repo.getConversations("agent-1") } returns conversations
         val vm = ConversationPickerViewModel(repo)
 
         composeRule.setLettaTestContent {
@@ -68,10 +61,7 @@ class ConversationPickerSheetTest {
 
     @Test
     fun tappingNewConversationInvokesNewAction() {
-        val repo = mockk<ConversationRepository>(relaxed = true)
-        val conversations = MutableStateFlow(emptyList<Conversation>())
-        coEvery { repo.refreshConversations(any()) } returns Unit
-        every { repo.getConversations("agent-1") } returns conversations
+        val repo = FakeConversationRepository()
         val vm = ConversationPickerViewModel(repo)
         var newConversationId: String? = "not-called"
 
@@ -92,10 +82,7 @@ class ConversationPickerSheetTest {
 
     @Test
     fun tappingExistingConversationInvokesSelectionAction() {
-        val repo = mockk<ConversationRepository>(relaxed = true)
-        val conversations = MutableStateFlow(listOf(conversation("conv-1", "Pick me")))
-        coEvery { repo.refreshConversations(any()) } returns Unit
-        every { repo.getConversations("agent-1") } returns conversations
+        val repo = FakeConversationRepository(listOf(conversation("conv-1", "Pick me")))
         val vm = ConversationPickerViewModel(repo)
         var selectedConversationId: String? = null
 
@@ -116,10 +103,7 @@ class ConversationPickerSheetTest {
 
     @Test
     fun longPressEntersSelectionModeAndShowsDeleteAction() {
-        val repo = mockk<ConversationRepository>(relaxed = true)
-        val conversations = MutableStateFlow(listOf(conversation("conv-1", "Selectable")))
-        coEvery { repo.refreshConversations(any()) } returns Unit
-        every { repo.getConversations("agent-1") } returns conversations
+        val repo = FakeConversationRepository(listOf(conversation("conv-1", "Selectable")))
         val vm = ConversationPickerViewModel(repo)
 
         composeRule.setLettaTestContent {
@@ -140,11 +124,7 @@ class ConversationPickerSheetTest {
 
     @Test
     fun confirmingDeleteForActiveConversationRoutesToNewConversation() {
-        val repo = mockk<ConversationRepository>(relaxed = true)
-        val conversations = MutableStateFlow(listOf(conversation("conv-active", "Active")))
-        coEvery { repo.refreshConversations(any()) } returns Unit
-        every { repo.getConversations("agent-1") } returns conversations
-        coEvery { repo.deleteConversation(any(), any()) } returns Unit
+        val repo = FakeConversationRepository(listOf(conversation("conv-active", "Active")))
         val vm = ConversationPickerViewModel(repo)
         var newConversationId: String? = "not-called"
 
