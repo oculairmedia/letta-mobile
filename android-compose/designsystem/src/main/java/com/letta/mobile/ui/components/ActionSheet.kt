@@ -87,8 +87,14 @@ fun ActionSheetItem(
     icon: ImageVector,
     onClick: () -> Unit,
     destructive: Boolean = false,
+    enabled: Boolean = true,
+    supportingText: String? = null,
 ) {
-    val tint = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+    val tint = when {
+        !enabled -> MaterialTheme.colorScheme.onSurfaceVariant
+        destructive -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.primary
+    }
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val corner by animateDpAsState(
@@ -114,9 +120,14 @@ fun ActionSheetItem(
             headlineContent = {
                 Text(
                     text = text,
-                    color = if (destructive) MaterialTheme.colorScheme.error else Color.Unspecified,
+                    color = when {
+                        !enabled -> MaterialTheme.colorScheme.onSurfaceVariant
+                        destructive -> MaterialTheme.colorScheme.error
+                        else -> Color.Unspecified
+                    },
                 )
             },
+            supportingContent = supportingText?.let { text -> { Text(text) } },
             leadingContent = {
                 Icon(
                     imageVector = icon,
@@ -128,6 +139,7 @@ fun ActionSheetItem(
             modifier = Modifier.clickable(
                 interactionSource = interactionSource,
                 indication = LocalIndication.current,
+                enabled = enabled,
                 onClick = onClick,
             ),
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
