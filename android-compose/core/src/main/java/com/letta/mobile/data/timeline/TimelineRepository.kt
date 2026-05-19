@@ -238,6 +238,11 @@ open class TimelineRepository @Inject constructor(
         getOrCreate(conversationId).markExternalTransportLocalSent(otid)
     }
 
+    /** Mark an externally-queued optimistic user bubble as failed before it was dispatched. */
+    suspend fun markExternalTransportLocalFailed(conversationId: String, otid: String) {
+        getOrCreate(conversationId).markExternalTransportLocalFailed(otid)
+    }
+
     /**
      * Reconcile a send that went through the admin-shim mobile WebSocket.
      * The shim guarantees `turn_done` is emitted after disk stamping, so callers

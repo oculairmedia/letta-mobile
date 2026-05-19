@@ -657,6 +657,12 @@ class TimelineSyncLoop(
         }
     }
 
+    internal suspend fun markExternalTransportLocalFailed(otid: String) {
+        writeMutex.withLock {
+            _state.value = _state.value.markFailed(otid)
+        }
+    }
+
     internal suspend fun reconcileExternalTransportSend(
         agentId: String,
         externalConversationId: String,
