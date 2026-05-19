@@ -200,11 +200,16 @@ internal fun buildStreamingMarkdownRenderPlan(
     // the in-flight row and send it back through MarkdownText at paint cadence — that recreates the
     // table subtree on every partial-row tick and is the source of table flicker.
     if (!isStreaming) {
-        val last = partition.committedBlocks.lastOrNull()
+        val lastIndex = partition.committedBlocks.lastIndex
+        val last = partition.committedBlocks.getOrNull(lastIndex)
         if (last != null && last.text.looksLikeMarkdownTable() && partition.activeTail.looksLikeTableRowTail()) {
+            val combinedText = last.text + partition.activeTail.ensureTrailingNewline()
             return StreamingMarkdownRenderPlan(
                 committedBlocks = partition.committedBlocks.dropLast(1) +
-                    last.copy(text = last.text + partition.activeTail.ensureTrailingNewline()),
+                    MarkdownBlock(
+                        key = "blk-$lastIndex-${combinedText.hashCode()}",
+                        text = combinedText,
+                    ),
                 activeTail = "",
             )
         }

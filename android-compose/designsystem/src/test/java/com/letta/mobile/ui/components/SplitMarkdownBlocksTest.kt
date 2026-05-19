@@ -126,6 +126,74 @@ class SplitMarkdownBlocksTest {
     }
 
     @Test
+    fun `complete GFM table in middle of prefix is atomic`() {
+        val text = "Before\n\n| Language | Runtime | UI |\n| --- | --- | --- |\n| Kotlin | JVM | Compose |\n| Swift | Native | SwiftUI |\nAfter"
+
+        val blocks = splitMarkdownBlocks(text)
+
+        assertEquals(3, blocks.size)
+        assertEquals("Before\n\n", blocks[0].text)
+        assertEquals(
+            "| Language | Runtime | UI |\n| --- | --- | --- |\n| Kotlin | JVM | Compose |\n| Swift | Native | SwiftUI |\n",
+            blocks[1].text,
+        )
+        assertEquals("After", blocks[2].text)
+    }
+
+    @Test
+    fun `complete GFM table at end of streaming prefix is atomic`() {
+        val text = "Intro\n\n| Language | Runtime |\n| --- | --- |\n| Kotlin | JVM |\n| Swift | Native |\n"
+
+        val blocks = splitMarkdownBlocks(text)
+
+        assertEquals(2, blocks.size)
+        assertEquals("Intro\n\n", blocks[0].text)
+        assertEquals(
+            "| Language | Runtime |\n| --- | --- |\n| Kotlin | JVM |\n| Swift | Native |\n",
+            blocks[1].text,
+        )
+    }
+
+    @Test
+    fun `complete GFM table as entire prefix is atomic`() {
+        val text = "| Language | Runtime |\n| --- | --- |\n| Kotlin | JVM |\n| Swift | Native |\n"
+
+        val blocks = splitMarkdownBlocks(text)
+
+        assertEquals(1, blocks.size)
+        assertEquals(text, blocks.single().text)
+    }
+
+    @Test
+    fun `two consecutive GFM tables remain separate atomic blocks`() {
+        val first = "| Language | Runtime |\n| --- | --- |\n| Kotlin | JVM |\n"
+        val second = "| Platform | UI |\n| --- | --- |\n| Android | Compose |\n"
+        val text = "$first\n$second"
+
+        val blocks = splitMarkdownBlocks(text)
+
+        assertEquals(2, blocks.size)
+        assertEquals("$first\n", blocks[0].text)
+        assertEquals(second, blocks[1].text)
+    }
+
+    @Test
+    fun `final snapshot table tail merge updates the block key`() {
+        val text = "| Language | Runtime |\n| --- | --- |\n| Kotlin | JVM |"
+        val partition = partitionStreamingMarkdown(text)
+
+        val renderPlan = buildStreamingMarkdownRenderPlan(
+            partition = partition,
+            isStreaming = false,
+        )
+
+        assertEquals("", renderPlan.activeTail)
+        assertEquals(1, renderPlan.committedBlocks.size)
+        assertEquals("| Language | Runtime |\n| --- | --- |\n| Kotlin | JVM |\n", renderPlan.committedBlocks.single().text)
+        assertNotEquals(partition.committedBlocks.single().key, renderPlan.committedBlocks.single().key)
+    }
+
+    @Test
     fun `complete GFM table followed by paragraph break stays one block`() {
         val text = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\nAfter"
         val blocks = splitMarkdownBlocks(text)
