@@ -42,7 +42,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
@@ -75,6 +78,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.platform.testTag
@@ -181,6 +185,7 @@ object A2uiTestTags {
     const val Checkbox = "a2ui_checkbox"
     const val Switch = "a2ui_switch"
     const val Radio = "a2ui_radio"
+    const val ChoicePicker = "a2ui_choice_picker"
     const val Slider = "a2ui_slider"
     const val Stepper = "a2ui_stepper"
     const val StepperDecrement = "a2ui_stepper_decrement"
@@ -355,6 +360,13 @@ private fun A2uiComponentNodeContent(
             kind = A2uiBooleanInputKind.Switch,
         )
         "Radio" -> A2uiRadio(
+            component = component,
+            surface = surface,
+            modifier = modifier,
+            surfaceSubmitting = surfaceSubmitting,
+            renderScope = renderScope,
+        )
+        "ChoicePicker" -> A2uiChoicePicker(
             component = component,
             surface = surface,
             modifier = modifier,
@@ -1009,6 +1021,103 @@ private fun A2uiRadio(
                         MaterialTheme.colorScheme.onSurface
                     },
                 )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun A2uiChoicePicker(
+    component: A2uiComponent,
+    surface: A2uiSurfaceState,
+    modifier: Modifier = Modifier,
+    surfaceSubmitting: Boolean,
+    renderScope: A2uiRenderScope,
+) {
+    val binding = component.raw["value"] ?: component.raw["selected"]
+    val explicitPath = binding.bindingPath()?.let(renderScope::resolvePath)
+    val effectivePath = explicitPath ?: "/_inputs/${component.id}"
+    val literalDefault = component.resolveInputValue(surface, binding, renderScope)
+    val observedAtPath by surface.dataModel.observe(effectivePath)
+    var localValue by remember(component.id) { mutableStateOf(literalDefault) }
+    val value = observedAtPath?.let(A2uiBindingResolver::displayText)
+        ?: if (explicitPath != null) literalDefault else localValue
+    val label = component.resolveControlLabel(surface, renderScope)
+    val options = component.resolveRadioOptions(surface, renderScope)
+
+    if (options.isEmpty()) {
+        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
+        return
+    }
+
+    fun update(next: String) {
+        surface.dataModel.applyPatch(path = effectivePath, value = JsonPrimitive(next))
+        if (explicitPath == null) {
+            localValue = next
+        }
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (surfaceSubmitting) Modifier.semantics { disabled() } else Modifier)
+            .testTag(A2uiTestTags.ChoicePicker),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        label?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        if (options.size <= ChoicePickerSegmentedOptionLimit) {
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                options.forEachIndexed { index, option ->
+                    SegmentedButton(
+                        selected = value == option.key,
+                        onClick = { update(option.key) },
+                        enabled = !surfaceSubmitting,
+                        shape = SegmentedButtonDefaults.itemShape(
+                            index = index,
+                            count = options.size,
+                        ),
+                        label = {
+                            Text(
+                                text = option.label,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
+                    )
+                }
+            }
+        } else {
+            options.forEach { option ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = !surfaceSubmitting) { update(option.key) },
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RadioButton(
+                        selected = value == option.key,
+                        onClick = { update(option.key) },
+                        enabled = !surfaceSubmitting,
+                    )
+                    Text(
+                        text = option.label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (surfaceSubmitting) {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                    )
+                }
             }
         }
     }
@@ -3110,6 +3219,7 @@ private const val MaxRenderDepth = 32
 private const val DefaultToolApprovalTimeoutSeconds = 30
 private const val A2uiButtonLocalTimeoutMillis = 10_000L
 private const val A2uiLocalStateRootComponentId = "__surface__"
+private const val ChoicePickerSegmentedOptionLimit = 4
 private const val SensitiveMask = "********"
 private const val ToolApprovalResponseAction = "tool_approval_response"
 private const val ToolApprovalButtonsPerRow = 2

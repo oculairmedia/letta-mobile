@@ -584,6 +584,74 @@ class A2uiRendererTest {
     }
 
     @Test
+    fun choicePickerRendersAndWritesOptionValueToBoundDataModelPath() {
+        val manager = choicePickerSurfaceManager(root = "bound-picker")
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+        }
+
+        composeRule.onNodeWithTag(A2uiTestTags.ChoicePicker).assertIsDisplayed()
+        composeRule.onNodeWithText("Bound feel").assertIsDisplayed()
+        composeRule.onNodeWithText("Glitchy").performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(
+                "glitchy",
+                manager.surface(SurfaceId)!!.dataModel.resolve("/feel")!!.jsonPrimitive.content,
+            )
+        }
+    }
+
+    @Test
+    fun unboundChoicePickerRoutesSelectionIntoSyntheticDataModelPathForDollarReferenceResolution() {
+        val manager = choicePickerSurfaceManager(root = "choiceForm")
+        val actions = mutableListOf<A2uiAction>()
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(
+                surfaceId = SurfaceId,
+                surfaceManager = manager,
+                onAction = actions::add,
+            )
+        }
+
+        composeRule.onNodeWithText("Clean").performClick()
+        composeRule.onNodeWithText("Submit").performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(
+                "clean",
+                manager.surface(SurfaceId)!!.dataModel.resolve("/_inputs/feel-picker")!!.jsonPrimitive.content,
+            )
+            val action = actions.single()
+            assertEquals("submit_feel", action.name)
+            assertEquals("clean", action.context["feel"]!!.jsonPrimitive.content)
+        }
+    }
+
+    @Test
+    fun choicePickerIsDisabledWhileSiblingActionIsSubmitting() {
+        val manager = choicePickerSurfaceManager(root = "choiceSubmitForm")
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(
+                surfaceId = SurfaceId,
+                surfaceManager = manager,
+                onAction = {},
+            )
+        }
+
+        composeRule.onNodeWithText("Submit").performClick()
+        composeRule.onNodeWithTag(A2uiTestTags.ButtonProgress).assertIsDisplayed()
+        composeRule.onNodeWithTag(A2uiTestTags.ChoicePicker).assertIsNotEnabled()
+
+        composeRule.runOnIdle {
+            assertEquals(null, manager.surface(SurfaceId)!!.dataModel.resolve("/_inputs/feel-picker"))
+        }
+    }
+
+    @Test
     fun formWidgetsAreDisabledWhileSiblingActionIsSubmitting() {
         val manager = formWidgetSurfaceManager(root = "form")
 
@@ -1670,6 +1738,39 @@ private fun formWidgetSurfaceManager(root: String): A2uiSurfaceManager {
                     {"key":"salad","label":"Salad"},
                     {"key":"pasta","label":"Pasta"}
                   ]}}
+                ]
+                """.trimIndent(),
+            ),
+        )
+    )
+    return manager
+}
+
+private fun choicePickerSurfaceManager(root: String): A2uiSurfaceManager {
+    val manager = A2uiSurfaceManager()
+    manager.applyMessages(
+        decodeA2uiMessages(
+            A2uiProtocolJson.Default,
+            A2uiProtocolJson.Default.parseToJsonElement(
+                """
+                [
+                  {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"basic"}},
+                  {"version":"v0.9","updateComponents":{"surfaceId":"$SurfaceId","root":"$root","components":[
+                    {"id":"choiceForm","component":"Column","children":["feel-picker","submit"],"spacing":"sm"},
+                    {"id":"choiceSubmitForm","component":"Column","children":["feel-picker","submit"],"spacing":"sm"},
+                    {"id":"feel-picker","component":"ChoicePicker","label":"Render feel?","options":[
+                      {"label":"Clean","value":"clean"},
+                      {"label":"Glitchy","value":"glitchy"},
+                      {"label":"Slow","value":"slow"}
+                    ]},
+                    {"id":"bound-picker","component":"ChoicePicker","label":"Bound feel","value":{"path":"/feel"},"options":[
+                      {"label":"Clean","value":"clean"},
+                      {"label":"Glitchy","value":"glitchy"},
+                      {"label":"Slow","value":"slow"}
+                    ]},
+                    {"id":"submit","component":"Button","label":{"literalString":"Submit"},"action":{"name":"submit_feel","context":{"feel":"${'$'}feel-picker.value"}}}
+                  ]}},
+                  {"version":"v0.9","updateDataModel":{"surfaceId":"$SurfaceId","path":"/feel","value":"clean"}}
                 ]
                 """.trimIndent(),
             ),
