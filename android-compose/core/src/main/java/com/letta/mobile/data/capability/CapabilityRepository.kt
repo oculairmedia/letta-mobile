@@ -35,13 +35,23 @@ import javax.inject.Singleton
  * the probe order deterministic and avoids duplicating the
  * config-change wiring.
  */
+internal fun defaultCapabilityScope(): CoroutineScope =
+    CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
 @Singleton
-class CapabilityRepository @Inject constructor(
+class CapabilityRepository(
     private val settingsRepository: SettingsRepository,
     private val projectApi: ProjectApi,
     private val projectRepository: ProjectRepository,
+    private val scope: CoroutineScope,
 ) {
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    /** Hilt-friendly constructor — uses [defaultCapabilityScope]. */
+    @Inject
+    constructor(
+        settingsRepository: SettingsRepository,
+        projectApi: ProjectApi,
+        projectRepository: ProjectRepository,
+    ) : this(settingsRepository, projectApi, projectRepository, defaultCapabilityScope())
 
     private val _projectsSupported = MutableStateFlow(true)
     val projectsSupported: StateFlow<Boolean> = _projectsSupported.asStateFlow()

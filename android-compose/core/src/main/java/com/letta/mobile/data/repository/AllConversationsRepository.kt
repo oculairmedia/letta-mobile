@@ -28,11 +28,22 @@ data class ConversationCountEstimate(
     val isApproximate: Boolean,
 )
 
+internal fun defaultAllConversationsScope(): CoroutineScope =
+    CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
 @Singleton
-class AllConversationsRepository @Inject constructor(
+class AllConversationsRepository(
     private val conversationApi: ConversationApi,
     private val conversationDao: ConversationDao? = null,
+    private val repositoryScope: CoroutineScope,
 ) {
+    /** Hilt-friendly constructor — uses [defaultAllConversationsScope]. */
+    @Inject
+    constructor(
+        conversationApi: ConversationApi,
+        conversationDao: ConversationDao? = null,
+    ) : this(conversationApi, conversationDao, defaultAllConversationsScope())
+
     private val _conversations = MutableStateFlow<List<Conversation>>(emptyList())
     val conversations: StateFlow<List<Conversation>> = _conversations.asStateFlow()
 
@@ -43,7 +54,6 @@ class AllConversationsRepository @Inject constructor(
     private var currentCursor: String? = null
     private var lastRefreshAtMillis: Long = 0L
     private var hasLoadedAtLeastOnce: Boolean = false
-    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     init {
         repositoryScope.launch {

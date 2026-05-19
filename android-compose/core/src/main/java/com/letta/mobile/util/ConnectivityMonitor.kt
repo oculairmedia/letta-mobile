@@ -27,14 +27,24 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
+internal fun defaultConnectivityScope(): CoroutineScope =
+    CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
 @Singleton
-class ConnectivityMonitor @Inject constructor(
+class ConnectivityMonitor(
     @ApplicationContext private val context: Context,
     private val settingsRepository: SettingsRepository,
     private val apiClient: LettaApiClient,
+    private val scope: CoroutineScope,
 ) : DefaultLifecycleObserver {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    /** Hilt-friendly constructor — uses [defaultConnectivityScope]. */
+    @Inject
+    constructor(
+        @ApplicationContext context: Context,
+        settingsRepository: SettingsRepository,
+        apiClient: LettaApiClient,
+    ) : this(context, settingsRepository, apiClient, defaultConnectivityScope())
 
     private val _isOnline = MutableStateFlow(false)
     val isOnline: StateFlow<Boolean> = _isOnline.asStateFlow()

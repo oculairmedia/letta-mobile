@@ -47,13 +47,26 @@ import javax.inject.Singleton
  * fresh state on open. There is no periodic background poll — the user
  * explicitly opted out of that on letta-mobile-qmxn.
  */
-@Singleton
-class ServerHealthRepository @Inject constructor(
-    private val settingsRepository: SettingsRepository,
-) {
-    enum class Health { UNKNOWN, PROBING, ONLINE, OFFLINE }
+/**
+ * Long-lived scope ServerHealthRepository uses for its config-observer
+ * coroutine. Defaults to [Dispatchers.IO] + a fresh [SupervisorJob]; tests
+ * can substitute a [kotlinx.coroutines.test.TestScope] via the primary
+ * constructor (see letta-mobile-0dnn.7).
+ */
+internal fun defaultServerHealthScope(): CoroutineScope =
+    CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+@Singleton
+class ServerHealthRepository(
+    private val settingsRepository: SettingsRepository,
+    private val scope: CoroutineScope,
+) {
+    /** Hilt-friendly constructor — uses [defaultServerHealthScope]. */
+    @Inject
+    constructor(settingsRepository: SettingsRepository) :
+        this(settingsRepository, defaultServerHealthScope())
+
+    enum class Health { UNKNOWN, PROBING, ONLINE, OFFLINE }
 
     private val _states = MutableStateFlow<Map<String, Health>>(emptyMap())
     val states: StateFlow<Map<String, Health>> = _states.asStateFlow()
