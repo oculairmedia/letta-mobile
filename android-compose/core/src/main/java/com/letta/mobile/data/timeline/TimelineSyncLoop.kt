@@ -133,6 +133,9 @@ class TimelineSyncLoop(
     private val _state = MutableStateFlow(Timeline(conversationId))
     val state: StateFlow<Timeline> = _state.asStateFlow()
 
+    private val _streamSubscriberActive = MutableStateFlow(false)
+    internal val streamSubscriberActive: StateFlow<Boolean> = _streamSubscriberActive.asStateFlow()
+
     // Serialize all mutations so append/replace logic is safe under concurrency.
     private val writeMutex = Mutex()
 
@@ -683,6 +686,22 @@ class TimelineSyncLoop(
         val timer = Telemetry.startTimer("TimelineSync", telemetryName)
         var appended = 0
         try {
+            if (_streamSubscriberActive.value) {
+                Telemetry.event(
+                    "TimelineSync", "$telemetryName.skipped",
+                    "conversationId" to conversationId,
+                    *telemetryAttrs,
+                    "reason" to "streamSubscriberActive",
+                )
+                timer.stop(
+                    *telemetryAttrs,
+                    "serverCount" to 0,
+                    "appended" to 0,
+                    "skipped" to true,
+                    "skipReason" to "streamSubscriberActive",
+                )
+                return
+            }
             val serverMessages = messageApi.listConversationMessages(
                 conversationId = conversationId,
                 limit = RECONCILE_LIMIT,
@@ -884,6 +903,17 @@ class TimelineSyncLoop(
             streamSilenceTimeoutMs = streamSilenceTimeoutMs,
             reconcileForExternalRun = ::reconcileForExternalRun,
             ingestStreamEvent = ::ingestStreamEvent,
+            setStreamActive = ::setStreamSubscriberActive,
+        )
+    }
+
+    private suspend fun setStreamSubscriberActive(active: Boolean) {
+        if (_streamSubscriberActive.value == active) return
+        _streamSubscriberActive.value = active
+        Telemetry.event(
+            "TimelineSync", "streamSubscriber.activeChanged",
+            "conversationId" to conversationId,
+            "active" to active,
         )
     }
 
