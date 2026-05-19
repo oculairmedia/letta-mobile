@@ -448,6 +448,9 @@ class ChannelTransport @Inject constructor() {
                     TAG,
                     "user_action sent surfaceId=${action.surfaceId} event=${action.name} frameId=${frame.id}",
                 )
+                // letta-mobile-lwmo diagnostic: dump the resolved context so we
+                // can see what reached the wire when payloads look wrong.
+                Log.d(TAG, "user_action context payload=${json.encodeToString(JsonObject.serializer(), frame.context)}")
                 return A2uiActionDispatchResult.Sent(frame.id)
             }
             Log.w(

@@ -803,35 +803,39 @@ private fun A2uiTextField(
     renderScope: A2uiRenderScope,
 ) {
     val binding = component.raw["value"] ?: component.raw["text"]
-    val path = binding.bindingPath()?.let(renderScope::resolvePath)
-    val boundValue = component.resolveInputValue(surface, binding, renderScope)
+    val explicitPath = binding.bindingPath()?.let(renderScope::resolvePath)
+    // letta-mobile-lwmo: when the agent omits an explicit value path, route
+    // input through a synthetic data-model slot keyed by component id so
+    // $componentId.value references in user_action contexts can resolve
+    // the typed value. Previously this case wrote to Compose-local state
+    // only (letta-mobile-ykkl), making the value invisible to action
+    // emission. The synthetic path stays under a reserved /_inputs/
+    // namespace to avoid colliding with agent-declared paths.
+    val effectivePath = explicitPath ?: "/_inputs/${component.id}"
+    val literalDefault = component.resolveInputValue(surface, binding, renderScope)
+    val observedAtPath by surface.dataModel.observe(effectivePath)
     val label = resolveBindingText(component.raw["label"], surface, renderScope)
     val placeholder = resolveBindingText(component.raw["placeholder"], surface, renderScope)
     val fieldType = component.raw.stringValue("textFieldType", "variant", "type").orEmpty()
     val validation = component.raw.stringValue("validationRegexp")
 
-    // letta-mobile-ykkl: when the payload omits `value: {path: …}` the
-    // field used to be silently controlled by an unchanging data-model
-    // entry — typed characters fired onValueChange but the rendered
-    // value stayed empty, so the field looked unresponsive. Fall back
-    // to local Compose state so unbound fields still echo user input
-    // and remain editable; bound fields keep round-tripping through
-    // the surface dataModel.
-    var localValue by remember(component.id) { mutableStateOf(boundValue) }
-    val value = if (path != null) boundValue else localValue
+    val value = if (explicitPath != null) {
+        // Bound surfaces: existing behavior — read from the observed binding.
+        literalDefault
+    } else {
+        // Unbound surfaces: synthetic data-model slot drives display; literal
+        // binding (if any) is the initial default until the user types.
+        observedAtPath?.let(A2uiBindingResolver::displayText) ?: literalDefault
+    }
     val isError = validation != null && value.isNotBlank() && !value.matchesValidation(validation)
 
     OutlinedTextField(
         value = value,
         onValueChange = { next ->
-            if (path != null) {
-                surface.dataModel.applyPatch(
-                    path = path,
-                    value = component.inputValue(next, fieldType),
-                )
-            } else {
-                localValue = next
-            }
+            surface.dataModel.applyPatch(
+                path = effectivePath,
+                value = component.inputValue(next, fieldType),
+            )
         },
         modifier = modifier
             .fillMaxWidth()
@@ -2108,7 +2112,22 @@ private fun A2uiComponent.action(surface: A2uiSurfaceState, renderScope: A2uiRen
     val contextSource = (eventBlock?.get("context") ?: eventBlock?.get("data"))
         ?: action["context"]
         ?: action["data"]
-    val context = resolveA2uiActionContext(contextSource?.withScopedPaths(renderScope), surface.dataModel)
+    val resolvedContext = resolveA2uiActionContext(contextSource?.withScopedPaths(renderScope), surface)
+    // letta-mobile-lwmo: form-style surfaces (TextField + Button) lost the
+    // typed value when the agent emitted Button.action with no context
+    // bindings. Two paths to surface the data model to the agent:
+    //   (a) Spec: agent sets createSurface.sendDataModel:true → always attach.
+    //   (b) Safety net: agent's declared context is empty but the surface
+    //       has data → attach anyway so the agent gets the inputs even
+    //       before the shim prompt change ships.
+    val dataModelRoot = surface.dataModel.root
+    val attachDataModel = dataModelRoot is JsonObject && dataModelRoot.isNotEmpty() &&
+        (surface.sendDataModel || resolvedContext.isEmpty())
+    val context = if (attachDataModel) {
+        JsonObject(resolvedContext + ("data_model" to dataModelRoot))
+    } else {
+        resolvedContext
+    }
     val raw = buildJsonObject {
         action.forEach { (key, value) -> put(key, value) }
         put("actionName", name)
