@@ -1,7 +1,7 @@
 package com.letta.mobile.feature.chat
 
 import com.letta.mobile.data.model.MessageContentPart
-import com.letta.mobile.data.repository.ConversationRepository
+import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
@@ -15,7 +15,7 @@ internal class TimelineSendCoordinator(
     private val agentId: String,
     private val isFreshRoute: Boolean,
     private val explicitConversationId: String?,
-    private val conversationRepository: ConversationRepository,
+    private val conversationRepository: IConversationRepository,
     private val timelineRepository: TimelineRepository,
     private val uiState: MutableStateFlow<ChatUiState>,
     private val clearComposerAfterSend: () -> Unit,

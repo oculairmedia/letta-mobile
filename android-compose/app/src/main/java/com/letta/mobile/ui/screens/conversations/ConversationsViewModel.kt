@@ -8,9 +8,9 @@ import com.letta.mobile.data.repository.ConversationInspectorMessage
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
-import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.SettingsRepository
+import com.letta.mobile.data.repository.api.IConversationRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -55,7 +55,7 @@ private data class ConversationListLoadResult(
 @HiltViewModel
 class ConversationsViewModel @Inject constructor(
     private val allConversationsRepository: AllConversationsRepository,
-    private val conversationRepository: ConversationRepository,
+    private val conversationRepository: IConversationRepository,
     private val agentRepository: AgentRepository,
     private val messageRepository: MessageRepository,
     private val settingsRepository: SettingsRepository,
