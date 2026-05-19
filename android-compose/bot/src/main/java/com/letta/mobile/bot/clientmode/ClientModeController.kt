@@ -6,7 +6,7 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import com.letta.mobile.bot.config.BotConfig
 import com.letta.mobile.bot.core.BotGateway
 import com.letta.mobile.bot.core.GatewayStatus
-import com.letta.mobile.data.repository.SettingsRepository
+import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.util.Telemetry
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -24,7 +24,7 @@ import kotlinx.coroutines.sync.withLock
 @Singleton
 class ClientModeController @Inject constructor(
     private val botGateway: BotGateway,
-    private val settingsRepository: SettingsRepository,
+    private val settingsRepository: ISettingsRepository,
 ) : DefaultLifecycleObserver {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

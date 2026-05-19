@@ -4,14 +4,12 @@ import androidx.lifecycle.LifecycleOwner
 import com.letta.mobile.bot.clientmode.ClientModeController
 import com.letta.mobile.bot.core.BotGateway
 import com.letta.mobile.bot.core.GatewayStatus
-import com.letta.mobile.data.repository.SettingsRepository
-import io.mockk.coEvery
+import com.letta.mobile.testutil.FakeSettingsRepository
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -36,11 +34,11 @@ class ClientModeControllerTest {
             every { status } returns MutableStateFlow(GatewayStatus.RUNNING)
             every { sessions } returns MutableStateFlow(emptyMap())
         }
-        val settings = mockk<SettingsRepository>(relaxed = true) {
-            every { observeClientModeEnabled() } returns flowOf(true)
-            every { observeClientModeBaseUrl() } returns flowOf("https://lettabot.example/")
-            every { getClientModeApiKey() } returns "tok"
-        }
+        val settings = FakeSettingsRepository(
+            initialClientModeEnabled = true,
+            initialClientModeBaseUrl = "https://lettabot.example/",
+            initialClientModeApiKey = "tok",
+        )
         val controller = ClientModeController(gateway, settings)
         val owner = mockk<LifecycleOwner>(relaxed = true)
 
@@ -63,11 +61,11 @@ class ClientModeControllerTest {
             every { sessions } returns MutableStateFlow(emptyMap())
             every { getSession(any()) } returns mockk(relaxed = true)
         }
-        val settings = mockk<SettingsRepository>(relaxed = true) {
-            every { observeClientModeEnabled() } returns flowOf(true)
-            every { observeClientModeBaseUrl() } returns flowOf("https://lettabot.example/")
-            every { getClientModeApiKey() } returns "tok"
-        }
+        val settings = FakeSettingsRepository(
+            initialClientModeEnabled = true,
+            initialClientModeBaseUrl = "https://lettabot.example/",
+            initialClientModeApiKey = "tok",
+        )
         val controller = ClientModeController(gateway, settings)
         val owner = mockk<LifecycleOwner>(relaxed = true)
 

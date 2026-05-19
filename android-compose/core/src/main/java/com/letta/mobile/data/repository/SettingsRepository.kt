@@ -14,6 +14,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
+import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.util.EncryptedPrefsHelper
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -43,7 +44,7 @@ data class LastChatSelection(
 @Singleton
 class SettingsRepository @Inject constructor(
     @ApplicationContext private val context: Context,
-) {
+) : ISettingsRepository {
     private val dataStore = context.dataStore
     private val encryptedPrefs: SharedPreferences = EncryptedPrefsHelper.getEncryptedPrefs(context)
     private val json = Json { ignoreUnknownKeys = true }
@@ -52,7 +53,7 @@ class SettingsRepository @Inject constructor(
     val configs: StateFlow<List<LettaConfig>> = _configs.asStateFlow()
 
     private val _activeConfig = MutableStateFlow<LettaConfig?>(null)
-    val activeConfig: StateFlow<LettaConfig?> = _activeConfig.asStateFlow()
+    override val activeConfig: StateFlow<LettaConfig?> = _activeConfig.asStateFlow()
 
     /**
      * letta-mobile-ze5l: emits whenever the active backend's config id
@@ -139,7 +140,7 @@ class SettingsRepository @Inject constructor(
 
     fun getConfigs(): Flow<List<LettaConfig>> = configs
 
-    fun getActiveConfig(): Flow<LettaConfig?> = activeConfig
+    override fun getActiveConfig(): Flow<LettaConfig?> = activeConfig
 
     suspend fun saveConfig(config: LettaConfig) {
         _configs.update { current ->
@@ -368,7 +369,7 @@ class SettingsRepository @Inject constructor(
         prefs[Keys.ENABLE_PROJECTS] ?: false
     }
 
-    fun observeClientModeEnabled(): Flow<Boolean> = dataStore.data.map { prefs ->
+    override fun observeClientModeEnabled(): Flow<Boolean> = dataStore.data.map { prefs ->
         prefs[Keys.CLIENT_MODE_ENABLED] ?: false
     }
 
@@ -394,7 +395,7 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    fun observeClientModeBaseUrl(): Flow<String> = dataStore.data.map { prefs ->
+    override fun observeClientModeBaseUrl(): Flow<String> = dataStore.data.map { prefs ->
         prefs[Keys.CLIENT_MODE_BASE_URL] ?: ""
     }
 
@@ -404,7 +405,7 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    fun getClientModeApiKey(): String? = encryptedPrefs.getString(CLIENT_MODE_API_KEY, null)
+    override fun getClientModeApiKey(): String? = encryptedPrefs.getString(CLIENT_MODE_API_KEY, null)
 
     fun setClientModeApiKey(apiKey: String?) {
         if (apiKey.isNullOrBlank()) {

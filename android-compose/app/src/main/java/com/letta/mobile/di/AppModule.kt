@@ -4,7 +4,9 @@ import com.letta.mobile.channel.NotificationDeliveryCoordinator
 import com.letta.mobile.chat.BuildConfigChatClientVersionProvider
 import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.repository.BlockRepository
+import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
+import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.feature.chat.ChatClientVersionProvider
 import com.letta.mobile.platform.storage.AndroidAppPrivateStorageRootProvider
 import com.letta.mobile.platform.storage.AndroidSafStorageGrantStore
@@ -28,6 +30,10 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindBlockRepository(impl: BlockRepository): IBlockRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSettingsRepository(impl: SettingsRepository): ISettingsRepository
 
     @Binds
     @Singleton

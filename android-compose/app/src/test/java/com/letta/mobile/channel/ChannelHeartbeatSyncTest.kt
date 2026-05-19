@@ -5,10 +5,11 @@ import com.letta.mobile.bot.channel.NotificationReplyHandler
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.api.ConversationApi
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.ConversationInspectorMessage
 import com.letta.mobile.data.repository.MessageRepository
-import com.letta.mobile.data.repository.SettingsRepository
+import com.letta.mobile.testutil.FakeSettingsRepository
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.just
@@ -119,7 +120,14 @@ class ChannelHeartbeatSyncTest {
         val stateStore = mockk<ChannelSyncStateStore>()
         val publisher = mockk<ChannelNotificationPublisher>()
         val replyHandler = mockk<NotificationReplyHandler>()
-        val settingsRepository = mockk<SettingsRepository>()
+        val settingsRepository = FakeSettingsRepository(
+            initialActiveConfig = LettaConfig(
+                id = "test-config",
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "http://localhost:8291",
+                accessToken = "tok",
+            ),
+        )
 
         val conversations = mutableListOf(
             Conversation(
@@ -137,7 +145,6 @@ class ChannelHeartbeatSyncTest {
         val processed = mutableMapOf<String, String>()
         val notified = mutableMapOf<String, String>()
 
-        every { settingsRepository.getActiveConfig() } returns MutableStateFlow(mockk(relaxed = true))
         coEvery {
             conversationApi.listConversations(limit = 100, order = "desc", orderBy = "last_message_at")
         } answers { conversations.toList() }
