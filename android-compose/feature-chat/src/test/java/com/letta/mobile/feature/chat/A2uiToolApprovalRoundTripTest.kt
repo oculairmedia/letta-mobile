@@ -256,7 +256,7 @@ class A2uiToolApprovalRoundTripTest {
     }
 
     @Test
-    fun queuedApprovalActionFlushesAfterReconnect() = runTest {
+    fun queuedApprovalActionTriggersReconnectAndFlushes() = runTest {
         val server = openServer()
         val transport = openTransport()
         val bridge = WsChatBridge(transport)
@@ -289,9 +289,7 @@ class A2uiToolApprovalRoundTripTest {
 
         composeRule.onNodeWithText("Once").performClick()
         composeRule.onNodeWithText("Approved once").assertIsDisplayed()
-        assertTrue(server.actions.tryReceive().isFailure)
 
-        connect(transport, bridge, server)
         val action = withRealTimeout { server.actions.receive() }
         action.assertToolApprovalAction(
             surfaceId = "reconnect-surface",
