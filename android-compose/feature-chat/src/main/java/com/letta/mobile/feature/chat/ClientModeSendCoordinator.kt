@@ -11,8 +11,6 @@ import com.letta.mobile.data.channel.NotificationDeliveryCandidate
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.data.model.buildContentParts
-import com.letta.mobile.data.model.toJsonArray
 import com.letta.mobile.data.timeline.ClientModeStreamChunk
 import com.letta.mobile.data.timeline.ClientModeStreamEvent
 import com.letta.mobile.data.timeline.TimelineRepository
@@ -87,7 +85,6 @@ internal class ClientModeSendCoordinator(
         val assistantMessageId = "client-assistant-${java.util.UUID.randomUUID()}"
         resetPreConversationBuffer()
         pendingStreamSessionId = assistantMessageId
-        val outboundText = buildClientModeOutboundText(text, attachments)
         val initialPriorConversationId = explicitConversationId ?: currentClientModeConversationId()
         clearComposerAfterSend()
         val job = scope.launch {
@@ -152,11 +149,21 @@ internal class ClientModeSendCoordinator(
             var sawAssistantPayload = false
             var migratedToTimeline = priorConversationId != null
             try {
-                clientModeChatSender.streamMessage(
-                    screenAgentId = agentId,
-                    text = outboundText,
-                    conversationId = priorConversationId,
-                ).collect { chunk ->
+                val stream = if (attachments.isEmpty()) {
+                    clientModeChatSender.streamMessage(
+                        screenAgentId = agentId,
+                        text = text,
+                        conversationId = priorConversationId,
+                    )
+                } else {
+                    clientModeChatSender.streamMessage(
+                        screenAgentId = agentId,
+                        text = text,
+                        conversationId = priorConversationId,
+                        attachments = attachments,
+                    )
+                }
+                stream.collect { chunk ->
                     chunk.conversationId?.takeIf { it.isNotBlank() }?.let { conversationId ->
                         latestConversationId = conversationId
 
@@ -533,12 +540,3 @@ internal fun BotStreamChunk.toTimelineStreamChunk(): ClientModeStreamChunk =
         isError = isError,
         done = done,
     )
-
-private fun buildClientModeOutboundText(
-    text: String,
-    attachments: List<MessageContentPart.Image>,
-): String = if (attachments.isEmpty()) {
-    text
-} else {
-    buildContentParts(text, attachments).toJsonArray().toString()
-}

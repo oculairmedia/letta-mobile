@@ -5,6 +5,7 @@ import com.letta.mobile.bot.protocol.BotStreamChunk
 import com.letta.mobile.bot.protocol.InternalBotClient
 import com.letta.mobile.bot.chat.ClientModeChatSender
 import com.letta.mobile.bot.clientmode.ClientModeController
+import com.letta.mobile.data.model.MessageContentPart
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -73,6 +74,31 @@ class ClientModeChatSenderTest {
         assertEquals("route-conv", fixture.capturedRequest.conversationId)
         assertEquals("agent:route-agent", fixture.capturedRequest.chatId)
         assertFalse(fixture.capturedRequest.forceNew)
+    }
+
+    @Test
+    fun `image attachments are sent as structured bot content items`() = runTest {
+        val fixture = ClientModeSenderFixture()
+
+        fixture.sender
+            .streamMessage(
+                screenAgentId = "route-agent",
+                text = "describe this",
+                conversationId = "route-conv",
+                attachments = listOf(MessageContentPart.Image(base64 = "AAAA", mediaType = "image/png")),
+            )
+            .toList()
+
+        fixture.verifyReadyAndSent()
+        assertEquals("describe this", fixture.capturedRequest.message)
+        val parts = fixture.capturedRequest.contentItems!!
+        assertEquals(2, parts.size)
+        assertEquals("text", parts[0].type)
+        assertEquals("describe this", parts[0].text)
+        assertEquals("image", parts[1].type)
+        assertEquals("base64", parts[1].source!!.type)
+        assertEquals("image/png", parts[1].source!!.mediaType)
+        assertEquals("AAAA", parts[1].source!!.data)
     }
 
     private class ClientModeSenderFixture {

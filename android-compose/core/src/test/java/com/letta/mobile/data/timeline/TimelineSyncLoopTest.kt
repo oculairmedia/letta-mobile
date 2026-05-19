@@ -30,6 +30,9 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -209,6 +212,56 @@ class TimelineSyncLoopTest {
         assertEquals(2, events.size)
         assertTrue(events[0].otid == userOtid || events[0].otid.contains(userOtid))
         assertEquals("OK", events[1].content)
+        scope.coroutineContext.job.cancel()
+    }
+
+    @Test
+    fun `send with image attachments posts Letta content parts`() = runBlocking {
+        val api = FakeSyncApi()
+        api.nextStreamMessages = listOf(
+            AssistantMessage(id = "reply-image", contentRaw = JsonPrimitive("I see it"), otid = "reply-otid")
+        )
+        val scope = CoroutineScope(Dispatchers.IO)
+        val sync = TimelineSyncLoop(api, "conv-image", scope)
+
+        sync.send(
+            content = "describe this image",
+            attachments = listOf(MessageContentPart.Image(base64 = "AAAA", mediaType = "image/png")),
+        )
+
+        withTimeout(5_000) {
+            while (api.lastSendRequest == null) delay(10)
+        }
+
+        val firstMessage = api.lastSendRequest!!.messages!!.single().jsonObject
+        val contentParts = firstMessage["content"]!!.jsonArray
+        assertEquals("text", contentParts[0].jsonObject["type"]!!.jsonPrimitive.content)
+        assertEquals("describe this image", contentParts[0].jsonObject["text"]!!.jsonPrimitive.content)
+        assertEquals("image", contentParts[1].jsonObject["type"]!!.jsonPrimitive.content)
+        val source = contentParts[1].jsonObject["source"]!!.jsonObject
+        assertEquals("base64", source["type"]!!.jsonPrimitive.content)
+        assertEquals("image/png", source["media_type"]!!.jsonPrimitive.content)
+        assertEquals("AAAA", source["data"]!!.jsonPrimitive.content)
+        scope.coroutineContext.job.cancel()
+    }
+
+    @Test
+    fun `send without attachments keeps legacy string content`() = runBlocking {
+        val api = FakeSyncApi()
+        api.nextStreamMessages = listOf(
+            AssistantMessage(id = "reply-text", contentRaw = JsonPrimitive("OK"), otid = "reply-otid")
+        )
+        val scope = CoroutineScope(Dispatchers.IO)
+        val sync = TimelineSyncLoop(api, "conv-text", scope)
+
+        sync.send("plain text")
+
+        withTimeout(5_000) {
+            while (api.lastSendRequest == null) delay(10)
+        }
+
+        val firstMessage = api.lastSendRequest!!.messages!!.single().jsonObject
+        assertEquals(JsonPrimitive("plain text"), firstMessage["content"])
         scope.coroutineContext.job.cancel()
     }
 
@@ -1860,6 +1913,7 @@ private class ExpiredThenIdleApi : MessageApi(mockk(relaxed = true)) {
 private class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
     private val stored = mutableListOf<LettaMessage>()
     var nextStreamMessages: List<LettaMessage> = emptyList()
+    var lastSendRequest: MessageCreateRequest? = null
 
     // letta-mobile-j44j: failure-injection for reconcile retry tests.
     // When [listMessagesFailuresBeforeSuccess] > 0, the first N calls to
@@ -1909,6 +1963,7 @@ private class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
         conversationId: String,
         request: MessageCreateRequest,
     ): ByteReadChannel {
+        lastSendRequest = request
         // Extract otid from request and create a UserMessage in the store to
         // mimic server persistence.
         val firstMessage = request.messages?.firstOrNull()
