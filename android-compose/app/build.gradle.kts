@@ -44,7 +44,7 @@ sentry {
     // lets local builds (no secrets) and fork PRs succeed, while main-branch
     // CI on the oculairmedia/letta-mobile repo (which has the secrets) still
     // ships mapping files so stack traces stay deobfuscated.
-    val hasSentryAuth = !System.getenv("SENTRY_AUTH_TOKEN").isNullOrBlank()
+    val hasSentryAuth = providers.environmentVariable("SENTRY_AUTH_TOKEN").orNull?.isNotBlank() == true
     includeProguardMapping.set(hasSentryAuth)
     includeSourceContext.set(hasSentryAuth)
 
@@ -52,9 +52,9 @@ sentry {
     // repo secrets — see .github/workflows/android.yml). Hard-defaulting
     // here would lock us to a single Sentry instance; env-driven keeps the
     // build portable.
-    System.getenv("SENTRY_ORG")?.takeIf { it.isNotBlank() }?.let { org.set(it) }
-    System.getenv("SENTRY_PROJECT")?.takeIf { it.isNotBlank() }?.let { projectName.set(it) }
-    System.getenv("SENTRY_URL")?.takeIf { it.isNotBlank() }?.let { url.set(it) }
+    providers.environmentVariable("SENTRY_ORG").orNull?.takeIf { it.isNotBlank() }?.let { org.set(it) }
+    providers.environmentVariable("SENTRY_PROJECT").orNull?.takeIf { it.isNotBlank() }?.let { projectName.set(it) }
+    providers.environmentVariable("SENTRY_URL").orNull?.takeIf { it.isNotBlank() }?.let { url.set(it) }
 
     tracingInstrumentation {
         enabled.set(true)
@@ -90,35 +90,29 @@ val localProps = Properties().apply {
 //      attaches it to the GitHub Release.
 
 @Suppress("UnstableApiUsage")
-fun computeVersionName(): String {
+fun computeVersionName() = providers.provider {
     // 1. Explicit override (handy for one-off builds).
-    (project.findProperty("versionNameOverride") as String?)?.takeIf { it.isNotBlank() }?.let {
-        return it
-    }
-
-    // 2. Tag-driven CI build: GITHUB_REF_NAME is "v1.2.3" when a tag push fires.
-    System.getenv("GITHUB_REF_NAME")?.takeIf { it.startsWith("v") }?.let { ref ->
-        val stripped = ref.removePrefix("v")
-        if (Regex("""\d+\.\d+\.\d+.*""").matches(stripped)) {
-            return stripped
-        }
-    }
-
-    // 3. Fallback: `git describe`. Reports e.g. `0.1.0-3-gab12cd` on a
-    //    branch 3 commits past v0.1.0, or `0.1.0-3-gab12cd-dirty` with
-    //    uncommitted changes. If no tags exist yet, returns `0.0.0-dev`.
-    return runCatching {
-        val proc = ProcessBuilder("git", "describe", "--tags", "--always", "--dirty", "--match", "v[0-9]*")
-            .directory(rootProject.projectDir.parentFile ?: rootProject.projectDir)
-            .redirectErrorStream(true)
-            .start()
-        proc.waitFor()
-        proc.inputStream.bufferedReader().readText().trim().removePrefix("v")
-    }
-        .getOrNull()
-        ?.takeIf { it.isNotBlank() && it.matches(Regex("""\d+\.\d+\.\d+.*""")) }
-        ?: "0.0.0-dev"
+    providers.gradleProperty("versionNameOverride").orNull?.takeIf { it.isNotBlank() }
+        ?: providers.environmentVariable("GITHUB_REF_NAME").orNull
+            ?.takeIf { it.startsWith("v") }
+            ?.removePrefix("v")
+            ?.takeIf { Regex("""\d+\.\d+\.\d+.*""").matches(it) }
 }
+    .orElse(
+        // 3. Fallback: `git describe`. Reports e.g. `0.1.0-3-gab12cd` on a
+        //    branch 3 commits past v0.1.0, or `0.1.0-3-gab12cd-dirty` with
+        //    uncommitted changes. If no tags exist yet, returns `0.0.0-dev`.
+        providers.exec {
+            commandLine("git", "describe", "--tags", "--always", "--dirty", "--match", "v[0-9]*")
+            workingDir = rootProject.projectDir.parentFile ?: rootProject.projectDir
+            isIgnoreExitValue = true
+        }.standardOutput.asText.map { output ->
+            output.trim()
+                .removePrefix("v")
+                .takeIf { it.isNotBlank() && it.matches(Regex("""\d+\.\d+\.\d+.*""")) }
+                ?: "0.0.0-dev"
+        },
+    )
 
 fun computeVersionCode(versionName: String): Int {
     // Strip any suffix (`-rc.1`, `-3-gab12cd`, `-dirty`) — only the
@@ -134,7 +128,7 @@ fun computeVersionCode(versionName: String): Int {
     return (major * 10_000 + minor * 100 + patch).coerceAtLeast(1)
 }
 
-val computedVersionName = computeVersionName()
+val computedVersionName = computeVersionName().get() ?: "0.0.0-dev"
 val computedVersionCode = computeVersionCode(computedVersionName)
 
 logger.lifecycle("[versioning] versionName=$computedVersionName versionCode=$computedVersionCode")
@@ -203,11 +197,11 @@ android {
                 keyAlias = props["keyAlias"] as String
                 keyPassword = props["keyPassword"] as String
             } else {
-                val envStoreFile = System.getenv("SIGNING_STORE_FILE")?.takeIf { it.isNotEmpty() }
+                val envStoreFile = providers.environmentVariable("SIGNING_STORE_FILE").orNull?.takeIf { it.isNotEmpty() }
                 storeFile = file(envStoreFile ?: "letta-release.jks")
-                storePassword = System.getenv("SIGNING_STORE_PASSWORD") ?: ""
-                keyAlias = System.getenv("SIGNING_KEY_ALIAS") ?: ""
-                keyPassword = System.getenv("SIGNING_KEY_PASSWORD") ?: ""
+                storePassword = providers.environmentVariable("SIGNING_STORE_PASSWORD").orNull ?: ""
+                keyAlias = providers.environmentVariable("SIGNING_KEY_ALIAS").orNull ?: ""
+                keyPassword = providers.environmentVariable("SIGNING_KEY_PASSWORD").orNull ?: ""
             }
         }
     }
