@@ -243,9 +243,12 @@ android {
             all {
                 it.useJUnitPlatform()
                 // Memory caps — see core/build.gradle.kts for rationale.
-                it.maxHeapSize = "1536m"
+                // The app suite is the heaviest Robolectric/Hilt test shard;
+                // fork more often so long CI runs do not carry retained class
+                // loader state into late suites such as ProjectHomeViewModelTest.
+                it.maxHeapSize = "2048m"
                 it.jvmArgs("-XX:+UseG1GC", "-XX:MaxMetaspaceSize=384m")
-                it.setForkEvery(100L)
+                it.setForkEvery(50L)
             }
         }
     }
