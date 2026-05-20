@@ -155,6 +155,94 @@ class MessageApiTest : com.letta.mobile.testutil.TrackedMockClientTestSupport() 
         assertEquals("msg-old", results.single().message["id"]!!.jsonPrimitive.content)
     }
 
+    // letta-mobile-t8q7: centralised idle-pattern classification.
+    // Before this change the subscriber re-classified ApiException bodies
+    // in its catch block, which still allocated an ApiException + stack
+    // on every idle cycle. Routing both "No active runs" and "EXPIRED"
+    // bodies into the stackless NoActiveRunException here removes the
+    // hot-path stack capture for the entire idle path.
+    @Test
+    fun `streamConversation 400 with No active runs body throws NoActiveRunException`() = runTest {
+        val api = createApi {
+            respond(
+                """{"detail":"No active runs found for conversation conv-1"}""",
+                HttpStatusCode.BadRequest,
+                jsonHeaders,
+            )
+        }
+
+        val thrown = try {
+            api.streamConversation("conv-1")
+            null
+        } catch (e: NoActiveRunException) {
+            e
+        }
+        assertTrue("expected NoActiveRunException, got nothing", thrown != null)
+        assertEquals("conv-1", thrown!!.conversationId)
+    }
+
+    @Test
+    fun `streamConversation 404 with No active runs body throws NoActiveRunException`() = runTest {
+        val api = createApi {
+            respond(
+                """{"detail":"No active runs"}""",
+                HttpStatusCode.NotFound,
+                jsonHeaders,
+            )
+        }
+
+        val thrown = try {
+            api.streamConversation("conv-1")
+            null
+        } catch (e: NoActiveRunException) {
+            e
+        }
+        assertTrue("expected NoActiveRunException, got nothing", thrown != null)
+    }
+
+    // letta-mobile-gqz3 contract: EXPIRED bodies must be idle, not error.
+    // letta-mobile-t8q7: now classified by MessageApi (was: by the subscriber).
+    @Test
+    fun `streamConversation 400 with EXPIRED body throws NoActiveRunException`() = runTest {
+        val api = createApi {
+            respond(
+                """{"detail":"EXPIRED: Run was created more than 3 hours ago, and is now expired."}""",
+                HttpStatusCode.BadRequest,
+                jsonHeaders,
+            )
+        }
+
+        val thrown = try {
+            api.streamConversation("conv-1")
+            null
+        } catch (e: NoActiveRunException) {
+            e
+        }
+        assertTrue("expected NoActiveRunException for EXPIRED body, got nothing", thrown != null)
+    }
+
+    @Test
+    fun `streamConversation 400 with unrelated body throws ApiException`() = runTest {
+        val api = createApi {
+            respond(
+                """{"detail":"some other validation error"}""",
+                HttpStatusCode.BadRequest,
+                jsonHeaders,
+            )
+        }
+
+        val thrown = try {
+            api.streamConversation("conv-1")
+            null
+        } catch (e: NoActiveRunException) {
+            error("non-idle 400 should not be classified as NoActiveRun: $e")
+        } catch (e: ApiException) {
+            e
+        }
+        assertTrue("expected ApiException, got nothing", thrown != null)
+        assertEquals(400, thrown!!.code)
+    }
+
     private fun requestBody(body: Any): String {
         val outgoing = body as OutgoingContent
         return when (outgoing) {

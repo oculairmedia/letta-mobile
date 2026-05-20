@@ -19,6 +19,18 @@ class ApiResultTest : WordSpec({
         }
     }
 
+    "NoActiveRunException" should {
+        // letta-mobile-t8q7: idle-poll control-flow signal. With multiple
+        // background subscribers each idling at the 32 s cap, capturing a
+        // stack on every throw was the dominant allocation source — verify
+        // it stays elided.
+        "skip stack trace capture (cheap to throw on the idle hot path)" {
+            val exception = NoActiveRunException("conv-1")
+            exception.stackTrace.size shouldBe 0
+            exception.conversationId shouldBe "conv-1"
+        }
+    }
+
     "ApiResult.Success" should {
         "wrap simple data" {
             val result = ApiResult.Success("test data")

@@ -220,42 +220,18 @@ internal suspend fun runStreamSubscriber(
             // letta-mobile-qv6d: idle path uses the longer cap.
             backoffMs = (backoffMs * 2).coerceAtMost(STREAM_IDLE_BACKOFF_MAX_MS)
         } catch (e: ApiException) {
-            // The Letta server returns 400 INVALID_ARGUMENT with body
-            // `{"detail":"... No active runs found ..."}` as an alternative
-            // form of "no active run". It may ALSO return
-            // `{"detail":"EXPIRED: Run was created more than 3 hours ago,
-            // and is now expired."}` once a previously-active run ages out
-            // without finishing. Both of these are the "idle" state from
-            // the subscriber's point of view — back off and retry; the
-            // next live run (or a subsequent probe) will open a fresh
-            // stream. Everything else is an actual error.
-            // letta-mobile-gqz3: before this fix, EXPIRED was mis-classified
-            // as a generic error and the subscriber wedged at the backoff
-            // cap, repeatedly re-attaching to the dead run forever.
-            val msg = e.message ?: ""
-            val isIdlePattern = msg.contains("No active runs", ignoreCase = true) ||
-                msg.contains("EXPIRED:", ignoreCase = true) ||
-                msg.contains("is now expired", ignoreCase = true)
-            if (isIdlePattern) {
-                Telemetry.event(
-                    "TimelineSync", "streamSubscriber.idle404",
-                    "conversationId" to conversationId,
-                    "backoffMs" to backoffMs,
-                    "via" to "apiException",
-                )
-                delay(backoffMs)
-                // letta-mobile-qv6d: idle path uses the longer cap.
-                backoffMs = (backoffMs * 2).coerceAtMost(STREAM_IDLE_BACKOFF_MAX_MS)
-            } else {
-                // letta-mobile-mge5.6: distinguish transient network /
-                // server errors from the idle path. Grafana alerts on
-                // sustained networkError rate, not on idle404.
-                Telemetry.error(
-                    "TimelineSync", "streamSubscriber.networkError", e,
-                    "conversationId" to conversationId,
-                )
-                delay(STREAM_BACKOFF_MAX_MS)
-            }
+            // letta-mobile-t8q7: idle-pattern classification (No active runs /
+            // EXPIRED / is now expired) is now done in MessageApi.streamConversation,
+            // which routes those bodies via the stackless NoActiveRunException
+            // path above. Anything that reaches here is a real server error.
+            // letta-mobile-mge5.6: distinguish transient network / server errors
+            // from the idle path. Grafana alerts on sustained networkError rate,
+            // not on idle404.
+            Telemetry.error(
+                "TimelineSync", "streamSubscriber.networkError", e,
+                "conversationId" to conversationId,
+            )
+            delay(STREAM_BACKOFF_MAX_MS)
         } catch (t: Throwable) {
             Telemetry.error(
                 "TimelineSync", "streamSubscriber.networkError", t,
