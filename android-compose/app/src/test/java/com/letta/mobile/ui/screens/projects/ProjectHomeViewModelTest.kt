@@ -3,7 +3,10 @@ package com.letta.mobile.ui.screens.projects
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.api.ProjectApi
+import com.letta.mobile.data.model.BeadsRemoteProvisionResponse
+import com.letta.mobile.data.model.BeadsRemoteStatus
 import com.letta.mobile.data.model.ProjectCatalog
+import com.letta.mobile.data.model.ProjectSyncTriggerResponse
 import com.letta.mobile.data.model.ProjectSummary
 import com.letta.mobile.data.repository.ProjectRepository
 import com.letta.mobile.testutil.FakeSettingsRepository
@@ -717,6 +720,24 @@ class ProjectHomeViewModelTest {
             calls.add("deleteProject:$identifier")
             if (deleteShouldFail) throw ApiException(400, "Delete failed")
             projects.removeAll { it.identifier == identifier }
+        }
+
+        override suspend fun getBeadsRemoteStatus(identifier: String): BeadsRemoteStatus {
+            calls.add("getBeadsRemoteStatus:$identifier")
+            return BeadsRemoteStatus(status = "not_configured")
+        }
+
+        override suspend fun provisionBeadsRemote(
+            identifier: String,
+            push: Boolean,
+        ): BeadsRemoteProvisionResponse {
+            calls.add("provisionBeadsRemote:$identifier:$push")
+            return BeadsRemoteProvisionResponse(status = "created", remoteUrl = "git@example.com:$identifier.git")
+        }
+
+        override suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse {
+            calls.add("triggerSync:$identifier")
+            return ProjectSyncTriggerResponse(status = "queued", eventId = "evt-$identifier")
         }
     }
 }
