@@ -224,9 +224,19 @@ open class MessageApi @Inject constructor(
         // The server has returned either 400 INVALID_ARGUMENT or 404 NOT_FOUND
         // for "no active runs" depending on version/endpoint. Treat both the
         // same — this is the normal idle path, not an error.
+        //
+        // letta-mobile-t8q7: "EXPIRED: Run was created more than 3 hours ago"
+        // (letta-mobile-gqz3) is also an idle signal — the previously-active
+        // run aged out without finishing and the next poll will see a fresh
+        // run. Route it through NoActiveRunException (stackless) here so the
+        // subscriber's hot-path doesn't allocate ApiException + stack on
+        // every idle cycle. Anything else stays a real ApiException.
         if (response.status.value == 400 || response.status.value == 404) {
             val body = response.bodyAsText()
-            if (body.contains("No active runs", ignoreCase = true)) {
+            val isIdle = body.contains("No active runs", ignoreCase = true) ||
+                body.contains("EXPIRED:", ignoreCase = true) ||
+                body.contains("is now expired", ignoreCase = true)
+            if (isIdle) {
                 throw NoActiveRunException(conversationId)
             }
             throw ApiException(response.status.value, body)

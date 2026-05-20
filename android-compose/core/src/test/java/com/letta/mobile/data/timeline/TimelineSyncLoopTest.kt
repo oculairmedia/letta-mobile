@@ -2,6 +2,7 @@ package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.api.MessageApi
+import com.letta.mobile.data.api.NoActiveRunException
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
@@ -1451,25 +1452,27 @@ class TimelineSyncLoopTest {
     }
 
     /**
-     * letta-mobile-gqz3 regression test.
+     * letta-mobile-gqz3 regression test (updated for letta-mobile-t8q7).
      *
-     * Before the fix, the subscriber's `ApiException` catch branch only
+     * Original gqz3 bug: the subscriber's `ApiException` catch branch only
      * treated `"No active runs"` as an idle pattern. When a previously-
      * active run aged out, the server returned
      * `EXPIRED: Run was created more than 3 hours ago, and is now expired.`
      * which the subscriber mis-classified as a generic network error,
      * wedging at the backoff cap and never opening a fresh stream.
      *
-     * The fix extends the idle-pattern match to include `EXPIRED:` /
-     * `is now expired`, so the subscriber backs off once and retries on the
-     * next iteration — exactly the same posture as `No active runs`.
+     * Post-t8q7: idle-pattern classification (including EXPIRED) now lives
+     * in `MessageApi.streamConversation` and is signalled by the stackless
+     * `NoActiveRunException`. The subscriber's ApiException branch only
+     * handles real network/server errors. This contract test verifies
+     * EXPIRED still reaches the idle path — it just goes through the
+     * stackless exception now.
      *
-     * Assertion: observing an EXPIRED ApiException must emit the
-     * `streamSubscriber.idle404` Telemetry event (with via=apiException)
-     * and must NOT emit a `streamSubscriber.error` for the same cycle.
+     * Assertion: observing EXPIRED must emit `streamSubscriber.idle404`
+     * and must NOT emit `streamSubscriber.error` or `streamSubscriber.networkError`.
      */
     @Test
-    fun `EXPIRED run ApiException is classified as idle, not error`() = runBlocking {
+    fun `EXPIRED run is classified as idle, not error`() = runBlocking {
         // Clear the Telemetry ring so we can look at an empty slate. This is
         // necessary because other tests sharing the same JVM worker may have
         // left unrelated events behind.
@@ -1481,8 +1484,7 @@ class TimelineSyncLoopTest {
         // Instantiating TimelineSyncLoop starts the subscriber coroutine in init{}.
         val sync = TimelineSyncLoop(api, "conv-gqz3", scope)
 
-        // Let the subscriber attempt one stream call. Because the fake throws
-        // immediately, this should flow through the ApiException branch.
+        // Let the subscriber attempt one stream call.
         withTimeout(2_000) {
             while (api.streamCallCount < 1) delay(10)
         }
@@ -1495,23 +1497,22 @@ class TimelineSyncLoopTest {
         val idle404 = events.firstOrNull {
             it.tag == "TimelineSync" &&
                 it.name == "streamSubscriber.idle404" &&
-                (it.attrs["via"] as? String) == "apiException" &&
                 (it.attrs["conversationId"] as? String) == "conv-gqz3"
         }
         assertNotNull(
-            "EXPIRED ApiException must be classified as idle (streamSubscriber.idle404 via=apiException). " +
+            "EXPIRED must be classified as idle (streamSubscriber.idle404). " +
                 "Saw events: ${events.map { "${it.tag}/${it.name}" }}",
             idle404,
         )
-        // And explicitly: there must not be a streamSubscriber.error for this
-        // cycle — before the fix, the wedge produced one error per retry.
+        // And explicitly: there must not be a streamSubscriber.error / networkError
+        // for this cycle — before the fix, the wedge produced one error per retry.
         val errorForGqz3 = events.firstOrNull {
             it.tag == "TimelineSync" &&
-                it.name == "streamSubscriber.error" &&
+                (it.name == "streamSubscriber.error" || it.name == "streamSubscriber.networkError") &&
                 (it.attrs["conversationId"] as? String) == "conv-gqz3"
         }
         assertEquals(
-            "EXPIRED must NOT produce a streamSubscriber.error (it's an idle pattern, not a real failure)",
+            "EXPIRED must NOT produce a streamSubscriber.error/networkError (it's an idle pattern, not a real failure)",
             null,
             errorForGqz3,
         )
@@ -1860,10 +1861,9 @@ private class AlwaysIdleApi : MessageApi(mockk(relaxed = true)) {
 
     override suspend fun streamConversation(conversationId: String): ByteReadChannel {
         streamCallCount++
-        throw ApiException(
-            400,
-            """{"detail":"No active runs found for conversation."}""",
-        )
+        // letta-mobile-t8q7: real MessageApi classifies the "No active runs"
+        // 400 body into NoActiveRunException before it reaches the subscriber.
+        throw NoActiveRunException(conversationId)
     }
 
     override suspend fun listConversationMessages(
@@ -1875,10 +1875,11 @@ private class AlwaysIdleApi : MessageApi(mockk(relaxed = true)) {
 }
 
 /**
- * Fake api for the gqz3 regression test. Throws an `ApiException` carrying
- * the server's EXPIRED detail string on the first `streamConversation`
- * call, then idles (awaits cancellation) so the subscriber's backoff loop
- * can settle without a stream of identical failures.
+ * Fake api for the gqz3 regression test. The real `MessageApi.streamConversation`
+ * classifies EXPIRED bodies into `NoActiveRunException` (letta-mobile-t8q7) so
+ * this fake mirrors that contract: first call throws `NoActiveRunException`,
+ * subsequent calls idle. Before t8q7 the fake threw `ApiException` and the
+ * subscriber re-classified by message-text in its catch block.
  */
 private class ExpiredThenIdleApi : MessageApi(mockk(relaxed = true)) {
     @Volatile var streamCallCount: Int = 0
@@ -1886,10 +1887,7 @@ private class ExpiredThenIdleApi : MessageApi(mockk(relaxed = true)) {
     override suspend fun streamConversation(conversationId: String): ByteReadChannel {
         streamCallCount++
         if (streamCallCount == 1) {
-            throw ApiException(
-                400,
-                """{"detail":"EXPIRED: Run was created more than 3 hours ago, and is now expired."}""",
-            )
+            throw NoActiveRunException(conversationId)
         }
         kotlinx.coroutines.awaitCancellation()
     }

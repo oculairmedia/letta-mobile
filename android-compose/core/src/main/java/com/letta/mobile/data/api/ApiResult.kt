@@ -17,9 +17,17 @@ class ApiException(val code: Int, message: String) : Exception(message)
  * to subscribe to. The caller (e.g. TimelineSyncLoop's subscriber coroutine) is
  * expected to back off and retry — a run will eventually start when any client
  * posts into the conversation. See letta-mobile-mge5.
+ *
+ * letta-mobile-t8q7: this is hot-path control flow — every idle poll on every
+ * background subscriber throws this. fillInStackTrace is overridden to skip
+ * the JVM stack walk; with N warmup subscribers each idling at the 32 s cap,
+ * the stack-capture allocation was producing GC bursts that landed between
+ * frames and dropped taps on the timeline / Settings.
  */
 class NoActiveRunException(val conversationId: String) :
-    Exception("No active runs for conversation $conversationId")
+    Exception("No active runs for conversation $conversationId") {
+    override fun fillInStackTrace(): Throwable = this
+}
 
 suspend inline fun <reified T> safeApiCall(crossinline call: suspend () -> HttpResponse): ApiResult<T> {
     return try {

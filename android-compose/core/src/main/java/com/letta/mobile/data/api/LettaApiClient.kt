@@ -141,6 +141,16 @@ open class LettaApiClient @Inject constructor(
                 socketTimeoutMillis = 60_000
             }
 
+            // Pin the non-throwing behavior on non-2xx responses. Ktor 3.x
+            // defaults to false, but several repositories (MessageApi.kt:227
+            // routing 400 EXPIRED → NoActiveRunException, VibesyncEventStream-
+            // Repository.kt:87 routing 404 → EndpointUnavailableException,
+            // letta-mobile-t8q7 + bddd3b16) depend on it. Pin it explicitly
+            // so a future Ktor upgrade or accidental override doesn't silently
+            // break those status-code branches. Matches ServerHealthRepository
+            // and poc/chat-cli/LettaApi.
+            expectSuccess = false
+
             defaultRequest {
                 url(baseUrl)
             }

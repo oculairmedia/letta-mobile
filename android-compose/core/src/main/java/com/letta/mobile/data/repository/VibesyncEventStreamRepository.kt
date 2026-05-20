@@ -59,9 +59,19 @@ open class VibesyncEventStreamRepository @Inject constructor(
     private suspend fun runStreamLoop() {
         var backoffMs = 1_000L
         while (scope.isActive && activeSubscribers.get() > 0) {
-            runCatching { connectOnce() }
-                .onSuccess { backoffMs = 1_000L }
-                .onFailure { error -> Log.i(TAG, "vibesync event stream unavailable", error) }
+            try {
+                connectOnce()
+                backoffMs = 1_000L
+            } catch (_: EndpointUnavailableException) {
+                // 404 means the backend doesn't expose vibesync events at
+                // all — retrying serves no purpose and the retry storm
+                // pressures the GC enough to jank the UI. Log once and
+                // exit the loop.
+                Log.i(TAG, "vibesync event stream not available on this backend; not retrying")
+                return
+            } catch (error: Throwable) {
+                Log.i(TAG, "vibesync event stream unavailable", error)
+            }
             if (activeSubscribers.get() <= 0) break
             delay(backoffMs)
             backoffMs = (backoffMs * 2).coerceAtMost(30_000L)
@@ -72,14 +82,24 @@ open class VibesyncEventStreamRepository @Inject constructor(
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl().trimEnd('/')
         val response = client.get("$baseUrl/api/events/stream")
-        if (response.status.value !in 200..299) {
-            throw IllegalStateException("Vibesync event stream failed with HTTP ${response.status.value}")
+        when (response.status.value) {
+            in 200..299 -> Unit
+            404 -> throw EndpointUnavailableException()
+            else -> throw IllegalStateException("Vibesync event stream failed with HTTP ${response.status.value}")
         }
         val channel = response.body<ByteReadChannel>()
         SseParser.parseRawEvents(channel).collect { raw ->
             routeRawEvent(raw.event, raw.data, raw.id)?.let { _events.emit(it) }
         }
     }
+
+    /**
+     * Thrown when the backend reports 404 for `/api/events/stream`. Distinct
+     * from a transient failure: the endpoint is not deployed and no amount
+     * of retrying will change that, so the stream loop exits instead of
+     * looping forever and burning heap.
+     */
+    private class EndpointUnavailableException : Exception()
 
     internal fun routeRawEvent(eventName: String?, rawData: String, id: String?): VibesyncEvent? {
         val envelope = runCatching { json.decodeFromString<VibesyncRawEventEnvelope>(rawData) }.getOrNull()
