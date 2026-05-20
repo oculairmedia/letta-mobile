@@ -974,6 +974,15 @@
     <string name="screen_runs_step_trace_created_label">Trace created: %1$s</string>
     <string name="screen_runs_step_trace_request_label">Request JSON: %1$s</string>
     <string name="screen_runs_step_trace_response_label">Response JSON: %1$s</string>
+    <string name="screen_runs_step_section_core_title">Core Status &amp; Identity</string>
+    <string name="screen_runs_step_section_telemetry_title">Token Telemetry</string>
+    <string name="screen_runs_step_section_errors_title">Errors</string>
+    <string name="screen_runs_step_trace_section_title">Developer Traces</string>
+    <string name="screen_runs_step_trace_request_accordion_title">Request JSON</string>
+    <string name="screen_runs_step_trace_response_accordion_title">Response JSON</string>
+    <string name="screen_runs_step_trace_size_subtitle">%1$d chars</string>
+    <string name="screen_runs_step_trace_truncation_warning">Truncated at %1$d chars. Use Copy Full JSON for the whole payload.</string>
+    <string name="screen_runs_step_trace_copy_full">Copy Full JSON</string>
     <string name="screen_runs_step_messages_title">Step Messages</string>
     <string name="screen_runs_step_feedback_positive_action">Mark Positive</string>
     <string name="screen_runs_step_feedback_negative_action">Mark Negative</string>
