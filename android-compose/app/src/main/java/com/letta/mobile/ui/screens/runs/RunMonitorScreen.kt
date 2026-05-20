@@ -2,6 +2,8 @@ package com.letta.mobile.ui.screens.runs
 
 import com.letta.mobile.ui.theme.LettaCodeFont
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -14,15 +16,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import com.letta.mobile.ui.components.ExpandableTitleSearch
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -30,6 +35,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,11 +43,19 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
@@ -69,8 +83,12 @@ import com.letta.mobile.ui.tags.TagDrillInEntityType
 import com.letta.mobile.ui.tags.TagDrillInSource
 import com.letta.mobile.ui.tags.TagDrillInViewModel
 import com.letta.mobile.util.formatRelativeTime
+import com.letta.mobile.ui.theme.LettaTheme
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonElement
 import com.letta.mobile.ui.icons.LettaIcons
+import java.time.Instant
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -277,32 +295,84 @@ private fun RunCard(
     run: Run,
     onInspect: () -> Unit,
 ) {
+    val clipboard = LocalClipboardManager.current
+    val haptic = LocalHapticFeedback.current
+    val active = isActiveRunStatus(run.status)
+    val containerColor = runCardContainerColor(run.status)
+
+    val startEpochMs = remember(run.createdAt) { parseInstantMillis(run.createdAt) }
+    val frozenDuration = remember(run.totalDurationNs, run.completedAt, startEpochMs) {
+        val totalNs = run.totalDurationNs
+        val completedAt = run.completedAt
+        when {
+            totalNs != null -> formatElapsedDuration(totalNs / 1_000_000L)
+            startEpochMs != null && completedAt != null -> {
+                val end = parseInstantMillis(completedAt)
+                if (end != null) formatElapsedDuration(end - startEpochMs) else "--:--"
+            }
+            else -> "--:--"
+        }
+    }
+    var liveDuration by remember(run.id, run.status) { mutableStateOf(frozenDuration) }
+    if (active && startEpochMs != null) {
+        LaunchedEffect(run.id, startEpochMs) {
+            while (true) {
+                liveDuration = formatElapsedDuration(System.currentTimeMillis() - startEpochMs)
+                delay(1000L)
+            }
+        }
+    }
+    val durationText = if (active && startEpochMs != null) liveDuration else frozenDuration
+
     Card(
         onClick = onInspect,
         modifier = Modifier.fillMaxWidth(),
-        colors = LettaCardDefaults.listCardColors(),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = run.id,
-                style = MaterialTheme.typography.listItemHeadline.copy(fontFamily = LettaCodeFont),
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                run.status?.let { status ->
-                    StatusChip(status = status)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            // Row 1 — primary: status chip + live/frozen duration
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    run.status?.let { status -> StatusChip(status = status) }
+                    if (run.background == true) {
+                        AssistChip(
+                            onClick = {},
+                            label = { Text(stringResource(R.string.screen_runs_background_chip)) },
+                        )
+                    }
                 }
-                if (run.background == true) {
-                    AssistChip(onClick = {}, label = { Text(stringResource(R.string.screen_runs_background_chip)) })
-                }
+                Text(
+                    text = durationText,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = LettaCodeFont,
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
             }
-            Spacer(modifier = Modifier.height(8.dp))
+
+            // Row 2 — supporting: agent id, optional conversation id
             Text(
-                    text = stringResource(R.string.screen_runs_agent_label, run.agentId),
-                    style = MaterialTheme.typography.listItemSupporting,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = stringResource(R.string.screen_runs_agent_label, run.agentId),
+                style = MaterialTheme.typography.listItemSupporting,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth(),
             )
             run.conversationId?.let { conversationId ->
                 Text(
@@ -311,25 +381,92 @@ private fun RunCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
-            run.createdAt?.let { createdAt ->
+
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+            )
+
+            // Row 3 — metadata: timestamp + low-contrast truncated UUID pill (click-to-copy)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
-                    text = stringResource(R.string.screen_runs_created_label, formatRelativeTime(createdAt)),
+                    text = run.createdAt
+                        ?.let { stringResource(R.string.screen_runs_created_label, formatRelativeTime(it)) }
+                        .orEmpty(),
                     style = MaterialTheme.typography.listItemMetadata,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
-            }
-            if (run.isTerminalStatus()) {
-                Icon(
-                    imageVector = LettaIcons.Delete,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                Text(
+                    text = truncateRunId(run.id),
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = LettaCodeFont,
+                        fontSize = 11.sp,
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    maxLines = 1,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable {
+                            clipboard.setText(AnnotatedString(run.id))
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        }
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
                 )
             }
         }
     }
 }
+
+@Composable
+private fun runCardContainerColor(status: String?): androidx.compose.ui.graphics.Color {
+    return when (status?.trim()?.lowercase(Locale.ROOT)) {
+        "error", "failed", "cancelled", "expired" -> MaterialTheme.colorScheme.errorContainer
+        "completed" -> MaterialTheme.colorScheme.secondaryContainer
+        "running", "active", "created", "pending", "processing", "working", "busy" ->
+            MaterialTheme.colorScheme.tertiaryContainer
+        else -> MaterialTheme.colorScheme.surfaceContainerLow
+    }
+}
+
+private fun isActiveRunStatus(status: String?): Boolean {
+    val normalized = status?.trim()?.lowercase(Locale.ROOT) ?: return false
+    return normalized in activeRunStatuses
+}
+
+private val activeRunStatuses = setOf(
+    "running", "active", "created", "pending", "processing", "working", "busy",
+)
+
+private fun parseInstantMillis(iso: String?): Long? {
+    if (iso.isNullOrBlank()) return null
+    return try {
+        Instant.parse(iso).toEpochMilli()
+    } catch (_: Exception) {
+        null
+    }
+}
+
+private fun formatElapsedDuration(elapsedMs: Long): String {
+    val totalSeconds = (elapsedMs / 1000L).coerceAtLeast(0L)
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds / 60) % 60
+    val seconds = totalSeconds % 60
+    return if (hours > 0) "%02d:%02d:%02d".format(hours, minutes, seconds)
+    else "%02d:%02d".format(minutes, seconds)
+}
+
+private fun truncateRunId(id: String): String =
+    if (id.length <= 18) id else id.take(8) + "…" + id.takeLast(8)
 
 @Composable
 private fun RunDetailDialog(
@@ -814,4 +951,51 @@ private fun messageSummary(message: LettaMessage): String {
 
 private fun Run.isTerminalStatus(): Boolean {
     return status in setOf("completed", "failed", "cancelled", "expired")
+}
+
+@PreviewLightDark
+@Composable
+private fun PreviewRunCardRunning() {
+    LettaTheme(dynamicColor = false) {
+        Surface {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                RunCard(
+                    run = Run(
+                        id = "run-01HXYZK7QJ4R3M8WJ0NABCDEF9G",
+                        agentId = "agent-research-01",
+                        status = "running",
+                        background = false,
+                        conversationId = "conv-7d4c2e1f",
+                        createdAt = Instant.now().minusSeconds(73).toString(),
+                    ),
+                    onInspect = {},
+                )
+                RunCard(
+                    run = Run(
+                        id = "run-01HXYZK7QJ4R3M8WJ0NABCDEFFAILED",
+                        agentId = "agent-coder-02",
+                        status = "failed",
+                        createdAt = Instant.now().minusSeconds(3725).toString(),
+                        completedAt = Instant.now().minusSeconds(3600).toString(),
+                        totalDurationNs = 125_000_000_000L,
+                    ),
+                    onInspect = {},
+                )
+                RunCard(
+                    run = Run(
+                        id = "run-01HXYZK7QJ4R3M8WJ0NABCDEFCOMPLETED",
+                        agentId = "agent-summarizer-09",
+                        status = "completed",
+                        createdAt = Instant.now().minusSeconds(86400).toString(),
+                        completedAt = Instant.now().minusSeconds(86340).toString(),
+                        totalDurationNs = 59_000_000_000L,
+                    ),
+                    onInspect = {},
+                )
+            }
+        }
+    }
 }
