@@ -31,6 +31,7 @@ import com.letta.mobile.data.model.UnknownMessage
 import com.letta.mobile.data.model.UsageStatistics
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.paging.MessagePagingSource
+import com.letta.mobile.data.repository.api.IConversationInspectorMessageRepository
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.encodeToJsonElement
@@ -65,7 +66,7 @@ data class ConversationInspectorMessage(
 @Singleton
 open class MessageRepository @Inject constructor(
     private val messageApi: MessageApi,
-) {
+) : IConversationInspectorMessageRepository {
     companion object {
         /** Number of messages to display on initial chat load */
         const val INITIAL_FETCH_LIMIT = 30
@@ -197,7 +198,7 @@ open class MessageRepository @Inject constructor(
         messageApi.cancelBatch(batchId)
     }
 
-    open suspend fun fetchConversationInspectorMessages(conversationId: String): List<ConversationInspectorMessage> {
+    override suspend fun fetchConversationInspectorMessages(conversationId: String): List<ConversationInspectorMessage> {
         return messageApi.listConversationMessages(conversationId, limit = 200, order = "asc")
             .map { it.toInspectorMessage() }
     }

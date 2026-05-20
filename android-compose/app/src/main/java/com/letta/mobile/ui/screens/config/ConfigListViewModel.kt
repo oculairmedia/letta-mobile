@@ -10,6 +10,7 @@ import app.cash.molecule.RecompositionMode
 import app.cash.molecule.launchMolecule
 import com.letta.mobile.channel.ChatPushAlarmScheduler
 import com.letta.mobile.data.health.ServerHealthRepository
+import com.letta.mobile.data.health.IServerHealthRepository
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.ui.common.UiState
@@ -56,7 +57,7 @@ data class ConfigListUiState(
 @HiltViewModel
 class ConfigListViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
-    private val healthRepository: ServerHealthRepository,
+    private val healthRepository: IServerHealthRepository,
     @param:ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -144,4 +145,3 @@ class ConfigListViewModel @Inject constructor(
         }
     }
 }
-

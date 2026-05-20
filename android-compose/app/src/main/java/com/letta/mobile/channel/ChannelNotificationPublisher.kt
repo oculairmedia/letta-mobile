@@ -39,7 +39,7 @@ internal data class ChannelNotificationContent(
 @Singleton
 class ChannelNotificationPublisher @Inject constructor(
     @ApplicationContext private val context: Context,
-) {
+) : IChannelNotificationPublisher {
     fun ensureChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             return
@@ -56,7 +56,7 @@ class ChannelNotificationPublisher @Inject constructor(
         manager.createNotificationChannel(channel)
     }
 
-    fun publish(notification: ChannelNotification): Boolean {
+    override fun publish(notification: ChannelNotification): Boolean {
         ensureChannel()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&

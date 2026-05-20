@@ -1,6 +1,6 @@
 package com.letta.mobile.channel
 
-import com.letta.mobile.bot.channel.NotificationReplyHandler
+import com.letta.mobile.bot.channel.NotificationReplyStreamTracker
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.channel.NotificationCandidatePhase
 import com.letta.mobile.data.channel.NotificationCandidateSource
@@ -40,9 +40,9 @@ import javax.inject.Singleton
 @Singleton
 class NotificationDeliveryCoordinator @Inject constructor(
     private val currentConversationTracker: CurrentConversationTracker,
-    private val notificationReplyHandler: NotificationReplyHandler,
-    private val syncStateStore: ChannelSyncStateStore,
-    private val publisher: ChannelNotificationPublisher,
+    private val notificationReplyHandler: NotificationReplyStreamTracker,
+    private val syncStateStore: IChannelSyncStateStore,
+    private val publisher: IChannelNotificationPublisher,
 ) : NotificationDelivery {
     override fun submit(candidate: NotificationDeliveryCandidate): NotificationDeliveryDecision {
         val notificationId = candidate.notificationIdentity
@@ -142,4 +142,3 @@ class NotificationDeliveryCoordinator @Inject constructor(
             messagePreview = previewText,
         )
 }
-
