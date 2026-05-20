@@ -675,7 +675,12 @@ internal fun CompactToolCallRow(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            if (approvalState != null) {
+            // letta-mobile-gbsq: suppress the "Approved" chip once the tool has
+            // produced a result — the success checkmark conveys the same
+            // information and dropping the chip reclaims width for the result
+            // preview. RequestingInput and Rejected still render (they carry
+            // information the checkmark can't).
+            if (shouldShowCompactApprovalChip(approvalState, hasResult = toolCall.result != null)) {
                 AnimatedToolApprovalChip(state = approvalState)
             }
             executionTimeText?.let { time ->
@@ -690,7 +695,14 @@ internal fun CompactToolCallRow(
                 )
                 toolCall.result != null -> Icon(
                     imageVector = LettaIcons.CheckCircle,
-                    contentDescription = "Success",
+                    // Preserve the approval semantic for screen readers even
+                    // when the visual chip is suppressed for a completed
+                    // approved row.
+                    contentDescription = if (approvalState == ToolApprovalState.Approved) {
+                        "Approved, success"
+                    } else {
+                        "Success"
+                    },
                     modifier = Modifier.size(LettaIconSizing.Inline),
                     tint = MaterialTheme.colorScheme.primary,
                 )
@@ -939,6 +951,27 @@ internal fun UiToolCall.approvalState(pendingApprovalToolCallIds: Set<String>): 
         return ToolApprovalState.RequestingInput
     }
     return approvalDecision?.toToolApprovalState()
+}
+
+/**
+ * Whether to render the inline approval chip in a [CompactToolCallRow].
+ *
+ * - `RequestingInput` always renders — the user needs to know an approval is
+ *   pending.
+ * - `Rejected` always renders — the decision is the row's payload.
+ * - `Approved` renders only while the tool is still running; once a result is
+ *   in hand, the success checkmark on the same row carries the same signal
+ *   and dropping the chip reclaims width for the result preview.
+ * - `null` (no approval involvement) never shows a chip.
+ */
+internal fun shouldShowCompactApprovalChip(
+    approvalState: ToolApprovalState?,
+    hasResult: Boolean,
+): Boolean = when (approvalState) {
+    null -> false
+    ToolApprovalState.RequestingInput -> true
+    ToolApprovalState.Rejected -> true
+    ToolApprovalState.Approved -> !hasResult
 }
 
 /**

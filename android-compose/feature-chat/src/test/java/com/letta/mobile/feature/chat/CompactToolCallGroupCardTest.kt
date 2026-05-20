@@ -3,16 +3,21 @@ package com.letta.mobile.feature.chat
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalToolCall
+import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LettaTheme
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -128,5 +133,97 @@ class CompactToolCallGroupCardTest {
         composeRule.onNodeWithText("Review the requested tool actions before continuing.").assertIsDisplayed()
         composeRule.onNodeWithText("Reject").assertIsDisplayed()
         composeRule.onNodeWithText("Approve").assertIsDisplayed()
+    }
+
+    // letta-mobile-gbsq: once an approval-gated tool has produced a result,
+    // the "approved" pill is redundant with the success checkmark — suppress
+    // it to reclaim row width. The icon's contentDescription still carries
+    // the approval semantic for screen readers.
+    @Test
+    fun completedApprovedRowSuppressesApprovalChipButKeepsCheckmark() {
+        composeRule.setContent {
+            LettaTheme(
+                appTheme = AppTheme.LIGHT,
+                themePreset = ThemePreset.DEFAULT,
+                dynamicColor = false,
+            ) {
+                LettaChatTheme {
+                    CompactToolCallGroupCard(
+                        toolCalls = listOf(
+                            UiToolCall(
+                                name = "Bash",
+                                arguments = """{"command":"pwd"}""",
+                                result = "/home/user",
+                                status = "success",
+                                toolCallId = "call-approved",
+                                approvalDecision = UiToolApprovalDecision.Approved,
+                            ),
+                            UiToolCall(
+                                name = "Bash",
+                                arguments = """{"command":"ls"}""",
+                                result = "files",
+                                status = "success",
+                                toolCallId = "call-no-approval",
+                            ),
+                        ),
+                        pendingApprovalToolCallIds = emptySet(),
+                    )
+                }
+            }
+        }
+        // The literal "approved" chip text must not appear on the approved-and-done row.
+        composeRule.onAllNodesWithText("approved").assertCountEquals(0)
+        // Both rows should still show their success checkmark — the approved
+        // row's contentDescription preserves the approval semantic.
+        composeRule.onNodeWithContentDescription("Approved, success").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Success").assertIsDisplayed()
+    }
+
+    @Test
+    fun pendingApprovalRowStillShowsRequestingInputChip() {
+        composeRule.setContent {
+            LettaTheme(
+                appTheme = AppTheme.LIGHT,
+                themePreset = ThemePreset.DEFAULT,
+                dynamicColor = false,
+            ) {
+                LettaChatTheme {
+                    CompactToolCallGroupCard(
+                        toolCalls = listOf(
+                            UiToolCall(
+                                name = "Bash",
+                                arguments = """{"command":"rm -rf /"}""",
+                                result = null,
+                                toolCallId = "pending",
+                            ),
+                            UiToolCall(
+                                name = "Read",
+                                arguments = """{"file_path":"/etc/passwd"}""",
+                                result = null,
+                                toolCallId = "other",
+                            ),
+                        ),
+                        pendingApprovalToolCallIds = setOf("pending"),
+                    )
+                }
+            }
+        }
+        // The "requesting input" chip must remain visible on pending rows.
+        composeRule.onNodeWithText("requesting input").assertIsDisplayed()
+    }
+
+    @Test
+    fun shouldShowCompactApprovalChip_rules() {
+        // Always show for RequestingInput / Rejected, regardless of result.
+        assertTrue(shouldShowCompactApprovalChip(ToolApprovalState.RequestingInput, hasResult = false))
+        assertTrue(shouldShowCompactApprovalChip(ToolApprovalState.RequestingInput, hasResult = true))
+        assertTrue(shouldShowCompactApprovalChip(ToolApprovalState.Rejected, hasResult = false))
+        assertTrue(shouldShowCompactApprovalChip(ToolApprovalState.Rejected, hasResult = true))
+        // Approved: show only while still running.
+        assertTrue(shouldShowCompactApprovalChip(ToolApprovalState.Approved, hasResult = false))
+        assertFalse(shouldShowCompactApprovalChip(ToolApprovalState.Approved, hasResult = true))
+        // null: never show.
+        assertFalse(shouldShowCompactApprovalChip(null, hasResult = false))
+        assertFalse(shouldShowCompactApprovalChip(null, hasResult = true))
     }
 }
