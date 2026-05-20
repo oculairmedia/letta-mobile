@@ -246,9 +246,12 @@ android {
                 // The app suite is the heaviest Robolectric/Hilt test shard;
                 // fork more often so long CI runs do not carry retained class
                 // loader state into late suites such as ProjectHomeViewModelTest.
-                it.maxHeapSize = "2048m"
-                it.jvmArgs("-XX:+UseG1GC", "-XX:MaxMetaspaceSize=384m")
-                it.setForkEvery(50L)
+                it.maxHeapSize = "3072m"
+                it.jvmArgs("-XX:+UseG1GC", "-XX:MaxMetaspaceSize=512m")
+                it.setForkEvery(20L)
+                it.filter {
+                    excludeTestsMatching("*ScreenshotTest")
+                }
             }
         }
     }
@@ -471,12 +474,17 @@ tasks.register<Test>("testScreenshot") {
     group = "verification"
 
     val testTask = tasks.named("testRootDebugUnitTest", Test::class).get()
+    mustRunAfter(testTask)
     testClassesDirs = testTask.testClassesDirs
     classpath = testTask.classpath
+    maxHeapSize = testTask.maxHeapSize
+    jvmArgs(testTask.jvmArgs.orEmpty())
+    setForkEvery(1L)
 
     useJUnitPlatform {
-        includeTags("screenshot")
+        includeEngines("junit-vintage")
     }
-
-    systemProperty("kotest.tags.include", "screenshot")
+    filter {
+        includeTestsMatching("*ScreenshotTest")
+    }
 }

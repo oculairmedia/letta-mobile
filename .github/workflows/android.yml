@@ -70,7 +70,9 @@ jobs:
         run: ./gradlew :core:compileDebugKotlin :app:compileRootDebugKotlin :app:compileSideloadDebugKotlin :app:compilePlayDebugKotlin
 
       - name: Run unit tests
-        run: ./gradlew :core:testDebugUnitTest :app:testRootDebugUnitTest
+        run: |
+          ./gradlew :core:testDebugUnitTest :app:testRootDebugUnitTest
+          ./gradlew :app:testScreenshot
 
   build-apk:
     runs-on: ubuntu-latest

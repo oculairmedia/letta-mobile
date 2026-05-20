@@ -2,6 +2,7 @@ package com.letta.mobile.ui.screens.config
 
 import android.content.ActivityNotFoundException
 import android.os.Build
+import com.letta.mobile.BuildConfig
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -43,6 +44,7 @@ fun ConfigScreen(
     onNavigateToConfigList: () -> Unit,
     onNavigateToLettaBotConnection: () -> Unit = {},
     onNavigateToSystemAccess: () -> Unit = {},
+    onNavigateToVibesyncDebug: () -> Unit = {},
     viewModel: ConfigViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -147,6 +149,7 @@ fun ConfigScreen(
                 },
                 onNavigateToLettaBotConnection = onNavigateToLettaBotConnection,
                 onNavigateToSystemAccess = onNavigateToSystemAccess,
+                onNavigateToVibesyncDebug = onNavigateToVibesyncDebug,
                 onSave = {
                     viewModel.saveConfig(
                         onSuccess = { snackbar.dispatch("Configuration saved"); onNavigateBack() },
@@ -173,6 +176,7 @@ private fun ConfigContent(
     onRequestBatteryOptimizationExemption: () -> Unit,
     onNavigateToLettaBotConnection: () -> Unit,
     onNavigateToSystemAccess: () -> Unit,
+    onNavigateToVibesyncDebug: () -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -381,6 +385,14 @@ private fun ConfigContent(
                 supportingContent = { Text(stringResource(R.string.screen_system_access_entry_description)) },
                 leadingContent = { Icon(LettaIcons.Key, contentDescription = null) },
             )
+            if (BuildConfig.DEBUG) {
+                item(
+                    onClick = onNavigateToVibesyncDebug,
+                    headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_title)) },
+                    supportingContent = { Text(stringResource(R.string.screen_vibesync_debug_entry_description)) },
+                    leadingContent = { Icon(LettaIcons.Database, contentDescription = null) },
+                )
+            }
         }
 
         CardGroup {

@@ -11,6 +11,7 @@ import com.letta.mobile.data.model.ProjectIssueDetail
 import com.letta.mobile.data.model.ProjectIssueListParams
 import com.letta.mobile.data.model.ProjectIssueSummary
 import com.letta.mobile.data.repository.ProjectWorkRepository
+import com.letta.mobile.data.repository.VibesyncEventStreamRepository
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.navigation.ProjectIssueDetailRoute
 import com.letta.mobile.ui.navigation.ProjectIssuesRoute
@@ -20,6 +21,7 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -118,6 +120,7 @@ sealed interface ProjectIssuesUiEvent {
 class ProjectIssuesViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val projectWorkRepository: ProjectWorkRepository,
+    private val vibesyncEventStreamRepository: VibesyncEventStreamRepository? = null,
 ) : ViewModel() {
     private val route = savedStateHandle.toRoute<ProjectIssuesRoute>()
 
@@ -127,8 +130,30 @@ class ProjectIssuesViewModel @Inject constructor(
     private val _events = Channel<ProjectIssuesUiEvent>(Channel.BUFFERED)
     val events = _events.receiveAsFlow()
 
+    private var loadIssuesJob: Job? = null
+
     init {
+        observeVibesyncEvents()
         loadIssues()
+    }
+
+    private fun observeVibesyncEvents() {
+        val eventRepository = vibesyncEventStreamRepository ?: return
+        eventRepository.start()
+        viewModelScope.launch {
+            eventRepository.events.collect { event ->
+                if (event.projectId != route.projectId) return@collect
+                if (event.type == "sync:completed" || event.type == "config:updated") {
+                    projectWorkRepository.invalidateProjectCache(route.projectId)
+                    loadIssues(forceRefresh = true)
+                }
+            }
+        }
+    }
+
+    override fun onCleared() {
+        vibesyncEventStreamRepository?.stop()
+        super.onCleared()
     }
 
     fun refresh() = loadIssues(forceRefresh = true)
@@ -214,7 +239,10 @@ class ProjectIssuesViewModel @Inject constructor(
     }
 
     private fun loadIssues(forceRefresh: Boolean = false) {
-        viewModelScope.launch {
+        // Cancel any in-flight load so a stale response can't overwrite the fresh
+        // post-sync data when events fire faster than the network round-trip.
+        loadIssuesJob?.cancel()
+        loadIssuesJob = viewModelScope.launch {
             val current = (_uiState.value as? UiState.Success)?.data
             if (current == null) {
                 _uiState.value = UiState.Loading

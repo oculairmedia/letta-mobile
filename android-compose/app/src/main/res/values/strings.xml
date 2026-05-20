@@ -98,7 +98,6 @@
     <string name="screen_projects_new_project_conversational_review_prompt">Here’s the project intake I gathered. Create the project when it looks right.</string>
     <string name="screen_projects_new_project_conversational_review_helper">This creates the registry project now. PM-agent brief handoff still needs backend support, so the intake notes are kept local for this step.</string>
     <string name="screen_projects_new_project_manual_title">Create project</string>
-    <string name="screen_projects_new_project_manual_pending">%1$s is ready to create, but project provisioning isn’t wired to the registry API yet.</string>
     <string name="screen_projects_new_project_manual_success">Created %1$s.</string>
     <string name="screen_projects_new_project_name_label">Project name</string>
     <string name="screen_projects_new_project_name_helper">Choose the name that should appear in the home grid and project chat.</string>
@@ -112,6 +111,25 @@
     <string name="screen_projects_missing_agent">%1$s doesn’t have a linked Letta agent yet.</string>
     <string name="screen_projects_open_chat_action">Open project chat</string>
     <string name="screen_projects_open_issues_action">Open issue tracker</string>
+    <string name="screen_projects_sync_now_action">Sync now</string>
+    <string name="screen_projects_syncing_chip">Syncing…</string>
+    <string name="screen_projects_last_sync_supporting">Last sync %1$s</string>
+    <string name="screen_projects_beads_provision_action">Provision Beads remote</string>
+    <string name="screen_projects_beads_provision_confirm">Provision a Beads remote for %1$s? This creates the remote backing store and cannot be undone from Android.</string>
+    <string name="screen_vibesync_debug_title">Vibesync debug</string>
+    <string name="screen_vibesync_debug_entry_description">Inspect backend health, stats, and AGENTS.md refresh tools.</string>
+    <string name="screen_vibesync_debug_status_section">Backend status</string>
+    <string name="screen_vibesync_debug_agents_md_section">AGENTS.md refresh</string>
+    <string name="screen_vibesync_debug_agents_md_refresh">Refresh generated AGENTS.md files</string>
+    <string name="screen_vibesync_debug_agents_md_dry_run">Dry run</string>
+    <string name="screen_vibesync_debug_agents_md_apply">Apply refresh</string>
+    <string name="screen_vibesync_debug_status_label">Status</string>
+    <string name="screen_vibesync_debug_uptime_label">Uptime</string>
+    <string name="screen_vibesync_debug_sse_clients_label">SSE clients</string>
+    <string name="screen_vibesync_debug_database_label">Database</string>
+    <string name="screen_vibesync_debug_refresh_summary">total=%1$d, updated=%2$d, skipped=%3$d, errors=%4$d</string>
+    <string name="screen_projects_beads_status_chip">Beads %1$s%2$s</string>
+    <string name="screen_projects_pm_agent_chip">PM agent %1$s</string>
     <string name="screen_projects_active_agents_action">Active agents</string>
     <string name="screen_projects_project_brief_action">Project brief</string>
     <string name="screen_projects_actions_menu">Project actions</string>

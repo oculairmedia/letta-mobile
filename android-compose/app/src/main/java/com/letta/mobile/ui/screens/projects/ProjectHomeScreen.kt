@@ -57,6 +57,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
+import com.letta.mobile.data.model.BeadsRemoteStatus
+import com.letta.mobile.data.model.PmAgentMetadata
 import com.letta.mobile.data.model.ProjectSummary
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.UiState
@@ -82,6 +84,7 @@ import com.letta.mobile.util.formatRelativeTime
 fun ProjectHomeScreen(
     onNavigateBack: (() -> Unit)?,
     onNavigateToProjectChat: (project: ProjectSummary, projectStartAction: String?) -> Unit,
+    onNavigateToPmAgentChat: (agentId: String) -> Unit = {},
     onNavigateToProjectIssues: (project: ProjectSummary) -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToCreateProject: () -> Unit,
@@ -436,6 +439,9 @@ fun ProjectHomeScreen(
                 ) {
                     val project = selectedProject ?: return@ActionSheet
                     val isPinned = project.identifier in state.data.pinnedProjectIds
+                    val beadsStatus = state.data.beadsRemoteStatusByProject[project.identifier]
+                    val pmAgent = state.data.pmAgentByProject[project.identifier]
+                    val syncInFlight = state.data.syncingProjectId == project.identifier
                     fun openProjectChat(projectStartAction: String?) {
                         viewModel.selectProject(null)
                         val agentId = project.lettaAgentId
@@ -445,6 +451,17 @@ fun ProjectHomeScreen(
                             onNavigateToProjectChat(project, projectStartAction)
                         }
                     }
+
+                    ProjectActionSheetHeader(
+                        project = project,
+                        beadsStatus = beadsStatus,
+                        pmAgent = pmAgent,
+                        syncInFlight = syncInFlight,
+                        onPmAgentClick = {
+                            viewModel.selectProject(null)
+                            onNavigateToPmAgentChat(it)
+                        },
+                    )
 
                     ActionSheetItem(
                         text = if (isPinned) "Unpin from top" else "Pin to top",
@@ -480,6 +497,22 @@ fun ProjectHomeScreen(
                         },
                     )
                     ActionSheetItem(
+                        text = stringResource(R.string.screen_projects_sync_now_action),
+                        icon = LettaIcons.Refresh,
+                        enabled = !syncInFlight,
+                        supportingText = project.lastSyncAt?.let { stringResource(R.string.screen_projects_last_sync_supporting, formatRelativeTime(it)) },
+                        onClick = viewModel::triggerSyncNow,
+                    )
+                    if (beadsStatus?.status != "provisioned") {
+                        ActionSheetItem(
+                            text = stringResource(R.string.screen_projects_beads_provision_action),
+                            icon = LettaIcons.Cloud,
+                            enabled = !state.data.isProvisioningBeadsRemote,
+                            supportingText = beadsStatus?.error,
+                            onClick = viewModel::startProvisionBeadsRemote,
+                        )
+                    }
+                    ActionSheetItem(
                         text = stringResource(R.string.action_edit),
                         icon = LettaIcons.Edit,
                         onClick = viewModel::startProjectSettingsEdit,
@@ -496,6 +529,16 @@ fun ProjectHomeScreen(
                         destructive = true,
                     )
                 }
+
+                ConfirmDialog(
+                    show = state.data.showProvisionBeadsRemoteDialog && selectedProject != null,
+                    title = stringResource(R.string.screen_projects_beads_provision_action),
+                    message = stringResource(R.string.screen_projects_beads_provision_confirm, selectedProject?.name.orEmpty()),
+                    confirmText = stringResource(R.string.screen_projects_beads_provision_action),
+                    dismissText = stringResource(R.string.action_cancel),
+                    onConfirm = viewModel::confirmProvisionBeadsRemote,
+                    onDismiss = viewModel::dismissProvisionBeadsRemote,
+                )
 
                 ConfirmDialog(
                     show = state.data.showArchiveProjectDialog && selectedProject != null,
@@ -524,6 +567,61 @@ fun ProjectHomeScreen(
                     destructive = true,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun ProjectActionSheetHeader(
+    project: ProjectSummary,
+    beadsStatus: BeadsRemoteStatus?,
+    pmAgent: PmAgentMetadata?,
+    syncInFlight: Boolean,
+    onPmAgentClick: (String) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            beadsStatus?.let { status ->
+                AssistChip(
+                    onClick = {},
+                    label = {
+                        val suffix = status.provisionedAt?.let { " · ${formatRelativeTime(it)}" }.orEmpty()
+                        Text(stringResource(R.string.screen_projects_beads_status_chip, status.status, suffix))
+                    },
+                )
+            }
+            pmAgent?.let { agent ->
+                AssistChip(
+                    onClick = { onPmAgentClick(agent.agentId) },
+                    label = { Text(stringResource(R.string.screen_projects_pm_agent_chip, agent.name ?: agent.agentId)) },
+                )
+            }
+            if (syncInFlight) {
+                AssistChip(onClick = {}, label = { Text(stringResource(R.string.screen_projects_syncing_chip)) })
+            }
+        }
+        val beadsError = beadsStatus?.error
+        if (beadsStatus?.status == "failed" && beadsError != null) {
+            Text(
+                text = beadsError,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        project.lastSyncAt?.let { lastSyncAt ->
+            Text(
+                text = stringResource(R.string.screen_projects_last_sync_supporting, formatRelativeTime(lastSyncAt)),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

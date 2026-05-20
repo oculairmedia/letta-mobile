@@ -82,13 +82,29 @@ class ProjectWorkRepository @Inject constructor(
         response
     }
 
-    suspend fun getIssue(issueId: String, forceRefresh: Boolean = false): ProjectIssueDetail {
-        if (!forceRefresh) {
-            _issueDetails.value[issueId]?.let { return it }
+    suspend fun getIssue(issueId: String, forceRefresh: Boolean = false): ProjectIssueDetail =
+        refreshMutex.withLock {
+            if (!forceRefresh) {
+                _issueDetails.value[issueId]?.let { return@withLock it }
+            }
+            val issue = projectWorkApi.getIssue(issueId).issue
+            _issueDetails.update { current -> current + (issueId to issue) }
+            issue
         }
-        val issue = projectWorkApi.getIssue(issueId).issue
-        _issueDetails.update { current -> current + (issueId to issue) }
-        return issue
+
+    suspend fun invalidateProjectCache(projectId: String) {
+        // Take both mutexes so invalidation can't interleave with an in-flight
+        // refresh and reintroduce stale entries we just cleared.
+        refreshMutex.withLock {
+            analyticsRefreshMutex.withLock {
+                _readyWorkByProject.update { it - projectId }
+                _issuesByProject.update { it - projectId }
+                _issueAnalyticsByProject.update { it - projectId }
+                _issueDetails.update { current ->
+                    current.filterValues { detail -> detail.projectId != projectId }
+                }
+            }
+        }
     }
 
     suspend fun claimIssue(
@@ -167,12 +183,13 @@ class ProjectWorkRepository @Inject constructor(
         ).issue,
     )
 
-    private fun applyMutationResult(issue: ProjectIssueSummary): ProjectIssueSummary {
-        val mergedIssue = mergeWithCachedIssue(issue)
-        _readyWorkByProject.update { current -> current.updateIssue(mergedIssue) }
-        _issuesByProject.update { current -> current.updateIssue(mergedIssue) }
-        return mergedIssue
-    }
+    private suspend fun applyMutationResult(issue: ProjectIssueSummary): ProjectIssueSummary =
+        refreshMutex.withLock {
+            val mergedIssue = mergeWithCachedIssue(issue)
+            _readyWorkByProject.update { current -> current.updateIssue(mergedIssue) }
+            _issuesByProject.update { current -> current.updateIssue(mergedIssue) }
+            mergedIssue
+        }
 
     private fun mergeWithCachedIssue(issue: ProjectIssueSummary): ProjectIssueSummary {
         val cached = readyWorkByProject.value.values.flatten().firstOrNull { it.id == issue.id }

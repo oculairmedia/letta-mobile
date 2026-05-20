@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 
 /**
  * Hand-written test double for [ISettingsRepository] — see
@@ -33,9 +34,14 @@ class FakeSettingsRepository(
     val clientModeBaseUrl: MutableStateFlow<String> =
         MutableStateFlow(initialClientModeBaseUrl)
 
+    val pinnedProjectIds: MutableStateFlow<Set<String>> =
+        MutableStateFlow(emptySet())
+
     var apiKey: String? = initialClientModeApiKey
 
     override val activeConfig: StateFlow<LettaConfig?> = activeConfigState.asStateFlow()
+
+    override val activeConfigChanges: Flow<LettaConfig> = emptyFlow()
 
     override fun getActiveConfig(): Flow<LettaConfig?> = activeConfigState
 
@@ -44,4 +50,14 @@ class FakeSettingsRepository(
     override fun observeClientModeBaseUrl(): Flow<String> = clientModeBaseUrl
 
     override fun getClientModeApiKey(): String? = apiKey
+
+    override fun getPinnedProjectIds(): Flow<Set<String>> = pinnedProjectIds
+
+    override suspend fun setProjectPinned(projectId: String, pinned: Boolean) {
+        pinnedProjectIds.value = if (pinned) {
+            pinnedProjectIds.value + projectId
+        } else {
+            pinnedProjectIds.value - projectId
+        }
+    }
 }

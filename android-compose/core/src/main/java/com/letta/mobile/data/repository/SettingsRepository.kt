@@ -67,7 +67,7 @@ class SettingsRepository @Inject constructor(
      * distinctness avoids redundant emissions if [_activeConfig] is
      * re-emitted with the same identity (e.g. token rotation).
      */
-    val activeConfigChanges: Flow<LettaConfig> = activeConfig
+    override val activeConfigChanges: Flow<LettaConfig> = activeConfig
         .filterNotNull()
         .distinctUntilChanged { old, new -> old.id == new.id }
         .drop(1)
@@ -333,11 +333,11 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    fun getPinnedProjectIds(): Flow<Set<String>> = dataStore.data.map { prefs ->
+    override fun getPinnedProjectIds(): Flow<Set<String>> = dataStore.data.map { prefs ->
         prefs[Keys.PINNED_PROJECT_IDS] ?: emptySet()
     }
 
-    suspend fun setProjectPinned(projectId: String, pinned: Boolean) {
+    override suspend fun setProjectPinned(projectId: String, pinned: Boolean) {
         dataStore.edit { prefs ->
             val current = prefs[Keys.PINNED_PROJECT_IDS] ?: emptySet()
             prefs[Keys.PINNED_PROJECT_IDS] = if (pinned) {

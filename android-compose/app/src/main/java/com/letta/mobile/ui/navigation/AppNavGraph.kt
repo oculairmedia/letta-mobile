@@ -51,6 +51,7 @@ import com.letta.mobile.ui.screens.blocks.BlockLibraryScreen
 import com.letta.mobile.ui.screens.config.BackendSwitcherSheet
 import com.letta.mobile.ui.screens.config.ConfigListScreen
 import com.letta.mobile.ui.screens.config.ConfigScreen
+import com.letta.mobile.ui.screens.config.VibesyncDebugScreen
 import com.letta.mobile.ui.screens.conversations.ConversationsScreen
 import com.letta.mobile.ui.screens.conversations.TwoPaneConversationsLayout
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
@@ -243,6 +244,7 @@ fun AppNavGraph(
                         )
                     )
                 },
+                onNavigateToPmAgentChat = { agentId -> navController.navigate(AgentChatRoute(agentId = agentId)) },
                 onNavigateToSettings = { navController.navigate(ConfigRoute()) },
                 onNavigateToCreateProject = { navController.navigate(CreateProjectRoute) },
                 activeBackendLabel = activeBackendLabel,
@@ -490,7 +492,14 @@ fun AppNavGraph(
                 onNavigateToSystemAccess = {
                     navController.navigate(SystemAccessRoute)
                 },
+                onNavigateToVibesyncDebug = {
+                    navController.navigate(VibesyncDebugRoute)
+                },
             )
+        }
+
+        composable<VibesyncDebugRoute> {
+            VibesyncDebugScreen(onNavigateBack = { navController.popBackStack() })
         }
 
         composable<ConfigListRoute> {
@@ -676,6 +685,7 @@ fun AppNavGraph(
                         )
                     )
                 },
+                onNavigateToPmAgentChat = { agentId -> navController.navigate(AgentChatRoute(agentId = agentId)) },
                 onNavigateToSettings = { navController.navigate(ConfigRoute()) },
                 onNavigateToCreateProject = { navController.navigate(CreateProjectRoute) },
             )

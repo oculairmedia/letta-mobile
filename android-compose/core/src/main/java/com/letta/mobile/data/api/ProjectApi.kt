@@ -2,6 +2,10 @@ package com.letta.mobile.data.api
 
 import com.letta.mobile.data.model.ProjectCatalog
 import com.letta.mobile.data.model.ProjectDetailResponse
+import com.letta.mobile.data.model.BeadsRemoteProvisionResponse
+import com.letta.mobile.data.model.BeadsRemoteStatus
+import com.letta.mobile.data.model.ProjectSyncTriggerRequest
+import com.letta.mobile.data.model.ProjectSyncTriggerResponse
 import com.letta.mobile.data.model.ProjectSummary
 import io.ktor.client.call.body
 import io.ktor.client.request.delete
@@ -93,6 +97,45 @@ open class ProjectApi @Inject constructor(
         return response.body<ProjectDetailResponse>().project
     }
 
+    open suspend fun getBeadsRemoteStatus(identifier: String): BeadsRemoteStatus {
+        val client = apiClient.getClient()
+        val baseUrl = apiClient.getBaseUrl().trimEnd('/')
+        val response = client.get("$baseUrl/api/projects/$identifier/beads-remote")
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
+    }
+
+    open suspend fun provisionBeadsRemote(
+        identifier: String,
+        push: Boolean = true,
+    ): BeadsRemoteProvisionResponse {
+        val client = apiClient.getClient()
+        val baseUrl = apiClient.getBaseUrl().trimEnd('/')
+        val response = client.post("$baseUrl/api/projects/$identifier/beads-remote/provision") {
+            contentType(ContentType.Application.Json)
+            setBody(BeadsRemoteProvisionRequest(push = push))
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
+    }
+
+    open suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse {
+        val client = apiClient.getClient()
+        val baseUrl = apiClient.getBaseUrl().trimEnd('/')
+        val response = client.post("$baseUrl/api/sync/trigger") {
+            contentType(ContentType.Application.Json)
+            setBody(ProjectSyncTriggerRequest(projectId = identifier))
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return response.body()
+    }
+
     open suspend fun createProject(request: ProjectCreateRequest): ProjectSummary {
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl().trimEnd('/')
@@ -138,3 +181,8 @@ open class ProjectApi @Inject constructor(
         }
     }
 }
+
+@Serializable
+private data class BeadsRemoteProvisionRequest(
+    val push: Boolean = true,
+)

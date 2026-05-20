@@ -88,6 +88,17 @@ class ProjectWorkRepositoryTest {
     }
 
     @Test
+    fun `invalidateProjectCache evicts details owned by project even when absent from cached pages`() = runTest {
+        fakeApi.issueDetails["letta-mobile-qmbg"] = detail("Before")
+        assertEquals("Before", repository.getIssue("letta-mobile-qmbg").title)
+
+        fakeApi.issueDetails["letta-mobile-qmbg"] = detail("After")
+        repository.invalidateProjectCache("letta-mobile")
+
+        assertEquals("After", repository.getIssue("letta-mobile-qmbg").title)
+    }
+
+    @Test
     fun `claimIssue sends provided concurrency headers and updates cached lists`() = runTest {
         fakeApi.readyWork["letta-mobile"] = listOf(issue("letta-mobile-qmbg"))
         fakeApi.issues["letta-mobile"] = listOf(issue("letta-mobile-qmbg"))

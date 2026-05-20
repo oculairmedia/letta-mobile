@@ -3,13 +3,18 @@ package com.letta.mobile.ui.screens.projects
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.ProjectSummary
+import com.letta.mobile.data.model.BeadsRemoteStatus
+import com.letta.mobile.data.model.PmAgentMetadata
+import com.letta.mobile.data.api.ProjectAgentApi
 import com.letta.mobile.data.repository.ProjectRepository
-import com.letta.mobile.data.repository.SettingsRepository
+import com.letta.mobile.data.repository.VibesyncEventStreamRepository
+import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.ui.common.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -156,34 +161,71 @@ data class ProjectHomeUiState(
     val projectSettingsDraft: ProjectSettingsDraft = ProjectSettingsDraft(),
     val showArchiveProjectDialog: Boolean = false,
     val showDeleteProjectDialog: Boolean = false,
+    val showProvisionBeadsRemoteDialog: Boolean = false,
     val isSubmittingManualCreate: Boolean = false,
     val isSubmittingProjectSettings: Boolean = false,
+    val isProvisioningBeadsRemote: Boolean = false,
+    val syncingProjectId: String? = null,
+    val beadsRemoteStatusByProject: Map<String, BeadsRemoteStatus> = emptyMap(),
+    val pmAgentByProject: Map<String, PmAgentMetadata> = emptyMap(),
     val pinnedProjectIds: Set<String> = emptySet(),
 )
 
 @HiltViewModel
-class ProjectHomeViewModel @Inject constructor(
+class ProjectHomeViewModel private constructor(
     private val projectRepository: ProjectRepository,
-    private val settingsRepository: SettingsRepository,
+    private val settingsRepository: ISettingsRepository,
+    private val projectAgentApi: ProjectAgentApi? = null,
+    private val vibesyncEventStreamRepository: VibesyncEventStreamRepository? = null,
+    private val externalScope: CoroutineScope? = null,
 ) : ViewModel() {
+
+    @Inject
+    constructor(
+        projectRepository: ProjectRepository,
+        settingsRepository: ISettingsRepository,
+        projectAgentApi: ProjectAgentApi? = null,
+        vibesyncEventStreamRepository: VibesyncEventStreamRepository? = null,
+    ) : this(
+        projectRepository = projectRepository,
+        settingsRepository = settingsRepository,
+        projectAgentApi = projectAgentApi,
+        vibesyncEventStreamRepository = vibesyncEventStreamRepository,
+        externalScope = null,
+    )
+
+    internal constructor(
+        projectRepository: ProjectRepository,
+        settingsRepository: ISettingsRepository,
+        coroutineScope: CoroutineScope,
+    ) : this(
+        projectRepository = projectRepository,
+        settingsRepository = settingsRepository,
+        projectAgentApi = null,
+        vibesyncEventStreamRepository = null,
+        externalScope = coroutineScope,
+    )
 
     private val _uiState = MutableStateFlow<UiState<ProjectHomeUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<ProjectHomeUiState>> = _uiState.asStateFlow()
     private val _events = Channel<ProjectHomeUiEvent>(Channel.BUFFERED)
     val events = _events.receiveAsFlow()
     private var latestPinnedProjectIds: Set<String> = emptySet()
+    private val launchScope: CoroutineScope
+        get() = externalScope ?: viewModelScope
 
     init {
         observePinnedProjects()
+        observeVibesyncEvents()
         loadProjects()
         // letta-mobile-ze5l: refetch projects on backend switch.
-        viewModelScope.launch {
+        launchScope.launch {
             settingsRepository.activeConfigChanges.collect { refresh() }
         }
     }
 
     private fun observePinnedProjects() {
-        viewModelScope.launch {
+        launchScope.launch {
             settingsRepository.getPinnedProjectIds().collect { pinnedProjectIds ->
                 applyPinnedProjects(pinnedProjectIds)
             }
@@ -191,7 +233,7 @@ class ProjectHomeViewModel @Inject constructor(
     }
 
     fun loadProjects(forceRefresh: Boolean = false) {
-        viewModelScope.launch {
+        launchScope.launch {
             val current = (_uiState.value as? UiState.Success)?.data
             if (current == null) {
                 _uiState.value = UiState.Loading
@@ -268,6 +310,96 @@ class ProjectHomeViewModel @Inject constructor(
                 showDeleteProjectDialog = if (projectId == null) current.showDeleteProjectDialog else false,
             )
         )
+        if (projectId != null) loadSelectedProjectMetadata(projectId)
+    }
+
+    private fun loadSelectedProjectMetadata(projectId: String) {
+        val project = projectRepository.projects.value.firstOrNull { it.identifier == projectId }
+            ?: (_uiState.value as? UiState.Success)?.data?.projects?.firstOrNull { it.identifier == projectId }
+            ?: return
+        launchScope.launch {
+            runCatching { projectRepository.getBeadsRemoteStatus(project.identifier) }
+                .onSuccess { status -> updateSuccess { it.copy(beadsRemoteStatusByProject = it.beadsRemoteStatusByProject + (project.identifier to status)) } }
+                .onFailure { android.util.Log.i("ProjectHomeVM", "Beads remote status unavailable", it) }
+        }
+        launchScope.launch {
+            val agentApi = projectAgentApi ?: return@launch
+            runCatching { agentApi.lookup(project.name) }
+                .onSuccess { agent -> updateSuccess { current ->
+                    if (agent == null) current.copy(pmAgentByProject = current.pmAgentByProject - project.identifier)
+                    else current.copy(pmAgentByProject = current.pmAgentByProject + (project.identifier to agent))
+                } }
+                .onFailure { error -> android.util.Log.i("ProjectHomeVM", "PM agent lookup unavailable", error) }
+        }
+    }
+
+    fun startProvisionBeadsRemote() = updateSuccess { it.copy(showProvisionBeadsRemoteDialog = true) }
+
+    fun dismissProvisionBeadsRemote() = updateSuccess { it.copy(showProvisionBeadsRemoteDialog = false) }
+
+    fun confirmProvisionBeadsRemote() {
+        val current = (_uiState.value as? UiState.Success)?.data ?: return
+        val project = current.projects.firstOrNull { it.identifier == current.selectedProjectId } ?: return
+        _uiState.value = UiState.Success(current.copy(showProvisionBeadsRemoteDialog = false, isProvisioningBeadsRemote = true))
+        launchScope.launch {
+            runCatching { projectRepository.provisionBeadsRemote(project.identifier, push = true) }
+                .onSuccess { response ->
+                    runCatching { projectRepository.getBeadsRemoteStatus(project.identifier) }
+                        .onSuccess { status -> updateSuccess { it.copy(beadsRemoteStatusByProject = it.beadsRemoteStatusByProject + (project.identifier to status)) } }
+                    _events.trySend(ProjectHomeUiEvent.ShowMessage(response.remoteUrl ?: response.status))
+                }
+                .onFailure { error -> _events.trySend(ProjectHomeUiEvent.ShowMessage(error.message ?: "Failed to provision Beads remote")) }
+            updateSuccess { it.copy(isProvisioningBeadsRemote = false) }
+        }
+    }
+
+    fun triggerSyncNow() {
+        val current = (_uiState.value as? UiState.Success)?.data ?: return
+        val project = current.projects.firstOrNull { it.identifier == current.selectedProjectId } ?: return
+        _uiState.value = UiState.Success(current.copy(syncingProjectId = project.identifier))
+        launchScope.launch {
+            runCatching { projectRepository.triggerSync(project.identifier) }
+                .onSuccess {
+                    _events.trySend(ProjectHomeUiEvent.ShowMessage(it.message ?: "Sync triggered"))
+                    // Fallback: when no SSE stream is wired the sync:completed event will
+                    // never arrive, so refresh and clear the syncing flag here.
+                    if (vibesyncEventStreamRepository == null) {
+                        loadProjects(forceRefresh = true)
+                        updateSuccess { state -> state.copy(syncingProjectId = null) }
+                    }
+                }
+                .onFailure { error ->
+                    updateSuccess { it.copy(syncingProjectId = null) }
+                    _events.trySend(ProjectHomeUiEvent.ShowMessage(error.message ?: "Failed to trigger sync"))
+                }
+        }
+    }
+
+    private fun observeVibesyncEvents() {
+        val eventRepository = vibesyncEventStreamRepository ?: return
+        eventRepository.start()
+        launchScope.launch {
+            eventRepository.events.collect { event ->
+                val projectId = event.projectId ?: return@collect
+                when (event.type) {
+                    "sync:started", "sync:triggered" -> updateSuccess { it.copy(syncingProjectId = projectId) }
+                    "sync:completed", "sync:error" -> {
+                        updateSuccess { it.copy(syncingProjectId = if (it.syncingProjectId == projectId) null else it.syncingProjectId) }
+                        if (event.type == "sync:completed") loadProjects(forceRefresh = true)
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onCleared() {
+        vibesyncEventStreamRepository?.stop()
+        super.onCleared()
+    }
+
+    private inline fun updateSuccess(transform: (ProjectHomeUiState) -> ProjectHomeUiState) {
+        val current = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(transform(current))
     }
 
     fun toggleSelectedProjectPinned() {
@@ -290,7 +422,7 @@ class ProjectHomeViewModel @Inject constructor(
                 ).toImmutableList(),
             )
         )
-        viewModelScope.launch {
+        launchScope.launch {
             settingsRepository.setProjectPinned(project.identifier, !isPinned)
             _events.trySend(
                 ProjectHomeUiEvent.ShowMessage(
@@ -359,7 +491,7 @@ class ProjectHomeViewModel @Inject constructor(
                 isSubmittingManualCreate = true,
             )
         )
-        viewModelScope.launch {
+        launchScope.launch {
             runCatching {
                 projectRepository.createProject(
                     name = draft.name.takeIf { it.isNotBlank() },
@@ -435,7 +567,7 @@ class ProjectHomeViewModel @Inject constructor(
                 isSubmittingProjectSettings = true,
             )
         )
-        viewModelScope.launch {
+        launchScope.launch {
             runCatching {
                 projectRepository.updateProject(
                     identifier = draft.identifier,
@@ -486,7 +618,7 @@ class ProjectHomeViewModel @Inject constructor(
         val current = (_uiState.value as? UiState.Success)?.data ?: return
         val project = currentProject() ?: return
         _uiState.value = UiState.Success(current.copy(showArchiveProjectDialog = false, selectedProjectId = null))
-        viewModelScope.launch {
+        launchScope.launch {
             runCatching {
                 projectRepository.archiveProject(project.identifier)
             }.onSuccess { archived ->
@@ -524,7 +656,7 @@ class ProjectHomeViewModel @Inject constructor(
         val current = (_uiState.value as? UiState.Success)?.data ?: return
         val project = currentProject() ?: return
         _uiState.value = UiState.Success(current.copy(showDeleteProjectDialog = false, selectedProjectId = null))
-        viewModelScope.launch {
+        launchScope.launch {
             runCatching {
                 projectRepository.deleteProject(project.identifier)
             }.onSuccess {
@@ -587,6 +719,7 @@ class ProjectHomeViewModel @Inject constructor(
         projectSettingsDraft = ProjectSettingsDraft(),
         showArchiveProjectDialog = false,
         showDeleteProjectDialog = false,
+        showProvisionBeadsRemoteDialog = false,
         isSubmittingManualCreate = false,
         isSubmittingProjectSettings = false,
     )

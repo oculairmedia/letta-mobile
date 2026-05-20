@@ -11,6 +11,7 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.intOrNull
@@ -50,6 +51,7 @@ data class ProjectSummary(
     val agents: ProjectAgentsInfo? = null,
     val conversations: ProjectConversationsInfo? = null,
     val tracker: ProjectTrackerInfo? = null,
+    @SerialName("beads_remote") val beadsRemote: BeadsRemoteStatus? = null,
     @SerialName("last_activity_at") val lastActivityAt: String? = null,
     val version: String? = null,
     val etag: String? = null,
@@ -65,6 +67,77 @@ data class ProjectCatalog(
 @Serializable
 data class ProjectDetailResponse(
     val project: ProjectSummary,
+)
+
+@Serializable
+data class BeadsRemoteStatus(
+    val status: String,
+    @SerialName("provisioned_at") val provisionedAt: String? = null,
+    @SerialName("remote_url") val remoteUrl: String? = null,
+    val error: String? = null,
+)
+
+@Serializable
+data class BeadsRemoteProvisionResponse(
+    val status: String,
+    @SerialName("remote_url") val remoteUrl: String? = null,
+    @SerialName("dry_run") val dryRun: Boolean? = null,
+    val error: String? = null,
+)
+
+@Serializable
+data class ProjectSyncTriggerRequest(
+    val projectId: String? = null,
+)
+
+@Serializable
+data class ProjectSyncTriggerResponse(
+    val status: String? = null,
+    val message: String? = null,
+    @SerialName("event_id") val eventId: String? = null,
+)
+
+@Serializable
+data class PmAgentMetadata(
+    @SerialName("agent_id") val agentId: String,
+    val name: String? = null,
+    val status: String? = null,
+    val repo: String? = null,
+)
+
+@Serializable
+data class VibesyncHealthResponse(
+    val status: String? = null,
+    val uptime: Double? = null,
+    val sync: JsonElement? = null,
+    val memory: JsonElement? = null,
+    val database: JsonElement? = null,
+    @SerialName("connectionPool") val connectionPool: JsonElement? = null,
+)
+
+@Serializable
+data class VibesyncStatsResponse(
+    @SerialName("sseClients") val sseClients: Int? = null,
+    @SerialName("syncHistory") val syncHistory: JsonElement? = null,
+    val database: JsonElement? = null,
+    val memory: JsonElement? = null,
+)
+
+@Serializable
+data class AgentsMdRefreshRequest(
+    val projectId: String? = null,
+    val dryRun: Boolean = true,
+)
+
+@Serializable
+data class AgentsMdRefreshSummary(
+    val total: Int = 0,
+    val updated: Int = 0,
+    @SerialName("dry_run") val dryRunLegacy: Boolean? = null,
+    val dryRun: Boolean? = null,
+    val skipped: Int = 0,
+    val errors: Int = 0,
+    val results: JsonElement? = null,
 )
 
 @Serializable

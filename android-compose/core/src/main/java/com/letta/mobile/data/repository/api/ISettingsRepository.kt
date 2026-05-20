@@ -20,8 +20,11 @@ import kotlinx.coroutines.flow.StateFlow
  */
 interface ISettingsRepository {
     val activeConfig: StateFlow<LettaConfig?>
+    val activeConfigChanges: Flow<LettaConfig>
     fun getActiveConfig(): Flow<LettaConfig?>
     fun observeClientModeEnabled(): Flow<Boolean>
     fun observeClientModeBaseUrl(): Flow<String>
     fun getClientModeApiKey(): String?
+    fun getPinnedProjectIds(): Flow<Set<String>>
+    suspend fun setProjectPinned(projectId: String, pinned: Boolean)
 }

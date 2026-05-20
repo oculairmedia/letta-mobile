@@ -4,7 +4,10 @@ import com.letta.mobile.data.api.ProjectApi
 import com.letta.mobile.data.api.ProjectCreateRequest
 import com.letta.mobile.data.api.ProjectUpdateRequest
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.BeadsRemoteProvisionResponse
+import com.letta.mobile.data.model.BeadsRemoteStatus
 import com.letta.mobile.data.model.ProjectCatalog
+import com.letta.mobile.data.model.ProjectSyncTriggerResponse
 import com.letta.mobile.data.model.ProjectSummary
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -66,6 +69,15 @@ class ProjectRepository @Inject constructor(
         }
         return fresh
     }
+
+    suspend fun getBeadsRemoteStatus(identifier: String): BeadsRemoteStatus =
+        projectApi.getBeadsRemoteStatus(identifier).sanitize()
+
+    suspend fun provisionBeadsRemote(identifier: String, push: Boolean = true): BeadsRemoteProvisionResponse =
+        projectApi.provisionBeadsRemote(identifier, push)
+
+    suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse =
+        projectApi.triggerSync(identifier)
 
     suspend fun createProject(
         name: String?,
@@ -157,6 +169,11 @@ class ProjectRepository @Inject constructor(
         lastSyncAt = normalizeTimestamp(lastSyncAt ?: tracker?.dataFreshness?.lastSyncAt),
         lastCheckedAt = normalizeTimestamp(lastCheckedAt),
         lastActivityAt = normalizeTimestamp(lastActivityAt),
+        beadsRemote = beadsRemote?.sanitize(),
+    )
+
+    private fun BeadsRemoteStatus.sanitize(): BeadsRemoteStatus = copy(
+        provisionedAt = normalizeTimestamp(provisionedAt),
     )
 
     private fun sanitizeGitUrl(raw: String): String {

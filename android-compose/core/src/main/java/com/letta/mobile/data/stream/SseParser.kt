@@ -10,6 +10,11 @@ import kotlinx.serialization.json.Json
 
 sealed interface SseFrame {
     data class Message(val message: LettaMessage) : SseFrame
+    data class RawEvent(
+        val event: String? = null,
+        val data: String,
+        val id: String? = null,
+    ) : SseFrame
     data object Heartbeat : SseFrame
     data object Done : SseFrame
 }
@@ -61,6 +66,37 @@ object SseParser {
                 processed.frame?.let { emit(it) }
             }
         }
+    }
+
+    fun parseRawEvents(channel: ByteReadChannel): Flow<SseFrame.RawEvent> = flow {
+        val buffer = StringBuilder()
+        val lineReader = Utf8LineReader(channel)
+        while (true) {
+            val line = lineReader.readLine() ?: break
+            if (line.isEmpty()) {
+                val event = buffer.toString()
+                buffer.clear()
+                if (event.isNotBlank()) processRawEvent(event)?.let { emit(it) }
+            } else {
+                buffer.append(line).append("\n")
+            }
+        }
+        if (buffer.isNotBlank()) processRawEvent(buffer.toString())?.let { emit(it) }
+    }
+
+    private fun processRawEvent(event: String): SseFrame.RawEvent? {
+        val lines = event.lineSequence().filter { it.isNotEmpty() }.toList()
+        val dataLines = lines.filter { it.startsWith("data:") }.map { line ->
+            line.removePrefix("data:").let { data -> if (data.startsWith(" ")) data.drop(1) else data }
+        }
+        if (dataLines.isEmpty()) return null
+        val data = dataLines.joinToString("\n").trim()
+        if (data == "[DONE]") return null
+        return SseFrame.RawEvent(
+            event = lines.firstOrNull { it.startsWith("event:") }?.removePrefix("event:")?.trim()?.takeIf { it.isNotBlank() },
+            data = data,
+            id = lines.firstOrNull { it.startsWith("id:") }?.removePrefix("id:")?.trim()?.takeIf { it.isNotBlank() },
+        )
     }
 
     private fun processEvent(event: String): ProcessedEvent {
