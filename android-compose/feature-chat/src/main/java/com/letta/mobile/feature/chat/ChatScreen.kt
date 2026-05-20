@@ -64,6 +64,16 @@ import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.isExpandedWidth
 import kotlin.math.max
 
+/**
+ * Feature flag: when false, the tool-affordance chip strip above the
+ * composer is suppressed. The component (`ToolAffordanceRow`), the
+ * smart-template builder (`buildToolCallTemplate`), and the
+ * `AdminChatViewModel.activeAgent` flow all stay wired — only the
+ * call-site stops feeding tools through, so flipping to true re-enables
+ * the row without any other change.
+ */
+private const val TOOL_AFFORDANCE_ROW_ENABLED = false
+
 @Composable
 internal fun ChatScreen(
     modifier: Modifier = Modifier,
@@ -284,7 +294,11 @@ internal fun ChatScreen(
                     onStop = { viewModel.interruptRun() },
                     onRemoveAttachment = { viewModel.removeAttachment(it) },
                     onAttachImage = launchPicker,
-                    availableTools = activeAgent?.tools.orEmpty(),
+                    availableTools = if (TOOL_AFFORDANCE_ROW_ENABLED) {
+                        activeAgent?.tools.orEmpty()
+                    } else {
+                        emptyList()
+                    },
                 )
             }
 
