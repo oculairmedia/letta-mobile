@@ -361,7 +361,9 @@ private fun ConversationsContent(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                var runningIndex = 0
                 sections.forEach { section ->
+                    val sectionBaseIndex = runningIndex
                     item(key = section.key) {
                         when {
                             section.isPinned -> ConversationPinnedHeader()
@@ -372,7 +374,7 @@ private fun ConversationsContent(
                         items = section.items,
                         key = { _, display -> display.conversation.id },
                     ) { index, display ->
-                        StaggeredListItem(index = index) {
+                        StaggeredListItem(index = sectionBaseIndex + index) {
                             ConversationCard(
                                 display = display,
                                 onClick = { onConversationClick(display) },
@@ -384,6 +386,7 @@ private fun ConversationsContent(
                             )
                         }
                     }
+                    runningIndex += section.items.size
                 }
             }
         }
