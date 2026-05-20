@@ -118,9 +118,7 @@ internal fun ChatComposer(
         if (inputText.isBlank() && pendingAttachments.isEmpty() && availableTools.isNotEmpty()) {
             ToolAffordanceRow(
                 tools = availableTools,
-                onToolSelected = { tool ->
-                    onTextChange("Call tool: ${tool.name} with parameters: ")
-                },
+                onToolSelected = { tool -> onTextChange(buildToolCallTemplate(tool)) },
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
             )
         }

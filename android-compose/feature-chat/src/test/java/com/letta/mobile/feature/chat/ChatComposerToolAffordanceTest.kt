@@ -9,7 +9,10 @@ import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.ui.components.ToolAffordanceRowTestTags
 import com.letta.mobile.ui.theme.LettaTheme
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -102,7 +105,7 @@ class ChatComposerToolAffordanceTest {
     }
 
     @Test
-    fun `clicking a tool chip inserts the call-tool template into text`() {
+    fun `clicking a tool chip without schema inserts the flat-fallback template`() {
         var captured = ""
         composeRule.setContent {
             LettaTheme {
@@ -124,5 +127,51 @@ class ChatComposerToolAffordanceTest {
             .onNodeWithTag("${ToolAffordanceRowTestTags.ChipPrefix}fetch_url")
             .performClick()
         assertEquals("Call tool: fetch_url with parameters: ", captured)
+    }
+
+    @Test
+    fun `clicking a tool chip with json schema inserts a multi-line typed template`() {
+        var captured = ""
+        val schemaTool = Tool(
+            id = ToolId("tool-3"),
+            name = "send_email",
+            jsonSchema = JsonObject(
+                mapOf(
+                    "type" to JsonPrimitive("object"),
+                    "properties" to JsonObject(
+                        mapOf(
+                            "to" to JsonObject(mapOf("type" to JsonPrimitive("string"))),
+                            "cc_count" to JsonObject(mapOf("type" to JsonPrimitive("integer"))),
+                            "urgent" to JsonObject(mapOf("type" to JsonPrimitive("boolean"))),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        composeRule.setContent {
+            LettaTheme {
+                ChatComposer(
+                    inputText = "",
+                    pendingAttachments = persistentListOf(),
+                    isStreaming = false,
+                    canSendMessages = true,
+                    onTextChange = { captured = it },
+                    onSend = {},
+                    onStop = {},
+                    onRemoveAttachment = {},
+                    onAttachImage = {},
+                    availableTools = listOf(schemaTool),
+                )
+            }
+        }
+        composeRule
+            .onNodeWithTag("${ToolAffordanceRowTestTags.ChipPrefix}send_email")
+            .performClick()
+        assertTrue("expected multi-line block, got '$captured'", captured.contains("\n"))
+        assertTrue(captured.contains("Call tool: send_email"))
+        assertTrue(captured.contains("Arguments: {"))
+        assertTrue(captured.contains("\"to\": \"\""))
+        assertTrue(captured.contains("\"cc_count\": 0"))
+        assertTrue(captured.contains("\"urgent\": false"))
     }
 }
