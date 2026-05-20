@@ -103,3 +103,27 @@ kover {
         }
     }
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// Test parallelism tuning — enable concurrent test JVM workers
+//
+// Default Gradle behavior: maxParallelForks=1 (serial), forkEvery=0 (unlimited).
+// This configuration enables parallel test execution across modules while
+// maintaining stability through conservative resource allocation.
+//
+// Rationale:
+// - maxParallelForks = (cores / 2).coerceAtLeast(1) balances parallelism vs.
+//   memory pressure, disk I/O contention, and CPU context-switching overhead.
+// - forkEvery=100 recycles JVM workers to prevent memory leaks and shared
+//   static state accumulation across long test suites.
+// - Forked JVMs are isolated from the main build process, preventing classpath
+//   pollution and shared static state leakage into the build itself.
+//
+// See: https://docs.gradle.org/current/userguide/java_testing.html
+//      https://docs.gradle.org/current/userguide/performance.html
+// ───────────────────────────────────────────────────────────────────────────
+subprojects {
+    tasks.withType<Test>().configureEach {
+        maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
+    }
+}
