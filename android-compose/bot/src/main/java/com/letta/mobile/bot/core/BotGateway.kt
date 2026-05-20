@@ -31,13 +31,13 @@ import javax.inject.Singleton
 @Singleton
 class BotGateway @Inject constructor(
     private val sessionFactory: BotSessionFactory,
-) {
+) : IBotGateway {
     /** sessions keyed on `config.id` (NOT agent ID) */
     private val _sessions = MutableStateFlow<Map<String, BotSession>>(emptyMap())
-    val sessions: StateFlow<Map<String, BotSession>> = _sessions.asStateFlow()
+    override val sessions: StateFlow<Map<String, BotSession>> = _sessions.asStateFlow()
 
     private val _status = MutableStateFlow(GatewayStatus.STOPPED)
-    val status: StateFlow<GatewayStatus> = _status.asStateFlow()
+    override val status: StateFlow<GatewayStatus> = _status.asStateFlow()
 
     private val mutex = Mutex()
 
@@ -47,7 +47,7 @@ class BotGateway @Inject constructor(
      * keyed on `config.id`, so multiple configs targeting the same Letta
      * server with different transport settings can coexist.
      */
-    suspend fun start(configs: List<BotConfig>) {
+    override suspend fun start(configs: List<BotConfig>) {
         mutex.withLock {
             _status.value = GatewayStatus.STARTING
             val sessions = mutableMapOf<String, BotSession>()
@@ -67,7 +67,7 @@ class BotGateway @Inject constructor(
     }
 
     /** Stop all sessions and shut down the gateway. */
-    suspend fun stop() {
+    override suspend fun stop() {
         mutex.withLock {
             _status.value = GatewayStatus.STOPPING
             _sessions.value.values.forEach { session ->
@@ -88,10 +88,10 @@ class BotGateway @Inject constructor(
     }
 
     /** Get a session by config ID, or null if not running. */
-    fun getSession(configId: String): BotSession? = _sessions.value[configId]
+    override fun getSession(configId: String): BotSession? = _sessions.value[configId]
 
     /** Get the default (first) session, or null. */
-    fun getDefaultSession(): BotSession? = _sessions.value.values.firstOrNull()
+    override fun getDefaultSession(): BotSession? = _sessions.value.values.firstOrNull()
 
     /**
      * Route an incoming message to a transport session.
@@ -101,17 +101,17 @@ class BotGateway @Inject constructor(
      * (and currently only) session — the agent identity is forwarded
      * per-message and the WS layer's per-agent pool handles multiplex.
      */
-    suspend fun routeMessage(message: ChannelMessage, conversationId: String? = null): BotResponse {
+    override suspend fun routeMessage(message: ChannelMessage, conversationId: String?): BotResponse {
         val session = getDefaultSession()
             ?: throw IllegalStateException("No active bot sessions")
 
         return session.sendToAgent(message, conversationId)
     }
 
-    fun streamMessage(
+    override fun streamMessage(
         message: ChannelMessage,
-        conversationId: String? = null,
-        forceNew: Boolean = false,
+        conversationId: String?,
+        forceNew: Boolean,
     ): Flow<BotResponseChunk> {
         val session = getDefaultSession()
             ?: throw IllegalStateException("No active bot sessions")
@@ -122,7 +122,7 @@ class BotGateway @Inject constructor(
     /**
      * Route a message and deliver the response back to the channel.
      */
-    suspend fun routeAndDeliver(message: ChannelMessage): DeliveryResult {
+    override suspend fun routeAndDeliver(message: ChannelMessage): DeliveryResult {
         val session = getDefaultSession()
             ?: throw IllegalStateException("No active bot sessions")
 
@@ -130,7 +130,7 @@ class BotGateway @Inject constructor(
         return session.deliverToChannel(response, message)
     }
 
-    suspend fun abortStream() {
+    override suspend fun abortStream() {
         getDefaultSession()?.abortStream()
     }
 

@@ -1,7 +1,7 @@
 package com.letta.mobile.bot.channel
 
 import android.util.Log
-import com.letta.mobile.bot.chat.ClientModeChatSender
+import com.letta.mobile.bot.chat.IClientModeChatSender
 import com.letta.mobile.bot.protocol.BotStreamEvent
 import com.letta.mobile.data.channel.NotificationCandidatePhase
 import com.letta.mobile.data.channel.NotificationCandidateSource
@@ -31,11 +31,11 @@ import kotlinx.coroutines.launch
 
 @Singleton
 class NotificationReplyHandler @Inject constructor(
-    private val clientModeChatSender: ClientModeChatSender,
+    private val clientModeChatSender: IClientModeChatSender,
     private val timelineRepository: TimelineClientModeWriter,
     private val agentRepository: IAgentRepository,
     private val notificationDeliveryProvider: Provider<NotificationDelivery>,
-) {
+) : NotificationReplyStreamTracker {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // Set of conversation IDs with active notification-reply streams.
@@ -43,7 +43,7 @@ class NotificationReplyHandler @Inject constructor(
     // handler-driven streaming so ChatMessageComponents uses plain Text
     // instead of re-parsing MarkdownText on every chunk (prevents flicker).
     private val _activeReplyStreams = MutableStateFlow<Set<String>>(emptySet())
-    val activeReplyStreams: StateFlow<Set<String>> = _activeReplyStreams.asStateFlow()
+    override val activeReplyStreams: StateFlow<Set<String>> = _activeReplyStreams.asStateFlow()
 
     fun sendReply(agentId: String, conversationId: String, text: String): Job {
         return scope.launch {

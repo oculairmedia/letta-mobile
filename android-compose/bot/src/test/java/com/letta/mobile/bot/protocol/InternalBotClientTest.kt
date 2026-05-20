@@ -2,9 +2,10 @@ package com.letta.mobile.bot.protocol
 
 import com.letta.mobile.bot.config.BotConfig
 import com.letta.mobile.bot.config.BotConfigStore
-import com.letta.mobile.bot.core.BotGateway
 import com.letta.mobile.bot.core.BotSession
 import com.letta.mobile.bot.core.BotStatus
+import com.letta.mobile.bot.core.GatewayStatus
+import com.letta.mobile.bot.testutil.FakeBotGateway
 import io.kotest.core.spec.style.WordSpec
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
@@ -19,14 +20,15 @@ import org.junit.jupiter.api.Tag
 class InternalBotClientTest : WordSpec({
     "getStatus" should {
         "include gateway sessions and active config metadata" {
-            val gateway = mockk<BotGateway>()
             val configStore = mockk<BotConfigStore>()
             val session = mockk<BotSession>()
 
-            every { gateway.status } returns MutableStateFlow(com.letta.mobile.bot.core.GatewayStatus.RUNNING)
             // letta-mobile-w2hx.4: gateway sessions are keyed on
             // `config.id`, not on the bound agent ID.
-            every { gateway.sessions } returns MutableStateFlow(mapOf("local" to session))
+            val gateway = FakeBotGateway(
+                status = GatewayStatus.RUNNING,
+                sessions = mapOf("local" to session),
+            )
             every { session.displayName } returns "Primary agent"
             every { session.status } returns MutableStateFlow(BotStatus.RUNNING)
             coEvery { configStore.getAll() } returns listOf(

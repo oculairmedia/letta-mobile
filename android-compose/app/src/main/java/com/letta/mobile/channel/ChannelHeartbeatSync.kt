@@ -7,7 +7,7 @@ import com.letta.mobile.data.channel.NotificationCandidateSource
 import com.letta.mobile.data.channel.NotificationDeliveryCandidate
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.repository.ConversationInspectorMessage
-import com.letta.mobile.data.repository.MessageRepository
+import com.letta.mobile.data.repository.api.IConversationInspectorMessageRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import kotlinx.coroutines.flow.first
@@ -18,9 +18,9 @@ import javax.inject.Singleton
 class ChannelHeartbeatSync @Inject constructor(
     private val settingsRepository: ISettingsRepository,
     private val conversationApi: ConversationApi,
-    private val messageRepository: MessageRepository,
+    private val messageRepository: IConversationInspectorMessageRepository,
     private val agentRepository: IAgentRepository,
-    private val syncStateStore: ChannelSyncStateStore,
+    private val syncStateStore: IChannelSyncStateStore,
     private val notificationDeliveryCoordinator: NotificationDeliveryCoordinator,
 ) {
     suspend fun run(): ListenableWorker.Result {

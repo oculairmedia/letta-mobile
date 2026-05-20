@@ -1,16 +1,24 @@
 package com.letta.mobile.di
 
 import com.letta.mobile.channel.NotificationDeliveryCoordinator
+import com.letta.mobile.channel.ChannelNotificationPublisher
+import com.letta.mobile.channel.ChannelSyncStateStore
+import com.letta.mobile.channel.IChannelNotificationPublisher
+import com.letta.mobile.channel.IChannelSyncStateStore
 import com.letta.mobile.chat.BuildConfigChatClientVersionProvider
 import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.repository.SettingsRepository
+import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
+import com.letta.mobile.data.repository.api.IConversationInspectorMessageRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.health.ServerHealthRepository
+import com.letta.mobile.data.health.IServerHealthRepository
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.timeline.api.TimelineClientModeWriter
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
@@ -55,6 +63,26 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindConversationRepository(impl: ConversationRepository): IConversationRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindConversationInspectorMessageRepository(
+        impl: MessageRepository,
+    ): IConversationInspectorMessageRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindServerHealthRepository(impl: ServerHealthRepository): IServerHealthRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindChannelSyncStateStore(impl: ChannelSyncStateStore): IChannelSyncStateStore
+
+    @Binds
+    @Singleton
+    abstract fun bindChannelNotificationPublisher(
+        impl: ChannelNotificationPublisher,
+    ): IChannelNotificationPublisher
 
     @Binds
     @Singleton

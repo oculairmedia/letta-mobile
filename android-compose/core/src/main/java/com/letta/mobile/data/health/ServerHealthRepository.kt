@@ -60,7 +60,7 @@ internal fun defaultServerHealthScope(): CoroutineScope =
 class ServerHealthRepository(
     private val settingsRepository: SettingsRepository,
     private val scope: CoroutineScope,
-) {
+) : IServerHealthRepository {
     /** Hilt-friendly constructor — uses [defaultServerHealthScope]. */
     @Inject
     constructor(settingsRepository: SettingsRepository) :
@@ -69,7 +69,7 @@ class ServerHealthRepository(
     enum class Health { UNKNOWN, PROBING, ONLINE, OFFLINE }
 
     private val _states = MutableStateFlow<Map<String, Health>>(emptyMap())
-    val states: StateFlow<Map<String, Health>> = _states.asStateFlow()
+    override val states: StateFlow<Map<String, Health>> = _states.asStateFlow()
 
     private val refreshMutex = Mutex()
 
@@ -97,7 +97,7 @@ class ServerHealthRepository(
     }
 
     /** Public re-probe trigger for picker UIs. Safe to call from main thread. */
-    suspend fun refreshAll() {
+    override suspend fun refreshAll() {
         refreshAllInternal(settingsRepository.configs.value)
     }
 

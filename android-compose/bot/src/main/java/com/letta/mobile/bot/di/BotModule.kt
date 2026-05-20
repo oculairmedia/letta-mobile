@@ -1,10 +1,20 @@
 package com.letta.mobile.bot.di
 
+import com.letta.mobile.bot.channel.NotificationReplyHandler
+import com.letta.mobile.bot.channel.NotificationReplyStreamTracker
 import com.letta.mobile.bot.context.BatteryContextProvider
 import com.letta.mobile.bot.config.BotServerProfileStore
+import com.letta.mobile.bot.clientmode.ClientModeController
+import com.letta.mobile.bot.clientmode.IClientModeController
+import com.letta.mobile.bot.chat.ClientModeChatSender
+import com.letta.mobile.bot.chat.IClientModeChatSender
 import com.letta.mobile.bot.context.ConnectivityContextProvider
 import com.letta.mobile.bot.context.DeviceContextProvider
 import com.letta.mobile.bot.config.IBotServerProfileStore
+import com.letta.mobile.bot.core.BotGateway
+import com.letta.mobile.bot.core.IBotGateway
+import com.letta.mobile.bot.protocol.BotClient
+import com.letta.mobile.bot.protocol.InternalBotClient
 import com.letta.mobile.bot.context.TimeContextProvider
 import com.letta.mobile.bot.runtime.DefaultLettaRuntimeClient
 import com.letta.mobile.bot.runtime.LettaRuntimeClient
@@ -41,6 +51,23 @@ abstract class BotModule {
 
     @Binds
     abstract fun bindBotServerProfileStore(impl: BotServerProfileStore): IBotServerProfileStore
+
+    @Binds
+    abstract fun bindBotGateway(impl: BotGateway): IBotGateway
+
+    @Binds
+    abstract fun bindClientModeController(impl: ClientModeController): IClientModeController
+
+    @Binds
+    abstract fun bindBotClient(impl: InternalBotClient): BotClient
+
+    @Binds
+    abstract fun bindClientModeChatSender(impl: ClientModeChatSender): IClientModeChatSender
+
+    @Binds
+    abstract fun bindNotificationReplyStreamTracker(
+        impl: NotificationReplyHandler,
+    ): NotificationReplyStreamTracker
 
     @Binds
     @IntoSet

@@ -8,22 +8,22 @@ import javax.inject.Singleton
 @Singleton
 class ChannelSyncStateStore @Inject constructor(
     @ApplicationContext context: Context,
-) {
+) : IChannelSyncStateStore {
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    fun getProcessedLastActivityAt(conversationId: String): String? {
+    override fun getProcessedLastActivityAt(conversationId: String): String? {
         return prefs.getString(processedKey(conversationId), null)
     }
 
-    fun setProcessedLastActivityAt(conversationId: String, value: String) {
+    override fun setProcessedLastActivityAt(conversationId: String, value: String) {
         prefs.edit().putString(processedKey(conversationId), value).apply()
     }
 
-    fun getLastNotifiedMessageId(conversationId: String): String? {
+    override fun getLastNotifiedMessageId(conversationId: String): String? {
         return prefs.getString(notifiedKey(conversationId), null)
     }
 
-    fun setLastNotifiedMessageId(conversationId: String, messageId: String) {
+    override fun setLastNotifiedMessageId(conversationId: String, messageId: String) {
         prefs.edit().putString(notifiedKey(conversationId), messageId).apply()
     }
 

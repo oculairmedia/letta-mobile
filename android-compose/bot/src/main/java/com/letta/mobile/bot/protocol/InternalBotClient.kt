@@ -2,7 +2,7 @@ package com.letta.mobile.bot.protocol
 
 import com.letta.mobile.bot.channel.ChannelMessage
 import com.letta.mobile.bot.config.BotConfigStore
-import com.letta.mobile.bot.core.BotGateway
+import com.letta.mobile.bot.core.IBotGateway
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.map
 
 @Singleton
 class InternalBotClient @Inject constructor(
-    private val gateway: BotGateway,
+    private val gateway: IBotGateway,
     private val configStore: BotConfigStore,
 ) : BotClient {
     override suspend fun sendMessage(request: BotChatRequest): BotChatResponse {

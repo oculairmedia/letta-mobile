@@ -4,8 +4,8 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.letta.mobile.bot.config.BotConfig
-import com.letta.mobile.bot.core.BotGateway
 import com.letta.mobile.bot.core.GatewayStatus
+import com.letta.mobile.bot.core.IBotGateway
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.util.Telemetry
 import javax.inject.Inject
@@ -23,9 +23,9 @@ import kotlinx.coroutines.sync.withLock
 
 @Singleton
 class ClientModeController @Inject constructor(
-    private val botGateway: BotGateway,
+    private val botGateway: IBotGateway,
     private val settingsRepository: ISettingsRepository,
-) : DefaultLifecycleObserver {
+) : DefaultLifecycleObserver, IClientModeController {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mutex = Mutex()
@@ -104,7 +104,7 @@ class ClientModeController @Inject constructor(
      * target agent per-message via `BotChatRequest.agentId`. This now
      * just guarantees that the transport session exists and is healthy.
      */
-    suspend fun ensureReady() {
+    override suspend fun ensureReady() {
         initialize()
         reconcile(forceForeground = true)
         check(botGateway.getSession(CLIENT_MODE_CONFIG_ID) != null) {
