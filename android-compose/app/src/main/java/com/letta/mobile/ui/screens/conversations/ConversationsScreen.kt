@@ -408,7 +408,9 @@ private fun ConversationCard(
     var showRenameDialog by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
-    val title = conversation.summary?.takeIf { it.isNotBlank() } ?: "Conversation"
+    val title = conversationCardTitle(display)
+    val subtitle = conversationCardSubtitle(display)
+    val timeText = conversationActivityText(conversation)
 
     Card(
         modifier = modifier
@@ -418,50 +420,75 @@ private fun ConversationCard(
                 onLongClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     showContextMenu = true
-                }
+                },
             ),
         shape = RoundedCornerShape(12.dp),
-        colors = LettaCardDefaults.listCardColors(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.listItemHeadline,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-
-            if (display.isPinned) {
-                Spacer(modifier = Modifier.height(4.dp))
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (display.isPinned) {
+                    Icon(
+                        imageVector = LettaIcons.Star,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
                 Text(
-                    text = "Pinned",
-                    style = MaterialTheme.typography.listItemMetadata,
-                    color = MaterialTheme.colorScheme.primary,
+                    text = title,
+                    style = MaterialTheme.typography.listItemHeadline,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
                 )
+                if (conversation.archived == true) {
+                    Text(
+                        text = stringResource(R.string.screen_conversations_archived_label),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = display.agentName,
-                style = MaterialTheme.typography.listItemSupporting,
-                color = MaterialTheme.colorScheme.primary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-
-            val timeText = conversationActivityText(conversation)
-            if (timeText != null) {
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = timeText,
-                    style = MaterialTheme.typography.listItemMetadata,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            if (subtitle != null || timeText != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (subtitle != null) {
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.listItemSupporting,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                    if (timeText != null) {
+                        Text(
+                            text = timeText,
+                            style = MaterialTheme.typography.listItemMetadata,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            maxLines = 1,
+                        )
+                    }
+                }
             }
         }
-
     }
 
     ActionSheet(
@@ -528,6 +555,35 @@ private fun conversationActivityText(conversation: com.letta.mobile.data.model.C
         stringResource(R.string.screen_conversations_last_activity_format, relative)
     } else {
         stringResource(R.string.screen_conversations_created_format, relative)
+    }
+}
+
+/**
+ * Headline for a conversation card. Prefer the user-set [Conversation.summary];
+ * fall back to the agent name; finally, a derived short id-suffix label so
+ * the row is still distinguishable. Never emit the generic literal
+ * "Conversation" — that's no-information.
+ */
+@Composable
+private fun conversationCardTitle(display: ConversationDisplay): String {
+    val summary = display.conversation.summary?.takeIf { it.isNotBlank() }
+    if (summary != null) return summary
+    if (display.agentName.isNotBlank()) return display.agentName
+    val tail = display.conversation.id.takeLast(6)
+    return stringResource(R.string.screen_conversations_card_fallback_title, tail)
+}
+
+/**
+ * Supporting line for a conversation card. Only render the agent name as a
+ * subtitle when the headline is the user-set summary (i.e. NOT already the
+ * agent name) — otherwise we'd repeat the agent name twice in the same card.
+ */
+private fun conversationCardSubtitle(display: ConversationDisplay): String? {
+    val hasMeaningfulSummary = !display.conversation.summary.isNullOrBlank()
+    return if (hasMeaningfulSummary && display.agentName.isNotBlank()) {
+        display.agentName
+    } else {
+        null
     }
 }
 

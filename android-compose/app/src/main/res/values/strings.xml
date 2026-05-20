@@ -696,6 +696,7 @@
     <string name="screen_conversations_dialog_no_agents">No agents available. Create one first.</string>
     <string name="screen_conversations_admin_details">Admin Details</string>
     <string name="screen_conversations_archived_label">Archived</string>
+    <string name="screen_conversations_card_fallback_title">Conv %1$s</string>
     <string name="screen_conversations_active_label">Active</string>
     <string name="screen_conversations_archive_action">Archive</string>
     <string name="screen_conversations_unarchive_action">Unarchive</string>
