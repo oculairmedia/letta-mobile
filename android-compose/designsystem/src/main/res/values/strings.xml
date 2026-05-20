@@ -7,4 +7,6 @@
     <string name="action_regenerate">Regenerate</string>
     <string name="action_delete">Delete</string>
     <string name="screen_models_no_models">No models available</string>
+    <string name="tool_affordance_row_label">Available agent capabilities</string>
+    <string name="tool_affordance_chip_content_description">Insert tool template: %1$s</string>
 </resources>

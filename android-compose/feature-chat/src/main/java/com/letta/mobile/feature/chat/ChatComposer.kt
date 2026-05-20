@@ -38,7 +38,9 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.feature.chat.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.Tool
 import com.letta.mobile.ui.components.LettaInputBar
+import com.letta.mobile.ui.components.ToolAffordanceRow
 import com.letta.mobile.ui.components.audio.HoldToDictateButton
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.feature.chat.voice.VoiceInputUiState
@@ -74,6 +76,7 @@ internal fun ChatComposer(
     onRemoveAttachment: (Int) -> Unit,
     onAttachImage: () -> Unit,
     modifier: Modifier = Modifier,
+    availableTools: List<Tool> = emptyList(),
 ) {
     val hasSendableContent = inputText.isNotBlank() || pendingAttachments.isNotEmpty()
     val canSend = !isStreaming && canSendMessages && hasSendableContent
@@ -109,6 +112,19 @@ internal fun ChatComposer(
     val useVoice = voiceVm != null && !isStreaming && canSendMessages && !hasSendableContent
 
     Column(modifier = modifier.fillMaxWidth()) {
+        // letta-mobile-ihuz: tool-affordance chips above the input when the
+        // composer is empty AND the active agent has tools. Hides as soon as
+        // the user starts typing — gated by composable visibility (no flicker).
+        if (inputText.isBlank() && pendingAttachments.isEmpty() && availableTools.isNotEmpty()) {
+            ToolAffordanceRow(
+                tools = availableTools,
+                onToolSelected = { tool ->
+                    onTextChange("Call tool: ${tool.name} with parameters: ")
+                },
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
+
         if (pendingAttachments.isNotEmpty()) {
             AttachmentStrip(
                 attachments = pendingAttachments,

@@ -265,6 +265,7 @@ internal fun ChatScreen(
                     onError = { viewModel.reportComposerError(it) },
                     limits = viewModel.attachmentLimits,
                 )
+                val activeAgent by viewModel.activeAgent.collectAsStateWithLifecycle()
                 ChatComposer(
                     inputText = composerState.inputText,
                     pendingAttachments = composerState.pendingAttachments,
@@ -283,6 +284,7 @@ internal fun ChatScreen(
                     onStop = { viewModel.interruptRun() },
                     onRemoveAttachment = { viewModel.removeAttachment(it) },
                     onAttachImage = launchPicker,
+                    availableTools = activeAgent?.tools.orEmpty(),
                 )
             }
 

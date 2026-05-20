@@ -50,6 +50,7 @@ import kotlinx.collections.immutable.toPersistentMap
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.collect
@@ -202,6 +203,17 @@ internal class AdminChatViewModel @Inject constructor(
 
     val availableAgents: StateFlow<List<Agent>> = agentRepository.agents
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /**
+     * letta-mobile-ihuz: the active agent for this chat session, hydrated
+     * via [AgentRepository.getAgent]. Emits cached value (if any) then the
+     * refreshed payload. Stays `null` on transport failure so the
+     * tool-affordance row can simply hide itself instead of crashing.
+     */
+    val activeAgent: StateFlow<Agent?> = agentRepository.getAgent(agentId)
+        .map<Agent, Agent?> { it }
+        .catch { emit(null) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val favoriteAgentId: StateFlow<String?> = settingsRepository.favoriteAgentId
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), settingsRepository.favoriteAgentId.value)
