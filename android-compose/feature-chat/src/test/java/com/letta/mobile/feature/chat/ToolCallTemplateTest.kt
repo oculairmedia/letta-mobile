@@ -5,10 +5,10 @@ import com.letta.mobile.data.model.ToolId
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Tag
+import org.junit.jupiter.api.Test
 
 @Tag("unit")
 class ToolCallTemplateTest {
@@ -112,8 +112,8 @@ class ToolCallTemplateTest {
         val zetaAt = out.indexOf("\"zeta\"")
         val alphaAt = out.indexOf("\"alpha\"")
         val muAt = out.indexOf("\"mu\"")
-        assertTrue("zeta should appear before alpha (got $zetaAt vs $alphaAt)", zetaAt in 0 until alphaAt)
-        assertTrue("alpha should appear before mu (got $alphaAt vs $muAt)", alphaAt in 0 until muAt)
+        assertTrue(zetaAt in 0 until alphaAt, "zeta should appear before alpha (got $zetaAt vs $alphaAt)")
+        assertTrue(alphaAt in 0 until muAt, "alpha should appear before mu (got $alphaAt vs $muAt)")
     }
 
     @Test

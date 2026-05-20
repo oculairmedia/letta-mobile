@@ -54,7 +54,7 @@ class ChatComposerToolAffordanceTest {
             .onNodeWithTag(ToolAffordanceRowTestTags.Container)
             .assertIsDisplayed()
         composeRule
-            .onNodeWithTag("${ToolAffordanceRowTestTags.ChipPrefix}fetch_url")
+            .onNodeWithTag("${ToolAffordanceRowTestTags.ChipPrefix}tool-1")
             .assertIsDisplayed()
     }
 
@@ -124,7 +124,7 @@ class ChatComposerToolAffordanceTest {
             }
         }
         composeRule
-            .onNodeWithTag("${ToolAffordanceRowTestTags.ChipPrefix}fetch_url")
+            .onNodeWithTag("${ToolAffordanceRowTestTags.ChipPrefix}tool-1")
             .performClick()
         assertEquals("Call tool: fetch_url with parameters: ", captured)
     }
@@ -165,7 +165,7 @@ class ChatComposerToolAffordanceTest {
             }
         }
         composeRule
-            .onNodeWithTag("${ToolAffordanceRowTestTags.ChipPrefix}send_email")
+            .onNodeWithTag("${ToolAffordanceRowTestTags.ChipPrefix}tool-3")
             .performClick()
         assertTrue("expected multi-line block, got '$captured'", captured.contains("\n"))
         assertTrue(captured.contains("Call tool: send_email"))

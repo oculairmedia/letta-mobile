@@ -114,7 +114,7 @@ fun ToolAffordanceRow(
                         )
                     },
                     modifier = Modifier
-                        .testTag(ToolAffordanceRowTestTags.ChipPrefix + tool.name)
+                        .testTag(ToolAffordanceRowTestTags.ChipPrefix + tool.id.value)
                         .semantics { contentDescription = chipDescription },
                 )
             }
