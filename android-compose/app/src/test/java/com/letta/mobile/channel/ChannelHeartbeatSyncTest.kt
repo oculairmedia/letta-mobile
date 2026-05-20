@@ -1,20 +1,19 @@
 package com.letta.mobile.channel
 
 import androidx.work.ListenableWorker
-import com.letta.mobile.bot.channel.NotificationReplyHandler
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.api.ConversationApi
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.ConversationInspectorMessage
-import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.testutil.FakeAgentRepository
+import com.letta.mobile.testutil.FakeChannelNotificationPublisher
+import com.letta.mobile.testutil.FakeChannelSyncStateStore
+import com.letta.mobile.testutil.FakeConversationInspectorMessageRepository
+import com.letta.mobile.testutil.FakeNotificationReplyStreamTracker
 import com.letta.mobile.testutil.FakeSettingsRepository
 import io.mockk.coEvery
-import io.mockk.every
 import io.mockk.mockk
-import io.mockk.verify
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -32,7 +31,7 @@ class ChannelHeartbeatSyncTest {
         assertTrue(result is ListenableWorker.Result.Success)
         assertEquals("2026-04-10T10:00:00Z", fixture.stateStore.getProcessedLastActivityAt("conv-1"))
         assertEquals("assistant-1", fixture.stateStore.getLastNotifiedMessageId("conv-1"))
-        verify(exactly = 0) { fixture.publisher.publish(any()) }
+        assertTrue(fixture.publisher.published.isEmpty())
     }
 
     @Test
@@ -57,7 +56,9 @@ class ChannelHeartbeatSyncTest {
 
         assertTrue(result is ListenableWorker.Result.Success)
         assertEquals("assistant-2", fixture.stateStore.getLastNotifiedMessageId("conv-1"))
-        verify(exactly = 1) { fixture.publisher.publish(match { it.messageId == "assistant-2" && it.messagePreview == "A proactive ping" }) }
+        assertEquals(1, fixture.publisher.published.size)
+        assertEquals("assistant-2", fixture.publisher.published.single().messageId)
+        assertEquals("A proactive ping", fixture.publisher.published.single().messagePreview)
     }
 
     @Test
@@ -82,7 +83,7 @@ class ChannelHeartbeatSyncTest {
 
         assertTrue(result is ListenableWorker.Result.Success)
         assertEquals("assistant-2", fixture.stateStore.getLastNotifiedMessageId("conv-1"))
-        verify(exactly = 0) { fixture.publisher.publish(any()) }
+        assertTrue(fixture.publisher.published.isEmpty())
     }
 
     @Test
@@ -108,16 +109,16 @@ class ChannelHeartbeatSyncTest {
         assertTrue(result is ListenableWorker.Result.Success)
         assertEquals("2026-04-10T10:06:00Z", fixture.stateStore.getProcessedLastActivityAt("conv-1"))
         assertEquals("assistant-1", fixture.stateStore.getLastNotifiedMessageId("conv-1"))
-        verify(exactly = 0) { fixture.publisher.publish(any()) }
+        assertTrue(fixture.publisher.published.isEmpty())
     }
 
     private fun createFixture(): Fixture {
         val conversationApi = mockk<ConversationApi>()
-        val messageRepository = mockk<MessageRepository>()
+        val messageRepository = FakeConversationInspectorMessageRepository()
         val agentRepository = FakeAgentRepository()
-        val stateStore = mockk<ChannelSyncStateStore>()
-        val publisher = mockk<ChannelNotificationPublisher>()
-        val replyHandler = mockk<NotificationReplyHandler>()
+        val stateStore = FakeChannelSyncStateStore()
+        val publisher = FakeChannelNotificationPublisher()
+        val replyHandler = FakeNotificationReplyStreamTracker()
         val settingsRepository = FakeSettingsRepository(
             initialActiveConfig = LettaConfig(
                 id = "test-config",
@@ -140,27 +141,10 @@ class ChannelHeartbeatSyncTest {
                 ConversationInspectorMessage(id = "assistant-1", messageType = "assistant_message", date = null, runId = null, stepId = null, otid = null, summary = "Earlier")
             )
         )
-        val processed = mutableMapOf<String, String>()
-        val notified = mutableMapOf<String, String>()
-
         coEvery {
             conversationApi.listConversations(limit = 100, order = "desc", orderBy = "last_message_at")
         } answers { conversations.toList() }
-        coEvery { messageRepository.fetchConversationInspectorMessages(any()) } answers {
-            messagesByConversation[firstArg<String>()].orEmpty()
-        }
-        every { stateStore.getProcessedLastActivityAt(any()) } answers { processed[firstArg()] }
-        every { stateStore.setProcessedLastActivityAt(any(), any()) } answers {
-            processed[firstArg()] = secondArg()
-            Unit
-        }
-        every { stateStore.getLastNotifiedMessageId(any()) } answers { notified[firstArg()] }
-        every { stateStore.setLastNotifiedMessageId(any(), any()) } answers {
-            notified[firstArg()] = secondArg()
-            Unit
-        }
-        every { replyHandler.activeReplyStreams } returns MutableStateFlow(emptySet())
-        every { publisher.publish(any()) } returns true
+        messageRepository.messagesByConversation += messagesByConversation
 
         val coordinator = NotificationDeliveryCoordinator(
             currentConversationTracker = CurrentConversationTracker(),
@@ -178,13 +162,13 @@ class ChannelHeartbeatSyncTest {
             notificationDeliveryCoordinator = coordinator,
         )
 
-        return Fixture(sync, stateStore, publisher, conversations, messagesByConversation)
+        return Fixture(sync, stateStore, publisher, conversations, messageRepository.messagesByConversation)
     }
 
     private data class Fixture(
         val sync: ChannelHeartbeatSync,
-        val stateStore: ChannelSyncStateStore,
-        val publisher: ChannelNotificationPublisher,
+        val stateStore: FakeChannelSyncStateStore,
+        val publisher: FakeChannelNotificationPublisher,
         val conversations: MutableList<Conversation>,
         val messagesByConversation: MutableMap<String, List<ConversationInspectorMessage>>,
     )

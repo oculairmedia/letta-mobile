@@ -1,10 +1,5 @@
 package com.letta.mobile.channel
 
-import io.mockk.every
-import io.mockk.mockk
-import io.mockk.slot
-import io.mockk.verify
-import com.letta.mobile.bot.channel.NotificationReplyHandler
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.channel.NotificationCandidatePhase
 import com.letta.mobile.data.channel.NotificationCandidateSource
@@ -12,8 +7,10 @@ import com.letta.mobile.data.channel.NotificationDeferralReason
 import com.letta.mobile.data.channel.NotificationDeliveryCandidate
 import com.letta.mobile.data.channel.NotificationDeliveryDecision
 import com.letta.mobile.data.channel.NotificationSuppressionReason
+import com.letta.mobile.testutil.FakeChannelNotificationPublisher
+import com.letta.mobile.testutil.FakeChannelSyncStateStore
+import com.letta.mobile.testutil.FakeNotificationReplyStreamTracker
 import com.letta.mobile.util.Telemetry
-import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -25,18 +22,17 @@ class NotificationDeliveryCoordinatorTest {
     @Test
     fun `publishes final candidate and records shared dedupe state`() {
         val fixture = createFixture()
-        val captured = slot<ChannelNotification>()
 
         val decision = fixture.coordinator.submit(candidate())
 
         assertEquals(NotificationDeliveryDecision.Published("message-1"), decision)
         assertEquals("message-1", fixture.notified["conversation-1"])
-        verify(exactly = 1) { fixture.publisher.publish(capture(captured)) }
-        assertEquals("agent-1", captured.captured.agentId)
-        assertEquals("Ada", captured.captured.agentName)
-        assertEquals("conversation-1", captured.captured.conversationId)
-        assertEquals("message-1", captured.captured.messageId)
-        assertEquals("Hello from the background", captured.captured.messagePreview)
+        val published = fixture.publisher.published.single()
+        assertEquals("agent-1", published.agentId)
+        assertEquals("Ada", published.agentName)
+        assertEquals("conversation-1", published.conversationId)
+        assertEquals("message-1", published.messageId)
+        assertEquals("Hello from the background", published.messagePreview)
     }
 
     @Test
@@ -49,7 +45,7 @@ class NotificationDeliveryCoordinatorTest {
             NotificationDeliveryDecision.Suppressed(NotificationSuppressionReason.DuplicateNotification),
             decision,
         )
-        verify(exactly = 0) { fixture.publisher.publish(any()) }
+        assertTrue(fixture.publisher.published.isEmpty())
     }
 
     @Test
@@ -62,7 +58,7 @@ class NotificationDeliveryCoordinatorTest {
             NotificationDeliveryDecision.Suppressed(NotificationSuppressionReason.ForegroundConversation),
             decision,
         )
-        verify(exactly = 0) { fixture.publisher.publish(any()) }
+        assertTrue(fixture.publisher.published.isEmpty())
     }
 
     @Test
@@ -77,7 +73,7 @@ class NotificationDeliveryCoordinatorTest {
             NotificationDeliveryDecision.Suppressed(NotificationSuppressionReason.ActiveNotificationReplyStream),
             decision,
         )
-        verify(exactly = 0) { fixture.publisher.publish(any()) }
+        assertTrue(fixture.publisher.published.isEmpty())
     }
 
     @Test
@@ -89,7 +85,7 @@ class NotificationDeliveryCoordinatorTest {
         )
 
         assertEquals(NotificationDeliveryDecision.Published("message-1"), decision)
-        verify(exactly = 1) { fixture.publisher.publish(match { it.messageId == "message-1" }) }
+        assertEquals("message-1", fixture.publisher.published.single().messageId)
     }
 
     @Test
@@ -110,7 +106,7 @@ class NotificationDeliveryCoordinatorTest {
             decision,
         )
         assertTrue(fixture.notified.isEmpty())
-        verify(exactly = 0) { fixture.publisher.publish(any()) }
+        assertTrue(fixture.publisher.published.isEmpty())
     }
 
     @Test
@@ -131,7 +127,7 @@ class NotificationDeliveryCoordinatorTest {
             NotificationDeliveryDecision.Deferred(NotificationDeferralReason.AwaitingFinalPreview),
             decision,
         )
-        verify(exactly = 0) { fixture.publisher.publish(any()) }
+        assertTrue(fixture.publisher.published.isEmpty())
         assertTrue(
             Telemetry.snapshot().any {
                 it.tag == "NotificationDelivery" &&
@@ -144,13 +140,11 @@ class NotificationDeliveryCoordinatorTest {
     @Test
     fun `final low-signal preview is published for fallback rendering`() {
         val fixture = createFixture()
-        val captured = slot<ChannelNotification>()
 
         val decision = fixture.coordinator.submit(candidate(previewText = "I"))
 
         assertEquals(NotificationDeliveryDecision.Published("message-1"), decision)
-        verify(exactly = 1) { fixture.publisher.publish(capture(captured)) }
-        assertEquals("I", captured.captured.messagePreview)
+        assertEquals("I", fixture.publisher.published.single().messagePreview)
     }
 
     @Test
@@ -176,7 +170,7 @@ class NotificationDeliveryCoordinatorTest {
 
         assertEquals(NotificationDeliveryDecision.Deferred(NotificationDeferralReason.AwaitingFinalPreview), partial)
         assertEquals(NotificationDeliveryDecision.Published("message-1"), final)
-        verify(exactly = 1) { fixture.publisher.publish(match { it.messagePreview == "Hello from the background" }) }
+        assertEquals("Hello from the background", fixture.publisher.published.single().messagePreview)
     }
 
     @Test
@@ -189,7 +183,7 @@ class NotificationDeliveryCoordinatorTest {
 
         assertEquals(NotificationDeliveryDecision.Published("run-1"), decision)
         assertEquals("run-1", fixture.notified["conversation-1"])
-        verify(exactly = 1) { fixture.publisher.publish(match { it.messageId == "run-1" }) }
+        assertEquals("run-1", fixture.publisher.published.single().messageId)
     }
 
     @Test
@@ -220,17 +214,9 @@ class NotificationDeliveryCoordinatorTest {
         publisherAccepted: Boolean = true,
     ): Fixture {
         val tracker = CurrentConversationTracker().apply { setCurrent(currentConversationId) }
-        val replyHandler = mockk<NotificationReplyHandler>()
-        val stateStore = mockk<ChannelSyncStateStore>()
-        val publisher = mockk<ChannelNotificationPublisher>()
-
-        every { replyHandler.activeReplyStreams } returns MutableStateFlow(activeReplyStreams)
-        every { stateStore.getLastNotifiedMessageId(any()) } answers { notified[firstArg()] }
-        every { stateStore.setLastNotifiedMessageId(any(), any()) } answers {
-            notified[firstArg()] = secondArg()
-            Unit
-        }
-        every { publisher.publish(any()) } returns publisherAccepted
+        val replyHandler = FakeNotificationReplyStreamTracker(activeReplyStreams)
+        val stateStore = FakeChannelSyncStateStore(initialNotified = notified)
+        val publisher = FakeChannelNotificationPublisher(accepted = publisherAccepted)
 
         return Fixture(
             coordinator = NotificationDeliveryCoordinator(
@@ -240,7 +226,7 @@ class NotificationDeliveryCoordinatorTest {
                 publisher = publisher,
             ),
             publisher = publisher,
-            notified = notified,
+            notified = stateStore.notified,
         )
     }
 
@@ -266,7 +252,7 @@ class NotificationDeliveryCoordinatorTest {
 
     private data class Fixture(
         val coordinator: NotificationDeliveryCoordinator,
-        val publisher: ChannelNotificationPublisher,
+        val publisher: FakeChannelNotificationPublisher,
         val notified: MutableMap<String, String>,
     )
 }

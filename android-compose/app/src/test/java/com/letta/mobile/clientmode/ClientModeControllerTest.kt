@@ -2,16 +2,14 @@ package com.letta.mobile.clientmode
 
 import androidx.lifecycle.LifecycleOwner
 import com.letta.mobile.bot.clientmode.ClientModeController
-import com.letta.mobile.bot.core.BotGateway
 import com.letta.mobile.bot.core.GatewayStatus
+import com.letta.mobile.testutil.FakeBotGateway
 import com.letta.mobile.testutil.FakeSettingsRepository
-import io.mockk.coVerify
-import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
@@ -30,10 +28,7 @@ class ClientModeControllerTest {
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `onStop does not stop the bot gateway`() = runTest {
-        val gateway = mockk<BotGateway>(relaxed = true) {
-            every { status } returns MutableStateFlow(GatewayStatus.RUNNING)
-            every { sessions } returns MutableStateFlow(emptyMap())
-        }
+        val gateway = FakeBotGateway(status = GatewayStatus.RUNNING)
         val settings = FakeSettingsRepository(
             initialClientModeEnabled = true,
             initialClientModeBaseUrl = "https://lettabot.example/",
@@ -48,7 +43,7 @@ class ClientModeControllerTest {
         // The whole point of letta-mobile-etc1: backgrounding must NOT
         // tear down the WS session, otherwise an in-flight Client Mode
         // run is cancelled the moment the screen turns off.
-        coVerify(exactly = 0) { gateway.stop() }
+        assertEquals(0, gateway.stopCount)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -56,11 +51,7 @@ class ClientModeControllerTest {
     fun `reconcile keeps gateway running when app is backgrounded but settings still enabled`() = runTest {
         // Gateway reports it is already running so reconcile should not
         // restart or stop it just because we are not in the foreground.
-        val gateway = mockk<BotGateway>(relaxed = true) {
-            every { status } returns MutableStateFlow(GatewayStatus.RUNNING)
-            every { sessions } returns MutableStateFlow(emptyMap())
-            every { getSession(any()) } returns mockk(relaxed = true)
-        }
+        val gateway = FakeBotGateway(status = GatewayStatus.RUNNING)
         val settings = FakeSettingsRepository(
             initialClientModeEnabled = true,
             initialClientModeBaseUrl = "https://lettabot.example/",
@@ -74,6 +65,6 @@ class ClientModeControllerTest {
         controller.onStop(owner)
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { gateway.stop() }
+        assertEquals(0, gateway.stopCount)
     }
 }
