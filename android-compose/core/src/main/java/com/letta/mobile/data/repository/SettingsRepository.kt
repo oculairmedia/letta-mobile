@@ -28,6 +28,8 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import androidx.datastore.preferences.core.floatPreferencesKey
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
@@ -157,7 +159,13 @@ class SettingsRepository @Inject constructor(
 
     override fun getActiveConfig(): Flow<LettaConfig?> = activeConfig
 
-    suspend fun saveConfig(config: LettaConfig) {
+    // EncryptedSharedPreferences runs AES-GCM on the calling thread when it
+    // serializes each value, so dispatch the config writes to IO. Otherwise
+    // tapping Save runs the encrypt + JSON encode synchronously on Main from
+    // viewModelScope.launch (default = Dispatchers.Main.immediate), which
+    // blocks the press handler long enough that the ripple state hangs and
+    // follow-up taps look like they're being ignored.
+    suspend fun saveConfig(config: LettaConfig) = withContext(Dispatchers.IO) {
         _configs.update { current ->
             val index = current.indexOfFirst { it.id == config.id }
             if (index >= 0) {
@@ -171,13 +179,13 @@ class SettingsRepository @Inject constructor(
         encryptedPrefs.edit().putString(Keys.ACTIVE_CONFIG_ID.name, config.id).apply()
     }
 
-    suspend fun setActiveConfigId(id: String) {
-        val config = _configs.value.find { it.id == id } ?: return
+    suspend fun setActiveConfigId(id: String) = withContext(Dispatchers.IO) {
+        val config = _configs.value.find { it.id == id } ?: return@withContext
         _activeConfig.update { config }
         encryptedPrefs.edit().putString(Keys.ACTIVE_CONFIG_ID.name, id).apply()
     }
 
-    suspend fun deleteConfig(id: String) {
+    suspend fun deleteConfig(id: String) = withContext(Dispatchers.IO) {
         _configs.update { current -> current.filter { it.id != id } }
         persistConfigs(_configs.value)
         if (_activeConfig.value?.id == id) {
@@ -277,7 +285,7 @@ class SettingsRepository @Inject constructor(
         )
     }
 
-    suspend fun clearAllData() {
+    suspend fun clearAllData() = withContext(Dispatchers.IO) {
         encryptedPrefs.edit().clear().apply()
         dataStore.edit { it.clear() }
         _configs.update { emptyList() }
