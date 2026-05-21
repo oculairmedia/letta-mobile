@@ -122,10 +122,15 @@ class DashboardViewModel @Inject constructor(
 
     private fun observeFavoriteAndPinned() {
         viewModelScope.launch {
+            // Include agentRepository.agents so the pinned/favorite name
+            // resolution re-fires when the agent cache is repopulated
+            // after a backend switch — otherwise tiles keep pointing at
+            // agents that don't exist on the new server (letta-mobile-9sx).
             combine(
                 settingsRepository.favoriteAgentId,
                 settingsRepository.getPinnedAgentIds(),
-            ) { favId, pinnedIds -> favId to pinnedIds }
+                agentRepository.agents,
+            ) { favId, pinnedIds, _ -> favId to pinnedIds }
                 .collect { (favId, pinnedIds) ->
                     val favName = favId?.let { agentRepository.getCachedAgent(it)?.name }
                     val pinned = pinnedIds.mapNotNull { id ->
