@@ -228,3 +228,23 @@ internal fun PreviewMessageSenderContent() {
 @PreviewLightDark
 @Composable
 private fun MessageSenderPreview() = PreviewMessageSenderContent()
+
+@PreviewLightDark
+@Composable
+internal fun PreviewTelemetryGridContent() {
+    LettaTheme(dynamicColor = false) {
+        Surface {
+            TelemetryGrid(
+                promptTokens = 12_348,
+                completionTokens = 684,
+                durationMs = 3_420,
+                costUsd = 0.0045,
+                modifier = Modifier.padding(16.dp),
+            )
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun TelemetryGridPreview() = PreviewTelemetryGridContent()

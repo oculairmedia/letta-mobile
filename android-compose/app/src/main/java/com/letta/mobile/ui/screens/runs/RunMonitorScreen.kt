@@ -81,6 +81,7 @@ import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.components.StatusChip
 import com.letta.mobile.ui.components.TagDrillInDialog
+import com.letta.mobile.ui.components.TelemetryGrid
 import com.letta.mobile.ui.theme.dialogSectionHeading
 import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.ui.theme.listItemMetadata
@@ -965,24 +966,22 @@ private fun StepDetailDialog(
             }
 
             // Section 2 — Token Telemetry
-            val hasTelemetry = step.promptTokens != null ||
+            val hasTelemetryGrid = step.promptTokens != null ||
                 step.completionTokens != null ||
-                step.totalTokens != null ||
+                metrics?.stepNs != null
+            if (hasTelemetryGrid) {
+                TelemetryGrid(
+                    promptTokens = step.promptTokens ?: 0,
+                    completionTokens = step.completionTokens ?: 0,
+                    durationMs = metrics?.stepNs?.toWholeMilliseconds() ?: 0L,
+                    costUsd = null,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            val hasSupplementalTelemetry = step.totalTokens != null ||
                 step.completionTokensDetails.isNotEmpty()
-            if (hasTelemetry) {
+            if (hasSupplementalTelemetry) {
                 CardGroup(title = { Text(stringResource(R.string.screen_runs_step_section_telemetry_title)) }) {
-                    step.promptTokens?.let { value ->
-                        item(
-                            headlineContent = { Text(stringResource(R.string.screen_runs_step_prompt_tokens_title)) },
-                            supportingContent = { Text(value.toString(), style = MaterialTheme.typography.listItemSupporting) },
-                        )
-                    }
-                    step.completionTokens?.let { value ->
-                        item(
-                            headlineContent = { Text(stringResource(R.string.screen_runs_step_completion_tokens_title)) },
-                            supportingContent = { Text(value.toString(), style = MaterialTheme.typography.listItemSupporting) },
-                        )
-                    }
                     step.totalTokens?.let { value ->
                         item(
                             headlineContent = { Text(stringResource(R.string.screen_runs_step_total_tokens_title)) },
@@ -1311,6 +1310,8 @@ private fun StepTagRow(
 private fun Map<String, JsonElement>.toSortedDisplayString(): String {
     return entries.sortedBy { it.key }.joinToString(", ") { (key, value) -> "$key=${value.toDisplayString()}" }
 }
+
+private fun Long.toWholeMilliseconds(): Long = this / 1_000_000L
 
 private fun JsonElement.toDisplayString(): String = toString().trim('"')
 
