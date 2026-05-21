@@ -1,0 +1,36 @@
+Meet Overmorrow, a beautiful material design weather app, that makes checking the weather a breeze.
+
+<b>🎉 Features: </b>
+
+-  <b>📡 Full screen precipitation radar: </b>
+  <i>Track storms in real-time, with 20 minutes of future forecast</i>
+-  <b>🗓️ 14 day forecast: </b>
+  <i>Plan your days ahead easily with 14 days of forecast</i>
+-  <b>🖼️ Beautiful weather images: </b>
+  <i>The weather images seamlessly adapt to your current weather condition</i>
+-  <b>📱Home screen weather widgets: </b>
+  <i>Beautiful Material-You home screen widgets</i>
+-  <b>🕒 72 hour forecast: </b>
+  <i>Track the temperature, precipitation chance, wind-speed, uv and more for the next 72 hours</i>
+-  <b>🍃 Dedicated Air quality page: </b>
+  <i>Track pollen, air pollutants, dust, and more, with 5 days of aqi forecast</i>
+-  <b>☔ 15 minute rain trend: </b>
+  <i>See the overview of the precipitation in the next 6 hours in 15 minute intervals</i>
+-  <b>🗃️ 3 different weather providers: </b>
+  <i>Choose the weather source that you find best</i>
+-  <b>🛜 Offline mode: </b>
+  <i>See previously loaded data, when offline</i>
+-  <b>📢 Weather alerts: </b>
+  <i>Get notified about upcoming storms, floods, and severe weather alerts</i>
+-  <b>⏳ Current conditions: </b>
+  <i>Check the current temperature, feels like, wind speed, humidity and more</i>
+-  <b>🌅 Sunrise/sunset times: </b>
+  <i>Know the time when the sun will rise and set</i>
+-  <b>⭐ Favorite places: </b>
+  <i>Save your favorite cities, to always have them just a tap away</i>
+-  <b>🔳 Tablet mode: </b>
+  <i>The app automatically adapts to your device's form factor to always utilize all the screen space</i>
+-  <b>✏️ Customization: </b>
+  <i>Customize app colors, image source, and layout to your liking</i>
+-  <b>🎨 Material You design: </b>
+  <i>Designed from the ground up with Google's material 3 principles</i>

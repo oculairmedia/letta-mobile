@@ -1,0 +1,252 @@
+{
+    "@@locale": "zh",
+    "feelsLike": "体感",
+    "precipCapital": "降水",
+    "humidity": "湿度",
+    "windCapital": "风",
+    "uvCapital": "紫外线",
+    "settings": "设置",
+    "donate": "捐赠",
+    "about": "关于",
+    "today": "今天",
+    "tomorrow": "明天",
+    "overmorrow": "后天",
+    "language": "语言",
+    "temperature": "温度",
+    "rain": "雨",
+    "favorites": "收藏夹",
+    "clearNight": "晴",
+    "partlyCloudy": "局部多云",
+    "clearSky": "晴",
+    "overcast": "阴天",
+    "haze": "雾霾",
+    "sleet": "雨夹雪",
+    "drizzle": "毛毛雨",
+    "thunderstorm": "雷暴",
+    "heavySnow": "大雪",
+    "fog": "雾",
+    "snow": "雪",
+    "heavyRain": "大雨",
+    "cloudyNight": "多云",
+    "weakOrNoWifiConnection": "无线网络信号弱或无连接",
+    "notConnectedToTheInternet": "未连接到互联网",
+    "placeNotFound": "未找到地点",
+    "unableToLocateDevice": "无法定位设备",
+    "locationServicesAreDisabled": "位置服务已禁用。",
+    "locationPermissionIsDenied": "位置权限已拒绝",
+    "locationPermissionDeniedForever": "位置权限已永久拒绝",
+    "failedToAccessGps": "无法访问 GPS",
+    "search": "搜索...",
+    "sunriseSunset": "日出/日落",
+    "airQuality": "空气质量",
+    "good": "好",
+    "fair": "公平",
+    "moderate": "适中",
+    "poor": "较差",
+    "veryPoor": "非常差",
+    "unhealthy": "不健康",
+    "radar": "雷达",
+    "colorMode": "彩色模式",
+    "weatherProvider": "天气服务提供商",
+    "timeMode": "时间格式",
+    "mon": "一",
+    "tue": "二",
+    "wed": "三",
+    "thu": "四",
+    "fri": "五",
+    "sat": "六",
+    "sun": "日",
+    "fontSize": "字体大小",
+    "daily": "每日",
+    "searchProvider": "搜索提供商",
+    "updatedXMinAgo": "更新于 x 分钟前",
+    "updatedJustNow": "刚刚更新",
+    "colorSource": "颜色来源",
+    "imageSource": "图片来源",
+    "temp": "温度",
+    "precipLowercase": "降水",
+    "windLowercase": "风",
+    "uvLowercase": "紫外线",
+    "goodAqiDesc": "空气质量极佳；无健康风险。",
+    "fairAqiDesc": "可接受的空气质量；对敏感人群有轻微风险。",
+    "moderateAqiDesc": "易感人群可能出现轻微不适。",
+    "poorAqiDesc": "可能对所有人造成健康影响，对敏感人群影响严重。",
+    "veryPoorAqiDesc": "对所有人都有严重的健康影响。",
+    "unhealthyAqiDesc": "紧急状况；可能对所有人产生严重健康影响。",
+    "photoByXOnUnsplash": "照片, ,x, 拍摄，发布于 ,Unsplash",
+    "developedBy": "开发者：",
+    "sourceCode": "源代码",
+    "reportAnIssue": "报告问题",
+    "weatherData": "天气数据：",
+    "allImagesUsedAreFrom": "所有使用的图片来自：",
+    "supportOnPatreon": "在 Patreon 上支持",
+    "appearance": "外观",
+    "general": "常规",
+    "units": "单位",
+    "appearanceSettingDesc": "颜色主题, 图片来源",
+    "generalSettingDesc": "时间格式, 字体大小",
+    "languageSettingDesc": "使用的语言",
+    "unitsSettingdesc": "应用中使用的单位",
+    "now": "现在",
+    "hr": "小时",
+    "layout": "布局",
+    "layoutSettingDesc": "小部件顺序，自定义",
+    "thirtyMinutes": "30分",
+    "mainPollutant": "主要污染物",
+    "alderPollen": "桤木花粉",
+    "birchPollen": "桦木花粉",
+    "grassPollen": "草花粉",
+    "mugwortPollen": "艾蒿花粉",
+    "olivePollen": "橄榄花粉",
+    "ragweedPollen": "豚草花粉",
+    "dailyAqi": "每日空气质量指数",
+    "dateFormat": "日期格式",
+    "d": "天",
+    "aerosolOpticalDepth": "大气浑浊度指数",
+    "dust": "灰尘",
+    "europeanAqi": "欧盟aqi",
+    "unitedStatesAqi": "美国aqi",
+    "offline": "离线",
+    "rainInOneHour": "一小时后有雨",
+    "@rainInOneHour": {
+        "description": "rain in the next hour"
+    },
+    "updatedXHoursAgo": "{hours, plural, =1 {1 hour} other {{hours} hours}} 小时前更新",
+    "@updatedXHoursAgo": {
+        "description": "updated x hours ago",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "updatedXDaysAgo": "{days, plural, =1 {#天前更新} other {#天前更新}}",
+    "@updatedXDaysAgo": {
+        "description": "updated x days ago",
+        "placeholders": {
+            "days": {
+                "type": "int"
+            }
+        }
+    },
+    "rainInHalfHour": "半小时后有雨",
+    "@rainInHalfHour": {
+        "description": "rain in the next half an hour"
+    },
+    "airQualityLowercase": "空气质量",
+    "precipitaion": "降水",
+    "helpTranslate": "帮助翻译",
+    "poweredByOpenMeteo": "open-meteo 提供气象支持",
+    "@poweredByOpenMeteo": {
+        "description": "text displayed at the end of the air quality page, crediting open-meteo for the data"
+    },
+    "tomorrowLowercase": "明天",
+    "grantLocationPermission": "授权定位权限",
+    "currentLocation": "目前位置",
+    "favoritesLowercase": "收藏",
+    "weatherProvderLowercase": "天气数据源",
+    "dailyLowercase": "每日预报",
+    "sumLowercase": "总结",
+    "@sumLowercase": {
+        "description": "short for summary, overview, gist or something similar, used in the context of hourly list"
+    },
+    "sourceCodeLowercase": "源码",
+    "emailLowercase": "邮箱",
+    "reportAnIssueLowercase": "问题反馈",
+    "donateLowercase": "捐款",
+    "versionUppercase": "版本",
+    "apiAndServices": "接口及服务",
+    "licenseUppercase": "许可",
+    "weatherDataLowercase": "天气数据",
+    "imagesLowercase": "图片",
+    "aboutSettingsDesc": "关于此 app",
+    "extremelyClear": "极其清晰",
+    "veryClear": "非常清晰",
+    "clear": "清晰",
+    "slightlyHazy": "略微模糊",
+    "hazy": "模糊",
+    "veryHazy": "非常模糊",
+    "extremelyHazy": "极其模糊",
+    "rainExpectedInOneHour": "预计一小时后有雨",
+    "@rainExpectedInOneHour": {
+        "description": "rain expected in the next hour"
+    },
+    "radarHaptics": "雷达触感反馈",
+    "@radarHaptics": {
+        "description": "setting for enabling or disabling haptic feedback for the radar"
+    },
+    "alertsCapital": "警报",
+    "alertsLowercase": "警报",
+    "severity": "严重",
+    "certainty": "确定",
+    "urgency": "紧急",
+    "areas": "地区",
+    "light": "轻度",
+    "@light": {
+        "description": "light precipitation"
+    },
+    "heavy": "重度",
+    "@heavy": {
+        "description": "heavy precipitation"
+    },
+    "showMore": "显示更多",
+    "showLess": "隐藏更多",
+    "overmorrowLowercase": "后天",
+    "rainInMinutes": "{minutes, plural, =1 {#分钟后有雨} other {#分钟后有雨}}",
+    "@rainInMinutes": {
+        "description": "rain in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "rainInHours": "{hours, plural, =1 {#小时后有雨} other {#小时后有雨}}",
+    "@rainInHours": {
+        "description": "rain in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInMinutes": "预计{minutes, plural, =1 {#分钟后有雨} other {#分钟后有雨}}",
+    "@rainExpectedInMinutes": {
+        "description": "rain expected in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInHours": "预计{hours, plural, =1 {#小时后有雨} other {#小时后有雨}}",
+    "@rainExpectedInHours": {
+        "description": "rain expected in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "updatedXMinutesAgo": "{minutes}分钟前更新",
+    "cold": "冷",
+    "hot": "热",
+    "calm": "平静",
+    "severe": "剧烈",
+    "low": "低",
+    "high": "高",
+    "tempLowercase": "气",
+    "pressureLowercase": "气压",
+    "liveRadar": "实时雷达图",
+    "backgroundUpdates": "后台更新",
+    "backgroundUpdatesSettingsDesc": "小部件更新、通知",
+    "ongoingNotification": "持续通知",
+    "north": "北",
+    "northEast": "东北",
+    "east": "东",
+    "southEast": "东南",
+    "south": "南",
+    "southWest": "西南",
+    "west": "西",
+    "northWest": "西北"
+}

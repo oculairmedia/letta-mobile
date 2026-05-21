@@ -1,0 +1,232 @@
+{
+    "@@locale": "ru",
+    "feelsLike": "Ощущается как",
+    "precipCapital": "Осадки.",
+    "humidity": "Влажность",
+    "windCapital": "Ветер",
+    "uvCapital": "УФ",
+    "settings": "Настройки",
+    "donate": "Пожертвовать",
+    "about": "О программе",
+    "today": "Сегодня",
+    "tomorrow": "Завтра",
+    "overmorrow": "Послезавтра",
+    "language": "Язык",
+    "temperature": "Температура",
+    "rain": "Дождь",
+    "favorites": "Избранное",
+    "clearNight": "Чистая ночь",
+    "partlyCloudy": "Частичная облачность",
+    "clearSky": "Чистое небо",
+    "overcast": "Пасмурно",
+    "haze": "Дымка",
+    "sleet": "Мокрый снег",
+    "drizzle": "Морось",
+    "thunderstorm": "Гроза",
+    "heavySnow": "Сильный снег",
+    "fog": "Туман",
+    "snow": "Снег",
+    "heavyRain": "Сильный дождь",
+    "cloudyNight": "Облачная ночь",
+    "weakOrNoWifiConnection": "Слабое или отсутствующее подключение Wi-Fi",
+    "notConnectedToTheInternet": "Нет подключения к Интернету",
+    "placeNotFound": "Место не найдено",
+    "unableToLocateDevice": "Не удается найти устройство",
+    "locationServicesAreDisabled": "Сервисы определения местоположения отключены.",
+    "locationPermissionIsDenied": "Отказано в разрешении на местоположение",
+    "locationPermissionDeniedForever": "Разрешение на местоположение отклонено навсегда",
+    "failedToAccessGps": "Не удалось получить доступ к GPS",
+    "search": "Поиск...",
+    "sunriseSunset": "восход/заход солнца",
+    "airQuality": "Качество воздуха",
+    "good": "хороший",
+    "fair": "удовлетворительный",
+    "moderate": "умеренный",
+    "poor": "плохой",
+    "veryPoor": "очень плохой",
+    "unhealthy": "вредный для здоровья",
+    "radar": "радар",
+    "colorMode": "Режим цвета",
+    "weatherProvider": "Поставщик погоды",
+    "timeMode": "Формат времени",
+    "mon": "Пн",
+    "tue": "Вт",
+    "wed": "Ср",
+    "thu": "Чт",
+    "fri": "Пт",
+    "sat": "Сб",
+    "sun": "Вс",
+    "fontSize": "Размер шрифта",
+    "daily": "Наступні дні",
+    "searchProvider": "Поставщик поиска",
+    "updatedXMinAgo": "обновлено, x мин назад",
+    "updatedJustNow": "обновлено только что",
+    "colorSource": "Источник цвета",
+    "imageSource": "Источник изображения",
+    "temp": "темп",
+    "precipLowercase": "осадки",
+    "windLowercase": "ветер",
+    "uvLowercase": "уф",
+    "goodAqiDesc": "Качество воздуха отличное; угрозы для здоровья нет.",
+    "fairAqiDesc": "Приемлемое качество воздуха; незначительный риск для чувствительных людей.",
+    "moderateAqiDesc": "Чувствительные люди могут испытывать дискомфорт.",
+    "poorAqiDesc": "Возможны последствия для здоровья у всех, серьезные для чувствительных групп.",
+    "veryPoorAqiDesc": "Серьезные последствия для здоровья у всех.",
+    "unhealthyAqiDesc": "Чрезвычайные условия; серьезные последствия для здоровья у всех.",
+    "photoByXOnUnsplash": "Фото, ,x, на ,Unsplash",
+    "developedBy": "Разработано:",
+    "sourceCode": "Исходный код",
+    "reportAnIssue": "Сообщить о проблеме",
+    "weatherData": "Метеоданные:",
+    "allImagesUsedAreFrom": "Все использованные изображения из:",
+    "supportOnPatreon": "Поддержка на Patreon",
+    "appearance": "Внешний вид",
+    "general": "Общие",
+    "units": "Единицы измерения",
+    "appearanceSettingDesc": "цветовая тема, источник изображения",
+    "generalSettingDesc": "режим времени, размер шрифта",
+    "languageSettingDesc": "используемый язык",
+    "unitsSettingdesc": "единицы, используемые в приложении",
+    "now": "сейчас",
+    "hr": "ч",
+    "layout": "Макет",
+    "layoutSettingDesc": "порядок виджетов, настройка",
+    "thirtyMinutes": "30м",
+    "mainPollutant": "основной загрязнитель",
+    "alderPollen": "пыльца ольхи",
+    "birchPollen": "пыльца берёзы",
+    "grassPollen": "пыльца трав",
+    "mugwortPollen": "пыльца полыни",
+    "olivePollen": "пыльца оливы",
+    "ragweedPollen": "пыльца амброзии",
+    "dailyAqi": "ежедневный AQI",
+    "dateFormat": "Формат даты",
+    "d": "д",
+    "aerosolOpticalDepth": "оптическая глубина аэрозолей",
+    "dust": "пыль",
+    "europeanAqi": "Евро aqi",
+    "unitedStatesAqi": "aqi США",
+    "offline": "офлайн",
+    "showMore": "Показать",
+    "showLess": "Скрыть",
+    "helpTranslate": "Помочь с переводом",
+    "rainInHalfHour": "дождь в течение получаса",
+    "@rainInHalfHour": {
+        "description": "rain in the next half an hour"
+    },
+    "rainInOneHour": "дождь в течение часа",
+    "@rainInOneHour": {
+        "description": "rain in the next hour"
+    },
+    "rainExpectedInOneHour": "ожидается дождь в течение часа",
+    "@rainExpectedInOneHour": {
+        "description": "rain expected in the next hour"
+    },
+    "rainInHours": "дождь в течение {hours, plural, =1 {часа} other {{hours} часов}}",
+    "@rainInHours": {
+        "description": "rain in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "precipitaion": "Осадки",
+    "tomorrowLowercase": "завтра",
+    "rainExpectedInMinutes": "ожидается дождь в течение {minutes, plural, =1 {минуты} other {{minutes} минут}}",
+    "@rainExpectedInMinutes": {
+        "description": "rain expected in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "updatedXMinutesAgo": "обновлено {minutes} мин. назад",
+    "sumLowercase": "осн",
+    "@sumLowercase": {
+        "description": "short for summary, overview, gist or something similar, used in the context of hourly list"
+    },
+    "airQualityLowercase": "качество воздуха",
+    "favoritesLowercase": "избранное",
+    "currentLocation": "текущее местоположение",
+    "reportAnIssueLowercase": "сообщить об ошибке",
+    "licenseUppercase": "Лицензия",
+    "imagesLowercase": "изображения",
+    "aboutSettingsDesc": "о приложении",
+    "versionUppercase": "Версия",
+    "apiAndServices": "API и сервисы",
+    "sourceCodeLowercase": "исходный код",
+    "emailLowercase": "почта",
+    "donateLowercase": "пожертвования",
+    "updatedXHoursAgo": "обновлено , {hours, plural, =1 {1 час} other {{hours} часов}} назад",
+    "@updatedXHoursAgo": {
+        "description": "updated x hours ago",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "updatedXDaysAgo": "обновлено {days, plural, =1 {1 день} other {{days} дней}} назад",
+    "@updatedXDaysAgo": {
+        "description": "updated x days ago",
+        "placeholders": {
+            "days": {
+                "type": "int"
+            }
+        }
+    },
+    "dailyLowercase": "по дням",
+    "grantLocationPermission": "Предоставить доступ к местоположению",
+    "weatherDataLowercase": "данные о погоде",
+    "rainInMinutes": "дождь в течение {minutes, plural, =1 {минуты} other {{minutes} минут}}",
+    "@rainInMinutes": {
+        "description": "rain in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInHours": "ожидается дождь в течение {hours, plural, =1 {часа} other {{hours} часов}}",
+    "@rainExpectedInHours": {
+        "description": "rain expected in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "alertsLowercase": "оповещения",
+    "alertsCapital": "Оповещения",
+    "overmorrowLowercase": "Послезавтра",
+    "weatherProvderLowercase": "Поставщик погоды",
+    "extremelyClear": "чрезвычайно ясно",
+    "veryClear": "очень ясно",
+    "clear": "ясно",
+    "slightlyHazy": "легкая туманность",
+    "hazy": "туманность",
+    "veryHazy": "сильная туманность",
+    "extremelyHazy": "чрезвычайно туманно",
+    "poweredByOpenMeteo": "на базе open-meteo",
+    "@poweredByOpenMeteo": {
+        "description": "text displayed at the end of the air quality page, crediting open-meteo for the data"
+    },
+    "radarHaptics": "тактильная отдача на радаре",
+    "@radarHaptics": {
+        "description": "setting for enabling or disabling haptic feedback for the radar"
+    },
+    "severity": "серьезность",
+    "certainty": "достоверность",
+    "urgency": "срочность",
+    "areas": "области",
+    "light": "небольшие",
+    "@light": {
+        "description": "light precipitation"
+    },
+    "heavy": "сильные",
+    "@heavy": {
+        "description": "heavy precipitation"
+    }
+}

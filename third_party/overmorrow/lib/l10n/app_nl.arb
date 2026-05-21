@@ -1,0 +1,232 @@
+{
+    "today": "Vandaag",
+    "heavyRain": "Zware regenval",
+    "birchPollen": "Berkenpollen",
+    "sumLowercase": "Overzicht",
+    "@sumLowercase": {
+        "description": "short for summary, overview, gist or something similar, used in the context of hourly list"
+    },
+    "veryPoorAqiDesc": "Ernstige gezondheidseffecten voor iedereen.",
+    "settings": "Instellingen",
+    "feelsLike": "Gevoels­temperatuur",
+    "overmorrowLowercase": "Overmorgen",
+    "thunderstorm": "Onweer",
+    "precipCapital": "Neerslag",
+    "humidity": "Lucht­vochtigheid",
+    "windCapital": "Wind",
+    "uvCapital": "UV",
+    "tomorrowLowercase": "Morgen",
+    "language": "Taal",
+    "rain": "Regen",
+    "clearNight": "Heldere nacht",
+    "partlyCloudy": "Deels bewolkt",
+    "clearSky": "Heldere hemel",
+    "haze": "Nevel",
+    "sleet": "Sneeuwregen",
+    "drizzle": "Motregen",
+    "heavySnow": "Zware sneeuwval",
+    "fog": "Mist",
+    "snow": "Sneeuw",
+    "cloudyNight": "Bewolkte nacht",
+    "notConnectedToTheInternet": "Niet verbonden met het Internet",
+    "locationPermissionIsDenied": "Locatie­rechten zijn geweigerd",
+    "locationPermissionDeniedForever": "Locatie­rechten zijn permanent geweigerd",
+    "grantLocationPermission": "Locatie­rechten verlenen",
+    "currentLocation": "Huidige locatie",
+    "favoritesLowercase": "Favorieten",
+    "failedToAccessGps": "Geen toegang tot GPS",
+    "search": "Zoeken…",
+    "poor": "Slecht",
+    "veryPoor": "Zeer slecht",
+    "unhealthy": "Ongezond",
+    "colorMode": "Kleur­modus",
+    "timeMode": "Tijd­modus",
+    "tue": "Di",
+    "weatherProvderLowercase": "Weer­aanbieder",
+    "fri": "Vr",
+    "sat": "Za",
+    "sun": "Zo",
+    "searchProvider": "Zoek­aanbieder",
+    "updatedJustNow": "Zojuist bijgewerkt",
+    "colorSource": "Kleur­bron",
+    "precipLowercase": "Neerslag",
+    "windLowercase": "Wind",
+    "uvLowercase": "UV",
+    "poorAqiDesc": "Gezondheidsrisico mogelijk voor iedereen, hoog voor gevoelige groepen.",
+    "photoByXOnUnsplash": "Foto, door ,x, op ,Unsplash",
+    "reportAnIssueLowercase": "Probleem melden",
+    "apiAndServices": "API's en diensten",
+    "licenseUppercase": "Licentie",
+    "imagesLowercase": "Afbeeldingen",
+    "units": "Eenheden",
+    "generalSettingDesc": "Tijd­modus, letter­grootte",
+    "languageSettingDesc": "De gebruikte taal",
+    "aboutSettingsDesc": "Over deze app",
+    "now": "Nu",
+    "layout": "Lay-out",
+    "layoutSettingDesc": "Widget-volgorde, aanpassing",
+    "mainPollutant": "Belangrijkste vervuilende stof",
+    "alderPollen": "Elzenpollen",
+    "mugwortPollen": "Bijvoetpollen",
+    "ragweedPollen": "Raaigraspollen",
+    "dailyAqi": "Dagelijkse LKI",
+    "aerosolOpticalDepth": "Aërosol optische diepte",
+    "europeanAqi": "Europese LKI",
+    "helpTranslate": "Help mee vertalen",
+    "clear": "Helder",
+    "slightlyHazy": "Licht wazig",
+    "veryHazy": "Zeer wazig",
+    "extremelyHazy": "Extreem wazig",
+    "rainInHalfHour": "Regen in het komende halfuur",
+    "@rainInHalfHour": {
+        "description": "rain in the next half an hour"
+    },
+    "rainInOneHour": "Regen in het komende uur",
+    "@rainInOneHour": {
+        "description": "rain in the next hour"
+    },
+    "rainInHours": "Regen in {hours, plural, =1 {het komende uur} other {de komende {hours} uur}}",
+    "@rainInHours": {
+        "description": "rain in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInOneHour": "Regen verwacht over een uur",
+    "@rainExpectedInOneHour": {
+        "description": "rain expected in the next hour"
+    },
+    "updatedXMinutesAgo": "{minutes} minuten geleden bijgewerkt",
+    "updatedXDaysAgo": "{days, plural, =1 {1 dag} other {{days} dagen}} geleden bijgewerkt",
+    "@updatedXDaysAgo": {
+        "description": "updated x days ago",
+        "placeholders": {
+            "days": {
+                "type": "int"
+            }
+        }
+    },
+    "radarHaptics": "Radar­haptiek",
+    "@radarHaptics": {
+        "description": "setting for enabling or disabling haptic feedback for the radar"
+    },
+    "alertsCapital": "Waarschuwingen",
+    "alertsLowercase": "Waarschuwingen",
+    "severity": "Ernst",
+    "light": "Licht",
+    "@light": {
+        "description": "light precipitation"
+    },
+    "heavy": "Sterk",
+    "@heavy": {
+        "description": "heavy precipitation"
+    },
+    "showMore": "Meer tonen",
+    "showLess": "Minder tonen",
+    "temperature": "Temperatuur",
+    "precipitaion": "Neerslag",
+    "airQualityLowercase": "Lucht­kwaliteit",
+    "unableToLocateDevice": "Apparaat kan niet worden gevonden",
+    "airQuality": "Lucht­kwaliteit",
+    "overcast": "Bewolkt",
+    "moderate": "Matig",
+    "mon": "Ma",
+    "locationServicesAreDisabled": "Locatie­diensten zijn uit­geschakeld",
+    "fairAqiDesc": "Acceptabele luchtkwaliteit; gering gezondheidsrisico voor gevoelige personen.",
+    "appearance": "Uiterlijk",
+    "hr": "Uur",
+    "good": "Goed",
+    "donateLowercase": "Doneren",
+    "placeNotFound": "Plaats niet gevonden",
+    "weakOrNoWifiConnection": "Zwak of geen WiFi -signaal",
+    "fair": "Redelijk",
+    "general": "Algemeen",
+    "wed": "Wo",
+    "thu": "Do",
+    "olivePollen": "Olijfpollen",
+    "offline": "Offline",
+    "sunriseSunset": "Zons­opkomst/zons­ondergang",
+    "dailyLowercase": "Dagelijks",
+    "goodAqiDesc": "De lucht­kwaliteit is uitstekend; geen gezondheids­risico.",
+    "appearanceSettingDesc": "Kleur­thema, afbeeldings­bron",
+    "d": "d",
+    "@d": {
+        "description": "short for day"
+    },
+    "hazy": "Wazig",
+    "radar": "Radar",
+    "fontSize": "Letter­grootte",
+    "rainExpectedInMinutes": "Regen verwacht over {minutes, plural, =1 {minute} other {{minutes} minutes}}",
+    "@rainExpectedInMinutes": {
+        "description": "rain expected in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "imageSource": "Afbeeldings­bron",
+    "moderateAqiDesc": "Gevoelige personen kunnen milde effecten ervaren.",
+    "sourceCodeLowercase": "Bron­code",
+    "unitsSettingdesc": "De in de app gebruikte eenheden",
+    "unhealthyAqiDesc": "Noodtoestand; ernstige gezondheidseffecten voor iedereen.",
+    "emailLowercase": "E-mail",
+    "versionUppercase": "Versie",
+    "thirtyMinutes": "30m",
+    "about": "Over",
+    "unitedStatesAqi": "Verenigde Staten LKI",
+    "rainInMinutes": "Regen in de komende {minutes, plural, =1 {minuut} other {{minutes} minuten}}",
+    "@rainInMinutes": {
+        "description": "rain in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "grassPollen": "Graspollen",
+    "dateFormat": "Datumnotatie",
+    "veryClear": "Zeer helder",
+    "dust": "Stof",
+    "areas": "Gebieden",
+    "extremelyClear": "Extreem helder",
+    "poweredByOpenMeteo": "Verstrekt door Open-Meteo",
+    "@poweredByOpenMeteo": {
+        "description": "text displayed at the end of the air quality page, crediting open-meteo for the data"
+    },
+    "rainExpectedInHours": "Regen verwacht over {hours, plural, =1 {een uur} other {{hours} uur}}",
+    "@rainExpectedInHours": {
+        "description": "rain expected in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "certainty": "Zekerheid",
+    "updatedXHoursAgo": "{hours, plural, =1 {1 uur} other {{hours} uur}} geleden bijgewerkt",
+    "@updatedXHoursAgo": {
+        "description": "updated x hours ago",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "urgency": "Urgentie",
+    "weatherDataLowercase": "Weer­gegevens",
+    "cold": "Koud",
+    "hot": "Heet",
+    "calm": "Kalm",
+    "severe": "Ernstig",
+    "low": "Laag",
+    "high": "Hoog",
+    "tempLowercase": "Temperatuur",
+    "pressureLowercase": "Druk",
+    "backgroundUpdates": "Achtergrond­updates",
+    "backgroundUpdatesSettingsDesc": "Widget-updates, meldingen",
+    "liveRadar": "Live-radar",
+    "ongoingNotification": "Doorlopende melding"
+}

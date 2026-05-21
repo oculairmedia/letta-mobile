@@ -1,0 +1,240 @@
+{
+    "humidity": "Umiditate",
+    "windCapital": "Vânt",
+    "uvCapital": "UV",
+    "settings": "Setări",
+    "today": "Astăzi",
+    "tomorrowLowercase": "Mâine",
+    "overmorrowLowercase": "Poimâine",
+    "language": "Limbă",
+    "temperature": "Temperatură",
+    "precipitaion": "Precipitații",
+    "rain": "Ploaie",
+    "clearNight": "Noapte senină",
+    "partlyCloudy": "Parțial înnorat",
+    "clearSky": "Cer senin",
+    "overcast": "Înnorat",
+    "haze": "Ceață ușoară",
+    "sleet": "Lapoviță",
+    "drizzle": "Burniță",
+    "thunderstorm": "Furtună",
+    "heavySnow": "Viscol",
+    "fog": "Ceață",
+    "snow": "Zăpadă",
+    "heavyRain": "Ploaie puternică",
+    "cloudyNight": "Noapte înnorată",
+    "weakOrNoWifiConnection": "Wifi slab sau lipsă",
+    "notConnectedToTheInternet": "Lipsă conexiune la internet",
+    "placeNotFound": "Locația nu a fost găsită",
+    "unableToLocateDevice": "Nu se poate localiza dispozitivul",
+    "locationServicesAreDisabled": "Localizarea este dezactivată.",
+    "locationPermissionIsDenied": "permisiunea accesului la locație este respinsă",
+    "locationPermissionDeniedForever": "permisiunea accesului la locație este respinsă pentru totdeauna",
+    "grantLocationPermission": "Oferă permisiunea accesului la locație",
+    "currentLocation": "locație actuală",
+    "favoritesLowercase": "favorite",
+    "failedToAccessGps": "nu s-a putut accesa GPS-ul",
+    "search": "Căutare...",
+    "sunriseSunset": "răsărit/apus",
+    "airQuality": "Calitatea aerului",
+    "airQualityLowercase": "calitatea aerului",
+    "good": "bună",
+    "fair": "acceptabilă",
+    "moderate": "moderată",
+    "poor": "rea",
+    "veryPoor": "deplorabilă",
+    "unhealthy": "nesănătoasă",
+    "radar": "radar",
+    "colorMode": "Mod culoare",
+    "weatherProvderLowercase": "Furnizor date meteo",
+    "timeMode": "Formatul timpului",
+    "mon": "Lu",
+    "tue": "Ma",
+    "wed": "Mi",
+    "thu": "Jo",
+    "fri": "Vi",
+    "sat": "Sâ",
+    "sun": "Du",
+    "fontSize": "Dimensiunea fontului",
+    "dailyLowercase": "zilnic",
+    "searchProvider": "Furnizor căutare",
+    "updatedJustNow": "actualizat, chiar acum",
+    "colorSource": "Sursă culoare",
+    "imageSource": "Sursă imagine",
+    "sumLowercase": "pe scurt",
+    "@sumLowercase": {
+        "description": "short for summary, overview, gist or something similar, used in the context of hourly list"
+    },
+    "precipLowercase": "precipitații",
+    "windLowercase": "vânt",
+    "uvLowercase": "uv",
+    "goodAqiDesc": "Calitatea aerului este excelentă, niciun risc de sănătate.",
+    "fairAqiDesc": "Calitatea aerului este acceptabilă, risc minim pentru persoanele sensibile.",
+    "moderateAqiDesc": "Persoanele sensibile ar putea resimți efecte ușoare.",
+    "feelsLike": "Resimțit ca",
+    "poorAqiDesc": "Efecte asupra sănătății posibile pentru toată lumea, grave pentru grupurile sensibile.",
+    "veryPoorAqiDesc": "Efecte grave dăunătoare sănătății pentru toți.",
+    "unhealthyAqiDesc": "Condiții de urgență, efecte foarte grav dăunătoare sănătății pentru toți.",
+    "photoByXOnUnsplash": "Poză, de ,x, pe ,Unsplash",
+    "sourceCodeLowercase": "cod sursă",
+    "emailLowercase": "email",
+    "reportAnIssueLowercase": "raportează o problemă",
+    "donateLowercase": "donează",
+    "versionUppercase": "Versiune",
+    "apiAndServices": "API-uri și Servicii",
+    "licenseUppercase": "Licență",
+    "weatherDataLowercase": "date meteo",
+    "imagesLowercase": "imagini",
+    "appearance": "Aspect",
+    "general": "General",
+    "units": "Unități",
+    "about": "Despre",
+    "appearanceSettingDesc": "temă, sursă imagine",
+    "generalSettingDesc": "mod timp, dimensiunea fontului",
+    "languageSettingDesc": "limba folosită",
+    "unitsSettingdesc": "unitățile folosite în aplicație",
+    "aboutSettingsDesc": "despre aplicație",
+    "now": "acum",
+    "hr": "h",
+    "layout": "Structură",
+    "layoutSettingDesc": "ordine widget-uri, personalizare",
+    "thirtyMinutes": "30m",
+    "mainPollutant": "poluant principal",
+    "alderPollen": "Polen de arin",
+    "birchPollen": "Polen de mesteacăn",
+    "grassPollen": "Polen de iarbă",
+    "mugwortPollen": "Polen de pelin",
+    "olivePollen": "Polen de măslin",
+    "ragweedPollen": "Polen de ambrozie",
+    "dailyAqi": "AQI zilnic",
+    "dateFormat": "Format dată",
+    "d": "z",
+    "@d": {
+        "description": "short for day"
+    },
+    "aerosolOpticalDepth": "adâncimea optică a aerosolilor",
+    "dust": "praf",
+    "europeanAqi": "AQI european",
+    "unitedStatesAqi": "AQI SUA",
+    "offline": "off-line",
+    "helpTranslate": "ajută la traducere",
+    "extremelyClear": "extrem de senin",
+    "veryClear": "foarte senin",
+    "clear": "senin",
+    "slightlyHazy": "puțin încețoșat",
+    "hazy": "încețoșat",
+    "veryHazy": "foarte încețoșat",
+    "extremelyHazy": "extrem de încețoșat",
+    "poweredByOpenMeteo": "bazat pe open-meteo",
+    "@poweredByOpenMeteo": {
+        "description": "text displayed at the end of the air quality page, crediting open-meteo for the data"
+    },
+    "rainInHalfHour": "va ploua în următoarea jumătate de oră",
+    "@rainInHalfHour": {
+        "description": "rain in the next half an hour"
+    },
+    "rainInMinutes": "va ploua în {minutes, plural,=1 {minut}other {{minutes} minute}}",
+    "@rainInMinutes": {
+        "description": "rain in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "rainInOneHour": "va ploua în următoarea oră",
+    "@rainInOneHour": {
+        "description": "rain in the next hour"
+    },
+    "rainInHours": "va ploua în {hours, plural,=1 {oră}other {{hours} ore}}",
+    "@rainInHours": {
+        "description": "rain in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInMinutes": "se așteaptă ploaie în {minutes, plural,=1 {un minut}other {{minutes} minute}}",
+    "@rainExpectedInMinutes": {
+        "description": "rain expected in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInOneHour": "se așteaptă ploaie într-o oră",
+    "@rainExpectedInOneHour": {
+        "description": "rain expected in the next hour"
+    },
+    "rainExpectedInHours": "se așteaptă ploaie în {hours, plural,=1 {o oră}other {{hours} ore}}",
+    "@rainExpectedInHours": {
+        "description": "rain expected in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "updatedXMinutesAgo": "actualizat, acum {minutes} min",
+    "updatedXHoursAgo": "actualizat, acum {hours, plural,=1 {o oră}other {{hours} ore}}",
+    "@updatedXHoursAgo": {
+        "description": "updated x hours ago",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "updatedXDaysAgo": "actualizat, acum {days, plural,=1 {o zi}other {{days} zile}}",
+    "@updatedXDaysAgo": {
+        "description": "updated x days ago",
+        "placeholders": {
+            "days": {
+                "type": "int"
+            }
+        }
+    },
+    "radarHaptics": "Vibrații radar",
+    "@radarHaptics": {
+        "description": "setting for enabling or disabling haptic feedback for the radar"
+    },
+    "alertsCapital": "Alerte",
+    "alertsLowercase": "alerte",
+    "severity": "severitate",
+    "certainty": "certitudine",
+    "urgency": "urgență",
+    "areas": "zone",
+    "light": "slabe",
+    "@light": {
+        "description": "light precipitation"
+    },
+    "heavy": "puternice",
+    "@heavy": {
+        "description": "heavy precipitation"
+    },
+    "showMore": "arată mai mult",
+    "showLess": "arată mai puțin",
+    "precipCapital": "Precipitații",
+    "pressureLowercase": "presiune",
+    "tempLowercase": "temperatură",
+    "backgroundUpdates": "Actualizări în fundal",
+    "backgroundUpdatesSettingsDesc": "actualizări widget, notificări",
+    "cold": "rece",
+    "hot": "fierbinte",
+    "calm": "liniștit",
+    "severe": "sever",
+    "low": "scăzut",
+    "high": "ridicat",
+    "liveRadar": "radar live",
+    "ongoingNotification": "notificare în curs",
+    "north": "N",
+    "northEast": "NE",
+    "east": "E",
+    "southEast": "SE",
+    "south": "S",
+    "southWest": "SV",
+    "west": "V",
+    "northWest": "NV"
+}

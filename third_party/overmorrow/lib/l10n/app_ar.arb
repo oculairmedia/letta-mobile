@@ -1,0 +1,241 @@
+{
+    "feelsLike": "تشعر وكأنها",
+    "windCapital": "الرياح",
+    "donate": "التبرع",
+    "haze": "الضبابية",
+    "humidity": "الرطوبة",
+    "language": "اللغة",
+    "temperature": "الحرارة",
+    "precipitaion": "الهطول",
+    "rain": "المطر",
+    "favorites": "المفضلة",
+    "clearNight": "ليلة صافية",
+    "partlyCloudy": "غائم جزئيًا",
+    "clearSky": "سماء صافية",
+    "overcast": "غائم كليًا",
+    "sleet": "برد",
+    "drizzle": "رذاذ",
+    "thunderstorm": "عاصفة رعدية",
+    "fog": "ضباب",
+    "snow": "ثلج",
+    "cloudyNight": "ليلة غائمة",
+    "weakOrNoWifiConnection": "اتصال واي فاي ضعيف أو غير موجود",
+    "notConnectedToTheInternet": "غير متصل بالإنترنت",
+    "placeNotFound": "المكان غير موجود",
+    "unableToLocateDevice": "تعذر تحديد موقع الجهاز",
+    "locationServicesAreDisabled": "خدمات الموقع معطلة.",
+    "about": "حول التطبيق",
+    "today": "اليوم",
+    "tomorrow": "غدًا",
+    "uvCapital": "الأشعة فوق البنفسجية",
+    "settings": "الإعدادات",
+    "overmorrow": "بعد غد",
+    "timeMode": "وضع الوقت",
+    "tue": "الثلاثاء",
+    "appearanceSettingDesc": "سمة الألوان، مصدر الصور",
+    "supportOnPatreon": "الدعم على باتريون",
+    "moderate": "متوسط",
+    "veryPoorAqiDesc": "آثار صحية خطيرة للجميع.",
+    "unitsSettingdesc": "الوحدات المستخدمة في التطبيق",
+    "now": "الآن",
+    "veryHazy": "ضبابي جدًا",
+    "heavySnow": "ثلج كثيف",
+    "heavyRain": "مطر غزير",
+    "locationPermissionIsDenied": "تم رفض إذن الموقع",
+    "locationPermissionDeniedForever": "تم رفض إذن الموقع نهائيًا",
+    "failedToAccessGps": "فشل الوصول إلى نظام تحديد المواقع",
+    "search": "البحث...",
+    "sunriseSunset": "الشروق/الغروب",
+    "airQuality": "جودة الهواء",
+    "airQualityLowercase": "جودة الهواء",
+    "good": "ممتاز",
+    "poor": "سيء",
+    "fair": "مقبول",
+    "veryPoor": "سيء جدًا",
+    "unhealthy": "غير صحي",
+    "radar": "الرادار",
+    "colorMode": "وضع الألوان",
+    "weatherProvider": "مزود الطقس",
+    "mon": "الإثنين",
+    "wed": "الأربعاء",
+    "thu": "الخميس",
+    "fri": "الجمعة",
+    "sat": "السبت",
+    "sun": "الأحد",
+    "fontSize": "حجم الخط",
+    "daily": "يومي",
+    "searchProvider": "مزود البحث",
+    "updatedJustNow": "تم التحديث الآن",
+    "colorSource": "مصدر الألوان",
+    "imageSource": "مصدر الصور",
+    "temp": "درجة الحرارة",
+    "windLowercase": "الرياح",
+    "uvLowercase": "الأشعة فوق البنفسجية",
+    "goodAqiDesc": "جودة الهواء ممتازة، لا توجد مخاطر صحية.",
+    "precipLowercase": "هطول",
+    "fairAqiDesc": "جودة الهواء مقبولة، مخاطر طفيفة للأشخاص الحساسين.",
+    "moderateAqiDesc": "قد يعاني الأشخاص الحساسون من آثار خفيفة.",
+    "poorAqiDesc": "آثار صحية محتملة للجميع، خطيرة بالنسبة للفئات الحساسة.",
+    "unhealthyAqiDesc": "حالات الطوارئ؛ آثار صحية خطيرة على الجميع.",
+    "developedBy": "تطوير:",
+    "sourceCode": "الكود المصدري",
+    "reportAnIssue": "الإبلاغ عن مشكلة",
+    "weatherData": "بيانات الطقس:",
+    "allImagesUsedAreFrom": "جميع الصور المستخدمة من:",
+    "appearance": "المظهر",
+    "general": "عام",
+    "units": "الوحدات",
+    "generalSettingDesc": "وضع الوقت، حجم الخط",
+    "languageSettingDesc": "اللغة المستخدمة",
+    "hr": "ساعة",
+    "layout": "التخطيط",
+    "layoutSettingDesc": "ترتيب الأدوات، التخصيص",
+    "thirtyMinutes": "30 دقيقة",
+    "mainPollutant": "الملوث الرئيسي",
+    "alderPollen": "حبوب لقاح الآلدر",
+    "birchPollen": "حبوب لقاح البتولا",
+    "grassPollen": "حبوب لقاح العشب",
+    "olivePollen": "حبوب لقاح الزيتون",
+    "ragweedPollen": "حبوب لقاح الرجيد",
+    "mugwortPollen": "حبوب لقاح المغوورت",
+    "dailyAqi": "مؤشر جودة الهواء اليومي",
+    "dateFormat": "تنسيق التاريخ",
+    "d": "يوم",
+    "@d": {
+        "description": "short for day"
+    },
+    "aerosolOpticalDepth": "العمق البصري للجزيئات",
+    "dust": "الغبار",
+    "europeanAqi": "مؤشر جودة الهواء الأوروبي",
+    "unitedStatesAqi": "مؤشر جودة الهواء الأمريكي",
+    "offline": "غير متصل",
+    "helpTranslate": "ساعد في الترجمة",
+    "extremelyClear": "صافٍ تمامًا",
+    "veryClear": "صافٍ جدًا",
+    "clear": "صافٍ",
+    "hazy": "ضبابي",
+    "extremelyHazy": "ضبابي للغاية",
+    "poweredByOpenMeteo": "مدعوم من Open-Meteo",
+    "@poweredByOpenMeteo": {
+        "description": "text displayed at the end of the air quality page, crediting open-meteo for the data"
+    },
+    "slightlyHazy": "ضبابي قليلاً",
+    "donationPageTextNew": "تم تصميم تطبيق Overmorrow ليكون مجانيًا تمامًا، بدون إعلانات أو مشتريات داخل التطبيق.\n\nإذا كنت ترغب في استخدامه مجانًا، فاستمتع به!\n\nولكن إذا أعجبك التطبيق، يرجى التفكير في تقديم تبرع صغير.\n\nشكرًا لك!",
+    "rainInMinutes": "مطر متوقع خلال {minutes, plural, =1 {دقيقة} other {{minutes} دقيقة}} القادمة",
+    "@rainInMinutes": {
+        "description": "rain in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "rainInHalfHour": "مطر متوقع خلال النصف ساعة القادمة",
+    "@rainInHalfHour": {
+        "description": "rain in the next half an hour"
+    },
+    "rainInOneHour": "مطر متوقع خلال الساعة القادمة",
+    "@rainInOneHour": {
+        "description": "rain in the next hour"
+    },
+    "rainExpectedInMinutes": "مطر متوقع بعد {minutes, plural, =1 {دقيقة} other {{minutes} دقيقة}}",
+    "@rainExpectedInMinutes": {
+        "description": "rain expected in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInOneHour": "مطر متوقع بعد ساعة",
+    "@rainExpectedInOneHour": {
+        "description": "rain expected in the next hour"
+    },
+    "updatedXHoursAgo": "تم التحديث قبل {hours, plural, =1 {ساعة} other {{hours} ساعات}}",
+    "@updatedXHoursAgo": {
+        "description": "updated x hours ago",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInHours": "مطر متوقع بعد {hours, plural, =1 {ساعة} other {{hours} ساعات}}",
+    "@rainExpectedInHours": {
+        "description": "rain expected in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "updatedXMinutesAgo": "تم التحديث قبل {minutes} دقيقة",
+    "updatedXDaysAgo": "تم التحديث قبل {days, plural, =1 {يوم} other {{days} أيام}}",
+    "@updatedXDaysAgo": {
+        "description": "updated x days ago",
+        "placeholders": {
+            "days": {
+                "type": "int"
+            }
+        }
+    },
+    "severity": "الشدة",
+    "certainty": "اليقين",
+    "urgency": "الإلحاح",
+    "areas": "المناطق",
+    "precipCapital": "هطول الأمطار.",
+    "photoByXOnUnsplash": "صورة, بواسطة ,x, على ,Unsplash",
+    "buyMeACoffee": "اشترِ لي قهوة!",
+    "rainInHours": "مطر متوقع خلال {hours, plural, =1 {ساعة} other {{hours} ساعات}} القادمة",
+    "@rainInHours": {
+        "description": "rain in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "radarHaptics": "تفعيل الاهتزاز للرادار",
+    "@radarHaptics": {
+        "description": "setting for enabling or disabling haptic feedback for the radar"
+    },
+    "alertsCapital": "التنبيهات",
+    "weatherProvderLowercase": "مزود خدمة الطقس",
+    "currentLocation": "الموقع الحالي",
+    "favoritesLowercase": "المفضلة",
+    "sumLowercase": "ملخص",
+    "@sumLowercase": {
+        "description": "short for summary, overview, gist or something similar, used in the context of hourly list"
+    },
+    "dailyLowercase": "يومياً",
+    "sourceCodeLowercase": "الكود المصدري",
+    "apiAndServices": "واجهات برمجة التطبيقات(APIs) والخدمات",
+    "licenseUppercase": "الترخيص",
+    "weatherDataLowercase": "بيانات الطقس",
+    "imagesLowercase": "الصور",
+    "aboutSettingsDesc": "حول هذا التطبيق",
+    "reportAnIssueLowercase": "الإبلاغ عن مشكلة",
+    "versionUppercase": "الإصدار",
+    "emailLowercase": "البريد الإلكتروني",
+    "grantLocationPermission": "منح إذن الموقع",
+    "donateLowercase": "تبرع",
+    "alertsLowercase": "التنبيهات",
+    "heavy": "غزيرة",
+    "@heavy": {
+        "description": "heavy precipitation"
+    },
+    "light": "ضعيفة",
+    "@light": {
+        "description": "light precipitation"
+    },
+    "showMore": "عرض المزيد",
+    "showLess": "عرض القليل",
+    "tomorrowLowercase": "غدا",
+    "overmorrowLowercase": "بعد غد",
+    "cold": "بارد",
+    "hot": "ساخن",
+    "calm": "هادئ",
+    "severe": "قاس",
+    "low": "منخفِض",
+    "high": "مرتفع"
+}
