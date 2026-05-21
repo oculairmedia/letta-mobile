@@ -1,0 +1,220 @@
+{
+    "feelsLike": "се чувствува како",
+    "precipCapital": "Врнежи",
+    "humidity": "Влажност",
+    "windCapital": "Ветер",
+    "uvCapital": "УВ",
+    "settings": "Поставки",
+    "today": "Денес",
+    "tomorrowLowercase": "утре",
+    "overmorrowLowercase": "Задутре",
+    "language": "Јазик",
+    "temperature": "Температура",
+    "precipitaion": "Врнеж",
+    "rain": "Дожд",
+    "clearNight": "Ведра Ноќ",
+    "partlyCloudy": "Делумно Облачно",
+    "clearSky": "Ведро Небо",
+    "overcast": "Облачно",
+    "haze": "Измаглица",
+    "sleet": "Сунснежица",
+    "drizzle": "Ситен Дожд",
+    "thunderstorm": "Грмотевици",
+    "heavySnow": "Обилен Снег",
+    "fog": "Магла",
+    "snow": "Снег",
+    "heavyRain": "Обилен Дожд",
+    "cloudyNight": "Облачно Ноќ",
+    "weakOrNoWifiConnection": "Слаба или без WiFi конекција",
+    "notConnectedToTheInternet": "Одврзано од интернет",
+    "placeNotFound": "Местото не е најдено",
+    "unableToLocateDevice": "Уредот не може да се лоцира",
+    "locationServicesAreDisabled": "Локациски сервиси се исклучени.",
+    "locationPermissionIsDenied": "Локациски дозвола е одбиена",
+    "locationPermissionDeniedForever": "Локациски дозвола е целосно одбиена",
+    "grantLocationPermission": "Одобрете локациски дозвола",
+    "currentLocation": "Моментална локација",
+    "favoritesLowercase": "Омилени",
+    "failedToAccessGps": "Не може да се пристапи до GPS мрежата",
+    "search": "Пребарај...",
+    "sunriseSunset": "изгрејсонце/зајдисонце",
+    "airQuality": "Квалитет на воздухот",
+    "airQualityLowercase": "квалитет на воздухот",
+    "good": "добро",
+    "appearance": "Изглед",
+    "general": "Општо",
+    "units": "Мерни Единици",
+    "about": "Повеќе за нас",
+    "appearanceSettingDesc": "тема на бојата, извор на сликата",
+    "generalSettingDesc": "временски режим, големина на фонтот",
+    "languageSettingDesc": "јазикот во употреба",
+    "unitsSettingdesc": "мерни единици во корист",
+    "aboutSettingsDesc": "повеќе за апликацијава",
+    "now": "моментално",
+    "hr": "час",
+    "layout": "Распоред",
+    "layoutSettingDesc": "редослед на виџети, уредување",
+    "thirtyMinutes": "30 минути",
+    "mainPollutant": "главен загадувач",
+    "alderPollen": "Полен на алдер",
+    "birchPollen": "полен од бреза",
+    "grassPollen": "полен од трева",
+    "mugwortPollen": "полен од пелин",
+    "olivePollen": "полен од маслина",
+    "ragweedPollen": "полен од амброзија",
+    "dailyAqi": "дневен индекс за квалитет на воздух",
+    "dateFormat": "Формат на датуми",
+    "d": "д",
+    "@d": {
+        "description": "short for day"
+    },
+    "aerosolOpticalDepth": "оптичка длабочина на аеросоли",
+    "dust": "прав",
+    "europeanAqi": "европски индекс за квалитет на воздухот",
+    "unitedStatesAqi": "американски индекс за квалитет на воздухот",
+    "offline": "одврзано",
+    "helpTranslate": "помогни со превод",
+    "extremelyClear": "екстремно ведро",
+    "veryClear": "многу ведро",
+    "clear": "ведро",
+    "slightlyHazy": "малку измаглено",
+    "hazy": "измаглено",
+    "veryHazy": "многу измаглено",
+    "extremelyHazy": "екстремно измаглено",
+    "poweredByOpenMeteo": "со помош од open-meteo",
+    "@poweredByOpenMeteo": {
+        "description": "text displayed at the end of the air quality page, crediting open-meteo for the data"
+    },
+    "rainInHalfHour": "дожд во следната половина час",
+    "@rainInHalfHour": {
+        "description": "rain in the next half an hour"
+    },
+    "rainInMinutes": "дожд во {minutes, plural, =1 {следната минута} other {следните {minutes} минути}}",
+    "@rainInMinutes": {
+        "description": "rain in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "rainInOneHour": "дожд во следниот час",
+    "@rainInOneHour": {
+        "description": "rain in the next hour"
+    },
+    "rainInHours": "дожд во {hours, plural, =1 {следниот час} other {следните {hours} часови}}",
+    "@rainInHours": {
+        "description": "rain in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInMinutes": "се очекува дожд за {minutes, plural, =1 {минута} other {{minutes} минути}}",
+    "@rainExpectedInMinutes": {
+        "description": "rain expected in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInOneHour": "се очекува дожд за околу 1 час",
+    "@rainExpectedInOneHour": {
+        "description": "rain expected in the next hour"
+    },
+    "rainExpectedInHours": "се очекува дожд за {hours, plural, =1 {час} other {{hours} часови}}",
+    "@rainExpectedInHours": {
+        "description": "rain expected in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "updatedXMinutesAgo": "ажурирано пред {minutes} минути",
+    "updatedXHoursAgo": "ажурирано пред {hours, plural, =1 {1 час} other {{hours} часови}} часови",
+    "@updatedXHoursAgo": {
+        "description": "updated x hours ago",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "updatedXDaysAgo": "ажурирано пред {days, plural, =1 {1 ден} other {{days} дена}}",
+    "@updatedXDaysAgo": {
+        "description": "updated x days ago",
+        "placeholders": {
+            "days": {
+                "type": "int"
+            }
+        }
+    },
+    "radarHaptics": "радарски хаптики",
+    "@radarHaptics": {
+        "description": "setting for enabling or disabling haptic feedback for the radar"
+    },
+    "alertsCapital": "Известувања",
+    "alertsLowercase": "известувања",
+    "severity": "сериозност",
+    "certainty": "сигурност",
+    "urgency": "итност",
+    "areas": "области",
+    "light": "слабо",
+    "@light": {
+        "description": "light precipitation"
+    },
+    "heavy": "обилни",
+    "@heavy": {
+        "description": "heavy precipitation"
+    },
+    "showMore": "покажи повеќе",
+    "showLess": "покажи помалку",
+    "fair": "ведро",
+    "moderate": "умерено",
+    "poor": "слабо",
+    "veryPoor": "многу слабо",
+    "unhealthy": "не здраво",
+    "radar": "радар",
+    "colorMode": "режим на боја",
+    "weatherProvderLowercase": "обезбедувач на прогноза",
+    "timeMode": "Временски режим",
+    "mon": "Пон",
+    "tue": "Вто",
+    "wed": "Сре",
+    "thu": "Чет",
+    "fri": "Пет",
+    "sat": "Саб",
+    "sun": "Нед",
+    "fontSize": "Големина на фонт",
+    "dailyLowercase": "дневно",
+    "searchProvider": "Обезбедувач на пребарување",
+    "updatedJustNow": "ажурирано, токму сега",
+    "colorSource": "Извор на боја",
+    "imageSource": "Извор на слика",
+    "sumLowercase": "Прег.",
+    "@sumLowercase": {
+        "description": "short for summary, overview, gist or something similar, used in the context of hourly list"
+    },
+    "precipLowercase": "врнеж",
+    "windLowercase": "ветер",
+    "uvLowercase": "ув",
+    "goodAqiDesc": "Квалитетот на воздухот е одличен; нема ризик по здравјето.",
+    "fairAqiDesc": "Прифатилив квалитет на воздухот; мал ризик за сензитивни луѓе.",
+    "moderateAqiDesc": "Сензитивни индивидуалци можат да почувствуваат благи ефекти.",
+    "poorAqiDesc": "Можни здравствени ефекти за сите, по сериозно за сензитивни групи.",
+    "veryPoorAqiDesc": "Сериозни здравствени ефекти за сите.",
+    "unhealthyAqiDesc": "Итни услови; сериозни ефекти за сите.",
+    "photoByXOnUnsplash": "Слика, од ,x, на ,Unsplash",
+    "sourceCodeLowercase": "изворен код",
+    "emailLowercase": "е-пошта",
+    "reportAnIssueLowercase": "изјави проблем",
+    "donateLowercase": "донирај",
+    "versionUppercase": "Верзија",
+    "apiAndServices": "АПИ и Сервиси",
+    "licenseUppercase": "Лиценца",
+    "weatherDataLowercase": "временски податоци",
+    "imagesLowercase": "слики"
+}

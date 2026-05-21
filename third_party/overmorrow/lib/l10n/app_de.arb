@@ -1,0 +1,243 @@
+{
+    "@@locale": "de",
+    "feelsLike": "Gefühlt wie",
+    "precipCapital": "Niederschlag",
+    "humidity": "Luftfeuchtigkeit",
+    "windCapital": "Wind",
+    "uvCapital": "UV",
+    "settings": "Einstellungen",
+    "donate": "Spenden",
+    "about": "Über",
+    "today": "Heute",
+    "tomorrow": "Morgen",
+    "overmorrow": "Übermorgen",
+    "language": "Sprache",
+    "temperature": "Temperatur",
+    "rain": "Regen",
+    "favorites": "Favoriten",
+    "clearNight": "Klare Nacht",
+    "partlyCloudy": "Teils bewölkt",
+    "clearSky": "Klarer Himmel",
+    "overcast": "Bedeckt",
+    "haze": "Dunst",
+    "sleet": "Schneeregen",
+    "drizzle": "Nieselregen",
+    "thunderstorm": "Gewitter",
+    "heavySnow": "Starker Schneefall",
+    "fog": "Nebel",
+    "snow": "Schnee",
+    "heavyRain": "Starker Regen",
+    "cloudyNight": "Bewölkte Nacht",
+    "weakOrNoWifiConnection": "Schwache oder keine WLAN-Verbindung",
+    "notConnectedToTheInternet": "Nicht mit dem Internet verbunden",
+    "placeNotFound": "Ort nicht gefunden",
+    "unableToLocateDevice": "Standort konnte nicht gefunden werden",
+    "locationServicesAreDisabled": "Standortdienste sind deaktiviert.",
+    "locationPermissionIsDenied": "Standortberechtigungen sind verweigert",
+    "locationPermissionDeniedForever": "Standortberechtigungen sind für immer verweigert",
+    "failedToAccessGps": "GPS-Zugriff fehlgeschlagen",
+    "search": "Suchen...",
+    "sunriseSunset": "Sonnenaufgang/Sonnenuntergang",
+    "airQuality": "Luftqualität",
+    "good": "gut",
+    "fair": "akzeptabel",
+    "moderate": "mäßig",
+    "poor": "schlecht",
+    "veryPoor": "sehr schlecht",
+    "unhealthy": "ungesund",
+    "radar": "Radar",
+    "colorMode": "Farbmodus",
+    "weatherProvider": "Wetteranbieter",
+    "timeMode": "Zeitformat",
+    "mon": "Mo",
+    "tue": "Di",
+    "wed": "Mi",
+    "thu": "Do",
+    "fri": "Fr",
+    "sat": "Sa",
+    "sun": "So",
+    "fontSize": "Schriftgröße",
+    "daily": "Täglich",
+    "searchProvider": "Suchanbieter",
+    "updatedXMinAgo": "aktualisiert, vor x min",
+    "updatedJustNow": "aktualisiert, gerade eben",
+    "colorSource": "Farbquelle",
+    "imageSource": "Bildquelle",
+    "temp": "Temp",
+    "precipLowercase": "Niederschlag",
+    "windLowercase": "Wind",
+    "uvLowercase": "uv",
+    "goodAqiDesc": "Die Luftqualität ist ausgezeichnet; kein Gesundheitsrisiko.",
+    "fairAqiDesc": "Akzeptable Luftqualität; geringes Risiko für empfindliche Personen.",
+    "moderateAqiDesc": "Bei Empfindliche Personen können leichte Effekte auftreten.",
+    "poorAqiDesc": "Gesundheitliche Auswirkungen für alle möglich, ernsthaft für empfindliche Gruppen.",
+    "veryPoorAqiDesc": "Schwere gesundheitliche Auswirkungen für alle.",
+    "unhealthyAqiDesc": "Notfallbedingungen; schwere gesundheitliche Auswirkungen für alle.",
+    "photoByXOnUnsplash": "Foto, von ,x, auf ,Unsplash",
+    "developedBy": "Entwickelt von:",
+    "sourceCode": "Quellcode",
+    "reportAnIssue": "Ein Problem melden",
+    "weatherData": "Wetterdaten:",
+    "allImagesUsedAreFrom": "Alle verwendeten Bilder stammen von:",
+    "supportOnPatreon": "Unterstützung auf Patreon",
+    "appearance": "Aussehen",
+    "general": "Allgemein",
+    "units": "Einheiten",
+    "appearanceSettingDesc": "Farbschema, Bildquelle",
+    "generalSettingDesc": "Zeitmodus, Schriftgröße",
+    "languageSettingDesc": "die verwendete Sprache",
+    "unitsSettingdesc": "die in der App verwendeten Einheiten",
+    "now": "jetzt",
+    "hr": "Std",
+    "layout": "Layout",
+    "layoutSettingDesc": "Widget-Reihenfolge, Anpassung",
+    "thirtyMinutes": "30m",
+    "mainPollutant": "Hauptschadstoff",
+    "alderPollen": "Erlenpollen",
+    "birchPollen": "Birkenpollen",
+    "grassPollen": "Gräserpollen",
+    "mugwortPollen": "Beifußpollen",
+    "olivePollen": "Olivenpollen",
+    "ragweedPollen": "Ambrosiapollen",
+    "dailyAqi": "täglicher AQI",
+    "dateFormat": "Datumsformat",
+    "d": "T",
+    "aerosolOpticalDepth": "aerosol-optische Tiefe",
+    "dust": "Staub",
+    "europeanAqi": "eu aqi",
+    "unitedStatesAqi": "us aqi",
+    "offline": "offline",
+    "clear": "klar",
+    "slightlyHazy": "leicht trüb",
+    "hazy": "trüb",
+    "veryHazy": "sehr trüb",
+    "extremelyHazy": "extrem trüb",
+    "poweredByOpenMeteo": "Bereitgestellt von Open-Meteo",
+    "@poweredByOpenMeteo": {
+        "description": "text displayed at the end of the air quality page, crediting open-meteo for the data"
+    },
+    "rainInHalfHour": "Regen in der nächsten halben Stunde",
+    "@rainInHalfHour": {
+        "description": "rain in the next half an hour"
+    },
+    "rainInMinutes": "Regen in den nächsten {minutes, plural, =1 {minute} other {{minutes} minutes}}",
+    "@rainInMinutes": {
+        "description": "rain in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "rainInOneHour": "Regen in der nächsten Stunde",
+    "@rainInOneHour": {
+        "description": "rain in the next hour"
+    },
+    "rainInHours": "Regen in den nächsten {hours, plural, =1 {hour} other {{hours} hours}}",
+    "@rainInHours": {
+        "description": "rain in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInMinutes": "Regen erwartet in {minutes, plural, =1 {minute} other {{minutes} minutes}}",
+    "@rainExpectedInMinutes": {
+        "description": "rain expected in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInOneHour": "Regen erwartet in der nächsten Stunde",
+    "@rainExpectedInOneHour": {
+        "description": "rain expected in the next hour"
+    },
+    "rainExpectedInHours": "Regen erwartet in {hours, plural, =1 {hour} other {{hours} hours}}",
+    "@rainExpectedInHours": {
+        "description": "rain expected in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "updatedXHoursAgo": "Aktualisiert vor {hours, plural, =1 {1 hour} other {{hours} hours}} Stunden",
+    "@updatedXHoursAgo": {
+        "description": "updated x hours ago",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "updatedXDaysAgo": "Aktualisiert vor {days, plural, =1 {1 day} other {{days} days}} Tagen",
+    "@updatedXDaysAgo": {
+        "description": "updated x days ago",
+        "placeholders": {
+            "days": {
+                "type": "int"
+            }
+        }
+    },
+    "updatedXMinutesAgo": "Aktualisiert vor {minutes} Minuten",
+    "airQualityLowercase": "Luftqualität",
+    "precipitaion": "Niederschlag",
+    "helpTranslate": "Beim Übersetzen helfen",
+    "extremelyClear": "extrem klar",
+    "veryClear": "sehr klar",
+    "donationPageText": "Overmorrow sollte immer eine völlig kostenlose App sein, ohne Werbung oder In-App-Käufe.\n\nWenn Sie sie also einfach so verwenden möchten, dann viel Spaß damit.\n\nWenn Sie sie jedoch gerne verwenden und der Meinung sind, dass sie ein bisschen Geld wert ist, dann denken Sie bitte darüber nach, das Projekt auf meinem Patreon zu unterstützen.",
+    "areas": "Gebiete",
+    "urgency": "Dringlichkeit",
+    "radarHaptics": "Radar Haptik",
+    "@radarHaptics": {
+        "description": "setting for enabling or disabling haptic feedback for the radar"
+    },
+    "buyMeACoffee": "Kauf mir einen Kaffee!",
+    "severity": "Schweregrad",
+    "certainty": "bestimmte",
+    "alertsCapital": "Warnungen",
+    "donationPageTextNew": "Overmorrow sollte immer eine völlig kostenlose App sein, ohne Werbung oder In-App-Käufe. \n\nWenn Sie sie also einfach nur so benutzen wollen, dann genießen Sie sie bitte. \n\nWenn Sie die App jedoch gerne nutzen, dann geben Sie bitte ein kleines Trinkgeld. \n\nVielen Dank dafür!",
+    "tomorrowLowercase": "morgen",
+    "overmorrowLowercase": "Overmorrow",
+    "showMore": "mehr zeigen",
+    "favoritesLowercase": "Favoriten",
+    "currentLocation": "aktuelle Position",
+    "weatherProvderLowercase": "Wetteranbieter",
+    "showLess": "weniger zeigen",
+    "grantLocationPermission": "Standort Berechtigungen erteilen",
+    "dailyLowercase": "täglich",
+    "sourceCodeLowercase": "Quellcode",
+    "emailLowercase": "E-Mail",
+    "reportAnIssueLowercase": "Ein Problem melden",
+    "donateLowercase": "Spenden",
+    "versionUppercase": "Version",
+    "apiAndServices": "APIs & Dienste",
+    "licenseUppercase": "Lizenz",
+    "weatherDataLowercase": "Wetterdaten",
+    "imagesLowercase": "Bilder",
+    "aboutSettingsDesc": "über diese App",
+    "sumLowercase": "Gesamt",
+    "@sumLowercase": {
+        "description": "short for summary, overview, gist or something similar, used in the context of hourly list"
+    },
+    "heavy": "schwer",
+    "@heavy": {
+        "description": "heavy precipitation"
+    },
+    "light": "leicht",
+    "@light": {
+        "description": "light precipitation"
+    },
+    "alertsLowercase": "Warnungen",
+    "north": "N",
+    "northEast": "NO",
+    "east": "O",
+    "southEast": "SO",
+    "south": "S",
+    "southWest": "SW",
+    "west": "W",
+    "northWest": "NW"
+}

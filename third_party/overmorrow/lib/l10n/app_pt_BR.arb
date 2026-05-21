@@ -1,0 +1,232 @@
+{
+    "feelsLike": "Sensação",
+    "precipCapital": "Precip.",
+    "humidity": "Umidade",
+    "windCapital": "Vento",
+    "uvCapital": "UV",
+    "settings": "Configurações",
+    "today": "Hoje",
+    "tomorrowLowercase": "amanhã",
+    "overmorrowLowercase": "depois de amanhã",
+    "language": "Idioma",
+    "temperature": "Temperatura",
+    "precipitaion": "Precipitação",
+    "rain": "Chuva",
+    "clearNight": "Noite limpa",
+    "partlyCloudy": "Pouco nublado",
+    "clearSky": "Céu limpo",
+    "overcast": "Nublado",
+    "haze": "Névoa",
+    "sleet": "Água-neve",
+    "drizzle": "Chuvisco",
+    "thunderstorm": "Trovoada",
+    "heavySnow": "Neve intensa",
+    "fog": "Nevoeiro",
+    "snow": "Neve",
+    "heavyRain": "Chuva intensa",
+    "cloudyNight": "Noite nublada",
+    "weakOrNoWifiConnection": "Wi-Fi fraco ou sem conexão",
+    "notConnectedToTheInternet": "Não conectado à internet",
+    "placeNotFound": "Local não encontrado",
+    "unableToLocateDevice": "Incapaz de localizar o dispositivo",
+    "locationServicesAreDisabled": "os serviços de localização estão desativados.",
+    "locationPermissionIsDenied": "permissão de localização negada",
+    "locationPermissionDeniedForever": "permissão de localização negada para sempre",
+    "grantLocationPermission": "conceder permissão de localização",
+    "currentLocation": "localização atual",
+    "favoritesLowercase": "favoritos",
+    "failedToAccessGps": "falha ao acessar gps",
+    "search": "Pesquisar...",
+    "sunriseSunset": "nascer e pôr do sol",
+    "airQuality": "Qualidade do Ar",
+    "airQualityLowercase": "qualidade do ar",
+    "good": "boa",
+    "fair": "razoável",
+    "moderate": "moderada",
+    "poor": "ruim",
+    "veryPoor": "muito ruim",
+    "unhealthy": "insalubre",
+    "radar": "radar",
+    "colorMode": "Modo de cor",
+    "weatherProvderLowercase": "provedor de clima",
+    "timeMode": "Formato de hora",
+    "mon": "Seg",
+    "tue": "Ter",
+    "wed": "Qua",
+    "thu": "Qui",
+    "fri": "Sex",
+    "sat": "Sáb",
+    "sun": "Dom",
+    "fontSize": "Tamanho da fonte",
+    "dailyLowercase": "diário",
+    "searchProvider": "Provedor de pesquisa",
+    "updatedJustNow": "atualizado, agora mesmo",
+    "colorSource": "Fonte de cor",
+    "imageSource": "Fonte de imagem",
+    "sumLowercase": "resumo",
+    "@sumLowercase": {
+        "description": "short for summary, overview, gist or something similar, used in the context of hourly list"
+    },
+    "precipLowercase": "precipitação",
+    "windLowercase": "vento",
+    "uvLowercase": "uv",
+    "goodAqiDesc": "Qualidade do ar excelente; sem risco à saúde.",
+    "fairAqiDesc": "Qualidade do ar aceitável; risco menor para pessoas sensíveis.",
+    "moderateAqiDesc": "Pessoas sensíveis podem sentir efeitos leves.",
+    "poorAqiDesc": "Possíveis efeitos à saúde para todos, grave para grupos sensíveis.",
+    "veryPoorAqiDesc": "Efeitos graves à saúde para todos.",
+    "unhealthyAqiDesc": "Condições de emergência; efeitos severos à saúde para todos.",
+    "photoByXOnUnsplash": "Foto, de ,x, no ,Unsplash",
+    "sourceCodeLowercase": "código-fonte",
+    "emailLowercase": "e-mail",
+    "reportAnIssueLowercase": "reportar um problema",
+    "donateLowercase": "doar",
+    "versionUppercase": "Versão",
+    "apiAndServices": "APIs e Serviços",
+    "licenseUppercase": "Licença",
+    "weatherDataLowercase": "dados meteorológicos",
+    "imagesLowercase": "imagens",
+    "appearance": "Aparência",
+    "general": "Geral",
+    "units": "Unidades",
+    "about": "Sobre",
+    "appearanceSettingDesc": "cor do tema, fonte de imagem",
+    "generalSettingDesc": "formato de hora, tamanho da fonte",
+    "languageSettingDesc": "o idioma usado no aplicativo",
+    "unitsSettingdesc": "as unidades usadas no aplicativo",
+    "aboutSettingsDesc": "sobre este aplicativo",
+    "now": "agora",
+    "hr": "h",
+    "layout": "Layout",
+    "layoutSettingDesc": "ordem dos cartões, personalização",
+    "thirtyMinutes": "30m",
+    "mainPollutant": "poluente principal",
+    "alderPollen": "Pólen de Amieiro",
+    "birchPollen": "Pólen de Bétula",
+    "grassPollen": "Pólen de Gramínea",
+    "mugwortPollen": "Pólen de Artemísia",
+    "olivePollen": "Pólen de Oliveira",
+    "ragweedPollen": "Pólen de Ambrósia",
+    "dailyAqi": "AQI diário",
+    "dateFormat": "Formato de data",
+    "d": "d",
+    "@d": {
+        "description": "short for day"
+    },
+    "aerosolOpticalDepth": "profundidade óptica de aerossóis",
+    "dust": "poeira",
+    "europeanAqi": "europa aqi",
+    "unitedStatesAqi": "aqi estados Unidos",
+    "offline": "off-line",
+    "helpTranslate": "ajude a traduzir",
+    "extremelyClear": "extremamente limpo",
+    "veryClear": "muito limpo",
+    "clear": "limpo",
+    "slightlyHazy": "levemente enevoado",
+    "hazy": "enevoado",
+    "veryHazy": "muito enevoado",
+    "extremelyHazy": "extremamente enevoado",
+    "poweredByOpenMeteo": "fornecido por open-meteo",
+    "@poweredByOpenMeteo": {
+        "description": "text displayed at the end of the air quality page, crediting open-meteo for the data"
+    },
+    "rainInHalfHour": "chuva na próxima meia hora",
+    "@rainInHalfHour": {
+        "description": "rain in the next half an hour"
+    },
+    "rainInMinutes": "chuva em {minutes, plural, =1 {1 minuto} other {{minutes} minutos}}",
+    "@rainInMinutes": {
+        "description": "rain in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "rainInOneHour": "chuva na próxima hora",
+    "@rainInOneHour": {
+        "description": "rain in the next hour"
+    },
+    "rainInHours": "chuva em {hours, plural, =1 {1 hora} other {{hours} horas}}",
+    "@rainInHours": {
+        "description": "rain in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInMinutes": "chuva prevista em {minutes, plural, =1 {1 minuto} other {{minutes} minutos}}",
+    "@rainExpectedInMinutes": {
+        "description": "rain expected in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInOneHour": "chuva prevista em uma hora",
+    "@rainExpectedInOneHour": {
+        "description": "rain expected in the next hour"
+    },
+    "rainExpectedInHours": "chuva prevista em {hours, plural, =1 {1 hora} other {{hours} horas}}",
+    "@rainExpectedInHours": {
+        "description": "rain expected in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "updatedXMinutesAgo": "atualizado, há {minutes} min atrás",
+    "updatedXHoursAgo": "atualizado, há {hours, plural, =1 {1 hora} other {{hours} horas}} atrás",
+    "@updatedXHoursAgo": {
+        "description": "updated x hours ago",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "updatedXDaysAgo": "atualizado, há {days, plural, =1 {1 dia} other {{days} dias}} atrás",
+    "@updatedXDaysAgo": {
+        "description": "updated x days ago",
+        "placeholders": {
+            "days": {
+                "type": "int"
+            }
+        }
+    },
+    "radarHaptics": "Feedback tátil do radar",
+    "@radarHaptics": {
+        "description": "setting for enabling or disabling haptic feedback for the radar"
+    },
+    "alertsCapital": "Alertas",
+    "alertsLowercase": "alertas",
+    "severity": "severidade",
+    "certainty": "certeza",
+    "urgency": "urgência",
+    "areas": "áreas",
+    "light": "leve",
+    "@light": {
+        "description": "light precipitation"
+    },
+    "heavy": "intensa",
+    "@heavy": {
+        "description": "heavy precipitation"
+    },
+    "showMore": "mostrar mais",
+    "showLess": "mostrar menos",
+    "tempLowercase": "temperatura",
+    "pressureLowercase": "Pressão",
+    "backgroundUpdates": "Atualizações em segundo plano",
+    "backgroundUpdatesSettingsDesc": "Atualizações de widgets, notificações",
+    "cold": "Frio",
+    "hot": "Quente",
+    "calm": "Calmo",
+    "severe": "forte",
+    "low": "baixo",
+    "high": "Alto",
+    "liveRadar": "Radar ao vivo",
+    "ongoingNotification": "notificação contínua"
+}

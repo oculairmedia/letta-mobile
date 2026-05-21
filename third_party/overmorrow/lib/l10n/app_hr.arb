@@ -1,0 +1,220 @@
+{
+    "language": "Jezik",
+    "temperature": "Temperatura",
+    "rain": "Kiša",
+    "clearNight": "Vedra noć",
+    "tomorrowLowercase": "sutra",
+    "feelsLike": "Osjeća se kao",
+    "humidity": "Vlažnost",
+    "windCapital": "Vjetar",
+    "uvCapital": "UV",
+    "settings": "Postavke",
+    "today": "Danas",
+    "overmorrowLowercase": "Sutrašnjica",
+    "precipitaion": "Oborine",
+    "partlyCloudy": "Djelomično oblačno",
+    "clearSky": "Vedro nebo",
+    "overcast": "Oblačno",
+    "haze": "Izmaglica",
+    "sleet": "Susnježica",
+    "drizzle": "Rominjanje",
+    "thunderstorm": "Grmljavina",
+    "heavySnow": "Jak snijeg",
+    "fog": "Magla",
+    "snow": "Snijeg",
+    "heavyRain": "Jaka kiša",
+    "cloudyNight": "Oblačna noć",
+    "weakOrNoWifiConnection": "Slaba ili nikakva Wi-Fi veza",
+    "notConnectedToTheInternet": "Nije povezano s internetom",
+    "placeNotFound": "Mjesto nije pronađeno",
+    "unableToLocateDevice": "Nije moguće pronaći uređaj",
+    "locationServicesAreDisabled": "Usluge lokacije su onemogućene.",
+    "locationPermissionIsDenied": "dozvola za lokaciju je odbijena",
+    "locationPermissionDeniedForever": "dozvola za lokaciju zauvijek odbijena",
+    "grantLocationPermission": "odobri dopuštenje za lokaciju",
+    "currentLocation": "trenutna lokacija",
+    "favoritesLowercase": "favoriti",
+    "failedToAccessGps": "neuspio pristup GPS-u",
+    "search": "Pretraživanje...",
+    "sunriseSunset": "izlazak/zalazak",
+    "airQuality": "Kvaliteta zraka",
+    "airQualityLowercase": "kvaliteta zraka",
+    "good": "dobro",
+    "fair": "pošteno",
+    "moderate": "umjereno",
+    "poor": "loše",
+    "veryPoor": "vrlo loše",
+    "unhealthy": "nezdravo",
+    "radar": "radar",
+    "colorMode": "Način boja",
+    "weatherProvderLowercase": "pružatelj vremenske prognoze",
+    "timeMode": "Vremenski način rada",
+    "mon": "Pon",
+    "tue": "Ut",
+    "wed": "Sri",
+    "thu": "Čet",
+    "fri": "Pe",
+    "sat": "Sub",
+    "sun": "Ned",
+    "fontSize": "Veličina fonta",
+    "dailyLowercase": "dnevno",
+    "searchProvider": "Pružatelj pretraživanja",
+    "updatedJustNow": "ažurirano, upravo sada",
+    "colorSource": "Izvor boje",
+    "imageSource": "Izvor slike",
+    "sumLowercase": "suma",
+    "@sumLowercase": {
+        "description": "short for summary, overview, gist or something similar, used in the context of hourly list"
+    },
+    "precipLowercase": "oborina",
+    "windLowercase": "vjetar",
+    "uvLowercase": "uv",
+    "goodAqiDesc": "Kvaliteta zraka je izvrsna; nema zdravstvenog rizika.",
+    "fairAqiDesc": "Prihvatljiva kvaliteta zraka; manji rizik za osjetljive osobe.",
+    "moderateAqiDesc": "Osjetljive osobe mogu osjetiti blage nuspojave.",
+    "poorAqiDesc": "Zdravstveni učinci mogući su za sve, ozbiljni za osjetljive skupine.",
+    "veryPoorAqiDesc": "Ozbiljne zdravstvene posljedice za sve.",
+    "unhealthyAqiDesc": "Izvanredne situacije; teške zdravstvene posljedice za sve.",
+    "photoByXOnUnsplash": "Fotografija, autora ,x, na ,Unsplashu",
+    "sourceCodeLowercase": "izvorni kod",
+    "emailLowercase": "email",
+    "reportAnIssueLowercase": "prijavi problem",
+    "donateLowercase": "doniraj",
+    "versionUppercase": "Verzija",
+    "apiAndServices": "API i Servisi",
+    "licenseUppercase": "Licenca",
+    "weatherDataLowercase": "podaci o vremenu",
+    "imagesLowercase": "slike",
+    "appearance": "Izgled",
+    "general": "Općenito",
+    "units": "Jedinice",
+    "about": "O aplikaciji",
+    "appearanceSettingDesc": "tema boja, izvor slike",
+    "generalSettingDesc": "vremenski način, veličina fonta",
+    "languageSettingDesc": "korišteni jezik",
+    "unitsSettingdesc": "jedinice korištene u aplikaciji",
+    "aboutSettingsDesc": "o ovoj aplikaciji",
+    "now": "sada",
+    "hr": "hr",
+    "layout": "Raspored",
+    "layoutSettingDesc": "redoslijed widgeta, prilagodba",
+    "thirtyMinutes": "30m",
+    "mainPollutant": "glavni zagađivač",
+    "alderPollen": "Pelud johe",
+    "birchPollen": "Pelud breze",
+    "grassPollen": "Pelud trave",
+    "mugwortPollen": "Pelud pelina",
+    "olivePollen": "Pelud masline",
+    "ragweedPollen": "Pelud ambrozije",
+    "dailyAqi": "dnevni AQI",
+    "dateFormat": "Format datuma",
+    "d": "d",
+    "@d": {
+        "description": "short for day"
+    },
+    "aerosolOpticalDepth": "optička dubina aerosola",
+    "dust": "prašina",
+    "europeanAqi": "europski aqi",
+    "unitedStatesAqi": "američki aqi",
+    "offline": "izvan mreže",
+    "helpTranslate": "pomoć pri prevođenju",
+    "extremelyClear": "izuzetno jasno",
+    "veryClear": "vrlo jasno",
+    "clear": "jasno",
+    "slightlyHazy": "blaga izmaglica",
+    "hazy": "maglovito",
+    "veryHazy": "vrlo maglovito",
+    "extremelyHazy": "izuzetno maglovito",
+    "poweredByOpenMeteo": "podaci sa open-meteo",
+    "@poweredByOpenMeteo": {
+        "description": "text displayed at the end of the air quality page, crediting open-meteo for the data"
+    },
+    "rainInHalfHour": "kiša u sljedećih pola sata",
+    "@rainInHalfHour": {
+        "description": "rain in the next half an hour"
+    },
+    "rainInOneHour": "kiša u sljedećem satu",
+    "@rainInOneHour": {
+        "description": "rain in the next hour"
+    },
+    "rainExpectedInOneHour": "očekuje se kiša za sat vremena",
+    "@rainExpectedInOneHour": {
+        "description": "rain expected in the next hour"
+    },
+    "updatedXMinutesAgo": "osvježeno prije {minutes} min",
+    "radarHaptics": "Haptika radara",
+    "@radarHaptics": {
+        "description": "setting for enabling or disabling haptic feedback for the radar"
+    },
+    "alertsCapital": "Upozorenja",
+    "alertsLowercase": "upozorenja",
+    "severity": "ozbiljnost",
+    "certainty": "sigurnost",
+    "urgency": "hitnost",
+    "areas": "područja",
+    "light": "svjetlo",
+    "@light": {
+        "description": "light precipitation"
+    },
+    "heavy": "težak",
+    "@heavy": {
+        "description": "heavy precipitation"
+    },
+    "showMore": "pokaži više",
+    "showLess": "pokaži manje",
+    "precipCapital": "Oborine.",
+    "rainInMinutes": "kiša za {minutes, plural, =1 {minute} other {{minutes} minutes}}",
+    "@rainInMinutes": {
+        "description": "rain in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "rainInHours": "kiša za {hours, plural, =1 {hour} other {{hours} hours}}",
+    "@rainInHours": {
+        "description": "rain in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInMinutes": "očekuje se kiša za {minutes, plural, =1 {minute} other {{minutes} minutes}}",
+    "@rainExpectedInMinutes": {
+        "description": "rain expected in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInHours": "očekuje se kiša za {hours, plural, =1 {hour} other {{hours} hours}}",
+    "@rainExpectedInHours": {
+        "description": "rain expected in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "updatedXHoursAgo": "osvježeno prije {hours, plural, =1 {1 hour} other {{hours} hours}}",
+    "@updatedXHoursAgo": {
+        "description": "updated x hours ago",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "updatedXDaysAgo": "osvježeno prije {days, plural, =1 {1 day} other {{days} days}}",
+    "@updatedXDaysAgo": {
+        "description": "updated x days ago",
+        "placeholders": {
+            "days": {
+                "type": "int"
+            }
+        }
+    }
+}

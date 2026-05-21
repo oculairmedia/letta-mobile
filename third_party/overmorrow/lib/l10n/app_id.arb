@@ -1,0 +1,231 @@
+{
+    "about": "Tentang",
+    "notConnectedToTheInternet": "Tidak ada internet",
+    "unableToLocateDevice": "Tidak dapat menemukan perangkat",
+    "drizzle": "Gerimis",
+    "humidity": "Kelembapan",
+    "windCapital": "Angin",
+    "uvCapital": "UV",
+    "settings": "Setelan",
+    "donate": "Donasi",
+    "today": "Hari ini",
+    "tomorrow": "Besok",
+    "overmorrow": "Lusa",
+    "language": "Bahasa",
+    "precipCapital": "Curah hjn.",
+    "rain": "Hujan",
+    "favorites": "Favorit",
+    "clearNight": "Cerah",
+    "partlyCloudy": "Berawan",
+    "clearSky": "Cerah",
+    "overcast": "Mendung",
+    "haze": "Kabut",
+    "sleet": "Hujan Es",
+    "thunderstorm": "Petir",
+    "heavySnow": "Bersalju",
+    "fog": "Kabut",
+    "snow": "Salju",
+    "heavyRain": "Hujan Lebat",
+    "weakOrNoWifiConnection": "Sinyal Wi-Fi lemah atau hilang",
+    "placeNotFound": "Lokasi tidak ditemukan",
+    "locationServicesAreDisabled": "GPS dinonaktifkan.",
+    "locationPermissionIsDenied": "izin lokasi ditolak",
+    "locationPermissionDeniedForever": "tidak mendapat izin lokasi",
+    "failedToAccessGps": "gagal mengakses GPS",
+    "search": "Cari...",
+    "airQualityLowercase": "kualitas udara",
+    "fair": "cukup",
+    "good": "baik",
+    "moderate": "sedang",
+    "poor": "buruk",
+    "veryPoor": "sangat buruk",
+    "unhealthy": "tidak sehat",
+    "radar": "radar",
+    "colorMode": "Mode warna",
+    "weatherProvider": "Penyedia cuaca",
+    "timeMode": "12/24 jam",
+    "mon": "Sen",
+    "tue": "Sel",
+    "wed": "Rab",
+    "thu": "Kam",
+    "fri": "Jum",
+    "sat": "Sab",
+    "sun": "Min",
+    "fontSize": "Ukuran font",
+    "searchProvider": "Penyedia pencarian",
+    "updatedJustNow": "baru saja diperbarui",
+    "colorSource": "Sumber warna",
+    "imageSource": "Sumber gambar",
+    "temp": "Suhu",
+    "windLowercase": "angin",
+    "uvLowercase": "uv",
+    "goodAqiDesc": "Kualitas udara sangat baik; tidak ada risiko kesehatan.",
+    "precipLowercase": "curah hujan",
+    "poorAqiDesc": "Efek kesehatan mungkin terjadi untuk semua orang, serius bagi kelompok sensitif.",
+    "veryPoorAqiDesc": "Dampak kesehatan serius untuk semua orang.",
+    "photoByXOnUnsplash": "Foto, oleh ,x, di ,Unsplash",
+    "developedBy": "Dikembangkan oleh:",
+    "sourceCode": "Kode sumber",
+    "reportAnIssue": "Laporkan masalah",
+    "weatherData": "Data cuaca:",
+    "allImagesUsedAreFrom": "Semua gambar yang digunakan berasal dari:",
+    "appearance": "Tampilan",
+    "general": "Umum",
+    "units": "Unit",
+    "appearanceSettingDesc": "tema warna, sumber gambar",
+    "generalSettingDesc": "mode waktu, ukuran font",
+    "languageSettingDesc": "bahasa yang digunakan",
+    "layout": "Tata letak",
+    "layoutSettingDesc": "urutan widget, kustomisasi",
+    "thirtyMinutes": "30m",
+    "mainPollutant": "polusi utama",
+    "birchPollen": "Polen Birch",
+    "alderPollen": "Polen Alder",
+    "hr": "jam",
+    "grassPollen": "Polen Rumput",
+    "mugwortPollen": "Polen Mugwort",
+    "olivePollen": "Polen Zaitun",
+    "ragweedPollen": "Polen Ragweed",
+    "dailyAqi": "AQI harian",
+    "dateFormat": "Format tanggal",
+    "d": "h",
+    "europeanAqi": "aqi eropa",
+    "unitedStatesAqi": "aqi amerika",
+    "offline": "offline",
+    "helpTranslate": "terjemahkan",
+    "extremelyClear": "sangat cerah",
+    "veryClear": "cerah sekali",
+    "slightlyHazy": "agak berkabut",
+    "veryHazy": "sangat berkabut",
+    "extremelyHazy": "sangat berkabut",
+    "rainInHalfHour": "hujan dalam setengah jam ke depan",
+    "@rainInHalfHour": {
+        "description": "rain in the next half an hour"
+    },
+    "rainInOneHour": "hujan dalam satu jam ke depan",
+    "@rainInOneHour": {
+        "description": "rain in the next hour"
+    },
+    "rainInMinutes": "hujan dalam {minutes, plural, =1 {minute} other {{minutes} minutes}} ke depan",
+    "@rainInMinutes": {
+        "description": "rain in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInOneHour": "hujan diperkirakan dalam satu jam ke depan",
+    "@rainExpectedInOneHour": {
+        "description": "rain expected in the next hour"
+    },
+    "updatedXMinutesAgo": "diperbarui, {minutes} menit yang lalu",
+    "temperature": "Suhu",
+    "airQuality": "Kualitas Udara",
+    "feelsLike": "Terasa seperti",
+    "daily": "Harian",
+    "cloudyNight": "Berawan",
+    "sunriseSunset": "terbit/terbenam",
+    "unhealthyAqiDesc": "Kondisi darurat; dampak kesehatan parah untuk semua orang.",
+    "rainInHours": "hujan dalam {hours, plural, =1 {hour} other {{hours} hours}} ke depan",
+    "@rainInHours": {
+        "description": "rain in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "fairAqiDesc": "Kualitas udara dapat diterima; sedikit risiko bagi orang yang sensitif.",
+    "moderateAqiDesc": "Individu yang sensitif mungkin mengalami efek ringan.",
+    "unitsSettingdesc": "unit dalam apl",
+    "updatedXDaysAgo": "diperbarui, {days, plural, =1 {1 hari} other {{days} hari}} yang lalu",
+    "@updatedXDaysAgo": {
+        "description": "updated x days ago",
+        "placeholders": {
+            "days": {
+                "type": "int"
+            }
+        }
+    },
+    "supportOnPatreon": "Dukung di Patreon",
+    "aerosolOpticalDepth": "kedalaman optik aerosol",
+    "dust": "debu",
+    "rainExpectedInHours": "hujan diperkirakan dalam {hours, plural, =1 {hour} other {{hours} hours}} ke depan",
+    "@rainExpectedInHours": {
+        "description": "rain expected in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "clear": "cerah",
+    "updatedXHoursAgo": "diperbarui, {hours, plural, =1 {1 hour} other {{hours} hours}} yang lalu",
+    "@updatedXHoursAgo": {
+        "description": "updated x hours ago",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "hazy": "berkabut",
+    "poweredByOpenMeteo": "didukung oleh open-mateo",
+    "@poweredByOpenMeteo": {
+        "description": "text displayed at the end of the air quality page, crediting open-meteo for the data"
+    },
+    "donationPageText": "Overmorrow selalu dimaksudkan untuk menjadi aplikasi yang sepenuhnya gratis, tanpa iklan atau pembelian dalam aplikasi.\n\nJadi, jika Anda hanya ingin menggunakannya seperti itu, silakan nikmati.\n\nNamun, jika Anda suka menggunakannya dan merasa itu layak dengan 1 uang Anda, harap pertimbangkan untuk mendukung proyek ini di Patreon saya.",
+    "precipitaion": "Curah hujan",
+    "rainExpectedInMinutes": "hujan diperkirakan dalam {minutes, plural, =1 {minute} other {{minutes} minutes}} ke depan",
+    "@rainExpectedInMinutes": {
+        "description": "rain expected in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "now": "skrg.",
+    "tomorrowLowercase": "esok",
+    "overmorrowLowercase": "Overmorrow",
+    "grantLocationPermission": "izin lokasi",
+    "currentLocation": "lokasi saat ini",
+    "favoritesLowercase": "favorite",
+    "weatherProvderLowercase": "server cuaca",
+    "dailyLowercase": "harian",
+    "sumLowercase": "jumlah",
+    "@sumLowercase": {
+        "description": "short for summary, overview, gist or something similar, used in the context of hourly list"
+    },
+    "sourceCodeLowercase": "sumber kode",
+    "emailLowercase": "email",
+    "reportAnIssueLowercase": "laporkan bug",
+    "donateLowercase": "donasi",
+    "versionUppercase": "Versi",
+    "apiAndServices": "Layanan Server",
+    "licenseUppercase": "Lisensi",
+    "weatherDataLowercase": "data cuaca",
+    "imagesLowercase": "gambar",
+    "aboutSettingsDesc": "info apl",
+    "radarHaptics": "Radar haptik",
+    "@radarHaptics": {
+        "description": "setting for enabling or disabling haptic feedback for the radar"
+    },
+    "alertsCapital": "Peringatan",
+    "alertsLowercase": "peringatan",
+    "severity": "tingkat bahaya",
+    "certainty": "tingkat akurasi",
+    "urgency": "tingkat saran",
+    "areas": "wilayah",
+    "light": "ringan",
+    "@light": {
+        "description": "light precipitation"
+    },
+    "heavy": "lebat",
+    "@heavy": {
+        "description": "heavy precipitation"
+    },
+    "showMore": "lebih",
+    "showLess": "kurangi detail"
+}

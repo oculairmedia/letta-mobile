@@ -1,0 +1,251 @@
+{
+    "donate": "Bağış yap",
+    "precipCapital": "Yağış.",
+    "humidity": "Nem",
+    "windCapital": "Rüzgar",
+    "uvCapital": "UV",
+    "settings": "Ayarlar",
+    "today": "Bugün",
+    "overmorrow": "Yarından sonra",
+    "language": "Dil",
+    "feelsLike": "Hissedilen",
+    "about": "Hakkında",
+    "tomorrow": "Yarın",
+    "temperature": "Sıcaklık",
+    "precipitaion": "Yağış",
+    "rain": "Yağmur",
+    "favorites": "Favoriler",
+    "clearNight": "Berrak Gece",
+    "partlyCloudy": "Parçalı Bulutlu",
+    "clearSky": "Berrak Gökyüzü",
+    "overcast": "Bulutlu",
+    "haze": "Puslu",
+    "sleet": "Karla karışık yağmur",
+    "drizzle": "Çiseleyen",
+    "thunderstorm": "Gök gürültülü fırtına",
+    "cloudyNight": "Bulutlu Gece",
+    "weakOrNoWifiConnection": "Wifi bağlantısı zayıf veya hiç yok",
+    "placeNotFound": "Yer bulunamadı",
+    "locationPermissionDeniedForever": "konum i̇zni̇ sonsuza kadar reddedi̇ldi̇",
+    "search": "Ara...",
+    "sunriseSunset": "gün doğumu/gün batımı",
+    "airQuality": "Hava Kalitesi",
+    "moderate": "ılımlı",
+    "poor": "kötü",
+    "veryPoor": "berbat",
+    "fair": "uygun",
+    "unhealthy": "sağlıksız",
+    "radar": "radar",
+    "thu": "Per",
+    "fri": "Cuma",
+    "fontSize": "Yazı tipi boyutu",
+    "daily": "Günlük",
+    "searchProvider": "Arama sağlayıcı",
+    "updatedXMinAgo": "güncellendi, x dakika önce",
+    "updatedJustNow": "güncellendi, şimdi",
+    "colorSource": "Renk kaynağı",
+    "imageSource": "Resim kaynağı",
+    "temp": "sıcaklık",
+    "precipLowercase": "yağış",
+    "uvLowercase": "uv",
+    "goodAqiDesc": "Hava kalitesi mükemmel; sağlık riski yok.",
+    "fairAqiDesc": "Kabul edilebilir hava kalitesi; hassas kişiler için küçük risk.",
+    "moderateAqiDesc": "Hassas bireyler hafif etkiler yaşayabilir.",
+    "poorAqiDesc": "Herkes için olası sağlık etkileri, hassas gruplar için ciddi.",
+    "veryPoorAqiDesc": "Herkes için ciddi sağlık etkileri.",
+    "unhealthyAqiDesc": "Acil durum koşulları; herkes için ciddi sağlık etkileri.",
+    "photoByXOnUnsplash": ",Unsplash,'ta ,x, tarafından fotoğraf",
+    "sourceCode": "Kaynak kodu",
+    "reportAnIssue": "Bir sorun bildirin",
+    "weatherData": "Hava durumu verileri:",
+    "allImagesUsedAreFrom": "Kullanılan tüm görseller:",
+    "supportOnPatreon": "Patreon üzerinden destek",
+    "appearance": "Görünüm",
+    "appearanceSettingDesc": "renk teması, görüntü kaynağı",
+    "languageSettingDesc": "kullanılan dil",
+    "unitsSettingdesc": "uygulamada kullanılan birimler",
+    "now": "şimdi",
+    "hr": "saat",
+    "layout": "Düzen",
+    "thirtyMinutes": "30dk",
+    "mainPollutant": "ana kirletici",
+    "alderPollen": "Kızılağaç Poleni",
+    "birchPollen": "Huş Ağacı Poleni",
+    "grassPollen": "Çim Poleni",
+    "mugwortPollen": "Pelin Otu Poleni",
+    "olivePollen": "Zeytin Poleni",
+    "ragweedPollen": "Kanarya Otu Poleni",
+    "dailyAqi": "günlük AQI",
+    "dateFormat": "Tarih biçimi",
+    "d": "Gün",
+    "aerosolOpticalDepth": "aerosol optik derinliği",
+    "europeanAqi": "avrupa aqi",
+    "unitedStatesAqi": "ABD AQI",
+    "offline": "çevrimdışı",
+    "colorMode": "Renk modu",
+    "wed": "Çar",
+    "mon": "Pzt",
+    "general": "Genel",
+    "heavyRain": "Şiddetli Yağmur",
+    "locationServicesAreDisabled": "konum hizmetleri devre dışı bırakıldı.",
+    "unableToLocateDevice": "Cihazın yeri tespit edilemiyor",
+    "snow": "Kar",
+    "notConnectedToTheInternet": "İnternete bağlı değilsiniz",
+    "windLowercase": "rüzgar",
+    "airQualityLowercase": "hava kali̇tesi̇",
+    "good": "iyi",
+    "dust": "toz",
+    "units": "Birimler",
+    "generalSettingDesc": "zaman modu, yazı tipi boyutu",
+    "layoutSettingDesc": "widget düzeni, özelleştirme",
+    "developedBy": "x, tarafından geliştirilmiştir",
+    "fog": "Sis",
+    "sun": "Pzr",
+    "heavySnow": "Yoğun Kar",
+    "failedToAccessGps": "GPS'e erişilemedi",
+    "locationPermissionIsDenied": "konum izni reddedildi",
+    "timeMode": "Zaman modu",
+    "weatherProvider": "Hava durumu sağlayıcısı",
+    "tue": "Salı",
+    "sat": "Cmts",
+    "showMore": "daha fazla göster",
+    "showLess": "daha az göster",
+    "helpTranslate": "çevirmeye yardım et",
+    "extremelyClear": "son derece açık",
+    "veryClear": "çok açık",
+    "clear": "açık",
+    "rainInHalfHour": "önümüzdeki yarım saat içinde yağmur",
+    "@rainInHalfHour": {
+        "description": "rain in the next half an hour"
+    },
+    "rainInOneHour": "önümüzdeki bir saat içinde yağmur",
+    "@rainInOneHour": {
+        "description": "rain in the next hour"
+    },
+    "rainExpectedInOneHour": "Bir saat içinde yağmur bekleniyor",
+    "@rainExpectedInOneHour": {
+        "description": "rain expected in the next hour"
+    },
+    "weatherProvderLowercase": "hava durumu sağlayıcısı",
+    "tomorrowLowercase": "yarın",
+    "overmorrowLowercase": "yarından sonra",
+    "updatedXMinutesAgo": "güncellendi, {minutes} dakika önce",
+    "radarHaptics": "Radar dokunsallığı",
+    "@radarHaptics": {
+        "description": "setting for enabling or disabling haptic feedback for the radar"
+    },
+    "severity": "şiddet",
+    "urgency": "aciliyet",
+    "certainty": "kesinlik",
+    "areas": "alanlar",
+    "grantLocationPermission": "konum izni ver",
+    "currentLocation": "mevcut konum",
+    "favoritesLowercase": "favoriler",
+    "dailyLowercase": "günlük",
+    "sourceCodeLowercase": "kaynak kodu",
+    "emailLowercase": "e-posta",
+    "reportAnIssueLowercase": "bir sorunu bildirin",
+    "donateLowercase": "bağış",
+    "slightlyHazy": "hafif puslu",
+    "hazy": "puslu",
+    "veryHazy": "çok puslu",
+    "extremelyHazy": "aşırı puslu",
+    "poweredByOpenMeteo": "open-meteo tarafından desteklenmektedir",
+    "@poweredByOpenMeteo": {
+        "description": "text displayed at the end of the air quality page, crediting open-meteo for the data"
+    },
+    "sumLowercase": "toplam",
+    "@sumLowercase": {
+        "description": "short for summary, overview, gist or something similar, used in the context of hourly list"
+    },
+    "imagesLowercase": "görüntüler",
+    "apiAndServices": "API'ler ve Hizmetler",
+    "versionUppercase": "Versiyon",
+    "weatherDataLowercase": "hava durumu verileri",
+    "aboutSettingsDesc": "bu uygulama hakkında",
+    "licenseUppercase": "Lisans",
+    "alertsLowercase": "uyarılar",
+    "light": "hafif",
+    "@light": {
+        "description": "light precipitation"
+    },
+    "heavy": "ağır",
+    "@heavy": {
+        "description": "heavy precipitation"
+    },
+    "alertsCapital": "Uyarılar",
+    "rainInMinutes": "{minutes, plural, =1 {dakika} other {{minutes} dakika}} içinde yağmur",
+    "@rainInMinutes": {
+        "description": "rain in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "rainInHours": "{hours, plural, =1 {saat} other {{hours} saat}} içinde yağmur",
+    "@rainInHours": {
+        "description": "rain in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInMinutes": "{minutes, plural, =1 {dakika} other {{minutes} dakika}} içinde yağmur bekleniyor",
+    "@rainExpectedInMinutes": {
+        "description": "rain expected in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInHours": "{hours, plural, =1 {saat} other {{hours} saat}} içinde yağmur bekleniyor",
+    "@rainExpectedInHours": {
+        "description": "rain expected in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "updatedXHoursAgo": "güncellendi, {hours, plural, =1 {1 saat} other {{hours} saat}} önce",
+    "@updatedXHoursAgo": {
+        "description": "updated x hours ago",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "updatedXDaysAgo": "güncellendi, {days, plural, =1 {1 gün} other {{days} gün}} önce",
+    "@updatedXDaysAgo": {
+        "description": "updated x days ago",
+        "placeholders": {
+            "days": {
+                "type": "int"
+            }
+        }
+    },
+    "cold": "soğuk",
+    "hot": "sıcak",
+    "calm": "sakin",
+    "severe": "şiddetli",
+    "low": "düşük",
+    "high": "yüksek",
+    "tempLowercase": "sıcaklık",
+    "pressureLowercase": "basınç",
+    "liveRadar": "canlı radar",
+    "backgroundUpdates": "Arkaplan güncellemeleri",
+    "backgroundUpdatesSettingsDesc": "widget güncellemeleri, bildirimler",
+    "ongoingNotification": "sürekli bildirim",
+    "north": "K",
+    "northEast": "KD",
+    "east": "D",
+    "southEast": "GD",
+    "south": "G",
+    "southWest": "GB",
+    "west": "B",
+    "northWest": "KB"
+}

@@ -1,0 +1,253 @@
+{
+    "unhealthy": "нездравословно",
+    "birchPollen": "Прашец от бреза",
+    "clear": "ясно",
+    "rainExpectedInMinutes": "очаква се дъжд в следващите {minutes, plural, =1 {minute} other {{minutes} минути}}",
+    "@rainExpectedInMinutes": {
+        "description": "rain expected in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "extremelyClear": "изключително ясно",
+    "mugwortPollen": "Прашец от пелин",
+    "extremelyHazy": "изключително мъгливо",
+    "rainInHalfHour": "дъжд в следващия половин час",
+    "@rainInHalfHour": {
+        "description": "rain in the next half an hour"
+    },
+    "veryHazy": "много мъгливо",
+    "rainInHours": "дъжд в следващите {hours, plural, =1 {hour} other {{hours} часа}}",
+    "@rainInHours": {
+        "description": "rain in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "updatedXHoursAgo": "актуализирано, преди {hours, plural, =1 {1 hour} other {{hours} часа}}",
+    "@updatedXHoursAgo": {
+        "description": "updated x hours ago",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "notConnectedToTheInternet": "Не сте свързани с интернет",
+    "goodAqiDesc": "Качеството на въздуха е отлично; няма риск за здравето.",
+    "allImagesUsedAreFrom": "Всички използвани изображения са от:",
+    "feelsLike": "Усеща се като",
+    "locationPermissionIsDenied": "разрешението за местоположение е отказано",
+    "fairAqiDesc": "Приемливо качество на въздуха; малък риск за чувствителни хора.",
+    "partlyCloudy": "Частично облачно",
+    "locationServicesAreDisabled": "услугите за местоположение са деактивирани.",
+    "veryPoorAqiDesc": "Сериозни последици за здравето на всички.",
+    "unhealthyAqiDesc": "Извънредни условия; тежки последици за здравето на всички.",
+    "aerosolOpticalDepth": "оптична дълбочина на аерозола",
+    "fog": "Мъгла",
+    "colorMode": "Режим на цвят",
+    "fontSize": "Размер на шрифта",
+    "search": "Търсене ...",
+    "sun": "Нд",
+    "weatherProvider": "Доставчик на метеорологични услуги",
+    "poorAqiDesc": "Възможни са последици за здравето на всички, но сериозни за чувствителните групи.",
+    "uvCapital": "UV индекс",
+    "precipCapital": "Валежи",
+    "humidity": "Влажност",
+    "settings": "Настройки",
+    "donate": "Дарение",
+    "about": "Относно",
+    "tomorrow": "Утре",
+    "language": "Език",
+    "overmorrow": "Вдругиден",
+    "temperature": "Температура",
+    "precipitaion": "Валежи",
+    "rain": "Дъжд",
+    "favorites": "Любими",
+    "clearNight": "Ясна нощ",
+    "clearSky": "Ясно небе",
+    "sleet": "Суграшица",
+    "snow": "Сняг",
+    "haze": "Мараня",
+    "heavyRain": "Силен дъжд",
+    "cloudyNight": "Облачна нощ",
+    "placeNotFound": "Мястото не е намерено",
+    "unableToLocateDevice": "Не може да се намери устройство",
+    "weakOrNoWifiConnection": "Слаба или никаква Wi-Fi връзка",
+    "locationPermissionDeniedForever": "разрешението за местоположение, отказано завинаги",
+    "failedToAccessGps": "не успя да получи достъп до gps",
+    "sunriseSunset": "изгрев / залез",
+    "airQuality": "Качество на въздуха",
+    "airQualityLowercase": "качество на въздуха",
+    "good": "добро",
+    "fair": "приемливо",
+    "moderate": "умерено",
+    "poor": "лошо",
+    "veryPoor": "много лошо",
+    "radar": "радар",
+    "timeMode": "Формат на време",
+    "mon": "Пн",
+    "tue": "Вт",
+    "wed": "Ср",
+    "fri": "Пт",
+    "sat": "Сб",
+    "searchProvider": "Доставчик на търсене",
+    "updatedJustNow": "обновено, току-що",
+    "colorSource": "Източник на цвят",
+    "precipLowercase": "валежи",
+    "windLowercase": "вятър",
+    "uvLowercase": "uv индекс",
+    "temp": "темп.",
+    "photoByXOnUnsplash": "Снимка, от ,x, на ,Unsplash",
+    "developedBy": "Разработено от:",
+    "sourceCode": "Изходен код",
+    "reportAnIssue": "Докладвайте за проблем",
+    "weatherData": "Метеорологични данни:",
+    "general": "Общи",
+    "appearanceSettingDesc": "цветна тема, източник на изображения",
+    "generalSettingDesc": "формат на време, размер на шрифта",
+    "languageSettingDesc": "използван език",
+    "units": "Мерни единици",
+    "supportOnPatreon": "Подкрепете в Patreon",
+    "unitsSettingdesc": "мерните единици използвани в приложението",
+    "now": "сега",
+    "layout": "Оформление",
+    "layoutSettingDesc": "ред на приспособление, персонализиране",
+    "thirtyMinutes": "30мин.",
+    "mainPollutant": "основен замърсител",
+    "hr": "ч.",
+    "alderPollen": "Прашец от елша",
+    "grassPollen": "Прашец от трева",
+    "olivePollen": "Прашец от маслина",
+    "ragweedPollen": "Прашец от амброзия",
+    "dateFormat": "Формат на дата",
+    "dust": "прах",
+    "europeanAqi": "Индекс на качеството на въздуха в Европа",
+    "unitedStatesAqi": "Индекс на качеството на въздуха в САЩ",
+    "offline": "офлайн",
+    "helpTranslate": "помогнете с превода",
+    "dailyAqi": "ежедневно AQI",
+    "veryClear": "много ясно",
+    "d": "д",
+    "slightlyHazy": "леко мъгливо",
+    "hazy": "мъгливо",
+    "poweredByOpenMeteo": "предоставено от open-meteo",
+    "@poweredByOpenMeteo": {
+        "description": "text displayed at the end of the air quality page, crediting open-meteo for the data"
+    },
+    "rainInMinutes": "дъжд в следващите {minutes, plural, =1 {minute} other {{minutes} минути}}",
+    "@rainInMinutes": {
+        "description": "rain in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "rainInOneHour": "дъжд в следващия час",
+    "@rainInOneHour": {
+        "description": "rain in the next hour"
+    },
+    "rainExpectedInOneHour": "очаква се дъжд в следващия час",
+    "@rainExpectedInOneHour": {
+        "description": "rain expected in the next hour"
+    },
+    "updatedXMinutesAgo": "актуализирано, преди {minutes} минути",
+    "updatedXDaysAgo": "актуализирано, преди {days, plural, =1 {1 day} other {{days} дни}}",
+    "@updatedXDaysAgo": {
+        "description": "updated x days ago",
+        "placeholders": {
+            "days": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInHours": "очаква се дъжд в следващите {hours, plural, =1 {hour} other {{hours} часа}}",
+    "@rainExpectedInHours": {
+        "description": "rain expected in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "appearance": "Външен вид",
+    "overcast": "Облачно",
+    "today": "Днес",
+    "thunderstorm": "Гръмотевична буря",
+    "drizzle": "Ситен дъжд",
+    "daily": "Ежедневно",
+    "windCapital": "Вятър",
+    "heavySnow": "Силен сняг",
+    "moderateAqiDesc": "Чувствителните хора могат да изпитат леки въздействия.",
+    "imageSource": "Източник на изображение",
+    "thu": "Чт",
+    "donationPageText": "Overmorrow винаги е бил предназначен за напълно безплатно приложение, без реклами или покупки в приложението. \n \nТака че, ако просто искате да го използвате по този начин, моля, наслаждавайте се. \n \nАко обаче ви харесва да го използвате и чувствате, че си струва 1 от парите ви, моля, помислете за подкрепа на проекта на моя Patreon..",
+    "radarHaptics": "Tактилна обратна връзка на радара",
+    "@radarHaptics": {
+        "description": "setting for enabling or disabling haptic feedback for the radar"
+    },
+    "alertsCapital": "Сигнали",
+    "severity": "сериозност",
+    "areas": "области",
+    "certainty": "сигурност",
+    "urgency": "спешност",
+    "buyMeACoffee": "Купете ми кафе!",
+    "donationPageTextNew": "Overmorrow винаги е бил предназначен за напълно безплатно приложение, без реклами и покупки в приложението. \n \nТака че, ако просто искате да го използвате по този начин, моля, наслаждавайте се. \n \nВъпреки това, ако обичате да го използвате, тогава, моля, помислете за малка сума. \n\nБлагодаря ви!",
+    "weatherProvderLowercase": "доставчик на метеорологични услуги",
+    "grantLocationPermission": "предоставяне на разрешение за местоположение",
+    "currentLocation": "текущо местоположение",
+    "favoritesLowercase": "любими",
+    "sumLowercase": "обобщение",
+    "@sumLowercase": {
+        "description": "short for summary, overview, gist or something similar, used in the context of hourly list"
+    },
+    "dailyLowercase": "ежедневно",
+    "sourceCodeLowercase": "изходен код",
+    "emailLowercase": "електронна поща",
+    "reportAnIssueLowercase": "докладване на проблем",
+    "donateLowercase": "дарение",
+    "versionUppercase": "Версия",
+    "apiAndServices": "API и Услуги",
+    "licenseUppercase": "Лиценз",
+    "weatherDataLowercase": "данни за времето",
+    "imagesLowercase": "изображения",
+    "aboutSettingsDesc": "относно това приложение",
+    "alertsLowercase": "сигнали",
+    "light": "лек",
+    "@light": {
+        "description": "light precipitation"
+    },
+    "heavy": "силен",
+    "@heavy": {
+        "description": "heavy precipitation"
+    },
+    "showLess": "покажи по-малко",
+    "showMore": "покажи повече",
+    "tomorrowLowercase": "утре",
+    "overmorrowLowercase": "вдругиден",
+    "cold": "студено",
+    "hot": "горещо",
+    "calm": "спокойно",
+    "severe": "тежко",
+    "low": "ниско",
+    "high": "високо",
+    "tempLowercase": "температура",
+    "pressureLowercase": "налягане",
+    "liveRadar": "радар на живо",
+    "backgroundUpdates": "Актуализации на фона",
+    "backgroundUpdatesSettingsDesc": "актуализации на джаджи, известия",
+    "ongoingNotification": "текущо известие",
+    "north": "С",
+    "northEast": "СИ",
+    "east": "И",
+    "southEast": "ЮИ",
+    "south": "Ю",
+    "southWest": "ЮЗ",
+    "west": "З",
+    "northWest": "СЗ"
+}

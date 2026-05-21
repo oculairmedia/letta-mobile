@@ -1,0 +1,240 @@
+{
+    "feelsLike": "體感",
+    "precipCapital": "降水",
+    "humidity": "濕度",
+    "windCapital": "風",
+    "uvCapital": "紫外線",
+    "settings": "設定",
+    "today": "今天",
+    "tomorrowLowercase": "明天",
+    "language": "語言",
+    "temperature": "溫度",
+    "precipitaion": "降水",
+    "rain": "雨",
+    "clearNight": "晴朗的夜晚",
+    "partlyCloudy": "局部多雲",
+    "clearSky": "晴朗的天空",
+    "overcast": "陰天",
+    "haze": "霧霾",
+    "sleet": "雨夾雪",
+    "drizzle": "毛毛雨",
+    "thunderstorm": "雷暴",
+    "heavySnow": "大雪",
+    "fog": "霧",
+    "snow": "雪",
+    "heavyRain": "大雨",
+    "cloudyNight": "多雲的夜晚",
+    "weakOrNoWifiConnection": "無線網絡信號弱或無連接",
+    "notConnectedToTheInternet": "未連接到網際網路",
+    "placeNotFound": "未找到地點",
+    "unableToLocateDevice": "無法定位設備",
+    "locationServicesAreDisabled": "定位服務已關閉。",
+    "locationPermissionIsDenied": "定位權限已拒絕",
+    "locationPermissionDeniedForever": "定位權限已永久拒絕",
+    "grantLocationPermission": "授權定位權限",
+    "currentLocation": "目前位置",
+    "favoritesLowercase": "最愛",
+    "failedToAccessGps": "無法訪問 GPS",
+    "search": "搜尋...",
+    "sunriseSunset": "日出/日落",
+    "airQuality": "空氣品質",
+    "airQualityLowercase": "空氣品質",
+    "good": "好",
+    "fair": "不錯",
+    "moderate": "適中",
+    "poor": "較差",
+    "veryPoor": "非常差",
+    "unhealthy": "不健康",
+    "radar": "雷達",
+    "colorMode": "彩色模式",
+    "weatherProvderLowercase": "天氣資訊提供者",
+    "timeMode": "時間格式",
+    "mon": "一",
+    "tue": "二",
+    "wed": "三",
+    "thu": "四",
+    "fri": "五",
+    "sat": "六",
+    "sun": "日",
+    "fontSize": "文字大小",
+    "dailyLowercase": "每日預報",
+    "searchProvider": "搜尋提供商",
+    "updatedJustNow": "剛剛更新",
+    "colorSource": "顔色來源",
+    "imageSource": "圖片來源",
+    "sumLowercase": "總結",
+    "@sumLowercase": {
+        "description": "short for summary, overview, gist or something similar, used in the context of hourly list"
+    },
+    "precipLowercase": "降水",
+    "windLowercase": "風",
+    "uvLowercase": "紫外線",
+    "goodAqiDesc": "空氣品質極佳；無健康風險。",
+    "fairAqiDesc": "可接受的空氣品質；對敏感人群有輕微風險。",
+    "moderateAqiDesc": "敏感人群可能會出現輕微影響。",
+    "poorAqiDesc": "健康影響可能對所有人生效，對敏感族群則較為嚴重。",
+    "veryPoorAqiDesc": "對所有人都有嚴重的健康影響。",
+    "unhealthyAqiDesc": "緊急狀況；對所有人有嚴重健康影響。",
+    "photoByXOnUnsplash": "圖片, ,x, 拍攝，發佈於 ,Unsplash",
+    "sourceCodeLowercase": "原始码",
+    "emailLowercase": "電子郵箱",
+    "reportAnIssueLowercase": "問題回報",
+    "donateLowercase": "捐款",
+    "versionUppercase": "版本",
+    "apiAndServices": "接口及服務",
+    "licenseUppercase": "許可證",
+    "weatherDataLowercase": "天氣資料",
+    "imagesLowercase": "圖片",
+    "appearance": "外觀",
+    "general": "一般",
+    "units": "單位",
+    "about": "關於",
+    "appearanceSettingDesc": "顏色主題, 圖片來源",
+    "generalSettingDesc": "時間格式, 字體大小",
+    "languageSettingDesc": "使用的語言",
+    "unitsSettingdesc": "應用程式中的單位",
+    "aboutSettingsDesc": "關於此應用程式",
+    "now": "現在",
+    "hr": "小時",
+    "layout": "佈局",
+    "layoutSettingDesc": "小部件順序，自定",
+    "thirtyMinutes": "30分鐘",
+    "mainPollutant": "主要污染物",
+    "alderPollen": "榿木花粉",
+    "birchPollen": "樺木花粉",
+    "grassPollen": "草花粉",
+    "mugwortPollen": "艾蒿花粉",
+    "olivePollen": "橄欖花粉",
+    "ragweedPollen": "豚草花粉",
+    "dailyAqi": "每日空氣品質指數",
+    "dateFormat": "日期格式",
+    "d": "天",
+    "@d": {
+        "description": "short for day"
+    },
+    "aerosolOpticalDepth": "氣溶膠光學深度",
+    "dust": "灰塵",
+    "europeanAqi": "歐洲空氣品質指標",
+    "unitedStatesAqi": "美國空氣品質指標",
+    "offline": "離綫",
+    "helpTranslate": "幫忙翻譯",
+    "extremelyClear": "極其清晰",
+    "veryClear": "非常清晰",
+    "clear": "清晰",
+    "slightlyHazy": "略帶朦朧",
+    "hazy": "朦朧",
+    "veryHazy": "非常朦朧",
+    "extremelyHazy": "極其朦朧",
+    "poweredByOpenMeteo": "由 open-meteo 提供",
+    "@poweredByOpenMeteo": {
+        "description": "text displayed at the end of the air quality page, crediting open-meteo for the data"
+    },
+    "rainInHalfHour": "未來半小時內降雨",
+    "@rainInHalfHour": {
+        "description": "rain in the next half an hour"
+    },
+    "rainInOneHour": "未來一小時內降雨",
+    "@rainInOneHour": {
+        "description": "rain in the next hour"
+    },
+    "rainExpectedInOneHour": "預計未來一小時內會下雨",
+    "@rainExpectedInOneHour": {
+        "description": "rain expected in the next hour"
+    },
+    "updatedXMinutesAgo": "{minutes} 分鐘前更新",
+    "updatedXHoursAgo": "{hours, plural, =1 {1 hour} other {{hours} hours}} 小時前更新",
+    "@updatedXHoursAgo": {
+        "description": "updated x hours ago",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "updatedXDaysAgo": "{days, plural, =1 {1 day} other {{days} days}} 天前更新",
+    "@updatedXDaysAgo": {
+        "description": "updated x days ago",
+        "placeholders": {
+            "days": {
+                "type": "int"
+            }
+        }
+    },
+    "radarHaptics": "雷達震動反饋",
+    "@radarHaptics": {
+        "description": "setting for enabling or disabling haptic feedback for the radar"
+    },
+    "alertsCapital": "警報",
+    "alertsLowercase": "警報",
+    "severity": "嚴重",
+    "certainty": "確定",
+    "urgency": "緊急",
+    "areas": "地區",
+    "light": "輕度",
+    "@light": {
+        "description": "light precipitation"
+    },
+    "heavy": "重度",
+    "@heavy": {
+        "description": "heavy precipitation"
+    },
+    "showMore": "顯示更多",
+    "showLess": "隱藏更多",
+    "rainInMinutes": "將在 {minutes, plural, =1 {1 分鐘} other {{minutes} 分鐘}} 後下雨",
+    "@rainInMinutes": {
+        "description": "rain in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "rainInHours": "將在 {hours, plural, =1 {1 小時} other {{hours} 小時}} 後下雨",
+    "@rainInHours": {
+        "description": "rain in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInMinutes": "預計在 {minutes, plural, =1 {1 分鐘} other {{minutes} 分鐘}} 後下雨",
+    "@rainExpectedInMinutes": {
+        "description": "rain expected in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInHours": "預計在 {hours, plural, =1 {1 小時} other {{hours} 小時}} 後下雨",
+    "@rainExpectedInHours": {
+        "description": "rain expected in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "overmorrowLowercase": "後天",
+    "cold": "冷",
+    "hot": "熱",
+    "calm": "晴朗無風",
+    "severe": "惡劣",
+    "low": "低",
+    "high": "高",
+    "tempLowercase": "溫度",
+    "pressureLowercase": "壓力",
+    "backgroundUpdates": "背景更新",
+    "backgroundUpdatesSettingsDesc": "桌面物件與通知",
+    "liveRadar": "雷達回波圖",
+    "ongoingNotification": "背景常駐通知",
+    "north": "北",
+    "northEast": "東北",
+    "east": "東",
+    "southEast": "東南",
+    "south": "南",
+    "southWest": "西南",
+    "west": "西",
+    "northWest": "西北"
+}

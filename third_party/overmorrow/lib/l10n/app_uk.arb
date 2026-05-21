@@ -1,0 +1,246 @@
+{
+    "updatedXMinAgo": "Оновлено, x хв тому",
+    "ragweedPollen": "Пилок амброзії",
+    "about": "Про застосунок",
+    "moderateAqiDesc": "Чутливі люди можуть відчувати легкі наслідки.",
+    "precipCapital": "Опади",
+    "d": "дн",
+    "windCapital": "Вітер",
+    "donate": "Пожертвувати",
+    "today": "Сьогодні",
+    "tomorrow": "Завтра",
+    "overmorrow": "Післязавтра",
+    "language": "Мова",
+    "favorites": "Улюблене",
+    "clearNight": "Ясна ніч",
+    "partlyCloudy": "Мінлива хмарність",
+    "clearSky": "Ясне небо",
+    "sleet": "Мокрий сніг",
+    "drizzle": "Мряка",
+    "thunderstorm": "Гроза",
+    "haze": "Серпанок",
+    "heavySnow": "Сильний сніг",
+    "fog": "Туман",
+    "snow": "Сніг",
+    "heavyRain": "Сильний дощ",
+    "cloudyNight": "Хмарна ніч",
+    "weakOrNoWifiConnection": "Слабке або відсутнє Wi-Fi з'єднання",
+    "placeNotFound": "Місце не знайдено",
+    "unableToLocateDevice": "Не вдалося знайти пристрій",
+    "locationPermissionIsDenied": "Відмовлено в дозволі на розташування",
+    "locationPermissionDeniedForever": "Назавжди відмовлено у доступі на розташування",
+    "failedToAccessGps": "Не вдалося отримати доступ до GPS",
+    "search": "Пошук...",
+    "sunriseSunset": "Схід / Захід",
+    "unhealthy": "Шкідлива",
+    "good": "Добра",
+    "radar": "Радар",
+    "colorMode": "Режим кольору",
+    "weatherProvider": "Постачальник погоди",
+    "timeMode": "Режим часу",
+    "mon": "Пн",
+    "tue": "Вт",
+    "wed": "Ср",
+    "daily": "Наступні дні",
+    "searchProvider": "Постачальник пошуку",
+    "colorSource": "Джерело кольору",
+    "imageSource": "Джерело зображення",
+    "temp": "Темп.",
+    "precipLowercase": "Опади",
+    "windLowercase": "Вітер",
+    "fairAqiDesc": "Прийнятна якість повітря; незначний ризик для чутливих людей.",
+    "poorAqiDesc": "Можливий вплив на здоров'я для всіх, серйозний для чутливого населення.",
+    "veryPoorAqiDesc": "Серйозні наслідки для здоров'я в усіх.",
+    "photoByXOnUnsplash": "Фото, ,x, на ,Unsplash",
+    "developedBy": "Розроблено:",
+    "sourceCode": "Вихідний код",
+    "reportAnIssue": "Повідомити про проблему",
+    "weatherData": "Погодні дані:",
+    "allImagesUsedAreFrom": "Усі використані зображення взяті з:",
+    "appearance": "Вигляд",
+    "general": "Загальні",
+    "units": "Одиниці виміру",
+    "appearanceSettingDesc": "колірна тема, джерело зображення",
+    "languageSettingDesc": "мова, що використовується",
+    "unitsSettingdesc": "одиниці, що використовуються в застосунку",
+    "hr": "год",
+    "layout": "Розміщення",
+    "layoutSettingDesc": "порядок віджетів, персоналізація",
+    "thirtyMinutes": "30хв",
+    "mainPollutant": "Головний забруднювач",
+    "alderPollen": "Пилок вільхи",
+    "feelsLike": "Відчувається",
+    "locationServicesAreDisabled": "Служби визначення місцеположення вимкнено.",
+    "grassPollen": "Пилок трави",
+    "olivePollen": "Пилок оливи",
+    "humidity": "Вологість",
+    "uvCapital": "УФ",
+    "overcast": "Хмарно",
+    "airQuality": "Якість повітря",
+    "offline": "Не в мережі",
+    "moderate": "Помірна",
+    "notConnectedToTheInternet": "Не під'єднано до мережі",
+    "veryPoor": "Дуже погана",
+    "updatedJustNow": "Оновлено, щойно",
+    "sat": "Сб",
+    "sun": "Нд",
+    "uvLowercase": "УФ",
+    "thu": "Чт",
+    "unhealthyAqiDesc": "Надзвичайні ситуації; серйозні наслідки для здоров'я в усіх.",
+    "birchPollen": "Пилок берези",
+    "fontSize": "Розмір шрифту",
+    "now": "Зараз",
+    "mugwortPollen": "Пилок полину",
+    "dateFormat": "Формат дати",
+    "dailyAqi": "Щоденна якість повітря",
+    "dust": "Пил",
+    "aerosolOpticalDepth": "Оптична глибина аерозолю",
+    "europeanAqi": "Европейська якість повітря",
+    "unitedStatesAqi": "Якість повітря США",
+    "fair": "Задовільна",
+    "poor": "Погана",
+    "temperature": "Температура",
+    "rain": "Дощ",
+    "goodAqiDesc": "Якість повітря відмінна; немає ризику для здоров'я.",
+    "generalSettingDesc": "режим часу, розмір шрифту",
+    "supportOnPatreon": "Підтримати на Patreon",
+    "settings": "Налаштування",
+    "fri": "Пт",
+    "airQualityLowercase": "Якість повітря",
+    "precipitaion": "Опади",
+    "helpTranslate": "Допомогти з перекладом",
+    "hazy": "Туманність",
+    "veryHazy": "Сильна туманність",
+    "extremelyHazy": "Вкрай туманно",
+    "extremelyClear": "Вкрай ясно",
+    "veryClear": "Дуже ясно",
+    "poweredByOpenMeteo": "На базі open-meteo",
+    "@poweredByOpenMeteo": {
+        "description": "text displayed at the end of the air quality page, crediting open-meteo for the data"
+    },
+    "donationPageText": "Overmorrow завжди задумувався як повністю безплатний застосунок, без реклами та внутрішніх покупок. \n \nТож якщо ви хочете користуватися ним просто так, то користуйтеся на здоров'я. \n \nЯкщо ж вам подобається користуватися ним і ви відчуваєте, що він вартий ваших грошей, тоді, підтримайте проєкт на моєму Patreon.",
+    "slightlyHazy": "Легка туманність",
+    "clear": "Ясно",
+    "rainInHalfHour": "Дощ у найближчі півгодини",
+    "@rainInHalfHour": {
+        "description": "rain in the next half an hour"
+    },
+    "rainInOneHour": "Дощ у найближчу годину",
+    "@rainInOneHour": {
+        "description": "rain in the next hour"
+    },
+    "rainExpectedInOneHour": "За годину очікується дощ",
+    "@rainExpectedInOneHour": {
+        "description": "rain expected in the next hour"
+    },
+    "updatedXMinutesAgo": "Оновлено, {minutes} хв тому",
+    "rainInMinutes": "Дощ у наступні {minutes, plural, =1 {хвилину} other {{minutes} хвилин}}",
+    "@rainInMinutes": {
+        "description": "rain in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "rainInHours": "Дощ в наступні {hours, plural, =1 {hour} other {{hours} hours}}",
+    "@rainInHours": {
+        "description": "rain in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInHours": "Дощ очікується через {hours, plural, =1 {годину} other {{hours} годин}}",
+    "@rainExpectedInHours": {
+        "description": "rain expected in the next X hours",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "rainExpectedInMinutes": "Дощ очікується через {minutes, plural, =1 {хвилину} other {{minutes} хвилин}}",
+    "@rainExpectedInMinutes": {
+        "description": "rain expected in the next X minutes",
+        "placeholders": {
+            "minutes": {
+                "type": "int"
+            }
+        }
+    },
+    "updatedXHoursAgo": "Оновлено, {hours, plural, =1 {1 годину} other {{hours} годин}} тому",
+    "@updatedXHoursAgo": {
+        "description": "updated x hours ago",
+        "placeholders": {
+            "hours": {
+                "type": "int"
+            }
+        }
+    },
+    "updatedXDaysAgo": "Оновлено, {days, plural, =1 {1 день} other {{days} днів}} тому",
+    "@updatedXDaysAgo": {
+        "description": "updated x days ago",
+        "placeholders": {
+            "days": {
+                "type": "int"
+            }
+        }
+    },
+    "radarHaptics": "Тактильна віддача на радарі",
+    "@radarHaptics": {
+        "description": "setting for enabling or disabling haptic feedback for the radar"
+    },
+    "alertsCapital": "Оповіщення",
+    "severity": "Серйозність",
+    "certainty": "Достовірність",
+    "urgency": "Терміновість",
+    "areas": "Райони",
+    "donationPageTextNew": "Overmorrow завжди задумувався як абсолютно безплатний застосунок, без реклами та внутрішніх покупок. \n \nТож якщо ви хочете користуватися ним просто так, то насолоджуйтеся. \n \nАле якщо вам подобається користуватися застосунком, будь ласка, не забувайте залишати невеликі чайові. \n\nСпасибі!",
+    "buyMeACoffee": "Пригостіть мене кавою!",
+    "weatherProvderLowercase": "Постачальник погоди",
+    "sumLowercase": "Загалом",
+    "@sumLowercase": {
+        "description": "short for summary, overview, gist or something similar, used in the context of hourly list"
+    },
+    "grantLocationPermission": "Надати дозвіл на розташування",
+    "currentLocation": "Поточне розташування",
+    "dailyLowercase": "Щодня",
+    "sourceCodeLowercase": "Вихідний код",
+    "emailLowercase": "Пошта",
+    "reportAnIssueLowercase": "Повідомити про проблему",
+    "donateLowercase": "Пожертвувати",
+    "versionUppercase": "Версія",
+    "apiAndServices": "API та служби",
+    "weatherDataLowercase": "Дані про погоду",
+    "imagesLowercase": "Зображення",
+    "aboutSettingsDesc": "Про застосунок",
+    "alertsLowercase": "Оповіщення",
+    "light": "Невеликі",
+    "@light": {
+        "description": "light precipitation"
+    },
+    "heavy": "Сильні",
+    "@heavy": {
+        "description": "heavy precipitation"
+    },
+    "favoritesLowercase": "Улюблені",
+    "licenseUppercase": "Ліцензія",
+    "showMore": "Розгорнути",
+    "showLess": "Згорнути",
+    "tomorrowLowercase": "Завтра",
+    "overmorrowLowercase": "Післязавтра",
+    "cold": "Холодно",
+    "hot": "Жарко",
+    "calm": "Спокійно",
+    "severe": "Важко",
+    "low": "Низько",
+    "high": "Високо",
+    "tempLowercase": "Температура",
+    "pressureLowercase": "Тиск",
+    "backgroundUpdates": "Оновлення у фоні",
+    "backgroundUpdatesSettingsDesc": "Оновлення віджета, сповіщення",
+    "liveRadar": "Радар наживо",
+    "ongoingNotification": "Поточне сповіщення"
+}
