@@ -31,7 +31,8 @@ internal class ChatConversationCoordinator(
     private val scope: CoroutineScope,
     private val agentId: String,
     private val initialMessage: String?,
-    private val explicitConversationId: String?,
+    private val explicitConversationId: () -> String?,
+    private val setRouteConversationId: (String?) -> Unit,
     private val isFreshRoute: Boolean,
     private val chatSessionResolver: ChatSessionResolver,
     private val agentRepository: AgentRepository,
@@ -58,9 +59,8 @@ internal class ChatConversationCoordinator(
         private const val CONVERSATION_CACHE_TTL_MS = 30_000L
     }
 
-    @Volatile
-    var activeConversationId: String? = explicitConversationId
-        private set
+    val activeConversationId: String?
+        get() = explicitConversationId()
 
     private val initialMessageConsumed = AtomicBoolean(false)
     private var hasResolvedConversationOnce: Boolean = false
@@ -68,10 +68,10 @@ internal class ChatConversationCoordinator(
         if (isFreshRoute) ClientModeBootstrapState.NewConversationPending else ClientModeBootstrapState.Idle
 
     fun conversationId(useClientMode: Boolean): String? =
-        if (useClientMode) currentClientModeConversationId() else activeConversationId
+        activeConversationId ?: if (useClientMode) currentClientModeConversationId() else null
 
     fun setActiveConversationId(conversationId: String?) {
-        activeConversationId = conversationId?.takeIf { it.isNotBlank() }
+        setRouteConversationId(conversationId)
     }
 
     fun markClientModeBootstrapReady(conversationId: String) {
@@ -81,8 +81,8 @@ internal class ChatConversationCoordinator(
     fun resolveConversationAndLoad(useClientModeForResolve: Boolean) {
         val isFirstResolve = !hasResolvedConversationOnce
         hasResolvedConversationOnce = true
-        if (isFreshRoute && isFirstResolve && explicitConversationId == null) {
-            activeConversationId = null
+        if (isFreshRoute && isFirstResolve && explicitConversationId() == null) {
+            setRouteConversationId(null)
         }
         scope.launch {
             uiState.value = uiState.value.copy(
@@ -120,7 +120,7 @@ internal class ChatConversationCoordinator(
         val suppressFreshRouteFallbackClient =
             clientModeBootstrapState == ClientModeBootstrapState.NewConversationPending ||
                 (isFreshRoute && isFirstResolve)
-        val clientConversationId = explicitConversationId
+        val clientConversationId = explicitConversationId()
             ?: currentClientModeConversationId()?.also {
                 clientModeBootstrapState = ClientModeBootstrapState.Ready(it)
             }
@@ -128,7 +128,7 @@ internal class ChatConversationCoordinator(
                 runCatching {
                     resolveMostRecentConversation(CONVERSATION_CACHE_TTL_MS)
                 }.getOrNull()?.also { resolved ->
-                    setClientModeConversationId(resolved)
+                    setRouteConversationId(resolved)
                     clientModeBootstrapState = ClientModeBootstrapState.Ready(resolved)
                 }
             } else {
@@ -172,15 +172,15 @@ internal class ChatConversationCoordinator(
         if (
             !suppressFreshRouteFallback &&
             activeConversationId == null &&
-            explicitConversationId == null
+            explicitConversationId() == null
         ) {
             resolveMostRecentConversation(CONVERSATION_CACHE_TTL_MS)
         }
 
         val conversationId = if (suppressFreshRouteFallback) {
-            explicitConversationId?.also { activeConversationId = it }
+            explicitConversationId()
         } else {
-            activeConversationId ?: explicitConversationId?.also { activeConversationId = it }
+            activeConversationId ?: explicitConversationId()
         }
 
         if (conversationId == null) {
@@ -207,15 +207,13 @@ internal class ChatConversationCoordinator(
 
     private suspend fun resolveMostRecentConversation(maxAgeMs: Long): String? {
         return chatSessionResolver.resolveMostRecentConversation(agentId, maxAgeMs)
-            ?.also { activeConversationId = it }
+            ?.also { setRouteConversationId(it) }
     }
 
     suspend fun loadMessagesInternal() {
         val loadTimer = Telemetry.startTimer("AdminChatVM", "loadMessages")
-        val requestedConversationId = activeConversationId ?: explicitConversationId?.also {
-            activeConversationId = it
-        }
-        val currentConversationId = activeConversationId ?: explicitConversationId
+        val requestedConversationId = activeConversationId ?: explicitConversationId()
+        val currentConversationId = activeConversationId ?: explicitConversationId()
         if (requestedConversationId == null) {
             if (requestedConversationId == currentConversationId) {
                 uiState.value = uiState.value.copy(
@@ -248,7 +246,7 @@ internal class ChatConversationCoordinator(
         }
         try {
             val agent = agentRepository.getAgent(agentId).first()
-            if (requestedConversationId != (activeConversationId ?: explicitConversationId)) {
+            if (requestedConversationId != (activeConversationId ?: explicitConversationId())) {
                 loadTimer.stop("result" to "staleConversation")
                 return
             }
@@ -285,7 +283,7 @@ internal class ChatConversationCoordinator(
             )
         } catch (e: Exception) {
             loadTimer.stopError(e, "conversationId" to requestedConversationId)
-            if (requestedConversationId != (activeConversationId ?: explicitConversationId)) {
+            if (requestedConversationId != (activeConversationId ?: explicitConversationId())) {
                 return
             }
             uiState.value = uiState.value.copy(
@@ -303,7 +301,7 @@ internal class ChatConversationCoordinator(
 
         val deliveryKey = InitialRouteMessageDeliveryGuard.key(
             agentId = agentId,
-            conversationId = activeConversationId ?: explicitConversationId ?: currentClientModeConversationId(),
+            conversationId = activeConversationId ?: explicitConversationId() ?: currentClientModeConversationId(),
             message = message,
         )
         return if (InitialRouteMessageDeliveryGuard.tryConsume(deliveryKey)) {
@@ -312,7 +310,7 @@ internal class ChatConversationCoordinator(
             android.util.Log.w(
                 "AdminChatViewModel",
                 "Suppressed duplicate initial route message agent=$agentId " +
-                    "conversation=${activeConversationId ?: explicitConversationId ?: currentClientModeConversationId()} " +
+                    "conversation=${activeConversationId ?: explicitConversationId() ?: currentClientModeConversationId()} " +
                     "messageHash=${message.hashCode()}",
             )
             markFollowingDuplicateInitialMessageInFlight()
@@ -360,6 +358,7 @@ internal class ChatConversationCoordinator(
 
     fun resetClientModeConversationState() {
         setClientModeConversationId(null)
+        setRouteConversationId(null)
         clientModeBootstrapState = if (isFreshRoute) {
             ClientModeBootstrapState.NewConversationPending
         } else {
