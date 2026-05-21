@@ -115,6 +115,8 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0")
     implementation("androidx.lifecycle:lifecycle-process:2.8.7")
     implementation("me.xdrop:fuzzywuzzy:1.4.0")
+    // Material Color Utilities (HCT, Blend, Scheme) ship inside com.google.android.material
+    implementation("com.google.android.material:material:1.12.0")
 
     api("androidx.room:room-runtime:2.7.0")
     api("androidx.room:room-ktx:2.7.0")
