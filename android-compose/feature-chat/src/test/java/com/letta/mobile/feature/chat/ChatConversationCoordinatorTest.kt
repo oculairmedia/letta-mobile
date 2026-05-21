@@ -86,6 +86,34 @@ class ChatConversationCoordinatorTest {
         assertEquals("conv-existing", harness.coordinator.activeConversationId)
     }
 
+    /**
+     * letta-mobile-go8el follow-up. PR #177 wired setRouteConversationId on the
+     * resolveMostRecent fallback but missed the cached-CM branch: when
+     * `currentClientModeConversationId()` already returns a value from a prior
+     * session, resolve was only updating `clientModeBootstrapState` and never
+     * mirroring the id into the unified `conversationId` SavedStateHandle key.
+     * That left `coordinator.activeConversationId` (derived from
+     * `explicitConversationId()`) null, so `WsChatSendCoordinator.send`'s
+     * `activeConversationId() ?: createConversation(...)` minted a fresh conv on
+     * first send after every reopen. Regression test prevents that branch from
+     * silently regressing again.
+     */
+    @Test
+    fun `client mode open with cached clientModeConversationId mirrors it into the unified route key`() = runTest {
+        val harness = Harness(scope = this, isFreshRoute = false)
+        harness.clientModeConversationId = "conv-cached"
+        // No chatSessionResolver expectation — resolve must take the cached
+        // branch before falling through to resolveMostRecent.
+
+        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = true)
+        advanceUntilIdle()
+
+        assertEquals(ConversationState.Ready("conv-cached"), harness.uiState.value.conversationState)
+        assertEquals("conv-cached", harness.routeConversationId)
+        assertEquals("conv-cached", harness.coordinator.activeConversationId)
+        coVerify(exactly = 0) { harness.chatSessionResolver.resolveMostRecentConversation(any(), any()) }
+    }
+
     @Test
     fun `first ws send after client mode open uses resolved conversation without creating one`() = runTest {
         val harness = Harness(scope = this, isFreshRoute = false)

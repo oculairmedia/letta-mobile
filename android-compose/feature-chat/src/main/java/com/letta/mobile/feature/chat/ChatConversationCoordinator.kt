@@ -121,8 +121,17 @@ internal class ChatConversationCoordinator(
             clientModeBootstrapState == ClientModeBootstrapState.NewConversationPending ||
                 (isFreshRoute && isFirstResolve)
         val clientConversationId = explicitConversationId()
-            ?: currentClientModeConversationId()?.also {
-                clientModeBootstrapState = ClientModeBootstrapState.Ready(it)
+            ?: currentClientModeConversationId()?.also { cached ->
+                // letta-mobile-go8el follow-up: PR #177 wired setRouteConversationId on the
+                // resolveMostRecent fallback below but missed this branch — the legacy
+                // clientModeConversationId SavedStateHandle key still persists across sessions
+                // (will be deleted after a soak per the bead). When the user reopens a chat
+                // and resolve takes THIS branch (cached value present), we must mirror the
+                // id into the unified `conversationId` key so WsChatSendCoordinator's read of
+                // chatConversationCoordinator.activeConversationId (which derives from
+                // explicitConversationId()) doesn't return null and silently mint a fresh conv.
+                setRouteConversationId(cached)
+                clientModeBootstrapState = ClientModeBootstrapState.Ready(cached)
             }
             ?: if (!suppressFreshRouteFallbackClient) {
                 runCatching {
