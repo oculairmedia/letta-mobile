@@ -5,18 +5,19 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Narrow surface of [com.letta.mobile.data.repository.SettingsRepository]
- * used by collaborators that need to be test-isolated. Promoted to an
- * interface so tests can substitute a hand-written
- * [com.letta.mobile.testutil.FakeSettingsRepository] instead of mocking
- * the stateful concrete class (mockk on a final class with internal
- * StateFlows / EncryptedSharedPreferences leaks across the daemon JVM —
- * see letta-mobile-0dnn).
+ * Surface of [com.letta.mobile.data.repository.SettingsRepository] used by
+ * collaborators that need to be test-isolated. Promoted to an interface so
+ * tests can substitute a hand-written
+ * [com.letta.mobile.testutil.FakeSettingsRepository] instead of mocking the
+ * stateful concrete class (mockk on a final class with internal StateFlows /
+ * EncryptedSharedPreferences leaks across the daemon JVM — see letta-mobile-0dnn).
  *
- * Members here are limited to what consumers (ShimBackendDetector,
- * ChannelHeartbeatSync, ClientModeController) actually read. The
- * concrete [SettingsRepository] still owns the full configuration
- * surface; widen this interface only when a new consumer needs it.
+ * Covers the reads used by:
+ *  - Infra collaborators: ShimBackendDetector, ChannelHeartbeatSync, ClientModeController.
+ *  - VM-facing reads: ConversationsViewModel (pinned-conversation state) and
+ *    DashboardViewModel (favorite + pinned agents + shortcuts). Adding new
+ *    VM consumers should widen the interface here rather than reaching for
+ *    the concrete class — see letta-mobile-9x4 / letta-mobile-utc.
  */
 interface ISettingsRepository {
     val activeConfig: StateFlow<LettaConfig?>
@@ -29,6 +30,8 @@ interface ISettingsRepository {
     fun getClientModeApiKey(): String?
     fun getPinnedAgentIds(): Flow<Set<String>>
     fun getPinnedAgentOrder(): Flow<List<String>>
+    fun getPinnedConversationIds(): Flow<Set<String>>
+    suspend fun setConversationPinned(conversationId: String, pinned: Boolean)
     fun setFavoriteAgentId(agentId: String?)
     suspend fun setAgentPinned(agentId: String, pinned: Boolean)
     suspend fun setPinnedAgentOrder(order: List<String>)

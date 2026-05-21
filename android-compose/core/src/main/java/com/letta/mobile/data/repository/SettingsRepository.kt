@@ -318,11 +318,11 @@ class SettingsRepository @Inject constructor(
         prefs[Keys.CHAT_BACKGROUND] ?: DEFAULT_CHAT_BACKGROUND_KEY
     }
 
-    fun getPinnedConversationIds(): Flow<Set<String>> = dataStore.data.map { prefs ->
+    override fun getPinnedConversationIds(): Flow<Set<String>> = dataStore.data.map { prefs ->
         prefs[Keys.PINNED_CONVERSATION_IDS] ?: emptySet()
     }
 
-    suspend fun setConversationPinned(conversationId: String, pinned: Boolean) {
+    override suspend fun setConversationPinned(conversationId: String, pinned: Boolean) {
         dataStore.edit { prefs ->
             val current = prefs[Keys.PINNED_CONVERSATION_IDS] ?: emptySet()
             prefs[Keys.PINNED_CONVERSATION_IDS] = if (pinned) {

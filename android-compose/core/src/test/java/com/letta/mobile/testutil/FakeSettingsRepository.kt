@@ -71,6 +71,19 @@ class FakeSettingsRepository(
 
     override fun getPinnedAgentOrder(): Flow<List<String>> = pinnedAgentOrder
 
+    val pinnedConversationIds: MutableStateFlow<Set<String>> =
+        MutableStateFlow(emptySet())
+
+    override fun getPinnedConversationIds(): Flow<Set<String>> = pinnedConversationIds
+
+    override suspend fun setConversationPinned(conversationId: String, pinned: Boolean) {
+        pinnedConversationIds.value = if (pinned) {
+            pinnedConversationIds.value + conversationId
+        } else {
+            pinnedConversationIds.value - conversationId
+        }
+    }
+
     override fun setFavoriteAgentId(agentId: String?) {
         favoriteAgentIdState.value = agentId
     }
