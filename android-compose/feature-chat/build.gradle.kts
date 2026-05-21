@@ -130,6 +130,7 @@ dependencies {
     testImplementation("com.squareup.okhttp3:mockwebserver:5.3.2")
     testImplementation("io.kotest:kotest-runner-junit5:5.9.1")
     testImplementation("io.kotest:kotest-assertions-core:5.9.1")
+    testImplementation("io.kotest:kotest-property:5.9.1")
     testImplementation("org.robolectric:robolectric:4.16.1")
     testImplementation("androidx.compose.ui:ui-test-junit4")
     testImplementation("io.github.takahirom.roborazzi:roborazzi:1.10.0")
