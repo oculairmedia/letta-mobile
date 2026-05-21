@@ -41,7 +41,7 @@ import org.junit.Test
 import org.junit.jupiter.api.Tag
 
 @OptIn(ExperimentalCoroutinesApi::class)
-@Tag("integration")
+@Tag("unit")
 class DashboardViewModelTest {
 
     private val testDispatcher = UnconfinedTestDispatcher()

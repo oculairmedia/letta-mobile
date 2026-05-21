@@ -35,7 +35,7 @@ import org.junit.Test
 import org.junit.jupiter.api.Tag
 
 @OptIn(ExperimentalCoroutinesApi::class)
-@Tag("integration")
+@Tag("unit")
 class ConversationsViewModelTest {
 
     private lateinit var fakeAllRepo: FakeAllConversationsRepository
