@@ -78,6 +78,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.feature.chat.ProjectChatStartAction
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
+import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.isExpandedWidth
 import com.letta.mobile.util.formatRelativeTime
 
@@ -676,9 +677,9 @@ private fun ProjectTileMetaRow(
     isPinned: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    // letta-mobile-f8v: badges share one shape/size. Issue-count uses a
-    // single warning shade (errorContainer) regardless of size so red is
-    // reserved for true warnings and doesn't shift palette by magnitude.
+    // letta-mobile-f8v + letta-mobile-2ks: badges share one shape/size.
+    // Issue-count uses the harmonized error container so the warning remains
+    // semantic while blending with the active Material seed color.
     androidx.compose.foundation.layout.FlowRow(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -692,7 +693,7 @@ private fun ProjectTileMetaRow(
         if (issueCount > 0) {
             StatusBadge(
                 text = "$issueCount issues",
-                containerColor = MaterialTheme.colorScheme.errorContainer,
+                containerColor = MaterialTheme.customColors.harmonizedErrorContainer,
                 contentColor = MaterialTheme.colorScheme.onErrorContainer,
             )
         }

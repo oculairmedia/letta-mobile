@@ -275,6 +275,30 @@ internal fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
     val complementary = colorScheme.primary.complementary()
     val complementaryHsl = complementary.toHslColor()
     val isLightTheme = colorScheme.background.luminance() > 0.5f
+    val harmonizedError = HctColorHarmonizer.harmonize(
+        stateColor = colorScheme.error,
+        seedColor = colorScheme.primary,
+    )
+    val harmonizedErrorContainer = HctColorHarmonizer.harmonize(
+        stateColor = colorScheme.errorContainer,
+        seedColor = colorScheme.primary,
+    )
+    val harmonizedWarning = HctColorHarmonizer.harmonize(
+        stateColor = colorScheme.tertiary,
+        seedColor = colorScheme.primary,
+    )
+    val harmonizedWarningContainer = HctColorHarmonizer.harmonize(
+        stateColor = colorScheme.tertiaryContainer,
+        seedColor = colorScheme.primary,
+    )
+    val harmonizedSuccess = HctColorHarmonizer.harmonize(
+        stateColor = colorScheme.primary,
+        seedColor = colorScheme.primary,
+    )
+    val harmonizedSuccessContainer = HctColorHarmonizer.harmonize(
+        stateColor = colorScheme.primaryContainer,
+        seedColor = colorScheme.primary,
+    )
     val freshAccent = Color.hsl(
         complementaryHsl.hue,
         complementaryHsl.saturation.coerceAtLeast(0.45f),
@@ -288,40 +312,46 @@ internal fun deriveCustomColors(colorScheme: ColorScheme): CustomColors {
         alpha = if (isLightTheme) 0.18f else 0.28f,
     ).compositeOver(colorScheme.surfaceContainerHigh)
     return CustomColors(
-    userBubbleBgColor = colorScheme.primaryContainer,
-    agentBubbleBgColor = colorScheme.surfaceContainerLow,
-    reasoningBubbleBgColor = colorScheme.tertiaryContainer.copy(alpha = 0.45f),
-    toolBubbleBgColor = colorScheme.secondaryContainer,
-    systemMessageColor = colorScheme.surfaceContainerHigh,
-    dateSeparatorColor = colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-    textPrimary = colorScheme.onSurface,
-    textSecondary = colorScheme.onSurfaceVariant,
-    textDisabled = colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-    textLink = colorScheme.primary,
-    textOnPrimary = colorScheme.onPrimaryContainer,
-    errorTextColor = colorScheme.onErrorContainer,
-    errorContainerColor = colorScheme.errorContainer,
-    warningTextColor = colorScheme.onTertiaryContainer,
-    warningContainerColor = colorScheme.tertiaryContainer,
-    successColor = colorScheme.primary,
-    successContainerColor = colorScheme.primaryContainer,
-    onlineColor = colorScheme.primary,
-    offlineColor = colorScheme.error,
-    reconnectingColor = colorScheme.secondary,
-    iconPrimary = colorScheme.onSurface,
-    iconSecondary = colorScheme.onSurfaceVariant,
-    iconAccent = colorScheme.primary,
-    freshAccent = freshAccent,
-    onFreshAccent = if (isLightTheme) Color.White else colorScheme.background,
-    freshAccentContainer = freshAccentContainer,
-    onFreshAccentContainer = colorScheme.onSurface,
-    listItemContainerColor = colorScheme.surfaceBright,
-    selectionContainer = complementary.copy(alpha = 0.15f),
-    onSelectionContainer = colorScheme.onSurface,
-    selectionIndicator = complementary,
-    borderDefault = colorScheme.outlineVariant,
-    borderFocused = colorScheme.primary,
-    borderCritical = colorScheme.error,
+        userBubbleBgColor = colorScheme.primaryContainer,
+        agentBubbleBgColor = colorScheme.surfaceContainerLow,
+        reasoningBubbleBgColor = colorScheme.tertiaryContainer.copy(alpha = 0.45f),
+        toolBubbleBgColor = colorScheme.secondaryContainer,
+        systemMessageColor = colorScheme.surfaceContainerHigh,
+        dateSeparatorColor = colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+        textPrimary = colorScheme.onSurface,
+        textSecondary = colorScheme.onSurfaceVariant,
+        textDisabled = colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+        textLink = colorScheme.primary,
+        textOnPrimary = colorScheme.onPrimaryContainer,
+        errorTextColor = colorScheme.onErrorContainer,
+        errorContainerColor = harmonizedErrorContainer,
+        harmonizedError = harmonizedError,
+        harmonizedErrorContainer = harmonizedErrorContainer,
+        warningTextColor = colorScheme.onTertiaryContainer,
+        warningContainerColor = harmonizedWarningContainer,
+        harmonizedWarning = harmonizedWarning,
+        harmonizedWarningContainer = harmonizedWarningContainer,
+        successColor = harmonizedSuccess,
+        successContainerColor = harmonizedSuccessContainer,
+        harmonizedSuccess = harmonizedSuccess,
+        harmonizedSuccessContainer = harmonizedSuccessContainer,
+        onlineColor = colorScheme.primary,
+        offlineColor = colorScheme.error,
+        reconnectingColor = colorScheme.secondary,
+        iconPrimary = colorScheme.onSurface,
+        iconSecondary = colorScheme.onSurfaceVariant,
+        iconAccent = colorScheme.primary,
+        freshAccent = freshAccent,
+        onFreshAccent = if (isLightTheme) Color.White else colorScheme.background,
+        freshAccentContainer = freshAccentContainer,
+        onFreshAccentContainer = colorScheme.onSurface,
+        listItemContainerColor = colorScheme.surfaceBright,
+        selectionContainer = complementary.copy(alpha = 0.15f),
+        onSelectionContainer = colorScheme.onSurface,
+        selectionIndicator = complementary,
+        borderDefault = colorScheme.outlineVariant,
+        borderFocused = colorScheme.primary,
+        borderCritical = harmonizedError,
     )
 }
 

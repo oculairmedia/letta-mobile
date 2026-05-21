@@ -75,7 +75,7 @@ class ThemeColorsTest {
     }
 
     @Test
-    fun `deriveCustomColors maps primary to textLink and successColor`() {
+    fun `deriveCustomColors maps primary to textLink and harmonized successColor`() {
         val scheme = lightColorScheme(primary = Color(0xFF123456))
         val custom = deriveCustomColors(scheme)
         assertEquals(Color(0xFF123456), custom.textLink)
@@ -126,14 +126,23 @@ class ThemeColorsTest {
     }
 
     @Test
-    fun `deriveCustomColors warning colors map to tertiary`() {
+    fun `deriveCustomColors warning colors harmonize from tertiary`() {
         val scheme = lightColorScheme(
+            primary = Color(0xFF00897B),
+            tertiary = Color(0xFFE0AA22),
             tertiaryContainer = Color(0xFFEEDDCC),
             onTertiaryContainer = Color(0xFF332211),
         )
         val custom = deriveCustomColors(scheme)
         assertEquals(Color(0xFF332211), custom.warningTextColor)
-        assertEquals(Color(0xFFEEDDCC), custom.warningContainerColor)
+        assertEquals(
+            HctColorHarmonizer.harmonize(Color(0xFFE0AA22), Color(0xFF00897B)),
+            custom.harmonizedWarning,
+        )
+        assertEquals(
+            HctColorHarmonizer.harmonize(Color(0xFFEEDDCC), Color(0xFF00897B)),
+            custom.warningContainerColor,
+        )
     }
 
     @Test
@@ -146,7 +155,10 @@ class ThemeColorsTest {
         val custom = deriveCustomColors(scheme)
         assertEquals(Color(0xFFCCCCCC), custom.borderDefault)
         assertEquals(Color(0xFF00897B), custom.borderFocused)
-        assertEquals(Color(0xFFB00020), custom.borderCritical)
+        assertEquals(
+            HctColorHarmonizer.harmonize(Color(0xFFB00020), Color(0xFF00897B)),
+            custom.borderCritical,
+        )
     }
 
     @Test
@@ -179,7 +191,10 @@ class ThemeColorsTest {
         )
         val custom = deriveCustomColors(scheme)
         assertEquals(Color(0xFF410002), custom.errorTextColor)
-        assertEquals(Color(0xFFFFDAD6), custom.errorContainerColor)
+        assertEquals(
+            HctColorHarmonizer.harmonize(Color(0xFFFFDAD6), Color(0xFF00897B)),
+            custom.errorContainerColor,
+        )
         assertEquals(Color(0xFF00897B), custom.successColor)
         assertEquals(Color(0xFFB2DFDB), custom.successContainerColor)
     }

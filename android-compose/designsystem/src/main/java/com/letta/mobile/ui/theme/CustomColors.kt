@@ -29,10 +29,16 @@ data class CustomColors(
     // Status
     val errorTextColor: Color = Color.Unspecified,
     val errorContainerColor: Color = Color.Unspecified,
+    val harmonizedError: Color = Color.Unspecified,
+    val harmonizedErrorContainer: Color = Color.Unspecified,
     val warningTextColor: Color = Color.Unspecified,
     val warningContainerColor: Color = Color.Unspecified,
+    val harmonizedWarning: Color = Color.Unspecified,
+    val harmonizedWarningContainer: Color = Color.Unspecified,
     val successColor: Color = Color.Unspecified,
     val successContainerColor: Color = Color.Unspecified,
+    val harmonizedSuccess: Color = Color.Unspecified,
+    val harmonizedSuccessContainer: Color = Color.Unspecified,
 
     // Connection status
     val onlineColor: Color = Color.Unspecified,
