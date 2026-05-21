@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.os.Build
 import com.letta.mobile.core.BuildConfig
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -96,10 +97,24 @@ class SettingsRepository @Inject constructor(
         val LAST_CHAT_CONVERSATION_ID = stringPreferencesKey("last_chat_conversation_id")
         val PINNED_CONVERSATION_IDS = stringSetPreferencesKey("pinned_conversation_ids")
         val PINNED_AGENT_IDS = stringSetPreferencesKey("pinned_agent_ids")
+        // JSON-encoded List<String> — source of truth for pinned agent
+        // display order. The legacy Set key above is kept in sync for any
+        // direct readers; new readers should prefer this ordered list.
+        val PINNED_AGENT_ORDER = stringPreferencesKey("pinned_agent_order")
         val PINNED_PROJECT_IDS = stringSetPreferencesKey("pinned_project_ids")
         val CHAT_FONT_SCALE = floatPreferencesKey("chat_font_scale")
         val ENABLE_PROJECTS = booleanPreferencesKey("enable_projects")
         val PINNED_SHORTCUT_ORDER = stringPreferencesKey("pinned_shortcut_order")
+        // JSON-encoded List<String> of qualified pinned-item keys
+        // ("shortcut:<NAME>" / "agent:<ID>"). Source of truth for the
+        // unified drag-to-reorder grid; per-type legacy keys above are
+        // derived from this on read and kept in sync on write.
+        val PINNED_ITEMS_ORDER = stringPreferencesKey("pinned_items_order")
+        // JSON-encoded Map<String, String> of agentId → display name.
+        // Persisted so the pinned grid can show tiles immediately on
+        // backend switch without waiting for the new server's agent
+        // cache to load.
+        val PINNED_AGENT_NAMES = stringPreferencesKey("pinned_agent_names")
         val CLIENT_MODE_ENABLED = booleanPreferencesKey("client_mode_enabled")
         val CLIENT_MODE_BASE_URL = stringPreferencesKey("client_mode_base_url")
         // letta-mobile-h2b8: feature flag for the resume-most-recent-conversation
@@ -318,20 +333,166 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    override fun getPinnedAgentIds(): Flow<Set<String>> = dataStore.data.map { prefs ->
-        prefs[Keys.PINNED_AGENT_IDS] ?: emptySet()
+    override fun getPinnedAgentIds(): Flow<Set<String>> =
+        getPinnedAgentOrder().map { it.toSet() }
+
+    override fun getPinnedAgentOrder(): Flow<List<String>> = dataStore.data.map { prefs ->
+        readUnifiedPinnedItems(prefs).mapNotNull(::parseAgentKeyPart)
+    }
+
+    override fun getPinnedItemsOrder(): Flow<List<String>> = dataStore.data.map { prefs ->
+        readUnifiedPinnedItems(prefs)
     }
 
     override suspend fun setAgentPinned(agentId: String, pinned: Boolean) {
         dataStore.edit { prefs ->
-            val current = prefs[Keys.PINNED_AGENT_IDS] ?: emptySet()
-            prefs[Keys.PINNED_AGENT_IDS] = if (pinned) {
-                current + agentId
+            val current = readUnifiedPinnedItems(prefs)
+            val key = agentKeyPart(agentId)
+            val updated = if (pinned) {
+                if (key in current) current else current + key
             } else {
-                current - agentId
+                current - key
+            }
+            writeUnifiedPinnedItems(prefs, updated)
+            if (!pinned) {
+                // Explicit unpin: also drop the persisted display-name
+                // cache entry so it doesn't linger. (Orphan agents on
+                // other backends are NOT unpinned — their entries are
+                // intentionally preserved so switching back restores them.)
+                val names = readPinnedAgentNames(prefs).toMutableMap()
+                if (names.remove(agentId) != null) {
+                    prefs[Keys.PINNED_AGENT_NAMES] = json.encodeToString(names)
+                }
             }
         }
     }
+
+    override suspend fun setPinnedAgentOrder(order: List<String>) {
+        // Legacy per-type setter: replace agents in the unified list in
+        // their existing absolute positions where possible; otherwise
+        // place them after the shortcuts.
+        dataStore.edit { prefs ->
+            val current = readUnifiedPinnedItems(prefs)
+            val newAgents = order.distinct().map(::agentKeyPart)
+            val unified = replaceTypeSegment(current, newAgents, ::isAgentKeyPart)
+            writeUnifiedPinnedItems(prefs, unified)
+        }
+    }
+
+    override suspend fun setPinnedItemsOrder(order: List<String>) {
+        dataStore.edit { prefs ->
+            writeUnifiedPinnedItems(prefs, order.distinct())
+        }
+    }
+
+    override fun getPinnedAgentNames(): Flow<Map<String, String>> = dataStore.data.map { prefs ->
+        readPinnedAgentNames(prefs)
+    }
+
+    override suspend fun upsertPinnedAgentName(id: String, name: String) {
+        dataStore.edit { prefs ->
+            val current = readPinnedAgentNames(prefs).toMutableMap()
+            if (current[id] == name) return@edit
+            current[id] = name
+            prefs[Keys.PINNED_AGENT_NAMES] = json.encodeToString(current)
+        }
+    }
+
+    override suspend fun removePinnedAgentName(id: String) {
+        dataStore.edit { prefs ->
+            val current = readPinnedAgentNames(prefs).toMutableMap()
+            if (current.remove(id) != null) {
+                prefs[Keys.PINNED_AGENT_NAMES] = json.encodeToString(current)
+            }
+        }
+    }
+
+    private fun readPinnedAgentNames(prefs: Preferences): Map<String, String> {
+        val raw = prefs[Keys.PINNED_AGENT_NAMES] ?: return emptyMap()
+        return try {
+            json.decodeFromString<Map<String, String>>(raw)
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
+
+    private fun readUnifiedPinnedItems(prefs: Preferences): List<String> {
+        prefs[Keys.PINNED_ITEMS_ORDER]?.let { raw ->
+            return try {
+                json.decodeFromString<List<String>>(raw)
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
+        // Migration: build the unified list from the legacy per-type
+        // storage. Shortcuts first (default or persisted), then agents
+        // (from the persisted order, falling back to the legacy Set).
+        val shortcuts = readLegacyPinnedShortcutOrder(prefs).map(::shortcutKeyPart)
+        val agents = readLegacyPinnedAgentOrder(prefs).map(::agentKeyPart)
+        return shortcuts + agents
+    }
+
+    private fun writeUnifiedPinnedItems(prefs: MutablePreferences, items: List<String>) {
+        val deduped = items.distinct()
+        prefs[Keys.PINNED_ITEMS_ORDER] = json.encodeToString(deduped)
+        // Keep per-type legacy keys in sync for any direct readers.
+        val agentIds = deduped.mapNotNull(::parseAgentKeyPart)
+        val shortcutNames = deduped.mapNotNull(::parseShortcutKeyPart)
+        prefs[Keys.PINNED_AGENT_ORDER] = json.encodeToString(agentIds)
+        prefs[Keys.PINNED_AGENT_IDS] = agentIds.toSet()
+        prefs[Keys.PINNED_SHORTCUT_ORDER] = json.encodeToString(shortcutNames)
+    }
+
+    private fun readLegacyPinnedAgentOrder(prefs: Preferences): List<String> {
+        prefs[Keys.PINNED_AGENT_ORDER]?.let { raw ->
+            return try {
+                json.decodeFromString<List<String>>(raw)
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
+        return (prefs[Keys.PINNED_AGENT_IDS] ?: emptySet()).toList()
+    }
+
+    private fun readLegacyPinnedShortcutOrder(prefs: Preferences): List<String> {
+        prefs[Keys.PINNED_SHORTCUT_ORDER]?.let { raw ->
+            return try {
+                json.decodeFromString<List<String>>(raw)
+            } catch (_: Exception) {
+                DEFAULT_PINNED_SHORTCUTS
+            }
+        }
+        return DEFAULT_PINNED_SHORTCUTS
+    }
+
+    /**
+     * Replace all entries matching [typePredicate] in [current] with
+     * [replacement], preserving the positions of non-matching entries.
+     * If the new list's size differs from the existing matches, the
+     * extra items are appended (or trimmed) at the end of the section.
+     */
+    private fun replaceTypeSegment(
+        current: List<String>,
+        replacement: List<String>,
+        typePredicate: (String) -> Boolean,
+    ): List<String> {
+        val existingMatches = current.count(typePredicate)
+        if (existingMatches == replacement.size) {
+            val iter = replacement.iterator()
+            return current.map { if (typePredicate(it)) iter.next() else it }
+        }
+        val others = current.filterNot(typePredicate)
+        return replacement + others
+    }
+
+    private fun shortcutKeyPart(name: String) = "shortcut:$name"
+    private fun agentKeyPart(id: String) = "agent:$id"
+    private fun isShortcutKeyPart(key: String) = key.startsWith("shortcut:")
+    private fun isAgentKeyPart(key: String) = key.startsWith("agent:")
+    private fun parseShortcutKeyPart(key: String): String? =
+        if (isShortcutKeyPart(key)) key.removePrefix("shortcut:") else null
+    private fun parseAgentKeyPart(key: String): String? =
+        if (isAgentKeyPart(key)) key.removePrefix("agent:") else null
 
     override fun getPinnedProjectIds(): Flow<Set<String>> = dataStore.data.map { prefs ->
         prefs[Keys.PINNED_PROJECT_IDS] ?: emptySet()
@@ -422,16 +583,7 @@ class SettingsRepository @Inject constructor(
     }
 
     override fun getPinnedShortcutOrder(): Flow<List<String>> = dataStore.data.map { prefs ->
-        val raw = prefs[Keys.PINNED_SHORTCUT_ORDER]
-        if (raw != null) {
-            try {
-                json.decodeFromString<List<String>>(raw)
-            } catch (_: Exception) {
-                DEFAULT_PINNED_SHORTCUTS
-            }
-        } else {
-            DEFAULT_PINNED_SHORTCUTS
-        }
+        readUnifiedPinnedItems(prefs).mapNotNull(::parseShortcutKeyPart)
     }
 
     companion object {
@@ -445,27 +597,27 @@ class SettingsRepository @Inject constructor(
 
     override suspend fun setPinnedShortcutOrder(order: List<String>) {
         dataStore.edit { prefs ->
-            prefs[Keys.PINNED_SHORTCUT_ORDER] = json.encodeToString(order)
+            val current = readUnifiedPinnedItems(prefs)
+            val newShortcuts = order.distinct().map(::shortcutKeyPart)
+            val unified = replaceTypeSegment(current, newShortcuts, ::isShortcutKeyPart)
+            writeUnifiedPinnedItems(prefs, unified)
         }
     }
 
     override suspend fun addPinnedShortcut(name: String) {
         dataStore.edit { prefs ->
-            val current = prefs[Keys.PINNED_SHORTCUT_ORDER]?.let {
-                try { json.decodeFromString<List<String>>(it) } catch (_: Exception) { emptyList() }
-            } ?: emptyList()
-            if (name !in current) {
-                prefs[Keys.PINNED_SHORTCUT_ORDER] = json.encodeToString(current + name)
+            val current = readUnifiedPinnedItems(prefs)
+            val key = shortcutKeyPart(name)
+            if (key !in current) {
+                writeUnifiedPinnedItems(prefs, current + key)
             }
         }
     }
 
     override suspend fun removePinnedShortcut(name: String) {
         dataStore.edit { prefs ->
-            val current = prefs[Keys.PINNED_SHORTCUT_ORDER]?.let {
-                try { json.decodeFromString<List<String>>(it) } catch (_: Exception) { emptyList() }
-            } ?: emptyList()
-            prefs[Keys.PINNED_SHORTCUT_ORDER] = json.encodeToString(current - name)
+            val current = readUnifiedPinnedItems(prefs)
+            writeUnifiedPinnedItems(prefs, current - shortcutKeyPart(name))
         }
     }
 

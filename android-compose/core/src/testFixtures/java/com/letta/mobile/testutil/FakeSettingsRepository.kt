@@ -40,6 +40,9 @@ class FakeSettingsRepository(
     val pinnedAgentIds: MutableStateFlow<Set<String>> =
         MutableStateFlow(emptySet())
 
+    val pinnedAgentOrder: MutableStateFlow<List<String>> =
+        MutableStateFlow(emptyList())
+
     val pinnedShortcutOrder: MutableStateFlow<List<String>> =
         MutableStateFlow(emptyList())
 
@@ -66,6 +69,8 @@ class FakeSettingsRepository(
 
     override fun getPinnedAgentIds(): Flow<Set<String>> = pinnedAgentIds
 
+    override fun getPinnedAgentOrder(): Flow<List<String>> = pinnedAgentOrder
+
     override fun setFavoriteAgentId(agentId: String?) {
         favoriteAgentIdState.value = agentId
     }
@@ -76,6 +81,18 @@ class FakeSettingsRepository(
         } else {
             pinnedAgentIds.value - agentId
         }
+        pinnedAgentOrder.value = if (pinned) {
+            if (agentId in pinnedAgentOrder.value) pinnedAgentOrder.value
+            else pinnedAgentOrder.value + agentId
+        } else {
+            pinnedAgentOrder.value - agentId
+        }
+    }
+
+    override suspend fun setPinnedAgentOrder(order: List<String>) {
+        val deduped = order.distinct()
+        pinnedAgentOrder.value = deduped
+        pinnedAgentIds.value = deduped.toSet()
     }
 
     override fun getPinnedProjectIds(): Flow<Set<String>> = pinnedProjectIds
@@ -102,5 +119,27 @@ class FakeSettingsRepository(
 
     override suspend fun removePinnedShortcut(name: String) {
         pinnedShortcutOrder.value = pinnedShortcutOrder.value - name
+    }
+
+    val pinnedItemsOrder: MutableStateFlow<List<String>> =
+        MutableStateFlow(emptyList())
+
+    override fun getPinnedItemsOrder(): Flow<List<String>> = pinnedItemsOrder
+
+    override suspend fun setPinnedItemsOrder(order: List<String>) {
+        pinnedItemsOrder.value = order.distinct()
+    }
+
+    val pinnedAgentNames: MutableStateFlow<Map<String, String>> =
+        MutableStateFlow(emptyMap())
+
+    override fun getPinnedAgentNames(): Flow<Map<String, String>> = pinnedAgentNames
+
+    override suspend fun upsertPinnedAgentName(id: String, name: String) {
+        pinnedAgentNames.value = pinnedAgentNames.value + (id to name)
+    }
+
+    override suspend fun removePinnedAgentName(id: String) {
+        pinnedAgentNames.value = pinnedAgentNames.value - id
     }
 }

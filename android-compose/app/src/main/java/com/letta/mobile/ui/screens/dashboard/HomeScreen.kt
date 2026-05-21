@@ -157,7 +157,9 @@ fun HomeScreen(
                         previousGroup = shortcut.group
 
                         key(shortcut) {
-                            val isPinned = shortcut in uiState.pinnedShortcuts
+                            val isPinned = uiState.pinnedItems.any {
+                                it is PinnedItem.Shortcut && it.value == shortcut
+                            }
                             val context = LocalContext.current
                             val label = stringResource(shortcut.labelResId)
 
@@ -278,7 +280,7 @@ fun HomeScreen(
             onUnpinAgent = viewModel::unpinAgent,
             onShortcutClick = { shortcut -> shortcutNavigator(shortcut)() },
             onUnpinShortcut = viewModel::unpinShortcut,
-            onReorderShortcuts = viewModel::reorderShortcuts,
+            onReorderPinnedItems = viewModel::reorderPinnedItems,
             modifier = Modifier.padding(paddingValues),
         )
     }
@@ -296,7 +298,7 @@ private fun HomeContent(
     onUnpinAgent: (String) -> Unit,
     onShortcutClick: (DashboardShortcut) -> Unit,
     onUnpinShortcut: (DashboardShortcut) -> Unit,
-    onReorderShortcuts: (List<DashboardShortcut>) -> Unit,
+    onReorderPinnedItems: (List<String>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize().imePadding()) {
@@ -346,35 +348,12 @@ private fun HomeContent(
                 modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
             ) {
-                if (state.isPinnedShortcutsLoading) {
-                    Column(
-                        modifier = Modifier
-                            .padding(horizontal = LettaSpacing.screenHorizontal)
-                            .height(228.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        for (i in 0..5) {
-                            ShimmerBox(height = 68.dp, widthFraction = 1f)
-                        }
-                    }
-                } else if (state.pinnedShortcuts.isNotEmpty()) {
-                    ReorderableWidgetGrid(
-                        shortcuts = state.pinnedShortcuts,
-                        state = state,
-                        onShortcutClick = onShortcutClick,
-                        onUnpinShortcut = onUnpinShortcut,
-                        onReorder = onReorderShortcuts,
-                        columns = 3,
-                        modifier = Modifier.padding(horizontal = LettaSpacing.screenHorizontal),
-                    )
-                }
-
-                if (state.isPinnedAgentsLoading) {
+                if (state.isPinnedItemsLoading) {
                     Column(
                         modifier = Modifier.padding(horizontal = LettaSpacing.screenHorizontal),
                         verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
                     ) {
-                        for (row in 0..1) {
+                        for (row in 0..2) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
@@ -382,38 +361,25 @@ private fun HomeContent(
                                 for (col in 0..2) {
                                     ShimmerBox(
                                         modifier = Modifier.weight(1f),
-                                        height = 90.dp,
+                                        height = 100.dp,
                                     )
                                 }
                             }
                         }
                     }
-                } else if (state.pinnedAgents.isNotEmpty()) {
-                    val agentColumns = 3
-                    Column(
+                } else if (state.pinnedItems.isNotEmpty()) {
+                    ReorderablePinnedItemsGrid(
+                        items = state.pinnedItems,
+                        state = state,
+                        onShortcutClick = onShortcutClick,
+                        onUnpinShortcut = onUnpinShortcut,
+                        onAgentClick = { onNavigateToChat(it.id, it.name, null) },
+                        onUnpinAgent = { onUnpinAgent(it.id) },
+                        onConfigureAgent = { onNavigateToEditAgent(it.id) },
+                        onReorder = onReorderPinnedItems,
+                        columns = 3,
                         modifier = Modifier.padding(horizontal = LettaSpacing.screenHorizontal),
-                    ) {
-                        state.pinnedAgents.chunked(agentColumns).forEach { row ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
-                            ) {
-                                row.forEach { pinned ->
-                                    PinnedAgentCard(
-                                        name = pinned.name,
-                                        onClick = { onNavigateToChat(pinned.id, pinned.name, null) },
-                                        onUnpin = { onUnpinAgent(pinned.id) },
-                                        onConfigure = { onNavigateToEditAgent(pinned.id) },
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                }
-                                repeat(agentColumns - row.size) {
-                                    Spacer(Modifier.weight(1f))
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(LettaSpacing.cardGap))
-                        }
-                    }
+                    )
                 }
             }
 

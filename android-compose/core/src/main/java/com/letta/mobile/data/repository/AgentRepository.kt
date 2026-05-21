@@ -38,6 +38,8 @@ class AgentRepository @Inject constructor(
 ) : IAgentRepository {
     private val _agents = MutableStateFlow<List<Agent>>(emptyList())
     override val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
+    private val _isRefreshing = MutableStateFlow(false)
+    override val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
     private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val refreshMutex = Mutex()
     private var lastRefreshAtMillis: Long = 0L
@@ -69,7 +71,12 @@ class AgentRepository @Inject constructor(
     override suspend fun countAgents(): Int = agentApi.countAgents()
 
     override suspend fun refreshAgents() = refreshMutex.withLock {
-        refreshAgentsLocked()
+        _isRefreshing.value = true
+        try {
+            refreshAgentsLocked()
+        } finally {
+            _isRefreshing.value = false
+        }
     }
 
     private suspend fun refreshAgentsLocked() {
@@ -137,7 +144,12 @@ class AgentRepository @Inject constructor(
 
     suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = refreshMutex.withLock {
         if (hasFreshAgents(maxAgeMs)) return@withLock false
-        refreshAgentsLocked()
+        _isRefreshing.value = true
+        try {
+            refreshAgentsLocked()
+        } finally {
+            _isRefreshing.value = false
+        }
         true
     }
 

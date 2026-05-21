@@ -37,6 +37,33 @@ import javax.inject.Inject
 
 data class PinnedAgent(val id: String, val name: String)
 
+/**
+ * Unified pinned-item type so shortcuts and pinned agents can share a
+ * single drag-to-reorder grid on the Home/Admin tab. Each value carries
+ * a stable qualified key used by both the LazyGrid item key and the
+ * persistence layer (see [com.letta.mobile.data.repository.SettingsRepository]).
+ */
+sealed interface PinnedItem {
+    val key: String
+
+    data class Shortcut(val value: DashboardShortcut) : PinnedItem {
+        override val key: String get() = shortcutKey(value.name)
+    }
+
+    data class Agent(val value: PinnedAgent) : PinnedItem {
+        override val key: String get() = agentKey(value.id)
+    }
+
+    companion object {
+        fun shortcutKey(name: String): String = "shortcut:$name"
+        fun agentKey(id: String): String = "agent:$id"
+        fun parseShortcutKey(key: String): String? =
+            if (key.startsWith("shortcut:")) key.removePrefix("shortcut:") else null
+        fun parseAgentKey(key: String): String? =
+            if (key.startsWith("agent:")) key.removePrefix("agent:") else null
+    }
+}
+
 @androidx.compose.runtime.Immutable
 data class DashboardUiState(
     val serverUrl: String = "",
@@ -54,10 +81,8 @@ data class DashboardUiState(
     val isUsageLoading: Boolean = true,
     val favoriteAgentId: String? = null,
     val favoriteAgentName: String? = null,
-    val pinnedAgents: ImmutableList<PinnedAgent> = persistentListOf(),
-    val isPinnedAgentsLoading: Boolean = true,
-    val pinnedShortcuts: ImmutableList<DashboardShortcut> = persistentListOf(),
-    val isPinnedShortcutsLoading: Boolean = true,
+    val pinnedItems: ImmutableList<PinnedItem> = persistentListOf(),
+    val isPinnedItemsLoading: Boolean = true,
     val searchQuery: String = "",
     val isSearching: Boolean = false,
     val isSearchActive: Boolean = false,
@@ -101,7 +126,6 @@ class DashboardViewModel @Inject constructor(
         migrateAdminToFavorite()
         loadProgressively()
         observeFavoriteAndPinned()
-        observePinnedShortcuts()
         setupSearch()
         // letta-mobile-ze5l: refetch dashboard data on backend switch.
         viewModelScope.launch {
@@ -122,25 +146,59 @@ class DashboardViewModel @Inject constructor(
 
     private fun observeFavoriteAndPinned() {
         viewModelScope.launch {
-            // Include agentRepository.agents so the pinned/favorite name
-            // resolution re-fires when the agent cache is repopulated
-            // after a backend switch — otherwise tiles keep pointing at
-            // agents that don't exist on the new server (letta-mobile-9sx).
+            // Drive the unified pinned grid off five sources:
+            //
+            //  - favoriteAgentId       : separate "favorite" tile (not in the grid).
+            //  - pinnedItemsOrder      : authoritative qualified-key order.
+            //  - agentRepository.agents: current backend's agent cache.
+            //  - pinnedAgentNames      : persisted id → name cache; lets us
+            //                            render tiles instantly on backend
+            //                            switch without waiting for the
+            //                            network refresh to settle.
+            //  - isRefreshing          : gate orphan removal on a known-fresh
+            //                            cache; while a refresh is in flight
+            //                            we keep showing cached tiles so the
+            //                            grid doesn't flash empty.
             combine(
                 settingsRepository.favoriteAgentId,
-                settingsRepository.getPinnedAgentIds(),
+                settingsRepository.getPinnedItemsOrder(),
                 agentRepository.agents,
-            ) { favId, pinnedIds, _ -> favId to pinnedIds }
-                .collect { (favId, pinnedIds) ->
+                settingsRepository.getPinnedAgentNames(),
+                agentRepository.isRefreshing,
+            ) { favId, items, agents, names, refreshing ->
+                ResolutionSnapshot(favId, items, agents, names, refreshing)
+            }
+                .collect { snapshot ->
+                    val favId = snapshot.favId
                     val favName = favId?.let { agentRepository.getCachedAgent(it)?.name }
-                    val pinned = pinnedIds.mapNotNull { id ->
-                        agentRepository.getCachedAgent(id)?.let { PinnedAgent(it.id.value, it.name) }
+
+                    // Write-through: any pinned agent currently in the
+                    // active backend's cache has its name persisted so
+                    // future backend switches can display it instantly.
+                    syncPinnedAgentNamesIntoCache(snapshot.items, snapshot.agents, snapshot.names)
+
+                    val currentAgentIds = snapshot.agents.map { it.id.value }.toSet()
+                    val cacheIsAuthoritative = !snapshot.refreshing
+
+                    val items = snapshot.items.mapNotNull { key ->
+                        PinnedItem.parseShortcutKey(key)?.let { name ->
+                            runCatching { PinnedItem.Shortcut(DashboardShortcut.valueOf(name)) }
+                                .getOrNull()
+                        }
+                            ?: PinnedItem.parseAgentKey(key)?.let { id ->
+                                resolveAgentItem(
+                                    id = id,
+                                    agentNames = snapshot.names,
+                                    currentAgentIds = currentAgentIds,
+                                    cacheIsAuthoritative = cacheIsAuthoritative,
+                                )
+                            }
                     }
                     _uiState.value = _uiState.value.copy(
                         favoriteAgentId = favId,
                         favoriteAgentName = favName,
-                        pinnedAgents = pinned.toImmutableList(),
-                        isPinnedAgentsLoading = false,
+                        pinnedItems = items.toImmutableList(),
+                        isPinnedItemsLoading = false,
                     )
                     if (favId != null && favName == null) {
                         try {
@@ -151,6 +209,65 @@ class DashboardViewModel @Inject constructor(
                         }
                     }
                 }
+        }
+    }
+
+    private data class ResolutionSnapshot(
+        val favId: String?,
+        val items: List<String>,
+        val agents: List<com.letta.mobile.data.model.Agent>,
+        val names: Map<String, String>,
+        val refreshing: Boolean,
+    )
+
+    /**
+     * Resolve a pinned agent key into a [PinnedItem.Agent].
+     *
+     *  - If the agent is in the active backend's cache: use the live
+     *    name (most up-to-date).
+     *  - Else if the cache is still refreshing AND we have a persisted
+     *    name: render from the persisted cache so the tile stays visible
+     *    during the backend-switch window.
+     *  - Else: drop. The agent isn't on this backend (orphan from a
+     *    different server); storage keeps the key so switching back
+     *    restores the tile.
+     */
+    private fun resolveAgentItem(
+        id: String,
+        agentNames: Map<String, String>,
+        currentAgentIds: Set<String>,
+        cacheIsAuthoritative: Boolean,
+    ): PinnedItem.Agent? {
+        val cached = agentRepository.getCachedAgent(id)
+        if (cached != null) {
+            return PinnedItem.Agent(PinnedAgent(cached.id.value, cached.name))
+        }
+        if (cacheIsAuthoritative) {
+            // The agent cache is settled and this id isn't in it →
+            // orphan on the active backend. Drop from the visible grid
+            // but leave storage and the persisted name cache alone so
+            // switching back to the original backend restores the tile.
+            return null
+        }
+        val persistedName = agentNames[id] ?: return null
+        return PinnedItem.Agent(PinnedAgent(id, persistedName))
+    }
+
+    private fun syncPinnedAgentNamesIntoCache(
+        itemKeys: List<String>,
+        agents: List<com.letta.mobile.data.model.Agent>,
+        currentNames: Map<String, String>,
+    ) {
+        val pinnedIds = itemKeys.mapNotNull(PinnedItem::parseAgentKey).toSet()
+        if (pinnedIds.isEmpty()) return
+        val agentMap = agents.associate { it.id.value to it.name }
+        viewModelScope.launch {
+            for (id in pinnedIds) {
+                val liveName = agentMap[id] ?: continue
+                if (currentNames[id] != liveName) {
+                    settingsRepository.upsertPinnedAgentName(id, liveName)
+                }
+            }
         }
     }
 
@@ -267,24 +384,6 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    private fun observePinnedShortcuts() {
-        viewModelScope.launch {
-            settingsRepository.getPinnedShortcutOrder().collect { names ->
-                val shortcuts = names.mapNotNull { name ->
-                    try {
-                        DashboardShortcut.valueOf(name)
-                    } catch (_: IllegalArgumentException) {
-                        null
-                    }
-                }
-                _uiState.value = _uiState.value.copy(
-                    pinnedShortcuts = shortcuts.toImmutableList(),
-                    isPinnedShortcutsLoading = false,
-                )
-            }
-        }
-    }
-
     fun pinShortcut(shortcut: DashboardShortcut) {
         viewModelScope.launch {
             settingsRepository.addPinnedShortcut(shortcut.name)
@@ -297,9 +396,14 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    fun reorderShortcuts(newOrder: List<DashboardShortcut>) {
+    /**
+     * Persist the new display order from the unified pinned grid.
+     * `keys` is the post-drag list of qualified PinnedItem keys
+     * ("shortcut:NAME" / "agent:ID").
+     */
+    fun reorderPinnedItems(keys: List<String>) {
         viewModelScope.launch {
-            settingsRepository.setPinnedShortcutOrder(newOrder.map { it.name })
+            settingsRepository.setPinnedItemsOrder(keys)
         }
     }
 

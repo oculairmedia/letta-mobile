@@ -28,12 +28,33 @@ interface ISettingsRepository {
     fun observeClientModeBaseUrl(): Flow<String>
     fun getClientModeApiKey(): String?
     fun getPinnedAgentIds(): Flow<Set<String>>
+    fun getPinnedAgentOrder(): Flow<List<String>>
     fun setFavoriteAgentId(agentId: String?)
     suspend fun setAgentPinned(agentId: String, pinned: Boolean)
+    suspend fun setPinnedAgentOrder(order: List<String>)
     fun getPinnedProjectIds(): Flow<Set<String>>
     suspend fun setProjectPinned(projectId: String, pinned: Boolean)
     fun getPinnedShortcutOrder(): Flow<List<String>>
     suspend fun setPinnedShortcutOrder(order: List<String>)
     suspend fun addPinnedShortcut(name: String)
     suspend fun removePinnedShortcut(name: String)
+
+    /**
+     * Unified pinned-item order (shortcuts + pinned agents) used to drive
+     * the single drag-to-reorder grid on the Home/Admin tab. Stored as a
+     * list of qualified keys: "shortcut:<NAME>" or "agent:<ID>".
+     */
+    fun getPinnedItemsOrder(): Flow<List<String>>
+    suspend fun setPinnedItemsOrder(order: List<String>)
+
+    /**
+     * Persisted display-name cache for pinned agents, keyed by agent id.
+     * Lets the Home/Admin pinned grid render tiles instantly when the
+     * user switches backends instead of waiting for the new server's
+     * agent cache to load. The dashboard ViewModel writes through to
+     * this whenever it sees a pinned agent in the live agent cache.
+     */
+    fun getPinnedAgentNames(): Flow<Map<String, String>>
+    suspend fun upsertPinnedAgentName(id: String, name: String)
+    suspend fun removePinnedAgentName(id: String)
 }

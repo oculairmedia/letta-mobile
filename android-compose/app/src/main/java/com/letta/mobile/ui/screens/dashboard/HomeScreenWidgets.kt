@@ -1,54 +1,45 @@
 package com.letta.mobile.ui.screens.dashboard
 
+import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.key
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -59,8 +50,9 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.customColors
 import kotlinx.collections.immutable.ImmutableList
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyGridState
 import java.util.Locale
-import kotlin.math.roundToInt
 import androidx.compose.material3.Text
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -71,27 +63,53 @@ internal fun PinnedAgentCard(
     onUnpin: () -> Unit,
     onConfigure: () -> Unit,
     modifier: Modifier = Modifier,
+    isDragging: Boolean = false,
+    enableLongPressMenu: Boolean = true,
 ) {
     var showMenu by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
     val accentColors = MaterialTheme.customColors
+    val scale by animateFloatAsState(
+        targetValue = if (isDragging) 1.05f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium,
+        ),
+        label = "agentTileScale",
+    )
+    val elevation by animateFloatAsState(
+        targetValue = if (isDragging) 8f else 0f,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "agentTileElevation",
+    )
+    val clickModifier = if (enableLongPressMenu) {
+        Modifier.combinedClickable(
+            onClick = onClick,
+            onLongClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                showMenu = true
+            },
+        )
+    } else {
+        Modifier.combinedClickable(onClick = onClick)
+    }
     Card(
         modifier = modifier
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    showMenu = true
-                },
-            ),
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                shadowElevation = elevation * density
+            }
+            .then(clickModifier),
         colors = CardDefaults.cardColors(
             containerColor = accentColors.freshAccentContainer,
         ),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            modifier = Modifier.fillMaxSize().padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
             Icon(
                 LettaIcons.Agent,
@@ -163,7 +181,7 @@ internal fun resolveContextualInfo(
             formatNumber(it.totalTokens) + " tokens"
         } ?: if (state.isUsageLoading) "—" else stringResource(shortcut.descriptionResId)
         DashboardShortcut.FAVORITE_AGENT -> {
-            if (state.isPinnedAgentsLoading) "—" 
+            if (state.isPinnedItemsLoading) "—"
             else state.favoriteAgentName ?: stringResource(shortcut.descriptionResId)
         }
         else -> {
@@ -234,9 +252,10 @@ internal fun DashboardWidgetTile(
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
                 .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
             Icon(
                 imageVector = shortcut.icon,
@@ -288,179 +307,236 @@ internal fun ReorderableWidgetGrid(
     columns: Int,
     modifier: Modifier = Modifier,
 ) {
+    // letta-mobile-rnyg superseded: the previous hand-rolled Layout +
+    // detectDragGesturesAfterLongPress + rect tracking implementation had
+    // bugs around cross-row drag and parent-scroll interference. Use
+    // sh.calvin.reorderable's LazyGrid integration instead — handles
+    // long-press start, swap detection, item displacement animation, and
+    // auto-scroll out of the box.
     var currentList by remember(shortcuts) { mutableStateOf(shortcuts.toList()) }
-    var draggingIndex by remember { mutableStateOf<Int?>(null) }
-    var dragOffset by remember { mutableStateOf(Offset.Zero) }
-    val itemRects = remember { mutableStateMapOf<Int, Rect>() }
-    val haptic = LocalHapticFeedback.current
-
-    val nestedScrollConnection = remember {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                return if (draggingIndex != null) available else Offset.Zero
-            }
+    val view = LocalView.current
+    val lazyGridState = rememberLazyGridState()
+    val reorderableState = rememberReorderableLazyGridState(lazyGridState) { from, to ->
+        currentList = currentList.toMutableList().apply {
+            add(to.index, removeAt(from.index))
         }
+        view.performHapticFeedback(HapticFeedbackConstants.SEGMENT_FREQUENT_TICK)
+    }
+
+    // Commit the new order to the caller when no item is being dragged.
+    // The library's onMove fires on every swap; we only persist once the
+    // user settles to avoid spammy writes mid-drag.
+    LaunchedEffect(reorderableState, currentList) {
+        snapshotFlow { reorderableState.isAnyItemDragging }
+            .collect { dragging ->
+                if (!dragging && currentList != shortcuts.toList()) {
+                    onReorder(currentList)
+                }
+            }
     }
 
     val gap = LettaSpacing.cardGap
+    val rows = (currentList.size + columns - 1) / columns
+    // Tile content (icon + optional contextual text + label + padding) lands
+    // around ~96-100dp. Pad to 108 so wider text doesn't clip. Items inside
+    // each cell still fillMaxWidth and align to a fixed cell height.
+    val tileHeight = 108.dp
+    val totalHeight = tileHeight * rows + gap * (rows - 1).coerceAtLeast(0)
 
-    Layout(
-        content = {
-            currentList.forEachIndexed { index, shortcut ->
-                key(shortcut) {
-                    val isDragging = draggingIndex == index
-
-                    // Track previous slot for easing animation
-                    var previousSlot by remember { mutableIntStateOf(index) }
-                    val slotOffset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
-
-                    LaunchedEffect(index) {
-                        if (previousSlot != index && draggingIndex != index) {
-                            // Item was displaced — animate from old position to new
-                            val cols = columns
-                            val oldCol = previousSlot % cols
-                            val newCol = index % cols
-                            val oldRow = previousSlot / cols
-                            val newRow = index / cols
-
-                            // We compute pixel delta using measured rects if available
-                            val oldRect = itemRects[previousSlot]
-                            val newRect = itemRects[index]
-                            if (oldRect != null && newRect != null) {
-                                val delta = Offset(
-                                    oldRect.left - newRect.left,
-                                    oldRect.top - newRect.top,
-                                )
-                                slotOffset.snapTo(delta)
-                                slotOffset.animateTo(
-                                    targetValue = Offset.Zero,
-                                    animationSpec = spring(
-                                        dampingRatio = Spring.DampingRatioLowBouncy,
-                                        stiffness = Spring.StiffnessMediumLow,
-                                    ),
-                                )
-                            }
-                        }
-                        previousSlot = index
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .then(if (isDragging) Modifier.zIndex(10f) else Modifier)
-                            .then(
-                                if (isDragging) {
-                                    Modifier.offset {
-                                        IntOffset(
-                                            dragOffset.x.roundToInt(),
-                                            dragOffset.y.roundToInt(),
-                                        )
-                                    }
-                                } else {
-                                    Modifier.offset {
-                                        IntOffset(
-                                            slotOffset.value.x.roundToInt(),
-                                            slotOffset.value.y.roundToInt(),
-                                        )
-                                    }
-                                },
-                            )
-                            .pointerInput(index) {
-                                detectDragGesturesAfterLongPress(
-                                    onDragStart = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        draggingIndex = index
-                                        dragOffset = Offset.Zero
-                                    },
-                                    onDrag = { change, dragAmount ->
-                                        change.consume()
-                                        dragOffset += Offset(dragAmount.x, dragAmount.y)
-
-                                        // letta-mobile-rnyg: after the first swap the dragged
-                                        // item lives at draggingIndex, not the original `index`
-                                        // that scoped this pointerInput. Always derive the
-                                        // current slot from draggingIndex so subsequent
-                                        // crossings reorder the right item.
-                                        val currentIndex = draggingIndex ?: index
-                                        val draggedRect = itemRects[currentIndex] ?: return@detectDragGesturesAfterLongPress
-                                        val draggedCenter = draggedRect.center + dragOffset
-                                        val targetIndex = itemRects.entries
-                                            .firstOrNull { (i, rect) ->
-                                                i != currentIndex && rect.contains(draggedCenter)
-                                            }?.key
-
-                                        if (targetIndex != null && targetIndex != currentIndex) {
-                                            val oldRect = itemRects[currentIndex] ?: return@detectDragGesturesAfterLongPress
-                                            val newRect = itemRects[targetIndex] ?: return@detectDragGesturesAfterLongPress
-
-                                            currentList = currentList.toMutableList().apply {
-                                                val item = removeAt(currentIndex)
-                                                add(targetIndex, item)
-                                            }
-                                            draggingIndex = targetIndex
-                                            dragOffset += Offset(
-                                                oldRect.left - newRect.left,
-                                                oldRect.top - newRect.top,
-                                            )
-                                        }
-                                    },
-                                    onDragEnd = {
-                                        draggingIndex = null
-                                        dragOffset = Offset.Zero
-                                        onReorder(currentList)
-                                    },
-                                    onDragCancel = {
-                                        draggingIndex = null
-                                        dragOffset = Offset.Zero
-                                        currentList = shortcuts.toList()
-                                    },
-                                )
-                            },
-                    ) {
-                        DashboardWidgetTile(
-                            shortcut = shortcut,
-                            contextualInfo = resolveContextualInfo(shortcut, state),
-                            onClick = { onShortcutClick(shortcut) },
-                            onUnpin = { onUnpinShortcut(shortcut) },
-                            isDragging = isDragging,
-                            enableLongPressMenu = false,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
-            }
-        },
+    LazyVerticalGrid(
+        state = lazyGridState,
+        columns = GridCells.Fixed(columns),
         modifier = modifier
             .fillMaxWidth()
-            .nestedScroll(nestedScrollConnection),
-    ) { measurables, constraints ->
-        val gapPx = gap.roundToPx()
-        val totalGapWidth = gapPx * (columns - 1)
-        val cellWidth = (constraints.maxWidth - totalGapWidth) / columns
-        val cellConstraints = constraints.copy(
-            minWidth = cellWidth,
-            maxWidth = cellWidth,
-            minHeight = 0,
-        )
+            .height(totalHeight),
+        horizontalArrangement = Arrangement.spacedBy(gap),
+        verticalArrangement = Arrangement.spacedBy(gap),
+        userScrollEnabled = false,
+    ) {
+        items(currentList, key = { it.name }) { shortcut ->
+            ReorderableItem(reorderableState, key = shortcut.name) { isDragging ->
+                DashboardWidgetTile(
+                    shortcut = shortcut,
+                    contextualInfo = resolveContextualInfo(shortcut, state),
+                    onClick = { onShortcutClick(shortcut) },
+                    onUnpin = { onUnpinShortcut(shortcut) },
+                    isDragging = isDragging,
+                    enableLongPressMenu = false,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(tileHeight)
+                        .longPressDraggableHandle(
+                            onDragStarted = {
+                                view.performHapticFeedback(HapticFeedbackConstants.GESTURE_START)
+                            },
+                            onDragStopped = {
+                                view.performHapticFeedback(HapticFeedbackConstants.GESTURE_END)
+                            },
+                        ),
+                )
+            }
+        }
+    }
+}
 
-        val placeables = measurables.map { it.measure(cellConstraints) }
-        val rows = placeables.chunked(columns)
-        val rowHeights = rows.map { row -> row.maxOf { it.height } }
-        val totalHeight = rowHeights.sum() + gapPx * (rowHeights.size - 1).coerceAtLeast(0)
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun ReorderablePinnedItemsGrid(
+    items: ImmutableList<PinnedItem>,
+    state: DashboardUiState,
+    onShortcutClick: (DashboardShortcut) -> Unit,
+    onUnpinShortcut: (DashboardShortcut) -> Unit,
+    onAgentClick: (PinnedAgent) -> Unit,
+    onUnpinAgent: (PinnedAgent) -> Unit,
+    onConfigureAgent: (PinnedAgent) -> Unit,
+    onReorder: (List<String>) -> Unit,
+    columns: Int,
+    modifier: Modifier = Modifier,
+) {
+    var currentList by remember(items) { mutableStateOf(items.toList()) }
+    val view = LocalView.current
+    val lazyGridState = rememberLazyGridState()
+    val reorderableState = rememberReorderableLazyGridState(lazyGridState) { from, to ->
+        currentList = currentList.toMutableList().apply {
+            add(to.index, removeAt(from.index))
+        }
+        view.performHapticFeedback(HapticFeedbackConstants.SEGMENT_FREQUENT_TICK)
+    }
 
-        layout(constraints.maxWidth, totalHeight) {
-            var y = 0
-            rows.forEachIndexed { rowIndex, row ->
-                var x = 0
-                row.forEachIndexed { colIndex, placeable ->
-                    val globalIndex = rowIndex * columns + colIndex
-                    itemRects[globalIndex] = Rect(
-                        Offset(x.toFloat(), y.toFloat()),
-                        Size(cellWidth.toFloat(), rowHeights[rowIndex].toFloat()),
-                    )
-                    placeable.placeRelative(x, y)
-                    x += cellWidth + gapPx
+    LaunchedEffect(reorderableState, currentList) {
+        snapshotFlow { reorderableState.isAnyItemDragging }
+            .collect { dragging ->
+                if (!dragging && currentList != items.toList()) {
+                    onReorder(currentList.map { it.key })
                 }
-                y += rowHeights[rowIndex] + gapPx
+            }
+    }
+
+    val gap = LettaSpacing.cardGap
+    val rows = (currentList.size + columns - 1) / columns
+    // Tile content (icon + 1-2 text lines + padding) lands around 96-100dp
+    // for both shortcut and agent tiles. Pad to 108 so wider text doesn't
+    // clip. Items inside each cell fillMaxWidth and align to a fixed cell
+    // height — keeping both types visually identical inside the grid.
+    val tileHeight = 108.dp
+    val totalHeight = tileHeight * rows + gap * (rows - 1).coerceAtLeast(0)
+
+    LazyVerticalGrid(
+        state = lazyGridState,
+        columns = GridCells.Fixed(columns),
+        modifier = modifier
+            .fillMaxWidth()
+            .height(totalHeight),
+        horizontalArrangement = Arrangement.spacedBy(gap),
+        verticalArrangement = Arrangement.spacedBy(gap),
+        userScrollEnabled = false,
+    ) {
+        items(currentList, key = { it.key }) { item ->
+            ReorderableItem(reorderableState, key = item.key) { isDragging ->
+                val tileModifier = Modifier
+                    .fillMaxWidth()
+                    .height(tileHeight)
+                    .longPressDraggableHandle(
+                        onDragStarted = {
+                            view.performHapticFeedback(HapticFeedbackConstants.GESTURE_START)
+                        },
+                        onDragStopped = {
+                            view.performHapticFeedback(HapticFeedbackConstants.GESTURE_END)
+                        },
+                    )
+                when (item) {
+                    is PinnedItem.Shortcut -> DashboardWidgetTile(
+                        shortcut = item.value,
+                        contextualInfo = resolveContextualInfo(item.value, state),
+                        onClick = { onShortcutClick(item.value) },
+                        onUnpin = { onUnpinShortcut(item.value) },
+                        isDragging = isDragging,
+                        enableLongPressMenu = false,
+                        modifier = tileModifier,
+                    )
+                    is PinnedItem.Agent -> PinnedAgentCard(
+                        name = item.value.name,
+                        onClick = { onAgentClick(item.value) },
+                        onUnpin = { onUnpinAgent(item.value) },
+                        onConfigure = { onConfigureAgent(item.value) },
+                        isDragging = isDragging,
+                        enableLongPressMenu = false,
+                        modifier = tileModifier,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun ReorderableAgentGrid(
+    pinnedAgents: ImmutableList<PinnedAgent>,
+    onAgentClick: (PinnedAgent) -> Unit,
+    onUnpinAgent: (PinnedAgent) -> Unit,
+    onConfigureAgent: (PinnedAgent) -> Unit,
+    onReorder: (List<String>) -> Unit,
+    columns: Int,
+    modifier: Modifier = Modifier,
+) {
+    var currentList by remember(pinnedAgents) { mutableStateOf(pinnedAgents.toList()) }
+    val view = LocalView.current
+    val lazyGridState = rememberLazyGridState()
+    val reorderableState = rememberReorderableLazyGridState(lazyGridState) { from, to ->
+        currentList = currentList.toMutableList().apply {
+            add(to.index, removeAt(from.index))
+        }
+        view.performHapticFeedback(HapticFeedbackConstants.SEGMENT_FREQUENT_TICK)
+    }
+
+    LaunchedEffect(reorderableState, currentList) {
+        snapshotFlow { reorderableState.isAnyItemDragging }
+            .collect { dragging ->
+                if (!dragging && currentList != pinnedAgents.toList()) {
+                    onReorder(currentList.map { it.id })
+                }
+            }
+    }
+
+    val gap = LettaSpacing.cardGap
+    val rows = (currentList.size + columns - 1) / columns
+    // Agent tile content (icon + name + subtitle + padding) is similar to
+    // shortcut tiles — ~90dp. Pad to 100 for safety.
+    val tileHeight = 100.dp
+    val totalHeight = tileHeight * rows + gap * (rows - 1).coerceAtLeast(0)
+
+    LazyVerticalGrid(
+        state = lazyGridState,
+        columns = GridCells.Fixed(columns),
+        modifier = modifier
+            .fillMaxWidth()
+            .height(totalHeight),
+        horizontalArrangement = Arrangement.spacedBy(gap),
+        verticalArrangement = Arrangement.spacedBy(gap),
+        userScrollEnabled = false,
+    ) {
+        items(currentList, key = { it.id }) { agent ->
+            ReorderableItem(reorderableState, key = agent.id) { isDragging ->
+                PinnedAgentCard(
+                    name = agent.name,
+                    onClick = { onAgentClick(agent) },
+                    onUnpin = { onUnpinAgent(agent) },
+                    onConfigure = { onConfigureAgent(agent) },
+                    isDragging = isDragging,
+                    enableLongPressMenu = false,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(tileHeight)
+                        .longPressDraggableHandle(
+                            onDragStarted = {
+                                view.performHapticFeedback(HapticFeedbackConstants.GESTURE_START)
+                            },
+                            onDragStopped = {
+                                view.performHapticFeedback(HapticFeedbackConstants.GESTURE_END)
+                            },
+                        ),
+                )
             }
         }
     }

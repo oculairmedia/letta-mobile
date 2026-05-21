@@ -24,6 +24,9 @@ class FakeAgentRepository(
     val agentsState: MutableStateFlow<List<Agent>> = MutableStateFlow(initialAgents)
     override val agents: StateFlow<List<Agent>> = agentsState.asStateFlow()
 
+    val isRefreshingState: MutableStateFlow<Boolean> = MutableStateFlow(false)
+    override val isRefreshing: StateFlow<Boolean> = isRefreshingState.asStateFlow()
+
     val calls: MutableList<String> = mutableListOf()
 
     override suspend fun countAgents(): Int {

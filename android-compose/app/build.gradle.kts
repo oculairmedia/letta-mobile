@@ -381,6 +381,9 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
+    // Drag-to-reorder for Compose
+    implementation("sh.calvin.reorderable:reorderable:3.1.0")
+
     // Immutable collections for Compose stability
     implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.4.0")
 

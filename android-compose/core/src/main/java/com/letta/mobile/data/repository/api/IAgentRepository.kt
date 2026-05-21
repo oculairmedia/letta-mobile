@@ -9,6 +9,16 @@ import kotlinx.coroutines.flow.StateFlow
 
 interface IAgentRepository {
     val agents: StateFlow<List<Agent>>
+    /**
+     * Set to true while [refreshAgents] is in flight (i.e. while the
+     * agent cache may not reflect the active backend). Consumers that
+     * need to gate "is this id an orphan?" decisions on a known-fresh
+     * cache should observe this and only treat a missing id as an
+     * orphan once it flips back to false. Particularly important on
+     * backend switches, where the cache transitions from one server's
+     * agents to another.
+     */
+    val isRefreshing: StateFlow<Boolean>
     suspend fun countAgents(): Int
     suspend fun refreshAgents()
     fun getCachedAgent(id: String): Agent?
