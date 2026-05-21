@@ -8,17 +8,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -27,38 +23,6 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.designsystem.R
 import com.letta.mobile.ui.icons.LettaIcons
-
-private val FadingEdgeWidth = 24.dp
-
-/**
- * Paints a horizontal gradient that fades the leading and trailing edges of
- * the row from [color] to transparent, so a scrollable LazyRow visibly
- * dissolves into the surrounding surface instead of hard-clipping at the
- * padding bounds. Pass [MaterialTheme.colorScheme.surface] (or whatever the
- * parent surface paints) so the gradient blends theme-aware in light and
- * dark modes.
- */
-private fun Modifier.fadingEdges(color: Color): Modifier = drawWithContent {
-    drawContent()
-    val w = FadingEdgeWidth.toPx()
-    drawRect(
-        brush = Brush.horizontalGradient(
-            colors = listOf(color, Color.Transparent),
-            startX = 0f,
-            endX = w,
-        ),
-        size = Size(w, size.height),
-    )
-    drawRect(
-        brush = Brush.horizontalGradient(
-            colors = listOf(Color.Transparent, color),
-            startX = size.width - w,
-            endX = size.width,
-        ),
-        topLeft = Offset(size.width - w, 0f),
-        size = Size(w, size.height),
-    )
-}
 
 object ToolAffordanceRowTestTags {
     const val Container = "tool-affordance-row"
@@ -72,6 +36,7 @@ fun ToolAffordanceRow(
     modifier: Modifier = Modifier,
 ) {
     if (tools.isEmpty()) return
+    val rowState = rememberLazyListState()
 
     Column(
         modifier = modifier
@@ -86,9 +51,13 @@ fun ToolAffordanceRow(
             modifier = Modifier.padding(start = 4.dp),
         )
         LazyRow(
+            state = rowState,
             modifier = Modifier
                 .fillMaxWidth()
-                .fadingEdges(MaterialTheme.colorScheme.surface),
+                .statefulFadingEdges(
+                    scrollState = rowState,
+                    backgroundColor = MaterialTheme.colorScheme.surface,
+                ),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(vertical = 4.dp),
         ) {

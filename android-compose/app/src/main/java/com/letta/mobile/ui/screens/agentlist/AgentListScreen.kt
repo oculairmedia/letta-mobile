@@ -93,6 +93,7 @@ import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.components.ShimmerGrid
+import com.letta.mobile.ui.components.statefulFadingEdges
 import com.letta.mobile.ui.navigation.agentAvatarSharedElementKey
 import com.letta.mobile.ui.navigation.optionalSharedElement
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
@@ -260,10 +261,17 @@ fun AgentListScreen(
                     )
                 }
                 if (allTags.isNotEmpty()) {
+                    val tagRowState = rememberLazyListState()
                     LazyRow(
+                        state = tagRowState,
                         modifier = Modifier
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                            .fillMaxWidth()
+                            .statefulFadingEdges(
+                                scrollState = tagRowState,
+                                backgroundColor = MaterialTheme.colorScheme.surface,
+                            ),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                     ) {
                         item {
                             FilterChip(
