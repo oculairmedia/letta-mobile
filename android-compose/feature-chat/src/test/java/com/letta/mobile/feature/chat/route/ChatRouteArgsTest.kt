@@ -57,6 +57,26 @@ class ChatRouteArgsTest {
     }
 
     @Test
+    fun `isFreshRoute is stable across setRouteConversationId writes`() {
+        val args = ChatRouteArgs(
+            SavedStateHandle(
+                mapOf(
+                    "agentId" to "agent-1",
+                    "conversationId" to "",
+                    "freshRouteKey" to 123L,
+                )
+            )
+        )
+
+        assertTrue(args.isFreshRoute)
+
+        args.setRouteConversationId("conv-resolved")
+
+        assertEquals("conv-resolved", args.explicitConversationId)
+        assertTrue(args.isFreshRoute)
+    }
+
+    @Test
     fun `restores project context with identifier fallback name`() {
         val args = ChatRouteArgs(
             SavedStateHandle(

@@ -200,7 +200,7 @@ internal class ClientModeSendCoordinator(
                                         attachments = attachments,
                                     )
                                     clearBootstrapUserMessage()
-                                    setClientModeConversationId(conversationId)
+                                    setRouteConversationId(conversationId)
                                     setActiveConversationId(conversationId)
                                     markClientModeBootstrapReady(conversationId)
                                     currentConversationTracker.setCurrent(conversationId)
@@ -218,7 +218,7 @@ internal class ClientModeSendCoordinator(
                     }
                     if (!latestConversationId.isNullOrBlank()) {
                         val latest = latestConversationId.orEmpty()
-                        setClientModeConversationId(latest)
+                        setRouteConversationId(latest)
                         setActiveConversationId(latest)
                         markClientModeBootstrapReady(latest)
                         currentConversationTracker.setCurrent(latest)
@@ -314,7 +314,7 @@ internal class ClientModeSendCoordinator(
                 android.util.Log.e("AdminChatViewModel", "sendViaClientMode: stream exception", e)
                 val recoverableConversationId = latestConversationId?.takeIf { it.isNotBlank() }
                 if (recoverableConversationId != null) {
-                    setClientModeConversationId(recoverableConversationId)
+                    setRouteConversationId(recoverableConversationId)
                     setActiveConversationId(recoverableConversationId)
                     markClientModeBootstrapReady(recoverableConversationId)
                     currentConversationTracker.setCurrent(recoverableConversationId)

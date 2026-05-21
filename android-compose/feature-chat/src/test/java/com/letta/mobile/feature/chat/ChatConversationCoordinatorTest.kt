@@ -1,19 +1,27 @@
 package com.letta.mobile.feature.chat
 
 import com.letta.mobile.data.channel.CurrentConversationTracker
+import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.repository.AgentRepository
+import com.letta.mobile.data.transport.ChannelTransport
+import com.letta.mobile.data.transport.WsChatBridge
+import com.letta.mobile.testutil.FakeTimelineExternalTransportWriter
 import com.letta.mobile.testutil.TestData
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -59,9 +67,71 @@ class ChatConversationCoordinatorTest {
         advanceUntilIdle()
 
         assertEquals(ConversationState.Ready("conv-recent"), harness.uiState.value.conversationState)
-        assertEquals("conv-recent", harness.clientModeConversationId)
+        assertEquals("conv-recent", harness.routeConversationId)
+        assertEquals("conv-recent", harness.coordinator.activeConversationId)
         assertEquals(listOf("conv-recent"), harness.startedObservers)
         assertEquals("conv-recent", harness.currentConversationTracker.current)
+    }
+
+    @Test
+    fun `client mode open without route arg exposes resolved most recent conversation as active`() = runTest {
+        val harness = Harness(scope = this, isFreshRoute = false)
+        coEvery { harness.chatSessionResolver.resolveMostRecentConversation("agent-1", any()) } returns "conv-existing"
+
+        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = true)
+        advanceUntilIdle()
+
+        assertEquals(ConversationState.Ready("conv-existing"), harness.uiState.value.conversationState)
+        assertEquals("conv-existing", harness.routeConversationId)
+        assertEquals("conv-existing", harness.coordinator.activeConversationId)
+    }
+
+    @Test
+    fun `first ws send after client mode open uses resolved conversation without creating one`() = runTest {
+        val harness = Harness(scope = this, isFreshRoute = false)
+        coEvery { harness.chatSessionResolver.resolveMostRecentConversation("agent-1", any()) } returns "conv-existing"
+        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = true)
+        advanceUntilIdle()
+        val bridge = mockBridge(sendAccepted = true)
+        val conversationRepository = stubConversationRepository()
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val wsSendCoordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = {
+                LettaConfig(
+                    id = "shim",
+                    mode = LettaConfig.Mode.SELF_HOSTED,
+                    serverUrl = "http://localhost:8291",
+                    accessToken = "token",
+                )
+            },
+            wsChatBridge = bridge,
+            timelineRepository = timelineRepository,
+            conversationRepository = conversationRepository,
+            uiState = harness.uiState,
+            clearComposerAfterSend = {},
+            activeConversationId = { harness.coordinator.activeConversationId },
+            setActiveConversationId = harness.coordinator::setActiveConversationId,
+            startTimelineObserver = { harness.startedObservers += it },
+            clientVersionProvider = object : ChatClientVersionProvider {
+                override val clientVersion: String = "letta-mobile/test (android)"
+            },
+        )
+
+        wsSendCoordinator.send("ping").join()
+
+        coVerify(exactly = 0) { conversationRepository.createConversation(any(), any()) }
+        verify(exactly = 1) {
+            bridge.send(
+                agentId = "agent-1",
+                conversationId = "conv-existing",
+                text = "ping",
+                otid = any(),
+                attachments = emptyList(),
+            )
+        }
+        assertEquals("conv-existing", timelineRepository.externalLocals.single().conversationId)
     }
 
     @Test
@@ -121,6 +191,7 @@ class ChatConversationCoordinatorTest {
         val sentTimelineMessages = mutableListOf<String>()
         var stoppedObserverCount = 0
         var clientModeConversationId: String? = null
+        var routeConversationId: String? = explicitConversationId
         var pendingBootstrapMessages: ImmutableList<UiMessage> = persistentListOf()
         var followingDuplicateInitialMessageInFlight = false
 
@@ -128,7 +199,8 @@ class ChatConversationCoordinatorTest {
             scope = scope,
             agentId = "agent-1",
             initialMessage = initialMessage,
-            explicitConversationId = explicitConversationId,
+            explicitConversationId = { routeConversationId },
+            setRouteConversationId = { routeConversationId = it?.takeIf { value -> value.isNotBlank() } },
             isFreshRoute = isFreshRoute,
             chatSessionResolver = chatSessionResolver,
             agentRepository = agentRepository,
@@ -152,5 +224,27 @@ class ChatConversationCoordinatorTest {
             every { agentRepository.getAgent("agent-1") } returns flowOf(TestData.agent(id = "agent-1", name = "Ada"))
             coEvery { chatSessionResolver.resolveMostRecentConversation(any(), any()) } returns null
         }
+    }
+
+    private fun stubConversationRepository(): ConversationRepository = mockk(relaxed = true) {
+        coEvery { createConversation(any(), any()) } returns Conversation(
+            id = "conv-created",
+            agentId = "agent-1",
+            createdAt = "1970-01-01T00:00:00Z",
+            updatedAt = "1970-01-01T00:00:00Z",
+            lastMessageAt = "1970-01-01T00:00:00Z",
+        )
+    }
+
+    private fun mockBridge(sendAccepted: Boolean): WsChatBridge = mockk(relaxed = true) {
+        every { state } returns MutableStateFlow(
+            ChannelTransport.State.Connected(
+                serverId = "server-1",
+                sessionId = "sess-1",
+                deviceId = "android-letta-mobile",
+            )
+        )
+        every { events } returns emptyFlow()
+        every { send(any(), any(), any(), any(), any()) } returns sendAccepted
     }
 }

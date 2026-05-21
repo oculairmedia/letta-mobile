@@ -16,20 +16,25 @@ internal class ChatRouteArgs @Inject constructor(
 
     val initialMessage: String? = savedStateHandle.get<String>(INITIAL_MESSAGE_KEY)
 
-    val requestedConversationArg: String? = savedStateHandle.get<String>(CONVERSATION_ID_KEY)
+    val requestedConversationArg: String?
+        get() = savedStateHandle.get<String>(CONVERSATION_ID_KEY)
 
     val explicitConversationId: String?
         get() = requestedConversationArg?.takeIf { it.isNotBlank() }
 
-    private val freshRouteKey: Long? = savedStateHandle.get<Long>(FRESH_ROUTE_KEY)
+    private val freshRouteKeyAtConstruction: Long? = savedStateHandle.get<Long>(FRESH_ROUTE_KEY)
+    private val requestedConversationArgAtConstruction: String? = requestedConversationArg
 
     val scrollToMessageId: String? = savedStateHandle.get<String>(SCROLL_TO_MESSAGE_ID_KEY)
 
+    // Freshness is a route-entry property, not mutable conversation state. The
+    // resolved conversation id is now written back to CONVERSATION_ID_KEY, so
+    // this must not be recomputed from requestedConversationArg after init.
     val isFreshRoute: Boolean
-        get() = freshRouteKey != null || requestedConversationArg?.isBlank() == true
+        get() = freshRouteKeyAtConstruction != null || requestedConversationArgAtConstruction?.isBlank() == true
 
     val explicitNewChat: Boolean
-        get() = freshRouteKey != null
+        get() = freshRouteKeyAtConstruction != null
 
     val projectContext: ProjectChatContext? =
         savedStateHandle.get<String>(PROJECT_IDENTIFIER_KEY)?.let { identifier ->
@@ -51,8 +56,8 @@ internal class ChatRouteArgs @Inject constructor(
         savedStateHandle[CLIENT_MODE_CONVERSATION_ID_KEY] = conversationId?.takeIf { it.isNotBlank() }
     }
 
-    fun setRouteConversationId(conversationId: String) {
-        savedStateHandle[CONVERSATION_ID_KEY] = conversationId
+    fun setRouteConversationId(conversationId: String?) {
+        savedStateHandle[CONVERSATION_ID_KEY] = conversationId?.takeIf { it.isNotBlank() }
     }
 
     internal fun savedStateHandle(): SavedStateHandle = savedStateHandle

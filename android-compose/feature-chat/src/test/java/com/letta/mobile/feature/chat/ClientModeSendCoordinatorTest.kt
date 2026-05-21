@@ -73,7 +73,8 @@ class ClientModeSendCoordinatorTest {
         harness.coordinator.send(text = "hello", explicitConversationId = null)
         advanceUntilIdle()
 
-        assertEquals("conv-new", harness.clientConversationId)
+        assertEquals("conv-new", harness.routeConversationId)
+        assertNull(harness.clientConversationId)
         assertEquals("conv-new", harness.activeConversationId)
         assertEquals("conv-new", harness.bootstrapReadyConversationId)
         assertEquals(listOf("conv-new"), harness.startedObservers)
@@ -95,7 +96,8 @@ class ClientModeSendCoordinatorTest {
         harness.coordinator.send(text = "hello", explicitConversationId = null)
         advanceUntilIdle()
 
-        assertEquals("conv-recover", harness.clientConversationId)
+        assertEquals("conv-recover", harness.routeConversationId)
+        assertNull(harness.clientConversationId)
         assertEquals("conv-recover", harness.activeConversationId)
         assertEquals("conv-recover", harness.startedObservers.last())
         assertTrue(harness.startedObservers.isNotEmpty())
@@ -136,7 +138,7 @@ class ClientModeSendCoordinatorTest {
 
         assertEquals(ClientModeConversationSwap("conv-old", "conv-new"), harness.uiState.value.clientModeConversationSwap)
         assertEquals("conv-new", harness.routeConversationId)
-        assertEquals("conv-new", harness.clientConversationId)
+        assertEquals("conv-old", harness.clientConversationId)
         assertEquals("conv-new", harness.activeConversationId)
         assertEquals(listOf("conv-old", "conv-new"), harness.startedObservers)
         assertEquals(listOf("conv-old" to "hello", "conv-new" to "hello"), harness.appendedClientModeLocals)
