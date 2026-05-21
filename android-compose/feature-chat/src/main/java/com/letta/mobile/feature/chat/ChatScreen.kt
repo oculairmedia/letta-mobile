@@ -47,6 +47,7 @@ import com.letta.mobile.feature.chat.R
 import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.SnackbarMessage
+import com.letta.mobile.ui.components.AmbientShaderAgentBackground
 import com.letta.mobile.ui.components.FloatingBanner
 import com.letta.mobile.ui.components.MessageSkeletonList
 import com.letta.mobile.ui.components.StarterPrompts
@@ -108,6 +109,8 @@ internal fun ChatScreen(
         val navBottomPx = WindowInsets.navigationBars.getBottom(density)
         val bottomBarPx = if (windowSizeClass.isExpandedWidth) 0 else with(density) { 56.dp.roundToPx() }
         val bottomInsetDp = with(density) { max(imeBottomPx, navBottomPx + bottomBarPx).toDp() }
+        var ambientAgentStatus by remember { mutableStateOf("Idle") }
+        var hadActiveAmbientRun by remember { mutableStateOf(false) }
 
         LaunchedEffect(composerState.error) {
             val message = composerState.error ?: return@LaunchedEffect
@@ -137,13 +140,31 @@ internal fun ChatScreen(
             viewModel.markA2uiActionSnackbarShown(snackbar.id)
         }
 
+        LaunchedEffect(state.error, state.isAgentTyping, state.isStreaming) {
+            when {
+                state.error != null -> ambientAgentStatus = "Failed"
+                state.isStreaming || state.isAgentTyping -> {
+                    hadActiveAmbientRun = true
+                    ambientAgentStatus = "Running"
+                }
+                hadActiveAmbientRun -> {
+                    ambientAgentStatus = "Completed"
+                    kotlinx.coroutines.delay(1400)
+                    hadActiveAmbientRun = false
+                    ambientAgentStatus = "Idle"
+                }
+                else -> ambientAgentStatus = "Idle"
+            }
+        }
+
         // letta-mobile-ndtc.3: the 60s delay subtitle is rendered inline by
         // ThinkingTextToken below (not as a snackbar/banner). The ViewModel
         // keeps `a2uiThinkingDelayMessage` set until the next thinking start
         // clears it (see startA2uiThinkingIndicator), so the operator sees
         // the subtitle until they take their next action.
 
-        Box(
+        AmbientShaderAgentBackground(
+            agentStatus = ambientAgentStatus,
             modifier = modifier
                 .fillMaxSize()
                 .then(backgroundModifier)
