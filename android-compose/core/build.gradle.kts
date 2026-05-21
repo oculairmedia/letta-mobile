@@ -3,6 +3,13 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("org.jetbrains.kotlin.plugin.allopen")
+    // letta-mobile-oc8j: enables @Composable lambda transformation so
+    // ConversationStateHolder's `launchMolecule { present() }` block compiles
+    // to the Composer-augmented Function2 the molecule-runtime API expects.
+    // Without it, lambdas compile to plain Function0 and fail at runtime with
+    // NoSuchMethodError. :core already depends on androidx.compose.runtime;
+    // the plugin just enables the bytecode transform.
+    id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.dagger.hilt.android")
     id("com.google.devtools.ksp")
     id("io.gitlab.arturbosch.detekt")
@@ -94,6 +101,13 @@ dependencies {
     // Compose runtime for @Stable and @Immutable annotations
     implementation("androidx.compose.runtime:runtime:1.8.3")
 
+    // letta-mobile-oc8j: Cash App's Molecule — Compose-style declarative
+    // state derivation that produces a Flow, no UI required. Used by the
+    // experimental ConversationStateHolder (foldless presenter over the
+    // pure reduceStreamFrame extracted by letta-mobile-bfqgi). Dep matches
+    // the version already in :app, :feature-chat, :feature-editagent.
+    implementation("app.cash.molecule:molecule-runtime:2.2.0")
+
     // androidx.tracing — emits systrace/Perfetto sections so Telemetry
     // timers are visible in ui.perfetto.dev alongside framework traces.
     // Used as an integration layer inside Telemetry; beginAsyncSection /
@@ -130,6 +144,11 @@ dependencies {
     testImplementation("io.kotest:kotest-runner-junit5:5.9.1")
     testImplementation("io.kotest:kotest-assertions-core:5.9.1")
     testImplementation("io.kotest:kotest-property:5.9.1")
+    // letta-mobile-oc8j: forces 2.2.0 on the test classpath. Without this an
+    // older Molecule (no SnapshotNotifier overload) was being resolved for
+    // testDebugUnitTest, causing NoSuchMethodError on launchMolecule$default
+    // — compile saw 2.2.0, runtime saw the older API.
+    testImplementation("app.cash.molecule:molecule-runtime:2.2.0")
     testImplementation("org.robolectric:robolectric:4.16.1")
     testImplementation("androidx.test:core-ktx:1.7.0")
     testImplementation("androidx.test.ext:junit-ktx:1.3.0")
