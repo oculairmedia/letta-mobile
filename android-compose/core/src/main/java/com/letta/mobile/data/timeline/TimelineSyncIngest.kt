@@ -330,6 +330,7 @@ internal suspend fun ingestStreamEvent(
     // Lock released — safe to suspend on emit/dispatch.
     pendingEvents.forEach { events.emit(it) }
     ingestNotificationDispatcher.dispatch(notification)
+    dumpTimelineState("streamIngest.${message.messageType ?: "?"}", conversationId, state.value)
 }
 
 /**

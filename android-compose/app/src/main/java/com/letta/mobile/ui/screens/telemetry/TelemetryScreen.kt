@@ -27,8 +27,10 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -132,9 +134,55 @@ fun TelemetryScreen(onBack: () -> Unit) {
             )
         },
     ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            TimelineDumpToggleRow()
+            HorizontalDivider()
+            TelemetryEventList(visibleEvents = visibleEvents, modifier = Modifier.fillMaxSize())
+        }
+    }
+}
+
+@Composable
+private fun TimelineDumpToggleRow() {
+    var enabled by remember { mutableStateOf(Telemetry.isTimelineDumpEnabled()) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                "Timeline state dump",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                "Logs every timeline event after hydrate / reconcile / stream-ingest. " +
+                    "High-volume — leave off unless diagnosing hydration dupes (1ar3u / 3j6 / 16li).",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(
+            checked = enabled,
+            onCheckedChange = { newValue ->
+                Telemetry.timelineDumpEnabled.set(newValue)
+                enabled = newValue
+            },
+        )
+    }
+}
+
+@Composable
+private fun TelemetryEventList(
+    visibleEvents: List<Telemetry.Event>,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier) {
         if (visibleEvents.isEmpty()) {
             Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -145,7 +193,7 @@ fun TelemetryScreen(onBack: () -> Unit) {
             }
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
+                modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 // Use itemsIndexed with an index suffix: multiple telemetry

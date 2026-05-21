@@ -236,6 +236,7 @@ class TimelineSyncLoop(
                 "rawCount" to response.size,
                 "eventCount" to hydrated.visibleEventCount,
             )
+            dumpTimelineState("hydrate", conversationId, _state.value)
         } catch (t: Throwable) {
             timer.stopError(t, "conversationId" to conversationId)
             throw t
@@ -725,6 +726,7 @@ class TimelineSyncLoop(
                 "serverCount" to serverMessages.size,
                 "appended" to appended,
             )
+            dumpTimelineState("reconcile.$telemetryName", conversationId, _state.value)
         } catch (t: Throwable) {
             timer.stopError(t, *telemetryAttrs)
             throw t

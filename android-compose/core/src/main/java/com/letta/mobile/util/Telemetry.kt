@@ -100,6 +100,32 @@ object Telemetry {
     @Suppress("MemberVisibilityCanBePrivate")
     val logcatEnabled = AtomicBoolean(BuildConfig.DEBUG)
 
+    /**
+     * Per-event timeline state dump after every hydrate / reconcile / stream
+     * ingest. OFF by default — when on, every dump emits one Telemetry event
+     * per timeline entry, which is high-volume. Use only while diagnosing
+     * hydration duplication bugs like letta-mobile-1ar3u / 3j6 / 16li.
+     *
+     * Single volatile read on the hot path when off.
+     *
+     * Flip from the TelemetryScreen (debug builds), or via adb without a
+     * rebuild: `adb shell setprop log.tag.LettaTimelineDump VERBOSE`. The
+     * setprop check runs lazily inside [isTimelineDumpEnabled].
+     */
+    @Suppress("MemberVisibilityCanBePrivate")
+    val timelineDumpEnabled = AtomicBoolean(false)
+
+    /**
+     * Tag used for the adb setprop override.
+     * `adb shell setprop log.tag.LettaTimelineDump VERBOSE` flips the dump on
+     * without needing the in-app toggle. Read via [android.util.Log.isLoggable]
+     * which caches per process, so the cost is a single int compare.
+     */
+    private const val TIMELINE_DUMP_TAG = "LettaTimelineDump"
+
+    fun isTimelineDumpEnabled(): Boolean =
+        timelineDumpEnabled.get() || Log.isLoggable(TIMELINE_DUMP_TAG, Log.VERBOSE)
+
     private const val TAG_PREFIX = "Telemetry"
     private const val MAX_RING_SIZE = 1000
 
