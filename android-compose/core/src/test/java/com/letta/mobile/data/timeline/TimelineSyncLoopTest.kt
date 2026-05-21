@@ -34,6 +34,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import app.cash.turbine.test
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -338,6 +339,61 @@ class TimelineSyncLoopTest {
             expected,
             assistant!!.content,
         )
+        scope.coroutineContext.job.cancel()
+    }
+
+    /**
+     * Worked example for letta-mobile-7abe: Turbine adoption.
+     *
+     * Asserts the same pure-delta concat contract the polling-loop sibling
+     * test covers above (lcp-cv3 / lcp-pro / lcp-r0m / wucn-snapshot-recovery
+     * cascade), but via [app.cash.turbine.test] on the [TimelineSyncLoop.state]
+     * StateFlow — no `delay(10)` polling, no manual stability heuristic, no
+     * arbitrary `withTimeout(5_000)`. Each `awaitItem()` is bounded by
+     * Turbine's default 1s timeout, so a broken merge surfaces as a clear
+     * "expected item but no emission" failure instead of a stable-content
+     * heuristic that quietly passes on the wrong content.
+     *
+     * Read together with `docs/testing-with-turbine.md` for the rationale
+     * and the pattern this test demonstrates.
+     */
+    @Test
+    fun `Turbine - pure-delta merge yields concatenated assistant content`() = runBlocking {
+        val fragments = listOf("Hello ", "world", "!")
+        val expected = fragments.joinToString("")
+
+        val api = FakeSyncApi()
+        api.nextStreamMessages = fragments.mapIndexed { idx, f ->
+            AssistantMessage(
+                id = "reply-stream",
+                contentRaw = JsonPrimitive(f),
+                otid = if (idx == 0) "reply-otid-turbine" else null,
+            )
+        }
+        val scope = CoroutineScope(Dispatchers.IO)
+        val sync = TimelineSyncLoop(api, "conv1", scope)
+
+        sync.state.test {
+            // Initial empty timeline before send.
+            assertEquals(0, awaitItem().events.size)
+
+            sync.send("hello")
+
+            // Walk emissions until the assistant event reaches the full
+            // concatenated content. Conflation may drop intermediate states,
+            // but the terminal state must include the expected content.
+            var assistantContent: String? = null
+            while (assistantContent != expected) {
+                val timeline = awaitItem()
+                val assistant = timeline.events.firstOrNull {
+                    it is TimelineEvent.Confirmed && it.serverId == "reply-stream"
+                } as? TimelineEvent.Confirmed
+                if (assistant != null) assistantContent = assistant.content
+            }
+            assertEquals(expected, assistantContent)
+
+            cancelAndIgnoreRemainingEvents()
+        }
         scope.coroutineContext.job.cancel()
     }
 
