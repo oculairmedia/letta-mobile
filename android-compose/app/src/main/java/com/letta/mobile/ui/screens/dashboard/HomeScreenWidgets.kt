@@ -47,8 +47,8 @@ import com.letta.mobile.R
 import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.theme.LettaSpacing
-import com.letta.mobile.ui.theme.customColors
 import kotlinx.collections.immutable.ImmutableList
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyGridState
@@ -69,7 +69,6 @@ internal fun PinnedAgentCard(
     var showMenu by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
-    val accentColors = MaterialTheme.customColors
     val scale by animateFloatAsState(
         targetValue = if (isDragging) 1.05f else 1f,
         animationSpec = spring(
@@ -94,6 +93,10 @@ internal fun PinnedAgentCard(
     } else {
         Modifier.combinedClickable(onClick = onClick)
     }
+    // letta-mobile-f8v: pinned tiles share the Conversations card
+    // baseline (surfaceContainerLow + listShape + 1dp elevation), with
+    // teal-only iconography. Restores the unified visual language that
+    // was on feat/test-parallelism-tuning but never reached main.
     Card(
         modifier = modifier
             .graphicsLayer {
@@ -102,9 +105,9 @@ internal fun PinnedAgentCard(
                 shadowElevation = elevation * density
             }
             .then(clickModifier),
-        colors = CardDefaults.cardColors(
-            containerColor = accentColors.freshAccentContainer,
-        ),
+        shape = LettaCardDefaults.listShape,
+        colors = LettaCardDefaults.listCardColors(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
             modifier = Modifier.fillMaxSize().padding(12.dp),
@@ -114,7 +117,7 @@ internal fun PinnedAgentCard(
             Icon(
                 LettaIcons.Agent,
                 contentDescription = null,
-                tint = accentColors.freshAccent,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp),
             )
             Spacer(modifier = Modifier.height(4.dp))
@@ -205,10 +208,13 @@ internal fun DashboardWidgetTile(
 ) {
     val haptic = LocalHapticFeedback.current
     var showMenu by remember { mutableStateOf(false) }
-    val accentColors = MaterialTheme.customColors
 
-    val containerColor = accentColors.freshAccentContainer
-    val contentColor = accentColors.freshAccent
+    // letta-mobile-f8v: dashboard widget tiles share the Conversations
+    // card baseline (surfaceContainerLow + listShape + 1dp elevation),
+    // with teal-only iconography. No more coral/fresh-accent — keeps
+    // the four main surfaces reading as one app.
+    val containerColor = LettaCardDefaults.listContainerColor
+    val contentColor = MaterialTheme.colorScheme.primary
 
     val scale by animateFloatAsState(
         targetValue = if (isDragging) 1.05f else 1f,
@@ -248,7 +254,9 @@ internal fun DashboardWidgetTile(
                 shadowElevation = elevation * density
             }
             .then(clickModifier),
-        colors = CardDefaults.cardColors(containerColor = containerColor),
+        shape = LettaCardDefaults.listShape,
+        colors = LettaCardDefaults.listCardColors(containerColor = containerColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
             modifier = Modifier

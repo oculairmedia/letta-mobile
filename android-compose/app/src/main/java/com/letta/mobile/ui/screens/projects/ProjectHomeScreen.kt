@@ -48,6 +48,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
@@ -675,10 +676,9 @@ private fun ProjectTileMetaRow(
     isPinned: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    // letta-mobile-cygd: replaced the 8dp status dot + "• N issues"
-    // string concatenation with semantic Surface badges. Status reads
-    // as a colored chip; issue count is its own urgency-tinted chip
-    // (tertiary for a handful, primary as it grows, error past ~20).
+    // letta-mobile-f8v: badges share one shape/size. Issue-count uses a
+    // single warning shade (errorContainer) regardless of size so red is
+    // reserved for true warnings and doesn't shift palette by magnitude.
     androidx.compose.foundation.layout.FlowRow(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -690,27 +690,10 @@ private fun ProjectTileMetaRow(
             contentColor = statusContentColor,
         )
         if (issueCount > 0) {
-            val urgency = when {
-                issueCount >= 20 -> Triple(
-                    MaterialTheme.colorScheme.errorContainer,
-                    MaterialTheme.colorScheme.onErrorContainer,
-                    "$issueCount issues",
-                )
-                issueCount >= 6 -> Triple(
-                    MaterialTheme.colorScheme.primaryContainer,
-                    MaterialTheme.colorScheme.onPrimaryContainer,
-                    "$issueCount issues",
-                )
-                else -> Triple(
-                    MaterialTheme.colorScheme.tertiaryContainer,
-                    MaterialTheme.colorScheme.onTertiaryContainer,
-                    "$issueCount issues",
-                )
-            }
             StatusBadge(
-                text = urgency.third,
-                containerColor = urgency.first,
-                contentColor = urgency.second,
+                text = "$issueCount issues",
+                containerColor = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
             )
         }
         if (isPinned) {
@@ -759,27 +742,17 @@ private fun ProjectTile(
     val issueCount = project.beadsIssueCount ?: project.issueCount ?: 0
     val statusLabel = project.status?.replaceFirstChar { it.uppercase() } ?: stringResource(R.string.common_unknown)
 
-    // letta-mobile-cygd: status now drives both the Status badge color
-    // and the tile-level border/wash so users get a glanceable read of
-    // archived vs active. Active = primary border + container; archived
-    // = muted outlineVariant border + softer surface; unknown defaults
-    // to secondary so it doesn't masquerade as active.
-    val (statusContainerColor, statusContentColor, tileBorderColor) = when (project.status?.lowercase()) {
-        "active" -> Triple(
-            MaterialTheme.colorScheme.primaryContainer,
-            MaterialTheme.colorScheme.onPrimaryContainer,
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-        )
-        "archived" -> Triple(
-            MaterialTheme.colorScheme.surfaceContainerHighest,
-            MaterialTheme.colorScheme.onSurfaceVariant,
-            MaterialTheme.colorScheme.outlineVariant,
-        )
-        else -> Triple(
-            MaterialTheme.colorScheme.secondaryContainer,
-            MaterialTheme.colorScheme.onSecondaryContainer,
-            MaterialTheme.colorScheme.outlineVariant,
-        )
+    // letta-mobile-f8v: project tiles share the Conversations card baseline
+    // (subtle outlineVariant border, surfaceContainerLow fill). Status is
+    // expressed through the badge color only — no per-tile border tint —
+    // so Projects reads as the same visual language as Conversations.
+    val (statusContainerColor, statusContentColor) = when (project.status?.lowercase()) {
+        "active" -> MaterialTheme.colorScheme.primaryContainer to
+            MaterialTheme.colorScheme.onPrimaryContainer
+        "archived" -> MaterialTheme.colorScheme.surfaceContainerHighest to
+            MaterialTheme.colorScheme.onSurfaceVariant
+        else -> MaterialTheme.colorScheme.secondaryContainer to
+            MaterialTheme.colorScheme.onSecondaryContainer
     }
 
     val initials = remember(project.name, project.identifier) {
@@ -791,7 +764,11 @@ private fun ProjectTile(
             .ifBlank { project.identifier.take(2).uppercase() }
     }
 
-    Surface(
+    // letta-mobile-f8v: project tile uses a plain Card with the shared
+    // listContainerColor + listShape — no border, no tonalElevation
+    // overlay — so it reads as the same surface as the Conversations
+    // cards rather than a paler, outlined variant.
+    androidx.compose.material3.Card(
         modifier = modifier
             .fillMaxWidth()
             .height(176.dp)
@@ -802,13 +779,9 @@ private fun ProjectTile(
                     onOpenActions()
                 },
             ),
-        shape = RoundedCornerShape(16.dp),
-        color = LettaCardDefaults.listContainerColor,
-        tonalElevation = 3.dp,
-        border = androidx.compose.foundation.BorderStroke(
-            width = 1.dp,
-            color = tileBorderColor,
-        ),
+        shape = LettaCardDefaults.listShape,
+        colors = LettaCardDefaults.listCardColors(),
+        elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
         Column(
             modifier = Modifier
@@ -821,9 +794,16 @@ private fun ProjectTile(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top,
             ) {
+                // letta-mobile-f8v: avatar uses a teal-tinted dark surface
+                // (primary @ low alpha over surfaceContainerHighest) instead
+                // of solid primaryContainer, so it reads as a quiet teal
+                // accent rather than a saturated block.
+                val avatarBg = MaterialTheme.colorScheme.primary
+                    .copy(alpha = 0.16f)
+                    .compositeOver(MaterialTheme.colorScheme.surfaceContainerHighest)
                 Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(12.dp),
+                    color = avatarBg,
                 ) {
                     Box(
                         modifier = Modifier.size(44.dp),
@@ -833,7 +813,7 @@ private fun ProjectTile(
                             text = initials,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            color = MaterialTheme.colorScheme.primary,
                         )
                     }
                 }
