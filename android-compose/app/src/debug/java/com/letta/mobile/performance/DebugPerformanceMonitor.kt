@@ -69,8 +69,25 @@ object DebugPerformanceMonitor {
     }
 
     private fun installStrictMode() {
+        // ThreadPolicy.detectAll() includes detectNetwork(). Android
+        // propagates the calling thread's StrictMode policy to threads
+        // it spawns, so once we install on Main the kotlinx.coroutines
+        // scheduler workers (created lazily from Main on first dispatch)
+        // inherit detectNetwork. Every legitimate okhttp chunked-stream
+        // read on those workers — including the timeline idle long-poll
+        // subscribers and the vibesync stream — trips the violation,
+        // which fires penaltyLog (~30 Log.d binder calls per hit) plus
+        // penaltyListener (Sentry breadcrumb + Telemetry.error). At the
+        // typical idle-poll cadence that produces periodic ~150ms Main
+        // stalls (visible as dropped taps in Settings). Build the policy
+        // with the useful disk/resource detectors explicitly and skip
+        // network, which we already verify by code review.
         val threadPolicyBuilder = StrictMode.ThreadPolicy.Builder()
-            .detectAll()
+            .detectDiskReads()
+            .detectDiskWrites()
+            .detectCustomSlowCalls()
+            .detectResourceMismatches()
+            .detectUnbufferedIo()
             .penaltyLog()
         val vmPolicyBuilder = StrictMode.VmPolicy.Builder()
             .detectAll()
