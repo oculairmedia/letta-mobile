@@ -12,11 +12,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class RunRepository @Inject constructor(
+class RunRepository(
     private val runApi: RunApi,
 ) : IRunRepository {
     private val _runs = MutableStateFlow<List<Run>>(emptyList())

@@ -3,11 +3,17 @@ package com.letta.mobile.data.session
 import com.letta.mobile.data.api.AgentApi
 import com.letta.mobile.data.api.ArchiveApi
 import com.letta.mobile.data.api.ConversationApi
+import com.letta.mobile.data.api.JobApi
+import com.letta.mobile.data.api.RunApi
+import com.letta.mobile.data.api.StepApi
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.ArchiveRepository
 import com.letta.mobile.data.repository.ConversationRepository
+import com.letta.mobile.data.repository.JobRepository
+import com.letta.mobile.data.repository.RunRepository
+import com.letta.mobile.data.repository.StepRepository
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -22,6 +28,9 @@ class SessionGraphFactory @Inject constructor(
     private val conversationApi: ConversationApi,
     private val conversationDao: ConversationDao,
     private val archiveApi: ArchiveApi,
+    private val runApi: RunApi,
+    private val jobApi: JobApi,
+    private val stepApi: StepApi,
 ) {
     private val nextId = AtomicLong(0L)
 
@@ -43,6 +52,9 @@ class SessionGraphFactory @Inject constructor(
                 repositoryScope = scope,
             ),
             archiveRepository = ArchiveRepository(archiveApi),
+            runRepository = RunRepository(runApi),
+            jobRepository = JobRepository(jobApi),
+            stepRepository = StepRepository(stepApi),
         )
     }
 }

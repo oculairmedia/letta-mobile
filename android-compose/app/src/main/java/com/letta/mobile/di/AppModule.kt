@@ -14,7 +14,6 @@ import com.letta.mobile.data.repository.BugReportRepository
 import com.letta.mobile.data.repository.FolderRepository
 import com.letta.mobile.data.repository.GroupRepository
 import com.letta.mobile.data.repository.IdentityRepository
-import com.letta.mobile.data.repository.JobRepository
 import com.letta.mobile.data.repository.McpServerRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.ModelRepository
@@ -23,10 +22,8 @@ import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.ProjectRepository
 import com.letta.mobile.data.repository.ProjectWorkRepository
 import com.letta.mobile.data.repository.ProviderRepository
-import com.letta.mobile.data.repository.RunRepository
 import com.letta.mobile.data.repository.ScheduleRepository
 import com.letta.mobile.data.repository.SettingsRepository
-import com.letta.mobile.data.repository.StepRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.data.repository.VibesyncEventStreamRepository
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
@@ -56,6 +53,9 @@ import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
 import com.letta.mobile.data.session.SessionScopedAgentRepository
 import com.letta.mobile.data.session.SessionScopedArchiveRepository
 import com.letta.mobile.data.session.SessionScopedConversationRepository
+import com.letta.mobile.data.session.SessionScopedJobRepository
+import com.letta.mobile.data.session.SessionScopedRunRepository
+import com.letta.mobile.data.session.SessionScopedStepRepository
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.timeline.api.TimelineClientModeWriter
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
@@ -155,7 +155,7 @@ abstract class AppModule {
 
     @Binds
     @Singleton
-    abstract fun bindJobRepository(impl: JobRepository): IJobRepository
+    abstract fun bindJobRepository(impl: SessionScopedJobRepository): IJobRepository
 
     @Binds
     @Singleton
@@ -175,7 +175,7 @@ abstract class AppModule {
 
     @Binds
     @Singleton
-    abstract fun bindRunRepository(impl: RunRepository): IRunRepository
+    abstract fun bindRunRepository(impl: SessionScopedRunRepository): IRunRepository
 
     @Binds
     @Singleton
@@ -183,7 +183,7 @@ abstract class AppModule {
 
     @Binds
     @Singleton
-    abstract fun bindStepRepository(impl: StepRepository): IStepRepository
+    abstract fun bindStepRepository(impl: SessionScopedStepRepository): IStepRepository
 
     @Binds
     @Singleton
