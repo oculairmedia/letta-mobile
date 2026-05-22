@@ -23,7 +23,7 @@ import org.junit.Test
  *
  * Validates that [ConversationStateHolder] produces the same terminal
  * [Timeline] state as a hand-written fold over the same canonical fixtures
- * — proving the Molecule plumbing doesn't introduce side effects beyond
+ * — proving the shadow holder plumbing doesn't introduce side effects beyond
  * the pure [reduceStreamFrame] (which has its own per-branch unit
  * coverage in `TimelineStreamReducerTest` from letta-mobile-bfqgi).
  *

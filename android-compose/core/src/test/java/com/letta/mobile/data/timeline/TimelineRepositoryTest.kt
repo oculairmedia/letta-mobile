@@ -5,10 +5,13 @@ import com.letta.mobile.data.model.LettaMessage
 import io.ktor.utils.io.ByteReadChannel
 import io.mockk.mockk
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -77,11 +80,35 @@ class TimelineRepositoryTest {
         assertTrue("new loop should remain active", api.isActive("conv-c"))
         assertFalse("least recently used loop should be closed", api.isActive("conv-b"))
     }
+
+    @Test
+    fun `getOrCreate hydrates on background dispatcher even when caller is main-like`() = runBlocking {
+        val api = CancellableStreamApi()
+        val repository = TimelineRepository(api, NoOpPendingLocalStore, maxCachedLoops = 4)
+        val callerDispatcher = Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "caller-main-probe")
+        }.asCoroutineDispatcher()
+
+        try {
+            withContext(callerDispatcher) {
+                repository.getOrCreate("conv-dispatch")
+            }
+        } finally {
+            callerDispatcher.close()
+        }
+
+        val hydrateThread = api.listMessageThreads.getValue("conv-dispatch")
+        assertFalse(
+            "hydrate should not run on caller dispatcher, ran on $hydrateThread",
+            hydrateThread.contains("caller-main-probe"),
+        )
+    }
 }
 
 private class CancellableStreamApi : MessageApi(mockk(relaxed = true)) {
     private val activeStreams = ConcurrentHashMap<String, AtomicInteger>()
     private val closedStreams = ConcurrentHashMap<String, AtomicInteger>()
+    val listMessageThreads = ConcurrentHashMap<String, String>()
 
     override suspend fun streamConversation(conversationId: String): ByteReadChannel {
         activeStreams.counter(conversationId).incrementAndGet()
@@ -98,7 +125,10 @@ private class CancellableStreamApi : MessageApi(mockk(relaxed = true)) {
         limit: Int?,
         after: String?,
         order: String?,
-    ): List<LettaMessage> = emptyList()
+    ): List<LettaMessage> {
+        listMessageThreads[conversationId] = Thread.currentThread().name
+        return emptyList()
+    }
 
     fun isActive(conversationId: String): Boolean =
         activeStreams[conversationId]?.get()?.let { it > 0 } == true
