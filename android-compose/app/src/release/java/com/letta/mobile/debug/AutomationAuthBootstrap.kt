@@ -3,7 +3,7 @@ package com.letta.mobile.debug
 import android.content.Context
 import android.util.Base64
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.repository.SettingsRepository
+import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.ui.screens.config.ConfigViewModel
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.runBlocking
@@ -18,7 +18,7 @@ object AutomationAuthBootstrap {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    fun importPendingConfig(context: Context, settingsRepository: SettingsRepository) {
+    fun importPendingConfig(context: Context, settingsRepository: ISettingsRepository) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val encodedPayload = prefs.getString(KEY_PAYLOAD_BASE64, null)?.trim().orEmpty()
         if (encodedPayload.isBlank()) {
@@ -121,7 +121,7 @@ object AutomationAuthBootstrap {
         val baseUrl: String,
         val apiKey: String?,
     ) {
-        suspend fun applyTo(settingsRepository: SettingsRepository) {
+        suspend fun applyTo(settingsRepository: ISettingsRepository) {
             settingsRepository.setClientModeEnabled(enabled)
             settingsRepository.setClientModeBaseUrl(baseUrl)
             settingsRepository.setClientModeApiKey(apiKey)
