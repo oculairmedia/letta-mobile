@@ -23,7 +23,7 @@ import com.letta.mobile.data.channel.NotificationCandidatePhase
 import com.letta.mobile.data.channel.NotificationCandidateSource
 import com.letta.mobile.data.channel.NotificationDeliveryCandidate
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.repository.AgentRepository
+import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.timeline.IngestedMessageListener
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.util.Telemetry
@@ -80,7 +80,7 @@ class ChatPushService : Service() {
 
     @Inject lateinit var timelineRepository: TimelineRepository
     @Inject lateinit var conversationApi: ConversationApi
-    @Inject lateinit var agentRepository: AgentRepository
+    @Inject lateinit var agentRepository: IAgentRepository
     @Inject lateinit var notificationDeliveryCoordinator: NotificationDeliveryCoordinator
     @Inject lateinit var channelNotificationPublisher: ChannelNotificationPublisher
     @Inject lateinit var currentConversationTracker: CurrentConversationTracker

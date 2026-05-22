@@ -2,7 +2,7 @@ package com.letta.mobile.di
 
 import android.content.Context
 import com.letta.mobile.data.api.*
-import com.letta.mobile.data.repository.SettingsRepository
+import com.letta.mobile.data.repository.api.ISettingsRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -18,7 +18,7 @@ object NetworkModule {
     @Singleton
     fun provideLettaApiClient(
         @ApplicationContext context: Context,
-        settingsRepository: SettingsRepository
+        settingsRepository: ISettingsRepository
     ): LettaApiClient {
         return LettaApiClient(context, settingsRepository)
     }

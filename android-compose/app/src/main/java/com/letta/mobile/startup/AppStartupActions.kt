@@ -7,7 +7,7 @@ import com.letta.mobile.bot.heartbeat.BotHeartbeatScheduler
 import com.letta.mobile.bot.service.BotServiceAutoStarter
 import com.letta.mobile.channel.ChannelHeartbeatScheduler
 import com.letta.mobile.channel.ChannelNotificationPublisher
-import com.letta.mobile.data.repository.SettingsRepository
+import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.debug.AutomationAuthBootstrap
 import com.letta.mobile.performance.DebugPerformanceMonitor
 import com.letta.mobile.performance.ProductionJankStatsMonitor
@@ -31,7 +31,7 @@ internal interface AppStartupActions {
 internal class DefaultAppStartupActions @Inject constructor(
     @ApplicationContext private val context: Context,
     private val channelNotificationPublisher: ChannelNotificationPublisher,
-    private val settingsRepository: Lazy<SettingsRepository>,
+    private val settingsRepository: Lazy<ISettingsRepository>,
     private val clientModeController: Lazy<ClientModeController>,
     private val channelHeartbeatScheduler: ChannelHeartbeatScheduler,
     private val botServiceAutoStarter: BotServiceAutoStarter,

@@ -7,18 +7,55 @@ import com.letta.mobile.channel.IChannelNotificationPublisher
 import com.letta.mobile.channel.IChannelSyncStateStore
 import com.letta.mobile.chat.BuildConfigChatClientVersionProvider
 import com.letta.mobile.data.channel.NotificationDelivery
+import com.letta.mobile.data.health.IServerHealthRepository
+import com.letta.mobile.data.health.ServerHealthRepository
 import com.letta.mobile.data.repository.AgentRepository
+import com.letta.mobile.data.repository.ArchiveRepository
 import com.letta.mobile.data.repository.BlockRepository
+import com.letta.mobile.data.repository.BugReportRepository
 import com.letta.mobile.data.repository.ConversationRepository
-import com.letta.mobile.data.repository.SettingsRepository
+import com.letta.mobile.data.repository.FolderRepository
+import com.letta.mobile.data.repository.GroupRepository
+import com.letta.mobile.data.repository.IdentityRepository
+import com.letta.mobile.data.repository.JobRepository
+import com.letta.mobile.data.repository.McpServerRepository
 import com.letta.mobile.data.repository.MessageRepository
+import com.letta.mobile.data.repository.ModelRepository
+import com.letta.mobile.data.repository.PassageRepository
+import com.letta.mobile.data.repository.AllConversationsRepository
+import com.letta.mobile.data.repository.ProjectRepository
+import com.letta.mobile.data.repository.ProjectWorkRepository
+import com.letta.mobile.data.repository.ProviderRepository
+import com.letta.mobile.data.repository.RunRepository
+import com.letta.mobile.data.repository.ScheduleRepository
+import com.letta.mobile.data.repository.SettingsRepository
+import com.letta.mobile.data.repository.StepRepository
+import com.letta.mobile.data.repository.ToolRepository
+import com.letta.mobile.data.repository.VibesyncEventStreamRepository
+import com.letta.mobile.data.repository.api.IAllConversationsRepository
+import com.letta.mobile.data.repository.api.IArchiveRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
-import com.letta.mobile.data.repository.api.IConversationRepository
+import com.letta.mobile.data.repository.api.IBugReportRepository
 import com.letta.mobile.data.repository.api.IConversationInspectorMessageRepository
+import com.letta.mobile.data.repository.api.IConversationRepository
+import com.letta.mobile.data.repository.api.IFolderRepository
+import com.letta.mobile.data.repository.api.IGroupRepository
+import com.letta.mobile.data.repository.api.IIdentityRepository
+import com.letta.mobile.data.repository.api.IJobRepository
+import com.letta.mobile.data.repository.api.IMcpServerRepository
+import com.letta.mobile.data.repository.api.IMessageRepository
+import com.letta.mobile.data.repository.api.IModelRepository
+import com.letta.mobile.data.repository.api.IPassageRepository
+import com.letta.mobile.data.repository.api.IProjectRepository
+import com.letta.mobile.data.repository.api.IProjectWorkRepository
+import com.letta.mobile.data.repository.api.IProviderRepository
+import com.letta.mobile.data.repository.api.IRunRepository
+import com.letta.mobile.data.repository.api.IScheduleRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
-import com.letta.mobile.data.health.ServerHealthRepository
-import com.letta.mobile.data.health.IServerHealthRepository
+import com.letta.mobile.data.repository.api.IStepRepository
+import com.letta.mobile.data.repository.api.IToolRepository
+import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.timeline.api.TimelineClientModeWriter
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
@@ -69,6 +106,84 @@ abstract class AppModule {
     abstract fun bindConversationInspectorMessageRepository(
         impl: MessageRepository,
     ): IConversationInspectorMessageRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindMessageRepository(impl: MessageRepository): IMessageRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAllConversationsRepository(impl: AllConversationsRepository): IAllConversationsRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindProjectRepository(impl: ProjectRepository): IProjectRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindProjectWorkRepository(impl: ProjectWorkRepository): IProjectWorkRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindVibesyncEventStreamRepository(
+        impl: VibesyncEventStreamRepository,
+    ): IVibesyncEventStreamRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindToolRepository(impl: ToolRepository): IToolRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindArchiveRepository(impl: ArchiveRepository): IArchiveRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindBugReportRepository(impl: BugReportRepository): IBugReportRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindFolderRepository(impl: FolderRepository): IFolderRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindGroupRepository(impl: GroupRepository): IGroupRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindIdentityRepository(impl: IdentityRepository): IIdentityRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindJobRepository(impl: JobRepository): IJobRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindMcpServerRepository(impl: McpServerRepository): IMcpServerRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindModelRepository(impl: ModelRepository): IModelRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindPassageRepository(impl: PassageRepository): IPassageRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindProviderRepository(impl: ProviderRepository): IProviderRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindRunRepository(impl: RunRepository): IRunRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindScheduleRepository(impl: ScheduleRepository): IScheduleRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindStepRepository(impl: StepRepository): IStepRepository
 
     @Binds
     @Singleton

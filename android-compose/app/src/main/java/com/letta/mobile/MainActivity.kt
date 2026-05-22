@@ -26,7 +26,7 @@ import com.letta.mobile.channel.ChatPushService
 import com.letta.mobile.crash.CrashReporter
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
-import com.letta.mobile.data.repository.SettingsRepository
+import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.debug.AutomationAuthBootstrap
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.content.ContextCompat
@@ -48,7 +48,7 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     @Inject
-    lateinit var settingsRepository: SettingsRepository
+    lateinit var settingsRepository: ISettingsRepository
 
     @Inject
     lateinit var crashReporter: CrashReporter

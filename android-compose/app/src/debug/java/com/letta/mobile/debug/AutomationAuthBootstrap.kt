@@ -4,7 +4,7 @@ import android.content.Context
 import android.util.Base64
 import android.util.Log
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.repository.SettingsRepository
+import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.ui.screens.config.ConfigViewModel
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
@@ -19,7 +19,7 @@ object AutomationAuthBootstrap {
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    fun importPendingConfig(context: Context, settingsRepository: SettingsRepository) {
+    fun importPendingConfig(context: Context, settingsRepository: ISettingsRepository) {
         importPendingConfig(
             context = context,
             saveConfig = { config -> settingsRepository.saveConfig(config) },
@@ -129,7 +129,7 @@ object AutomationAuthBootstrap {
         val baseUrl: String,
         val apiKey: String?,
     ) {
-        suspend fun applyTo(settingsRepository: SettingsRepository) {
+        suspend fun applyTo(settingsRepository: ISettingsRepository) {
             settingsRepository.setClientModeEnabled(enabled)
             settingsRepository.setClientModeBaseUrl(baseUrl)
             settingsRepository.setClientModeApiKey(apiKey)

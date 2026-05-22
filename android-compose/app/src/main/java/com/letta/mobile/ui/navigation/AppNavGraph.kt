@@ -32,7 +32,7 @@ import com.letta.mobile.AppLaunchTarget
 import com.letta.mobile.NotificationNavigationTarget
 import com.letta.mobile.channel.ChatPushAlarmScheduler
 import com.letta.mobile.data.model.toBackendLabel
-import com.letta.mobile.data.repository.SettingsRepository
+import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.feature.chat.AgentChatRoute
 import com.letta.mobile.feature.chat.chatGraph
 import com.letta.mobile.ui.screens.projects.CreateProjectScreen
@@ -122,7 +122,7 @@ val LocalAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> 
 
 @HiltViewModel
 class NavViewModel @Inject constructor(
-    private val settingsRepository: SettingsRepository,
+    private val settingsRepository: ISettingsRepository,
     @param:ApplicationContext private val appContext: Context,
 ) : ViewModel() {
     val hasConfig = settingsRepository.activeConfig.map { it != null }
