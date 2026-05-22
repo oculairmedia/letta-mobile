@@ -1,7 +1,5 @@
 package com.letta.mobile.data.repository
 
-import android.content.Context
-import android.content.SharedPreferences
 import android.os.Build
 import com.letta.mobile.core.BuildConfig
 import androidx.datastore.core.DataStore
@@ -11,13 +9,11 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.repository.api.ISettingsRepository
-import com.letta.mobile.util.EncryptedPrefsHelper
-import dagger.hilt.android.qualifiers.ApplicationContext
+import com.letta.mobile.data.storage.SecureSettingsStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,7 +31,6 @@ import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "letta_settings")
 private const val DEFAULT_CHAT_BACKGROUND_KEY = "default"
 
 data class LastChatSelection(
@@ -46,10 +41,9 @@ data class LastChatSelection(
 
 @Singleton
 class SettingsRepository @Inject constructor(
-    @ApplicationContext private val context: Context,
+    private val dataStore: DataStore<Preferences>,
+    private val secureSettingsStore: SecureSettingsStore,
 ) : ISettingsRepository {
-    private val dataStore = context.dataStore
-    private val encryptedPrefs: SharedPreferences = EncryptedPrefsHelper.getEncryptedPrefs(context)
     private val json = Json { ignoreUnknownKeys = true }
 
     private val _configs = MutableStateFlow<List<LettaConfig>>(emptyList())
@@ -132,13 +126,13 @@ class SettingsRepository @Inject constructor(
     init {
         loadConfigs()
         loadActiveConfig()
-        _favoriteAgentId.value = encryptedPrefs.getString(Keys.FAVORITE_AGENT_ID.name, null)
-        _adminAgentId.value = encryptedPrefs.getString(Keys.ADMIN_AGENT_ID.name, null)
+        _favoriteAgentId.value = secureSettingsStore.getString(Keys.FAVORITE_AGENT_ID.name)
+        _adminAgentId.value = secureSettingsStore.getString(Keys.ADMIN_AGENT_ID.name)
         _lastChatSelection.value = loadLastChatSelection()
     }
 
     private fun loadConfigs() {
-        val configsJson = encryptedPrefs.getString(Keys.CONFIGS.name, null)
+        val configsJson = secureSettingsStore.getString(Keys.CONFIGS.name)
         if (configsJson != null) {
             try {
                 val configList = json.decodeFromString<List<LettaConfigData>>(configsJson)
@@ -150,7 +144,7 @@ class SettingsRepository @Inject constructor(
     }
 
     private fun loadActiveConfig() {
-        encryptedPrefs.getString(Keys.ACTIVE_CONFIG_ID.name, null)?.let { activeId ->
+        secureSettingsStore.getString(Keys.ACTIVE_CONFIG_ID.name)?.let { activeId ->
             _activeConfig.value = _configs.value.find { it.id == activeId }
         }
     }
@@ -176,13 +170,13 @@ class SettingsRepository @Inject constructor(
         }
         persistConfigs(_configs.value)
         _activeConfig.update { config }
-        encryptedPrefs.edit().putString(Keys.ACTIVE_CONFIG_ID.name, config.id).apply()
+        secureSettingsStore.putString(Keys.ACTIVE_CONFIG_ID.name, config.id)
     }
 
     suspend fun setActiveConfigId(id: String) = withContext(Dispatchers.IO) {
         val config = _configs.value.find { it.id == id } ?: return@withContext
         _activeConfig.update { config }
-        encryptedPrefs.edit().putString(Keys.ACTIVE_CONFIG_ID.name, id).apply()
+        secureSettingsStore.putString(Keys.ACTIVE_CONFIG_ID.name, id)
     }
 
     suspend fun deleteConfig(id: String) = withContext(Dispatchers.IO) {
@@ -192,9 +186,9 @@ class SettingsRepository @Inject constructor(
             val fallback = _configs.value.firstOrNull()
             _activeConfig.update { fallback }
             if (fallback != null) {
-                encryptedPrefs.edit().putString(Keys.ACTIVE_CONFIG_ID.name, fallback.id).apply()
+                secureSettingsStore.putString(Keys.ACTIVE_CONFIG_ID.name, fallback.id)
             } else {
-                encryptedPrefs.edit().remove(Keys.ACTIVE_CONFIG_ID.name).apply()
+                secureSettingsStore.remove(Keys.ACTIVE_CONFIG_ID.name)
             }
         }
     }
@@ -234,18 +228,18 @@ class SettingsRepository @Inject constructor(
     fun setAdminAgentId(agentId: String?) {
         _adminAgentId.update { agentId }
         if (agentId != null) {
-            encryptedPrefs.edit().putString(Keys.ADMIN_AGENT_ID.name, agentId).apply()
+            secureSettingsStore.putString(Keys.ADMIN_AGENT_ID.name, agentId)
         } else {
-            encryptedPrefs.edit().remove(Keys.ADMIN_AGENT_ID.name).apply()
+            secureSettingsStore.remove(Keys.ADMIN_AGENT_ID.name)
         }
     }
 
     override fun setFavoriteAgentId(agentId: String?) {
         _favoriteAgentId.update { agentId }
         if (agentId != null) {
-            encryptedPrefs.edit().putString(Keys.FAVORITE_AGENT_ID.name, agentId).apply()
+            secureSettingsStore.putString(Keys.FAVORITE_AGENT_ID.name, agentId)
         } else {
-            encryptedPrefs.edit().remove(Keys.FAVORITE_AGENT_ID.name).apply()
+            secureSettingsStore.remove(Keys.FAVORITE_AGENT_ID.name)
         }
     }
 
@@ -257,36 +251,34 @@ class SettingsRepository @Inject constructor(
             conversationId = conversationId?.takeIf { it.isNotBlank() },
         )
         _lastChatSelection.update { selection }
-        val editor = encryptedPrefs.edit()
-            .putString(Keys.LAST_CHAT_AGENT_ID.name, selection.agentId)
+        secureSettingsStore.putString(Keys.LAST_CHAT_AGENT_ID.name, selection.agentId)
         if (selection.agentName != null) {
-            editor.putString(Keys.LAST_CHAT_AGENT_NAME.name, selection.agentName)
+            secureSettingsStore.putString(Keys.LAST_CHAT_AGENT_NAME.name, selection.agentName)
         } else {
-            editor.remove(Keys.LAST_CHAT_AGENT_NAME.name)
+            secureSettingsStore.remove(Keys.LAST_CHAT_AGENT_NAME.name)
         }
         if (selection.conversationId != null) {
-            editor.putString(Keys.LAST_CHAT_CONVERSATION_ID.name, selection.conversationId)
+            secureSettingsStore.putString(Keys.LAST_CHAT_CONVERSATION_ID.name, selection.conversationId)
         } else {
-            editor.remove(Keys.LAST_CHAT_CONVERSATION_ID.name)
+            secureSettingsStore.remove(Keys.LAST_CHAT_CONVERSATION_ID.name)
         }
-        editor.apply()
     }
 
     private fun loadLastChatSelection(): LastChatSelection? {
-        val agentId = encryptedPrefs.getString(Keys.LAST_CHAT_AGENT_ID.name, null)
+        val agentId = secureSettingsStore.getString(Keys.LAST_CHAT_AGENT_ID.name)
             ?.takeIf { it.isNotBlank() }
             ?: return null
         return LastChatSelection(
             agentId = agentId,
-            agentName = encryptedPrefs.getString(Keys.LAST_CHAT_AGENT_NAME.name, null)
+            agentName = secureSettingsStore.getString(Keys.LAST_CHAT_AGENT_NAME.name)
                 ?.takeIf { it.isNotBlank() },
-            conversationId = encryptedPrefs.getString(Keys.LAST_CHAT_CONVERSATION_ID.name, null)
+            conversationId = secureSettingsStore.getString(Keys.LAST_CHAT_CONVERSATION_ID.name)
                 ?.takeIf { it.isNotBlank() },
         )
     }
 
     suspend fun clearAllData() = withContext(Dispatchers.IO) {
-        encryptedPrefs.edit().clear().apply()
+        secureSettingsStore.clear()
         dataStore.edit { it.clear() }
         _configs.update { emptyList() }
         _activeConfig.update { null }
@@ -574,13 +566,13 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    override fun getClientModeApiKey(): String? = encryptedPrefs.getString(CLIENT_MODE_API_KEY, null)
+    override fun getClientModeApiKey(): String? = secureSettingsStore.getString(CLIENT_MODE_API_KEY)
 
     fun setClientModeApiKey(apiKey: String?) {
         if (apiKey.isNullOrBlank()) {
-            encryptedPrefs.edit().remove(CLIENT_MODE_API_KEY).apply()
+            secureSettingsStore.remove(CLIENT_MODE_API_KEY)
         } else {
-            encryptedPrefs.edit().putString(CLIENT_MODE_API_KEY, apiKey).apply()
+            secureSettingsStore.putString(CLIENT_MODE_API_KEY, apiKey)
         }
     }
 
@@ -632,7 +624,7 @@ class SettingsRepository @Inject constructor(
     private fun persistConfigs(configs: List<LettaConfig>) {
         val configData = configs.map { LettaConfigData.fromLettaConfig(it) }
         val configsJson = json.encodeToString(configData)
-        encryptedPrefs.edit().putString(Keys.CONFIGS.name, configsJson).apply()
+        secureSettingsStore.putString(Keys.CONFIGS.name, configsJson)
     }
 
     @kotlinx.serialization.Serializable
