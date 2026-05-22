@@ -2,7 +2,7 @@ package com.letta.mobile.data.repository.api
 
 import androidx.paging.PagingData
 import com.letta.mobile.data.model.Conversation
-import com.letta.mobile.data.repository.ConversationCountEstimate
+import com.letta.mobile.data.model.ConversationCountEstimate
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 

@@ -8,6 +8,7 @@ import com.letta.mobile.data.api.ConversationApi
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.local.ConversationEntity
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationCountEstimate
 import com.letta.mobile.data.paging.ConversationPagingSource
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import kotlinx.coroutines.CoroutineScope
@@ -23,11 +24,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
-
-data class ConversationCountEstimate(
-    val count: Int,
-    val isApproximate: Boolean,
-)
 
 internal fun defaultAllConversationsScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
