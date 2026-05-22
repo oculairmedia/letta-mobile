@@ -65,9 +65,9 @@ class SettingsRepository @Inject constructor(
      * re-emitted with the same identity (e.g. token rotation).
      */
     override val activeConfigChanges: Flow<LettaConfig> = activeConfig
+        .drop(1)
         .filterNotNull()
         .distinctUntilChanged { old, new -> old.id == new.id }
-        .drop(1)
 
     private val _favoriteAgentId = MutableStateFlow<String?>(null)
     override val favoriteAgentId: StateFlow<String?> = _favoriteAgentId.asStateFlow()

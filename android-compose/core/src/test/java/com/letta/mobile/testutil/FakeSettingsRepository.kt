@@ -75,9 +75,9 @@ class FakeSettingsRepository(
     override val activeConfig: StateFlow<LettaConfig?> = activeConfigState.asStateFlow()
 
     override val activeConfigChanges: Flow<LettaConfig> = activeConfigState
+        .drop(1)
         .filterNotNull()
         .distinctUntilChanged { old, new -> old.id == new.id }
-        .drop(1)
 
     override val favoriteAgentId: StateFlow<String?> = favoriteAgentIdState.asStateFlow()
 
