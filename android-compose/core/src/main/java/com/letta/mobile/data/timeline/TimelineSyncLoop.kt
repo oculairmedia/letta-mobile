@@ -154,6 +154,25 @@ class TimelineSyncLoop(
     // reconcile reattached it. Keep unmatched returns in memory and fold them
     // into the call event as soon as that event lands.
     private val pendingToolReturnsByCallId = LinkedHashMap<String, ToolReturnMessage>()
+
+    // letta-mobile-t0vha (oc8j Phase 2): shadow-run the Molecule
+    // ConversationStateHolder alongside the imperative ingest path. Every
+    // WS frame the imperative path processes is ALSO emitted into the
+    // holder's frames flow; the holder maintains its own fold and exposes
+    // state/events/notifications via Molecule. Nothing here is authoritative
+    // yet — the holder's outputs are observed in telemetry (parity counter)
+    // so a later Phase 3 bead can flip the source of truth once trusted.
+    // BUFFER_SIZE 64 mirrors the loop's _events buffer; tryEmit never drops
+    // in normal load (production tops out at a handful of frames/s).
+    private val holderFramesIn = MutableSharedFlow<LettaMessage>(extraBufferCapacity = 64)
+    @Suppress("UnusedPrivateMember") // kept alive for its Molecule scope + parity observer below
+    private val holder = com.letta.mobile.data.timeline.experimental.ConversationStateHolder(
+        conversationId = conversationId,
+        scope = loopScope,
+        frames = holderFramesIn.asSharedFlow(),
+        initial = Timeline(conversationId),
+    )
+
     private val ingestNotificationDispatcher = TimelineIngestNotificationDispatcher(
         conversationId = conversationId,
         listener = ingestedListener,
@@ -933,6 +952,21 @@ class TimelineSyncLoop(
             pendingToolReturnsByCallId = pendingToolReturnsByCallId,
             conversationId = conversationId,
             ingestNotificationDispatcher = ingestNotificationDispatcher,
+        )
+        // letta-mobile-t0vha (oc8j Phase 2): fan the same frame into the
+        // Molecule holder for shadow-run parity. tryEmit is non-suspending
+        // and never blocks the ingest path even under heavy fold; if the
+        // 64-slot buffer ever fills the parity counter goes negative,
+        // which is visible in Grafana as a holderParity miss.
+        val emitted = holderFramesIn.tryEmit(message)
+        Telemetry.event(
+            "TimelineSync", "streamSubscriber.foldedViaHolder",
+            "serverId" to (message.id),
+            "messageType" to (message.messageType ?: "?"),
+            "emitted" to emitted,
+            "holderEventCount" to holder.state.value.events.size,
+            "loopEventCount" to _state.value.events.size,
+            "matched" to (holder.state.value.events.size == _state.value.events.size),
         )
     }
 

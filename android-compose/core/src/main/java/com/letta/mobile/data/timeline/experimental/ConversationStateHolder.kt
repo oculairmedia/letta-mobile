@@ -6,68 +6,59 @@ import androidx.compose.runtime.getValue
 import app.cash.molecule.RecompositionMode
 import app.cash.molecule.launchMolecule
 import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.model.ToolReturnMessage
+import com.letta.mobile.data.timeline.PendingIngestNotification
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineHydrationReducer
 import com.letta.mobile.data.timeline.TimelineReducerInput
+import com.letta.mobile.data.timeline.TimelineReducerOutput
+import com.letta.mobile.data.timeline.TimelineSyncEvent
 import com.letta.mobile.data.timeline.reduceStreamFrame
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.runningFold
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 
 /**
- * letta-mobile-oc8j Phase 1 prototype.
+ * letta-mobile-oc8j Phase 1 → Phase 2.
  *
  * Molecule-backed `ConversationStateHolder` for a single conversation.
- * Folds the WS frame stream (and an optional cold-start hydration) into a
- * `Timeline` `StateFlow` using the pure [reduceStreamFrame] extracted in
- * letta-mobile-bfqgi as the per-frame reducer.
+ * Folds an upstream `Flow<LettaMessage>` (WS frame stream) into a
+ * `Timeline` using the pure [reduceStreamFrame] extracted in
+ * letta-mobile-bfqgi.
  *
- * Lives under `experimental/` and runs alongside the imperative
- * `TimelineSyncIngest` path — no production call site wired to it yet.
- * The next bead's parity test feeds the same fixture into both shapes and
- * asserts byte-equal output `Timeline`s. If parity holds and there's no
- * regression in perceived latency / memory, Phase 2 will migrate
- * `TimelineSyncLoop` to consume this holder instead.
+ * Exposes three output surfaces — Phase 2 wiring (`letta-mobile-t0vha`)
+ * routes the loop's stream-ingest entry point through these instead of
+ * mutating loop-local state directly:
  *
- * ## Shape
+ *  - [state] : StateFlow<Timeline> — the reduced timeline, Molecule-driven.
+ *  - [events] : SharedFlow<TimelineSyncEvent> — per-frame events to emit
+ *    on the loop's `_events` SharedFlow.
+ *  - [notifications] : SharedFlow<PendingIngestNotification> — per-frame
+ *    notifications to dispatch via `TimelineIngestNotificationDispatcher`.
  *
- *  - Construction takes the conversation id and the `Flow<LettaMessage>`
- *    representing the live WS frame stream for that conversation.
- *  - Optional hydration is folded into the initial state via
- *    [TimelineHydrationReducer]'s existing pure reduce — the same logic
- *    that the imperative path uses on cold start. The holder accepts a
- *    pre-hydrated `initial` `Timeline` so the hydration call site stays
- *    where it is (REST `/messages` fetch lives in `TimelineSyncLoop`).
- *  - `state: StateFlow<Timeline>` is the single observable output. It is
- *    Molecule-driven so future Phase 2 composition (active runs banner,
- *    agent state, A2UI surface registry) can read other Flows in the same
- *    `@Composable present()` without re-architecting.
+ * ## Fold via Flow.scan, derivation via Molecule
  *
- * ## Why fold via Flow.scan, not Molecule itself
- *
- * Molecule's `@Composable` model is pure derivation per recomposition — it
- * has no native concept of "accumulate state across emissions." Doing the
- * fold inside `@Composable` would require `LaunchedEffect` + `mutableStateOf`
- * and would couple the reducer to the composition lifecycle, making the
- * pure reducer harder to test. Instead the fold lives upstream as
- * `frames.scan(initial, ::reduceStreamFrame)` and the `@Composable present()`
- * just collects the most recent state via `collectAsState`. Molecule's
- * value-add is composing this state with other Flows in Phase 2; the fold
- * stays a pure function.
+ * The fold is `frames.scan(seed, reduce)` so the reducer stays a pure
+ * function and the test surface (TimelineStreamReducerTest +
+ * TimelineSyncLoopTest fixtures) keeps applying byte-equal. The Molecule
+ * `@Composable present()` reads the scanned outputs via `collectAsState`,
+ * so Phase 2's downstream composition (active runs banner, agent state,
+ * A2UI surface registry) can join in the same derivation block without
+ * restructuring the call site.
  *
  * ## RecompositionMode
  *
- * Uses `RecompositionMode.Immediate` because the consuming scope typically
- * runs on `Dispatchers.Main.immediate` (no `MonotonicFrameClock`), where
- * `ContextClock` crashes on first composition. Same gotcha
- * `ConfigListViewModel` already documents.
+ * `RecompositionMode.Immediate` because consumers typically run on
+ * `Dispatchers.Main.immediate`, where `ContextClock` crashes for lack of
+ * a `MonotonicFrameClock`. Same gotcha `ConfigListViewModel` documents.
  */
 internal class ConversationStateHolder(
     private val conversationId: String,
@@ -76,56 +67,78 @@ internal class ConversationStateHolder(
     initial: Timeline = Timeline(conversationId = conversationId),
 ) {
 
-    /**
-     * Reduced state stream. Each WS frame triggers one `reduceStreamFrame`
-     * invocation upstream; Molecule then re-emits the resulting `Timeline`
-     * to subscribers. Conflated by the underlying `StateFlow`.
-     */
-    private val reduced: StateFlow<ReducedFold> = frames
-        .scan(ReducedFold(timeline = initial)) { acc, frame ->
-            val output = reduceStreamFrame(
-                TimelineReducerInput(
-                    prev = acc.timeline,
-                    frame = frame,
-                    pendingToolReturnsByCallId = acc.pendingToolReturnsByCallId,
-                )
-            )
-            ReducedFold(
-                timeline = output.next,
-                pendingToolReturnsByCallId = output.updatedPendingToolReturnsByCallId,
-            )
-        }
-        .stateIn(scope, SharingStarted.Eagerly, ReducedFold(timeline = initial))
+    private val seedOutput = TimelineReducerOutput(
+        next = initial,
+        updatedPendingToolReturnsByCallId = emptyMap(),
+        emittedEvents = emptyList(),
+        notification = null,
+    )
 
     /**
-     * Observable timeline state for this conversation. Subscribers see one
-     * emission per inbound frame plus the seed.
-     *
-     * Molecule-backed: `@Composable present()` reads [reduced] via
-     * `collectAsState` so future Phase 2 can compose other Flows in the
-     * same derivation block without restructuring the call site.
+     * Per-frame reducer output stream. Eager-shared so a single fold runs
+     * for the lifetime of the holder, with downstream consumers seeing
+     * each [reduceStreamFrame] result.
+     */
+    private val reducerOutputs: StateFlow<TimelineReducerOutput> = frames
+        .scan(seedOutput) { acc, frame ->
+            reduceStreamFrame(
+                TimelineReducerInput(
+                    prev = acc.next,
+                    frame = frame,
+                    pendingToolReturnsByCallId = acc.updatedPendingToolReturnsByCallId,
+                )
+            )
+        }
+        .stateIn(scope, SharingStarted.Eagerly, seedOutput)
+
+    /**
+     * Reduced timeline state. Mirrors [reducerOutputs] but exposed as
+     * a Molecule-driven `StateFlow<Timeline>` so future Phase 2+ surfaces
+     * can compose with other Flows declaratively.
      */
     val state: StateFlow<Timeline> = scope.launchMolecule(mode = RecompositionMode.Immediate) {
         present()
     }
 
-    @Composable
-    private fun present(): Timeline {
-        val fold by reduced.collectAsState()
-        return fold.timeline
+    /**
+     * Per-frame events emitted by the reducer. Drops the seed (whose
+     * emittedEvents list is always empty) so subscribers don't see a
+     * spurious empty emission at attach time.
+     */
+    private val _events = MutableSharedFlow<TimelineSyncEvent>(extraBufferCapacity = 64)
+    val events: SharedFlow<TimelineSyncEvent> = _events.asSharedFlow()
+
+    /**
+     * Per-frame notifications. Same drop-seed semantics as [events].
+     */
+    private val _notifications = MutableSharedFlow<PendingIngestNotification>(extraBufferCapacity = 16)
+    val notifications: SharedFlow<PendingIngestNotification> = _notifications.asSharedFlow()
+
+    init {
+        // Fan-out reducer-output side channels (events + notifications)
+        // into their own SharedFlows. The fold itself is owned by
+        // reducerOutputs.stateIn — this just splits the outputs.
+        reducerOutputs
+            .drop(1) // skip the seed (no events / notification on the initial value)
+            .onEach { output ->
+                output.emittedEvents.forEach { _events.emit(it) }
+                output.notification?.let { _notifications.emit(it) }
+            }
+            .launchIn(scope)
     }
 
-    private data class ReducedFold(
-        val timeline: Timeline,
-        val pendingToolReturnsByCallId: Map<String, ToolReturnMessage> = emptyMap(),
-    )
+    @Composable
+    private fun present(): Timeline {
+        val output by reducerOutputs.collectAsState()
+        return output.next
+    }
 
     companion object {
         /**
          * Convenience constructor that wraps a non-Flow hydration list into
          * the holder via [TimelineHydrationReducer]. Mirrors the cold-start
-         * shape that `TimelineSyncLoop.hydrate()` uses, so Phase 1 parity
-         * tests can exercise hydration alongside streaming.
+         * shape `TimelineSyncLoop.hydrate()` uses, so parity tests can
+         * exercise hydration alongside streaming.
          */
         internal fun withHydration(
             conversationId: String,
