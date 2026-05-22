@@ -30,13 +30,10 @@ class LettaApplication : Application(), SingletonImageLoader.Factory {
 
     /**
      * Eagerly inject the legacy static-bridge singleton (syf4 migration) so
-     * `getEncryptedPrefs(...)` calls (still used during repository construction
-     * before the migration to constructor injection completes) never see a null
-     * `INSTANCE`. Without this, the first caller to reach the static bridge
-     * before any other code requests the singleton will NPE on `INSTANCE!!`.
-     *
-     * `EncryptedPrefsHelper` is critical because `SettingsRepository.<init>`
-     * calls `EncryptedPrefsHelper.getEncryptedPrefs(...)` synchronously.
+     * `getEncryptedPrefs(...)` calls from Hilt storage providers never see a
+     * null `INSTANCE`. Without this, the first caller to reach the static
+     * bridge before any other code requests the singleton will NPE on
+     * `INSTANCE!!`.
      */
     @Suppress("unused")
     @Inject
