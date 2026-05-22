@@ -1,14 +1,10 @@
 package com.letta.mobile.data.repository
 
-import android.content.Context
-import androidx.test.core.app.ApplicationProvider
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
-import com.letta.mobile.util.EncryptedPrefsHelper
-import io.mockk.every
-import io.mockk.mockkObject
-import io.mockk.unmockkObject
+import com.letta.mobile.testutil.InMemorySecureSettingsStore
+import com.letta.mobile.testutil.createTestPreferencesDataStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -17,39 +13,25 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import org.junit.After
 import org.junit.Before
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import org.junit.jupiter.api.Tag
 
-@RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], manifest = Config.NONE)
 @OptIn(ExperimentalCoroutinesApi::class)
-@Tag("integration")
+@Tag("unit")
 class SettingsRepositoryTest {
 
-    private lateinit var context: Context
     private lateinit var repository: SettingsRepository
 
     @Before
     fun setup() {
-        context = ApplicationProvider.getApplicationContext()
-        val sharedPreferences = context.getSharedPreferences("settings-repository-test", Context.MODE_PRIVATE)
-        sharedPreferences.edit().clear().commit()
-        mockkObject(EncryptedPrefsHelper)
-        every { EncryptedPrefsHelper.getEncryptedPrefs(any()) } returns sharedPreferences
-        repository = SettingsRepository(context)
+        repository = SettingsRepository(
+            dataStore = createTestPreferencesDataStore(),
+            secureSettingsStore = InMemorySecureSettingsStore(),
+        )
         runBlocking {
             repository.clearAllData()
         }
-    }
-
-    @After
-    fun tearDown() {
-        unmockkObject(EncryptedPrefsHelper)
     }
 
     @Test
@@ -187,9 +169,9 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun `dynamic color defaults on for default preset on android 12 plus`() = runTest {
+    fun `dynamic color defaults off on plain JVM runtime`() = runTest {
         val dynamicColor = repository.getDynamicColor().first()
-        assertTrue(dynamicColor)
+        assertEquals(false, dynamicColor)
     }
 
     @Test
