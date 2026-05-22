@@ -28,19 +28,19 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class AgentRepository @Inject constructor(
+internal fun defaultAgentRepositoryScope(): CoroutineScope =
+    CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+open class AgentRepository(
     private val agentApi: AgentApi,
     private val agentDao: AgentDao,
+    private val repositoryScope: CoroutineScope = defaultAgentRepositoryScope(),
 ) : IAgentRepository {
     private val _agents = MutableStateFlow<List<Agent>>(emptyList())
-    override val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
+    override open val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
     private val _isRefreshing = MutableStateFlow(false)
-    override val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
-    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    override open val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
     private val refreshMutex = Mutex()
     private var lastRefreshAtMillis: Long = 0L
 
@@ -68,9 +68,9 @@ class AgentRepository @Inject constructor(
         ).flow
     }
 
-    override suspend fun countAgents(): Int = agentApi.countAgents()
+    override open suspend fun countAgents(): Int = agentApi.countAgents()
 
-    override suspend fun refreshAgents() = refreshMutex.withLock {
+    override open suspend fun refreshAgents() = refreshMutex.withLock {
         _isRefreshing.value = true
         try {
             refreshAgentsLocked()
@@ -136,13 +136,13 @@ class AgentRepository @Inject constructor(
         return fullList
     }
 
-    override fun getCachedAgent(id: String): Agent? = _agents.value.find { it.id == AgentId(id) }
+    override open fun getCachedAgent(id: String): Agent? = _agents.value.find { it.id == AgentId(id) }
 
     fun hasFreshAgents(maxAgeMs: Long): Boolean {
         return _agents.value.isNotEmpty() && System.currentTimeMillis() - lastRefreshAtMillis <= maxAgeMs
     }
 
-    override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = refreshMutex.withLock {
+    override open suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = refreshMutex.withLock {
         if (hasFreshAgents(maxAgeMs)) return@withLock false
         _isRefreshing.value = true
         try {
@@ -153,7 +153,7 @@ class AgentRepository @Inject constructor(
         true
     }
 
-    override fun getAgent(id: String): Flow<Agent> = flow {
+    override open fun getAgent(id: String): Flow<Agent> = flow {
         val cached = _agents.value.find { it.id == AgentId(id) }
         if (cached != null) {
             emit(cached)
@@ -163,7 +163,7 @@ class AgentRepository @Inject constructor(
         updateAgentInCache(fresh)
     }
 
-    override suspend fun getContextWindow(agentId: String, conversationId: String?) =
+    override open suspend fun getContextWindow(agentId: String, conversationId: String?) =
         agentApi.getContextWindow(agentId, conversationId)
 
     fun getAgentPolling(id: String): Flow<Agent> = flow {
@@ -175,19 +175,19 @@ class AgentRepository @Inject constructor(
         }
     }
 
-    override suspend fun createAgent(params: AgentCreateParams): Agent {
+    override open suspend fun createAgent(params: AgentCreateParams): Agent {
         val agent = agentApi.createAgent(params)
         refreshAgents()
         return agent
     }
 
-    override suspend fun updateAgent(id: String, params: AgentUpdateParams): Agent {
+    override open suspend fun updateAgent(id: String, params: AgentUpdateParams): Agent {
         val agent = agentApi.updateAgent(id, params)
         refreshAgents()
         return agent
     }
 
-    override suspend fun deleteAgent(id: String) {
+    override open suspend fun deleteAgent(id: String) {
         agentApi.deleteAgent(id)
         _agents.update { current -> current.filterNot { it.id == AgentId(id) } }
         try {
@@ -197,11 +197,11 @@ class AgentRepository @Inject constructor(
         }
     }
 
-    override suspend fun exportAgent(id: String): String {
+    override open suspend fun exportAgent(id: String): String {
         return agentApi.exportAgent(id)
     }
 
-    override suspend fun importAgent(
+    override open suspend fun importAgent(
         fileName: String,
         fileBytes: ByteArray,
         overrideName: String?,
@@ -221,12 +221,12 @@ class AgentRepository @Inject constructor(
         return response
     }
 
-    override suspend fun attachArchive(agentId: String, archiveId: String) {
+    override open suspend fun attachArchive(agentId: String, archiveId: String) {
         agentApi.attachArchive(agentId, archiveId)
         refreshAgents()
     }
 
-    override suspend fun detachArchive(agentId: String, archiveId: String) {
+    override open suspend fun detachArchive(agentId: String, archiveId: String) {
         agentApi.detachArchive(agentId, archiveId)
         refreshAgents()
     }
@@ -242,7 +242,7 @@ class AgentRepository @Inject constructor(
         }
     }
 
-    override suspend fun checkpointAndRestoreConfig(
+    override open suspend fun checkpointAndRestoreConfig(
         agentId: String,
         operation: suspend () -> Unit
     ) {

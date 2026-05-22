@@ -9,7 +9,6 @@ import com.letta.mobile.chat.BuildConfigChatClientVersionProvider
 import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.health.IServerHealthRepository
 import com.letta.mobile.data.health.ServerHealthRepository
-import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.ArchiveRepository
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.BugReportRepository
@@ -56,6 +55,7 @@ import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.IStepRepository
 import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
+import com.letta.mobile.data.session.SessionScopedAgentRepository
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.timeline.api.TimelineClientModeWriter
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
@@ -95,7 +95,7 @@ abstract class AppModule {
 
     @Binds
     @Singleton
-    abstract fun bindAgentRepository(impl: AgentRepository): IAgentRepository
+    abstract fun bindAgentRepository(impl: SessionScopedAgentRepository): IAgentRepository
 
     @Binds
     @Singleton
