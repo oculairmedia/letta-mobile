@@ -47,7 +47,7 @@ class SettingsRepository @Inject constructor(
     private val json = Json { ignoreUnknownKeys = true }
 
     private val _configs = MutableStateFlow<List<LettaConfig>>(emptyList())
-    val configs: StateFlow<List<LettaConfig>> = _configs.asStateFlow()
+    override val configs: StateFlow<List<LettaConfig>> = _configs.asStateFlow()
 
     private val _activeConfig = MutableStateFlow<LettaConfig?>(null)
     override val activeConfig: StateFlow<LettaConfig?> = _activeConfig.asStateFlow()
@@ -76,7 +76,7 @@ class SettingsRepository @Inject constructor(
     override val adminAgentId: StateFlow<String?> = _adminAgentId.asStateFlow()
 
     private val _lastChatSelection = MutableStateFlow<LastChatSelection?>(null)
-    val lastChatSelection: StateFlow<LastChatSelection?> = _lastChatSelection.asStateFlow()
+    override val lastChatSelection: StateFlow<LastChatSelection?> = _lastChatSelection.asStateFlow()
 
     private object Keys {
         val CONFIGS = stringPreferencesKey("configs")
@@ -159,7 +159,7 @@ class SettingsRepository @Inject constructor(
     // viewModelScope.launch (default = Dispatchers.Main.immediate), which
     // blocks the press handler long enough that the ripple state hangs and
     // follow-up taps look like they're being ignored.
-    suspend fun saveConfig(config: LettaConfig) = withContext(Dispatchers.IO) {
+    override suspend fun saveConfig(config: LettaConfig) = withContext(Dispatchers.IO) {
         _configs.update { current ->
             val index = current.indexOfFirst { it.id == config.id }
             if (index >= 0) {
@@ -173,13 +173,13 @@ class SettingsRepository @Inject constructor(
         secureSettingsStore.putString(Keys.ACTIVE_CONFIG_ID.name, config.id)
     }
 
-    suspend fun setActiveConfigId(id: String) = withContext(Dispatchers.IO) {
+    override suspend fun setActiveConfigId(id: String) = withContext(Dispatchers.IO) {
         val config = _configs.value.find { it.id == id } ?: return@withContext
         _activeConfig.update { config }
         secureSettingsStore.putString(Keys.ACTIVE_CONFIG_ID.name, id)
     }
 
-    suspend fun deleteConfig(id: String) = withContext(Dispatchers.IO) {
+    override suspend fun deleteConfig(id: String) = withContext(Dispatchers.IO) {
         _configs.update { current -> current.filter { it.id != id } }
         persistConfigs(_configs.value)
         if (_activeConfig.value?.id == id) {
@@ -193,7 +193,7 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    fun getTheme(): Flow<AppTheme> = dataStore.data.map { prefs ->
+    override fun getTheme(): Flow<AppTheme> = dataStore.data.map { prefs ->
         val themeName = prefs[Keys.THEME] ?: AppTheme.SYSTEM.name
         try {
             AppTheme.valueOf(themeName)
@@ -202,7 +202,7 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    fun getThemePreset(): Flow<ThemePreset> = dataStore.data.map { prefs ->
+    override fun getThemePreset(): Flow<ThemePreset> = dataStore.data.map { prefs ->
         val legacyAmoledDarkMode = prefs[Keys.AMOLED_DARK_MODE] ?: false
         if (legacyAmoledDarkMode) {
             return@map ThemePreset.AMOLED_BLACK
@@ -215,7 +215,7 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    fun getDynamicColor(): Flow<Boolean> = dataStore.data.map { prefs ->
+    override fun getDynamicColor(): Flow<Boolean> = dataStore.data.map { prefs ->
         prefs[Keys.DYNAMIC_COLOR]
             ?: ((prefs[Keys.THEME_PRESET] ?: ThemePreset.DEFAULT.name) == ThemePreset.DEFAULT.name &&
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
@@ -243,7 +243,7 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    fun setLastChatSelection(agentId: String, agentName: String?, conversationId: String?) {
+    override fun setLastChatSelection(agentId: String, agentName: String?, conversationId: String?) {
         val normalizedAgentId = agentId.takeIf { it.isNotBlank() } ?: return
         val selection = LastChatSelection(
             agentId = normalizedAgentId,
@@ -277,7 +277,7 @@ class SettingsRepository @Inject constructor(
         )
     }
 
-    suspend fun clearAllData() = withContext(Dispatchers.IO) {
+    override suspend fun clearAllData() = withContext(Dispatchers.IO) {
         secureSettingsStore.clear()
         dataStore.edit { it.clear() }
         _configs.update { emptyList() }
@@ -287,14 +287,14 @@ class SettingsRepository @Inject constructor(
         _lastChatSelection.update { null }
     }
 
-    suspend fun setTheme(theme: AppTheme) {
+    override suspend fun setTheme(theme: AppTheme) {
         dataStore.edit { prefs ->
             prefs[Keys.THEME] = theme.name
             prefs[Keys.CHAT_BACKGROUND] = DEFAULT_CHAT_BACKGROUND_KEY
         }
     }
 
-    suspend fun setThemePreset(themePreset: ThemePreset) {
+    override suspend fun setThemePreset(themePreset: ThemePreset) {
         dataStore.edit { prefs ->
             prefs[Keys.THEME_PRESET] = themePreset.name
             prefs[Keys.AMOLED_DARK_MODE] = false
@@ -302,7 +302,7 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    suspend fun setDynamicColor(enabled: Boolean) {
+    override suspend fun setDynamicColor(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[Keys.DYNAMIC_COLOR] = enabled
         }
@@ -314,7 +314,7 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    fun getChatBackgroundKey(): Flow<String> = dataStore.data.map { prefs ->
+    override fun getChatBackgroundKey(): Flow<String> = dataStore.data.map { prefs ->
         prefs[Keys.CHAT_BACKGROUND] ?: DEFAULT_CHAT_BACKGROUND_KEY
     }
 
@@ -509,24 +509,24 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    suspend fun setChatBackgroundKey(key: String) {
+    override suspend fun setChatBackgroundKey(key: String) {
         dataStore.edit { prefs ->
             prefs[Keys.CHAT_BACKGROUND] = key
         }
     }
 
-    fun getChatFontScale(): Flow<Float> = dataStore.data.map { prefs ->
+    override fun getChatFontScale(): Flow<Float> = dataStore.data.map { prefs ->
         prefs[Keys.CHAT_FONT_SCALE] ?: 1.0f
     }
 
-    suspend fun setChatFontScale(scale: Float) {
+    override suspend fun setChatFontScale(scale: Float) {
         val clamped = scale.coerceIn(0.7f, 1.6f)
         dataStore.edit { prefs ->
             prefs[Keys.CHAT_FONT_SCALE] = clamped
         }
     }
 
-    fun getEnableProjects(): Flow<Boolean> = dataStore.data.map { prefs ->
+    override fun getEnableProjects(): Flow<Boolean> = dataStore.data.map { prefs ->
         prefs[Keys.ENABLE_PROJECTS] ?: false
     }
 
@@ -550,7 +550,7 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    suspend fun setClientModeEnabled(enabled: Boolean) {
+    override suspend fun setClientModeEnabled(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[Keys.CLIENT_MODE_ENABLED] = enabled
         }
@@ -560,7 +560,7 @@ class SettingsRepository @Inject constructor(
         prefs[Keys.CLIENT_MODE_BASE_URL] ?: ""
     }
 
-    suspend fun setClientModeBaseUrl(baseUrl: String) {
+    override suspend fun setClientModeBaseUrl(baseUrl: String) {
         dataStore.edit { prefs ->
             prefs[Keys.CLIENT_MODE_BASE_URL] = baseUrl
         }
@@ -568,7 +568,7 @@ class SettingsRepository @Inject constructor(
 
     override fun getClientModeApiKey(): String? = secureSettingsStore.getString(CLIENT_MODE_API_KEY)
 
-    fun setClientModeApiKey(apiKey: String?) {
+    override fun setClientModeApiKey(apiKey: String?) {
         if (apiKey.isNullOrBlank()) {
             secureSettingsStore.remove(CLIENT_MODE_API_KEY)
         } else {
@@ -576,7 +576,7 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    suspend fun setEnableProjects(enabled: Boolean) {
+    override suspend fun setEnableProjects(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[Keys.ENABLE_PROJECTS] = enabled
         }

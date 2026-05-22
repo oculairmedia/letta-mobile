@@ -2,7 +2,7 @@ package com.letta.mobile.data.api
 
 import android.content.Context
 import android.util.Log
-import com.letta.mobile.data.repository.SettingsRepository
+import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.TelemetryContext
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -24,7 +24,7 @@ import javax.inject.Singleton
 @Singleton
 open class LettaApiClient @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: ISettingsRepository
 ) {
     private val json = Json {
         ignoreUnknownKeys = true

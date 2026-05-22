@@ -25,8 +25,23 @@ class FakeConversationRepository(
         return conversationsByAgentState.map { conversationsByAgent -> conversationsByAgent[agentId].orEmpty() }
     }
 
+    override fun getCachedConversations(agentId: String): List<Conversation> {
+        calls += "getCachedConversations:$agentId"
+        return conversationsByAgentState.value[agentId].orEmpty()
+    }
+
+    override fun hasFreshConversations(agentId: String, maxAgeMs: Long): Boolean {
+        calls += "hasFreshConversations:$agentId:$maxAgeMs"
+        return conversationsByAgentState.value.containsKey(agentId)
+    }
+
     override suspend fun refreshConversations(agentId: String) {
         calls += "refreshConversations:$agentId"
+    }
+
+    override suspend fun refreshConversationsIfStale(agentId: String, maxAgeMs: Long): Boolean {
+        calls += "refreshConversationsIfStale:$agentId:$maxAgeMs"
+        return false
     }
 
     override suspend fun getConversation(id: String): Conversation {

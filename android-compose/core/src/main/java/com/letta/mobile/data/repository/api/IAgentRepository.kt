@@ -3,6 +3,7 @@ package com.letta.mobile.data.repository.api
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentUpdateParams
+import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,8 +22,10 @@ interface IAgentRepository {
     val isRefreshing: StateFlow<Boolean>
     suspend fun countAgents(): Int
     suspend fun refreshAgents()
+    suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean
     fun getCachedAgent(id: String): Agent?
     fun getAgent(id: String): Flow<Agent>
+    suspend fun getContextWindow(agentId: String, conversationId: String? = null): ContextWindowOverview
     suspend fun checkpointAndRestoreConfig(agentId: String, operation: suspend () -> Unit)
     suspend fun createAgent(params: AgentCreateParams): Agent
     suspend fun updateAgent(id: String, params: AgentUpdateParams): Agent

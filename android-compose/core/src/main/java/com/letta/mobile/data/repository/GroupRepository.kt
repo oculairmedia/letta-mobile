@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.GroupUpdateParams
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LettaResponse
 import com.letta.mobile.data.model.MessageCreateRequest
+import com.letta.mobile.data.repository.api.IGroupRepository
 import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,54 +20,54 @@ import javax.inject.Singleton
 @Singleton
 class GroupRepository @Inject constructor(
     private val groupApi: GroupApi,
-) {
+) : IGroupRepository {
     private val _groups = MutableStateFlow<List<Group>>(emptyList())
-    val groups: StateFlow<List<Group>> = _groups.asStateFlow()
+    override val groups: StateFlow<List<Group>> = _groups.asStateFlow()
 
-    suspend fun refreshGroups(managerType: String? = null, projectId: String? = null, showHiddenGroups: Boolean? = null) {
+    override suspend fun refreshGroups(managerType: String?, projectId: String?, showHiddenGroups: Boolean?) {
         _groups.value = groupApi.listGroups(limit = 1000, managerType = managerType, projectId = projectId, showHiddenGroups = showHiddenGroups)
     }
 
-    suspend fun countGroups(): Int = groupApi.countGroups()
+    override suspend fun countGroups(): Int = groupApi.countGroups()
 
-    suspend fun getGroup(groupId: String): Group {
+    override suspend fun getGroup(groupId: String): Group {
         return groupApi.retrieveGroup(groupId)
     }
 
-    suspend fun createGroup(params: GroupCreateParams): Group {
+    override suspend fun createGroup(params: GroupCreateParams): Group {
         val group = groupApi.createGroup(params)
         upsertGroup(group)
         return group
     }
 
-    suspend fun updateGroup(groupId: String, params: GroupUpdateParams): Group {
+    override suspend fun updateGroup(groupId: String, params: GroupUpdateParams): Group {
         val group = groupApi.updateGroup(groupId, params)
         upsertGroup(group)
         return group
     }
 
-    suspend fun deleteGroup(groupId: String) {
+    override suspend fun deleteGroup(groupId: String) {
         groupApi.deleteGroup(groupId)
         _groups.update { current -> current.filterNot { it.id == groupId } }
     }
 
-    suspend fun sendGroupMessage(groupId: String, request: MessageCreateRequest): LettaResponse {
+    override suspend fun sendGroupMessage(groupId: String, request: MessageCreateRequest): LettaResponse {
         return groupApi.sendGroupMessage(groupId, request)
     }
 
-    suspend fun sendGroupMessageStream(groupId: String, request: MessageCreateRequest): ByteReadChannel {
+    override suspend fun sendGroupMessageStream(groupId: String, request: MessageCreateRequest): ByteReadChannel {
         return groupApi.sendGroupMessageStream(groupId, request)
     }
 
-    suspend fun updateGroupMessage(groupId: String, messageId: String, request: JsonElement): LettaMessage {
+    override suspend fun updateGroupMessage(groupId: String, messageId: String, request: JsonElement): LettaMessage {
         return groupApi.updateGroupMessage(groupId, messageId, request)
     }
 
-    suspend fun listGroupMessages(groupId: String): List<LettaMessage> {
+    override suspend fun listGroupMessages(groupId: String): List<LettaMessage> {
         return groupApi.listGroupMessages(groupId = groupId, limit = 1000)
     }
 
-    suspend fun resetGroupMessages(groupId: String) {
+    override suspend fun resetGroupMessages(groupId: String) {
         groupApi.resetGroupMessages(groupId)
     }
 

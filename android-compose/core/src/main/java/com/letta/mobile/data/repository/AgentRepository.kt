@@ -142,7 +142,7 @@ class AgentRepository @Inject constructor(
         return _agents.value.isNotEmpty() && System.currentTimeMillis() - lastRefreshAtMillis <= maxAgeMs
     }
 
-    suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = refreshMutex.withLock {
+    override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = refreshMutex.withLock {
         if (hasFreshAgents(maxAgeMs)) return@withLock false
         _isRefreshing.value = true
         try {
@@ -163,7 +163,7 @@ class AgentRepository @Inject constructor(
         updateAgentInCache(fresh)
     }
 
-    suspend fun getContextWindow(agentId: String, conversationId: String? = null) =
+    override suspend fun getContextWindow(agentId: String, conversationId: String?) =
         agentApi.getContextWindow(agentId, conversationId)
 
     fun getAgentPolling(id: String): Flow<Agent> = flow {

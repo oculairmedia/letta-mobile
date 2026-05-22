@@ -5,7 +5,10 @@ import kotlinx.coroutines.flow.Flow
 
 interface IConversationRepository {
     fun getConversations(agentId: String): Flow<List<Conversation>>
+    fun getCachedConversations(agentId: String): List<Conversation>
+    fun hasFreshConversations(agentId: String, maxAgeMs: Long): Boolean
     suspend fun refreshConversations(agentId: String)
+    suspend fun refreshConversationsIfStale(agentId: String, maxAgeMs: Long): Boolean
     suspend fun getConversation(id: String): Conversation
     suspend fun createConversation(agentId: String, summary: String? = null): Conversation
     suspend fun deleteConversation(id: String, agentId: String)

@@ -9,6 +9,7 @@ import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.local.ConversationEntity
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.paging.ConversationPagingSource
+import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -36,7 +37,7 @@ class AllConversationsRepository(
     private val conversationApi: ConversationApi,
     private val conversationDao: ConversationDao? = null,
     private val repositoryScope: CoroutineScope,
-) {
+) : IAllConversationsRepository {
     /** Hilt-friendly constructor — uses [defaultAllConversationsScope]. */
     @Inject
     constructor(
@@ -45,10 +46,10 @@ class AllConversationsRepository(
     ) : this(conversationApi, conversationDao, defaultAllConversationsScope())
 
     private val _conversations = MutableStateFlow<List<Conversation>>(emptyList())
-    val conversations: StateFlow<List<Conversation>> = _conversations.asStateFlow()
+    override val conversations: StateFlow<List<Conversation>> = _conversations.asStateFlow()
 
     private val _hasMore = MutableStateFlow(true)
-    val hasMore: StateFlow<Boolean> = _hasMore.asStateFlow()
+    override val hasMore: StateFlow<Boolean> = _hasMore.asStateFlow()
 
     private val refreshMutex = Mutex()
     private var currentCursor: String? = null
@@ -68,10 +69,10 @@ class AllConversationsRepository(
         }
     }
 
-    fun getConversationsPaged(
-        agentId: String? = null,
-        archiveStatus: String? = null,
-        summarySearch: String? = null,
+    override fun getConversationsPaged(
+        agentId: String?,
+        archiveStatus: String?,
+        summarySearch: String?,
     ): Flow<PagingData<Conversation>> {
         return Pager(
             config = PagingConfig(
@@ -92,14 +93,14 @@ class AllConversationsRepository(
         ).flow
     }
 
-    suspend fun loadNextPage() {
+    override suspend fun loadNextPage() {
         if (!_hasMore.value) return
 
         val newConversations = fetchPage(after = currentCursor)
         applyLoadedPage(newConversations)
     }
 
-    suspend fun refresh() = refreshMutex.withLock {
+    override suspend fun refresh() = refreshMutex.withLock {
         refreshLocked()
     }
 
@@ -113,17 +114,17 @@ class AllConversationsRepository(
         lastRefreshAtMillis = System.currentTimeMillis()
     }
 
-    fun hasFreshConversations(maxAgeMs: Long): Boolean {
+    override fun hasFreshConversations(maxAgeMs: Long): Boolean {
         return hasLoadedAtLeastOnce && System.currentTimeMillis() - lastRefreshAtMillis <= maxAgeMs
     }
 
-    suspend fun refreshIfStale(maxAgeMs: Long): Boolean = refreshMutex.withLock {
+    override suspend fun refreshIfStale(maxAgeMs: Long): Boolean = refreshMutex.withLock {
         if (hasFreshConversations(maxAgeMs)) return@withLock false
         refreshLocked()
         true
     }
 
-    fun handleOptimisticUpdate(conversation: Conversation) {
+    override fun handleOptimisticUpdate(conversation: Conversation) {
         _conversations.update { current ->
             val index = current.indexOfFirst { it.id == conversation.id }
             if (index >= 0) {
@@ -137,7 +138,7 @@ class AllConversationsRepository(
         }
     }
 
-    fun handleOptimisticDelete(conversationId: String) {
+    override fun handleOptimisticDelete(conversationId: String) {
         _conversations.update { current -> current.filter { it.id != conversationId } }
         repositoryScope.launch {
             conversationDao?.delete(conversationId)
@@ -153,7 +154,7 @@ class AllConversationsRepository(
      * exact count when [ConversationCountEstimate.isApproximate] is false or as a
      * lower bound (for example, "50+") when more pages are available.
      */
-    fun loadedCountEstimate(): ConversationCountEstimate? {
+    override fun loadedCountEstimate(): ConversationCountEstimate? {
         if (!hasLoadedAtLeastOnce && _conversations.value.isEmpty()) return null
         return ConversationCountEstimate(
             count = _conversations.value.size,
@@ -167,7 +168,7 @@ class AllConversationsRepository(
      * performs no network I/O.
      */
     @Deprecated("Use loadedCountEstimate() and render approximate/unknown states explicitly.")
-    suspend fun countConversations(): Int {
+    override suspend fun countConversations(): Int {
         return loadedCountEstimate()?.count ?: 0
     }
 

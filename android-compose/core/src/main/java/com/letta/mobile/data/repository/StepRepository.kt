@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.Step
 import com.letta.mobile.data.model.StepFeedbackUpdateParams
 import com.letta.mobile.data.model.StepListParams
 import com.letta.mobile.data.model.StepMetrics
+import com.letta.mobile.data.repository.api.IStepRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,41 +18,41 @@ import javax.inject.Singleton
 @Singleton
 class StepRepository @Inject constructor(
     private val stepApi: StepApi,
-) {
+) : IStepRepository {
     private val _steps = MutableStateFlow<List<Step>>(emptyList())
-    val steps: StateFlow<List<Step>> = _steps.asStateFlow()
+    override val steps: StateFlow<List<Step>> = _steps.asStateFlow()
 
-    suspend fun refreshSteps(params: StepListParams = StepListParams()) {
+    override suspend fun refreshSteps(params: StepListParams) {
         _steps.value = stepApi.listSteps(params)
     }
 
-    suspend fun listSteps(params: StepListParams = StepListParams()): List<Step> {
+    override suspend fun listSteps(params: StepListParams): List<Step> {
         return stepApi.listSteps(params)
     }
 
-    suspend fun getStep(stepId: String): Step {
+    override suspend fun getStep(stepId: String): Step {
         return stepApi.retrieveStep(stepId)
     }
 
-    suspend fun getStepMetrics(stepId: String): StepMetrics {
+    override suspend fun getStepMetrics(stepId: String): StepMetrics {
         return stepApi.retrieveStepMetrics(stepId)
     }
 
-    suspend fun getStepTrace(stepId: String): ProviderTrace? {
+    override suspend fun getStepTrace(stepId: String): ProviderTrace? {
         return stepApi.retrieveStepTrace(stepId)
     }
 
-    suspend fun getStepMessages(stepId: String): List<LettaMessage> {
+    override suspend fun getStepMessages(stepId: String): List<LettaMessage> {
         return stepApi.listStepMessages(stepId = stepId, order = "asc")
     }
 
-    suspend fun updateStepFeedback(stepId: String, params: StepFeedbackUpdateParams): Step {
+    override suspend fun updateStepFeedback(stepId: String, params: StepFeedbackUpdateParams): Step {
         val step = stepApi.updateStepFeedback(stepId, params)
         upsertStep(step)
         return step
     }
 
-    fun upsertStep(step: Step) {
+    override fun upsertStep(step: Step) {
         _steps.update { current ->
             val index = current.indexOfFirst { it.id == step.id }
             if (index >= 0) {

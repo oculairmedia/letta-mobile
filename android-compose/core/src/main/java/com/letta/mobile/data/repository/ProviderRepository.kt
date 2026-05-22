@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.Provider
 import com.letta.mobile.data.model.ProviderCheckParams
 import com.letta.mobile.data.model.ProviderCreateParams
 import com.letta.mobile.data.model.ProviderUpdateParams
+import com.letta.mobile.data.repository.api.IProviderRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,39 +16,39 @@ import javax.inject.Singleton
 @Singleton
 class ProviderRepository @Inject constructor(
     private val providerApi: ProviderApi,
-) {
+) : IProviderRepository {
     private val _providers = MutableStateFlow<List<Provider>>(emptyList())
-    val providers: StateFlow<List<Provider>> = _providers.asStateFlow()
+    override val providers: StateFlow<List<Provider>> = _providers.asStateFlow()
 
-    suspend fun refreshProviders(name: String? = null, providerType: String? = null) {
+    override suspend fun refreshProviders(name: String?, providerType: String?) {
         _providers.value = providerApi.listProviders(limit = 1000, name = name, providerType = providerType)
     }
 
-    suspend fun getProvider(providerId: String): Provider {
+    override suspend fun getProvider(providerId: String): Provider {
         return providerApi.retrieveProvider(providerId)
     }
 
-    suspend fun createProvider(params: ProviderCreateParams): Provider {
+    override suspend fun createProvider(params: ProviderCreateParams): Provider {
         val provider = providerApi.createProvider(params)
         upsertProvider(provider)
         return provider
     }
 
-    suspend fun updateProvider(providerId: String, params: ProviderUpdateParams): Provider {
+    override suspend fun updateProvider(providerId: String, params: ProviderUpdateParams): Provider {
         val provider = providerApi.updateProvider(providerId, params)
         upsertProvider(provider)
         return provider
     }
 
-    suspend fun checkProvider(params: ProviderCheckParams) {
+    override suspend fun checkProvider(params: ProviderCheckParams) {
         providerApi.checkProvider(params)
     }
 
-    suspend fun checkExistingProvider(providerId: String) {
+    override suspend fun checkExistingProvider(providerId: String) {
         providerApi.checkExistingProvider(providerId)
     }
 
-    suspend fun deleteProvider(providerId: String) {
+    override suspend fun deleteProvider(providerId: String) {
         providerApi.deleteProvider(providerId)
         _providers.update { current -> current.filterNot { it.id == providerId } }
     }

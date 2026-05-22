@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.RunListParams
 import com.letta.mobile.data.model.RunMetrics
 import com.letta.mobile.data.model.Step
 import com.letta.mobile.data.model.UsageStatistics
+import com.letta.mobile.data.repository.api.IRunRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,15 +18,15 @@ import javax.inject.Singleton
 @Singleton
 class RunRepository @Inject constructor(
     private val runApi: RunApi,
-) {
+) : IRunRepository {
     private val _runs = MutableStateFlow<List<Run>>(emptyList())
-    val runs: StateFlow<List<Run>> = _runs.asStateFlow()
+    override val runs: StateFlow<List<Run>> = _runs.asStateFlow()
 
-    suspend fun refreshRuns(params: RunListParams = RunListParams()) {
+    override suspend fun refreshRuns(params: RunListParams) {
         _runs.value = runApi.listRuns(params)
     }
 
-    suspend fun getRecentRuns(limit: Int = 100): List<Run> {
+    override suspend fun getRecentRuns(limit: Int): List<Run> {
         return runApi.listRuns(
             RunListParams(
                 limit = limit,
@@ -35,39 +36,39 @@ class RunRepository @Inject constructor(
         )
     }
 
-    suspend fun getRun(runId: String): Run {
+    override suspend fun getRun(runId: String): Run {
         return runApi.retrieveRun(runId)
     }
 
-    suspend fun getRunMessages(runId: String): List<LettaMessage> {
+    override suspend fun getRunMessages(runId: String): List<LettaMessage> {
         return runApi.listRunMessages(runId = runId, order = "asc")
     }
 
-    suspend fun getRunUsage(runId: String): UsageStatistics {
+    override suspend fun getRunUsage(runId: String): UsageStatistics {
         return runApi.retrieveRunUsage(runId)
     }
 
-    suspend fun getRunMetrics(runId: String): RunMetrics {
+    override suspend fun getRunMetrics(runId: String): RunMetrics {
         return runApi.retrieveRunMetrics(runId)
     }
 
-    suspend fun getRunSteps(runId: String): List<Step> {
+    override suspend fun getRunSteps(runId: String): List<Step> {
         return runApi.listRunSteps(runId = runId, order = "desc")
     }
 
-    suspend fun cancelRun(run: Run): Run {
+    override suspend fun cancelRun(run: Run): Run {
         runApi.cancelRun(agentId = run.agentId, runId = run.id)
         val refreshed = runApi.retrieveRun(run.id)
         upsertRun(refreshed)
         return refreshed
     }
 
-    suspend fun deleteRun(runId: String) {
+    override suspend fun deleteRun(runId: String) {
         runApi.deleteRun(runId)
         _runs.update { current -> current.filterNot { it.id == runId } }
     }
 
-    fun upsertRun(run: Run) {
+    override fun upsertRun(run: Run) {
         _runs.update { current ->
             val index = current.indexOfFirst { it.id == run.id }
             if (index >= 0) {

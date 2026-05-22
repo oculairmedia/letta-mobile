@@ -11,6 +11,8 @@ interface IToolRepository {
     fun getAgentTools(agentId: String): Flow<List<Tool>>
     suspend fun countTools(): Int
     suspend fun refreshTools()
+    suspend fun refreshToolsIfStale(maxAgeMs: Long): Boolean
+    suspend fun fetchToolsPage(limit: Int, offset: Int): List<Tool>
     suspend fun attachTool(agentId: String, toolId: String)
     suspend fun detachTool(agentId: String, toolId: String)
     suspend fun upsertTool(params: ToolCreateParams): Tool

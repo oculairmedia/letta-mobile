@@ -32,6 +32,7 @@ import com.letta.mobile.data.model.UsageStatistics
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.paging.MessagePagingSource
 import com.letta.mobile.data.repository.api.IConversationInspectorMessageRepository
+import com.letta.mobile.data.repository.api.IMessageRepository
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.encodeToJsonElement
@@ -66,7 +67,7 @@ data class ConversationInspectorMessage(
 @Singleton
 open class MessageRepository @Inject constructor(
     private val messageApi: MessageApi,
-) : IConversationInspectorMessageRepository {
+) : IMessageRepository, IConversationInspectorMessageRepository {
     companion object {
         /** Number of messages to display on initial chat load */
         const val INITIAL_FETCH_LIMIT = 30
@@ -79,7 +80,7 @@ open class MessageRepository @Inject constructor(
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    fun getMessagesPaged(agentId: String?, conversationId: String?): Flow<PagingData<AppMessage>> {
+    override fun getMessagesPaged(agentId: String?, conversationId: String?): Flow<PagingData<AppMessage>> {
         return Pager(
             config = PagingConfig(
                 pageSize = MessagePagingSource.PAGE_SIZE,
@@ -96,10 +97,10 @@ open class MessageRepository @Inject constructor(
      * Stateless — returns the API response and does not cache. For live sync,
      * use [com.letta.mobile.data.timeline.TimelineRepository] instead.
      */
-    suspend fun fetchMessages(
+    override suspend fun fetchMessages(
         agentId: String,
         conversationId: String,
-        targetMessageId: String? = null,
+        targetMessageId: String?,
     ): List<AppMessage> {
         return try {
             if (targetMessageId.isNullOrBlank()) {
@@ -156,7 +157,7 @@ open class MessageRepository @Inject constructor(
         return mergedMessages
     }
 
-    suspend fun fetchOlderMessages(
+    override suspend fun fetchOlderMessages(
         agentId: String,
         conversationId: String,
         beforeMessageId: String,
@@ -170,31 +171,31 @@ open class MessageRepository @Inject constructor(
         ).toAppMessages()
     }
 
-    suspend fun cancelMessage(agentId: String, runIds: List<String>? = null): Map<String, String> {
+    override suspend fun cancelMessage(agentId: String, runIds: List<String>?): Map<String, String> {
         return messageApi.cancelMessage(agentId = agentId, runIds = runIds)
     }
 
-    suspend fun searchMessages(request: MessageSearchRequest): List<MessageSearchResult> {
+    override suspend fun searchMessages(request: MessageSearchRequest): List<MessageSearchResult> {
         return messageApi.searchMessages(request)
     }
 
-    suspend fun createBatch(request: CreateBatchMessagesRequest): Job {
+    override suspend fun createBatch(request: CreateBatchMessagesRequest): Job {
         return messageApi.createBatch(request)
     }
 
-    suspend fun retrieveBatch(batchId: String): Job {
+    override suspend fun retrieveBatch(batchId: String): Job {
         return messageApi.retrieveBatch(batchId)
     }
 
-    suspend fun listBatches(): List<Job> {
+    override suspend fun listBatches(): List<Job> {
         return messageApi.listBatches(limit = 1000)
     }
 
-    suspend fun listBatchMessages(batchId: String, agentId: String? = null): BatchMessagesResponse {
+    override suspend fun listBatchMessages(batchId: String, agentId: String?): BatchMessagesResponse {
         return messageApi.listBatchMessages(batchId = batchId, limit = 1000, agentId = agentId)
     }
 
-    suspend fun cancelBatch(batchId: String) {
+    override suspend fun cancelBatch(batchId: String) {
         messageApi.cancelBatch(batchId)
     }
 
@@ -426,12 +427,12 @@ open class MessageRepository @Inject constructor(
         }
     }
 
-    suspend fun submitApproval(
+    override suspend fun submitApproval(
         conversationId: String,
         approvalRequestId: String,
         toolCallIds: List<String>,
         approve: Boolean,
-        reason: String? = null,
+        reason: String?,
     ) {
         val request = MessageCreateRequest(
             messages = listOf(
@@ -458,11 +459,11 @@ open class MessageRepository @Inject constructor(
         messageApi.sendConversationMessage(conversationId, request)
     }
 
-    suspend fun resetMessages(agentId: String) {
+    override suspend fun resetMessages(agentId: String) {
         messageApi.resetMessages(agentId)
     }
 
-    suspend fun resetMessages(agentId: String, conversationId: String) {
+    override suspend fun resetMessages(agentId: String, conversationId: String) {
         messageApi.resetMessages(agentId)
     }
 }

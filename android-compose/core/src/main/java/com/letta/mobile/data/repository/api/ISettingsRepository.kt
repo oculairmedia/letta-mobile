@@ -1,6 +1,9 @@
 package com.letta.mobile.data.repository.api
 
+import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.ThemePreset
+import com.letta.mobile.data.repository.LastChatSelection
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -20,11 +23,20 @@ import kotlinx.coroutines.flow.StateFlow
  *    the concrete class — see letta-mobile-9x4 / letta-mobile-utc.
  */
 interface ISettingsRepository {
+    val configs: StateFlow<List<LettaConfig>>
     val activeConfig: StateFlow<LettaConfig?>
     val activeConfigChanges: Flow<LettaConfig>
     val favoriteAgentId: StateFlow<String?>
     val adminAgentId: StateFlow<String?>
+    val lastChatSelection: StateFlow<LastChatSelection?>
     fun getActiveConfig(): Flow<LettaConfig?>
+    suspend fun saveConfig(config: LettaConfig)
+    suspend fun setActiveConfigId(id: String)
+    suspend fun deleteConfig(id: String)
+    suspend fun clearAllData()
+    fun getTheme(): Flow<AppTheme>
+    fun getThemePreset(): Flow<ThemePreset>
+    fun getDynamicColor(): Flow<Boolean>
     fun observeClientModeEnabled(): Flow<Boolean>
     fun observeResumeRecentConversation(): Flow<Boolean>
     fun observeClientModeBaseUrl(): Flow<String>
@@ -32,6 +44,7 @@ interface ISettingsRepository {
     fun getPinnedAgentIds(): Flow<Set<String>>
     fun getPinnedAgentOrder(): Flow<List<String>>
     fun getPinnedConversationIds(): Flow<Set<String>>
+    fun setLastChatSelection(agentId: String, agentName: String?, conversationId: String?)
     suspend fun setConversationPinned(conversationId: String, pinned: Boolean)
     fun setFavoriteAgentId(agentId: String?)
     suspend fun setAgentPinned(agentId: String, pinned: Boolean)
@@ -61,4 +74,16 @@ interface ISettingsRepository {
     fun getPinnedAgentNames(): Flow<Map<String, String>>
     suspend fun upsertPinnedAgentName(id: String, name: String)
     suspend fun removePinnedAgentName(id: String)
+    fun getChatBackgroundKey(): Flow<String>
+    suspend fun setChatBackgroundKey(key: String)
+    fun getChatFontScale(): Flow<Float>
+    suspend fun setChatFontScale(scale: Float)
+    fun getEnableProjects(): Flow<Boolean>
+    suspend fun setClientModeEnabled(enabled: Boolean)
+    suspend fun setClientModeBaseUrl(baseUrl: String)
+    fun setClientModeApiKey(apiKey: String?)
+    suspend fun setTheme(theme: AppTheme)
+    suspend fun setThemePreset(themePreset: ThemePreset)
+    suspend fun setDynamicColor(enabled: Boolean)
+    suspend fun setEnableProjects(enabled: Boolean)
 }

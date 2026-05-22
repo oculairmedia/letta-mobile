@@ -47,13 +47,13 @@ class ToolRepository @Inject constructor(
         return _tools.value.isNotEmpty() && System.currentTimeMillis() - lastRefreshAtMillis <= maxAgeMs
     }
 
-    suspend fun refreshToolsIfStale(maxAgeMs: Long): Boolean = refreshMutex.withLock {
+    override suspend fun refreshToolsIfStale(maxAgeMs: Long): Boolean = refreshMutex.withLock {
         if (hasFreshTools(maxAgeMs)) return@withLock false
         refreshToolsLocked()
         true
     }
 
-    suspend fun fetchToolsPage(limit: Int, offset: Int): List<Tool> {
+    override suspend fun fetchToolsPage(limit: Int, offset: Int): List<Tool> {
         return toolApi.listTools(limit = limit, offset = offset)
     }
 

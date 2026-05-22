@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.FolderCreateParams
 import com.letta.mobile.data.model.FolderUpdateParams
 import com.letta.mobile.data.model.OrganizationSourcesStats
 import com.letta.mobile.data.model.Passage
+import com.letta.mobile.data.repository.api.IFolderRepository
 import io.ktor.http.ContentType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,65 +19,65 @@ import javax.inject.Singleton
 @Singleton
 class FolderRepository @Inject constructor(
     private val folderApi: FolderApi,
-) {
+) : IFolderRepository {
     private val _folders = MutableStateFlow<List<Folder>>(emptyList())
-    val folders: StateFlow<List<Folder>> = _folders.asStateFlow()
+    override val folders: StateFlow<List<Folder>> = _folders.asStateFlow()
 
-    suspend fun refreshFolders(name: String? = null) {
+    override suspend fun refreshFolders(name: String?) {
         _folders.value = folderApi.listFolders(limit = 1000, name = name)
     }
 
-    suspend fun countFolders(): Int = folderApi.countFolders()
+    override suspend fun countFolders(): Int = folderApi.countFolders()
 
-    suspend fun getFolder(folderId: String): Folder {
+    override suspend fun getFolder(folderId: String): Folder {
         return folderApi.retrieveFolder(folderId)
     }
 
-    suspend fun getFolderMetadata(includeDetailedPerSourceMetadata: Boolean = false): OrganizationSourcesStats {
+    override suspend fun getFolderMetadata(includeDetailedPerSourceMetadata: Boolean): OrganizationSourcesStats {
         return folderApi.retrieveFolderMetadata(includeDetailedPerSourceMetadata)
     }
 
-    suspend fun createFolder(params: FolderCreateParams): Folder {
+    override suspend fun createFolder(params: FolderCreateParams): Folder {
         val folder = folderApi.createFolder(params)
         upsertFolder(folder)
         return folder
     }
 
-    suspend fun updateFolder(folderId: String, params: FolderUpdateParams): Folder {
+    override suspend fun updateFolder(folderId: String, params: FolderUpdateParams): Folder {
         val folder = folderApi.updateFolder(folderId, params)
         upsertFolder(folder)
         return folder
     }
 
-    suspend fun deleteFolder(folderId: String) {
+    override suspend fun deleteFolder(folderId: String) {
         folderApi.deleteFolder(folderId)
         _folders.update { current -> current.filterNot { it.id == folderId } }
     }
 
-    suspend fun uploadFileToFolder(
+    override suspend fun uploadFileToFolder(
         folderId: String,
         fileName: String,
         fileBytes: ByteArray,
-        duplicateHandling: String? = null,
-        customName: String? = null,
-        contentType: ContentType = ContentType.Application.OctetStream,
+        duplicateHandling: String?,
+        customName: String?,
+        contentType: ContentType,
     ): FileMetadata {
         return folderApi.uploadFileToFolder(folderId, fileName, fileBytes, duplicateHandling, customName, contentType)
     }
 
-    suspend fun listAgentsForFolder(folderId: String): List<String> {
+    override suspend fun listAgentsForFolder(folderId: String): List<String> {
         return folderApi.listAgentsForFolder(folderId = folderId, limit = 1000)
     }
 
-    suspend fun listFolderPassages(folderId: String): List<Passage> {
+    override suspend fun listFolderPassages(folderId: String): List<Passage> {
         return folderApi.listFolderPassages(folderId = folderId, limit = 1000)
     }
 
-    suspend fun listFolderFiles(folderId: String, includeContent: Boolean = false): List<FileMetadata> {
+    override suspend fun listFolderFiles(folderId: String, includeContent: Boolean): List<FileMetadata> {
         return folderApi.listFolderFiles(folderId = folderId, limit = 1000, includeContent = includeContent)
     }
 
-    suspend fun deleteFileFromFolder(folderId: String, fileId: String) {
+    override suspend fun deleteFileFromFolder(folderId: String, fileId: String) {
         folderApi.deleteFileFromFolder(folderId, fileId)
     }
 

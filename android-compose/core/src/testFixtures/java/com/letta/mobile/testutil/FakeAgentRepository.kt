@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
+import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.repository.api.IAgentRepository
 import kotlinx.coroutines.flow.Flow
@@ -38,6 +39,11 @@ class FakeAgentRepository(
         calls += "refreshAgents"
     }
 
+    override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean {
+        calls += "refreshAgentsIfStale:$maxAgeMs"
+        return false
+    }
+
     override fun getCachedAgent(id: String): Agent? {
         calls += "getCachedAgent:$id"
         return agentsState.value.find { it.id == AgentId(id) }
@@ -46,6 +52,11 @@ class FakeAgentRepository(
     override fun getAgent(id: String): Flow<Agent> = flow {
         calls += "getAgent:$id"
         emit(requireAgent(id))
+    }
+
+    override suspend fun getContextWindow(agentId: String, conversationId: String?): ContextWindowOverview {
+        calls += "getContextWindow:$agentId:${conversationId.orEmpty()}"
+        return ContextWindowOverview()
     }
 
     override suspend fun checkpointAndRestoreConfig(agentId: String, operation: suspend () -> Unit) {

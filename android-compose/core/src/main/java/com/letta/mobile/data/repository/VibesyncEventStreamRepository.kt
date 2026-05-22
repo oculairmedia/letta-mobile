@@ -4,6 +4,7 @@ import android.util.Log
 import com.letta.mobile.data.api.LettaApiClient
 import com.letta.mobile.data.model.VibesyncEvent
 import com.letta.mobile.data.model.VibesyncRawEventEnvelope
+import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
 import com.letta.mobile.data.stream.SseParser
 import io.ktor.client.call.body
 import io.ktor.client.request.get
@@ -30,24 +31,24 @@ import kotlinx.serialization.json.jsonPrimitive
 @Singleton
 open class VibesyncEventStreamRepository @Inject constructor(
     private val apiClient: LettaApiClient,
-) {
+) : IVibesyncEventStreamRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val activeSubscribers = AtomicInteger(0)
     private val _events = MutableSharedFlow<VibesyncEvent>(extraBufferCapacity = 64)
-    open val events: SharedFlow<VibesyncEvent> = _events.asSharedFlow()
+    override val events: SharedFlow<VibesyncEvent> = _events.asSharedFlow()
     private var streamJob: Job? = null
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     @Synchronized
-    open fun start() {
+    override fun start() {
         if (activeSubscribers.incrementAndGet() > 1) return
         if (streamJob?.isActive == true) return
         streamJob = scope.launch { runStreamLoop() }
     }
 
     @Synchronized
-    open fun stop() {
+    override fun stop() {
         val remaining = activeSubscribers.decrementAndGet()
         if (remaining > 0) return
         activeSubscribers.set(0)

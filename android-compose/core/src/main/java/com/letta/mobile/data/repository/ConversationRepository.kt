@@ -68,14 +68,14 @@ class ConversationRepository @Inject constructor(
         writeAgentConversations(agentId, conversations, refreshedAt)
     }
 
-    fun getCachedConversations(agentId: String): List<Conversation> = _conversationsByAgent.value[agentId] ?: emptyList()
+    override fun getCachedConversations(agentId: String): List<Conversation> = _conversationsByAgent.value[agentId] ?: emptyList()
 
-    fun hasFreshConversations(agentId: String, maxAgeMs: Long): Boolean {
+    override fun hasFreshConversations(agentId: String, maxAgeMs: Long): Boolean {
         val lastRefreshAt = lastRefreshAtMillisByAgent[agentId] ?: return false
         return System.currentTimeMillis() - lastRefreshAt <= maxAgeMs
     }
 
-    suspend fun refreshConversationsIfStale(agentId: String, maxAgeMs: Long): Boolean = refreshMutex.withLock {
+    override suspend fun refreshConversationsIfStale(agentId: String, maxAgeMs: Long): Boolean = refreshMutex.withLock {
         if (hasFreshConversations(agentId, maxAgeMs)) return@withLock false
         refreshConversationsLocked(agentId)
         true
