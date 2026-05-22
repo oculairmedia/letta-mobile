@@ -34,6 +34,7 @@ import java.io.IOException
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.random.Random
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -225,6 +226,11 @@ class TimelineSyncLoop(
 
     private sealed interface TimelineGatewayEvent {
         data class StreamMessage(val message: LettaMessage) : TimelineGatewayEvent
+        data class LocalSendAppend(
+            val pending: PendingSend,
+            val sentAt: Instant,
+            val ack: CompletableDeferred<Unit>,
+        ) : TimelineGatewayEvent
     }
 
     private data class PendingSend(
@@ -307,19 +313,10 @@ class TimelineSyncLoop(
     ): String {
         val otid = newOtid()
         val sentAt = Instant.now()
-        writeMutex.withLock {
-            val local = TimelineEvent.Local(
-                position = _state.value.nextLocalPosition(),
-                otid = otid,
-                content = content,
-                role = Role.USER,
-                sentAt = sentAt,
-                deliveryState = DeliveryState.SENDING,
-                attachments = attachments,
-            )
-            _state.value = _state.value.append(local)
-            sendQueue.send(PendingSend(otid, content, attachments))  // unlimited capacity → never suspends
-        }
+        val pending = PendingSend(otid, content, attachments)
+        val appendAck = CompletableDeferred<Unit>()
+        eventQueue.send(TimelineGatewayEvent.LocalSendAppend(pending, sentAt, appendAck))
+        appendAck.await()
         // mge5.24: persist sends carrying images so the bubble survives a
         // process restart. The Letta server drops user_message records that
         // include image content, so reconcile alone can't bring them back.
@@ -339,13 +336,6 @@ class TimelineSyncLoop(
                 Telemetry.error(logTag, "send.persistFailed", t, "otid" to otid)
             }
         }
-        _events.emit(TimelineSyncEvent.LocalAppended(otid))
-        Telemetry.event(
-            "TimelineSync", "send.localAppended",
-            "otid" to otid,
-            "conversationId" to conversationId,
-            "contentLength" to content.length,
-        )
         return otid
     }
 
@@ -561,8 +551,37 @@ class TimelineSyncLoop(
         for (event in eventQueue) {
             when (event) {
                 is TimelineGatewayEvent.StreamMessage -> applyStreamEvent(event.message)
+                is TimelineGatewayEvent.LocalSendAppend -> applyLocalSendAppend(event)
             }
         }
+    }
+
+    private suspend fun applyLocalSendAppend(event: TimelineGatewayEvent.LocalSendAppend) {
+        runCatching {
+            writeMutex.withLock {
+                val local = TimelineEvent.Local(
+                    position = _state.value.nextLocalPosition(),
+                    otid = event.pending.otid,
+                    content = event.pending.content,
+                    role = Role.USER,
+                    sentAt = event.sentAt,
+                    deliveryState = DeliveryState.SENDING,
+                    attachments = event.pending.attachments,
+                )
+                _state.value = _state.value.append(local)
+                sendQueue.send(event.pending) // unlimited capacity → never suspends
+            }
+            _events.emit(TimelineSyncEvent.LocalAppended(event.pending.otid))
+            Telemetry.event(
+                "TimelineSync", "send.localAppended",
+                "otid" to event.pending.otid,
+                "conversationId" to conversationId,
+                "contentLength" to event.pending.content.length,
+            )
+        }.fold(
+            onSuccess = { event.ack.complete(Unit) },
+            onFailure = { event.ack.completeExceptionally(it) },
+        )
     }
 
     /** Background worker: processes one send at a time from the queue. */

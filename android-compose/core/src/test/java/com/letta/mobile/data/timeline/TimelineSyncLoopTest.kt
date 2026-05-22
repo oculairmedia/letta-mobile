@@ -19,6 +19,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
@@ -169,11 +170,12 @@ class TimelineSyncLoopTest {
 
     @Test
     fun `send optimistically appends local event`() = runTest {
-        // Uses StandardTestDispatcher (not Unconfined) so the background
-        // processSendQueue coroutine is only resumed when we explicitly
-        // advance the scheduler. That lets us observe the optimistic Local
-        // state before stream+reconcile has a chance to swap it to Confirmed.
+        // Uses StandardTestDispatcher (not Unconfined) so the gateway worker
+        // and processSendQueue only resume when we explicitly advance the
+        // scheduler. That lets us observe the optimistic Local state after the
+        // gateway append but before stream+reconcile can swap it to Confirmed.
         val api = FakeSyncApi()
+        api.sendResponseGate = CompletableDeferred()
         api.nextStreamMessages = listOf(
             AssistantMessage(id = "reply-1", contentRaw = JsonPrimitive("OK"), otid = "reply-otid")
         )
@@ -181,8 +183,17 @@ class TimelineSyncLoopTest {
         val scope = CoroutineScope(dispatcher)
         val sync = TimelineSyncLoop(api, "conv1", scope)
 
-        val otid = sync.send("hello")
-        // Do NOT advance the scheduler yet — we want the pre-drain snapshot.
+        val otidDeferred = async { sync.send("hello") }
+
+        assertEquals(
+            "send should submit the Local append to the gateway instead of mutating inline",
+            0,
+            sync.state.value.events.size,
+        )
+
+        testScheduler.runCurrent()
+
+        val otid = otidDeferred.await()
         val local = sync.state.value.findByOtid(otid)
 
         assertNotNull(local)
@@ -2003,6 +2014,7 @@ private class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
     private val stored = mutableListOf<LettaMessage>()
     var nextStreamMessages: List<LettaMessage> = emptyList()
     var lastSendRequest: MessageCreateRequest? = null
+    var sendResponseGate: CompletableDeferred<Unit>? = null
 
     // letta-mobile-j44j: failure-injection for reconcile retry tests.
     // When [listMessagesFailuresBeforeSuccess] > 0, the first N calls to
@@ -2053,6 +2065,7 @@ private class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
         request: MessageCreateRequest,
     ): ByteReadChannel {
         lastSendRequest = request
+        sendResponseGate?.await()
         // Extract otid from request and create a UserMessage in the store to
         // mimic server persistence.
         val firstMessage = request.messages?.firstOrNull()
