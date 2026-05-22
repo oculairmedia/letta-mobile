@@ -9,7 +9,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filterNotNull
 
 /**
  * Hand-written test double for [ISettingsRepository] — see
@@ -70,7 +72,10 @@ class FakeSettingsRepository(
 
     override val activeConfig: StateFlow<LettaConfig?> = activeConfigState.asStateFlow()
 
-    override val activeConfigChanges: Flow<LettaConfig> = emptyFlow()
+    override val activeConfigChanges: Flow<LettaConfig> = activeConfigState
+        .drop(1)
+        .filterNotNull()
+        .distinctUntilChanged { old, new -> old.id == new.id }
 
     override val favoriteAgentId: StateFlow<String?> = favoriteAgentIdState.asStateFlow()
 

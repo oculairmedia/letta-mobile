@@ -5,10 +5,14 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.testutil.InMemorySecureSettingsStore
 import com.letta.mobile.testutil.createTestPreferencesDataStore
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -80,6 +84,27 @@ class SettingsRepositoryTest {
 
         repository.setActiveConfigId("c1")
         assertEquals("c1", repository.activeConfig.value?.id)
+    }
+
+    @Test
+    fun `activeConfigChanges emits first real selection after initial null and deduplicates by id`() = runTest {
+        val emissions = Channel<LettaConfig>(Channel.UNLIMITED)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            repository.activeConfigChanges.collect { emissions.send(it) }
+        }
+
+        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://one.com")
+        val c1Updated = c1.copy(accessToken = "rotated-token")
+        val c2 = LettaConfig(id = "c2", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "http://two.com")
+
+        repository.saveConfig(c1)
+        assertEquals("c1", emissions.receive().id)
+
+        repository.saveConfig(c1Updated)
+        assertNull(withTimeoutOrNull(100) { emissions.receive() })
+
+        repository.saveConfig(c2)
+        assertEquals("c2", emissions.receive().id)
     }
 
     @Test
