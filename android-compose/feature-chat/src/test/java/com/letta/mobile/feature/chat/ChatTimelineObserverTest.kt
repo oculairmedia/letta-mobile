@@ -17,13 +17,16 @@ import io.mockk.every
 import io.mockk.mockk
 import java.time.Instant
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlin.coroutines.ContinuationInterceptor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -183,6 +186,8 @@ class ChatTimelineObserverTest {
             isFollowingDuplicateInitialMessageInFlight = isFollowingDuplicateInitialMessageInFlight,
             clearFollowingDuplicateInitialMessageInFlight = clearFollowingDuplicateInitialMessageInFlight,
             collapseCompletedRunsIfStreamingFinished = { _, next -> next },
+            projectionDispatcher = scope.coroutineContext[ContinuationInterceptor] as? CoroutineDispatcher
+                ?: Dispatchers.Default,
         )
 
         init {

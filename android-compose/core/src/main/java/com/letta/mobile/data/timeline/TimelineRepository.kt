@@ -13,6 +13,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /**
  * Per-conversation [TimelineSyncLoop] registry.
@@ -99,7 +100,11 @@ open class TimelineRepository @Inject constructor(
         // the loop in the map and short-circuit at the fast path — hydrate
         // still only runs once per conv (first caller wins). The TimelineSync
         // writeMutex inside hydrate() prevents concurrent state mutation.
-        runCatching { loop.hydrate() }.onFailure { t ->
+        runCatching {
+            withContext(Dispatchers.IO) {
+                loop.hydrate()
+            }
+        }.onFailure { t ->
             Telemetry.error(
                 "TimelineRepo", "hydrate.failed", t,
                 "conversationId" to conversationId,

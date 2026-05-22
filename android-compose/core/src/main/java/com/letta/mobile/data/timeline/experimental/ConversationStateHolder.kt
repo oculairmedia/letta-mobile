@@ -1,10 +1,5 @@
 package com.letta.mobile.data.timeline.experimental
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import app.cash.molecule.RecompositionMode
-import app.cash.molecule.launchMolecule
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.timeline.PendingIngestNotification
 import com.letta.mobile.data.timeline.Timeline
@@ -24,6 +19,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
@@ -31,30 +27,30 @@ import kotlinx.coroutines.flow.stateIn
 /**
  * letta-mobile-oc8j Phase 1 → Phase 3a.
  *
- * Molecule-backed `ConversationStateHolder` for a single conversation.
- * Folds an upstream `Flow<LettaMessage>` (WS frame stream) into a
- * `Timeline` using the pure [reduceStreamFrame] extracted in
- * letta-mobile-bfqgi.
+ * Flow-backed `ConversationStateHolder` for a single conversation. Folds an
+ * upstream `Flow<LettaMessage>` (WS frame stream) into a `Timeline` using the
+ * pure [reduceStreamFrame] extracted in letta-mobile-bfqgi.
  *
  * Exposes three output surfaces — Phase 2 wiring (`letta-mobile-t0vha`)
  * routes the loop's stream-ingest entry point through these instead of
  * mutating loop-local state directly:
  *
- *  - [state] : StateFlow<Timeline> — the reduced timeline, Molecule-driven.
+ *  - [state] : StateFlow<Timeline> — the reduced timeline.
  *  - [events] : SharedFlow<TimelineSyncEvent> — per-frame events to emit
  *    on the loop's `_events` SharedFlow.
  *  - [notifications] : SharedFlow<PendingIngestNotification> — per-frame
  *    notifications to dispatch via `TimelineIngestNotificationDispatcher`.
  *
- * ## Fold via Flow.scan, derivation via Molecule
+ * ## Fold via Flow.scan
  *
  * The fold is `frames.scan(seed, reduce)` so the reducer stays a pure
  * function and the test surface (TimelineStreamReducerTest +
- * TimelineSyncLoopTest fixtures) keeps applying byte-equal. The Molecule
- * `@Composable present()` reads the scanned outputs via `collectAsState`,
- * so Phase 2's downstream composition (active runs banner, agent state,
- * A2UI surface registry) can join in the same derivation block without
- * restructuring the call site.
+ * TimelineSyncLoopTest fixtures) keeps applying byte-equal. This holder used
+ * to expose [state] through Molecule, but each cached conversation loop then
+ * owned a background Compose runtime. ANR traces showed those runtimes
+ * contending with the UI on the global Compose snapshot apply locks during
+ * chat/list scroll. The shadow holder is not UI and not authoritative, so it
+ * must not participate in Compose snapshot notification dispatch.
  *
  * ## Hydration seed (Phase 3a, letta-mobile-bmgro)
  *
@@ -68,12 +64,6 @@ import kotlinx.coroutines.flow.stateIn
  * first N events after every cold-start. Phase 3b will be the actual flip
  * of authoritative state to the holder; this bead only makes parity
  * observable.
- *
- * ## RecompositionMode
- *
- * `RecompositionMode.Immediate` because consumers typically run on
- * `Dispatchers.Main.immediate`, where `ContextClock` crashes for lack of
- * a `MonotonicFrameClock`. Same gotcha `ConfigListViewModel` documents.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 internal class ConversationStateHolder(
@@ -112,14 +102,10 @@ internal class ConversationStateHolder(
         }
         .stateIn(scope, SharingStarted.Eagerly, initialSeedOutput)
 
-    /**
-     * Reduced timeline state. Mirrors [reducerOutputs] but exposed as
-     * a Molecule-driven `StateFlow<Timeline>` so future Phase 2+ surfaces
-     * can compose with other Flows declaratively.
-     */
-    val state: StateFlow<Timeline> = scope.launchMolecule(mode = RecompositionMode.Immediate) {
-        present()
-    }
+    /** Reduced timeline state without involving Compose snapshot machinery. */
+    val state: StateFlow<Timeline> = reducerOutputs
+        .map { it.next }
+        .stateIn(scope, SharingStarted.Eagerly, initialSeedOutput.next)
 
     /**
      * Per-frame events emitted by the reducer. Drops the seed (whose
@@ -147,11 +133,4 @@ internal class ConversationStateHolder(
             }
             .launchIn(scope)
     }
-
-    @Composable
-    private fun present(): Timeline {
-        val output by reducerOutputs.collectAsState()
-        return output.next
-    }
-
 }

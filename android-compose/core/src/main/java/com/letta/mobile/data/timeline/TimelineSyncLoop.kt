@@ -155,13 +155,13 @@ class TimelineSyncLoop(
     // into the call event as soon as that event lands.
     private val pendingToolReturnsByCallId = LinkedHashMap<String, ToolReturnMessage>()
 
-    // letta-mobile-t0vha (oc8j Phase 2): shadow-run the Molecule
+    // letta-mobile-t0vha (oc8j Phase 2): shadow-run the
     // ConversationStateHolder alongside the imperative ingest path. Every
     // WS frame the imperative path processes is ALSO emitted into the
     // holder's frames flow; the holder maintains its own fold and exposes
-    // state/events/notifications via Molecule. Nothing here is authoritative
-    // yet — the holder's outputs are observed in telemetry (parity counter)
-    // so a later Phase 3 bead can flip the source of truth once trusted.
+    // state/events/notifications. Nothing here is authoritative yet — the
+    // holder's outputs are observed in telemetry (parity counter) so a later
+    // Phase 3 bead can flip the source of truth once trusted.
     // BUFFER_SIZE 64 mirrors the loop's _events buffer; tryEmit never drops
     // in normal load (production tops out at a handful of frames/s).
     //
@@ -175,7 +175,7 @@ class TimelineSyncLoop(
     // (letta-mobile-3dl85).
     private val holderFramesIn = MutableSharedFlow<LettaMessage>(extraBufferCapacity = 64)
     private val holderHydrationSeed = MutableStateFlow(Timeline(conversationId))
-    @Suppress("UnusedPrivateMember") // kept alive for its Molecule scope + parity observer below
+    @Suppress("UnusedPrivateMember") // kept alive for parity observer below
     private val holder = com.letta.mobile.data.timeline.experimental.ConversationStateHolder(
         conversationId = conversationId,
         scope = loopScope,
@@ -257,7 +257,7 @@ class TimelineSyncLoop(
                     diskRecords = diskRecords,
                 ).also { result ->
                     _state.value = result.timeline
-                    // letta-mobile-bmgro (oc8j Phase 3a): rebase the Molecule
+                    // letta-mobile-bmgro (oc8j Phase 3a): rebase the holder
                     // holder's fold onto the same post-hydrate Timeline so
                     // parity telemetry (matched=true) becomes informative.
                     // Re-emission restarts the holder's scan with empty
@@ -972,7 +972,7 @@ class TimelineSyncLoop(
             ingestNotificationDispatcher = ingestNotificationDispatcher,
         )
         // letta-mobile-t0vha (oc8j Phase 2): fan the same frame into the
-        // Molecule holder for shadow-run parity. tryEmit is non-suspending
+        // Shadow holder for parity. tryEmit is non-suspending
         // and never blocks the ingest path even under heavy fold; if the
         // 64-slot buffer ever fills the parity counter goes negative,
         // which is visible in Grafana as a holderParity miss.

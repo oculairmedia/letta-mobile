@@ -4,17 +4,22 @@ import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.timeline.DeliveryState
 import com.letta.mobile.data.timeline.MessageSource
+import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineEvent
 import com.letta.mobile.data.timeline.TimelineMessageType
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.timeline.TimelineSyncEvent
+import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Owns the long-lived timeline subscriptions and projection of timeline events
@@ -34,6 +39,7 @@ internal class ChatTimelineObserver(
     private val isFollowingDuplicateInitialMessageInFlight: () -> Boolean,
     private val clearFollowingDuplicateInitialMessageInFlight: () -> Unit,
     private val collapseCompletedRunsIfStreamingFinished: (previous: ChatUiState, next: ChatUiState) -> ChatUiState,
+    private val projectionDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     private var observerJob: Job? = null
     private var hydrateSignalJob: Job? = null
@@ -110,21 +116,18 @@ internal class ChatTimelineObserver(
 
             try {
                 flow.collect { timeline ->
-                    val live = timeline.events.mapNotNull { timelineEventToUiMessage(it) }
                     val prefix = olderPrefixFor(conversationId)
-                    val combined = combineOlderPrefix(prefix, live)
-                    val ui = combined.toImmutableList()
-                    val tailIsAssistant = timeline.events.lastOrNull().let {
-                        it is TimelineEvent.Confirmed && it.messageType == TimelineMessageType.ASSISTANT
+                    val projection = withContext(projectionDispatcher) {
+                        projectTimelineSnapshot(
+                            timeline = timeline,
+                            prefix = prefix,
+                        )
                     }
-                    val anyLettaServerLocalPending = timeline.events.any {
-                        it is TimelineEvent.Local &&
-                            it.deliveryState == DeliveryState.SENDING &&
-                            it.source != MessageSource.CLIENT_MODE_HARNESS
-                    }
+                    val ui = projection.ui
+                    val tailIsAssistant = projection.tailIsAssistant
+                    val anyLettaServerLocalPending = projection.anyLettaServerLocalPending
                     val clearLoading = ui.isNotEmpty()
-                    val anyConfirmed = ui.any { !it.isPending }
-                    val newHasMoreOlder = if (anyConfirmed) true else uiState.value.hasMoreOlderMessages
+                    val newHasMoreOlder = if (projection.anyConfirmed) true else uiState.value.hasMoreOlderMessages
 
                     if (isFollowingDuplicateInitialMessageInFlight() && tailIsAssistant) {
                         clearFollowingDuplicateInitialMessageInFlight()
@@ -203,4 +206,34 @@ internal class ChatTimelineObserver(
         for (m in live) if (seenIds.add(m.id)) combined.add(m)
         return combined
     }
+
+    private fun projectTimelineSnapshot(
+        timeline: Timeline,
+        prefix: List<UiMessage>,
+    ): TimelineProjection {
+        val live = timeline.events.mapNotNull { timelineEventToUiMessage(it) }
+        val combined = combineOlderPrefix(prefix, live)
+        val ui = combined.toImmutableList()
+        val tailIsAssistant = timeline.events.lastOrNull().let {
+            it is TimelineEvent.Confirmed && it.messageType == TimelineMessageType.ASSISTANT
+        }
+        val anyLettaServerLocalPending = timeline.events.any {
+            it is TimelineEvent.Local &&
+                it.deliveryState == DeliveryState.SENDING &&
+                it.source != MessageSource.CLIENT_MODE_HARNESS
+        }
+        return TimelineProjection(
+            ui = ui,
+            tailIsAssistant = tailIsAssistant,
+            anyLettaServerLocalPending = anyLettaServerLocalPending,
+            anyConfirmed = ui.any { !it.isPending },
+        )
+    }
+
+    private data class TimelineProjection(
+        val ui: ImmutableList<UiMessage>,
+        val tailIsAssistant: Boolean,
+        val anyLettaServerLocalPending: Boolean,
+        val anyConfirmed: Boolean,
+    )
 }
