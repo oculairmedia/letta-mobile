@@ -505,6 +505,41 @@ class TimelineSyncLoopTest {
     }
 
     @Test
+    fun `submitStreamEvent folds ambient SSE frames through serialized gateway`() = runTest {
+        val api = FakeSyncApi()
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
+        val sync = TimelineSyncLoop(api, "conv-gateway", scope)
+
+        sync.submitStreamEvent(
+            AssistantMessage(
+                id = "gateway-assistant",
+                contentRaw = JsonPrimitive("Hello "),
+                otid = "gateway-otid",
+            )
+        )
+        sync.submitStreamEvent(
+            AssistantMessage(
+                id = "gateway-assistant",
+                contentRaw = JsonPrimitive("world"),
+            )
+        )
+
+        assertEquals(
+            "submitted frames should not mutate state until the gateway worker runs",
+            0,
+            sync.state.value.events.size,
+        )
+
+        advanceUntilIdle()
+
+        val assistant = sync.state.value.events.single() as TimelineEvent.Confirmed
+        assertEquals("gateway-otid", assistant.otid)
+        assertEquals("Hello world", assistant.content)
+        scope.coroutineContext.job.cancel()
+    }
+
+    @Test
     fun `external run reconcile collapses client mode local turns before SSE replay`() = runBlocking {
         val runId = "run-client-mode-replay"
         val api = FakeSyncApi()

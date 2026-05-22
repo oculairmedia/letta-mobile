@@ -139,6 +139,13 @@ class TimelineSyncLoop(
     // Serialize all mutations so append/replace logic is safe under concurrency.
     private val writeMutex = Mutex()
 
+    // Queue of incoming timeline events. This is the first Linearizing Event
+    // Gateway slice: ambient resume-stream frames are submitted here and folded
+    // by one worker coroutine instead of mutating state from the transport
+    // callback. Locally initiated send streams remain direct for now so the
+    // send -> stream -> markSent -> reconcile ordering stays unchanged.
+    private val eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED)
+
     // Queue of outgoing sends. Letta API returns 409 Conflict for concurrent
     // requests on the same conversation, so we must serialize client-side.
     private val sendQueue = Channel<PendingSend>(Channel.UNLIMITED)
@@ -205,13 +212,19 @@ class TimelineSyncLoop(
     private val seenRunIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     init {
+        loopScope.launch { processEventQueue() }
         loopScope.launch { processSendQueue() }
         loopScope.launch { runStreamSubscriber() }
     }
 
     fun close() {
+        eventQueue.close(CancellationException("TimelineSyncLoop closed"))
         sendQueue.close(CancellationException("TimelineSyncLoop closed"))
         loopJob.cancel(CancellationException("TimelineSyncLoop closed"))
+    }
+
+    private sealed interface TimelineGatewayEvent {
+        data class StreamMessage(val message: LettaMessage) : TimelineGatewayEvent
     }
 
     private data class PendingSend(
@@ -541,6 +554,15 @@ class TimelineSyncLoop(
             } else it
         })
         sendQueue.send(PendingSend(otid, existing.content, existing.attachments))
+    }
+
+    /** Background worker: serializes inbound transport events before mutation. */
+    private suspend fun processEventQueue() {
+        for (event in eventQueue) {
+            when (event) {
+                is TimelineGatewayEvent.StreamMessage -> applyStreamEvent(event.message)
+            }
+        }
     }
 
     /** Background worker: processes one send at a time from the queue. */
@@ -946,7 +968,7 @@ class TimelineSyncLoop(
             loopScope = loopScope,
             streamSilenceTimeoutMs = streamSilenceTimeoutMs,
             reconcileForExternalRun = ::reconcileForExternalRun,
-            ingestStreamEvent = ::ingestStreamEvent,
+            ingestStreamEvent = ::submitStreamEvent,
             setStreamActive = ::setStreamSubscriberActive,
         )
     }
@@ -961,7 +983,15 @@ class TimelineSyncLoop(
         )
     }
 
+    internal suspend fun submitStreamEvent(message: LettaMessage) {
+        eventQueue.send(TimelineGatewayEvent.StreamMessage(message))
+    }
+
     internal suspend fun ingestStreamEvent(message: LettaMessage) {
+        applyStreamEvent(message)
+    }
+
+    private suspend fun applyStreamEvent(message: LettaMessage) {
         ingestStreamEvent(
             message = message,
             writeMutex = writeMutex,
@@ -980,7 +1010,7 @@ class TimelineSyncLoop(
         Telemetry.event(
             "TimelineSync", "streamSubscriber.foldedViaHolder",
             "serverId" to (message.id),
-            "messageType" to (message.messageType ?: "?"),
+            "messageType" to message.messageType,
             "emitted" to emitted,
             "holderEventCount" to holder.state.value.events.size,
             "loopEventCount" to _state.value.events.size,
