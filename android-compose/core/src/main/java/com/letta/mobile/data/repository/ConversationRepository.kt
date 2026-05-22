@@ -20,19 +20,19 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class ConversationRepository @Inject constructor(
+internal fun defaultConversationRepositoryScope(): CoroutineScope =
+    CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+open class ConversationRepository(
     private val conversationApi: ConversationApi,
     private val agentRepository: IAgentRepository,
     private val conversationDao: ConversationDao,
+    private val repositoryScope: CoroutineScope = defaultConversationRepositoryScope(),
 ) : IConversationRepository {
     private val _conversationsByAgent = MutableStateFlow<Map<String, List<Conversation>>>(emptyMap())
     private val refreshMutex = Mutex()
     private val lastRefreshAtMillisByAgent = mutableMapOf<String, Long>()
-    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     init {
         repositoryScope.launch {
