@@ -6,8 +6,10 @@ import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.local.ConversationEntity
 import com.letta.mobile.data.local.ConversationRefreshEntity
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.Archive
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.testutil.FakeAgentApi
+import com.letta.mobile.testutil.FakeArchiveApi
 import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.TestData
@@ -40,6 +42,7 @@ class SessionManagerTest {
                 FakeAgentDao(),
                 FakeConversationApi(),
                 FakeConversationDao(),
+                FakeArchiveApi(),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
@@ -69,6 +72,7 @@ class SessionManagerTest {
                 FakeAgentDao(),
                 FakeConversationApi(),
                 FakeConversationDao(),
+                FakeArchiveApi(),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
@@ -106,6 +110,7 @@ class SessionManagerTest {
                 FakeAgentDao(),
                 fakeConversationApi,
                 FakeConversationDao(),
+                FakeArchiveApi(),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
@@ -125,6 +130,45 @@ class SessionManagerTest {
         advanceUntilIdle()
 
         assertEquals(listOf("conv-b"), proxy.getCachedConversations("agent-1").map { it.id })
+    }
+
+    @Test
+    fun `archive repository proxy switches caches to rebuilt graph`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val fakeArchiveApi = FakeArchiveApi().apply {
+            archives = mutableListOf(Archive(id = "archive-a", name = "Backend A"))
+        }
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val sessionManager = SessionManager(
+            settingsRepository = settingsRepository,
+            sessionGraphFactory = SessionGraphFactory(
+                FakeAgentApi(),
+                FakeAgentDao(),
+                FakeConversationApi(),
+                FakeConversationDao(),
+                fakeArchiveApi,
+            ),
+            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        val proxy = SessionScopedArchiveRepository(
+            sessionManager = sessionManager,
+            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+
+        proxy.refreshArchives()
+        advanceUntilIdle()
+        assertEquals(listOf("archive-a"), proxy.archives.value.map { it.id })
+
+        fakeArchiveApi.archives = mutableListOf(Archive(id = "archive-b", name = "Backend B"))
+        settingsRepository.activeConfigState.value = config("backend-b")
+        advanceUntilIdle()
+
+        assertEquals(emptyList<String>(), proxy.archives.value.map { it.id })
+
+        proxy.refreshArchives()
+        advanceUntilIdle()
+
+        assertEquals(listOf("archive-b"), proxy.archives.value.map { it.id })
     }
 
     private fun config(id: String): LettaConfig = LettaConfig(
