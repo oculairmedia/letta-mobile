@@ -1,6 +1,5 @@
 package com.letta.mobile.data.model
 
-import androidx.room.TypeConverter
 import kotlinx.serialization.Serializable
 
 /**
@@ -8,16 +7,15 @@ import kotlinx.serialization.Serializable
  *
  * Each ID type is a zero-overhead wrapper around [String] that prevents
  * accidental interchange between different ID domains (e.g., passing an
- * [AgentId] where a [ConversationId] is expected). At runtime these are
- * represented as plain Strings with no allocation overhead.
+ * [AgentId] where a [ProjectId] is expected). At runtime these are represented
+ * as plain Strings with no allocation overhead.
  *
- * Serialization: each value class carries [@Serializable] so kotlinx.serialization
- * treats it as its underlying [String] type transparently. [@SerialName]
- * annotations on parent data class properties continue to work unchanged.
+ * Serialization: each value class carries [Serializable] so kotlinx.serialization
+ * treats it as its underlying [String] type transparently. SerialName annotations
+ * on parent data class properties continue to work unchanged.
  *
- * Room: [DomainIdConverters] provides bidirectional [TypeConverter]s for
- * all ID types so Room DAOs can store them as TEXT columns without additional
- * migration steps.
+ * Room integration lives in :core, keeping this module free of AndroidX and
+ * persistence-framework dependencies.
  *
  * See: letta-mobile-925m.1
  */
@@ -52,32 +50,4 @@ value class ToolId(val value: String) {
 @Serializable
 value class BlockId(val value: String) {
     override fun toString(): String = value
-}
-
-// ─── Room TypeConverters ──────────────────────────────────────────────────
-
-class DomainIdConverters {
-    @TypeConverter
-    fun agentIdToString(id: AgentId): String = id.value
-
-    @TypeConverter
-    fun stringToAgentId(value: String): AgentId = AgentId(value)
-
-    @TypeConverter
-    fun projectIdToString(id: ProjectId): String = id.value
-
-    @TypeConverter
-    fun stringToProjectId(value: String): ProjectId = ProjectId(value)
-
-    @TypeConverter
-    fun toolIdToString(id: ToolId): String = id.value
-
-    @TypeConverter
-    fun stringToToolId(value: String): ToolId = ToolId(value)
-
-    @TypeConverter
-    fun blockIdToString(id: BlockId): String = id.value
-
-    @TypeConverter
-    fun stringToBlockId(value: String): BlockId = BlockId(value)
 }
