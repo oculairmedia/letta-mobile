@@ -52,13 +52,13 @@ class SessionScopedPassageRepository internal constructor(
         flow.asStateFlow()
     }
 
-    override suspend fun refreshPassages(agentId: String) = current.refreshPassages(agentId)
+    override suspend fun refreshPassages(agentId: String) = sessionManager.withCurrentSession { it.passageRepository.refreshPassages(agentId) }
 
-    override suspend fun createPassage(agentId: String, text: String): Passage = current.createPassage(agentId, text)
+    override suspend fun createPassage(agentId: String, text: String): Passage = sessionManager.withCurrentSession { it.passageRepository.createPassage(agentId, text) }
 
     override suspend fun deletePassage(agentId: String, passageId: String) =
-        current.deletePassage(agentId, passageId)
+        sessionManager.withCurrentSession { it.passageRepository.deletePassage(agentId, passageId) }
 
     override suspend fun searchArchival(agentId: String, query: String): List<Passage> =
-        current.searchArchival(agentId, query)
+        sessionManager.withCurrentSession { it.passageRepository.searchArchival(agentId, query) }
 }

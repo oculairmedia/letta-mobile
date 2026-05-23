@@ -60,15 +60,15 @@ class SessionScopedAllConversationsRepository internal constructor(
         summarySearch: String?,
     ): Flow<PagingData<Conversation>> = current.getConversationsPaged(agentId, archiveStatus, summarySearch)
 
-    override suspend fun loadNextPage() = current.loadNextPage()
-    override suspend fun refresh() = current.refresh()
+    override suspend fun loadNextPage() = sessionManager.withCurrentSession { it.allConversationsRepository.loadNextPage() }
+    override suspend fun refresh() = sessionManager.withCurrentSession { it.allConversationsRepository.refresh() }
     override fun hasFreshConversations(maxAgeMs: Long): Boolean = current.hasFreshConversations(maxAgeMs)
-    override suspend fun refreshIfStale(maxAgeMs: Long): Boolean = current.refreshIfStale(maxAgeMs)
+    override suspend fun refreshIfStale(maxAgeMs: Long): Boolean = sessionManager.withCurrentSession { it.allConversationsRepository.refreshIfStale(maxAgeMs) }
     override fun handleOptimisticUpdate(conversation: Conversation) = current.handleOptimisticUpdate(conversation)
     override fun handleOptimisticDelete(conversationId: String) = current.handleOptimisticDelete(conversationId)
     override fun loadedCountEstimate(): ConversationCountEstimate? = current.loadedCountEstimate()
 
     @Deprecated("Use loadedCountEstimate() and render approximate/unknown states explicitly.")
     @Suppress("DEPRECATION")
-    override suspend fun countConversations(): Int = current.countConversations()
+    override suspend fun countConversations(): Int = sessionManager.withCurrentSession { it.allConversationsRepository.countConversations() }
 }

@@ -19,7 +19,7 @@ class SessionScopedCronRepository @Inject constructor(
     override fun schedulesFlow(agentId: String): Flow<List<CronTask>> =
         sessionManager.currentGraph.flatMapLatest { it.cronRepository.schedulesFlow(agentId) }
 
-    override suspend fun refresh(agentId: String): Result<List<CronTask>> = current.refresh(agentId)
-    override suspend fun addSchedule(params: CronAddParams): Result<CronTask> = current.addSchedule(params)
-    override suspend fun deleteSchedule(agentId: String, taskId: String): Result<Unit> = current.deleteSchedule(agentId, taskId)
+    override suspend fun refresh(agentId: String): Result<List<CronTask>> = sessionManager.withCurrentSession { it.cronRepository.refresh(agentId) }
+    override suspend fun addSchedule(params: CronAddParams): Result<CronTask> = sessionManager.withCurrentSession { it.cronRepository.addSchedule(params) }
+    override suspend fun deleteSchedule(agentId: String, taskId: String): Result<Unit> = sessionManager.withCurrentSession { it.cronRepository.deleteSchedule(agentId, taskId) }
 }

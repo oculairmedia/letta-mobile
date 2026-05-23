@@ -53,7 +53,7 @@ class SessionScopedChannelTransport internal constructor(
         get() = sessionManager.current.channelTransport
 
     override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) =
-        current.connect(baseShimUrl, token, deviceId, clientVersion)
+        sessionManager.withCurrentSession { it.channelTransport.connect(baseShimUrl, token, deviceId, clientVersion) }
 
     override fun send(
         agentId: String,
@@ -65,14 +65,14 @@ class SessionScopedChannelTransport internal constructor(
 
     override fun cancel(): Boolean = current.cancel()
     override fun bye(): Boolean = current.bye()
-    override suspend fun disconnect() = current.disconnect()
+    override suspend fun disconnect() = sessionManager.withCurrentSession { it.channelTransport.disconnect() }
     override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult = current.sendA2uiAction(action)
 
     override suspend fun sendCronList(
         agentId: String?,
         conversationId: String?,
         timeoutMs: Long,
-    ): ServerFrame.CronListResponse = current.sendCronList(agentId, conversationId, timeoutMs)
+    ): ServerFrame.CronListResponse = sessionManager.withCurrentSession { it.channelTransport.sendCronList(agentId, conversationId, timeoutMs) }
 
     override suspend fun sendCronAdd(
         agentId: String,
@@ -86,16 +86,16 @@ class SessionScopedChannelTransport internal constructor(
         timezone: String?,
         conversationId: String?,
         timeoutMs: Long,
-    ): ServerFrame.CronAddResponse = current.sendCronAdd(
+    ): ServerFrame.CronAddResponse = sessionManager.withCurrentSession { it.channelTransport.sendCronAdd(
         agentId, name, description, prompt, recurring, cron, every, at, timezone, conversationId, timeoutMs,
-    )
+    ) }
 
     override suspend fun sendCronGet(taskId: String, timeoutMs: Long): ServerFrame.CronGetResponse =
-        current.sendCronGet(taskId, timeoutMs)
+        sessionManager.withCurrentSession { it.channelTransport.sendCronGet(taskId, timeoutMs) }
 
     override suspend fun sendCronDelete(taskId: String, timeoutMs: Long): ServerFrame.CronDeleteResponse =
-        current.sendCronDelete(taskId, timeoutMs)
+        sessionManager.withCurrentSession { it.channelTransport.sendCronDelete(taskId, timeoutMs) }
 
     override suspend fun sendCronDeleteAll(agentId: String, timeoutMs: Long): ServerFrame.CronDeleteAllResponse =
-        current.sendCronDeleteAll(agentId, timeoutMs)
+        sessionManager.withCurrentSession { it.channelTransport.sendCronDeleteAll(agentId, timeoutMs) }
 }

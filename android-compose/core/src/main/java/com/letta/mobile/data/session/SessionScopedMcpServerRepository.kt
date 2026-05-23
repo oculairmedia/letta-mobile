@@ -71,19 +71,19 @@ class SessionScopedMcpServerRepository internal constructor(
         flow.asStateFlow()
     }
 
-    override suspend fun refreshServers() = current.refreshServers()
-    override suspend fun refreshServerTools(serverId: String) = current.refreshServerTools(serverId)
+    override suspend fun refreshServers() = sessionManager.withCurrentSession { it.mcpServerRepository.refreshServers() }
+    override suspend fun refreshServerTools(serverId: String) = sessionManager.withCurrentSession { it.mcpServerRepository.refreshServerTools(serverId) }
     override suspend fun resyncServerTools(serverId: String): McpServerResyncResult =
-        current.resyncServerTools(serverId)
+        sessionManager.withCurrentSession { it.mcpServerRepository.resyncServerTools(serverId) }
 
     override suspend fun runServerTool(
         serverId: String,
         toolId: String,
         params: McpToolExecuteParams,
-    ): McpToolExecutionResult = current.runServerTool(serverId, toolId, params)
+    ): McpToolExecutionResult = sessionManager.withCurrentSession { it.mcpServerRepository.runServerTool(serverId, toolId, params) }
 
-    override suspend fun fetchAllMcpTools(): List<Tool> = current.fetchAllMcpTools()
-    override suspend fun createServer(params: McpServerCreateParams): McpServer = current.createServer(params)
-    override suspend fun updateServer(id: String, params: McpServerUpdateParams): McpServer = current.updateServer(id, params)
-    override suspend fun deleteServer(id: String) = current.deleteServer(id)
+    override suspend fun fetchAllMcpTools(): List<Tool> = sessionManager.withCurrentSession { it.mcpServerRepository.fetchAllMcpTools() }
+    override suspend fun createServer(params: McpServerCreateParams): McpServer = sessionManager.withCurrentSession { it.mcpServerRepository.createServer(params) }
+    override suspend fun updateServer(id: String, params: McpServerUpdateParams): McpServer = sessionManager.withCurrentSession { it.mcpServerRepository.updateServer(id, params) }
+    override suspend fun deleteServer(id: String) = sessionManager.withCurrentSession { it.mcpServerRepository.deleteServer(id) }
 }

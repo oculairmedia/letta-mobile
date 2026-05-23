@@ -48,20 +48,20 @@ class SessionScopedStepRepository internal constructor(
     private val current: IStepRepository
         get() = sessionManager.current.stepRepository
 
-    override suspend fun refreshSteps(params: StepListParams) = current.refreshSteps(params)
+    override suspend fun refreshSteps(params: StepListParams) = sessionManager.withCurrentSession { it.stepRepository.refreshSteps(params) }
 
-    override suspend fun listSteps(params: StepListParams): List<Step> = current.listSteps(params)
+    override suspend fun listSteps(params: StepListParams): List<Step> = sessionManager.withCurrentSession { it.stepRepository.listSteps(params) }
 
-    override suspend fun getStep(stepId: String): Step = current.getStep(stepId)
+    override suspend fun getStep(stepId: String): Step = sessionManager.withCurrentSession { it.stepRepository.getStep(stepId) }
 
-    override suspend fun getStepMetrics(stepId: String): StepMetrics = current.getStepMetrics(stepId)
+    override suspend fun getStepMetrics(stepId: String): StepMetrics = sessionManager.withCurrentSession { it.stepRepository.getStepMetrics(stepId) }
 
-    override suspend fun getStepTrace(stepId: String): ProviderTrace? = current.getStepTrace(stepId)
+    override suspend fun getStepTrace(stepId: String): ProviderTrace? = sessionManager.withCurrentSession { it.stepRepository.getStepTrace(stepId) }
 
-    override suspend fun getStepMessages(stepId: String): List<LettaMessage> = current.getStepMessages(stepId)
+    override suspend fun getStepMessages(stepId: String): List<LettaMessage> = sessionManager.withCurrentSession { it.stepRepository.getStepMessages(stepId) }
 
     override suspend fun updateStepFeedback(stepId: String, params: StepFeedbackUpdateParams): Step =
-        current.updateStepFeedback(stepId, params)
+        sessionManager.withCurrentSession { it.stepRepository.updateStepFeedback(stepId, params) }
 
     override fun upsertStep(step: Step) = current.upsertStep(step)
 }

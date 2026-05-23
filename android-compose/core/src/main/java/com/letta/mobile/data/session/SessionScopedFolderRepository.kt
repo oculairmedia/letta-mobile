@@ -49,21 +49,21 @@ class SessionScopedFolderRepository internal constructor(
     private val current: IFolderRepository
         get() = sessionManager.current.folderRepository
 
-    override suspend fun refreshFolders(name: String?) = current.refreshFolders(name)
+    override suspend fun refreshFolders(name: String?) = sessionManager.withCurrentSession { it.folderRepository.refreshFolders(name) }
 
-    override suspend fun countFolders(): Int = current.countFolders()
+    override suspend fun countFolders(): Int = sessionManager.withCurrentSession { it.folderRepository.countFolders() }
 
-    override suspend fun getFolder(folderId: String): Folder = current.getFolder(folderId)
+    override suspend fun getFolder(folderId: String): Folder = sessionManager.withCurrentSession { it.folderRepository.getFolder(folderId) }
 
     override suspend fun getFolderMetadata(includeDetailedPerSourceMetadata: Boolean): OrganizationSourcesStats =
-        current.getFolderMetadata(includeDetailedPerSourceMetadata)
+        sessionManager.withCurrentSession { it.folderRepository.getFolderMetadata(includeDetailedPerSourceMetadata) }
 
-    override suspend fun createFolder(params: FolderCreateParams): Folder = current.createFolder(params)
+    override suspend fun createFolder(params: FolderCreateParams): Folder = sessionManager.withCurrentSession { it.folderRepository.createFolder(params) }
 
     override suspend fun updateFolder(folderId: String, params: FolderUpdateParams): Folder =
-        current.updateFolder(folderId, params)
+        sessionManager.withCurrentSession { it.folderRepository.updateFolder(folderId, params) }
 
-    override suspend fun deleteFolder(folderId: String) = current.deleteFolder(folderId)
+    override suspend fun deleteFolder(folderId: String) = sessionManager.withCurrentSession { it.folderRepository.deleteFolder(folderId) }
 
     override suspend fun uploadFileToFolder(
         folderId: String,
@@ -72,24 +72,24 @@ class SessionScopedFolderRepository internal constructor(
         duplicateHandling: String?,
         customName: String?,
         contentType: ContentType,
-    ): FileMetadata = current.uploadFileToFolder(
+    ): FileMetadata = sessionManager.withCurrentSession { it.folderRepository.uploadFileToFolder(
         folderId = folderId,
         fileName = fileName,
         fileBytes = fileBytes,
         duplicateHandling = duplicateHandling,
         customName = customName,
         contentType = contentType,
-    )
+    ) }
 
     override suspend fun listAgentsForFolder(folderId: String): List<String> =
-        current.listAgentsForFolder(folderId)
+        sessionManager.withCurrentSession { it.folderRepository.listAgentsForFolder(folderId) }
 
     override suspend fun listFolderPassages(folderId: String): List<Passage> =
-        current.listFolderPassages(folderId)
+        sessionManager.withCurrentSession { it.folderRepository.listFolderPassages(folderId) }
 
     override suspend fun listFolderFiles(folderId: String, includeContent: Boolean): List<FileMetadata> =
-        current.listFolderFiles(folderId, includeContent)
+        sessionManager.withCurrentSession { it.folderRepository.listFolderFiles(folderId, includeContent) }
 
     override suspend fun deleteFileFromFolder(folderId: String, fileId: String) =
-        current.deleteFileFromFolder(folderId, fileId)
+        sessionManager.withCurrentSession { it.folderRepository.deleteFileFromFolder(folderId, fileId) }
 }

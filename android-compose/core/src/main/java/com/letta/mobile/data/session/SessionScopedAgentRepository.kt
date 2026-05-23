@@ -54,11 +54,11 @@ class SessionScopedAgentRepository internal constructor(
     private val current: IAgentRepository
         get() = sessionManager.current.agentRepository
 
-    override suspend fun countAgents(): Int = current.countAgents()
+    override suspend fun countAgents(): Int = sessionManager.withCurrentSession { it.agentRepository.countAgents() }
 
-    override suspend fun refreshAgents() = current.refreshAgents()
+    override suspend fun refreshAgents() = sessionManager.withCurrentSession { it.agentRepository.refreshAgents() }
 
-    override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = current.refreshAgentsIfStale(maxAgeMs)
+    override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = sessionManager.withCurrentSession { it.agentRepository.refreshAgentsIfStale(maxAgeMs) }
 
     override fun getCachedAgent(id: String): Agent? = current.getCachedAgent(id)
 
@@ -66,18 +66,18 @@ class SessionScopedAgentRepository internal constructor(
         sessionManager.currentGraph.flatMapLatest { it.agentRepository.getAgent(id) }
 
     override suspend fun getContextWindow(agentId: String, conversationId: String?): ContextWindowOverview =
-        current.getContextWindow(agentId, conversationId)
+        sessionManager.withCurrentSession { it.agentRepository.getContextWindow(agentId, conversationId) }
 
     override suspend fun checkpointAndRestoreConfig(agentId: String, operation: suspend () -> Unit) =
         current.checkpointAndRestoreConfig(agentId, operation)
 
-    override suspend fun createAgent(params: AgentCreateParams): Agent = current.createAgent(params)
+    override suspend fun createAgent(params: AgentCreateParams): Agent = sessionManager.withCurrentSession { it.agentRepository.createAgent(params) }
 
-    override suspend fun updateAgent(id: String, params: AgentUpdateParams): Agent = current.updateAgent(id, params)
+    override suspend fun updateAgent(id: String, params: AgentUpdateParams): Agent = sessionManager.withCurrentSession { it.agentRepository.updateAgent(id, params) }
 
-    override suspend fun deleteAgent(id: String) = current.deleteAgent(id)
+    override suspend fun deleteAgent(id: String) = sessionManager.withCurrentSession { it.agentRepository.deleteAgent(id) }
 
-    override suspend fun exportAgent(id: String): String = current.exportAgent(id)
+    override suspend fun exportAgent(id: String): String = sessionManager.withCurrentSession { it.agentRepository.exportAgent(id) }
 
     override suspend fun importAgent(
         fileName: String,
@@ -86,16 +86,16 @@ class SessionScopedAgentRepository internal constructor(
         overrideExistingTools: Boolean?,
         projectId: String?,
         stripMessages: Boolean?,
-    ): ImportedAgentsResponse = current.importAgent(
+    ): ImportedAgentsResponse = sessionManager.withCurrentSession { it.agentRepository.importAgent(
         fileName = fileName,
         fileBytes = fileBytes,
         overrideName = overrideName,
         overrideExistingTools = overrideExistingTools,
         projectId = projectId,
         stripMessages = stripMessages,
-    )
+    ) }
 
-    override suspend fun attachArchive(agentId: String, archiveId: String) = current.attachArchive(agentId, archiveId)
+    override suspend fun attachArchive(agentId: String, archiveId: String) = sessionManager.withCurrentSession { it.agentRepository.attachArchive(agentId, archiveId) }
 
-    override suspend fun detachArchive(agentId: String, archiveId: String) = current.detachArchive(agentId, archiveId)
+    override suspend fun detachArchive(agentId: String, archiveId: String) = sessionManager.withCurrentSession { it.agentRepository.detachArchive(agentId, archiveId) }
 }
