@@ -58,6 +58,29 @@ git push --force-with-lease
 
 Do not `git merge origin/main` into your feature branch — see hard rules above.
 
+## Development Environment & Platform Paths
+
+When running compilation, test execution, or deployment commands, you must configure the environment paths according to the operating system you are running on:
+
+### Windows Environments (PowerShell)
+Explicitly configure the environment variables in your shell session before running Gradle:
+```powershell
+$env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
+$env:ANDROID_HOME="$env:USERPROFILE\AppData\Local\Android\Sdk"
+./gradlew :app:compileRootDebugKotlin
+./gradlew :app:testRootDebugUnitTest
+```
+
+### Linux / macOS Environments (Bash)
+Use standard Bash syntax to prefix the build command with the required paths if they are not already in your environment:
+```bash
+# Set if not globally available:
+export JAVA_HOME="/usr/lib/jvm/default-java"  # Or your local JDK path
+export ANDROID_HOME="$HOME/Android/Sdk"
+./gradlew :app:compileRootDebugKotlin
+./gradlew :app:testRootDebugUnitTest
+```
+
 ## Non-Interactive Shell Commands
 
 **ALWAYS use non-interactive flags** with file operations to avoid hanging on confirmation prompts.
