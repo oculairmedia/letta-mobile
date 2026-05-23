@@ -13,7 +13,6 @@ import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.BugReportRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.SettingsRepository
-import com.letta.mobile.data.repository.VibesyncEventStreamRepository
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.repository.api.IArchiveRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -21,6 +20,7 @@ import com.letta.mobile.data.repository.api.IBlockRepository
 import com.letta.mobile.data.repository.api.IBugReportRepository
 import com.letta.mobile.data.repository.api.IConversationInspectorMessageRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
+import com.letta.mobile.data.repository.api.ICronRepository
 import com.letta.mobile.data.repository.api.IFolderRepository
 import com.letta.mobile.data.repository.api.IGroupRepository
 import com.letta.mobile.data.repository.api.IIdentityRepository
@@ -41,7 +41,9 @@ import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
 import com.letta.mobile.data.session.SessionScopedAgentRepository
 import com.letta.mobile.data.session.SessionScopedAllConversationsRepository
 import com.letta.mobile.data.session.SessionScopedArchiveRepository
+import com.letta.mobile.data.session.SessionScopedChannelTransport
 import com.letta.mobile.data.session.SessionScopedConversationRepository
+import com.letta.mobile.data.session.SessionScopedCronRepository
 import com.letta.mobile.data.session.SessionScopedFolderRepository
 import com.letta.mobile.data.session.SessionScopedGroupRepository
 import com.letta.mobile.data.session.SessionScopedIdentityRepository
@@ -56,10 +58,10 @@ import com.letta.mobile.data.session.SessionScopedRunRepository
 import com.letta.mobile.data.session.SessionScopedScheduleRepository
 import com.letta.mobile.data.session.SessionScopedStepRepository
 import com.letta.mobile.data.session.SessionScopedToolRepository
+import com.letta.mobile.data.session.SessionScopedVibesyncEventStreamRepository
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.timeline.api.TimelineClientModeWriter
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
-import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.feature.chat.ChatClientVersionProvider
 import com.letta.mobile.platform.storage.AndroidAppPrivateStorageRootProvider
@@ -91,7 +93,11 @@ abstract class AppModule {
 
     @Binds
     @Singleton
-    abstract fun bindChannelTransport(impl: ChannelTransport): IChannelTransport
+    abstract fun bindChannelTransport(impl: SessionScopedChannelTransport): IChannelTransport
+
+    @Binds
+    @Singleton
+    abstract fun bindCronRepository(impl: SessionScopedCronRepository): ICronRepository
 
     @Binds
     @Singleton
@@ -126,7 +132,7 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindVibesyncEventStreamRepository(
-        impl: VibesyncEventStreamRepository,
+        impl: SessionScopedVibesyncEventStreamRepository,
     ): IVibesyncEventStreamRepository
 
     @Binds
