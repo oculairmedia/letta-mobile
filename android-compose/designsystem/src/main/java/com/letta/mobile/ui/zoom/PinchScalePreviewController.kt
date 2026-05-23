@@ -13,6 +13,12 @@ class PinchScalePreviewController(
     private val maxScale: Float,
     private val step: Float,
 ) {
+    init {
+        require(minScale.isValidFiniteScale() && minScale > 0f) { "minScale must be finite and greater than 0" }
+        require(maxScale.isValidFiniteScale() && maxScale >= minScale) { "maxScale must be finite and greater than or equal to minScale" }
+        require(step.isValidFiniteScale() && step > 0f) { "step must be finite and greater than 0" }
+    }
+
     var isPinching by mutableStateOf(false)
         private set
 
@@ -64,3 +70,5 @@ class PinchScalePreviewController(
     private fun snap(value: Float): Float = (round(value.coerceIn(minScale, maxScale) / step) * step)
         .coerceIn(minScale, maxScale)
 }
+
+private fun Float.isValidFiniteScale(): Boolean = !isNaN() && !isInfinite()

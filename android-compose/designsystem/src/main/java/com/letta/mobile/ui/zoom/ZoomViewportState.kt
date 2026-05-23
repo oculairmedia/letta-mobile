@@ -14,6 +14,12 @@ class ZoomViewportState(
     private val maxScale: Float = 4f,
     initialScale: Float = minScale,
 ) {
+    init {
+        require(minScale.isValidFiniteScale() && minScale > 0f) { "minScale must be finite and greater than 0" }
+        require(maxScale.isValidFiniteScale() && maxScale >= minScale) { "maxScale must be finite and greater than or equal to minScale" }
+        require(initialScale.isValidFiniteScale()) { "initialScale must be finite" }
+    }
+
     var scale by mutableFloatStateOf(initialScale.coerceIn(minScale, maxScale))
         private set
 
@@ -54,3 +60,5 @@ class ZoomViewportState(
         const val MIN_SCALE_EPSILON = 0.01f
     }
 }
+
+private fun Float.isValidFiniteScale(): Boolean = !isNaN() && !isInfinite()

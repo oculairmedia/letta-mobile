@@ -3,6 +3,7 @@ package com.letta.mobile.ui.zoom
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class ZoomViewportStateTest {
@@ -31,5 +32,18 @@ class ZoomViewportStateTest {
 
         assertEquals(1f, state.scale, 0.001f)
         assertEquals(Offset.Zero, state.pan)
+    }
+
+    @Test
+    fun `constructor rejects invalid scale bounds`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            ZoomViewportState(minScale = 0f)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            ZoomViewportState(minScale = 2f, maxScale = 1f)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            ZoomViewportState(initialScale = Float.NaN)
+        }
     }
 }
