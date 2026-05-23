@@ -32,7 +32,9 @@ import androidx.compose.ui.focus.FocusManager
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -41,6 +43,7 @@ import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.letta.mobile.feature.chat.AgentChatRoute
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.isExpandedWidth
 import kotlin.reflect.KClass
@@ -93,6 +96,8 @@ private fun LettaNavigationRail(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val focusManager = LocalFocusManager.current
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     val visibleDestinations = visibleTopLevelDestinations()
 
     NavigationRail(
@@ -107,6 +112,7 @@ private fun LettaNavigationRail(
             NavigationRailItem(
                 selected = selected,
                 onClick = {
+                    HapticEffects.segmentTick(haptic, view, enabled = !selected)
                     navController.navigateTopLevel(destination, focusManager)
                 },
                 icon = {
@@ -134,6 +140,8 @@ private fun LettaBottomBar(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val focusManager = LocalFocusManager.current
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     val visibleDestinations = visibleTopLevelDestinations()
 
     Surface(
@@ -160,6 +168,11 @@ private fun LettaBottomBar(
                     label = destination.label,
                     selected = destination.isSelected(currentDestination),
                     onClick = {
+                        HapticEffects.segmentTick(
+                            haptic = haptic,
+                            view = view,
+                            enabled = !destination.isSelected(currentDestination),
+                        )
                         navController.navigateTopLevel(destination, focusManager)
                     },
                 )

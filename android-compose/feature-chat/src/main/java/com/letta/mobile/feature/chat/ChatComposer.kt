@@ -32,6 +32,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -42,6 +44,7 @@ import com.letta.mobile.data.model.Tool
 import com.letta.mobile.ui.components.LettaInputBar
 import com.letta.mobile.ui.components.ToolAffordanceRow
 import com.letta.mobile.ui.components.audio.HoldToDictateButton
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.feature.chat.voice.VoiceInputUiState
 import com.letta.mobile.feature.chat.voice.VoiceInputViewModel
@@ -80,6 +83,8 @@ internal fun ChatComposer(
 ) {
     val hasSendableContent = inputText.isNotBlank() || pendingAttachments.isNotEmpty()
     val canSend = !isStreaming && canSendMessages && hasSendableContent
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
 
     // letta-mobile-xtwt: defer to the IME's own Send action while the soft
     // keyboard is open and there's nothing in flight. The composer's trailing
@@ -180,7 +185,10 @@ internal fun ChatComposer(
                 Surface(
                     modifier = Modifier
                         .size(ChatComposerAttachButtonSize)
-                        .clickable(onClick = onAttachImage),
+                        .clickable {
+                            HapticEffects.contextClick(haptic, view)
+                            onAttachImage()
+                        },
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -210,6 +218,8 @@ private fun AttachmentStrip(
     attachments: ImmutableList<MessageContentPart.Image>,
     onRemove: (Int) -> Unit,
 ) {
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     LazyRow(
         modifier = Modifier
             .fillMaxWidth()
@@ -223,7 +233,10 @@ private fun AttachmentStrip(
             val index = attachments.indexOf(img)
             AttachmentThumbnail(
                 image = img,
-                onRemove = { onRemove(index) },
+                onRemove = {
+                    HapticEffects.segmentTick(haptic, view)
+                    onRemove(index)
+                },
             )
         }
     }

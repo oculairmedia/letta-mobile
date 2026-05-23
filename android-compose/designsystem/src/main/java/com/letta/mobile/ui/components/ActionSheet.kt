@@ -27,7 +27,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIconSizing
 
 
@@ -90,6 +93,8 @@ fun ActionSheetItem(
     enabled: Boolean = true,
     supportingText: String? = null,
 ) {
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     val tint = when {
         !enabled -> MaterialTheme.colorScheme.onSurfaceVariant
         destructive -> MaterialTheme.colorScheme.error
@@ -140,7 +145,14 @@ fun ActionSheetItem(
                 interactionSource = interactionSource,
                 indication = LocalIndication.current,
                 enabled = enabled,
-                onClick = onClick,
+                onClick = {
+                    if (destructive) {
+                        HapticEffects.reject(haptic, view)
+                    } else {
+                        HapticEffects.contextClick(haptic, view)
+                    }
+                    onClick()
+                },
             ),
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         )

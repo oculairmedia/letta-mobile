@@ -70,9 +70,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -108,6 +108,7 @@ import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.highlightSearchMatches
 import com.letta.mobile.ui.components.rememberSearchHighlightColors
 import com.letta.mobile.ui.components.searchResultSnippet
+import com.letta.mobile.ui.haptics.HapticEffects
 
 import com.letta.mobile.util.ConnectivityMonitor
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -189,6 +190,7 @@ internal fun AgentScaffoldContent(
     val projectBindings = viewModel.projectBindings
     val pinnedAgentIds by viewModel.pinnedAgentIds.collectAsStateWithLifecycle()
     val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     var chatMode by rememberSaveable { mutableStateOf("interactive") }
     val drawerConversationRepo = conversationRepository
         ?: hiltViewModel<ConversationPickerViewModel>().conversationRepository
@@ -322,14 +324,15 @@ internal fun AgentScaffoldContent(
                                     .fillMaxWidth()
                                     .testTag(AgentScaffoldTestTags.CONVERSATION_PICKER_TRIGGER)
                                     .combinedClickable(
-                                        onClick = {
-                                            viewModel.refreshAvailableAgents()
-                                            showAgentSwitcher = true
-                                        },
-                                        onLongClick = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            viewModel.toggleCurrentAgentPinned()
-                                        },
+                        onClick = {
+                            HapticEffects.contextClick(haptic, view)
+                            viewModel.refreshAvailableAgents()
+                            showAgentSwitcher = true
+                        },
+                        onLongClick = {
+                            HapticEffects.longPress(haptic)
+                            viewModel.toggleCurrentAgentPinned()
+                        },
                                     )
                                     .padding(end = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -394,6 +397,7 @@ internal fun AgentScaffoldContent(
                             )
                         }
                         IconButton(onClick = {
+                            HapticEffects.contextClick(haptic, view)
                             projectBindings.refreshContextWindow()
                             scope.launch {
                                 drawerState.open()
@@ -408,7 +412,10 @@ internal fun AgentScaffoldContent(
             floatingActionButton = {
                 if (projectContext != null) {
                     FloatingActionButton(
-                        onClick = { showBugReportSheet = true },
+                        onClick = {
+                            HapticEffects.contextClick(haptic, view)
+                            showBugReportSheet = true
+                        },
                         modifier = Modifier.testTag(AgentScaffoldTestTags.PROJECT_BUG_FAB),
                     ) {
                         Icon(LettaIcons.Error, contentDescription = stringResource(R.string.screen_project_bug_report_open))

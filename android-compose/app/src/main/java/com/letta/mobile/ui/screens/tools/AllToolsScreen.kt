@@ -44,6 +44,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -57,6 +59,7 @@ import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.ShimmerGrid
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -69,6 +72,8 @@ fun AllToolsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showCreateDialog by remember { mutableStateOf(false) }
     var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
@@ -127,7 +132,10 @@ fun AllToolsScreen(
                         item {
                             FilterChip(
                                 selected = selectedToolTags.isEmpty(),
-                                onClick = { viewModel.clearTags() },
+                                onClick = {
+                                    HapticEffects.segmentTick(haptic, view, enabled = selectedToolTags.isNotEmpty())
+                                    viewModel.clearTags()
+                                },
                                 label = { Text(stringResource(R.string.screen_tools_filter_all)) },
                             )
                         }
@@ -135,7 +143,10 @@ fun AllToolsScreen(
                             val tag = allToolTags[index]
                             FilterChip(
                                 selected = tag in selectedToolTags,
-                                onClick = { viewModel.toggleTag(tag) },
+                                onClick = {
+                                    HapticEffects.segmentTick(haptic, view)
+                                    viewModel.toggleTag(tag)
+                                },
                                 label = { Text(tag) },
                             )
                         }
@@ -157,7 +168,10 @@ fun AllToolsScreen(
                 }
                 PullToRefreshBox(
                     isRefreshing = false,
-                    onRefresh = { viewModel.loadTools() },
+                    onRefresh = {
+                        HapticEffects.confirm(haptic, view)
+                        viewModel.loadTools()
+                    },
                     modifier = Modifier.padding(paddingValues).fillMaxSize(),
                 ) {
                     if (filteredTools.isEmpty()) {

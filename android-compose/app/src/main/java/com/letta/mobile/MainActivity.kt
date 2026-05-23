@@ -37,6 +37,7 @@ import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.navigation.compose.rememberNavController
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.SnackbarDispatcher
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.navigation.AdaptiveScaffold
 import com.letta.mobile.ui.navigation.AppNavGraph
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
@@ -67,6 +68,8 @@ class MainActivity : ComponentActivity() {
             val windowSizeClass = calculateWindowSizeClass(this@MainActivity)
             val snackbarDispatcher = remember { SnackbarDispatcher() }
             val snackbarHostState = remember { SnackbarHostState() }
+            val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+            val view = androidx.compose.ui.platform.LocalView.current
             val appTheme by settingsRepository.getTheme().collectAsStateWithLifecycle(initialValue = AppTheme.SYSTEM)
             val themePreset by settingsRepository.getThemePreset().collectAsStateWithLifecycle(initialValue = ThemePreset.DEFAULT)
             val dynamicColor by settingsRepository.getDynamicColor().collectAsStateWithLifecycle(initialValue = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
@@ -81,6 +84,7 @@ class MainActivity : ComponentActivity() {
 
             LaunchedEffect(Unit) {
                 snackbarDispatcher.messages.collect { message ->
+                    HapticEffects.reject(haptic, view)
                     val result = snackbarHostState.showSnackbar(
                         message = message.message,
                         actionLabel = message.actionLabel,
@@ -98,6 +102,7 @@ class MainActivity : ComponentActivity() {
             val lastCrash by crashReporter.lastCrash.collectAsStateWithLifecycle()
             LaunchedEffect(lastCrash) {
                 val crash = lastCrash ?: return@LaunchedEffect
+                HapticEffects.reject(haptic, view)
                 val label = if (crash.sentryEventId != null) "Copy id" else "Details"
                 val summary = "App crashed last run (${crash.type.substringAfterLast('.')}). Tap to copy."
                 val result = snackbarHostState.showSnackbar(

@@ -15,6 +15,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.feature.chat.R
@@ -22,6 +24,7 @@ import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.components.TextInputDialog
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.theme.chatTypography
 
 @Composable
@@ -104,6 +107,8 @@ internal fun ApprovalActionRow(
 ) {
     var showRejectDialog by remember { mutableStateOf(false) }
     val toolCallIds = remember(approval) { approval.toolCalls.map { it.toolCallId } }
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
 
     TextInputDialog(
         show = showRejectDialog,
@@ -113,6 +118,7 @@ internal fun ApprovalActionRow(
         dismissText = stringResource(R.string.action_cancel),
         onConfirm = { reason ->
             showRejectDialog = false
+            HapticEffects.reject(haptic, view)
             onDecision?.invoke(approval.requestId, toolCallIds, false, reason)
         },
         onDismiss = { showRejectDialog = false },
@@ -124,13 +130,17 @@ internal fun ApprovalActionRow(
 
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(
-            onClick = { showRejectDialog = true },
+            onClick = {
+                HapticEffects.contextClick(haptic, view)
+                showRejectDialog = true
+            },
             enabled = !isSubmitting && onDecision != null,
         ) {
             Text(stringResource(R.string.screen_chat_approval_reject_action))
         }
         androidx.compose.material3.Button(
             onClick = {
+                HapticEffects.confirm(haptic, view)
                 onDecision?.invoke(approval.requestId, toolCallIds, true, null)
             },
             enabled = !isSubmitting && onDecision != null,

@@ -33,6 +33,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -46,6 +48,7 @@ import com.letta.mobile.bot.skills.BotSkillActivationRule
 import com.letta.mobile.ui.components.Accordions
 import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.LettaSearchBar
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import java.time.LocalDate
 
@@ -164,7 +167,7 @@ internal fun GeneralSection(vm: BotConfigEditViewModel) {
                 headlineContent = { Text("Enabled") },
                 supportingContent = { Text("Include this config when bot service starts") },
                 trailingContent = {
-                    Switch(checked = vm.enabled, onCheckedChange = { vm.enabled = it })
+                    HapticSwitch(checked = vm.enabled, onCheckedChange = { vm.enabled = it })
                 },
             )
         }
@@ -313,7 +316,7 @@ internal fun HeartbeatSection(vm: BotConfigEditViewModel) {
                 headlineContent = { Text("Heartbeat Enabled") },
                 supportingContent = { Text("Periodically check in with agent") },
                 trailingContent = {
-                    Switch(checked = vm.heartbeatEnabled, onCheckedChange = { vm.heartbeatEnabled = it })
+                    HapticSwitch(checked = vm.heartbeatEnabled, onCheckedChange = { vm.heartbeatEnabled = it })
                 },
             )
             if (vm.heartbeatEnabled) {
@@ -356,7 +359,7 @@ internal fun HeartbeatSection(vm: BotConfigEditViewModel) {
                     headlineContent = { Text("Requires Charging") },
                     supportingContent = { Text("Only fire when plugged in") },
                     trailingContent = {
-                        Switch(
+                        HapticSwitch(
                             checked = vm.heartbeatRequiresCharging,
                             onCheckedChange = { vm.heartbeatRequiresCharging = it },
                         )
@@ -366,7 +369,7 @@ internal fun HeartbeatSection(vm: BotConfigEditViewModel) {
                     headlineContent = { Text("Requires Wi-Fi") },
                     supportingContent = { Text("Only fire on unmetered connections") },
                     trailingContent = {
-                        Switch(
+                        HapticSwitch(
                             checked = vm.heartbeatRequiresUnmeteredNetwork,
                             onCheckedChange = { vm.heartbeatRequiresUnmeteredNetwork = it },
                         )
@@ -395,7 +398,7 @@ internal fun ApiServerSection(vm: BotConfigEditViewModel) {
                 headlineContent = { Text("API Server Enabled") },
                 supportingContent = { Text("Expose a local REST API on this device") },
                 trailingContent = {
-                    Switch(checked = vm.apiServerEnabled, onCheckedChange = { vm.apiServerEnabled = it })
+                    HapticSwitch(checked = vm.apiServerEnabled, onCheckedChange = { vm.apiServerEnabled = it })
                 },
             )
             if (vm.apiServerEnabled) {
@@ -496,7 +499,7 @@ internal fun ScheduledJobEditor(
             ) {
                 Text("Job", style = MaterialTheme.typography.labelMedium)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Switch(
+                    HapticSwitch(
                         checked = job.enabled,
                         onCheckedChange = { onUpdate(job.copy(enabled = it)) },
                     )
@@ -542,7 +545,7 @@ internal fun ScheduledJobEditor(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("Requires Charging", style = MaterialTheme.typography.bodySmall)
-                Switch(
+                HapticSwitch(
                     checked = job.requiresCharging,
                     onCheckedChange = { onUpdate(job.copy(requiresCharging = it)) },
                 )
@@ -553,7 +556,7 @@ internal fun ScheduledJobEditor(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("Requires Wi-Fi", style = MaterialTheme.typography.bodySmall)
-                Switch(
+                HapticSwitch(
                     checked = job.requiresUnmeteredNetwork,
                     onCheckedChange = { onUpdate(job.copy(requiresUnmeteredNetwork = it)) },
                 )
@@ -581,14 +584,14 @@ internal fun AdvancedSection(vm: BotConfigEditViewModel) {
                 headlineContent = { Text("Auto Start") },
                 supportingContent = { Text("Start bot when app launches") },
                 trailingContent = {
-                    Switch(checked = vm.autoStart, onCheckedChange = { vm.autoStart = it })
+                    HapticSwitch(checked = vm.autoStart, onCheckedChange = { vm.autoStart = it })
                 },
             )
             item(
                 headlineContent = { Text("Directives Enabled") },
                 supportingContent = { Text("Parse structured directives in responses") },
                 trailingContent = {
-                    Switch(checked = vm.directivesEnabled, onCheckedChange = { vm.directivesEnabled = it })
+                    HapticSwitch(checked = vm.directivesEnabled, onCheckedChange = { vm.directivesEnabled = it })
                 },
             )
             item(
@@ -744,4 +747,26 @@ internal fun SelectedSkillSummary(skill: BotSkill) {
             )
         }
     }
+}
+
+@Composable
+private fun HapticSwitch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+    Switch(
+        checked = checked,
+        modifier = modifier,
+        onCheckedChange = { isChecked ->
+            if (isChecked) {
+                HapticEffects.toggleOn(haptic, view)
+            } else {
+                HapticEffects.toggleOff(haptic, view)
+            }
+            onCheckedChange(isChecked)
+        },
+    )
 }

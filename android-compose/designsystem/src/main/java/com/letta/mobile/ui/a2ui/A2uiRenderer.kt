@@ -75,10 +75,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.painter.ColorPainter
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
@@ -103,6 +103,7 @@ import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.a2ui.LETTA_SCHEDULE_CARD_WIDGET_ID
 import com.letta.mobile.data.a2ui.LETTA_SCHEDULE_SELECTOR_WIDGET_ID
 import com.letta.mobile.data.a2ui.resolveA2uiActionContext
+import com.letta.mobile.ui.haptics.HapticEffects
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -548,6 +549,7 @@ private fun A2uiToolApprovalCard(
 
     val riskStyle = props.risk.style()
     val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     var result by remember(component.id, props.callId) { mutableStateOf<ToolApprovalResult?>(null) }
     var remainingSeconds by remember(component.id, props.callId, props.timeoutSeconds) {
         mutableStateOf(props.timeoutSeconds)
@@ -562,8 +564,10 @@ private fun A2uiToolApprovalCard(
             scope = affordance.scope,
         )
         result = next
-        if (props.risk == ToolApprovalRisk.Destructive || affordance == ToolApprovalAffordance.Deny) {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        if (affordance == ToolApprovalAffordance.Deny) {
+            HapticEffects.reject(haptic, view)
+        } else if (props.risk == ToolApprovalRisk.Destructive) {
+            HapticEffects.longPress(haptic)
         }
                 onAction(toolApprovalAction(surface, props.callId, next))
     }
@@ -929,8 +933,13 @@ private fun A2uiBooleanInput(
     val localChecked = rememberA2uiLocalBooleanState("value", boundChecked)
     val checked = if (path != null) boundChecked else localChecked.value
     val label = component.resolveControlLabel(surface, renderScope)
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
 
     fun update(next: Boolean) {
+        if (next != checked) {
+            if (next) HapticEffects.toggleOn(haptic, view) else HapticEffects.toggleOff(haptic, view)
+        }
         if (path != null) {
             surface.dataModel.applyPatch(path = path, value = JsonPrimitive(next))
         } else {
@@ -988,6 +997,8 @@ private fun A2uiRadio(
     val value = if (path != null) boundValue else localValue
     val label = component.resolveControlLabel(surface, renderScope)
     val options = component.resolveRadioOptions(surface, renderScope)
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
 
     if (options.isEmpty()) {
         A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
@@ -995,6 +1006,7 @@ private fun A2uiRadio(
     }
 
     fun update(next: String) {
+        if (next != value) HapticEffects.segmentTick(haptic, view)
         if (path != null) {
             surface.dataModel.applyPatch(path = path, value = JsonPrimitive(next))
         } else {
@@ -1061,6 +1073,8 @@ private fun A2uiChoicePicker(
         ?: if (explicitPath != null) literalDefault else localValue
     val label = component.resolveControlLabel(surface, renderScope)
     val options = component.resolveRadioOptions(surface, renderScope)
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
 
     if (options.isEmpty()) {
         A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
@@ -1068,6 +1082,7 @@ private fun A2uiChoicePicker(
     }
 
     fun update(next: String) {
+        if (next != value) HapticEffects.segmentTick(haptic, view)
         surface.dataModel.applyPatch(path = effectivePath, value = JsonPrimitive(next))
         if (explicitPath == null) {
             localValue = next
@@ -1155,6 +1170,8 @@ private fun A2uiDateTimeInput(
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var pendingDateMillis by remember { mutableStateOf(value.toDateMillis()) }
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     val datePickerState = rememberDatePickerState(initialSelectedDateMillis = value.toDateMillis())
     val initialTime = value.toLocalTime() ?: LocalTime.NOON
     val timePickerState = rememberTimePickerState(
@@ -1181,6 +1198,7 @@ private fun A2uiDateTimeInput(
                 .matchParentSize()
                 .zIndex(1f)
                 .clickable {
+                    HapticEffects.contextClick(haptic, view)
                     if (enableDate) {
                         showDatePicker = true
                     } else {
@@ -1204,6 +1222,7 @@ private fun A2uiDateTimeInput(
                         pendingDateMillis = datePickerState.selectedDateMillis ?: pendingDateMillis
                         showDatePicker = false
                         if (enableTime) {
+                            HapticEffects.contextClick(haptic, view)
                             showTimePicker = true
                         } else {
                             path?.let {
@@ -1212,6 +1231,7 @@ private fun A2uiDateTimeInput(
                                     value = JsonPrimitive(formatDateTime(pendingDateMillis, null, enableDate, false)),
                                 )
                             }
+                            HapticEffects.confirm(haptic, view)
                         }
                     },
                 ) {
@@ -1248,6 +1268,7 @@ private fun A2uiDateTimeInput(
                                 ),
                             )
                         }
+                        HapticEffects.confirm(haptic, view)
                     },
                 ) {
                     Text("OK")
@@ -1516,6 +1537,7 @@ private fun A2uiButton(
     val label = component.resolveButtonLabel(surface, renderScope)
     val action = component.action(surface, renderScope)
     val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     var inFlight by remember(surface.surfaceId, component.id) { mutableStateOf(false) }
 
     LaunchedEffect(inFlight) {
@@ -1551,7 +1573,7 @@ private fun A2uiButton(
                     "Button onClick: dispatching surfaceId=${surface.surfaceId} " +
                         "componentId=${component.id} event=${resolved.name}",
                 )
-                haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                HapticEffects.confirm(haptic, view)
                 inFlight = true
                 onPendingActionDelta(1)
                 onAction(resolved)
@@ -1969,9 +1991,16 @@ private fun A2uiChip(
         A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingText))
         return
     }
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
 
     AssistChip(
-        onClick = { action?.let(onAction) },
+        onClick = {
+            action?.let {
+                HapticEffects.contextClick(haptic, view)
+                onAction(it)
+            }
+        },
         enabled = action != null && !surfaceSubmitting,
         label = { Text(label) },
         modifier = modifier.testTag(A2uiTestTags.Chip),
@@ -1992,12 +2021,17 @@ private fun A2uiFilterChip(
     val localSelected = rememberA2uiLocalBooleanState("value", boundSelected)
     val selected = if (path != null) boundSelected else localSelected.value
     val label = component.resolveControlLabel(surface, renderScope)
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     if (label == null) {
         A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingText))
         return
     }
 
     fun update(next: Boolean) {
+        if (next != selected) {
+            if (next) HapticEffects.toggleOn(haptic, view) else HapticEffects.toggleOff(haptic, view)
+        }
         if (path != null) {
             surface.dataModel.applyPatch(path = path, value = JsonPrimitive(next))
         } else {
@@ -2057,6 +2091,8 @@ private fun A2uiTabs(
     val defaultIndex = component.defaultTabIndex(items)
     val selectedIndexState = rememberA2uiLocalIntState("selectedTabIndex", defaultIndex)
     val selectedIndex = selectedIndexState.value.coerceIn(0, items.lastIndex)
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
 
     Column(
         modifier = modifier
@@ -2068,7 +2104,10 @@ private fun A2uiTabs(
             items.forEachIndexed { index, item ->
                 Tab(
                     selected = selectedIndex == index,
-                    onClick = { selectedIndexState.value = index },
+                    onClick = {
+                        if (selectedIndex != index) HapticEffects.segmentTick(haptic, view)
+                        selectedIndexState.value = index
+                    },
                     text = { Text(item.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 )
             }
@@ -2197,8 +2236,11 @@ private fun A2uiDropdown(
     val selectedLabel = options.firstOrNull { it.key == value }?.label.orEmpty()
     val isError = validation != null && value.isNotBlank() && !value.matchesValidation(validation)
     var expanded by remember(component.id) { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
 
     fun update(next: String) {
+        if (next != value) HapticEffects.segmentTick(haptic, view)
         if (path != null) {
             surface.dataModel.applyPatch(path = path, value = JsonPrimitive(next))
         } else {
@@ -2209,7 +2251,12 @@ private fun A2uiDropdown(
 
     ExposedDropdownMenuBox(
         expanded = expanded,
-        onExpandedChange = { if (!surfaceSubmitting) expanded = it },
+        onExpandedChange = {
+            if (!surfaceSubmitting) {
+                if (it && !expanded) HapticEffects.contextClick(haptic, view)
+                expanded = it
+            }
+        },
         modifier = modifier.fillMaxWidth(),
     ) {
         OutlinedTextField(
@@ -2270,9 +2317,17 @@ private fun A2uiSlider(
     var localValue by remember(component.id) { mutableStateOf(boundValue) }
     val value = if (path != null) boundValue else localValue
     val label = component.resolveControlLabel(surface, renderScope)
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+    var dragStartValue by remember(component.id) { mutableStateOf<Double?>(null) }
+    var lastTickValue by remember(component.id) { mutableStateOf(range.coerce(value)) }
 
     fun update(next: Double) {
         val stepped = range.coerce(next)
+        if (stepped != lastTickValue) {
+            HapticEffects.segmentTick(haptic, view)
+            lastTickValue = stepped
+        }
         if (path != null) {
             surface.dataModel.applyPatch(path = path, value = stepped.numericJsonPrimitive(range.integralStep))
         } else {
@@ -2305,7 +2360,21 @@ private fun A2uiSlider(
         }
         Slider(
             value = range.coerce(value).toFloat(),
-            onValueChange = { update(it.toDouble()) },
+            onValueChange = {
+                if (dragStartValue == null) {
+                    val current = range.coerce(value)
+                    dragStartValue = current
+                    lastTickValue = current
+                }
+                update(it.toDouble())
+            },
+            onValueChangeFinished = {
+                val startedAt = dragStartValue
+                if (startedAt != null && lastTickValue != startedAt) {
+                    HapticEffects.confirm(haptic, view)
+                }
+                dragStartValue = null
+            },
             modifier = Modifier.testTag(A2uiTestTags.Slider),
             enabled = !surfaceSubmitting,
             valueRange = range.min.toFloat()..range.max.toFloat(),

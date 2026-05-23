@@ -36,6 +36,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -58,6 +60,7 @@ import androidx.compose.animation.core.EaseInOutCubic
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.draw.alpha
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.ui.theme.LettaChatTheme
@@ -103,6 +106,8 @@ internal fun ChatScreen(
         var floatingBannerMessage by remember { mutableStateOf("") }
         val snackbarDispatcher = LocalSnackbarDispatcher.current
         val density = LocalDensity.current
+        val haptic = LocalHapticFeedback.current
+        val view = LocalView.current
         val reducedMotion = rememberReducedMotionEnabled()
         val windowSizeClass = LocalWindowSizeClass.current
         val imeBottomPx = WindowInsets.ime.getBottom(density)
@@ -114,6 +119,7 @@ internal fun ChatScreen(
 
         LaunchedEffect(composerState.error) {
             val message = composerState.error ?: return@LaunchedEffect
+            HapticEffects.reject(haptic, view)
             floatingBannerMessage = message
             viewModel.clearComposerError()
         }

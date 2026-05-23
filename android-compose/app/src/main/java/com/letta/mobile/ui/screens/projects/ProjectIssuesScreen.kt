@@ -57,6 +57,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -77,6 +79,7 @@ import com.letta.mobile.ui.components.ExpandableTitleSearch
 import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.ShimmerBox
 import com.letta.mobile.ui.components.TextInputDialog
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.util.formatRelativeTime
@@ -105,6 +108,8 @@ fun ProjectIssuesScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbar = LocalSnackbarDispatcher.current
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
 
@@ -156,7 +161,10 @@ fun ProjectIssuesScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = viewModel::refresh) {
+                    IconButton(onClick = {
+                        HapticEffects.confirm(haptic, view)
+                        viewModel.refresh()
+                    }) {
                         Icon(LettaIcons.Refresh, stringResource(R.string.action_refresh))
                     }
                 },
@@ -204,7 +212,10 @@ fun ProjectIssuesScreen(
                 }
                 PullToRefreshBox(
                     isRefreshing = state.data.isRefreshing,
-                    onRefresh = viewModel::refresh,
+                    onRefresh = {
+                        HapticEffects.confirm(haptic, view)
+                        viewModel.refresh()
+                    },
                     modifier = Modifier
                         .padding(paddingValues)
                         .fillMaxSize(),

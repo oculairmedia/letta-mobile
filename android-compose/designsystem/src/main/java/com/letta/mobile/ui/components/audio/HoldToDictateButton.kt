@@ -28,8 +28,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.letta.mobile.ui.haptics.HapticEffects
 
 /**
  * letta-mobile-rl0d / letta-mobile-7w57: hold-to-talk affordance.
@@ -61,6 +64,8 @@ fun HoldToDictateButton(
 ) {
     var recordAudioPermissionGranted by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
 
     val recordAudioPermissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permissionGranted ->
@@ -99,6 +104,7 @@ fun HoldToDictateButton(
                         if (!enabledUpdated) return@awaitEachGesture
                         val startY = down.position.y
                         var cancelled = false
+                        HapticEffects.gestureThreshold(haptic, view)
                         onStartUpdated()
                         while (true) {
                             val event = awaitPointerEvent(PointerEventPass.Main)
@@ -109,11 +115,15 @@ fun HoldToDictateButton(
                                 val dy = change.position.y - startY
                                 if (dy < -cancelThresholdPx) {
                                     cancelled = true
+                                    HapticEffects.reject(haptic, view)
                                     onCancelUpdated()
                                 }
                             }
                         }
-                        if (!cancelled) onStopUpdated()
+                        if (!cancelled) {
+                            HapticEffects.confirm(haptic, view)
+                            onStopUpdated()
+                        }
                     }
                 }
                 .clip(CircleShape)
@@ -130,4 +140,3 @@ fun HoldToDictateButton(
         }
     }
 }
-

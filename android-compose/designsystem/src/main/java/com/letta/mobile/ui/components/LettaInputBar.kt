@@ -42,11 +42,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 
 /**
@@ -109,6 +110,7 @@ fun LettaInputBar(
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     val reducedMotion = rememberReducedMotionEnabled()
     val canSend = (canSendOverride ?: text.isNotBlank()) && enabled
     val actionButtonSize by animateDpAsState(
@@ -187,7 +189,7 @@ fun LettaInputBar(
             keyboardActions = KeyboardActions(
                 onSend = {
                     if (canSend) {
-                        haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                        HapticEffects.confirm(haptic, view)
                         onSend(text)
                     }
                 },
@@ -230,7 +232,7 @@ fun LettaInputBar(
             FilledIconButton(
                 onClick = {
                     if (canSend) {
-                        haptic.performHapticFeedback(HapticFeedbackType.Confirm)
+                        HapticEffects.confirm(haptic, view)
                         onSend(text)
                     }
                 },

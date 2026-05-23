@@ -10,6 +10,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -27,6 +29,7 @@ import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.components.TagDrillInDialog
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.tags.TagDrillInEntityType
 import com.letta.mobile.ui.tags.TagDrillInSource
@@ -199,7 +202,7 @@ private fun SettingsContent(
             item(
                 headlineContent = { Text(stringResource(R.string.common_parallel_tool_calls)) },
                 trailingContent = {
-                    Switch(
+                    HapticSwitch(
                         checked = state.parallelToolCalls,
                         onCheckedChange = onParallelToolCallsChange,
                     )
@@ -208,7 +211,7 @@ private fun SettingsContent(
             item(
                 headlineContent = { Text(stringResource(R.string.common_enable_sleeptime)) },
                 trailingContent = {
-                    Switch(
+                    HapticSwitch(
                         checked = state.enableSleeptime,
                         onCheckedChange = onSleeptimeChange,
                     )
@@ -423,7 +426,7 @@ internal fun ClientModeSettingsSection(
                         Text(stringResource(R.string.screen_settings_client_mode_enable_description))
                     },
                     tail = {
-                        Switch(
+                        HapticSwitch(
                             checked = state.clientModeEnabled,
                             onCheckedChange = onClientModeEnabledChange,
                         )
@@ -667,7 +670,7 @@ private fun CloneAgentDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Switch(checked = overrideExistingTools, onCheckedChange = { overrideExistingTools = it })
+                    HapticSwitch(checked = overrideExistingTools, onCheckedChange = { overrideExistingTools = it })
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -682,8 +685,32 @@ private fun CloneAgentDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Switch(checked = stripMessages, onCheckedChange = { stripMessages = it })
+                    HapticSwitch(checked = stripMessages, onCheckedChange = { stripMessages = it })
                 }
             }
         }
     }
+
+@Composable
+private fun HapticSwitch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+    Switch(
+        checked = checked,
+        enabled = enabled,
+        modifier = modifier,
+        onCheckedChange = { isChecked ->
+            if (isChecked) {
+                HapticEffects.toggleOn(haptic, view)
+            } else {
+                HapticEffects.toggleOff(haptic, view)
+            }
+            onCheckedChange(isChecked)
+        },
+    )
+}

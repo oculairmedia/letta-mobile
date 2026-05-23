@@ -52,8 +52,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -74,6 +74,7 @@ import com.letta.mobile.ui.components.LettaSearchBar
 import com.letta.mobile.ui.components.highlightSearchMatches
 import com.letta.mobile.ui.components.rememberSearchHighlightColors
 import com.letta.mobile.ui.components.searchResultSnippet
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.customColors
@@ -230,7 +231,7 @@ internal fun ConversationPickerSheet(
                                 }
                             },
                             onLongClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                HapticEffects.longPress(haptic)
                                 viewModel.toggleSelection(conversation.id)
                             },
                         )
@@ -285,6 +286,7 @@ internal fun AgentPickerSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     val filteredAgents = remember(agents, searchQuery) {
         if (searchQuery.isBlank()) {
             agents
@@ -365,10 +367,11 @@ internal fun AgentPickerSheet(
                                 .combinedClickable(
                                     enabled = !isDismissingForAction,
                                     onClick = {
+                                        HapticEffects.segmentTick(haptic, view, enabled = !isActive)
                                         dismissThen { onAgentSelected(agent) }
                                     },
                                     onLongClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        HapticEffects.longPress(haptic)
                                         onTogglePinned(agent)
                                     },
                                 ),
@@ -715,6 +718,8 @@ internal fun DrawerContent(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     Column(
         modifier = modifier
             .fillMaxHeight()
@@ -746,7 +751,10 @@ internal fun DrawerContent(
                 modifier = Modifier.weight(1f),
             )
             IconButton(
-                onClick = onEditAgent,
+                onClick = {
+                    HapticEffects.contextClick(haptic, view)
+                    onEditAgent()
+                },
                 modifier = Modifier.testTag(AgentScaffoldTestTags.DRAWER_EDIT_AGENT),
             ) {
                 Icon(
@@ -785,7 +793,10 @@ internal fun DrawerContent(
         Spacer(modifier = Modifier.height(16.dp))
         if (isClientModeEnabled) {
             AssistChip(
-                onClick = onOpenLocationPicker,
+                onClick = {
+                    HapticEffects.contextClick(haptic, view)
+                    onOpenLocationPicker()
+                },
                 leadingIcon = { Icon(LettaIcons.Storage, contentDescription = null) },
                 label = {
                     Text(
@@ -834,7 +845,10 @@ internal fun DrawerContent(
             chatModes.forEachIndexed { index, (mode, labelRes) ->
                 SegmentedButton(
                     selected = chatMode == mode,
-                    onClick = { onChatModeSelected(mode) },
+                    onClick = {
+                        HapticEffects.segmentTick(haptic, view, enabled = chatMode != mode)
+                        onChatModeSelected(mode)
+                    },
                     shape = SegmentedButtonDefaults.itemShape(index = index, count = chatModes.size),
                     modifier = Modifier.testTag(AgentScaffoldTestTags.drawerChatMode(mode)),
                     // letta-mobile: suppress SegmentedButton's default check
@@ -865,7 +879,10 @@ internal fun DrawerContent(
             icon = { Icon(LettaIcons.Add, contentDescription = null) },
             label = { Text(stringResource(R.string.screen_conversations_new_action)) },
             selected = currentConversationId == null,
-            onClick = onNewConversation,
+            onClick = {
+                HapticEffects.segmentTick(haptic, view)
+                onNewConversation()
+            },
             colors = drawerItemColors,
         )
         if (conversations.isEmpty()) {
@@ -901,7 +918,10 @@ internal fun DrawerContent(
                             },
                         )
                     },
-                    onClick = { onConversationSelected(conversation.id) },
+                    onClick = {
+                        HapticEffects.segmentTick(haptic, view, enabled = !isActive)
+                        onConversationSelected(conversation.id)
+                    },
                 )
             }
         }
@@ -917,7 +937,10 @@ internal fun DrawerContent(
             },
             label = { Text(stringResource(R.string.action_reset_messages)) },
             selected = false,
-            onClick = onResetMessages,
+            onClick = {
+                HapticEffects.reject(haptic, view)
+                onResetMessages()
+            },
             colors = drawerItemColors,
         )
 

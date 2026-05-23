@@ -26,12 +26,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.bot.config.BotConfig
 import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.EmptyState
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 
@@ -146,7 +149,7 @@ fun BotSettingsScreen(
                                 )
                             },
                             trailingContent = {
-                                Switch(
+                                HapticSwitch(
                                     checked = config.enabled,
                                     onCheckedChange = { viewModel.toggleConfigEnabled(config) },
                                 )
@@ -157,4 +160,26 @@ fun BotSettingsScreen(
             }
         }
     }
+}
+
+@Composable
+private fun HapticSwitch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+    Switch(
+        checked = checked,
+        modifier = modifier,
+        onCheckedChange = { isChecked ->
+            if (isChecked) {
+                HapticEffects.toggleOn(haptic, view)
+            } else {
+                HapticEffects.toggleOff(haptic, view)
+            }
+            onCheckedChange(isChecked)
+        },
+    )
 }

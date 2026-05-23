@@ -54,6 +54,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -72,6 +74,7 @@ import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.LatencyText
 import com.letta.mobile.ui.components.MarkdownText
 import com.letta.mobile.ui.components.TextInputDialog
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LocalChatFontScale
@@ -122,13 +125,25 @@ internal fun ChatMessageItem(
     val isUser = message.role == "user"
     val showAvatar = false
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     val copyLabel = stringResource(R.string.action_copy)
     val copyText = remember(message) { buildMessageCopyText(message) }
     var showMessageActions by remember { mutableStateOf(false) }
     val hasUserActions = isUser && onRerunMessage != null
     val onLongClick: (() -> Unit)? = when {
-        hasUserActions -> { { showMessageActions = true } }
-        copyText.isNotBlank() -> { { copyToClipboard(context, copyLabel, copyText) } }
+        hasUserActions -> {
+            {
+                HapticEffects.longPress(haptic)
+                showMessageActions = true
+            }
+        }
+        copyText.isNotBlank() -> {
+            {
+                HapticEffects.longPress(haptic)
+                copyToClipboard(context, copyLabel, copyText)
+            }
+        }
         else -> null
     }
 
@@ -143,6 +158,7 @@ internal fun ChatMessageItem(
                 icon = LettaIcons.Refresh,
                 onClick = {
                     showMessageActions = false
+                    HapticEffects.confirm(haptic, view)
                     onRerunMessage(message)
                 },
             )
@@ -153,6 +169,7 @@ internal fun ChatMessageItem(
                 icon = LettaIcons.Copy,
                 onClick = {
                     showMessageActions = false
+                    HapticEffects.contextClick(haptic, view)
                     copyToClipboard(context, copyLabel, copyText)
                 },
             )

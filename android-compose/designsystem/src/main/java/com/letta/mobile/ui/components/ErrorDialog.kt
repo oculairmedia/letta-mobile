@@ -6,9 +6,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import com.letta.mobile.designsystem.R
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 
 @Composable
@@ -19,6 +23,12 @@ fun ErrorDialog(
     title: String = stringResource(R.string.common_error),
     onRetry: (() -> Unit)? = null,
 ) {
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+    LaunchedEffect(message) {
+        HapticEffects.reject(haptic, view)
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         modifier = modifier,
@@ -33,7 +43,10 @@ fun ErrorDialog(
         text = { Text(text = message) },
         confirmButton = {
             if (onRetry != null) {
-                TextButton(onClick = onRetry) {
+                TextButton(onClick = {
+                    HapticEffects.contextClick(haptic, view)
+                    onRetry()
+                }) {
                     Text(stringResource(R.string.action_retry))
                 }
             }

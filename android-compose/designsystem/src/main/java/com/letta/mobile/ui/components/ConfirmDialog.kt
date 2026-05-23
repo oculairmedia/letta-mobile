@@ -6,6 +6,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
+import com.letta.mobile.ui.haptics.HapticEffects
 
 
 @Composable
@@ -20,13 +23,18 @@ fun ConfirmDialog(
     destructive: Boolean = false,
 ) {
     if (!show) return
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { Text(message) },
         confirmButton = {
-            TextButton(onClick = onConfirm) {
+            TextButton(onClick = {
+                HapticEffects.confirm(haptic, view)
+                onConfirm()
+            }) {
                 Text(
                     text = confirmText,
                     color = if (destructive) MaterialTheme.colorScheme.error else Color.Unspecified,
@@ -54,13 +62,18 @@ fun ConfirmDialog(
     content: @Composable () -> Unit,
 ) {
     if (!show) return
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = content,
         confirmButton = {
-            TextButton(onClick = onConfirm) {
+            TextButton(onClick = {
+                HapticEffects.confirm(haptic, view)
+                onConfirm()
+            }) {
                 Text(
                     text = confirmText,
                     color = if (destructive) MaterialTheme.colorScheme.error else Color.Unspecified,

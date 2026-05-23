@@ -49,8 +49,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -72,6 +72,7 @@ import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.components.ShimmerConversationList
 import com.letta.mobile.ui.components.ShimmerBox
 import com.letta.mobile.ui.components.TextInputDialog
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.theme.dialogSectionHeading
 import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.ui.theme.listItemMetadata
@@ -349,6 +350,8 @@ private fun ConversationsContent(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     if (conversations.isEmpty()) {
         EmptyState(
             icon = LettaIcons.ChatOutline,
@@ -362,7 +365,10 @@ private fun ConversationsContent(
         @OptIn(ExperimentalMaterial3Api::class)
         PullToRefreshBox(
             isRefreshing = isRefreshing,
-            onRefresh = onRefresh,
+            onRefresh = {
+                HapticEffects.confirm(haptic, view)
+                onRefresh()
+            },
             modifier = modifier.fillMaxSize(),
         ) {
             val sections = remember(conversations) {
@@ -421,6 +427,7 @@ private fun ConversationCard(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
 
     val title = conversation.summary?.takeIf { it.isNotBlank() } ?: "Conversation"
 
@@ -430,7 +437,7 @@ private fun ConversationCard(
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    HapticEffects.longPress(haptic)
                     showContextMenu = true
                 }
             ),
