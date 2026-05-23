@@ -44,6 +44,7 @@ class ChatPushServiceListenerTest {
         TimelineRepository(
             messageApi = mockk<MessageApi>(relaxed = true),
             pendingLocalStore = NoOpPendingLocalStore,
+            sessionManager = null,
         )
 
     private fun testListener(): IngestedMessageListener = object : IngestedMessageListener {
