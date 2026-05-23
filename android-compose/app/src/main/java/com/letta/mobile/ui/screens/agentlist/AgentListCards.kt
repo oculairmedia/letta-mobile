@@ -43,6 +43,10 @@ import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.navigation.agentAvatarSharedElementKey
 import com.letta.mobile.ui.navigation.optionalSharedElement
+import com.letta.mobile.ui.theme.LettaCornerRadius
+import com.letta.mobile.ui.theme.LettaElevation
+import com.letta.mobile.ui.theme.LettaSizing
+import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.ui.theme.listItemMetadata
 import com.letta.mobile.ui.theme.listItemSupporting
@@ -74,15 +78,15 @@ internal fun FavoriteAgentCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(horizontal = LettaSpacing.listItemHorizontal, vertical = LettaSpacing.listItemVertical),
+            horizontalArrangement = Arrangement.spacedBy(LettaSpacing.listItemVertical),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Surface(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(LettaSizing.prominentAvatar)
                     .optionalSharedElement(agentAvatarSharedElementKey(agent.id.value)),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(LettaCornerRadius.medium),
                 color = MaterialTheme.colorScheme.primaryContainer,
             ) {
                 Box(contentAlignment = Alignment.Center) {
@@ -90,14 +94,14 @@ internal fun FavoriteAgentCard(
                         imageVector = LettaIcons.Star,
                         contentDescription = "Favorite",
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(22.dp),
+                        modifier = Modifier.size(LettaIconSizing.ListAvatar),
                     )
                 }
             }
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(LettaSpacing.extraSmall),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -170,8 +174,8 @@ internal fun ShareContentPreviewCard(
         ),
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(LettaSpacing.innerPaddingSmall),
+            horizontalArrangement = Arrangement.spacedBy(LettaSpacing.iconGap),
             verticalAlignment = Alignment.Top,
         ) {
             Icon(
@@ -179,7 +183,7 @@ internal fun ShareContentPreviewCard(
                 contentDescription = null,
                 modifier = Modifier.size(LettaIconSizing.Toolbar),
             )
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(LettaSpacing.extraSmall)) {
                 Text(
                     text = "Pick an agent to send this content",
                     style = MaterialTheme.typography.labelLarge,
@@ -234,26 +238,26 @@ internal fun AgentCard(
                     null
                 },
             ),
-        shape = RoundedCornerShape(16.dp),
+            shape = LettaCardDefaults.prominentListShape,
         color = if (isFavorite) {
             MaterialTheme.colorScheme.primaryContainer
         } else {
             LettaCardDefaults.listContainerColor
         },
-        tonalElevation = 3.dp,
+        tonalElevation = LettaElevation.medium,
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(horizontal = LettaSpacing.listItemHorizontal, vertical = LettaSpacing.listItemVertical),
+            horizontalArrangement = Arrangement.spacedBy(LettaSpacing.listItemVertical),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Surface(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(LettaSizing.prominentAvatar)
                     .optionalSharedElement(agentAvatarSharedElementKey(agent.id.value)),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(LettaCornerRadius.medium),
                 color = if (isPinned) {
                     MaterialTheme.colorScheme.tertiaryContainer
                 } else {
@@ -269,14 +273,14 @@ internal fun AgentCard(
                         } else {
                             MaterialTheme.colorScheme.primary
                         },
-                        modifier = Modifier.size(22.dp),
+                        modifier = Modifier.size(LettaIconSizing.ListAvatar),
                     )
                 }
             }
 
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(LettaSpacing.extraSmall),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -300,7 +304,7 @@ internal fun AgentCard(
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.tertiary,
                             modifier = Modifier
-                                .padding(start = 6.dp)
+                                .padding(start = LettaSpacing.compact)
                                 .size(LettaIconSizing.Inline),
                         )
                     }
@@ -390,7 +394,7 @@ internal fun CompactAgentCard(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .height(108.dp)
+            .height(LettaSizing.compactAgentCardHeight)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = if (contextualActionsEnabled) {
@@ -402,26 +406,26 @@ internal fun CompactAgentCard(
                     null
                 },
             ),
-        shape = RoundedCornerShape(16.dp),
+        shape = LettaCardDefaults.prominentListShape,
         color = if (isFavorite) {
             MaterialTheme.colorScheme.primaryContainer
         } else {
             LettaCardDefaults.listContainerColor
         },
-        tonalElevation = 3.dp,
+        tonalElevation = LettaElevation.medium,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+                .padding(LettaSpacing.innerPaddingSmall),
+            verticalArrangement = Arrangement.spacedBy(LettaSpacing.compact),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     modifier = Modifier
-                        .size(30.dp)
+                        .size(LettaSizing.compactAvatar)
                         .optionalSharedElement(agentAvatarSharedElementKey(agent.id.value)),
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(LettaCornerRadius.listCompactAvatar),
                     color = if (isPinned) {
                         MaterialTheme.colorScheme.tertiaryContainer
                     } else {
@@ -437,7 +441,7 @@ internal fun CompactAgentCard(
                             } else {
                                 MaterialTheme.colorScheme.primary
                             },
-                            modifier = Modifier.size(18.dp),
+                            modifier = Modifier.size(LettaIconSizing.CompactAvatar),
                         )
                     }
                 }
@@ -456,7 +460,7 @@ internal fun CompactAgentCard(
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier
-                            .padding(start = if (isFavorite) 6.dp else 0.dp)
+                            .padding(start = if (isFavorite) LettaSpacing.compact else LettaSpacing.none)
                             .size(LettaIconSizing.Inline),
                     )
                 }
