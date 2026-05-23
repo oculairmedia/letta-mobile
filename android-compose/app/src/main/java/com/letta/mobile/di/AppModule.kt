@@ -13,7 +13,6 @@ import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.BugReportRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
-import com.letta.mobile.data.repository.ProjectRepository
 import com.letta.mobile.data.repository.ProjectWorkRepository
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.repository.VibesyncEventStreamRepository
@@ -52,6 +51,7 @@ import com.letta.mobile.data.session.SessionScopedMcpServerRepository
 import com.letta.mobile.data.session.SessionScopedModelRepository
 import com.letta.mobile.data.session.SessionScopedPassageRepository
 import com.letta.mobile.data.session.SessionScopedProviderRepository
+import com.letta.mobile.data.session.SessionScopedProjectRepository
 import com.letta.mobile.data.session.SessionScopedRunRepository
 import com.letta.mobile.data.session.SessionScopedScheduleRepository
 import com.letta.mobile.data.session.SessionScopedStepRepository
@@ -117,7 +117,7 @@ abstract class AppModule {
 
     @Binds
     @Singleton
-    abstract fun bindProjectRepository(impl: ProjectRepository): IProjectRepository
+    abstract fun bindProjectRepository(impl: SessionScopedProjectRepository): IProjectRepository
 
     @Binds
     @Singleton

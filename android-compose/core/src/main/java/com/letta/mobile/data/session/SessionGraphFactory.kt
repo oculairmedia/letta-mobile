@@ -10,6 +10,7 @@ import com.letta.mobile.data.api.JobApi
 import com.letta.mobile.data.api.McpServerApi
 import com.letta.mobile.data.api.ModelApi
 import com.letta.mobile.data.api.PassageApi
+import com.letta.mobile.data.api.ProjectApi
 import com.letta.mobile.data.api.ProviderApi
 import com.letta.mobile.data.api.RunApi
 import com.letta.mobile.data.api.ScheduleApi
@@ -27,6 +28,7 @@ import com.letta.mobile.data.repository.JobRepository
 import com.letta.mobile.data.repository.McpServerRepository
 import com.letta.mobile.data.repository.ModelRepository
 import com.letta.mobile.data.repository.PassageRepository
+import com.letta.mobile.data.repository.ProjectRepository
 import com.letta.mobile.data.repository.ProviderRepository
 import com.letta.mobile.data.repository.RunRepository
 import com.letta.mobile.data.repository.ScheduleRepository
@@ -52,6 +54,7 @@ class SessionGraphFactory @Inject constructor(
     private val mcpServerApi: McpServerApi,
     private val modelApi: ModelApi,
     private val passageApi: PassageApi,
+    private val projectApi: ProjectApi,
     private val runApi: RunApi,
     private val jobApi: JobApi,
     private val providerApi: ProviderApi,
@@ -85,6 +88,7 @@ class SessionGraphFactory @Inject constructor(
             mcpServerRepository = McpServerRepository(mcpServerApi),
             modelRepository = ModelRepository(modelApi),
             passageRepository = PassageRepository(passageApi),
+            projectRepository = ProjectRepository(projectApi),
             runRepository = RunRepository(runApi),
             jobRepository = JobRepository(jobApi),
             providerRepository = ProviderRepository(providerApi),

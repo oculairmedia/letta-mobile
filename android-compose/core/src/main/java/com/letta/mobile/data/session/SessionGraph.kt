@@ -10,6 +10,7 @@ import com.letta.mobile.data.repository.JobRepository
 import com.letta.mobile.data.repository.McpServerRepository
 import com.letta.mobile.data.repository.ModelRepository
 import com.letta.mobile.data.repository.PassageRepository
+import com.letta.mobile.data.repository.ProjectRepository
 import com.letta.mobile.data.repository.ProviderRepository
 import com.letta.mobile.data.repository.RunRepository
 import com.letta.mobile.data.repository.ScheduleRepository
@@ -29,6 +30,7 @@ class SessionGraph internal constructor(
     val mcpServerRepository: McpServerRepository,
     val modelRepository: ModelRepository,
     val passageRepository: PassageRepository,
+    val projectRepository: ProjectRepository,
     val runRepository: RunRepository,
     val jobRepository: JobRepository,
     val providerRepository: ProviderRepository,
