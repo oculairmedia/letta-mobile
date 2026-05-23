@@ -11,7 +11,6 @@ interface IProjectRepository {
     val projects: StateFlow<List<ProjectSummary>>
 
     suspend fun refreshProjects(): ProjectCatalog
-    fun clearCache()
     suspend fun getProject(identifier: String): ProjectSummary
     suspend fun getBeadsRemoteStatus(identifier: String): BeadsRemoteStatus
     suspend fun provisionBeadsRemote(identifier: String, push: Boolean = true): BeadsRemoteProvisionResponse

@@ -19,10 +19,8 @@ import kotlinx.coroutines.sync.withLock
 import java.time.Instant
 import java.net.URI
 import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class ProjectRepository @Inject constructor(
+open class ProjectRepository @Inject constructor(
     private val projectApi: ProjectApi,
 ) : IProjectRepository {
     private val _projects = MutableStateFlow<List<ProjectSummary>>(emptyList())
@@ -31,21 +29,8 @@ class ProjectRepository @Inject constructor(
     private val refreshMutex = Mutex()
     private var lastRefreshAtMillis: Long = 0L
 
-    override suspend fun refreshProjects(): ProjectCatalog = refreshMutex.withLock {
+    override open suspend fun refreshProjects(): ProjectCatalog = refreshMutex.withLock {
         refreshProjectsLocked()
-    }
-
-    /**
-     * letta-mobile-2ixd: drop the in-memory project cache. Called by
-     * CapabilityRepository when the active-backend probe says
-     * `/api/projects` isn't supported on the new server — otherwise the
-     * UI keeps showing the previous backend's project list (e.g.
-     * docling-api, gpt-researcher from a vanilla Letta session) on a
-     * shim that stubs the endpoint to `[]`.
-     */
-    override fun clearCache() {
-        _projects.value = emptyList()
-        lastRefreshAtMillis = 0L
     }
 
     private suspend fun refreshProjectsLocked(): ProjectCatalog {
@@ -55,7 +40,7 @@ class ProjectRepository @Inject constructor(
         return catalog
     }
 
-    override suspend fun getProject(identifier: String): ProjectSummary {
+    override open suspend fun getProject(identifier: String): ProjectSummary {
         val cached = _projects.value.firstOrNull { it.identifier == identifier }
         if (cached != null) return cached
 
@@ -71,16 +56,16 @@ class ProjectRepository @Inject constructor(
         return fresh
     }
 
-    override suspend fun getBeadsRemoteStatus(identifier: String): BeadsRemoteStatus =
+    override open suspend fun getBeadsRemoteStatus(identifier: String): BeadsRemoteStatus =
         projectApi.getBeadsRemoteStatus(identifier).sanitize()
 
-    override suspend fun provisionBeadsRemote(identifier: String, push: Boolean): BeadsRemoteProvisionResponse =
+    override open suspend fun provisionBeadsRemote(identifier: String, push: Boolean): BeadsRemoteProvisionResponse =
         projectApi.provisionBeadsRemote(identifier, push)
 
-    override suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse =
+    override open suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse =
         projectApi.triggerSync(identifier)
 
-    override suspend fun createProject(
+    override open suspend fun createProject(
         name: String?,
         filesystemPath: String,
         gitUrl: String?,
@@ -101,7 +86,7 @@ class ProjectRepository @Inject constructor(
         return created
     }
 
-    override suspend fun updateProject(
+    override open suspend fun updateProject(
         identifier: String,
         filesystemPath: String?,
         gitUrl: String?,
@@ -125,7 +110,7 @@ class ProjectRepository @Inject constructor(
         return updated
     }
 
-    override suspend fun archiveProject(identifier: String): ProjectSummary {
+    override open suspend fun archiveProject(identifier: String): ProjectSummary {
         val updated = projectApi.archiveProject(identifier).sanitize()
         _projects.update { current ->
             val index = current.indexOfFirst { it.identifier == updated.identifier }
@@ -139,17 +124,17 @@ class ProjectRepository @Inject constructor(
         return updated
     }
 
-    override suspend fun deleteProject(identifier: String) {
+    override open suspend fun deleteProject(identifier: String) {
         projectApi.deleteProject(identifier)
         _projects.update { current -> current.filterNot { it.identifier == identifier } }
         lastRefreshAtMillis = System.currentTimeMillis()
     }
 
-    override fun hasFreshProjects(maxAgeMs: Long): Boolean {
+    override open fun hasFreshProjects(maxAgeMs: Long): Boolean {
         return _projects.value.isNotEmpty() && System.currentTimeMillis() - lastRefreshAtMillis <= maxAgeMs
     }
 
-    override suspend fun refreshProjectsIfStale(maxAgeMs: Long): Boolean = refreshMutex.withLock {
+    override open suspend fun refreshProjectsIfStale(maxAgeMs: Long): Boolean = refreshMutex.withLock {
         if (hasFreshProjects(maxAgeMs)) return@withLock false
         refreshProjectsLocked()
         true

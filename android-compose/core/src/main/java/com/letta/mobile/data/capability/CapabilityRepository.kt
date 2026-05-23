@@ -1,7 +1,6 @@
 package com.letta.mobile.data.capability
 
 import com.letta.mobile.data.api.ProjectApi
-import com.letta.mobile.data.repository.ProjectRepository
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
@@ -42,16 +41,14 @@ internal fun defaultCapabilityScope(): CoroutineScope =
 class CapabilityRepository(
     private val settingsRepository: SettingsRepository,
     private val projectApi: ProjectApi,
-    private val projectRepository: ProjectRepository,
     private val scope: CoroutineScope,
 ) {
     /** Hilt-friendly constructor — uses [defaultCapabilityScope]. */
     @Inject
-    constructor(
-        settingsRepository: SettingsRepository,
-        projectApi: ProjectApi,
-        projectRepository: ProjectRepository,
-    ) : this(settingsRepository, projectApi, projectRepository, defaultCapabilityScope())
+        constructor(
+            settingsRepository: SettingsRepository,
+            projectApi: ProjectApi,
+        ) : this(settingsRepository, projectApi, defaultCapabilityScope())
 
     private val _projectsSupported = MutableStateFlow(true)
     val projectsSupported: StateFlow<Boolean> = _projectsSupported.asStateFlow()
@@ -89,12 +86,5 @@ class CapabilityRepository(
             "configId" to configId,
             "supported" to supported,
         )
-        if (!supported) {
-            // Drop any cache the user inherited from the previous backend so
-            // the projects list doesn't keep rendering stale data (e.g. the
-            // shim returning `200 []` would otherwise leave the prior Letta
-            // server's catalog visible until the next manual refresh).
-            projectRepository.clearCache()
-        }
     }
 }
