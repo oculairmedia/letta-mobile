@@ -1138,6 +1138,47 @@ class TimelineSyncLoopTest {
     }
 
     @Test
+    fun `recent reconcile appends fresh server message through gateway`() = runTest {
+        val api = FakeSyncApi()
+        api.addStoredMessage(
+            UserMessage(
+                id = "older-user",
+                contentRaw = JsonPrimitive("already hydrated"),
+                otid = "known-otid",
+                date = "2026-05-19T06:00:00Z",
+            )
+        )
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
+        val sync = TimelineSyncLoop(api, "conv-reconcile-gateway", scope)
+
+        sync.hydrate()
+        api.addStoredMessage(
+            UserMessage(
+                id = "fresh-user-no-otid",
+                contentRaw = JsonPrimitive("fresh server prompt"),
+                date = "2026-05-19T06:25:00Z",
+            )
+        )
+
+        val reconcile = async { sync.reconcileRecentMessages("open") }
+
+        assertEquals(
+            "reconcile should enqueue the snapshot before the gateway worker mutates state",
+            listOf("older-user"),
+            sync.state.value.events.filterIsInstance<TimelineEvent.Confirmed>().map { it.serverId },
+        )
+
+        advanceUntilIdle()
+        reconcile.await()
+
+        val confirmed = sync.state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
+        assertEquals(listOf("older-user", "fresh-user-no-otid"), confirmed.map { it.serverId })
+        assertEquals("fresh server prompt", confirmed.last().content)
+        scope.coroutineContext.job.cancel()
+    }
+
+    @Test
     fun `reconcile does not retry on 4xx permanent errors`() = runBlocking {
         // letta-mobile-j44j: 4xx responses (auth, validation) won't become
         // true on retry, so we fail fast to avoid wasting up to 1.4s of

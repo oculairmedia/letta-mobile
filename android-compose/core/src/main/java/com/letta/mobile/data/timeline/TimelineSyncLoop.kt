@@ -231,6 +231,19 @@ class TimelineSyncLoop(
             val sentAt: Instant,
             val ack: CompletableDeferred<Unit>,
         ) : TimelineGatewayEvent
+
+        data class ReconcileAfterSendSnapshot(
+            val otid: String,
+            val serverMessages: List<LettaMessage>,
+            val ack: CompletableDeferred<ReconcileAfterSendResult>,
+        ) : TimelineGatewayEvent
+
+        data class RecentMessagesSnapshot(
+            val serverMessages: List<LettaMessage>,
+            val telemetryName: String,
+            val telemetryAttrs: List<Pair<String, Any?>>,
+            val ack: CompletableDeferred<Int>,
+        ) : TimelineGatewayEvent
     }
 
     private data class PendingSend(
@@ -552,6 +565,8 @@ class TimelineSyncLoop(
             when (event) {
                 is TimelineGatewayEvent.StreamMessage -> applyStreamEvent(event.message)
                 is TimelineGatewayEvent.LocalSendAppend -> applyLocalSendAppend(event)
+                is TimelineGatewayEvent.ReconcileAfterSendSnapshot -> applyReconcileAfterSendSnapshot(event)
+                is TimelineGatewayEvent.RecentMessagesSnapshot -> applyRecentMessagesSnapshot(event)
             }
         }
     }
@@ -580,6 +595,40 @@ class TimelineSyncLoop(
             )
         }.fold(
             onSuccess = { event.ack.complete(Unit) },
+            onFailure = { event.ack.completeExceptionally(it) },
+        )
+    }
+
+    private suspend fun applyReconcileAfterSendSnapshot(
+        event: TimelineGatewayEvent.ReconcileAfterSendSnapshot,
+    ) {
+        runCatching {
+            applyReconcileAfterSendSnapshot(
+                otid = event.otid,
+                conversationId = conversationId,
+                serverMessages = event.serverMessages,
+                writeMutex = writeMutex,
+                state = _state,
+            )
+        }.fold(
+            onSuccess = { event.ack.complete(it) },
+            onFailure = { event.ack.completeExceptionally(it) },
+        )
+    }
+
+    private suspend fun applyRecentMessagesSnapshot(
+        event: TimelineGatewayEvent.RecentMessagesSnapshot,
+    ) {
+        runCatching {
+            writeMutex.withLock {
+                applyRecentMessagesSnapshotLocked(
+                    serverMessages = event.serverMessages,
+                    telemetryName = event.telemetryName,
+                    telemetryAttrs = event.telemetryAttrs.toTypedArray(),
+                )
+            }
+        }.fold(
+            onSuccess = { event.ack.complete(it) },
             onFailure = { event.ack.completeExceptionally(it) },
         )
     }
@@ -685,15 +734,44 @@ class TimelineSyncLoop(
      * event for the server-confirmed version, and pull in any missed events.
      */
     private suspend fun reconcileAfterSend(otid: String) {
-        reconcileAfterSend(
-            otid = otid,
-            conversationId = conversationId,
-            writeMutex = writeMutex,
-            state = _state,
-            events = _events,
-            pendingLocalStore = pendingLocalStore,
-            listMessagesWithRetry = ::listMessagesWithRetry,
+        val timer = Telemetry.startTimer("TimelineSync", "reconcile")
+        try {
+            val serverMessages = listMessagesWithRetry(otid).reversed()
+            val result = submitReconcileAfterSendSnapshot(
+                otid = otid,
+                serverMessages = serverMessages,
+            )
+            result.confirmedServerId?.let { serverId ->
+                _events.emit(TimelineSyncEvent.LocalConfirmed(otid, serverId))
+            }
+            if (result.shouldDeletePendingLocal) {
+                runCatching { pendingLocalStore.delete(otid) }
+            }
+            timer.stop(
+                "otid" to otid,
+                "serverCount" to serverMessages.size,
+                "confirmedLocal" to result.confirmedLocal,
+                "appendedMissing" to result.appendedMissing,
+            )
+        } catch (t: Throwable) {
+            timer.stopError(t, "otid" to otid)
+            _events.emit(TimelineSyncEvent.ReconcileError(t.message ?: "unknown"))
+        }
+    }
+
+    private suspend fun submitReconcileAfterSendSnapshot(
+        otid: String,
+        serverMessages: List<LettaMessage>,
+    ): ReconcileAfterSendResult {
+        val ack = CompletableDeferred<ReconcileAfterSendResult>()
+        eventQueue.send(
+            TimelineGatewayEvent.ReconcileAfterSendSnapshot(
+                otid = otid,
+                serverMessages = serverMessages,
+                ack = ack,
+            )
         )
+        return ack.await()
     }
 
     /**
@@ -747,21 +825,33 @@ class TimelineSyncLoop(
         externalConversationId: String,
         otid: String,
     ) {
-        reconcileAfterSend(
-            otid = otid,
-            conversationId = conversationId,
-            writeMutex = writeMutex,
-            state = _state,
-            events = _events,
-            pendingLocalStore = pendingLocalStore,
-            listMessagesWithRetry = {
-                listAgentMessagesWithRetry(
-                    agentId = agentId,
-                    externalConversationId = externalConversationId,
-                    otid = otid,
-                )
-            },
-        )
+        val timer = Telemetry.startTimer("TimelineSync", "reconcile")
+        try {
+            val serverMessages = listAgentMessagesWithRetry(
+                agentId = agentId,
+                externalConversationId = externalConversationId,
+                otid = otid,
+            ).reversed()
+            val result = submitReconcileAfterSendSnapshot(
+                otid = otid,
+                serverMessages = serverMessages,
+            )
+            result.confirmedServerId?.let { serverId ->
+                _events.emit(TimelineSyncEvent.LocalConfirmed(otid, serverId))
+            }
+            if (result.shouldDeletePendingLocal) {
+                runCatching { pendingLocalStore.delete(otid) }
+            }
+            timer.stop(
+                "otid" to otid,
+                "serverCount" to serverMessages.size,
+                "confirmedLocal" to result.confirmedLocal,
+                "appendedMissing" to result.appendedMissing,
+            )
+        } catch (t: Throwable) {
+            timer.stopError(t, "otid" to otid)
+            _events.emit(TimelineSyncEvent.ReconcileError(t.message ?: "unknown"))
+        }
     }
 
     private suspend fun reconcileRecentMessagesFromServer(
@@ -792,13 +882,16 @@ class TimelineSyncLoop(
                 limit = RECONCILE_LIMIT,
                 order = "desc",
             ).reversed()
-            writeMutex.withLock {
-                appended = applyRecentMessagesSnapshotLocked(
+            val ack = CompletableDeferred<Int>()
+            eventQueue.send(
+                TimelineGatewayEvent.RecentMessagesSnapshot(
                     serverMessages = serverMessages,
                     telemetryName = telemetryName,
-                    telemetryAttrs = telemetryAttrs,
+                    telemetryAttrs = telemetryAttrs.toList(),
+                    ack = ack,
                 )
-            }
+            )
+            appended = ack.await()
             timer.stop(
                 *telemetryAttrs,
                 "serverCount" to serverMessages.size,
