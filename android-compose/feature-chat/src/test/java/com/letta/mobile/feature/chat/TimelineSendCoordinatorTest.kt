@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat
 
+import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.timeline.TimelineRepository
@@ -58,6 +59,23 @@ class TimelineSendCoordinatorTest {
 
         assertEquals(1, harness.composerClearCount)
         coVerify(exactly = 1) { harness.timelineRepository.sendMessage("conv-1", "see image", listOf(image)) }
+    }
+
+    @Test
+    fun `stale existing conversation creates replacement and retries send`() = runTest {
+        val harness = Harness(scope = this, activeConversationId = "stale-conv")
+        coEvery { harness.conversationRepository.createConversation("agent-1", "hello") } returns
+            TestData.conversation(id = "replacement-conv", agentId = "agent-1")
+        coEvery { harness.timelineRepository.sendMessage("stale-conv", "hello") } throws
+            ApiException(404, "Conversation not found with id='stale-conv'")
+
+        harness.coordinator.send("hello")
+        advanceUntilIdle()
+
+        assertEquals("replacement-conv", harness.activeConversationId)
+        assertEquals(ConversationState.Ready("replacement-conv"), harness.uiState.value.conversationState)
+        assertEquals(listOf("stale-conv", "replacement-conv"), harness.startedObservers)
+        coVerify(exactly = 1) { harness.timelineRepository.sendMessage("replacement-conv", "hello") }
     }
 
     @Test

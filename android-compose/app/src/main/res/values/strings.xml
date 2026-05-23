@@ -127,6 +127,7 @@
     <string name="screen_vibesync_debug_uptime_label">Uptime</string>
     <string name="screen_vibesync_debug_sse_clients_label">SSE clients</string>
     <string name="screen_vibesync_debug_database_label">Database</string>
+    <string name="screen_vibesync_debug_status_stats_available">Stats available</string>
     <string name="screen_vibesync_debug_refresh_summary">total=%1$d, updated=%2$d, skipped=%3$d, errors=%4$d</string>
     <string name="screen_projects_beads_status_chip">Beads %1$s%2$s</string>
     <string name="screen_projects_pm_agent_chip">PM agent %1$s</string>

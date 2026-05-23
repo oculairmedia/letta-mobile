@@ -254,12 +254,27 @@ internal fun ToolCallCard(
             // overshooting its bounds during the transition, which keeps the
             // LazyColumn's scroll anchor stable (the same trade-off
             // ToolOutputRenderer relies on; see letta-mobile-3wjn). Pinch
-            // gestures skip the wrapper so multi-touch height interpolations
-            // don't cascade across bubbles.
-            val isPinching = LocalChatIsPinching.current
-            if (isPinching) {
+            // gestures keep the AnimatedContent wrapper mounted but switch to
+            // instant transitions so the content tree does not disappear and
+            // remount on finger-up.
+            val suppressLayoutAnimation = LocalChatIsPinching.current
+            AnimatedContent(
+                targetState = showDetails,
+                modifier = Modifier.fillMaxWidth(),
+                transitionSpec = {
+                    if (suppressLayoutAnimation) {
+                        (ChatMotion.instantEnter() togetherWith ChatMotion.instantExit())
+                            .using(SizeTransform(clip = true) { _, _ -> ChatMotion.instantSizeSpec })
+                    } else {
+                        (ChatMotion.expandEnter() togetherWith ChatMotion.expandExit())
+                            .using(SizeTransform(clip = true) { _, _ -> ChatMotion.contentSizeSpec })
+                    }
+                },
+                contentAlignment = Alignment.TopStart,
+                label = "ToolCallCardExpanded",
+            ) { expandedNow ->
                 ToolCallExpandedBodyContent(
-                    visible = showDetails,
+                    visible = expandedNow,
                     toolCall = toolCall,
                     argumentSummary = argumentSummary,
                     resultPreview = resultPreview,
@@ -270,30 +285,6 @@ internal fun ToolCallCard(
                     executionTimeText = executionTimeText,
                     displayResult = displayResult,
                 )
-            } else {
-                AnimatedContent(
-                    targetState = showDetails,
-                    modifier = Modifier.fillMaxWidth(),
-                    transitionSpec = {
-                        (ChatMotion.expandEnter() togetherWith ChatMotion.expandExit())
-                            .using(SizeTransform(clip = true) { _, _ -> ChatMotion.contentSizeSpec })
-                    },
-                    contentAlignment = Alignment.TopStart,
-                    label = "ToolCallCardExpanded",
-                ) { expandedNow ->
-                    ToolCallExpandedBodyContent(
-                        visible = expandedNow,
-                        toolCall = toolCall,
-                        argumentSummary = argumentSummary,
-                        resultPreview = resultPreview,
-                        isError = isError,
-                        fontScale = fontScale,
-                        codeStyle = codeStyle,
-                        display = display,
-                        executionTimeText = executionTimeText,
-                        displayResult = displayResult,
-                    )
-                }
             }
         }
     }

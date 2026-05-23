@@ -4,6 +4,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 object LettaSpacing {
+    val none: Dp = 0.dp
     val screenHorizontal: Dp = 12.dp
     val cardGap: Dp = 8.dp
     val sectionGap: Dp = 16.dp

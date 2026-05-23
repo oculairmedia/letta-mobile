@@ -75,8 +75,9 @@ internal fun ToolOutputRenderer(
     // animation here is keyed on `expanded` (a user-toggled state), not on
     // streamed `raw` content growth, so it does not collide with the
     // LazyColumn measurement issue that 74314380 fixed. We still suppress
-    // during pinch because animateContentSize/AnimatedContent during a
-    // multi-touch gesture can cascade height interpolations across bubbles.
+    // during pinch by keeping the AnimatedContent wrapper mounted and swapping
+    // to instant transitions. That avoids both height interpolation cascades
+    // during multi-touch and content remounts on finger-up.
     val isPinching = LocalChatIsPinching.current
     val clipboard = LocalClipboardManager.current
     Column(
@@ -87,29 +88,26 @@ internal fun ToolOutputRenderer(
                 )
             },
     ) {
-        if (isPinching) {
-            ToolOutputBody(
-                document = document,
-                expanded = expanded,
-                isError = isError,
-            )
-        } else {
-            AnimatedContent(
-                targetState = expanded,
-                modifier = Modifier.fillMaxWidth(),
-                transitionSpec = {
+        AnimatedContent(
+            targetState = expanded,
+            modifier = Modifier.fillMaxWidth(),
+            transitionSpec = {
+                if (isPinching) {
+                    (ChatMotion.instantEnter() togetherWith ChatMotion.instantExit())
+                        .using(SizeTransform(clip = true) { _, _ -> ChatMotion.instantSizeSpec })
+                } else {
                     (ChatMotion.expandEnter() togetherWith ChatMotion.expandExit())
                         .using(SizeTransform(clip = true) { _, _ -> ChatMotion.contentSizeSpec })
-                },
-                contentAlignment = Alignment.TopStart,
-                label = "ToolOutputExpandedState",
-            ) { isExpanded ->
-                ToolOutputBody(
-                    document = document,
-                    expanded = isExpanded,
-                    isError = isError,
-                )
-            }
+                }
+            },
+            contentAlignment = Alignment.TopStart,
+            label = "ToolOutputExpandedState",
+        ) { isExpanded ->
+            ToolOutputBody(
+                document = document,
+                expanded = isExpanded,
+                isError = isError,
+            )
         }
     }
 }

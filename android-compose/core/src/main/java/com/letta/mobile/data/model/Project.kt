@@ -112,6 +112,7 @@ data class VibesyncHealthResponse(
     val status: String? = null,
     val uptime: JsonElement? = null,
     val sync: JsonElement? = null,
+    val database: JsonElement? = null,
     val memory: JsonElement? = null,
     @SerialName("lastError") val lastError: JsonElement? = null,
     val config: JsonElement? = null,
@@ -121,10 +122,13 @@ data class VibesyncHealthResponse(
 
 @Serializable
 data class VibesyncStatsResponse(
+    val uptime: JsonElement? = null,
+    val sync: JsonElement? = null,
     @SerialName("sseClients") val sseClients: Int? = null,
     @SerialName("syncHistory") val syncHistory: JsonElement? = null,
     val database: JsonElement? = null,
     val memory: JsonElement? = null,
+    @SerialName("connectionPool") val connectionPool: JsonElement? = null,
 )
 
 @Serializable

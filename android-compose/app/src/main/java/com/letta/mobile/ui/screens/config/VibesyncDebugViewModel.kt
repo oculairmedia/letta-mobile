@@ -10,6 +10,7 @@ import com.letta.mobile.data.model.VibesyncStatsResponse
 import com.letta.mobile.ui.common.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,6 +19,7 @@ import kotlinx.coroutines.launch
 data class VibesyncDebugUiState(
     val health: VibesyncHealthResponse? = null,
     val stats: VibesyncStatsResponse? = null,
+    val healthError: String? = null,
     val refreshSummary: AgentsMdRefreshSummary? = null,
     val isRefreshingAgentsMd: Boolean = false,
 )
@@ -35,13 +37,22 @@ class VibesyncDebugViewModel @Inject constructor(
     fun refresh() {
         viewModelScope.launch {
             _uiState.value = UiState.Loading
-            runCatching {
-                VibesyncDebugUiState(
-                    health = debugApi.getHealth(),
-                    stats = debugApi.getStats(),
+            val healthResult = runCatchingCancellable { debugApi.getHealth() }
+            val statsResult = runCatchingCancellable { debugApi.getStats() }
+            val health = healthResult.getOrNull()
+            val stats = statsResult.getOrNull()
+            if (health != null || stats != null) {
+                _uiState.value = UiState.Success(
+                    VibesyncDebugUiState(
+                        health = health,
+                        stats = stats,
+                        healthError = healthResult.exceptionOrNull()?.message,
+                    )
                 )
-            }.onSuccess { _uiState.value = UiState.Success(it) }
-                .onFailure { _uiState.value = UiState.Error(it.message ?: "Failed to load vibesync status") }
+            } else {
+                val error = statsResult.exceptionOrNull() ?: healthResult.exceptionOrNull()
+                _uiState.value = UiState.Error(error?.message ?: "Failed to load vibesync status")
+            }
         }
     }
 
@@ -49,7 +60,7 @@ class VibesyncDebugViewModel @Inject constructor(
         val current = (_uiState.value as? UiState.Success)?.data ?: return
         _uiState.value = UiState.Success(current.copy(isRefreshingAgentsMd = true))
         viewModelScope.launch {
-            runCatching { adminApi.refreshAgentsMd(dryRun = dryRun) }
+            runCatchingCancellable { adminApi.refreshAgentsMd(dryRun = dryRun) }
                 .onSuccess { summary -> updateSuccess { it.copy(refreshSummary = summary) } }
                 .onFailure { _uiState.value = UiState.Error(it.message ?: "Failed to refresh AGENTS.md") }
             updateSuccess { it.copy(isRefreshingAgentsMd = false) }
@@ -59,5 +70,13 @@ class VibesyncDebugViewModel @Inject constructor(
     private inline fun updateSuccess(transform: (VibesyncDebugUiState) -> VibesyncDebugUiState) {
         val current = (_uiState.value as? UiState.Success)?.data ?: return
         _uiState.value = UiState.Success(transform(current))
+    }
+
+    private suspend inline fun <T> runCatchingCancellable(crossinline block: suspend () -> T): Result<T> = try {
+        Result.success(block())
+    } catch (e: CancellationException) {
+        throw e
+    } catch (t: Throwable) {
+        Result.failure(t)
     }
 }

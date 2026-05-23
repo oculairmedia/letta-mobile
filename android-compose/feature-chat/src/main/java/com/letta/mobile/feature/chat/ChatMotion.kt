@@ -7,6 +7,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
@@ -40,6 +41,8 @@ internal object ChatMotion {
     val contentSizeSpec: FiniteAnimationSpec<IntSize> =
         tween(durationMillis = ContentSizeMillis, easing = FastOutSlowInEasing)
 
+    val instantSizeSpec: FiniteAnimationSpec<IntSize> = snap()
+
     val chipSizeSpec: FiniteAnimationSpec<IntSize> =
         tween(durationMillis = ChipMillis, easing = LinearOutSlowInEasing)
 
@@ -69,6 +72,10 @@ internal object ChatMotion {
                 animationSpec = tween(durationMillis = ExitMillis, easing = FastOutLinearInEasing),
                 shrinkTowards = shrinkTowards,
             )
+
+    fun instantEnter(): EnterTransition = EnterTransition.None
+
+    fun instantExit(): ExitTransition = ExitTransition.None
 
     fun verticalEnter(
         slideDivisor: Int = 5,
