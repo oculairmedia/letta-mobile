@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -74,6 +75,7 @@ import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.ShimmerBox
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.feature.chat.ProjectChatStartAction
 import com.letta.mobile.ui.theme.LettaSpacing
@@ -97,6 +99,8 @@ fun ProjectHomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbar = LocalSnackbarDispatcher.current
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
     var isAppBarCollapsed by remember { mutableStateOf(false) }
@@ -273,7 +277,10 @@ fun ProjectHomeScreen(
 
                 PullToRefreshBox(
                     isRefreshing = state.data.isRefreshing,
-                    onRefresh = viewModel::refresh,
+                    onRefresh = {
+                        HapticEffects.confirm(haptic, view)
+                        viewModel.refresh()
+                    },
                     modifier = Modifier
                         .padding(paddingValues)
                         .fillMaxSize(),
@@ -776,7 +783,7 @@ private fun ProjectTile(
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = {
-                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    HapticEffects.longPress(haptic)
                     onOpenActions()
                 },
             ),

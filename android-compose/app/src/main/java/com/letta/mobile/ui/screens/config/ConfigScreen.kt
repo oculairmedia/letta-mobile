@@ -12,6 +12,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
@@ -33,6 +35,7 @@ import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 import com.letta.mobile.util.Telemetry
@@ -181,6 +184,8 @@ private fun ConfigContent(
     modifier: Modifier = Modifier
 ) {
     val dynamicColorSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
 
     Column(
         modifier = modifier
@@ -195,13 +200,19 @@ private fun ConfigContent(
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                         SegmentedButton(
                             selected = state.mode == ServerMode.CLOUD,
-                            onClick = { onModeChange(ServerMode.CLOUD) },
+                            onClick = {
+                                HapticEffects.segmentTick(haptic, view, enabled = state.mode != ServerMode.CLOUD)
+                                onModeChange(ServerMode.CLOUD)
+                            },
                             shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                             label = { Text(stringResource(R.string.common_cloud)) },
                         )
                         SegmentedButton(
                             selected = state.mode == ServerMode.SELF_HOSTED,
-                            onClick = { onModeChange(ServerMode.SELF_HOSTED) },
+                            onClick = {
+                                HapticEffects.segmentTick(haptic, view, enabled = state.mode != ServerMode.SELF_HOSTED)
+                                onModeChange(ServerMode.SELF_HOSTED)
+                            },
                             shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                             label = { Text(stringResource(R.string.common_self_hosted)) },
                         )
@@ -254,19 +265,28 @@ private fun ConfigContent(
                         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                             SegmentedButton(
                                 selected = state.theme == AppTheme.SYSTEM,
-                                onClick = { onThemeChange(AppTheme.SYSTEM) },
+                                onClick = {
+                                    HapticEffects.segmentTick(haptic, view, enabled = state.theme != AppTheme.SYSTEM)
+                                    onThemeChange(AppTheme.SYSTEM)
+                                },
                                 shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
                                 label = { Text(stringResource(R.string.screen_config_theme_mode_system)) },
                             )
                             SegmentedButton(
                                 selected = state.theme == AppTheme.LIGHT,
-                                onClick = { onThemeChange(AppTheme.LIGHT) },
+                                onClick = {
+                                    HapticEffects.segmentTick(haptic, view, enabled = state.theme != AppTheme.LIGHT)
+                                    onThemeChange(AppTheme.LIGHT)
+                                },
                                 shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
                                 label = { Text(stringResource(R.string.common_light_theme)) },
                             )
                             SegmentedButton(
                                 selected = state.theme == AppTheme.DARK,
-                                onClick = { onThemeChange(AppTheme.DARK) },
+                                onClick = {
+                                    HapticEffects.segmentTick(haptic, view, enabled = state.theme != AppTheme.DARK)
+                                    onThemeChange(AppTheme.DARK)
+                                },
                                 shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
                                 label = { Text(stringResource(R.string.common_dark_theme)) },
                             )
@@ -288,7 +308,7 @@ private fun ConfigContent(
                     )
                 },
                 trailingContent = {
-                    Switch(
+                    HapticSwitch(
                         checked = state.dynamicColor,
                         onCheckedChange = onDynamicColorChange,
                         enabled = dynamicColorSupported,
@@ -305,7 +325,10 @@ private fun ConfigContent(
                         ThemePreset.entries.forEach { preset ->
                             FilterChip(
                                 selected = state.themePreset == preset,
-                                onClick = { onThemePresetChange(preset) },
+                                onClick = {
+                                    HapticEffects.segmentTick(haptic, view, enabled = state.themePreset != preset)
+                                    onThemePresetChange(preset)
+                                },
                                 label = { Text(themePresetLabel(preset)) },
                             )
                         }
@@ -330,7 +353,7 @@ private fun ConfigContent(
                 headlineContent = { Text(stringResource(R.string.screen_config_enable_projects)) },
                 supportingContent = { Text(stringResource(R.string.screen_config_enable_projects_description)) },
                 trailingContent = {
-                    Switch(
+                    HapticSwitch(
                         checked = state.enableProjects,
                         onCheckedChange = onEnableProjectsChange,
                     )
@@ -403,6 +426,30 @@ private fun ConfigContent(
             )
         }
     }
+}
+
+@Composable
+private fun HapticSwitch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+    Switch(
+        checked = checked,
+        enabled = enabled,
+        modifier = modifier,
+        onCheckedChange = { isChecked ->
+            if (isChecked) {
+                HapticEffects.toggleOn(haptic, view)
+            } else {
+                HapticEffects.toggleOff(haptic, view)
+            }
+            onCheckedChange(isChecked)
+        },
+    )
 }
 
 @Composable

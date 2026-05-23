@@ -63,8 +63,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -97,6 +97,7 @@ import com.letta.mobile.ui.components.statefulFadingEdges
 import com.letta.mobile.ui.navigation.agentAvatarSharedElementKey
 import com.letta.mobile.ui.navigation.optionalSharedElement
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.screens.tools.ToolPickerDialog
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
@@ -126,6 +127,8 @@ fun AgentListScreen(
     var pendingImportOverrideTools by remember { mutableStateOf(true) }
     var pendingImportStripMessages by remember { mutableStateOf(false) }
     val snackbar = LocalSnackbarDispatcher.current
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     val isShareMode = shareContentPreview != null
     var shareNavigationConsumed by rememberSaveable(shareContentPreview) { mutableStateOf(false) }
     fun selectAgent(agentId: String, agentName: String?) {
@@ -241,13 +244,19 @@ fun AgentListScreen(
                 ) {
                     SegmentedButton(
                         selected = !showGrid,
-                        onClick = { showGrid = false },
+                        onClick = {
+                            HapticEffects.segmentTick(haptic, view, enabled = showGrid)
+                            showGrid = false
+                        },
                         shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                         label = { Text(stringResource(R.string.screen_agents_view_list)) },
                     )
                     SegmentedButton(
                         selected = showGrid,
-                        onClick = { showGrid = true },
+                        onClick = {
+                            HapticEffects.segmentTick(haptic, view, enabled = !showGrid)
+                            showGrid = true
+                        },
                         shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                         label = { Text(stringResource(R.string.screen_agents_view_grid)) },
                     )
@@ -276,7 +285,10 @@ fun AgentListScreen(
                         item {
                             FilterChip(
                                 selected = uiState.selectedTags.isEmpty(),
-                                onClick = { viewModel.clearTags() },
+                                onClick = {
+                                    HapticEffects.segmentTick(haptic, view, enabled = uiState.selectedTags.isNotEmpty())
+                                    viewModel.clearTags()
+                                },
                                 label = { Text(stringResource(R.string.screen_agents_filter_all)) },
                             )
                         }
@@ -284,7 +296,10 @@ fun AgentListScreen(
                             val tag = allTags[index]
                             FilterChip(
                                 selected = tag in uiState.selectedTags,
-                                onClick = { viewModel.toggleTag(tag) },
+                                onClick = {
+                                    HapticEffects.segmentTick(haptic, view)
+                                    viewModel.toggleTag(tag)
+                                },
                                 label = { Text(tag) },
                             )
                         }
@@ -309,9 +324,12 @@ fun AgentListScreen(
                 modifier = Modifier.padding(paddingValues),
             )
             else -> {
-                PullToRefreshBox(
-                    isRefreshing = uiState.isRefreshing,
-                    onRefresh = { viewModel.refresh() },
+                    PullToRefreshBox(
+                        isRefreshing = uiState.isRefreshing,
+                        onRefresh = {
+                            HapticEffects.confirm(haptic, view)
+                            viewModel.refresh()
+                        },
                     modifier = Modifier.padding(paddingValues).fillMaxSize(),
                 ) {
                     if (filteredAgents.isEmpty()) {

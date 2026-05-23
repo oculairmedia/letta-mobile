@@ -33,6 +33,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,6 +47,7 @@ import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.tooloutput.ToolOutputParser
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.theme.LocalChatFontScale
 import com.letta.mobile.ui.theme.LocalChatIsPinching
 import com.letta.mobile.ui.theme.chatBubbleSender
@@ -139,6 +142,8 @@ internal fun ToolCallCard(
     keepExpanded: Boolean = false,
 ) {
     val fontScale = LocalChatFontScale.current
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     var expanded by remember { mutableStateOf(false) }
     val display = remember(toolCall.name, toolCall.arguments) {
         ToolDisplayRegistry.resolve(toolCall.name, toolCall.arguments)
@@ -156,6 +161,11 @@ internal fun ToolCallCard(
     val codeStyle = MaterialTheme.chatTypography.codeBlock
     val showDetails = keepExpanded || expanded
     val approvalState = approvalStateOverride ?: toolCall.approvalDecision?.toToolApprovalState()
+    LaunchedEffect(toolCall.toolCallId, toolCall.status, isError) {
+        if (isError) {
+            HapticEffects.reject(haptic, view)
+        }
+    }
     val compactDetail = remember(
         display.label,
         display.detailLine,
@@ -195,7 +205,10 @@ internal fun ToolCallCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(enabled = !keepExpanded) { expanded = !expanded },
+                    .clickable(enabled = !keepExpanded) {
+                        HapticEffects.segmentTick(haptic, view)
+                        expanded = !expanded
+                    },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(display.emoji, style = codeStyle)
@@ -305,6 +318,8 @@ private fun ToolCallExpandedBodyContent(
     displayResult: String?,
 ) {
     if (!visible) return
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     Column {
         ToolCallExpandedSummary(
             toolCall = toolCall,
@@ -367,7 +382,10 @@ private fun ToolCallExpandedBodyContent(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { resultExpanded = !resultExpanded },
+                        .clickable {
+                            HapticEffects.segmentTick(haptic, view)
+                            resultExpanded = !resultExpanded
+                        },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -419,6 +437,8 @@ internal fun ToolCallExpandedBody(
     fontScale: Float,
 ) {
     val codeStyle = MaterialTheme.chatTypography.codeBlock
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -472,7 +492,10 @@ internal fun ToolCallExpandedBody(
                 modifier = Modifier
                     .fillMaxWidth()
                     .semantics(mergeDescendants = true) { }
-                    .clickable { resultExpanded = !resultExpanded },
+                    .clickable {
+                        HapticEffects.segmentTick(haptic, view)
+                        resultExpanded = !resultExpanded
+                    },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -631,6 +654,8 @@ internal fun CompactToolCallRow(
     approvalState: ToolApprovalState?,
 ) {
     val fontScale = LocalChatFontScale.current
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     var expanded by remember(toolCall.toolCallMotionKey()) { mutableStateOf(false) }
     val display = remember(toolCall.name, toolCall.arguments) {
         ToolDisplayRegistry.resolve(toolCall.name, toolCall.arguments)
@@ -646,6 +671,11 @@ internal fun CompactToolCallRow(
         "${toolCall.name} - $summary"
     }
     val isError = ToolReturnStatus.isError(toolCall.status)
+    LaunchedEffect(toolCall.toolCallId, toolCall.status, isError) {
+        if (isError) {
+            HapticEffects.reject(haptic, view)
+        }
+    }
     val chevronRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
         animationSpec = ChatMotion.chipCrossfadeSpec,
@@ -659,7 +689,10 @@ internal fun CompactToolCallRow(
                 .semantics(mergeDescendants = true) { }
                 .clickable(
                     onClickLabel = if (expanded) "Collapse tool details" else "Expand tool details",
-                ) { expanded = !expanded }
+                ) {
+                    HapticEffects.segmentTick(haptic, view)
+                    expanded = !expanded
+                }
                 .padding(vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
