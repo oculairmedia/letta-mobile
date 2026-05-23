@@ -5,6 +5,7 @@ import com.letta.mobile.data.local.AgentEntity
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.local.ConversationEntity
 import com.letta.mobile.data.local.ConversationRefreshEntity
+import com.letta.mobile.data.api.LettaApiClient
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Archive
 import com.letta.mobile.data.model.EmbeddingModel
@@ -51,6 +52,7 @@ import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.FakeStepApi
 import com.letta.mobile.testutil.FakeToolApi
 import com.letta.mobile.testutil.TestData
+import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
@@ -85,6 +87,7 @@ class SessionManagerTest {
                 FakeFolderApi(),
                 FakeGroupApi(),
                 FakeIdentityApi(),
+                fakeLettaApiClient(),
                 FakeMcpServerApi(),
                 FakeModelApi(),
                 FakePassageApi(),
@@ -129,6 +132,7 @@ class SessionManagerTest {
                 FakeFolderApi(),
                 FakeGroupApi(),
                 FakeIdentityApi(),
+                fakeLettaApiClient(),
                 FakeMcpServerApi(),
                 FakeModelApi(),
                 FakePassageApi(),
@@ -181,6 +185,7 @@ class SessionManagerTest {
                 FakeFolderApi(),
                 FakeGroupApi(),
                 FakeIdentityApi(),
+                fakeLettaApiClient(),
                 FakeMcpServerApi(),
                 FakeModelApi(),
                 FakePassageApi(),
@@ -231,6 +236,7 @@ class SessionManagerTest {
                 FakeFolderApi(),
                 FakeGroupApi(),
                 FakeIdentityApi(),
+                fakeLettaApiClient(),
                 FakeMcpServerApi(),
                 FakeModelApi(),
                 FakePassageApi(),
@@ -290,6 +296,7 @@ class SessionManagerTest {
                 FakeFolderApi(),
                 FakeGroupApi(),
                 FakeIdentityApi(),
+                fakeLettaApiClient(),
                 FakeMcpServerApi(),
                 FakeModelApi(),
                 FakePassageApi(),
@@ -372,6 +379,7 @@ class SessionManagerTest {
                 fakeFolderApi,
                 fakeGroupApi,
                 fakeIdentityApi,
+                fakeLettaApiClient(),
                 FakeMcpServerApi(),
                 FakeModelApi(),
                 FakePassageApi(),
@@ -462,6 +470,7 @@ class SessionManagerTest {
                 FakeFolderApi(),
                 FakeGroupApi(),
                 FakeIdentityApi(),
+                fakeLettaApiClient(),
                 FakeMcpServerApi(),
                 fakeModelApi,
                 fakePassageApi,
@@ -549,6 +558,7 @@ class SessionManagerTest {
                 FakeFolderApi(),
                 FakeGroupApi(),
                 FakeIdentityApi(),
+                fakeLettaApiClient(),
                 fakeMcpServerApi,
                 FakeModelApi(),
                 FakePassageApi(),
@@ -625,6 +635,7 @@ class SessionManagerTest {
                 FakeFolderApi(),
                 FakeGroupApi(),
                 FakeIdentityApi(),
+                fakeLettaApiClient(),
                 FakeMcpServerApi(),
                 FakeModelApi(),
                 FakePassageApi(),
@@ -681,6 +692,7 @@ class SessionManagerTest {
                 FakeFolderApi(),
                 FakeGroupApi(),
                 FakeIdentityApi(),
+                fakeLettaApiClient(),
                 FakeMcpServerApi(),
                 FakeModelApi(),
                 FakePassageApi(),
@@ -735,6 +747,7 @@ class SessionManagerTest {
                 FakeFolderApi(),
                 FakeGroupApi(),
                 FakeIdentityApi(),
+                fakeLettaApiClient(),
                 FakeMcpServerApi(),
                 FakeModelApi(),
                 FakePassageApi(),
@@ -778,6 +791,97 @@ class SessionManagerTest {
         assertEquals("Backend B", backendBIssue.title)
         assertNull(workProxy.issueDetails.value["letta-mobile-a"])
     }
+
+    @Test
+    fun `transport adjacent state holders are recreated when graph rebuilds`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val sessionManager = SessionManager(
+            settingsRepository = settingsRepository,
+            sessionGraphFactory = SessionGraphFactory(
+                FakeAgentApi(),
+                FakeAgentDao(),
+                FakeConversationApi(),
+                FakeConversationDao(),
+                FakeArchiveApi(),
+                FakeFolderApi(),
+                FakeGroupApi(),
+                FakeIdentityApi(),
+                fakeLettaApiClient(),
+                FakeMcpServerApi(),
+                FakeModelApi(),
+                FakePassageApi(),
+                FakeProjectApi(),
+                FakeProjectWorkApi(),
+                FakeRunApi(),
+                FakeJobApi(),
+                FakeProviderApi(),
+                FakeScheduleApi(),
+                FakeStepApi(),
+                FakeToolApi(),
+            ),
+            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        advanceUntilIdle()
+
+        val firstGraph = sessionManager.current
+        settingsRepository.activeConfigState.value = config("backend-b")
+        advanceUntilIdle()
+
+        val secondGraph = sessionManager.current
+        assertNotEquals(System.identityHashCode(firstGraph.channelTransport), System.identityHashCode(secondGraph.channelTransport))
+        assertNotEquals(System.identityHashCode(firstGraph.cronRepository), System.identityHashCode(secondGraph.cronRepository))
+        assertNotEquals(
+            System.identityHashCode(firstGraph.vibesyncEventStreamRepository),
+            System.identityHashCode(secondGraph.vibesyncEventStreamRepository),
+        )
+    }
+
+    @Test
+    fun `channel transport proxy switches to rebuilt graph state`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val sessionManager = SessionManager(
+            settingsRepository = settingsRepository,
+            sessionGraphFactory = SessionGraphFactory(
+                FakeAgentApi(),
+                FakeAgentDao(),
+                FakeConversationApi(),
+                FakeConversationDao(),
+                FakeArchiveApi(),
+                FakeFolderApi(),
+                FakeGroupApi(),
+                FakeIdentityApi(),
+                fakeLettaApiClient(),
+                FakeMcpServerApi(),
+                FakeModelApi(),
+                FakePassageApi(),
+                FakeProjectApi(),
+                FakeProjectWorkApi(),
+                FakeRunApi(),
+                FakeJobApi(),
+                FakeProviderApi(),
+                FakeScheduleApi(),
+                FakeStepApi(),
+                FakeToolApi(),
+            ),
+            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        val proxy = SessionScopedChannelTransport(
+            sessionManager = sessionManager,
+            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        advanceUntilIdle()
+
+        assertTrue(proxy.state.value is com.letta.mobile.data.transport.ChannelTransport.State.Idle)
+
+        settingsRepository.activeConfigState.value = config("backend-b")
+        advanceUntilIdle()
+
+        assertTrue(proxy.state.value is com.letta.mobile.data.transport.ChannelTransport.State.Idle)
+    }
+
+    private fun fakeLettaApiClient(): LettaApiClient = mockk(relaxed = true)
 
     private fun config(id: String): LettaConfig = LettaConfig(
         id = id,
