@@ -29,10 +29,16 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 @Singleton
-open class VibesyncEventStreamRepository @Inject constructor(
+open class VibesyncEventStreamRepository internal constructor(
     private val apiClient: LettaApiClient,
+    private val scope: CoroutineScope,
 ) : IVibesyncEventStreamRepository {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @Inject
+    constructor(apiClient: LettaApiClient) : this(
+        apiClient = apiClient,
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    )
+
     private val activeSubscribers = AtomicInteger(0)
     private val _events = MutableSharedFlow<VibesyncEvent>(extraBufferCapacity = 64)
     override val events: SharedFlow<VibesyncEvent> = _events.asSharedFlow()

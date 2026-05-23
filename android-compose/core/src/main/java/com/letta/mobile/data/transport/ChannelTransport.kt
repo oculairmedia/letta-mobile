@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -67,8 +68,15 @@ sealed interface A2uiActionDispatchResult {
  * On any close the client lands in [State.Disconnected]; nothing here
  * auto-redials.
  */
+internal fun defaultChannelTransportScope(): CoroutineScope =
+    CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
 @Singleton
-class ChannelTransport @Inject constructor() : IChannelTransport {
+class ChannelTransport internal constructor(
+    private val scope: CoroutineScope,
+) : IChannelTransport {
+    @Inject
+    constructor() : this(defaultChannelTransportScope())
 
     sealed interface State {
         data object Idle : State
@@ -117,8 +125,6 @@ class ChannelTransport @Inject constructor() : IChannelTransport {
             .build()
     }
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
     private val _state = MutableStateFlow<State>(State.Idle)
     override val state: StateFlow<State> = _state.asStateFlow()
 
@@ -165,6 +171,17 @@ class ChannelTransport @Inject constructor() : IChannelTransport {
     // when the response arrives. On disconnect the pending map is
     // cancelled so callers don't wait forever.
     private val pendingCronRequests = ConcurrentHashMap<String, CompletableDeferred<ServerFrame>>()
+
+    init {
+        scope.coroutineContext.job.invokeOnCompletion {
+            clearPendingA2uiActions(reason = "session ended")
+            socketRef.getAndSet(null)?.close(NORMAL_CLOSE, "session ended")
+            listenerJob?.cancel()
+            reconnectJob?.cancel()
+            cancelPendingCronRequests("session ended")
+            _state.value = State.Disconnected(NORMAL_CLOSE, "session ended")
+        }
+    }
 
     // letta-mobile-ns5l: tracks who triggered the close so onClosed can
     // log initiator alongside the wire code. Set true in disconnect()

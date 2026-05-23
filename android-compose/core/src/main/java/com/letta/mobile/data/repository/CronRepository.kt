@@ -2,9 +2,10 @@ package com.letta.mobile.data.repository
 
 import android.util.Log
 import com.letta.mobile.data.model.CronTask
+import com.letta.mobile.data.repository.api.ICronRepository
 import com.letta.mobile.data.transport.ChannelTransport
-import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.ServerFrame
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -57,7 +58,7 @@ internal fun defaultCronScope(): CoroutineScope =
 open class CronRepository(
     private val transport: IChannelTransport,
     private val scope: CoroutineScope,
-) {
+) : ICronRepository {
     /**
      * Hilt-friendly constructor — uses a fresh [defaultCronScope] tied
      * to the singleton's lifetime. Tests inject their own scope via the
@@ -83,7 +84,7 @@ open class CronRepository(
      * shared across all subscribers; only the first subscription per
      * agent triggers a `cron_list` round-trip.
      */
-    open fun schedulesFlow(agentId: String): Flow<List<CronTask>> {
+    override fun schedulesFlow(agentId: String): Flow<List<CronTask>> {
         val state = stateFor(agentId)
         if (initialized.add(agentId)) {
             scope.launch { refresh(agentId) }
@@ -101,7 +102,7 @@ open class CronRepository(
      * the shim's error message (or transport-level exception). Either
      * way callers can branch on `Result.isSuccess`.
      */
-    open suspend fun refresh(agentId: String): Result<List<CronTask>> {
+    override suspend fun refresh(agentId: String): Result<List<CronTask>> {
         inFlightRefresh[agentId]?.takeIf { !it.isCompleted }?.let { return it.await() }
         val deferred = CompletableDeferred<Result<List<CronTask>>>()
         val previous = inFlightRefresh.put(agentId, deferred)
@@ -126,7 +127,7 @@ open class CronRepository(
      * is also patched into the local cache so the UI updates without
      * waiting for the `crons_updated` push to round-trip.
      */
-    open suspend fun addSchedule(params: CronAddParams): Result<CronTask> = runCatching {
+    override suspend fun addSchedule(params: CronAddParams): Result<CronTask> = runCatching {
         val response = transport.sendCronAdd(
             agentId = params.agentId,
             name = params.name,
@@ -154,7 +155,7 @@ open class CronRepository(
      * `cron_delete_response` with `success=true`; on success the task is
      * filtered out of the local cache for [agentId].
      */
-    open suspend fun deleteSchedule(agentId: String, taskId: String): Result<Unit> = runCatching {
+    override suspend fun deleteSchedule(agentId: String, taskId: String): Result<Unit> = runCatching {
         val response = transport.sendCronDelete(taskId)
         if (!response.success) {
             throw IllegalStateException(response.error ?: "cron_delete failed")
