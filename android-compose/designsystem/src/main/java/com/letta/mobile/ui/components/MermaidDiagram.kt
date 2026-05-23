@@ -7,8 +7,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.rememberTransformableState
-import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,13 +41,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -56,7 +56,11 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.size.Size
 import coil3.svg.SvgDecoder
+import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LettaSizing
+import com.letta.mobile.ui.theme.LettaSpacing
+import com.letta.mobile.ui.zoom.ZoomViewportState
 
 @Composable
 fun MermaidDiagram(
@@ -159,9 +163,9 @@ private fun MermaidSvgDiagram(
     }
 
         Surface(
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(LettaSpacing.cardGap),
             color = Color.Transparent,
-            modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
+            modifier = modifier.fillMaxWidth().padding(vertical = LettaSpacing.cardGroupItemGap + LettaSpacing.cardGroupItemGap),
         ) {
             Column {
                 MermaidHeader(onCopy = onCopy)
@@ -170,7 +174,7 @@ private fun MermaidSvgDiagram(
                     contentDescription = "Mermaid diagram rendered natively",
                     modifier = Modifier
                         .fillMaxWidth()
-                        .defaultMinSize(minHeight = 120.dp)
+                        .defaultMinSize(minHeight = LettaSizing.diagramPreviewMinHeight)
                         .combinedClickable(
                             onClick = {},
                             onLongClick = { onFullscreenChange(true) },
@@ -199,26 +203,13 @@ private fun MermaidFullscreenDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        var zoom by mutableStateOf(1f)
-        var pan by mutableStateOf(Offset.Zero)
+        val zoomState = remember { ZoomViewportState() }
+        var viewportSize by remember { mutableStateOf(IntSize.Zero) }
         fun resetViewport() {
-            zoom = 1f
-            pan = Offset.Zero
+            zoomState.reset()
         }
         fun setHundredPercentViewport() {
-            zoom = FULLSCREEN_ONE_TO_ONE_APPROX_ZOOM
-            pan = Offset.Zero
-        }
-
-        val transformableState = rememberTransformableState { zoomChange, panChange, _ ->
-            val nextZoom = (zoom * zoomChange).coerceIn(1f, 4f)
-            val appliedScale = nextZoom / zoom
-            zoom = nextZoom
-            pan = if (zoom <= 1.01f) {
-                Offset.Zero
-            } else {
-                (pan + panChange * appliedScale)
-            }
+            zoomState.setAbsoluteScale(FULLSCREEN_ONE_TO_ONE_APPROX_ZOOM)
         }
 
         BoxWithConstraints(
@@ -226,14 +217,14 @@ private fun MermaidFullscreenDialog(
                 .fillMaxSize()
                 .background(Color(0xE6000000)),
         ) {
-            val isCompact = maxWidth < 600.dp
+            val isCompact = maxWidth < LettaSizing.compactWidthBreakpoint
             val contentModifier = if (isCompact) {
                 Modifier.fillMaxSize()
             } else {
                 Modifier
-                    .widthIn(max = 1000.dp)
+                    .widthIn(max = LettaSizing.readableDialogMaxWidth)
                     .fillMaxWidth()
-                    .padding(32.dp)
+                    .padding(LettaSpacing.innerPadding + LettaSpacing.innerPadding)
             }
 
             Card(
@@ -245,7 +236,7 @@ private fun MermaidFullscreenDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                            .padding(horizontal = LettaSpacing.innerPaddingSmall, vertical = LettaSpacing.cardGap),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
@@ -264,16 +255,16 @@ private fun MermaidFullscreenDialog(
                         }
                         FilledTonalButton(
                             onClick = onCopy,
-                            modifier = Modifier.padding(start = 8.dp),
+                            modifier = Modifier.padding(start = LettaSpacing.cardGap),
                         ) {
                             Icon(
                                 imageVector = LettaIcons.Copy,
                                 contentDescription = null,
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(LettaIconSizing.Inline),
                             )
                             Text(
                                 text = "Copy",
-                                modifier = Modifier.padding(start = 8.dp),
+                                modifier = Modifier.padding(start = LettaSpacing.cardGap),
                             )
                         }
                     }
@@ -281,15 +272,25 @@ private fun MermaidFullscreenDialog(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
-                            .clip(RoundedCornerShape(16.dp))
+                            .padding(horizontal = LettaSpacing.innerPaddingSmall, vertical = LettaSpacing.cardGap)
+                            .onSizeChanged { viewportSize = it }
+                            .clip(RoundedCornerShape(LettaSpacing.innerPadding))
                             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.08f))
                             .pointerInput(Unit) {
                                 detectTapGestures(
                                     onDoubleTap = { resetViewport() },
                                 )
                             }
-                            .transformable(transformableState),
+                            .pointerInput(Unit) {
+                                detectTransformGestures { centroid, panChange, zoomChange, _ ->
+                                    zoomState.onTransform(
+                                        zoomChange = zoomChange,
+                                        panChange = panChange,
+                                        centroid = centroid,
+                                        viewportSize = viewportSize,
+                                    )
+                                }
+                            },
                         contentAlignment = Alignment.Center,
                     ) {
                         AsyncImage(
@@ -298,10 +299,10 @@ private fun MermaidFullscreenDialog(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .graphicsLayer(
-                                    scaleX = zoom,
-                                    scaleY = zoom,
-                                    translationX = pan.x,
-                                    translationY = pan.y,
+                                    scaleX = zoomState.scale,
+                                    scaleY = zoomState.scale,
+                                    translationX = zoomState.pan.x,
+                                    translationY = zoomState.pan.y,
                                 ),
                             contentScale = ContentScale.Fit,
                         )
@@ -317,14 +318,14 @@ private fun MermaidHeader(onCopy: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 12.dp, end = 4.dp),
+            .padding(start = LettaSpacing.innerPaddingSmall, end = LettaSpacing.cardGroupItemGap + LettaSpacing.cardGroupItemGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = "mermaid",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-            modifier = Modifier.padding(vertical = 8.dp),
+            modifier = Modifier.padding(vertical = LettaSpacing.cardGap),
         )
         Box(modifier = Modifier.weight(1f))
         IconButton(
@@ -336,7 +337,7 @@ private fun MermaidHeader(onCopy: () -> Unit) {
             Icon(
                 imageVector = LettaIcons.Copy,
                 contentDescription = "Copy diagram source",
-                modifier = Modifier.padding(4.dp),
+                modifier = Modifier.padding(LettaSpacing.cardGroupItemGap + LettaSpacing.cardGroupItemGap),
             )
         }
     }
@@ -349,11 +350,11 @@ private fun MermaidErrorFallback(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.errorContainer,
-        modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+            shape = RoundedCornerShape(LettaSpacing.cardGap),
+            color = MaterialTheme.colorScheme.errorContainer,
+            modifier = modifier.fillMaxWidth().padding(vertical = LettaSpacing.cardGroupItemGap + LettaSpacing.cardGroupItemGap),
+        ) {
+            Column(modifier = Modifier.padding(LettaSpacing.innerPaddingSmall)) {
             Text(
                 text = "Mermaid render failed: $errorMessage",
                 style = MaterialTheme.typography.labelSmall,
@@ -363,7 +364,7 @@ private fun MermaidErrorFallback(
                 text = source,
                 style = MaterialTheme.typography.bodySmall.copy(fontFamily = LettaCodeFont),
                 color = MaterialTheme.colorScheme.onErrorContainer,
-                modifier = Modifier.padding(top = 8.dp),
+                    modifier = Modifier.padding(top = LettaSpacing.cardGap),
             )
         }
     }
