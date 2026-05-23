@@ -7,9 +7,13 @@ import com.letta.mobile.data.local.ConversationEntity
 import com.letta.mobile.data.local.ConversationRefreshEntity
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Archive
+import com.letta.mobile.data.model.Folder
+import com.letta.mobile.data.model.Group
+import com.letta.mobile.data.model.Identity
 import com.letta.mobile.data.model.Job
 import com.letta.mobile.data.model.JobListParams
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.Provider
 import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.model.RunListParams
 import com.letta.mobile.data.model.RunRequestConfig
@@ -17,7 +21,11 @@ import com.letta.mobile.data.model.StepListParams
 import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeArchiveApi
 import com.letta.mobile.testutil.FakeConversationApi
+import com.letta.mobile.testutil.FakeFolderApi
+import com.letta.mobile.testutil.FakeGroupApi
+import com.letta.mobile.testutil.FakeIdentityApi
 import com.letta.mobile.testutil.FakeJobApi
+import com.letta.mobile.testutil.FakeProviderApi
 import com.letta.mobile.testutil.FakeRunApi
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.FakeStepApi
@@ -52,8 +60,12 @@ class SessionManagerTest {
                 FakeConversationApi(),
                 FakeConversationDao(),
                 FakeArchiveApi(),
+                FakeFolderApi(),
+                FakeGroupApi(),
+                FakeIdentityApi(),
                 FakeRunApi(),
                 FakeJobApi(),
+                FakeProviderApi(),
                 FakeStepApi(),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
@@ -85,8 +97,12 @@ class SessionManagerTest {
                 FakeConversationApi(),
                 FakeConversationDao(),
                 FakeArchiveApi(),
+                FakeFolderApi(),
+                FakeGroupApi(),
+                FakeIdentityApi(),
                 FakeRunApi(),
                 FakeJobApi(),
+                FakeProviderApi(),
                 FakeStepApi(),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
@@ -126,8 +142,12 @@ class SessionManagerTest {
                 fakeConversationApi,
                 FakeConversationDao(),
                 FakeArchiveApi(),
+                FakeFolderApi(),
+                FakeGroupApi(),
+                FakeIdentityApi(),
                 FakeRunApi(),
                 FakeJobApi(),
+                FakeProviderApi(),
                 FakeStepApi(),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
@@ -165,8 +185,12 @@ class SessionManagerTest {
                 FakeConversationApi(),
                 FakeConversationDao(),
                 fakeArchiveApi,
+                FakeFolderApi(),
+                FakeGroupApi(),
+                FakeIdentityApi(),
                 FakeRunApi(),
                 FakeJobApi(),
+                FakeProviderApi(),
                 FakeStepApi(),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
@@ -213,8 +237,12 @@ class SessionManagerTest {
                 FakeConversationApi(),
                 FakeConversationDao(),
                 FakeArchiveApi(),
+                FakeFolderApi(),
+                FakeGroupApi(),
+                FakeIdentityApi(),
                 fakeRunApi,
                 fakeJobApi,
+                FakeProviderApi(),
                 fakeStepApi,
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
@@ -260,6 +288,91 @@ class SessionManagerTest {
         assertEquals(listOf("step-b"), stepProxy.steps.value.map { it.id })
     }
 
+    @Test
+    fun `admin repository proxies switch caches to rebuilt graph`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val fakeFolderApi = FakeFolderApi().apply {
+            folders = mutableListOf(Folder(id = "folder-a", name = "Backend A Folder"))
+        }
+        val fakeGroupApi = FakeGroupApi().apply {
+            groups = mutableListOf(sampleGroup("group-a", "Backend A Group"))
+        }
+        val fakeIdentityApi = FakeIdentityApi().apply {
+            identities = mutableListOf(sampleIdentity("identity-a", "Backend A Identity"))
+        }
+        val fakeProviderApi = FakeProviderApi().apply {
+            providers = mutableListOf(sampleProvider("provider-a", "Backend A Provider"))
+        }
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val sessionManager = SessionManager(
+            settingsRepository = settingsRepository,
+            sessionGraphFactory = SessionGraphFactory(
+                FakeAgentApi(),
+                FakeAgentDao(),
+                FakeConversationApi(),
+                FakeConversationDao(),
+                FakeArchiveApi(),
+                fakeFolderApi,
+                fakeGroupApi,
+                fakeIdentityApi,
+                FakeRunApi(),
+                FakeJobApi(),
+                fakeProviderApi,
+                FakeStepApi(),
+            ),
+            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        val folderProxy = SessionScopedFolderRepository(
+            sessionManager = sessionManager,
+            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        val groupProxy = SessionScopedGroupRepository(
+            sessionManager = sessionManager,
+            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        val identityProxy = SessionScopedIdentityRepository(
+            sessionManager = sessionManager,
+            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        val providerProxy = SessionScopedProviderRepository(
+            sessionManager = sessionManager,
+            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+
+        folderProxy.refreshFolders()
+        groupProxy.refreshGroups()
+        identityProxy.refreshIdentities()
+        providerProxy.refreshProviders()
+        advanceUntilIdle()
+        assertEquals(listOf("folder-a"), folderProxy.folders.value.map { it.id })
+        assertEquals(listOf("group-a"), groupProxy.groups.value.map { it.id })
+        assertEquals(listOf("identity-a"), identityProxy.identities.value.map { it.id })
+        assertEquals(listOf("provider-a"), providerProxy.providers.value.map { it.id })
+
+        fakeFolderApi.folders = mutableListOf(Folder(id = "folder-b", name = "Backend B Folder"))
+        fakeGroupApi.groups = mutableListOf(sampleGroup("group-b", "Backend B Group"))
+        fakeIdentityApi.identities = mutableListOf(sampleIdentity("identity-b", "Backend B Identity"))
+        fakeProviderApi.providers = mutableListOf(sampleProvider("provider-b", "Backend B Provider"))
+        settingsRepository.activeConfigState.value = config("backend-b")
+        advanceUntilIdle()
+
+        assertEquals(emptyList<String>(), folderProxy.folders.value.map { it.id })
+        assertEquals(emptyList<String>(), groupProxy.groups.value.map { it.id })
+        assertEquals(emptyList<String>(), identityProxy.identities.value.map { it.id })
+        assertEquals(emptyList<String>(), providerProxy.providers.value.map { it.id })
+
+        folderProxy.refreshFolders()
+        groupProxy.refreshGroups()
+        identityProxy.refreshIdentities()
+        providerProxy.refreshProviders()
+        advanceUntilIdle()
+
+        assertEquals(listOf("folder-b"), folderProxy.folders.value.map { it.id })
+        assertEquals(listOf("group-b"), groupProxy.groups.value.map { it.id })
+        assertEquals(listOf("identity-b"), identityProxy.identities.value.map { it.id })
+        assertEquals(listOf("provider-b"), providerProxy.providers.value.map { it.id })
+    }
+
     private fun config(id: String): LettaConfig = LettaConfig(
         id = id,
         mode = LettaConfig.Mode.SELF_HOSTED,
@@ -282,6 +395,26 @@ class SessionManagerTest {
     )
 
     private fun sampleStep(id: String) = FakeStepApi().sampleStep(id)
+
+    private fun sampleGroup(id: String, description: String) = Group(
+        id = id,
+        managerType = "round_robin",
+        description = description,
+        agentIds = listOf("agent-1"),
+    )
+
+    private fun sampleIdentity(id: String, name: String) = Identity(
+        id = id,
+        identifierKey = id,
+        name = name,
+        identityType = "user",
+    )
+
+    private fun sampleProvider(id: String, name: String) = Provider(
+        id = id,
+        name = name,
+        providerType = "openai",
+    )
 
     private class FakeAgentDao : AgentDao {
         private val agents = MutableStateFlow<List<AgentEntity>>(emptyList())

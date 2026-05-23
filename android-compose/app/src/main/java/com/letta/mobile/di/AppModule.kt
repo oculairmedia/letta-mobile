@@ -11,9 +11,6 @@ import com.letta.mobile.data.health.IServerHealthRepository
 import com.letta.mobile.data.health.ServerHealthRepository
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.BugReportRepository
-import com.letta.mobile.data.repository.FolderRepository
-import com.letta.mobile.data.repository.GroupRepository
-import com.letta.mobile.data.repository.IdentityRepository
 import com.letta.mobile.data.repository.McpServerRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.ModelRepository
@@ -21,7 +18,6 @@ import com.letta.mobile.data.repository.PassageRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.ProjectRepository
 import com.letta.mobile.data.repository.ProjectWorkRepository
-import com.letta.mobile.data.repository.ProviderRepository
 import com.letta.mobile.data.repository.ScheduleRepository
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.repository.ToolRepository
@@ -53,7 +49,11 @@ import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
 import com.letta.mobile.data.session.SessionScopedAgentRepository
 import com.letta.mobile.data.session.SessionScopedArchiveRepository
 import com.letta.mobile.data.session.SessionScopedConversationRepository
+import com.letta.mobile.data.session.SessionScopedFolderRepository
+import com.letta.mobile.data.session.SessionScopedGroupRepository
+import com.letta.mobile.data.session.SessionScopedIdentityRepository
 import com.letta.mobile.data.session.SessionScopedJobRepository
+import com.letta.mobile.data.session.SessionScopedProviderRepository
 import com.letta.mobile.data.session.SessionScopedRunRepository
 import com.letta.mobile.data.session.SessionScopedStepRepository
 import com.letta.mobile.data.timeline.TimelineRepository
@@ -143,15 +143,15 @@ abstract class AppModule {
 
     @Binds
     @Singleton
-    abstract fun bindFolderRepository(impl: FolderRepository): IFolderRepository
+    abstract fun bindFolderRepository(impl: SessionScopedFolderRepository): IFolderRepository
 
     @Binds
     @Singleton
-    abstract fun bindGroupRepository(impl: GroupRepository): IGroupRepository
+    abstract fun bindGroupRepository(impl: SessionScopedGroupRepository): IGroupRepository
 
     @Binds
     @Singleton
-    abstract fun bindIdentityRepository(impl: IdentityRepository): IIdentityRepository
+    abstract fun bindIdentityRepository(impl: SessionScopedIdentityRepository): IIdentityRepository
 
     @Binds
     @Singleton
@@ -171,7 +171,7 @@ abstract class AppModule {
 
     @Binds
     @Singleton
-    abstract fun bindProviderRepository(impl: ProviderRepository): IProviderRepository
+    abstract fun bindProviderRepository(impl: SessionScopedProviderRepository): IProviderRepository
 
     @Binds
     @Singleton
