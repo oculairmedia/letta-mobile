@@ -26,9 +26,11 @@ import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,11 +57,19 @@ fun VibesyncDebugScreen(
                 modifier = Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
+                val statusText = state.data.health?.status
+                    ?: if (state.data.stats != null) {
+                        stringResource(R.string.screen_vibesync_debug_status_stats_available)
+                    } else {
+                        state.data.healthError.orEmpty()
+                    }
+                val uptimeText = (state.data.health?.uptime ?: state.data.stats?.uptime).toVibesyncDisplayText("human")
+                val databaseText = (state.data.health?.database ?: state.data.stats?.database).toVibesyncDisplayText()
                 CardGroup(title = { Text(stringResource(R.string.screen_vibesync_debug_status_section)) }) {
-                    item(headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_status_label)) }, supportingContent = { Text(state.data.health?.status.orEmpty()) })
-                    item(headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_uptime_label)) }, supportingContent = { Text(state.data.health?.uptime?.humanValue().orEmpty()) })
+                    item(headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_status_label)) }, supportingContent = { Text(statusText) })
+                    item(headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_uptime_label)) }, supportingContent = { Text(uptimeText) })
                     item(headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_sse_clients_label)) }, supportingContent = { Text(state.data.stats?.sseClients?.toString().orEmpty()) })
-                    item(headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_database_label)) }, supportingContent = { Text(state.data.stats?.database?.toString().orEmpty()) })
+                    item(headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_database_label)) }, supportingContent = { Text(databaseText) })
                 }
                 CardGroup(title = { Text(stringResource(R.string.screen_vibesync_debug_agents_md_section)) }) {
                     item(
@@ -94,4 +104,11 @@ fun VibesyncDebugScreen(
     }
 }
 
-private fun JsonElement.humanValue(): String = ((this as? JsonObject)?.get("human") as? JsonPrimitive)?.content.orEmpty()
+private fun JsonElement?.toVibesyncDisplayText(preferredKey: String? = null): String = when (this) {
+    null -> ""
+    is JsonPrimitive -> contentOrNull ?: toString()
+    is JsonObject -> preferredKey
+        ?.let { key -> (this[key] as? JsonPrimitive)?.contentOrNull }
+        ?: entries.joinToString(separator = ", ") { (key, value) -> "$key=${value.toVibesyncDisplayText()}" }
+    is JsonArray -> joinToString(separator = ", ") { it.toVibesyncDisplayText() }
+}

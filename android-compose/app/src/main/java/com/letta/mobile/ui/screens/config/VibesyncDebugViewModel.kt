@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 data class VibesyncDebugUiState(
     val health: VibesyncHealthResponse? = null,
     val stats: VibesyncStatsResponse? = null,
+    val healthError: String? = null,
     val refreshSummary: AgentsMdRefreshSummary? = null,
     val isRefreshingAgentsMd: Boolean = false,
 )
@@ -35,13 +36,22 @@ class VibesyncDebugViewModel @Inject constructor(
     fun refresh() {
         viewModelScope.launch {
             _uiState.value = UiState.Loading
-            runCatching {
-                VibesyncDebugUiState(
-                    health = debugApi.getHealth(),
-                    stats = debugApi.getStats(),
+            val healthResult = runCatching { debugApi.getHealth() }
+            val statsResult = runCatching { debugApi.getStats() }
+            val health = healthResult.getOrNull()
+            val stats = statsResult.getOrNull()
+            if (health != null || stats != null) {
+                _uiState.value = UiState.Success(
+                    VibesyncDebugUiState(
+                        health = health,
+                        stats = stats,
+                        healthError = healthResult.exceptionOrNull()?.message,
+                    )
                 )
-            }.onSuccess { _uiState.value = UiState.Success(it) }
-                .onFailure { _uiState.value = UiState.Error(it.message ?: "Failed to load vibesync status") }
+            } else {
+                val error = statsResult.exceptionOrNull() ?: healthResult.exceptionOrNull()
+                _uiState.value = UiState.Error(error?.message ?: "Failed to load vibesync status")
+            }
         }
     }
 
