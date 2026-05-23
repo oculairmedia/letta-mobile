@@ -47,6 +47,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.runBlocking
 
 @Singleton
 class SessionGraphFactory @Inject constructor(
@@ -74,6 +75,11 @@ class SessionGraphFactory @Inject constructor(
     private val nextId = AtomicLong(0L)
 
     fun create(): SessionGraph {
+        runBlocking(Dispatchers.IO) {
+            agentDao.deleteAll()
+            conversationDao.deleteAll()
+            conversationDao.deleteAllRefreshStates()
+        }
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val agentRepository = AgentRepository(
             agentApi = agentApi,

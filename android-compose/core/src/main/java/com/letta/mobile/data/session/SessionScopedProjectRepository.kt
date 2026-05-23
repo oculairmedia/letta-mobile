@@ -48,23 +48,23 @@ class SessionScopedProjectRepository internal constructor(
     private val current: IProjectRepository
         get() = sessionManager.current.projectRepository
 
-    override suspend fun refreshProjects(): ProjectCatalog = current.refreshProjects()
-    override suspend fun getProject(identifier: String): ProjectSummary = current.getProject(identifier)
+    override suspend fun refreshProjects(): ProjectCatalog = sessionManager.withCurrentSession { it.projectRepository.refreshProjects() }
+    override suspend fun getProject(identifier: String): ProjectSummary = sessionManager.withCurrentSession { it.projectRepository.getProject(identifier) }
     override suspend fun getBeadsRemoteStatus(identifier: String): BeadsRemoteStatus =
-        current.getBeadsRemoteStatus(identifier)
+        sessionManager.withCurrentSession { it.projectRepository.getBeadsRemoteStatus(identifier) }
 
     override suspend fun provisionBeadsRemote(identifier: String, push: Boolean): BeadsRemoteProvisionResponse =
-        current.provisionBeadsRemote(identifier, push)
+        sessionManager.withCurrentSession { it.projectRepository.provisionBeadsRemote(identifier, push) }
 
-    override suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse = current.triggerSync(identifier)
+    override suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse = sessionManager.withCurrentSession { it.projectRepository.triggerSync(identifier) }
     override suspend fun createProject(name: String?, filesystemPath: String, gitUrl: String?): ProjectSummary =
-        current.createProject(name, filesystemPath, gitUrl)
+        sessionManager.withCurrentSession { it.projectRepository.createProject(name, filesystemPath, gitUrl) }
 
     override suspend fun updateProject(identifier: String, filesystemPath: String?, gitUrl: String?): ProjectSummary =
-        current.updateProject(identifier, filesystemPath, gitUrl)
+        sessionManager.withCurrentSession { it.projectRepository.updateProject(identifier, filesystemPath, gitUrl) }
 
-    override suspend fun archiveProject(identifier: String): ProjectSummary = current.archiveProject(identifier)
-    override suspend fun deleteProject(identifier: String) = current.deleteProject(identifier)
+    override suspend fun archiveProject(identifier: String): ProjectSummary = sessionManager.withCurrentSession { it.projectRepository.archiveProject(identifier) }
+    override suspend fun deleteProject(identifier: String) = sessionManager.withCurrentSession { it.projectRepository.deleteProject(identifier) }
     override fun hasFreshProjects(maxAgeMs: Long): Boolean = current.hasFreshProjects(maxAgeMs)
-    override suspend fun refreshProjectsIfStale(maxAgeMs: Long): Boolean = current.refreshProjectsIfStale(maxAgeMs)
+    override suspend fun refreshProjectsIfStale(maxAgeMs: Long): Boolean = sessionManager.withCurrentSession { it.projectRepository.refreshProjectsIfStale(maxAgeMs) }
 }

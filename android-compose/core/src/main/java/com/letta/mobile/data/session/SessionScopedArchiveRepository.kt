@@ -47,23 +47,23 @@ class SessionScopedArchiveRepository internal constructor(
         get() = sessionManager.current.archiveRepository
 
     override suspend fun refreshArchives(name: String?, agentId: String?) =
-        current.refreshArchives(name, agentId)
+        sessionManager.withCurrentSession { it.archiveRepository.refreshArchives(name, agentId) }
 
     override suspend fun getArchive(archiveId: String): Archive =
-        current.getArchive(archiveId)
+        sessionManager.withCurrentSession { it.archiveRepository.getArchive(archiveId) }
 
     override suspend fun createArchive(params: ArchiveCreateParams): Archive =
-        current.createArchive(params)
+        sessionManager.withCurrentSession { it.archiveRepository.createArchive(params) }
 
     override suspend fun updateArchive(archiveId: String, params: ArchiveUpdateParams): Archive =
-        current.updateArchive(archiveId, params)
+        sessionManager.withCurrentSession { it.archiveRepository.updateArchive(archiveId, params) }
 
     override suspend fun deleteArchive(archiveId: String): Archive =
-        current.deleteArchive(archiveId)
+        sessionManager.withCurrentSession { it.archiveRepository.deleteArchive(archiveId) }
 
     override suspend fun listAgentsForArchive(archiveId: String): List<Agent> =
-        current.listAgentsForArchive(archiveId)
+        sessionManager.withCurrentSession { it.archiveRepository.listAgentsForArchive(archiveId) }
 
     override suspend fun deletePassageFromArchive(archiveId: String, passageId: String) =
-        current.deletePassageFromArchive(archiveId, passageId)
+        sessionManager.withCurrentSession { it.archiveRepository.deletePassageFromArchive(archiveId, passageId) }
 }

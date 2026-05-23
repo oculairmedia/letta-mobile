@@ -25,32 +25,32 @@ class SessionScopedConversationRepository @Inject constructor(
         current.hasFreshConversations(agentId, maxAgeMs)
 
     override suspend fun refreshConversations(agentId: String) =
-        current.refreshConversations(agentId)
+        sessionManager.withCurrentSession { it.conversationRepository.refreshConversations(agentId) }
 
     override suspend fun refreshConversationsIfStale(agentId: String, maxAgeMs: Long): Boolean =
-        current.refreshConversationsIfStale(agentId, maxAgeMs)
+        sessionManager.withCurrentSession { it.conversationRepository.refreshConversationsIfStale(agentId, maxAgeMs) }
 
     override suspend fun getConversation(id: String): Conversation =
-        current.getConversation(id)
+        sessionManager.withCurrentSession { it.conversationRepository.getConversation(id) }
 
     override suspend fun createConversation(agentId: String, summary: String?): Conversation =
-        current.createConversation(agentId, summary)
+        sessionManager.withCurrentSession { it.conversationRepository.createConversation(agentId, summary) }
 
     override suspend fun deleteConversation(id: String, agentId: String) =
-        current.deleteConversation(id, agentId)
+        sessionManager.withCurrentSession { it.conversationRepository.deleteConversation(id, agentId) }
 
     override suspend fun updateConversation(id: String, agentId: String, summary: String) =
-        current.updateConversation(id, agentId, summary)
+        sessionManager.withCurrentSession { it.conversationRepository.updateConversation(id, agentId, summary) }
 
     override suspend fun setConversationArchived(id: String, agentId: String, archived: Boolean) =
-        current.setConversationArchived(id, agentId, archived)
+        sessionManager.withCurrentSession { it.conversationRepository.setConversationArchived(id, agentId, archived) }
 
     override suspend fun cancelConversation(id: String, agentId: String?) =
-        current.cancelConversation(id, agentId)
+        sessionManager.withCurrentSession { it.conversationRepository.cancelConversation(id, agentId) }
 
     override suspend fun recompileConversation(id: String, dryRun: Boolean, agentId: String?): String =
-        current.recompileConversation(id, dryRun, agentId)
+        sessionManager.withCurrentSession { it.conversationRepository.recompileConversation(id, dryRun, agentId) }
 
     override suspend fun forkConversation(id: String, agentId: String): Conversation =
-        current.forkConversation(id, agentId)
+        sessionManager.withCurrentSession { it.conversationRepository.forkConversation(id, agentId) }
 }

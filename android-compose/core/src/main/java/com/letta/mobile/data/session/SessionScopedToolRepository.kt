@@ -65,14 +65,14 @@ class SessionScopedToolRepository internal constructor(
         flow.asStateFlow()
     }
 
-    override suspend fun countTools(): Int = current.countTools()
+    override suspend fun countTools(): Int = sessionManager.withCurrentSession { it.toolRepository.countTools() }
 
-    override suspend fun refreshTools() = current.refreshTools()
-    override suspend fun refreshToolsIfStale(maxAgeMs: Long): Boolean = current.refreshToolsIfStale(maxAgeMs)
-    override suspend fun fetchToolsPage(limit: Int, offset: Int): List<Tool> = current.fetchToolsPage(limit, offset)
-    override suspend fun attachTool(agentId: String, toolId: String) = current.attachTool(agentId, toolId)
-    override suspend fun detachTool(agentId: String, toolId: String) = current.detachTool(agentId, toolId)
-    override suspend fun upsertTool(params: ToolCreateParams): Tool = current.upsertTool(params)
-    override suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool = current.updateTool(toolId, params)
-    override suspend fun deleteTool(toolId: String) = current.deleteTool(toolId)
+    override suspend fun refreshTools() = sessionManager.withCurrentSession { it.toolRepository.refreshTools() }
+    override suspend fun refreshToolsIfStale(maxAgeMs: Long): Boolean = sessionManager.withCurrentSession { it.toolRepository.refreshToolsIfStale(maxAgeMs) }
+    override suspend fun fetchToolsPage(limit: Int, offset: Int): List<Tool> = sessionManager.withCurrentSession { it.toolRepository.fetchToolsPage(limit, offset) }
+    override suspend fun attachTool(agentId: String, toolId: String) = sessionManager.withCurrentSession { it.toolRepository.attachTool(agentId, toolId) }
+    override suspend fun detachTool(agentId: String, toolId: String) = sessionManager.withCurrentSession { it.toolRepository.detachTool(agentId, toolId) }
+    override suspend fun upsertTool(params: ToolCreateParams): Tool = sessionManager.withCurrentSession { it.toolRepository.upsertTool(params) }
+    override suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool = sessionManager.withCurrentSession { it.toolRepository.updateTool(toolId, params) }
+    override suspend fun deleteTool(toolId: String) = sessionManager.withCurrentSession { it.toolRepository.deleteTool(toolId) }
 }

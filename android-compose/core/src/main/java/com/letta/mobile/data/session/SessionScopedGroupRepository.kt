@@ -51,29 +51,29 @@ class SessionScopedGroupRepository internal constructor(
         get() = sessionManager.current.groupRepository
 
     override suspend fun refreshGroups(managerType: String?, projectId: String?, showHiddenGroups: Boolean?) =
-        current.refreshGroups(managerType, projectId, showHiddenGroups)
+        sessionManager.withCurrentSession { it.groupRepository.refreshGroups(managerType, projectId, showHiddenGroups) }
 
-    override suspend fun countGroups(): Int = current.countGroups()
+    override suspend fun countGroups(): Int = sessionManager.withCurrentSession { it.groupRepository.countGroups() }
 
-    override suspend fun getGroup(groupId: String): Group = current.getGroup(groupId)
+    override suspend fun getGroup(groupId: String): Group = sessionManager.withCurrentSession { it.groupRepository.getGroup(groupId) }
 
-    override suspend fun createGroup(params: GroupCreateParams): Group = current.createGroup(params)
+    override suspend fun createGroup(params: GroupCreateParams): Group = sessionManager.withCurrentSession { it.groupRepository.createGroup(params) }
 
     override suspend fun updateGroup(groupId: String, params: GroupUpdateParams): Group =
-        current.updateGroup(groupId, params)
+        sessionManager.withCurrentSession { it.groupRepository.updateGroup(groupId, params) }
 
-    override suspend fun deleteGroup(groupId: String) = current.deleteGroup(groupId)
+    override suspend fun deleteGroup(groupId: String) = sessionManager.withCurrentSession { it.groupRepository.deleteGroup(groupId) }
 
     override suspend fun sendGroupMessage(groupId: String, request: MessageCreateRequest): LettaResponse =
-        current.sendGroupMessage(groupId, request)
+        sessionManager.withCurrentSession { it.groupRepository.sendGroupMessage(groupId, request) }
 
     override suspend fun sendGroupMessageStream(groupId: String, request: MessageCreateRequest): ByteReadChannel =
-        current.sendGroupMessageStream(groupId, request)
+        sessionManager.withCurrentSession { it.groupRepository.sendGroupMessageStream(groupId, request) }
 
     override suspend fun updateGroupMessage(groupId: String, messageId: String, request: JsonElement): LettaMessage =
-        current.updateGroupMessage(groupId, messageId, request)
+        sessionManager.withCurrentSession { it.groupRepository.updateGroupMessage(groupId, messageId, request) }
 
-    override suspend fun listGroupMessages(groupId: String): List<LettaMessage> = current.listGroupMessages(groupId)
+    override suspend fun listGroupMessages(groupId: String): List<LettaMessage> = sessionManager.withCurrentSession { it.groupRepository.listGroupMessages(groupId) }
 
-    override suspend fun resetGroupMessages(groupId: String) = current.resetGroupMessages(groupId)
+    override suspend fun resetGroupMessages(groupId: String) = sessionManager.withCurrentSession { it.groupRepository.resetGroupMessages(groupId) }
 }

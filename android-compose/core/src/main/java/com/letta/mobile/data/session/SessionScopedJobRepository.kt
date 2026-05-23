@@ -44,13 +44,13 @@ class SessionScopedJobRepository internal constructor(
     private val current: IJobRepository
         get() = sessionManager.current.jobRepository
 
-    override suspend fun refreshJobs(params: JobListParams) = current.refreshJobs(params)
+    override suspend fun refreshJobs(params: JobListParams) = sessionManager.withCurrentSession { it.jobRepository.refreshJobs(params) }
 
-    override suspend fun getJob(jobId: String): Job = current.getJob(jobId)
+    override suspend fun getJob(jobId: String): Job = sessionManager.withCurrentSession { it.jobRepository.getJob(jobId) }
 
-    override suspend fun cancelJob(jobId: String): Job = current.cancelJob(jobId)
+    override suspend fun cancelJob(jobId: String): Job = sessionManager.withCurrentSession { it.jobRepository.cancelJob(jobId) }
 
-    override suspend fun deleteJob(jobId: String): Job = current.deleteJob(jobId)
+    override suspend fun deleteJob(jobId: String): Job = sessionManager.withCurrentSession { it.jobRepository.deleteJob(jobId) }
 
     override fun upsertJob(job: Job) = current.upsertJob(job)
 }

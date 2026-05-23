@@ -47,18 +47,18 @@ class SessionScopedProviderRepository internal constructor(
         get() = sessionManager.current.providerRepository
 
     override suspend fun refreshProviders(name: String?, providerType: String?) =
-        current.refreshProviders(name, providerType)
+        sessionManager.withCurrentSession { it.providerRepository.refreshProviders(name, providerType) }
 
-    override suspend fun getProvider(providerId: String): Provider = current.getProvider(providerId)
+    override suspend fun getProvider(providerId: String): Provider = sessionManager.withCurrentSession { it.providerRepository.getProvider(providerId) }
 
-    override suspend fun createProvider(params: ProviderCreateParams): Provider = current.createProvider(params)
+    override suspend fun createProvider(params: ProviderCreateParams): Provider = sessionManager.withCurrentSession { it.providerRepository.createProvider(params) }
 
     override suspend fun updateProvider(providerId: String, params: ProviderUpdateParams): Provider =
-        current.updateProvider(providerId, params)
+        sessionManager.withCurrentSession { it.providerRepository.updateProvider(providerId, params) }
 
-    override suspend fun checkProvider(params: ProviderCheckParams) = current.checkProvider(params)
+    override suspend fun checkProvider(params: ProviderCheckParams) = sessionManager.withCurrentSession { it.providerRepository.checkProvider(params) }
 
-    override suspend fun checkExistingProvider(providerId: String) = current.checkExistingProvider(providerId)
+    override suspend fun checkExistingProvider(providerId: String) = sessionManager.withCurrentSession { it.providerRepository.checkExistingProvider(providerId) }
 
-    override suspend fun deleteProvider(providerId: String) = current.deleteProvider(providerId)
+    override suspend fun deleteProvider(providerId: String) = sessionManager.withCurrentSession { it.providerRepository.deleteProvider(providerId) }
 }

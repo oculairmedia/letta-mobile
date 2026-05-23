@@ -1044,5 +1044,13 @@ class SessionManagerTest {
         override suspend fun upsertRefreshState(state: ConversationRefreshEntity) {
             refreshStates[state.agentId] = state
         }
+
+        override suspend fun deleteAll() {
+            conversations.value = emptyList()
+        }
+
+        override suspend fun deleteAllRefreshStates() {
+            refreshStates.clear()
+        }
     }
 }

@@ -49,35 +49,35 @@ class SessionScopedIdentityRepository internal constructor(
     private val current: IIdentityRepository
         get() = sessionManager.current.identityRepository
 
-    override suspend fun refreshIdentities() = current.refreshIdentities()
+    override suspend fun refreshIdentities() = sessionManager.withCurrentSession { it.identityRepository.refreshIdentities() }
 
-    override suspend fun countIdentities(): Int = current.countIdentities()
+    override suspend fun countIdentities(): Int = sessionManager.withCurrentSession { it.identityRepository.countIdentities() }
 
-    override suspend fun getIdentity(identityId: String): Identity = current.getIdentity(identityId)
+    override suspend fun getIdentity(identityId: String): Identity = sessionManager.withCurrentSession { it.identityRepository.getIdentity(identityId) }
 
-    override suspend fun createIdentity(params: IdentityCreateParams): Identity = current.createIdentity(params)
+    override suspend fun createIdentity(params: IdentityCreateParams): Identity = sessionManager.withCurrentSession { it.identityRepository.createIdentity(params) }
 
-    override suspend fun upsertIdentity(params: IdentityUpsertParams): Identity = current.upsertIdentity(params)
+    override suspend fun upsertIdentity(params: IdentityUpsertParams): Identity = sessionManager.withCurrentSession { it.identityRepository.upsertIdentity(params) }
 
     override suspend fun updateIdentity(identityId: String, params: IdentityUpdateParams): Identity =
-        current.updateIdentity(identityId, params)
+        sessionManager.withCurrentSession { it.identityRepository.updateIdentity(identityId, params) }
 
     override suspend fun upsertIdentityProperties(
         identityId: String,
         properties: List<IdentityProperty>,
-    ): Identity = current.upsertIdentityProperties(identityId, properties)
+    ): Identity = sessionManager.withCurrentSession { it.identityRepository.upsertIdentityProperties(identityId, properties) }
 
-    override suspend fun deleteIdentity(identityId: String) = current.deleteIdentity(identityId)
+    override suspend fun deleteIdentity(identityId: String) = sessionManager.withCurrentSession { it.identityRepository.deleteIdentity(identityId) }
 
     override suspend fun attachIdentity(agentId: String, identityId: String) =
-        current.attachIdentity(agentId, identityId)
+        sessionManager.withCurrentSession { it.identityRepository.attachIdentity(agentId, identityId) }
 
     override suspend fun detachIdentity(agentId: String, identityId: String) =
-        current.detachIdentity(agentId, identityId)
+        sessionManager.withCurrentSession { it.identityRepository.detachIdentity(agentId, identityId) }
 
     override suspend fun listAgentsForIdentity(identityId: String): List<Agent> =
-        current.listAgentsForIdentity(identityId)
+        sessionManager.withCurrentSession { it.identityRepository.listAgentsForIdentity(identityId) }
 
     override suspend fun listBlocksForIdentity(identityId: String): List<Block> =
-        current.listBlocksForIdentity(identityId)
+        sessionManager.withCurrentSession { it.identityRepository.listBlocksForIdentity(identityId) }
 }

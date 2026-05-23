@@ -73,56 +73,56 @@ class SessionScopedProjectWorkRepository internal constructor(
         get() = sessionManager.current.projectWorkRepository
 
     override suspend fun refreshReadyWork(projectId: String, limit: Int?, cursor: String?): List<ProjectIssueSummary> =
-        current.refreshReadyWork(projectId, limit, cursor)
+        sessionManager.withCurrentSession { it.projectWorkRepository.refreshReadyWork(projectId, limit, cursor) }
 
     override suspend fun refreshIssues(projectId: String, params: ProjectIssueListParams): List<ProjectIssueSummary> =
-        current.refreshIssues(projectId, params)
+        sessionManager.withCurrentSession { it.projectWorkRepository.refreshIssues(projectId, params) }
 
     override suspend fun refreshIssuePage(projectId: String, params: ProjectIssueListParams): ProjectIssueListResponse =
-        current.refreshIssuePage(projectId, params)
+        sessionManager.withCurrentSession { it.projectWorkRepository.refreshIssuePage(projectId, params) }
 
     override suspend fun refreshIssueAnalytics(
         projectId: String,
         params: ProjectIssueAnalyticsParams,
-    ): IssueAnalyticsResponse = current.refreshIssueAnalytics(projectId, params)
+    ): IssueAnalyticsResponse = sessionManager.withCurrentSession { it.projectWorkRepository.refreshIssueAnalytics(projectId, params) }
 
     override suspend fun getIssue(issueId: String, forceRefresh: Boolean): ProjectIssueDetail =
-        current.getIssue(issueId, forceRefresh)
+        sessionManager.withCurrentSession { it.projectWorkRepository.getIssue(issueId, forceRefresh) }
 
-    override suspend fun invalidateProjectCache(projectId: String) = current.invalidateProjectCache(projectId)
+    override suspend fun invalidateProjectCache(projectId: String) = sessionManager.withCurrentSession { it.projectWorkRepository.invalidateProjectCache(projectId) }
     override suspend fun claimIssue(issueId: String, assignee: String, ifMatch: String, idempotencyKey: String): ProjectIssueSummary =
-        current.claimIssue(issueId, assignee, ifMatch, idempotencyKey)
+        sessionManager.withCurrentSession { it.projectWorkRepository.claimIssue(issueId, assignee, ifMatch, idempotencyKey) }
 
     override suspend fun unclaimIssue(issueId: String, ifMatch: String, idempotencyKey: String): ProjectIssueSummary =
-        current.unclaimIssue(issueId, ifMatch, idempotencyKey)
+        sessionManager.withCurrentSession { it.projectWorkRepository.unclaimIssue(issueId, ifMatch, idempotencyKey) }
 
     override suspend fun updateIssueStatus(
         issueId: String,
         status: String,
         ifMatch: String,
         idempotencyKey: String,
-    ): ProjectIssueSummary = current.updateIssueStatus(issueId, status, ifMatch, idempotencyKey)
+    ): ProjectIssueSummary = sessionManager.withCurrentSession { it.projectWorkRepository.updateIssueStatus(issueId, status, ifMatch, idempotencyKey) }
 
     override suspend fun addIssueNote(
         issueId: String,
         note: String,
         ifMatch: String,
         idempotencyKey: String,
-    ): ProjectIssueSummary = current.addIssueNote(issueId, note, ifMatch, idempotencyKey)
+    ): ProjectIssueSummary = sessionManager.withCurrentSession { it.projectWorkRepository.addIssueNote(issueId, note, ifMatch, idempotencyKey) }
 
     override suspend fun closeIssue(
         issueId: String,
         reason: String,
         ifMatch: String,
         idempotencyKey: String,
-    ): ProjectIssueSummary = current.closeIssue(issueId, reason, ifMatch, idempotencyKey)
+    ): ProjectIssueSummary = sessionManager.withCurrentSession { it.projectWorkRepository.closeIssue(issueId, reason, ifMatch, idempotencyKey) }
 
     override suspend fun reopenIssue(
         issueId: String,
         reason: String,
         ifMatch: String,
         idempotencyKey: String,
-    ): ProjectIssueSummary = current.reopenIssue(issueId, reason, ifMatch, idempotencyKey)
+    ): ProjectIssueSummary = sessionManager.withCurrentSession { it.projectWorkRepository.reopenIssue(issueId, reason, ifMatch, idempotencyKey) }
 
     override fun newIdempotencyKey(): String = current.newIdempotencyKey()
 }

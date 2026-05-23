@@ -1,6 +1,7 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.api.MessageApi
+import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.data.timeline.api.TimelineClientModeWriter
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.util.Telemetry
@@ -11,6 +12,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -31,18 +35,26 @@ import kotlinx.coroutines.withContext
 open class TimelineRepository @Inject constructor(
     private val messageApi: MessageApi,
     private val pendingLocalStore: PendingLocalStore,
+    sessionManager: SessionManager?,
 ) : TimelineClientModeWriter, TimelineExternalTransportWriter {
     internal constructor(
         messageApi: MessageApi,
         pendingLocalStore: PendingLocalStore,
         maxCachedLoops: Int,
-    ) : this(messageApi, pendingLocalStore) {
+    ) : this(messageApi, pendingLocalStore, sessionManager = null) {
         require(maxCachedLoops > 0) { "maxCachedLoops must be positive" }
         this.maxCachedLoops = maxCachedLoops
     }
 
     // Dedicated supervisor scope — child jobs fail in isolation.
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    init {
+        sessionManager?.currentGraph
+            ?.drop(1)
+            ?.onEach { clearAll() }
+            ?.launchIn(scope)
+    }
 
     private var maxCachedLoops = DEFAULT_MAX_CACHED_LOOPS
     private val loops = LinkedHashMap<String, TimelineSyncLoop>(16, 0.75f, true)
@@ -122,6 +134,13 @@ open class TimelineRepository @Inject constructor(
      * still create on demand and remain cached for the process lifetime.
      */
     suspend fun cachedLoopCount(): Int = loopsMutex.withLock { loops.size }
+
+    suspend fun clearAll() = loopsMutex.withLock {
+        val count = loops.size
+        loops.values.forEach { it.close() }
+        loops.clear()
+        Telemetry.event("TimelineRepo", "clearAll", "clearedLoopCount" to count)
+    }
 
     /** Observe a conversation's timeline state. */
     suspend fun observe(conversationId: String): StateFlow<Timeline> =

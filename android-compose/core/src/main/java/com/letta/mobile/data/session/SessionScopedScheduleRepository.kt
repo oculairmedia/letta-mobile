@@ -35,14 +35,14 @@ class SessionScopedScheduleRepository internal constructor(
         sessionManager.currentGraph.flatMapLatest { it.scheduleRepository.getSchedules(agentId) }
 
     override suspend fun refreshSchedules(agentId: String, limit: Int?, after: String?) =
-        current.refreshSchedules(agentId, limit, after)
+        sessionManager.withCurrentSession { it.scheduleRepository.refreshSchedules(agentId, limit, after) }
 
     override suspend fun getSchedule(agentId: String, scheduledMessageId: String): ScheduledMessage =
-        current.getSchedule(agentId, scheduledMessageId)
+        sessionManager.withCurrentSession { it.scheduleRepository.getSchedule(agentId, scheduledMessageId) }
 
     override suspend fun createSchedule(agentId: String, params: ScheduleCreateParams): ScheduledMessage =
-        current.createSchedule(agentId, params)
+        sessionManager.withCurrentSession { it.scheduleRepository.createSchedule(agentId, params) }
 
     override suspend fun deleteSchedule(agentId: String, scheduledMessageId: String) =
-        current.deleteSchedule(agentId, scheduledMessageId)
+        sessionManager.withCurrentSession { it.scheduleRepository.deleteSchedule(agentId, scheduledMessageId) }
 }

@@ -53,6 +53,12 @@ interface ConversationDao {
     @Query("DELETE FROM conversations WHERE agentId = :agentId AND id NOT IN (:keepIds)")
     suspend fun deleteForAgentExcept(agentId: String, keepIds: List<String>)
 
+    @Query("DELETE FROM conversations")
+    suspend fun deleteAll()
+
+    @Query("DELETE FROM conversation_refresh_state")
+    suspend fun deleteAllRefreshStates()
+
     @Query("SELECT * FROM conversation_refresh_state WHERE agentId = :agentId LIMIT 1")
     suspend fun getRefreshState(agentId: String): ConversationRefreshEntity?
 
