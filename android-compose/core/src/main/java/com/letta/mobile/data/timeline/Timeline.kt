@@ -346,7 +346,10 @@ data class Timeline(
         val idx = events.indexOfFirst { it.otid == otid && it is TimelineEvent.Local }
         if (idx == -1) return insertOrdered(confirmed)
         val local = events[idx]
-        val stabilized = confirmed.copy(position = local.position)
+        val stabilized = confirmed.copy(
+            position = local.position,
+            otid = local.otid,
+        )
         val newEvents = events.toMutableList().also { it[idx] = stabilized }
         return copy(events = newEvents)
     }
@@ -478,9 +481,22 @@ data class Timeline(
         val existing = events[idx] as TimelineEvent.Confirmed
         val stabilized = confirmed.copy(
             position = existing.position,
-            otid = existing.otid ?: confirmed.otid // Preserve the local otid so upsertClientModeLocal can stop updating
+            otid = existing.otid // Preserve the local otid so upsertClientModeLocal can stop updating
         )
-        return copy(events = events.toMutableList().also { it[idx] = stabilized })
+        val replaced = events.toMutableList().also { it[idx] = stabilized }
+        val deduped = replaced.filterIndexed { eventIndex, event ->
+            eventIndex == idx || event.otid != stabilized.otid
+        }
+        if (deduped.size != replaced.size) {
+            Telemetry.event(
+                "Timeline", "replaceByServerId.duplicateOtidDropped",
+                "conversationId" to conversationId,
+                "serverId" to confirmed.serverId,
+                "otid" to stabilized.otid,
+                level = Telemetry.Level.WARN,
+            )
+        }
+        return copy(events = deduped)
     }
 
     /**

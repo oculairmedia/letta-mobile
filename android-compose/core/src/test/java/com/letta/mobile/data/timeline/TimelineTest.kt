@@ -88,6 +88,44 @@ class TimelineTest {
     }
 
     @Test
+    fun `replaceLocal preserves local otid when confirmed otid belongs to another event`() {
+        val t = Timeline("c1")
+            .append(local("local-user", 1.0, "hi"))
+            .append(confirmed("server-user", 2.0, TimelineMessageType.USER))
+
+        val updated = t.replaceLocal(
+            "local-user",
+            confirmed("server-user", 99.0, TimelineMessageType.USER),
+        )
+
+        assertEquals(listOf("local-user", "server-user"), updated.events.map { it.otid })
+        assertEquals(updated.events.size, updated.events.map { it.otid }.toSet().size)
+    }
+
+    @Test
+    fun `replaceByServerId drops pre existing duplicate otid outside replacement slot`() {
+        Telemetry.clear()
+        val existing = confirmed("stable", 1.0, TimelineMessageType.ASSISTANT).copy(serverId = "srv-1")
+        val duplicate = confirmed("stable", 2.0, TimelineMessageType.USER).copy(serverId = "srv-2")
+        val t = Timeline("c1", events = listOf(existing, duplicate))
+        Telemetry.clear()
+
+        val updated = t.replaceByServerId(
+            existing.copy(content = "updated"),
+        )
+
+        assertEquals(1, updated.events.size)
+        assertEquals("stable", updated.events.single().otid)
+        assertEquals("updated", updated.events.single().content)
+        assertTrue(
+            "Expected duplicate drop telemetry",
+            Telemetry.snapshot().any {
+                it.tag == "Timeline" && it.name == "replaceByServerId.duplicateOtidDropped"
+            },
+        )
+    }
+
+    @Test
     fun `replaceLocal with unknown otid appends via insertOrdered`() {
         val t = Timeline("c1").append(local("a", 1.0))
         val updated = t.replaceLocal("stranger", confirmed("stranger", 5.0))
