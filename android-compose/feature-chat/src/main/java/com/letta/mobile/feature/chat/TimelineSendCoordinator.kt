@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat
 
+import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.timeline.TimelineRepository
@@ -36,34 +37,21 @@ internal class TimelineSendCoordinator(
                 isStreaming = true,
                 isAgentTyping = true,
             )
+            val summary = text.conversationSummary()
             try {
-                var convId: String? = if (isFreshRoute) {
-                    explicitConversationId
-                } else {
-                    explicitConversationId ?: activeConversationId()
-                }
-                if (convId == null) {
-                    val summary = text.take(80).let { if (text.length > 80) "$it\u2026" else it }
-                    convId = conversationRepository.createConversation(agentId, summary).id
-                    setActiveConversationId(convId)
-                    hasSummary = true
-                    uiState.value = uiState.value.copy(
-                        conversationState = ConversationState.Ready(convId),
-                    )
-                } else if (!hasSummary) {
-                    runCatching {
-                        val summary = text.take(80).let { if (text.length > 80) "$it\u2026" else it }
-                        conversationRepository.updateConversation(convId, agentId, summary)
-                        hasSummary = true
-                    }
-                }
+                val convId = resolveConversationId(summary)
                 startTimelineObserver(convId)
-                val otid = if (attachments.isEmpty()) {
-                    timelineRepository.sendMessage(convId, text)
-                } else {
-                    timelineRepository.sendMessage(convId, text, attachments)
+                var sentConversationId = convId
+                val otid = try {
+                    sendToConversation(convId, text, attachments)
+                } catch (e: ApiException) {
+                    if (!e.isMissingConversation()) throw e
+                    val replacementId = createReplacementConversation(summary, convId)
+                    startTimelineObserver(replacementId)
+                    sentConversationId = replacementId
+                    sendToConversation(replacementId, text, attachments)
                 }
-                enqueueTimer.stop("otid" to otid, "conversationId" to convId)
+                enqueueTimer.stop("otid" to otid, "conversationId" to sentConversationId)
             } catch (e: Exception) {
                 enqueueTimer.stopError(e)
                 uiState.value = uiState.value.copy(
@@ -73,5 +61,65 @@ internal class TimelineSendCoordinator(
                 )
             }
         }
+    }
+
+    private suspend fun resolveConversationId(summary: String): String {
+        val existingConversationId = if (isFreshRoute) {
+            explicitConversationId
+        } else {
+            explicitConversationId ?: activeConversationId()
+        }
+        if (existingConversationId == null) {
+            return createReplacementConversation(summary, staleConversationId = null)
+        }
+        if (!hasSummary) {
+            runCatching {
+                conversationRepository.updateConversation(existingConversationId, agentId, summary)
+                hasSummary = true
+            }
+        }
+        return existingConversationId
+    }
+
+    private suspend fun createReplacementConversation(
+        summary: String,
+        staleConversationId: String?,
+    ): String {
+        val replacementId = conversationRepository.createConversation(agentId, summary).id
+        setActiveConversationId(replacementId)
+        hasSummary = true
+        uiState.value = uiState.value.copy(
+            conversationState = ConversationState.Ready(replacementId),
+            error = null,
+        )
+        staleConversationId?.let { staleId ->
+            Telemetry.event(
+                "AdminChatVM", "send.replacedMissingConversation",
+                "staleConversationId" to staleId,
+                "replacementConversationId" to replacementId,
+            )
+        }
+        return replacementId
+    }
+
+    private suspend fun sendToConversation(
+        conversationId: String,
+        text: String,
+        attachments: List<MessageContentPart.Image>,
+    ): String = if (attachments.isEmpty()) {
+        timelineRepository.sendMessage(conversationId, text)
+    } else {
+        timelineRepository.sendMessage(conversationId, text, attachments)
+    }
+
+    private fun String.conversationSummary(): String = take(SUMMARY_MAX_LENGTH).let { summary ->
+        if (length > SUMMARY_MAX_LENGTH) "$summary…" else summary
+    }
+
+    private fun ApiException.isMissingConversation(): Boolean = code == 404 &&
+        message.orEmpty().contains("Conversation not found", ignoreCase = true)
+
+    private companion object {
+        const val SUMMARY_MAX_LENGTH = 80
     }
 }
