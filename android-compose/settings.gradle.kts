@@ -17,6 +17,7 @@ dependencyResolutionManagement {
 rootProject.name = "LettaMobile"
 include(":app")
 include(":core")
+include(":core:domain")
 include(":designsystem")
 include(":bot")
 include(":feature-chat")

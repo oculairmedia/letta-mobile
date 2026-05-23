@@ -2,6 +2,7 @@ plugins {
     id("org.jetbrains.kotlinx.kover") version "0.9.1"
     id("com.android.application") version "8.9.2" apply false
     id("com.android.library") version "8.9.2" apply false
+    id("org.jetbrains.kotlin.jvm") version "2.3.20" apply false
     id("app.cash.paparazzi") version "1.3.5" apply false
     id("io.github.takahirom.roborazzi") version "1.10.0" apply false
     id("org.jetbrains.kotlin.android") version "2.3.20" apply false
@@ -63,6 +64,7 @@ subprojects {
 dependencies {
     kover(project(":app"))
     kover(project(":core"))
+    kover(project(":core:domain"))
     kover(project(":designsystem"))
     kover(project(":bot"))
     kover(project(":feature-chat"))

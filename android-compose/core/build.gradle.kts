@@ -88,6 +88,8 @@ kotlin {
 }
 
 dependencies {
+    api(project(":core:domain"))
+
     implementation("com.google.dagger:hilt-android:2.58")
     ksp("com.google.dagger:hilt-compiler:2.58")
 
