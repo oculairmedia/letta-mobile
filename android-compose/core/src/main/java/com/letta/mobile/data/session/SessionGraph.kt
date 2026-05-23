@@ -7,8 +7,11 @@ import com.letta.mobile.data.repository.FolderRepository
 import com.letta.mobile.data.repository.GroupRepository
 import com.letta.mobile.data.repository.IdentityRepository
 import com.letta.mobile.data.repository.JobRepository
+import com.letta.mobile.data.repository.ModelRepository
+import com.letta.mobile.data.repository.PassageRepository
 import com.letta.mobile.data.repository.ProviderRepository
 import com.letta.mobile.data.repository.RunRepository
+import com.letta.mobile.data.repository.ScheduleRepository
 import com.letta.mobile.data.repository.StepRepository
 import kotlinx.coroutines.CoroutineScope
 
@@ -21,8 +24,11 @@ class SessionGraph internal constructor(
     val folderRepository: FolderRepository,
     val groupRepository: GroupRepository,
     val identityRepository: IdentityRepository,
+    val modelRepository: ModelRepository,
+    val passageRepository: PassageRepository,
     val runRepository: RunRepository,
     val jobRepository: JobRepository,
     val providerRepository: ProviderRepository,
+    val scheduleRepository: ScheduleRepository,
     val stepRepository: StepRepository,
 )
