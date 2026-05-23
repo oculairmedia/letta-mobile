@@ -17,6 +17,7 @@ import io.ktor.utils.io.writeStringUtf8
 import io.mockk.mockk
 import kotlin.random.Random
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -31,6 +32,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
@@ -203,6 +205,44 @@ class TimelineSyncLoopTest {
             local is TimelineEvent.Local,
         )
         assertEquals("hello", local.content)
+        scope.coroutineContext.job.cancel()
+    }
+
+    @Test
+    fun `gateway worker rethrows cancellation instead of swallowing it`() = runTest {
+        val api = FakeSyncApi()
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
+        val sync = TimelineSyncLoop(api, "conv1", scope)
+        val cancellation = CancellationException("gateway cancelled")
+
+        val failedUpsert = async {
+            sync.upsertClientModeLocalAssistantChunk(
+                localId = "cm-cancel",
+                build = { throw cancellation },
+                transform = { it },
+            )
+        }
+
+        testScheduler.runCurrent()
+
+        try {
+            failedUpsert.await()
+            error("Expected gateway cancellation to propagate to the caller")
+        } catch (cancelled: CancellationException) {
+            assertEquals("gateway cancelled", cancelled.message)
+        }
+
+        val followUp = async { sync.appendExternalTransportLocal("after", "otid-after") }
+        testScheduler.runCurrent()
+
+        assertEquals(
+            "A swallowed CancellationException would leave the gateway worker alive and process follow-up events",
+            null,
+            withTimeoutOrNull(100) { followUp.await() },
+        )
+
+        followUp.cancel()
         scope.coroutineContext.job.cancel()
     }
 

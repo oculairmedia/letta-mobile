@@ -550,6 +550,9 @@ class TimelineSyncLoop(
                     is TimelineGatewayEvent.MarkSent -> applyMarkSent(event)
                     is TimelineGatewayEvent.MarkFailed -> applyMarkFailed(event)
                 }
+            } catch (cancelled: CancellationException) {
+                completeGatewayEventExceptionally(event, cancelled)
+                throw cancelled
             } catch (t: Throwable) {
                 completeGatewayEventExceptionally(event, t)
                 Telemetry.error(
