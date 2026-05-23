@@ -6,7 +6,6 @@ import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -276,11 +275,6 @@ private fun MermaidFullscreenDialog(
                             .onSizeChanged { viewportSize = it }
                             .clip(RoundedCornerShape(LettaSpacing.innerPadding))
                             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.08f))
-                            .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onDoubleTap = { resetViewport() },
-                                )
-                            }
                             .pointerInput(Unit) {
                                 detectTransformGestures { centroid, panChange, zoomChange, _ ->
                                     zoomState.onTransform(
