@@ -7,12 +7,14 @@ import com.letta.mobile.data.api.FolderApi
 import com.letta.mobile.data.api.GroupApi
 import com.letta.mobile.data.api.IdentityApi
 import com.letta.mobile.data.api.JobApi
+import com.letta.mobile.data.api.McpServerApi
 import com.letta.mobile.data.api.ModelApi
 import com.letta.mobile.data.api.PassageApi
 import com.letta.mobile.data.api.ProviderApi
 import com.letta.mobile.data.api.RunApi
 import com.letta.mobile.data.api.ScheduleApi
 import com.letta.mobile.data.api.StepApi
+import com.letta.mobile.data.api.ToolApi
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.repository.AgentRepository
@@ -22,12 +24,14 @@ import com.letta.mobile.data.repository.FolderRepository
 import com.letta.mobile.data.repository.GroupRepository
 import com.letta.mobile.data.repository.IdentityRepository
 import com.letta.mobile.data.repository.JobRepository
+import com.letta.mobile.data.repository.McpServerRepository
 import com.letta.mobile.data.repository.ModelRepository
 import com.letta.mobile.data.repository.PassageRepository
 import com.letta.mobile.data.repository.ProviderRepository
 import com.letta.mobile.data.repository.RunRepository
 import com.letta.mobile.data.repository.ScheduleRepository
 import com.letta.mobile.data.repository.StepRepository
+import com.letta.mobile.data.repository.ToolRepository
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -45,6 +49,7 @@ class SessionGraphFactory @Inject constructor(
     private val folderApi: FolderApi,
     private val groupApi: GroupApi,
     private val identityApi: IdentityApi,
+    private val mcpServerApi: McpServerApi,
     private val modelApi: ModelApi,
     private val passageApi: PassageApi,
     private val runApi: RunApi,
@@ -52,6 +57,7 @@ class SessionGraphFactory @Inject constructor(
     private val providerApi: ProviderApi,
     private val scheduleApi: ScheduleApi,
     private val stepApi: StepApi,
+    private val toolApi: ToolApi,
 ) {
     private val nextId = AtomicLong(0L)
 
@@ -76,6 +82,7 @@ class SessionGraphFactory @Inject constructor(
             folderRepository = FolderRepository(folderApi),
             groupRepository = GroupRepository(groupApi),
             identityRepository = IdentityRepository(identityApi),
+            mcpServerRepository = McpServerRepository(mcpServerApi),
             modelRepository = ModelRepository(modelApi),
             passageRepository = PassageRepository(passageApi),
             runRepository = RunRepository(runApi),
@@ -83,6 +90,7 @@ class SessionGraphFactory @Inject constructor(
             providerRepository = ProviderRepository(providerApi),
             scheduleRepository = ScheduleRepository(scheduleApi),
             stepRepository = StepRepository(stepApi),
+            toolRepository = ToolRepository(toolApi),
         )
     }
 }

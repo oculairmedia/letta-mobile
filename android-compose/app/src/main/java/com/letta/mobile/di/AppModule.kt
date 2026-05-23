@@ -11,13 +11,11 @@ import com.letta.mobile.data.health.IServerHealthRepository
 import com.letta.mobile.data.health.ServerHealthRepository
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.BugReportRepository
-import com.letta.mobile.data.repository.McpServerRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.ProjectRepository
 import com.letta.mobile.data.repository.ProjectWorkRepository
 import com.letta.mobile.data.repository.SettingsRepository
-import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.data.repository.VibesyncEventStreamRepository
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.repository.api.IArchiveRepository
@@ -50,12 +48,14 @@ import com.letta.mobile.data.session.SessionScopedFolderRepository
 import com.letta.mobile.data.session.SessionScopedGroupRepository
 import com.letta.mobile.data.session.SessionScopedIdentityRepository
 import com.letta.mobile.data.session.SessionScopedJobRepository
+import com.letta.mobile.data.session.SessionScopedMcpServerRepository
 import com.letta.mobile.data.session.SessionScopedModelRepository
 import com.letta.mobile.data.session.SessionScopedPassageRepository
 import com.letta.mobile.data.session.SessionScopedProviderRepository
 import com.letta.mobile.data.session.SessionScopedRunRepository
 import com.letta.mobile.data.session.SessionScopedScheduleRepository
 import com.letta.mobile.data.session.SessionScopedStepRepository
+import com.letta.mobile.data.session.SessionScopedToolRepository
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.timeline.api.TimelineClientModeWriter
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
@@ -131,7 +131,7 @@ abstract class AppModule {
 
     @Binds
     @Singleton
-    abstract fun bindToolRepository(impl: ToolRepository): IToolRepository
+    abstract fun bindToolRepository(impl: SessionScopedToolRepository): IToolRepository
 
     @Binds
     @Singleton
@@ -159,7 +159,7 @@ abstract class AppModule {
 
     @Binds
     @Singleton
-    abstract fun bindMcpServerRepository(impl: McpServerRepository): IMcpServerRepository
+    abstract fun bindMcpServerRepository(impl: SessionScopedMcpServerRepository): IMcpServerRepository
 
     @Binds
     @Singleton
