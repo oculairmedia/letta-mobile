@@ -53,4 +53,6 @@
 # - github.org
 # - github.repo
 
-dolt.shared-server: true
+dolt.shared-server: false
+
+sync.remote: "git+https://github.com/oculairmedia/letta-mobile.git"
