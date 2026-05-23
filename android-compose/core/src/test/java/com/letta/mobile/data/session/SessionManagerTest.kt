@@ -17,6 +17,7 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.Passage
+import com.letta.mobile.data.model.ProjectSummary
 import com.letta.mobile.data.model.Provider
 import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.model.RunListParams
@@ -38,6 +39,7 @@ import com.letta.mobile.testutil.FakeJobApi
 import com.letta.mobile.testutil.FakeMcpServerApi
 import com.letta.mobile.testutil.FakeModelApi
 import com.letta.mobile.testutil.FakePassageApi
+import com.letta.mobile.testutil.FakeProjectApi
 import com.letta.mobile.testutil.FakeProviderApi
 import com.letta.mobile.testutil.FakeRunApi
 import com.letta.mobile.testutil.FakeScheduleApi
@@ -82,6 +84,7 @@ class SessionManagerTest {
                 FakeMcpServerApi(),
                 FakeModelApi(),
                 FakePassageApi(),
+                FakeProjectApi(),
                 FakeRunApi(),
                 FakeJobApi(),
                 FakeProviderApi(),
@@ -124,6 +127,7 @@ class SessionManagerTest {
                 FakeMcpServerApi(),
                 FakeModelApi(),
                 FakePassageApi(),
+                FakeProjectApi(),
                 FakeRunApi(),
                 FakeJobApi(),
                 FakeProviderApi(),
@@ -174,6 +178,7 @@ class SessionManagerTest {
                 FakeMcpServerApi(),
                 FakeModelApi(),
                 FakePassageApi(),
+                FakeProjectApi(),
                 FakeRunApi(),
                 FakeJobApi(),
                 FakeProviderApi(),
@@ -222,6 +227,7 @@ class SessionManagerTest {
                 FakeMcpServerApi(),
                 FakeModelApi(),
                 FakePassageApi(),
+                FakeProjectApi(),
                 FakeRunApi(),
                 FakeJobApi(),
                 FakeProviderApi(),
@@ -279,6 +285,7 @@ class SessionManagerTest {
                 FakeMcpServerApi(),
                 FakeModelApi(),
                 FakePassageApi(),
+                FakeProjectApi(),
                 fakeRunApi,
                 fakeJobApi,
                 FakeProviderApi(),
@@ -359,6 +366,7 @@ class SessionManagerTest {
                 FakeMcpServerApi(),
                 FakeModelApi(),
                 FakePassageApi(),
+                FakeProjectApi(),
                 FakeRunApi(),
                 FakeJobApi(),
                 fakeProviderApi,
@@ -447,6 +455,7 @@ class SessionManagerTest {
                 FakeMcpServerApi(),
                 fakeModelApi,
                 fakePassageApi,
+                FakeProjectApi(),
                 FakeRunApi(),
                 FakeJobApi(),
                 FakeProviderApi(),
@@ -532,6 +541,7 @@ class SessionManagerTest {
                 fakeMcpServerApi,
                 FakeModelApi(),
                 FakePassageApi(),
+                FakeProjectApi(),
                 FakeRunApi(),
                 FakeJobApi(),
                 FakeProviderApi(),
@@ -583,6 +593,61 @@ class SessionManagerTest {
         assertEquals(listOf("tool-b"), agentTools.first().map { it.id.value })
         assertEquals(listOf("server-b"), mcpProxy.servers.value.map { it.id })
         assertEquals(listOf("mcp-tool-b"), serverTools.first().map { it.id.value })
+    }
+
+    @Test
+    fun `project repository proxy switches cache to rebuilt graph`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val fakeProjectApi = FakeProjectApi().apply {
+            projects = mutableListOf(sampleProject("project-a", "Backend A"))
+        }
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val sessionManager = SessionManager(
+            settingsRepository = settingsRepository,
+            sessionGraphFactory = SessionGraphFactory(
+                FakeAgentApi(),
+                FakeAgentDao(),
+                FakeConversationApi(),
+                FakeConversationDao(),
+                FakeArchiveApi(),
+                FakeFolderApi(),
+                FakeGroupApi(),
+                FakeIdentityApi(),
+                FakeMcpServerApi(),
+                FakeModelApi(),
+                FakePassageApi(),
+                fakeProjectApi,
+                FakeRunApi(),
+                FakeJobApi(),
+                FakeProviderApi(),
+                FakeScheduleApi(),
+                FakeStepApi(),
+                FakeToolApi(),
+            ),
+            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        val projectProxy = SessionScopedProjectRepository(
+            sessionManager = sessionManager,
+            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+
+        projectProxy.refreshProjects()
+        advanceUntilIdle()
+        assertEquals(listOf("project-a"), projectProxy.projects.value.map { it.identifier })
+        assertTrue(projectProxy.hasFreshProjects(maxAgeMs = 60_000))
+
+        fakeProjectApi.projects = mutableListOf(sampleProject("project-b", "Backend B"))
+        settingsRepository.activeConfigState.value = config("backend-b")
+        advanceUntilIdle()
+
+        assertEquals(emptyList<String>(), projectProxy.projects.value.map { it.identifier })
+        assertTrue(!projectProxy.hasFreshProjects(maxAgeMs = 60_000))
+
+        projectProxy.refreshProjects()
+        advanceUntilIdle()
+
+        assertEquals(listOf("project-b"), projectProxy.projects.value.map { it.identifier })
+        assertEquals("Backend B", projectProxy.getProject("project-b").name)
     }
 
     private fun config(id: String): LettaConfig = LettaConfig(
@@ -657,6 +722,11 @@ class SessionManagerTest {
     private fun sampleMcpServer(id: String) = McpServer(
         id = id,
         serverName = id,
+    )
+
+    private fun sampleProject(identifier: String, name: String) = ProjectSummary(
+        identifier = identifier,
+        name = name,
     )
 
     private class FakeAgentDao : AgentDao {
