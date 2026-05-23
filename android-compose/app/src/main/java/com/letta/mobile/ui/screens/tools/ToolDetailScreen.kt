@@ -26,10 +26,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -600,63 +598,50 @@ private fun ToolCodeSection(
 
     CardGroup(title = { Text(title) }, modifier = modifier) {
         item(
-            headlineContent = {
-                Column(
+            leadingContent = {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            },
+            headlineContent = { Text(title) },
+            supportingContent = {
+                Text(
+                    text = content,
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = LettaCodeFont),
+                    maxLines = if (expanded) Int.MAX_VALUE else 8,
+                    overflow = TextOverflow.Ellipsis,
+                    color = if (expanded) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .animateContentSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        .animateContentSize()
+                        .heightIn(min = if (expanded) 0.dp else 112.dp),
+                )
+            },
+            trailingContent = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onCopy) {
                         Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            imageVector = LettaIcons.Copy,
+                            contentDescription = stringResource(R.string.action_copy),
+                            modifier = Modifier.size(LettaIconSizing.Toolbar),
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.labelLarge,
-                            modifier = Modifier.weight(1f),
-                        )
-                        FilledTonalButton(
-                            onClick = onCopy,
-                            contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-                        ) {
-                            Icon(
-                                imageVector = LettaIcons.Copy,
-                                contentDescription = null,
-                                modifier = Modifier.size(ButtonDefaults.IconSize),
-                            )
-                            Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
-                            Text(stringResource(R.string.action_copy))
-                        }
-                        IconButton(onClick = { expanded = !expanded }) {
-                            Icon(
-                                imageVector = if (expanded) LettaIcons.ExpandLess else LettaIcons.ExpandMore,
-                                contentDescription = if (expanded) {
-                                    stringResource(R.string.screen_tool_detail_collapse)
-                                } else {
-                                    stringResource(R.string.screen_tool_detail_expand)
-                                },
-                            )
-                        }
                     }
-
-                    Text(
-                        text = content,
-                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = LettaCodeFont),
-                        maxLines = if (expanded) Int.MAX_VALUE else 8,
-                        overflow = TextOverflow.Ellipsis,
-                        color = if (expanded) {
-                            MaterialTheme.colorScheme.onSurface
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = if (expanded) 0.dp else 112.dp),
-                    )
+                    IconButton(onClick = { expanded = !expanded }) {
+                        Icon(
+                            imageVector = if (expanded) LettaIcons.ExpandLess else LettaIcons.ExpandMore,
+                            contentDescription = if (expanded) {
+                                stringResource(R.string.screen_tool_detail_collapse)
+                            } else {
+                                stringResource(R.string.screen_tool_detail_expand)
+                            },
+                        )
+                    }
                 }
             },
         )
