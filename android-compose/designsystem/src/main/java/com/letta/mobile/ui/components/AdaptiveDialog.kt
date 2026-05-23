@@ -14,10 +14,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LettaSizing
+import com.letta.mobile.ui.theme.LettaSpacing
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,7 +29,7 @@ fun AdaptiveDialog(
     content: @Composable () -> Unit,
 ) {
     BoxWithConstraints {
-        val isCompact = maxWidth < 600.dp
+        val isCompact = maxWidth < LettaSizing.compactWidthBreakpoint
 
         if (isCompact) {
             Dialog(
@@ -52,7 +53,7 @@ fun AdaptiveDialog(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(paddingValues)
-                            .padding(16.dp),
+                            .padding(LettaSpacing.innerPadding),
                     ) {
                         content()
                     }
@@ -62,9 +63,9 @@ fun AdaptiveDialog(
             Dialog(onDismissRequest = onDismiss) {
                 androidx.compose.material3.Card(
                     modifier = modifier
-                        .widthIn(max = 900.dp)
+                        .widthIn(max = LettaSizing.adaptiveDialogMaxWidth)
                         .fillMaxWidth()
-                        .padding(40.dp),
+                        .padding(LettaSpacing.dialogOuterPadding),
                 ) {
                     CenterAlignedTopAppBar(
                         title = { Text(title) },
@@ -75,7 +76,7 @@ fun AdaptiveDialog(
                         },
                     )
                     androidx.compose.foundation.layout.Box(
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier.padding(LettaSpacing.innerPadding),
                     ) {
                         content()
                     }
