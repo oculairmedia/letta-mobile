@@ -13,12 +13,9 @@ import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.BugReportRepository
 import com.letta.mobile.data.repository.McpServerRepository
 import com.letta.mobile.data.repository.MessageRepository
-import com.letta.mobile.data.repository.ModelRepository
-import com.letta.mobile.data.repository.PassageRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.ProjectRepository
 import com.letta.mobile.data.repository.ProjectWorkRepository
-import com.letta.mobile.data.repository.ScheduleRepository
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.data.repository.VibesyncEventStreamRepository
@@ -53,8 +50,11 @@ import com.letta.mobile.data.session.SessionScopedFolderRepository
 import com.letta.mobile.data.session.SessionScopedGroupRepository
 import com.letta.mobile.data.session.SessionScopedIdentityRepository
 import com.letta.mobile.data.session.SessionScopedJobRepository
+import com.letta.mobile.data.session.SessionScopedModelRepository
+import com.letta.mobile.data.session.SessionScopedPassageRepository
 import com.letta.mobile.data.session.SessionScopedProviderRepository
 import com.letta.mobile.data.session.SessionScopedRunRepository
+import com.letta.mobile.data.session.SessionScopedScheduleRepository
 import com.letta.mobile.data.session.SessionScopedStepRepository
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.timeline.api.TimelineClientModeWriter
@@ -163,11 +163,11 @@ abstract class AppModule {
 
     @Binds
     @Singleton
-    abstract fun bindModelRepository(impl: ModelRepository): IModelRepository
+    abstract fun bindModelRepository(impl: SessionScopedModelRepository): IModelRepository
 
     @Binds
     @Singleton
-    abstract fun bindPassageRepository(impl: PassageRepository): IPassageRepository
+    abstract fun bindPassageRepository(impl: SessionScopedPassageRepository): IPassageRepository
 
     @Binds
     @Singleton
@@ -179,7 +179,7 @@ abstract class AppModule {
 
     @Binds
     @Singleton
-    abstract fun bindScheduleRepository(impl: ScheduleRepository): IScheduleRepository
+    abstract fun bindScheduleRepository(impl: SessionScopedScheduleRepository): IScheduleRepository
 
     @Binds
     @Singleton

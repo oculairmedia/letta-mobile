@@ -7,8 +7,11 @@ import com.letta.mobile.data.api.FolderApi
 import com.letta.mobile.data.api.GroupApi
 import com.letta.mobile.data.api.IdentityApi
 import com.letta.mobile.data.api.JobApi
+import com.letta.mobile.data.api.ModelApi
+import com.letta.mobile.data.api.PassageApi
 import com.letta.mobile.data.api.ProviderApi
 import com.letta.mobile.data.api.RunApi
+import com.letta.mobile.data.api.ScheduleApi
 import com.letta.mobile.data.api.StepApi
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.ConversationDao
@@ -19,8 +22,11 @@ import com.letta.mobile.data.repository.FolderRepository
 import com.letta.mobile.data.repository.GroupRepository
 import com.letta.mobile.data.repository.IdentityRepository
 import com.letta.mobile.data.repository.JobRepository
+import com.letta.mobile.data.repository.ModelRepository
+import com.letta.mobile.data.repository.PassageRepository
 import com.letta.mobile.data.repository.ProviderRepository
 import com.letta.mobile.data.repository.RunRepository
+import com.letta.mobile.data.repository.ScheduleRepository
 import com.letta.mobile.data.repository.StepRepository
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
@@ -39,9 +45,12 @@ class SessionGraphFactory @Inject constructor(
     private val folderApi: FolderApi,
     private val groupApi: GroupApi,
     private val identityApi: IdentityApi,
+    private val modelApi: ModelApi,
+    private val passageApi: PassageApi,
     private val runApi: RunApi,
     private val jobApi: JobApi,
     private val providerApi: ProviderApi,
+    private val scheduleApi: ScheduleApi,
     private val stepApi: StepApi,
 ) {
     private val nextId = AtomicLong(0L)
@@ -67,9 +76,12 @@ class SessionGraphFactory @Inject constructor(
             folderRepository = FolderRepository(folderApi),
             groupRepository = GroupRepository(groupApi),
             identityRepository = IdentityRepository(identityApi),
+            modelRepository = ModelRepository(modelApi),
+            passageRepository = PassageRepository(passageApi),
             runRepository = RunRepository(runApi),
             jobRepository = JobRepository(jobApi),
             providerRepository = ProviderRepository(providerApi),
+            scheduleRepository = ScheduleRepository(scheduleApi),
             stepRepository = StepRepository(stepApi),
         )
     }

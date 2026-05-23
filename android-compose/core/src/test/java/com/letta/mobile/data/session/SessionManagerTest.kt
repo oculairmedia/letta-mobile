@@ -7,16 +7,23 @@ import com.letta.mobile.data.local.ConversationEntity
 import com.letta.mobile.data.local.ConversationRefreshEntity
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Archive
+import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.Folder
 import com.letta.mobile.data.model.Group
 import com.letta.mobile.data.model.Identity
 import com.letta.mobile.data.model.Job
 import com.letta.mobile.data.model.JobListParams
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.Passage
 import com.letta.mobile.data.model.Provider
 import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.model.RunListParams
 import com.letta.mobile.data.model.RunRequestConfig
+import com.letta.mobile.data.model.ScheduleDefinition
+import com.letta.mobile.data.model.ScheduleMessage
+import com.letta.mobile.data.model.SchedulePayload
+import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.data.model.StepListParams
 import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeArchiveApi
@@ -25,8 +32,11 @@ import com.letta.mobile.testutil.FakeFolderApi
 import com.letta.mobile.testutil.FakeGroupApi
 import com.letta.mobile.testutil.FakeIdentityApi
 import com.letta.mobile.testutil.FakeJobApi
+import com.letta.mobile.testutil.FakeModelApi
+import com.letta.mobile.testutil.FakePassageApi
 import com.letta.mobile.testutil.FakeProviderApi
 import com.letta.mobile.testutil.FakeRunApi
+import com.letta.mobile.testutil.FakeScheduleApi
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.FakeStepApi
 import com.letta.mobile.testutil.TestData
@@ -35,6 +45,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.job
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -63,9 +74,12 @@ class SessionManagerTest {
                 FakeFolderApi(),
                 FakeGroupApi(),
                 FakeIdentityApi(),
+                FakeModelApi(),
+                FakePassageApi(),
                 FakeRunApi(),
                 FakeJobApi(),
                 FakeProviderApi(),
+                FakeScheduleApi(),
                 FakeStepApi(),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
@@ -100,9 +114,12 @@ class SessionManagerTest {
                 FakeFolderApi(),
                 FakeGroupApi(),
                 FakeIdentityApi(),
+                FakeModelApi(),
+                FakePassageApi(),
                 FakeRunApi(),
                 FakeJobApi(),
                 FakeProviderApi(),
+                FakeScheduleApi(),
                 FakeStepApi(),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
@@ -145,9 +162,12 @@ class SessionManagerTest {
                 FakeFolderApi(),
                 FakeGroupApi(),
                 FakeIdentityApi(),
+                FakeModelApi(),
+                FakePassageApi(),
                 FakeRunApi(),
                 FakeJobApi(),
                 FakeProviderApi(),
+                FakeScheduleApi(),
                 FakeStepApi(),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
@@ -188,9 +208,12 @@ class SessionManagerTest {
                 FakeFolderApi(),
                 FakeGroupApi(),
                 FakeIdentityApi(),
+                FakeModelApi(),
+                FakePassageApi(),
                 FakeRunApi(),
                 FakeJobApi(),
                 FakeProviderApi(),
+                FakeScheduleApi(),
                 FakeStepApi(),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
@@ -240,9 +263,12 @@ class SessionManagerTest {
                 FakeFolderApi(),
                 FakeGroupApi(),
                 FakeIdentityApi(),
+                FakeModelApi(),
+                FakePassageApi(),
                 fakeRunApi,
                 fakeJobApi,
                 FakeProviderApi(),
+                FakeScheduleApi(),
                 fakeStepApi,
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
@@ -315,9 +341,12 @@ class SessionManagerTest {
                 fakeFolderApi,
                 fakeGroupApi,
                 fakeIdentityApi,
+                FakeModelApi(),
+                FakePassageApi(),
                 FakeRunApi(),
                 FakeJobApi(),
                 fakeProviderApi,
+                FakeScheduleApi(),
                 FakeStepApi(),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
@@ -373,6 +402,92 @@ class SessionManagerTest {
         assertEquals(listOf("provider-b"), providerProxy.providers.value.map { it.id })
     }
 
+    @Test
+    fun `model schedule and passage repository proxies switch caches to rebuilt graph`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val fakeModelApi = FakeModelApi().apply {
+            llmModels = mutableListOf(sampleLlmModel("llm-a"))
+            embeddingModels = mutableListOf(sampleEmbeddingModel("embedding-a"))
+        }
+        val fakePassageApi = FakePassageApi().apply {
+            setPassages("agent-1", listOf(Passage(id = "passage-a", text = "Backend A", agentId = "agent-1")))
+        }
+        val fakeScheduleApi = FakeScheduleApi().apply {
+            schedules["agent-1"] = mutableListOf(sampleScheduledMessage("schedule-a"))
+        }
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val sessionManager = SessionManager(
+            settingsRepository = settingsRepository,
+            sessionGraphFactory = SessionGraphFactory(
+                FakeAgentApi(),
+                FakeAgentDao(),
+                FakeConversationApi(),
+                FakeConversationDao(),
+                FakeArchiveApi(),
+                FakeFolderApi(),
+                FakeGroupApi(),
+                FakeIdentityApi(),
+                fakeModelApi,
+                fakePassageApi,
+                FakeRunApi(),
+                FakeJobApi(),
+                FakeProviderApi(),
+                fakeScheduleApi,
+                FakeStepApi(),
+            ),
+            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        val modelProxy = SessionScopedModelRepository(
+            sessionManager = sessionManager,
+            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        val passageProxy = SessionScopedPassageRepository(
+            sessionManager = sessionManager,
+            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        val scheduleProxy = SessionScopedScheduleRepository(
+            sessionManager = sessionManager,
+            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        val passages = passageProxy.getPassages("agent-1")
+
+        modelProxy.refreshLlmModels()
+        modelProxy.refreshEmbeddingModels()
+        passageProxy.refreshPassages("agent-1")
+        scheduleProxy.refreshSchedules("agent-1")
+        advanceUntilIdle()
+        assertEquals(listOf("llm-a"), modelProxy.llmModels.value.map { it.id })
+        assertEquals(listOf("embedding-a"), modelProxy.embeddingModels.value.map { it.id })
+        assertEquals(listOf("passage-a"), passages.value.map { it.id })
+        assertEquals(listOf("schedule-a"), scheduleProxy.getSchedules("agent-1").first().map { it.id })
+
+        fakeModelApi.llmModels = mutableListOf(sampleLlmModel("llm-b"))
+        fakeModelApi.embeddingModels = mutableListOf(sampleEmbeddingModel("embedding-b"))
+        fakePassageApi.setPassages(
+            "agent-1",
+            listOf(Passage(id = "passage-b", text = "Backend B", agentId = "agent-1")),
+        )
+        fakeScheduleApi.schedules["agent-1"] = mutableListOf(sampleScheduledMessage("schedule-b"))
+        settingsRepository.activeConfigState.value = config("backend-b")
+        advanceUntilIdle()
+
+        assertEquals(emptyList<String>(), modelProxy.llmModels.value.map { it.id })
+        assertEquals(emptyList<String>(), modelProxy.embeddingModels.value.map { it.id })
+        assertEquals(emptyList<String>(), passages.value.map { it.id })
+        assertEquals(emptyList<String>(), scheduleProxy.getSchedules("agent-1").first().map { it.id })
+
+        modelProxy.refreshLlmModels()
+        modelProxy.refreshEmbeddingModels()
+        passageProxy.refreshPassages("agent-1")
+        scheduleProxy.refreshSchedules("agent-1")
+        advanceUntilIdle()
+
+        assertEquals(listOf("llm-b"), modelProxy.llmModels.value.map { it.id })
+        assertEquals(listOf("embedding-b"), modelProxy.embeddingModels.value.map { it.id })
+        assertEquals(listOf("passage-b"), passages.value.map { it.id })
+        assertEquals(listOf("schedule-b"), scheduleProxy.getSchedules("agent-1").first().map { it.id })
+    }
+
     private fun config(id: String): LettaConfig = LettaConfig(
         id = id,
         mode = LettaConfig.Mode.SELF_HOSTED,
@@ -414,6 +529,27 @@ class SessionManagerTest {
         id = id,
         name = name,
         providerType = "openai",
+    )
+
+    private fun sampleLlmModel(id: String) = LlmModel(
+        id = id,
+        name = id,
+        providerType = "openai",
+    )
+
+    private fun sampleEmbeddingModel(id: String) = EmbeddingModel(
+        id = id,
+        name = id,
+        providerType = "openai",
+    )
+
+    private fun sampleScheduledMessage(id: String) = ScheduledMessage(
+        id = id,
+        agentId = "agent-1",
+        message = SchedulePayload(
+            messages = listOf(ScheduleMessage(content = "hello", role = "user")),
+        ),
+        schedule = ScheduleDefinition(type = "one-time", scheduledAt = 1_700_000_000.0),
     )
 
     private class FakeAgentDao : AgentDao {

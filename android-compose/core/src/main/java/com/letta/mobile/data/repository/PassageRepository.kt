@@ -7,18 +7,15 @@ import com.letta.mobile.data.repository.api.IPassageRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class PassageRepository @Inject constructor(
+open class PassageRepository(
     private val passageApi: PassageApi,
 ) : IPassageRepository {
     private val cacheLock = Any()
     private val _passages = MutableStateFlow<Map<String, List<Passage>>>(emptyMap())
     private val passageFlowsByAgent = mutableMapOf<String, MutableStateFlow<List<Passage>>>()
 
-    override fun getPassages(agentId: String): StateFlow<List<Passage>> {
+    override open fun getPassages(agentId: String): StateFlow<List<Passage>> {
         return synchronized(cacheLock) {
             passageFlowsByAgent
                 .getOrPut(agentId) { MutableStateFlow(_passages.value[agentId].orEmpty()) }
@@ -26,18 +23,18 @@ class PassageRepository @Inject constructor(
         }
     }
 
-    override suspend fun refreshPassages(agentId: String) {
+    override open suspend fun refreshPassages(agentId: String) {
         val passages = passageApi.listPassages(agentId, limit = 100)
         replaceCachedPassages(agentId, passages)
     }
 
-    override suspend fun createPassage(agentId: String, text: String): Passage {
+    override open suspend fun createPassage(agentId: String, text: String): Passage {
         val passage = passageApi.createPassage(agentId, PassageCreateParams(text = text))
         refreshPassages(agentId)
         return passage
     }
 
-    override suspend fun deletePassage(agentId: String, passageId: String) {
+    override open suspend fun deletePassage(agentId: String, passageId: String) {
         passageApi.deletePassage(agentId, passageId)
         replaceCachedPassages(
             agentId = agentId,
@@ -45,7 +42,7 @@ class PassageRepository @Inject constructor(
         )
     }
 
-    override suspend fun searchArchival(agentId: String, query: String): List<Passage> {
+    override open suspend fun searchArchival(agentId: String, query: String): List<Passage> {
         return passageApi.searchArchival(agentId, query, limit = 50)
     }
 

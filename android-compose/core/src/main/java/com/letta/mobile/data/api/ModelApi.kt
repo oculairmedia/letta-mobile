@@ -8,10 +8,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class ModelApi @Inject constructor(
+open class ModelApi @Inject constructor(
     private val apiClient: LettaApiClient
 ) {
-    suspend fun listLlmModels(): List<LlmModel> {
+    open suspend fun listLlmModels(): List<LlmModel> {
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
 
@@ -22,7 +22,7 @@ class ModelApi @Inject constructor(
         return response.body()
     }
 
-    suspend fun listEmbeddingModels(): List<EmbeddingModel> {
+    open suspend fun listEmbeddingModels(): List<EmbeddingModel> {
         val client = apiClient.getClient()
         val baseUrl = apiClient.getBaseUrl()
 
