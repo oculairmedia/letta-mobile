@@ -26,8 +26,9 @@ import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,12 +57,7 @@ fun VibesyncDebugScreen(
             ) {
                 CardGroup(title = { Text(stringResource(R.string.screen_vibesync_debug_status_section)) }) {
                     item(headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_status_label)) }, supportingContent = { Text(state.data.health?.status.orEmpty()) })
-                    item(headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_uptime_label)) }, supportingContent = {
-                        val uptimeText = state.data.health?.uptime?.let { el ->
-                            runCatching { el.jsonObject["human"]?.jsonPrimitive?.content }.getOrNull()
-                        }.orEmpty()
-                        Text(uptimeText)
-                    })
+                    item(headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_uptime_label)) }, supportingContent = { Text(state.data.health?.uptime?.humanValue().orEmpty()) })
                     item(headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_sse_clients_label)) }, supportingContent = { Text(state.data.stats?.sseClients?.toString().orEmpty()) })
                     item(headlineContent = { Text(stringResource(R.string.screen_vibesync_debug_database_label)) }, supportingContent = { Text(state.data.stats?.database?.toString().orEmpty()) })
                 }
@@ -97,3 +93,5 @@ fun VibesyncDebugScreen(
         }
     }
 }
+
+private fun JsonElement.humanValue(): String = ((this as? JsonObject)?.get("human") as? JsonPrimitive)?.content.orEmpty()

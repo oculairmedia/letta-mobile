@@ -107,16 +107,16 @@ data class PmAgentMetadata(
 
 @Serializable
 data class VibesyncHealthResponse(
-    val status: String? = null,
     val service: String? = null,
     val version: String? = null,
+    val status: String? = null,
     val uptime: JsonElement? = null,
     val sync: JsonElement? = null,
     val memory: JsonElement? = null,
     @SerialName("lastError") val lastError: JsonElement? = null,
     val config: JsonElement? = null,
-    @SerialName("connectionPool") val connectionPool: JsonElement? = null,
     val rigs: JsonElement? = null,
+    @SerialName("connectionPool") val connectionPool: JsonElement? = null,
 )
 
 @Serializable
