@@ -7,6 +7,7 @@ import com.letta.mobile.data.api.FolderApi
 import com.letta.mobile.data.api.GroupApi
 import com.letta.mobile.data.api.IdentityApi
 import com.letta.mobile.data.api.JobApi
+import com.letta.mobile.data.api.LettaApiClient
 import com.letta.mobile.data.api.McpServerApi
 import com.letta.mobile.data.api.ModelApi
 import com.letta.mobile.data.api.PassageApi
@@ -23,6 +24,7 @@ import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.ArchiveRepository
 import com.letta.mobile.data.repository.ConversationRepository
+import com.letta.mobile.data.repository.CronRepository
 import com.letta.mobile.data.repository.FolderRepository
 import com.letta.mobile.data.repository.GroupRepository
 import com.letta.mobile.data.repository.IdentityRepository
@@ -37,6 +39,8 @@ import com.letta.mobile.data.repository.RunRepository
 import com.letta.mobile.data.repository.ScheduleRepository
 import com.letta.mobile.data.repository.StepRepository
 import com.letta.mobile.data.repository.ToolRepository
+import com.letta.mobile.data.repository.VibesyncEventStreamRepository
+import com.letta.mobile.data.transport.ChannelTransport
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -54,6 +58,7 @@ class SessionGraphFactory @Inject constructor(
     private val folderApi: FolderApi,
     private val groupApi: GroupApi,
     private val identityApi: IdentityApi,
+    private val lettaApiClient: LettaApiClient,
     private val mcpServerApi: McpServerApi,
     private val modelApi: ModelApi,
     private val passageApi: PassageApi,
@@ -75,6 +80,7 @@ class SessionGraphFactory @Inject constructor(
             agentDao = agentDao,
             repositoryScope = scope,
         )
+        val channelTransport = ChannelTransport(scope)
         return SessionGraph(
             id = nextId.incrementAndGet(),
             scope = scope,
@@ -84,11 +90,16 @@ class SessionGraphFactory @Inject constructor(
                 conversationDao = conversationDao,
                 repositoryScope = scope,
             ),
+            channelTransport = channelTransport,
             conversationRepository = ConversationRepository(
                 conversationApi = conversationApi,
                 agentRepository = agentRepository,
                 conversationDao = conversationDao,
                 repositoryScope = scope,
+            ),
+            cronRepository = CronRepository(
+                transport = channelTransport,
+                scope = scope,
             ),
             archiveRepository = ArchiveRepository(archiveApi),
             folderRepository = FolderRepository(folderApi),
@@ -105,6 +116,10 @@ class SessionGraphFactory @Inject constructor(
             scheduleRepository = ScheduleRepository(scheduleApi),
             stepRepository = StepRepository(stepApi),
             toolRepository = ToolRepository(toolApi),
+            vibesyncEventStreamRepository = VibesyncEventStreamRepository(
+                apiClient = lettaApiClient,
+                scope = scope,
+            ),
         )
     }
 }

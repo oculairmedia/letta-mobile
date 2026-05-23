@@ -4,6 +4,7 @@ import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.ArchiveRepository
 import com.letta.mobile.data.repository.ConversationRepository
+import com.letta.mobile.data.repository.CronRepository
 import com.letta.mobile.data.repository.FolderRepository
 import com.letta.mobile.data.repository.GroupRepository
 import com.letta.mobile.data.repository.IdentityRepository
@@ -18,6 +19,8 @@ import com.letta.mobile.data.repository.RunRepository
 import com.letta.mobile.data.repository.ScheduleRepository
 import com.letta.mobile.data.repository.StepRepository
 import com.letta.mobile.data.repository.ToolRepository
+import com.letta.mobile.data.repository.VibesyncEventStreamRepository
+import com.letta.mobile.data.transport.ChannelTransport
 import kotlinx.coroutines.CoroutineScope
 
 class SessionGraph internal constructor(
@@ -25,7 +28,9 @@ class SessionGraph internal constructor(
     val scope: CoroutineScope,
     val agentRepository: AgentRepository,
     val allConversationsRepository: AllConversationsRepository,
+    val channelTransport: ChannelTransport,
     val conversationRepository: ConversationRepository,
+    val cronRepository: CronRepository,
     val archiveRepository: ArchiveRepository,
     val folderRepository: FolderRepository,
     val groupRepository: GroupRepository,
@@ -41,4 +46,5 @@ class SessionGraph internal constructor(
     val scheduleRepository: ScheduleRepository,
     val stepRepository: StepRepository,
     val toolRepository: ToolRepository,
+    val vibesyncEventStreamRepository: VibesyncEventStreamRepository,
 )
