@@ -20,10 +20,12 @@ class PinchScalePreviewController(
         private set
 
     private var baseScale = 1f
+    private var pendingCommittedScale: Float? = null
 
     fun begin(activeScale: Float) {
         baseScale = activeScale.coerceIn(minScale, maxScale)
         transientScale = 1f
+        pendingCommittedScale = null
         isPinching = true
     }
 
@@ -32,16 +34,25 @@ class PinchScalePreviewController(
         transientScale = visualScale / baseScale
     }
 
-    fun finish(): Float {
+    fun finishPreview(): Float {
         val snapped = snap(baseScale * transientScale)
-        baseScale = snapped
-        transientScale = 1f
+        pendingCommittedScale = snapped
         isPinching = false
         return snapped
     }
 
+    fun syncCommittedScale(activeScale: Float) {
+        val pending = pendingCommittedScale ?: return
+        if (activeScale == pending) {
+            baseScale = pending
+            transientScale = 1f
+            pendingCommittedScale = null
+        }
+    }
+
     fun cancel() {
         transientScale = 1f
+        pendingCommittedScale = null
         isPinching = false
     }
 

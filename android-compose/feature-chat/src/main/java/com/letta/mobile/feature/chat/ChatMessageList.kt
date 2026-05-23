@@ -82,6 +82,7 @@ internal fun ChatMessageList(
     val pinchFontScaleController = remember {
         PinchScalePreviewController(minScale = 0.7f, maxScale = 1.6f, step = 0.02f)
     }
+    pinchFontScaleController.syncCommittedScale(activeFontScale)
 
     LaunchedEffect(pinchTick) {
         if (pinchTick > 0) {
@@ -183,7 +184,7 @@ internal fun ChatMessageList(
                         }
                     } while (event.changes.any { it.pressed })
                     if (gesturePinching) {
-                        val snapped = pinchFontScaleController.finish()
+                        val snapped = pinchFontScaleController.finishPreview()
                         onActiveFontScaleChange(snapped)
                         onFontScaleChange(snapped)
                         pinchTick = System.nanoTime()

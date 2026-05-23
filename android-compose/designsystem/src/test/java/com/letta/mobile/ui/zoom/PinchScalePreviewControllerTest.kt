@@ -15,8 +15,10 @@ class PinchScalePreviewControllerTest {
 
         assertTrue(controller.isPinching)
         assertEquals(1.24f, controller.transientScale, 0.001f)
-        assertEquals(1.24f, controller.finish(), 0.001f)
+        assertEquals(1.24f, controller.finishPreview(), 0.001f)
         assertFalse(controller.isPinching)
+        assertEquals(1.24f, controller.transientScale, 0.001f)
+        controller.syncCommittedScale(1.24f)
         assertEquals(1f, controller.transientScale, 0.001f)
     }
 
@@ -28,6 +30,6 @@ class PinchScalePreviewControllerTest {
         controller.applyZoom(2f)
 
         assertEquals(1.6f / 1.5f, controller.transientScale, 0.001f)
-        assertEquals(1.6f, controller.finish(), 0.001f)
+        assertEquals(1.6f, controller.finishPreview(), 0.001f)
     }
 }
