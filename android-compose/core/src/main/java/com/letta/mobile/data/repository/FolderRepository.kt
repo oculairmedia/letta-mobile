@@ -13,11 +13,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class FolderRepository @Inject constructor(
+class FolderRepository(
     private val folderApi: FolderApi,
 ) : IFolderRepository {
     private val _folders = MutableStateFlow<List<Folder>>(emptyList())

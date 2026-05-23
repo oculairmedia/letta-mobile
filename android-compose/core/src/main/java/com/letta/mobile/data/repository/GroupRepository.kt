@@ -14,11 +14,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.JsonElement
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class GroupRepository @Inject constructor(
+class GroupRepository(
     private val groupApi: GroupApi,
 ) : IGroupRepository {
     private val _groups = MutableStateFlow<List<Group>>(emptyList())
