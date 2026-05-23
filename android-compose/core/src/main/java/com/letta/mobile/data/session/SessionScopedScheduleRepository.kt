@@ -6,6 +6,7 @@ import com.letta.mobile.data.repository.api.IScheduleRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
@@ -45,4 +46,6 @@ class SessionScopedScheduleRepository internal constructor(
 
     override suspend fun deleteSchedule(agentId: String, scheduledMessageId: String) =
         sessionManager.withCurrentSession { it.scheduleRepository.deleteSchedule(agentId, scheduledMessageId) }
+
+    fun close() { proxyScope.cancel() }
 }

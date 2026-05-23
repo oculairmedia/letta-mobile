@@ -9,6 +9,7 @@ import com.letta.mobile.data.model.StepMetrics
 import com.letta.mobile.data.repository.api.IStepRepository
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -64,4 +65,6 @@ class SessionScopedStepRepository internal constructor(
         sessionManager.withCurrentSession { it.stepRepository.updateStepFeedback(stepId, params) }
 
     override fun upsertStep(step: Step) = current.upsertStep(step)
+
+    fun close() { proxyScope.cancel() }
 }

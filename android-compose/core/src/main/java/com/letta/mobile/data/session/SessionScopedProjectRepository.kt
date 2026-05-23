@@ -9,6 +9,7 @@ import com.letta.mobile.data.repository.api.IProjectRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -67,4 +68,6 @@ class SessionScopedProjectRepository internal constructor(
     override suspend fun deleteProject(identifier: String) = sessionManager.withCurrentSession { it.projectRepository.deleteProject(identifier) }
     override fun hasFreshProjects(maxAgeMs: Long): Boolean = current.hasFreshProjects(maxAgeMs)
     override suspend fun refreshProjectsIfStale(maxAgeMs: Long): Boolean = sessionManager.withCurrentSession { it.projectRepository.refreshProjectsIfStale(maxAgeMs) }
+
+    fun close() { proxyScope.cancel() }
 }

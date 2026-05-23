@@ -7,6 +7,7 @@ import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
@@ -54,11 +55,13 @@ class SessionScopedAllConversationsRepository internal constructor(
     private val current: IAllConversationsRepository
         get() = sessionManager.current.allConversationsRepository
 
+    @Suppress("UNCHECKED_CAST")
     override fun getConversationsPaged(
         agentId: String?,
         archiveStatus: String?,
         summarySearch: String?,
-    ): Flow<PagingData<Conversation>> = current.getConversationsPaged(agentId, archiveStatus, summarySearch)
+    ): Flow<PagingData<Conversation>> = sessionManager.currentGraph
+        .flatMapLatest { it.allConversationsRepository.getConversationsPaged(agentId, archiveStatus, summarySearch) }
 
     override suspend fun loadNextPage() = sessionManager.withCurrentSession { it.allConversationsRepository.loadNextPage() }
     override suspend fun refresh() = sessionManager.withCurrentSession { it.allConversationsRepository.refresh() }
@@ -71,4 +74,6 @@ class SessionScopedAllConversationsRepository internal constructor(
     @Deprecated("Use loadedCountEstimate() and render approximate/unknown states explicitly.")
     @Suppress("DEPRECATION")
     override suspend fun countConversations(): Int = sessionManager.withCurrentSession { it.allConversationsRepository.countConversations() }
+
+    fun close() { proxyScope.cancel() }
 }

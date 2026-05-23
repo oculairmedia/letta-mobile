@@ -11,6 +11,7 @@ import io.ktor.utils.io.ByteReadChannel
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -76,4 +77,6 @@ class SessionScopedGroupRepository internal constructor(
     override suspend fun listGroupMessages(groupId: String): List<LettaMessage> = sessionManager.withCurrentSession { it.groupRepository.listGroupMessages(groupId) }
 
     override suspend fun resetGroupMessages(groupId: String) = sessionManager.withCurrentSession { it.groupRepository.resetGroupMessages(groupId) }
+
+    fun close() { proxyScope.cancel() }
 }

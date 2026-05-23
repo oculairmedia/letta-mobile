@@ -11,6 +11,7 @@ import com.letta.mobile.data.repository.api.IMcpServerRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -50,6 +52,17 @@ class SessionScopedMcpServerRepository internal constructor(
         sessionManager.currentGraph
             .flatMapLatest { it.mcpServerRepository.servers }
             .onEach { _servers.value = it }
+            .launchIn(proxyScope)
+        sessionManager.currentGraph
+            .drop(1)
+            .onEach {
+                synchronized(cacheLock) {
+                    serverToolJobs.values.forEach { it.cancel() }
+                    serverToolJobs.clear()
+                    serverToolFlows.values.forEach { it.value = emptyList() }
+                    serverToolFlows.clear()
+                }
+            }
             .launchIn(proxyScope)
     }
 
@@ -86,4 +99,6 @@ class SessionScopedMcpServerRepository internal constructor(
     override suspend fun createServer(params: McpServerCreateParams): McpServer = sessionManager.withCurrentSession { it.mcpServerRepository.createServer(params) }
     override suspend fun updateServer(id: String, params: McpServerUpdateParams): McpServer = sessionManager.withCurrentSession { it.mcpServerRepository.updateServer(id, params) }
     override suspend fun deleteServer(id: String) = sessionManager.withCurrentSession { it.mcpServerRepository.deleteServer(id) }
+
+    fun close() { proxyScope.cancel() }
 }

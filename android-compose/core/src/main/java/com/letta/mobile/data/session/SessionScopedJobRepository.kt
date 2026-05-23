@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.JobListParams
 import com.letta.mobile.data.repository.api.IJobRepository
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -53,4 +54,6 @@ class SessionScopedJobRepository internal constructor(
     override suspend fun deleteJob(jobId: String): Job = sessionManager.withCurrentSession { it.jobRepository.deleteJob(jobId) }
 
     override fun upsertJob(job: Job) = current.upsertJob(job)
+
+    fun close() { proxyScope.cancel() }
 }

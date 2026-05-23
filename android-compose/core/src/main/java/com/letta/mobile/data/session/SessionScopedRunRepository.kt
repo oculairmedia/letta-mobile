@@ -9,6 +9,7 @@ import com.letta.mobile.data.model.UsageStatistics
 import com.letta.mobile.data.repository.api.IRunRepository
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -67,4 +68,6 @@ class SessionScopedRunRepository internal constructor(
     override suspend fun deleteRun(runId: String) = sessionManager.withCurrentSession { it.runRepository.deleteRun(runId) }
 
     override fun upsertRun(run: Run) = current.upsertRun(run)
+
+    fun close() { proxyScope.cancel() }
 }

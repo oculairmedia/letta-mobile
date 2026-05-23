@@ -5,12 +5,14 @@ import com.letta.mobile.data.repository.api.IPassageRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -35,6 +37,20 @@ class SessionScopedPassageRepository internal constructor(
     private val cacheLock = Any()
     private val passageFlowsByAgent = mutableMapOf<String, MutableStateFlow<List<Passage>>>()
     private val passageJobsByAgent = mutableMapOf<String, Job>()
+
+    init {
+        sessionManager.currentGraph
+            .drop(1)
+            .onEach {
+                synchronized(cacheLock) {
+                    passageJobsByAgent.values.forEach { it.cancel() }
+                    passageJobsByAgent.clear()
+                    passageFlowsByAgent.values.forEach { it.value = emptyList() }
+                    passageFlowsByAgent.clear()
+                }
+            }
+            .launchIn(proxyScope)
+    }
 
     private val current: IPassageRepository
         get() = sessionManager.current.passageRepository
@@ -61,4 +77,6 @@ class SessionScopedPassageRepository internal constructor(
 
     override suspend fun searchArchival(agentId: String, query: String): List<Passage> =
         sessionManager.withCurrentSession { it.passageRepository.searchArchival(agentId, query) }
+
+    fun close() { proxyScope.cancel() }
 }

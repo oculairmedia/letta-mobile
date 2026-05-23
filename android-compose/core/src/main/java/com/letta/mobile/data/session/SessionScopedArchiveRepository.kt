@@ -8,6 +8,7 @@ import com.letta.mobile.data.repository.api.IArchiveRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -66,4 +67,6 @@ class SessionScopedArchiveRepository internal constructor(
 
     override suspend fun deletePassageFromArchive(archiveId: String, passageId: String) =
         sessionManager.withCurrentSession { it.archiveRepository.deletePassageFromArchive(archiveId, passageId) }
+
+    fun close() { proxyScope.cancel() }
 }

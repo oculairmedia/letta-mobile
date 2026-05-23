@@ -7,6 +7,7 @@ import com.letta.mobile.data.repository.api.IToolRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -45,6 +47,17 @@ class SessionScopedToolRepository internal constructor(
             .flatMapLatest { it.toolRepository.getTools() }
             .onEach { _tools.value = it }
             .launchIn(proxyScope)
+        sessionManager.currentGraph
+            .drop(1)
+            .onEach {
+                synchronized(cacheLock) {
+                    agentToolJobs.values.forEach { it.cancel() }
+                    agentToolJobs.clear()
+                    agentToolFlows.values.forEach { it.value = emptyList() }
+                    agentToolFlows.clear()
+                }
+            }
+            .launchIn(proxyScope)
     }
 
     private val current: IToolRepository
@@ -75,4 +88,6 @@ class SessionScopedToolRepository internal constructor(
     override suspend fun upsertTool(params: ToolCreateParams): Tool = sessionManager.withCurrentSession { it.toolRepository.upsertTool(params) }
     override suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool = sessionManager.withCurrentSession { it.toolRepository.updateTool(toolId, params) }
     override suspend fun deleteTool(toolId: String) = sessionManager.withCurrentSession { it.toolRepository.deleteTool(toolId) }
+
+    fun close() { proxyScope.cancel() }
 }

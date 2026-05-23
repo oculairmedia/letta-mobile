@@ -11,6 +11,7 @@ import io.ktor.http.ContentType
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -92,4 +93,6 @@ class SessionScopedFolderRepository internal constructor(
 
     override suspend fun deleteFileFromFolder(folderId: String, fileId: String) =
         sessionManager.withCurrentSession { it.folderRepository.deleteFileFromFolder(folderId, fileId) }
+
+    fun close() { proxyScope.cancel() }
 }
