@@ -18,6 +18,8 @@ class PinchScalePreviewControllerTest {
         assertEquals(1.24f, controller.finishPreview(), 0.001f)
         assertFalse(controller.isPinching)
         assertEquals(1.24f, controller.transientScale, 0.001f)
+        assertEquals(1f, controller.visualScaleFor(activeScale = 1.24f), 0.001f)
+        assertEquals(1.24f, controller.visualScaleFor(activeScale = 1f), 0.001f)
         controller.syncCommittedScale(1.24f)
         assertEquals(1f, controller.transientScale, 0.001f)
     }

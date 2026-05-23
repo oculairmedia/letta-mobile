@@ -25,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -82,7 +83,10 @@ internal fun ChatMessageList(
     val pinchFontScaleController = remember {
         PinchScalePreviewController(minScale = 0.7f, maxScale = 1.6f, step = 0.02f)
     }
-    pinchFontScaleController.syncCommittedScale(activeFontScale)
+    val visualFontScale = pinchFontScaleController.visualScaleFor(activeFontScale)
+    SideEffect {
+        pinchFontScaleController.syncCommittedScale(activeFontScale)
+    }
 
     LaunchedEffect(pinchTick) {
         if (pinchTick > 0) {
@@ -209,8 +213,8 @@ internal fun ChatMessageList(
                 ),
                 reverseLayout = true,
                 modifier = Modifier.graphicsLayer {
-                    scaleX = pinchFontScaleController.transientScale
-                    scaleY = pinchFontScaleController.transientScale
+                    scaleX = visualFontScale
+                    scaleY = visualFontScale
                     transformOrigin = TransformOrigin(0.5f, 0.5f)
                 },
             ) {

@@ -50,6 +50,11 @@ class PinchScalePreviewController(
         }
     }
 
+    fun visualScaleFor(activeScale: Float): Float {
+        val pending = pendingCommittedScale
+        return if (pending != null && activeScale == pending) 1f else transientScale
+    }
+
     fun cancel() {
         transientScale = 1f
         pendingCommittedScale = null
