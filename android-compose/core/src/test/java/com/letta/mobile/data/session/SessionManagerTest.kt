@@ -15,6 +15,7 @@ import com.letta.mobile.data.model.Job
 import com.letta.mobile.data.model.JobListParams
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.Passage
 import com.letta.mobile.data.model.Provider
 import com.letta.mobile.data.model.Run
@@ -25,6 +26,8 @@ import com.letta.mobile.data.model.ScheduleMessage
 import com.letta.mobile.data.model.SchedulePayload
 import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.data.model.StepListParams
+import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeArchiveApi
 import com.letta.mobile.testutil.FakeConversationApi
@@ -32,6 +35,7 @@ import com.letta.mobile.testutil.FakeFolderApi
 import com.letta.mobile.testutil.FakeGroupApi
 import com.letta.mobile.testutil.FakeIdentityApi
 import com.letta.mobile.testutil.FakeJobApi
+import com.letta.mobile.testutil.FakeMcpServerApi
 import com.letta.mobile.testutil.FakeModelApi
 import com.letta.mobile.testutil.FakePassageApi
 import com.letta.mobile.testutil.FakeProviderApi
@@ -39,6 +43,7 @@ import com.letta.mobile.testutil.FakeRunApi
 import com.letta.mobile.testutil.FakeScheduleApi
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.FakeStepApi
+import com.letta.mobile.testutil.FakeToolApi
 import com.letta.mobile.testutil.TestData
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -74,6 +79,7 @@ class SessionManagerTest {
                 FakeFolderApi(),
                 FakeGroupApi(),
                 FakeIdentityApi(),
+                FakeMcpServerApi(),
                 FakeModelApi(),
                 FakePassageApi(),
                 FakeRunApi(),
@@ -81,6 +87,7 @@ class SessionManagerTest {
                 FakeProviderApi(),
                 FakeScheduleApi(),
                 FakeStepApi(),
+                FakeToolApi(),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
@@ -114,6 +121,7 @@ class SessionManagerTest {
                 FakeFolderApi(),
                 FakeGroupApi(),
                 FakeIdentityApi(),
+                FakeMcpServerApi(),
                 FakeModelApi(),
                 FakePassageApi(),
                 FakeRunApi(),
@@ -121,6 +129,7 @@ class SessionManagerTest {
                 FakeProviderApi(),
                 FakeScheduleApi(),
                 FakeStepApi(),
+                FakeToolApi(),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
@@ -162,6 +171,7 @@ class SessionManagerTest {
                 FakeFolderApi(),
                 FakeGroupApi(),
                 FakeIdentityApi(),
+                FakeMcpServerApi(),
                 FakeModelApi(),
                 FakePassageApi(),
                 FakeRunApi(),
@@ -169,6 +179,7 @@ class SessionManagerTest {
                 FakeProviderApi(),
                 FakeScheduleApi(),
                 FakeStepApi(),
+                FakeToolApi(),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
@@ -208,6 +219,7 @@ class SessionManagerTest {
                 FakeFolderApi(),
                 FakeGroupApi(),
                 FakeIdentityApi(),
+                FakeMcpServerApi(),
                 FakeModelApi(),
                 FakePassageApi(),
                 FakeRunApi(),
@@ -215,6 +227,7 @@ class SessionManagerTest {
                 FakeProviderApi(),
                 FakeScheduleApi(),
                 FakeStepApi(),
+                FakeToolApi(),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
@@ -263,6 +276,7 @@ class SessionManagerTest {
                 FakeFolderApi(),
                 FakeGroupApi(),
                 FakeIdentityApi(),
+                FakeMcpServerApi(),
                 FakeModelApi(),
                 FakePassageApi(),
                 fakeRunApi,
@@ -270,6 +284,7 @@ class SessionManagerTest {
                 FakeProviderApi(),
                 FakeScheduleApi(),
                 fakeStepApi,
+                FakeToolApi(),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
@@ -341,6 +356,7 @@ class SessionManagerTest {
                 fakeFolderApi,
                 fakeGroupApi,
                 fakeIdentityApi,
+                FakeMcpServerApi(),
                 FakeModelApi(),
                 FakePassageApi(),
                 FakeRunApi(),
@@ -348,6 +364,7 @@ class SessionManagerTest {
                 fakeProviderApi,
                 FakeScheduleApi(),
                 FakeStepApi(),
+                FakeToolApi(),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
@@ -427,6 +444,7 @@ class SessionManagerTest {
                 FakeFolderApi(),
                 FakeGroupApi(),
                 FakeIdentityApi(),
+                FakeMcpServerApi(),
                 fakeModelApi,
                 fakePassageApi,
                 FakeRunApi(),
@@ -434,6 +452,7 @@ class SessionManagerTest {
                 FakeProviderApi(),
                 fakeScheduleApi,
                 FakeStepApi(),
+                FakeToolApi(),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
@@ -486,6 +505,84 @@ class SessionManagerTest {
         assertEquals(listOf("embedding-b"), modelProxy.embeddingModels.value.map { it.id })
         assertEquals(listOf("passage-b"), passages.value.map { it.id })
         assertEquals(listOf("schedule-b"), scheduleProxy.getSchedules("agent-1").first().map { it.id })
+    }
+
+    @Test
+    fun `tool and mcp repository proxies switch caches to rebuilt graph`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val fakeToolApi = FakeToolApi().apply {
+            tools = mutableListOf(sampleTool("tool-a"))
+        }
+        val fakeMcpServerApi = FakeMcpServerApi().apply {
+            servers = mutableListOf(sampleMcpServer("server-a"))
+            serverTools["server-a"] = listOf(sampleTool("mcp-tool-a"))
+        }
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val sessionManager = SessionManager(
+            settingsRepository = settingsRepository,
+            sessionGraphFactory = SessionGraphFactory(
+                FakeAgentApi(),
+                FakeAgentDao(),
+                FakeConversationApi(),
+                FakeConversationDao(),
+                FakeArchiveApi(),
+                FakeFolderApi(),
+                FakeGroupApi(),
+                FakeIdentityApi(),
+                fakeMcpServerApi,
+                FakeModelApi(),
+                FakePassageApi(),
+                FakeRunApi(),
+                FakeJobApi(),
+                FakeProviderApi(),
+                FakeScheduleApi(),
+                FakeStepApi(),
+                fakeToolApi,
+            ),
+            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        val toolProxy = SessionScopedToolRepository(
+            sessionManager = sessionManager,
+            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        val mcpProxy = SessionScopedMcpServerRepository(
+            sessionManager = sessionManager,
+            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        val agentTools = toolProxy.getAgentTools("agent-1")
+        val serverTools = mcpProxy.getServerTools("server-a")
+
+        toolProxy.refreshTools()
+        toolProxy.attachTool("agent-1", "tool-a")
+        mcpProxy.refreshServers()
+        mcpProxy.refreshServerTools("server-a")
+        advanceUntilIdle()
+        assertEquals(listOf("tool-a"), toolProxy.getTools().value.map { it.id.value })
+        assertEquals(listOf("tool-a"), agentTools.first().map { it.id.value })
+        assertEquals(listOf("server-a"), mcpProxy.servers.value.map { it.id })
+        assertEquals(listOf("mcp-tool-a"), serverTools.first().map { it.id.value })
+
+        fakeToolApi.tools = mutableListOf(sampleTool("tool-b"))
+        fakeMcpServerApi.servers = mutableListOf(sampleMcpServer("server-b"))
+        fakeMcpServerApi.serverTools = mutableMapOf("server-a" to listOf(sampleTool("mcp-tool-b")))
+        settingsRepository.activeConfigState.value = config("backend-b")
+        advanceUntilIdle()
+
+        assertEquals(emptyList<String>(), toolProxy.getTools().value.map { it.id.value })
+        assertEquals(emptyList<String>(), agentTools.first().map { it.id.value })
+        assertEquals(emptyList<String>(), mcpProxy.servers.value.map { it.id })
+        assertEquals(emptyList<String>(), serverTools.first().map { it.id.value })
+
+        toolProxy.refreshTools()
+        toolProxy.attachTool("agent-1", "tool-b")
+        mcpProxy.refreshServers()
+        mcpProxy.refreshServerTools("server-a")
+        advanceUntilIdle()
+
+        assertEquals(listOf("tool-b"), toolProxy.getTools().value.map { it.id.value })
+        assertEquals(listOf("tool-b"), agentTools.first().map { it.id.value })
+        assertEquals(listOf("server-b"), mcpProxy.servers.value.map { it.id })
+        assertEquals(listOf("mcp-tool-b"), serverTools.first().map { it.id.value })
     }
 
     private fun config(id: String): LettaConfig = LettaConfig(
@@ -550,6 +647,16 @@ class SessionManagerTest {
             messages = listOf(ScheduleMessage(content = "hello", role = "user")),
         ),
         schedule = ScheduleDefinition(type = "one-time", scheduledAt = 1_700_000_000.0),
+    )
+
+    private fun sampleTool(id: String) = Tool(
+        id = ToolId(id),
+        name = id,
+    )
+
+    private fun sampleMcpServer(id: String) = McpServer(
+        id = id,
+        serverName = id,
     )
 
     private class FakeAgentDao : AgentDao {
