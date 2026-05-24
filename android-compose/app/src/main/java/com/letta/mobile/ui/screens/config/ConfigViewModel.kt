@@ -4,6 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import com.letta.mobile.data.api.CloudConnectionValidationResult
+import com.letta.mobile.data.api.CloudConnectionValidator
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
@@ -32,12 +34,14 @@ data class ConfigUiState(
     val themePreset: ThemePreset = ThemePreset.DEFAULT,
     val dynamicColor: Boolean = false,
     val enableProjects: Boolean = false,
+    val isSaving: Boolean = false,
 )
 
 @HiltViewModel
 class ConfigViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val settingsRepository: ISettingsRepository,
+    private val cloudConnectionValidator: CloudConnectionValidator,
 ) : ViewModel() {
 
     companion object {
@@ -158,8 +162,9 @@ class ConfigViewModel @Inject constructor(
 
     fun saveConfig(onSuccess: () -> Unit, onError: ((String) -> Unit)? = null) {
         viewModelScope.launch {
+            val state = (_uiState.value as? UiState.Success)?.data ?: return@launch
+            if (state.isSaving) return@launch
             try {
-                val state = (_uiState.value as? UiState.Success)?.data ?: return@launch
                 val url = if (state.mode == ServerMode.CLOUD) {
                     DEFAULT_CLOUD_URL
                 } else {
@@ -171,6 +176,25 @@ class ConfigViewModel @Inject constructor(
                     if (raw.startsWith("http://") || raw.startsWith("https://")) raw
                     else "https://$raw"
                 }
+                _uiState.value = UiState.Success(state.copy(isSaving = true))
+                val apiToken = state.apiToken.trim()
+                if (state.mode == ServerMode.CLOUD) {
+                    if (apiToken.isBlank()) {
+                        _uiState.value = UiState.Success(state.copy(isSaving = false))
+                        onError?.invoke(
+                            "Letta Cloud API key is required. Paste a key from app.letta.com before saving."
+                        )
+                        return@launch
+                    }
+                    when (val validation = cloudConnectionValidator.validate(url, apiToken)) {
+                        CloudConnectionValidationResult.Success -> Unit
+                        is CloudConnectionValidationResult.Failed -> {
+                            _uiState.value = UiState.Success(state.copy(isSaving = false))
+                            onError?.invoke(validation.message)
+                            return@launch
+                        }
+                    }
+                }
                 // letta-mobile-cdlk: createNew bypasses the activeConfig
                 // id lookup so '+ Add server' in the backend-switcher sheet
                 // actually creates a new entry instead of overwriting the
@@ -180,7 +204,7 @@ class ConfigViewModel @Inject constructor(
                     id = reuseId ?: UUID.randomUUID().toString(),
                     mode = if (state.mode == ServerMode.CLOUD) LettaConfig.Mode.CLOUD else LettaConfig.Mode.SELF_HOSTED,
                     serverUrl = url,
-                    accessToken = state.apiToken.trim().ifBlank { null }
+                    accessToken = apiToken.ifBlank { null }
                 )
                 settingsRepository.saveConfig(config)
                 settingsRepository.setTheme(state.theme)
@@ -189,7 +213,8 @@ class ConfigViewModel @Inject constructor(
                 settingsRepository.setEnableProjects(state.enableProjects)
                 onSuccess()
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "Failed to save config")
+                _uiState.value = UiState.Success(state.copy(isSaving = false))
+                onError?.invoke(e.message ?: "Failed to save config")
             }
         }
     }

@@ -2,6 +2,8 @@ package com.letta.mobile.ui.screens.config
 
 import app.cash.turbine.test
 import androidx.lifecycle.SavedStateHandle
+import com.letta.mobile.data.api.CloudConnectionValidationResult
+import com.letta.mobile.data.api.CloudConnectionValidator
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
@@ -26,6 +28,7 @@ import org.junit.jupiter.api.Tag
 class ConfigViewModelTest {
 
     private lateinit var fakeRepository: FakeSettingsRepository
+    private lateinit var fakeValidator: FakeCloudConnectionValidator
     private lateinit var viewModel: ConfigViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
 
@@ -33,11 +36,12 @@ class ConfigViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         fakeRepository = FakeSettingsRepository()
+        fakeValidator = FakeCloudConnectionValidator()
         // letta-mobile-cdlk: ConfigViewModel now reads ConfigRoute(createNew)
         // from SavedStateHandle. Empty handle is fine for the existing edit-
         // active-config test cases (createNew defaults to false when the
         // route arg is absent).
-        viewModel = ConfigViewModel(SavedStateHandle(), fakeRepository)
+        viewModel = ConfigViewModel(SavedStateHandle(), fakeRepository, fakeValidator)
     }
 
     @After
@@ -191,7 +195,7 @@ class ConfigViewModelTest {
     }
 
     @Test
-    fun saveConfig_withBlankToken_savesAsNull() = runTest {
+    fun saveConfig_withBlankCloudToken_reportsErrorAndDoesNotSave() = runTest {
         fakeRepository.activeConfigState.value = null
         viewModel.loadConfig()
 
@@ -199,10 +203,35 @@ class ConfigViewModelTest {
         viewModel.updateServerUrl("https://api.letta.com")
         viewModel.updateApiToken("")
 
-        viewModel.saveConfig(onSuccess = {})
+        var errorMessage: String? = null
+        viewModel.saveConfig(onSuccess = {}, onError = { errorMessage = it })
 
-        val savedConfig = fakeRepository.activeConfig.value
-        assertEquals(null, savedConfig?.accessToken)
+        assertEquals(null, fakeRepository.activeConfig.value)
+        assertEquals(
+            "Letta Cloud API key is required. Paste a key from app.letta.com before saving.",
+            errorMessage,
+        )
+    }
+
+    @Test
+    fun saveConfig_withRejectedCloudToken_reportsErrorAndDoesNotSave() = runTest {
+        fakeRepository.activeConfigState.value = null
+        fakeValidator.result = CloudConnectionValidationResult.Failed("bad key")
+        viewModel.loadConfig()
+
+        viewModel.updateMode(ServerMode.CLOUD)
+        viewModel.updateApiToken("bad-token")
+
+        var onSuccessCalled = false
+        var errorMessage: String? = null
+        viewModel.saveConfig(
+            onSuccess = { onSuccessCalled = true },
+            onError = { errorMessage = it },
+        )
+
+        assertEquals(null, fakeRepository.activeConfig.value)
+        assertEquals("bad key", errorMessage)
+        assertEquals(false, onSuccessCalled)
     }
 
     @Test
@@ -328,6 +357,7 @@ class ConfigViewModelTest {
         viewModel.updateThemePreset(ThemePreset.AMOLED_BLACK)
         viewModel.updateDynamicColor(false)
         viewModel.updateServerUrl("https://api.letta.com")
+        viewModel.updateApiToken("new-token")
 
         viewModel.saveConfig(onSuccess = {})
 
@@ -350,5 +380,14 @@ class ConfigViewModelTest {
         val savedConfig = fakeRepository.activeConfig.value
         assertEquals("https://self-hosted.letta.dev", savedConfig?.serverUrl)
         assertEquals("token-with-spaces", savedConfig?.accessToken)
+    }
+
+    private class FakeCloudConnectionValidator(
+        var result: CloudConnectionValidationResult = CloudConnectionValidationResult.Success,
+    ) : CloudConnectionValidator() {
+        override suspend fun validate(
+            baseUrl: String,
+            apiToken: String,
+        ): CloudConnectionValidationResult = result
     }
 }

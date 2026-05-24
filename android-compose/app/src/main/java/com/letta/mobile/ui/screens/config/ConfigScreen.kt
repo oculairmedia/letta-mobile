@@ -421,9 +421,14 @@ private fun ConfigContent(
 
         CardGroup {
             item(
-                onClick = onSave,
+                onClick = if (state.isSaving) null else onSave,
                 headlineContent = { Text(stringResource(R.string.action_save_configuration)) },
                 leadingContent = { Icon(LettaIcons.Save, contentDescription = null) },
+                trailingContent = {
+                    if (state.isSaving) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    }
+                },
             )
         }
     }
