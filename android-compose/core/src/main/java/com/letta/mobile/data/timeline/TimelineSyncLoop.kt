@@ -143,9 +143,15 @@ class TimelineSyncLoop(
      * ingestion while this flag is set to avoid dual-ingest duplication —
      * the two transports use different message IDs for the same logical
      * events, so serverId-based dedup misses them.
+     *
+     * Auto-expires after [EXTERNAL_TRANSPORT_TIMEOUT_MS] to prevent a stuck
+     * flag from permanently suppressing SSE if TurnDone is never received
+     * (e.g., WS disconnect mid-turn).
      */
     @Volatile
     private var externalTransportActive = false
+    @Volatile
+    private var externalTransportSetAtMs = 0L
 
     // Serialize all mutations so append/replace logic is safe under concurrency.
     private val writeMutex = Mutex()
@@ -1178,6 +1184,7 @@ class TimelineSyncLoop(
     companion object {
         private const val TAG = "TimelineSync"
 
+        private const val EXTERNAL_TRANSPORT_TIMEOUT_MS = 120_000L
         private const val STREAM_DORMANT_MS = 3_000L
         private const val STREAM_HEARTBEAT_EXPECTED_MS = 30_000L
         private const val STREAM_SILENCE_TIMEOUT_MS = STREAM_HEARTBEAT_EXPECTED_MS * 3
@@ -1246,7 +1253,9 @@ class TimelineSyncLoop(
     }
 
     internal suspend fun submitStreamEvent(message: LettaMessage) {
-        if (externalTransportActive) {
+        if (externalTransportActive &&
+            System.currentTimeMillis() - externalTransportSetAtMs < EXTERNAL_TRANSPORT_TIMEOUT_MS
+        ) {
             Telemetry.event(
                 "TimelineSync", "streamSubscriber.skippedDualIngest",
                 "conversationId" to conversationId,
@@ -1255,11 +1264,20 @@ class TimelineSyncLoop(
             )
             return
         }
+        if (externalTransportActive) {
+            externalTransportActive = false
+            Telemetry.event(
+                "TimelineSync", "streamSubscriber.externalTransportExpired",
+                "conversationId" to conversationId,
+                "ageMs" to (System.currentTimeMillis() - externalTransportSetAtMs),
+            )
+        }
         eventQueue.send(TimelineGatewayEvent.StreamMessage(message))
     }
 
     internal suspend fun ingestStreamEvent(message: LettaMessage) {
         externalTransportActive = true
+        externalTransportSetAtMs = System.currentTimeMillis()
         val ack = CompletableDeferred<Unit>()
         eventQueue.send(TimelineGatewayEvent.StreamMessage(message, ack))
         ack.await()

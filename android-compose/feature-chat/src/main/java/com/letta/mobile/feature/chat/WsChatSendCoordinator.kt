@@ -418,6 +418,10 @@ internal class WsChatSendCoordinator(
             }
             is WsTimelineEvent.Disconnected -> {
                 clearPendingSends("disconnect")
+                val conversationId = activeWsConversationId ?: activeConversationId()
+                if (conversationId != null) {
+                    timelineRepository.clearExternalTransportActive(conversationId)
+                }
                 uiState.value = uiState.value.copy(
                     error = event.reason.ifBlank { "WebSocket disconnected" },
                     isStreaming = false,
