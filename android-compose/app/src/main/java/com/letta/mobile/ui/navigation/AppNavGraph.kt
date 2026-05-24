@@ -710,10 +710,10 @@ fun AppNavGraph(
         }
 
         chatGraph(
-            enterTransition = drillInEnter,
-            exitTransition = drillInExit,
-            popEnterTransition = drillInPopEnter,
-            popExitTransition = drillInPopExit,
+            enterTransition = { fadeIn(animationSpec = tween(150)) },
+            exitTransition = { fadeOut(animationSpec = tween(150)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(150)) },
+            popExitTransition = { fadeOut(animationSpec = tween(150)) },
             // letta-mobile: when AgentChatRoute is the cold-start landing
             // (lastChatSelection or fallbackAgentId picked it as the
             // startDestination), the back stack is empty. Fall back to the
