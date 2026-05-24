@@ -55,4 +55,4 @@
 
 dolt.shared-server: false
 
-# sync.remote: "git+https://github.com/oculairmedia/letta-mobile.git"
+sync.remote: "https://dolthub.com/oculair/letta_mobile"
