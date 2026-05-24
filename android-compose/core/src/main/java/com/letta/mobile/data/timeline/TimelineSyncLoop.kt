@@ -631,6 +631,9 @@ class TimelineSyncLoop(
             writeMutex = writeMutex,
             state = _state,
         )
+        writeMutex.withLock {
+            applyReturnsAndResponsesFromSnapshot(event.serverMessages)
+        }
         event.ack.complete(result)
     }
 
@@ -990,9 +993,6 @@ class TimelineSyncLoop(
                 otid = otid,
                 serverMessages = serverMessages,
             )
-            writeMutex.withLock {
-                applyReturnsAndResponsesFromSnapshot(serverMessages)
-            }
             result.confirmedServerId?.let { serverId ->
                 _events.emit(TimelineSyncEvent.LocalConfirmed(otid, serverId))
             }
