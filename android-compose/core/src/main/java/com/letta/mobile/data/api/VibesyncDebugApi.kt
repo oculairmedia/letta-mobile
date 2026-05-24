@@ -13,16 +13,14 @@ open class VibesyncDebugApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) {
     open suspend fun getHealth(): VibesyncHealthResponse {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl().trimEnd('/')
+        val (client, baseUrl) = apiClient.session()
         val response = client.get("$baseUrl/health")
         if (response.status.value !in 200..299) throw ApiException(response.status.value, response.bodyAsText())
         return response.body()
     }
 
     open suspend fun getStats(): VibesyncStatsResponse {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl().trimEnd('/')
+        val (client, baseUrl) = apiClient.session()
         val response = client.get("$baseUrl/api/stats")
         if (response.status.value !in 200..299) throw ApiException(response.status.value, response.bodyAsText())
         return response.body()

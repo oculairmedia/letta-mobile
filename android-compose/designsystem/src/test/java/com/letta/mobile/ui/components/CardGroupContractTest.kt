@@ -14,9 +14,9 @@ class CardGroupContractTest {
 
     @Test
     fun `card group keeps grouped corner and spacing tokens`() {
-        assertTrue(source.contains("private val CardGroupCorner = LettaCornerRadius.extraLarge"))
-        assertTrue(source.contains("private val CardGroupItemSpacing = LettaSpacing.cardGroupItemGap"))
-        assertTrue(source.contains("private val CardGroupInnerCorner = LettaCornerRadius.extraSmall"))
+        assertTrue(source.contains("private val CardGroupCorner = 20.dp"))
+        assertTrue(source.contains("private val CardGroupItemSpacing = 2.dp"))
+        assertTrue(source.contains("private val CardGroupInnerCorner = 4.dp"))
     }
 
     @Test

@@ -28,8 +28,7 @@ open class FolderApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) {
     open suspend fun countFolders(): Int {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/folders/count")
         if (response.status.value !in 200..299) {
@@ -39,8 +38,7 @@ open class FolderApi @Inject constructor(
     }
 
     open suspend fun retrieveFolder(folderId: String): Folder {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/folders/$folderId")
         if (response.status.value !in 200..299) {
@@ -50,8 +48,7 @@ open class FolderApi @Inject constructor(
     }
 
     open suspend fun retrieveFolderMetadata(includeDetailedPerSourceMetadata: Boolean = false): OrganizationSourcesStats {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/folders/metadata") {
             parameter("include_detailed_per_source_metadata", includeDetailedPerSourceMetadata)
@@ -69,8 +66,7 @@ open class FolderApi @Inject constructor(
         order: String? = null,
         name: String? = null,
     ): List<Folder> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/folders/") {
             parameter("before", before)
@@ -86,8 +82,7 @@ open class FolderApi @Inject constructor(
     }
 
     open suspend fun createFolder(params: FolderCreateParams): Folder {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/folders/") {
             contentType(ContentType.Application.Json)
@@ -100,8 +95,7 @@ open class FolderApi @Inject constructor(
     }
 
     open suspend fun updateFolder(folderId: String, params: FolderUpdateParams): Folder {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/folders/$folderId") {
             contentType(ContentType.Application.Json)
@@ -114,8 +108,7 @@ open class FolderApi @Inject constructor(
     }
 
     open suspend fun deleteFolder(folderId: String) {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/folders/$folderId")
         if (response.status.value !in 200..299) {
@@ -131,8 +124,7 @@ open class FolderApi @Inject constructor(
         customName: String? = null,
         contentType: ContentType = ContentType.Application.OctetStream,
     ): FileMetadata {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.submitFormWithBinaryData(
             url = "$baseUrl/v1/folders/$folderId/upload",
@@ -159,8 +151,7 @@ open class FolderApi @Inject constructor(
         after: String? = null,
         order: String? = null,
     ): List<String> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/folders/$folderId/agents") {
             parameter("limit", limit)
@@ -181,8 +172,7 @@ open class FolderApi @Inject constructor(
         after: String? = null,
         order: String? = null,
     ): List<Passage> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/folders/$folderId/passages") {
             parameter("limit", limit)
@@ -204,8 +194,7 @@ open class FolderApi @Inject constructor(
         order: String? = null,
         includeContent: Boolean? = null,
     ): List<FileMetadata> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/folders/$folderId/files") {
             parameter("limit", limit)
@@ -221,8 +210,7 @@ open class FolderApi @Inject constructor(
     }
 
     open suspend fun deleteFileFromFolder(folderId: String, fileId: String) {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/folders/$folderId/$fileId")
         if (response.status.value !in 200..299) {

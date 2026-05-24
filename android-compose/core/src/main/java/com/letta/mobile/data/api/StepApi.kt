@@ -22,8 +22,7 @@ open class StepApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) {
     open suspend fun listSteps(params: StepListParams = StepListParams()): List<Step> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/steps/") {
             parameter("before", params.before)
@@ -48,8 +47,7 @@ open class StepApi @Inject constructor(
     }
 
     open suspend fun retrieveStep(stepId: String): Step {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/steps/$stepId")
         if (response.status.value !in 200..299) {
@@ -59,8 +57,7 @@ open class StepApi @Inject constructor(
     }
 
     open suspend fun retrieveStepMetrics(stepId: String): StepMetrics {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/steps/$stepId/metrics")
         if (response.status.value !in 200..299) {
@@ -70,8 +67,7 @@ open class StepApi @Inject constructor(
     }
 
     open suspend fun retrieveStepTrace(stepId: String): ProviderTrace? {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/steps/$stepId/trace")
         if (response.status.value !in 200..299) {
@@ -87,8 +83,7 @@ open class StepApi @Inject constructor(
         limit: Int? = null,
         order: String? = null,
     ): List<LettaMessage> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/steps/$stepId/messages") {
             parameter("before", before)
@@ -104,8 +99,7 @@ open class StepApi @Inject constructor(
     }
 
     open suspend fun updateStepFeedback(stepId: String, params: StepFeedbackUpdateParams): Step {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/steps/$stepId/feedback") {
             contentType(ContentType.Application.Json)

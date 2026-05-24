@@ -24,8 +24,7 @@ open class RunApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) {
     open suspend fun listRuns(params: RunListParams = RunListParams()): List<Run> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/runs/") {
             parameter("active", params.active)
@@ -49,8 +48,7 @@ open class RunApi @Inject constructor(
     }
 
     open suspend fun retrieveRun(runId: String): Run {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/runs/$runId")
         if (response.status.value !in 200..299) {
@@ -66,8 +64,7 @@ open class RunApi @Inject constructor(
         limit: Int? = null,
         order: String? = null,
     ): List<LettaMessage> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/runs/$runId/messages") {
             parameter("before", before)
@@ -82,8 +79,7 @@ open class RunApi @Inject constructor(
     }
 
     open suspend fun retrieveRunUsage(runId: String): UsageStatistics {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/runs/$runId/usage")
         if (response.status.value !in 200..299) {
@@ -93,8 +89,7 @@ open class RunApi @Inject constructor(
     }
 
     open suspend fun retrieveRunMetrics(runId: String): RunMetrics {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/runs/$runId/metrics")
         if (response.status.value !in 200..299) {
@@ -110,8 +105,7 @@ open class RunApi @Inject constructor(
         limit: Int? = null,
         order: String? = null,
     ): List<Step> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/runs/$runId/steps") {
             parameter("before", before)
@@ -126,8 +120,7 @@ open class RunApi @Inject constructor(
     }
 
     open suspend fun cancelRun(agentId: String, runId: String): Map<String, String> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/agents/$agentId/messages/cancel") {
             contentType(ContentType.Application.Json)
@@ -140,8 +133,7 @@ open class RunApi @Inject constructor(
     }
 
     open suspend fun deleteRun(runId: String) {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/runs/$runId")
         if (response.status.value !in 200..299) {

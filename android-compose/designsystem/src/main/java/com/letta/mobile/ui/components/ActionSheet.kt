@@ -29,11 +29,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIconSizing
-import com.letta.mobile.ui.theme.LettaCornerRadius
-import com.letta.mobile.ui.theme.LettaElevation
-import com.letta.mobile.ui.theme.LettaSpacing
 
 
 /**
@@ -66,18 +64,15 @@ fun ActionSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = LettaSpacing.actionSheetBottomPadding),
+                .padding(bottom = 32.dp),
         ) {
             if (title != null) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(
-                        horizontal = LettaSpacing.innerPadding,
-                        vertical = LettaSpacing.small,
-                    ),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
-                HorizontalDivider(modifier = Modifier.padding(vertical = LettaSpacing.small))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             }
             content()
         }
@@ -108,12 +103,12 @@ fun ActionSheetItem(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val corner by animateDpAsState(
-        targetValue = if (isPressed) LettaCornerRadius.medium else LettaCornerRadius.small,
+        targetValue = if (isPressed) 12.dp else 8.dp,
         animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
         label = "actionSheetItemCorner",
     )
     val elevation by animateDpAsState(
-        targetValue = if (isPressed) LettaElevation.medium else LettaElevation.low,
+        targetValue = if (isPressed) 4.dp else 2.dp,
         animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
         label = "actionSheetItemElevation",
     )
@@ -121,10 +116,7 @@ fun ActionSheetItem(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(
-                horizontal = LettaSpacing.innerPadding,
-                vertical = LettaSpacing.extraSmall,
-            ),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
         shape = RoundedCornerShape(corner),
         color = LettaCardDefaults.listContainerColor,
         tonalElevation = elevation,

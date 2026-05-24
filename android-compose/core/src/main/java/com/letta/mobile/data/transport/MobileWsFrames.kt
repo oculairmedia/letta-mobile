@@ -509,6 +509,7 @@ sealed interface ServerFrame {
         @SerialName("run_id") val runId: String,
         val content: String,
         val otid: String? = null,
+        @SerialName("seq_id") val seqId: Int? = null,
     ) : ServerFrame
 
     @Serializable

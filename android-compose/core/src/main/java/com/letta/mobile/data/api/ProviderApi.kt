@@ -29,8 +29,7 @@ open class ProviderApi @Inject constructor(
         name: String? = null,
         providerType: String? = null,
     ): List<Provider> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/providers/") {
             parameter("before", before)
@@ -47,8 +46,7 @@ open class ProviderApi @Inject constructor(
     }
 
     open suspend fun retrieveProvider(providerId: String): Provider {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/providers/$providerId")
         if (response.status.value !in 200..299) {
@@ -58,8 +56,7 @@ open class ProviderApi @Inject constructor(
     }
 
     open suspend fun createProvider(params: ProviderCreateParams): Provider {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/providers/") {
             contentType(ContentType.Application.Json)
@@ -72,8 +69,7 @@ open class ProviderApi @Inject constructor(
     }
 
     open suspend fun updateProvider(providerId: String, params: ProviderUpdateParams): Provider {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/providers/$providerId") {
             contentType(ContentType.Application.Json)
@@ -86,8 +82,7 @@ open class ProviderApi @Inject constructor(
     }
 
     open suspend fun checkProvider(params: ProviderCheckParams) {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/providers/check") {
             contentType(ContentType.Application.Json)
@@ -99,8 +94,7 @@ open class ProviderApi @Inject constructor(
     }
 
     open suspend fun checkExistingProvider(providerId: String) {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/providers/$providerId/check")
         if (response.status.value !in 200..299) {
@@ -109,8 +103,7 @@ open class ProviderApi @Inject constructor(
     }
 
     open suspend fun deleteProvider(providerId: String) {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/providers/$providerId")
         if (response.status.value !in 200..299) {

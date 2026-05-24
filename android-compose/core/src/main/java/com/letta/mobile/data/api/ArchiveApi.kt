@@ -29,8 +29,7 @@ open class ArchiveApi @Inject constructor(
         name: String? = null,
         agentId: String? = null,
     ): List<Archive> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/archives/") {
             parameter("before", before)
@@ -47,8 +46,7 @@ open class ArchiveApi @Inject constructor(
     }
 
     open suspend fun retrieveArchive(archiveId: String): Archive {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/archives/$archiveId")
         if (response.status.value !in 200..299) {
@@ -58,8 +56,7 @@ open class ArchiveApi @Inject constructor(
     }
 
     open suspend fun createArchive(params: ArchiveCreateParams): Archive {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/archives/") {
             contentType(ContentType.Application.Json)
@@ -72,8 +69,7 @@ open class ArchiveApi @Inject constructor(
     }
 
     open suspend fun updateArchive(archiveId: String, params: ArchiveUpdateParams): Archive {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/archives/$archiveId") {
             contentType(ContentType.Application.Json)
@@ -86,8 +82,7 @@ open class ArchiveApi @Inject constructor(
     }
 
     open suspend fun deleteArchive(archiveId: String): Archive {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/archives/$archiveId")
         if (response.status.value !in 200..299) {
@@ -103,8 +98,7 @@ open class ArchiveApi @Inject constructor(
         after: String? = null,
         order: String? = null,
     ): List<Agent> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/archives/$archiveId/agents") {
             parameter("limit", limit)
@@ -119,8 +113,7 @@ open class ArchiveApi @Inject constructor(
     }
 
     open suspend fun deletePassageFromArchive(archiveId: String, passageId: String) {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/archives/$archiveId/passages/$passageId")
         if (response.status.value !in 200..299) {

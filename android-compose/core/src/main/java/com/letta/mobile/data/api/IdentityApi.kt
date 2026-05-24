@@ -26,8 +26,7 @@ open class IdentityApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) {
     open suspend fun listIdentities(): List<Identity> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/identities/")
         if (response.status.value !in 200..299) {
@@ -37,8 +36,7 @@ open class IdentityApi @Inject constructor(
     }
 
     open suspend fun countIdentities(): Int {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/identities/count")
         if (response.status.value !in 200..299) {
@@ -48,8 +46,7 @@ open class IdentityApi @Inject constructor(
     }
 
     open suspend fun retrieveIdentity(identityId: String): Identity {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/identities/$identityId")
         if (response.status.value !in 200..299) {
@@ -59,8 +56,7 @@ open class IdentityApi @Inject constructor(
     }
 
     open suspend fun createIdentity(params: IdentityCreateParams): Identity {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/identities/") {
             contentType(ContentType.Application.Json)
@@ -73,8 +69,7 @@ open class IdentityApi @Inject constructor(
     }
 
     open suspend fun upsertIdentity(params: IdentityUpsertParams): Identity {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.put("$baseUrl/v1/identities/") {
             contentType(ContentType.Application.Json)
@@ -87,8 +82,7 @@ open class IdentityApi @Inject constructor(
     }
 
     open suspend fun updateIdentity(identityId: String, params: IdentityUpdateParams): Identity {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/identities/$identityId") {
             contentType(ContentType.Application.Json)
@@ -101,8 +95,7 @@ open class IdentityApi @Inject constructor(
     }
 
     open suspend fun deleteIdentity(identityId: String) {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/identities/$identityId")
         if (response.status.value !in 200..299) {
@@ -111,8 +104,7 @@ open class IdentityApi @Inject constructor(
     }
 
     open suspend fun upsertIdentityProperties(identityId: String, properties: List<IdentityProperty>): Identity {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.put("$baseUrl/v1/identities/$identityId/properties") {
             contentType(ContentType.Application.Json)
@@ -131,8 +123,7 @@ open class IdentityApi @Inject constructor(
         after: String? = null,
         order: String? = null,
     ): List<Agent> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/identities/$identityId/agents") {
             parameter("limit", limit)
@@ -153,8 +144,7 @@ open class IdentityApi @Inject constructor(
         after: String? = null,
         order: String? = null,
     ): List<Block> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/identities/$identityId/blocks") {
             parameter("limit", limit)
@@ -169,8 +159,7 @@ open class IdentityApi @Inject constructor(
     }
 
     open suspend fun attachIdentity(agentId: String, identityId: String) {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/$agentId/identities/attach/$identityId")
         if (response.status.value !in 200..299) {
@@ -179,8 +168,7 @@ open class IdentityApi @Inject constructor(
     }
 
     open suspend fun detachIdentity(agentId: String, identityId: String) {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/$agentId/identities/detach/$identityId")
         if (response.status.value !in 200..299) {

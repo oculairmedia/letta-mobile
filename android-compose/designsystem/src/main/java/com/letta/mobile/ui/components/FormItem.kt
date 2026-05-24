@@ -11,7 +11,7 @@ import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.letta.mobile.ui.theme.LettaSpacing
+import androidx.compose.ui.unit.dp
 
 @Composable
 fun FormItem(
@@ -23,11 +23,11 @@ fun FormItem(
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(LettaSpacing.small),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(
-            verticalArrangement = Arrangement.spacedBy(LettaSpacing.extraSmall),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.weight(1f),
         ) {
             ProvideTextStyle(value = MaterialTheme.typography.titleMedium) {
@@ -38,7 +38,7 @@ fun FormItem(
                     color = LocalContentColor.current.copy(alpha = 0.6f)
                 )
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(LettaSpacing.extraSmall)) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     description?.invoke()
                 }
             }

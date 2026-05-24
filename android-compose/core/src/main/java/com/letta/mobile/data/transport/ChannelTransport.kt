@@ -102,7 +102,11 @@ class ChannelTransport internal constructor(
          * the WebSocket close frame when available; failure paths
          * surface a synthetic code (-1) and the throwable message.
          */
-        data class Disconnected(val code: Int, val reason: String) : State
+        data class Disconnected(
+            val code: Int,
+            val reason: String,
+            val isAuthFailure: Boolean = false,
+        ) : State
     }
 
     private val json = Json {
@@ -268,12 +272,18 @@ class ChannelTransport internal constructor(
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                Log.w(TAG, "WS failure: ${t.message} (httpCode=${response?.code})", t)
+                val httpCode = response?.code
+                Log.w(TAG, "WS failure: ${t.message} (httpCode=$httpCode)", t)
                 if (!socketRef.compareAndSet(webSocket, null)) {
                     Log.i(TAG, "Ignoring failure from superseded WS socket")
                     return
                 }
-                _state.value = State.Disconnected(-1, t.message ?: t::class.java.simpleName)
+                val isAuth = httpCode == 401 || httpCode == 403
+                _state.value = State.Disconnected(
+                    code = httpCode ?: -1,
+                    reason = t.message ?: t::class.java.simpleName,
+                    isAuthFailure = isAuth,
+                )
                 inFlight = false
                 currentRunId.set(null)
                 currentTurnId.set(null)

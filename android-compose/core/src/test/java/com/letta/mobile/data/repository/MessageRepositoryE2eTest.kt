@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.api.ApiSession
 import com.letta.mobile.data.api.LettaApiClient
 import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.data.model.MessageType
@@ -157,6 +158,7 @@ class MessageRepositoryE2eTest : com.letta.mobile.testutil.TrackedMockClientTest
         val apiClient = mockk<LettaApiClient> {
             coEvery { getClient() } returns client
             every { getBaseUrl() } returns "http://test"
+            coEvery { session() } returns ApiSession(client, "http://test")
         }
 
         val repository = MessageRepository(MessageApi(apiClient))
@@ -251,6 +253,7 @@ class MessageRepositoryE2eTest : com.letta.mobile.testutil.TrackedMockClientTest
         val apiClient = mockk<LettaApiClient> {
             coEvery { getClient() } returns client
             every { getBaseUrl() } returns "http://test"
+            coEvery { session() } returns ApiSession(client, "http://test")
         }
 
         return MessageRepository(MessageApi(apiClient))

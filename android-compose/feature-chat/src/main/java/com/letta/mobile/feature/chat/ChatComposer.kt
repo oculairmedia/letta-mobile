@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.feature.chat.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.letta.mobile.data.model.MessageContentPart
@@ -44,21 +45,17 @@ import com.letta.mobile.ui.components.LettaInputBar
 import com.letta.mobile.ui.components.ToolAffordanceRow
 import com.letta.mobile.ui.components.audio.HoldToDictateButton
 import com.letta.mobile.ui.haptics.HapticEffects
-import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.theme.LettaCornerRadius
-import com.letta.mobile.ui.theme.LettaSizing
-import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.feature.chat.voice.VoiceInputUiState
 import com.letta.mobile.feature.chat.voice.VoiceInputViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
 
-internal val ChatComposerAttachButtonSize = LettaSizing.chatComposerAttachButton
-private val ChatComposerAttachIconSize = LettaIconSizing.CompactAvatar
-private val ChatComposerInputHorizontalPadding = LettaSpacing.small
-private val ChatComposerInputVerticalPadding = LettaSpacing.compact
-private val ChatComposerInputItemSpacing = LettaSpacing.compact
+internal val ChatComposerAttachButtonSize = 36.dp
+private val ChatComposerAttachIconSize = 18.dp
+private val ChatComposerInputHorizontalPadding = 8.dp
+private val ChatComposerInputVerticalPadding = 6.dp
+private val ChatComposerInputItemSpacing = 6.dp
 
 internal object ChatComposerTestTags {
     const val AttachmentThumbnailImage = "chat-composer-attachment-thumbnail-image"
@@ -127,7 +124,7 @@ internal fun ChatComposer(
             ToolAffordanceRow(
                 tools = availableTools,
                 onToolSelected = { tool -> onTextChange(buildToolCallTemplate(tool)) },
-                modifier = Modifier.padding(horizontal = LettaSpacing.large, vertical = LettaSpacing.extraSmall),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
             )
         }
 
@@ -226,8 +223,8 @@ private fun AttachmentStrip(
     LazyRow(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = LettaSpacing.innerPaddingSmall, vertical = LettaSpacing.extraSmall),
-        horizontalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(
             items = attachments,
@@ -264,10 +261,10 @@ private fun AttachmentThumbnail(
         }.getOrNull()
     }
 
-    Box(modifier = Modifier.size(LettaSizing.chatAttachmentThumbnail)) {
+    Box(modifier = Modifier.size(64.dp)) {
         Surface(
-            modifier = Modifier.size(LettaSizing.chatAttachmentThumbnail),
-            shape = RoundedCornerShape(LettaCornerRadius.small),
+            modifier = Modifier.size(64.dp),
+            shape = RoundedCornerShape(8.dp),
             color = MaterialTheme.colorScheme.surfaceVariant,
         ) {
             if (imageBitmap != null) {
@@ -290,7 +287,7 @@ private fun AttachmentThumbnail(
         // Remove button overlay (top-right)
         Surface(
             modifier = Modifier
-                .size(LettaSizing.chatAttachmentRemoveButton)
+                .size(20.dp)
                 .align(Alignment.TopEnd)
                 .clip(CircleShape)
                 .clickable(onClick = onRemove),
@@ -299,12 +296,12 @@ private fun AttachmentThumbnail(
         ) {
             IconButton(
                 onClick = onRemove,
-                modifier = Modifier.size(LettaSizing.chatAttachmentRemoveButton),
+                modifier = Modifier.size(20.dp),
             ) {
                 Icon(
                     LettaIcons.Close,
                     contentDescription = stringResource(R.string.action_remove_attachment),
-                    modifier = Modifier.size(LettaIconSizing.Small),
+                    modifier = Modifier.size(12.dp),
                 )
             }
         }

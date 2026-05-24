@@ -24,8 +24,7 @@ open class ScheduleApi @Inject constructor(
         limit: Int? = null,
         after: String? = null,
     ): ScheduleListResponse {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/agents/$agentId/schedule") {
             parameter("limit", limit?.toString())
@@ -38,8 +37,7 @@ open class ScheduleApi @Inject constructor(
     }
 
     open suspend fun retrieveSchedule(agentId: String, scheduledMessageId: String): ScheduledMessage {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/agents/$agentId/schedule/$scheduledMessageId")
         if (response.status.value !in 200..299) {
@@ -49,8 +47,7 @@ open class ScheduleApi @Inject constructor(
     }
 
     open suspend fun createSchedule(agentId: String, params: ScheduleCreateParams): ScheduledMessage {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/agents/$agentId/schedule") {
             contentType(ContentType.Application.Json)
@@ -63,8 +60,7 @@ open class ScheduleApi @Inject constructor(
     }
 
     open suspend fun deleteSchedule(agentId: String, scheduledMessageId: String) {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/agents/$agentId/schedule/$scheduledMessageId")
         if (response.status.value !in 200..299) {

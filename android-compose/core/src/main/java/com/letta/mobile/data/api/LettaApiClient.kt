@@ -21,6 +21,8 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
+data class ApiSession(val client: HttpClient, val baseUrl: String)
+
 @Singleton
 open class LettaApiClient @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -55,6 +57,12 @@ open class LettaApiClient @Inject constructor(
             cachedToken = token
             return cachedClient ?: error("cachedClient null after initialization")
         }
+    }
+
+    open suspend fun session(): ApiSession {
+        val client = getClient()
+        val url = (cachedBaseUrl ?: "https://api.letta.com").trimEnd('/')
+        return ApiSession(client, url)
     }
 
     open fun getBaseUrl(): String {

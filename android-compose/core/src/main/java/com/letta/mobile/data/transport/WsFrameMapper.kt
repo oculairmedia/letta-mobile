@@ -37,6 +37,7 @@ object WsFrameMapper {
             contentRaw = JsonPrimitive(frame.content),
             runId = frame.runId,
             otid = frame.otid,
+            seqId = frame.seqId,
         )
 
         is ServerFrame.ReasoningMessage -> ReasoningMessage(

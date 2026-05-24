@@ -16,8 +16,7 @@ open class VibesyncAdminApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) {
     open suspend fun refreshAgentsMd(projectId: String? = null, dryRun: Boolean = true): AgentsMdRefreshSummary {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl().trimEnd('/')
+        val (client, baseUrl) = apiClient.session()
         val response = client.post("$baseUrl/api/admin/agents-md/refresh") {
             contentType(ContentType.Application.Json)
             setBody(AgentsMdRefreshRequest(projectId = projectId, dryRun = dryRun))

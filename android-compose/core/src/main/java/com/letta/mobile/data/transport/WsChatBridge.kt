@@ -58,7 +58,7 @@ class WsChatBridge @Inject constructor(
             .filter { it is ChannelTransport.State.Disconnected }
             .map { state ->
                 val d = state as ChannelTransport.State.Disconnected
-                WsTimelineEvent.Disconnected(d.code, d.reason)
+                WsTimelineEvent.Disconnected(d.code, d.reason, d.isAuthFailure)
             },
     )
 
@@ -165,7 +165,11 @@ sealed interface WsTimelineEvent {
         val runId: String?,
     ) : WsTimelineEvent
 
-    data class Disconnected(val code: Int, val reason: String) : WsTimelineEvent
+    data class Disconnected(
+        val code: Int,
+        val reason: String,
+        val isAuthFailure: Boolean = false,
+    ) : WsTimelineEvent
 
     data class UserActionOutcome(
         val frameId: String,

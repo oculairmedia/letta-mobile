@@ -12,8 +12,7 @@ open class ModelApi @Inject constructor(
     private val apiClient: LettaApiClient
 ) {
     open suspend fun listLlmModels(): List<LlmModel> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/models")
         if (response.status.value !in 200..299) {
@@ -23,8 +22,7 @@ open class ModelApi @Inject constructor(
     }
 
     open suspend fun listEmbeddingModels(): List<EmbeddingModel> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/models/embedding")
         if (response.status.value !in 200..299) {

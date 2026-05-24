@@ -12,8 +12,7 @@ open class ProjectAgentApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) {
     open suspend fun lookup(repo: String): PmAgentMetadata? {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl().trimEnd('/')
+        val (client, baseUrl) = apiClient.session()
         val response = client.get("$baseUrl/api/agents/lookup") {
             url { parameters.append("repo", repo) }
         }

@@ -32,6 +32,7 @@ class ConversationApiTest : com.letta.mobile.testutil.TrackedMockClientTestSuppo
         val apiClient = mockk<LettaApiClient> {
             coEvery { getClient() } returns client
             every { getBaseUrl() } returns "http://test"
+            coEvery { session() } returns ApiSession(client, "http://test")
         }
         return ConversationApi(apiClient)
     }

@@ -65,7 +65,8 @@ open class ProjectWorkApi @Inject constructor(
         limit: Int? = null,
         cursor: String? = null,
     ): ProjectReadyWorkResponse {
-        val response = client().get("${baseUrl()}/api/projects/$projectId/ready-work") {
+        val (client, baseUrl) = session()
+        val response = client.get("$baseUrl/api/projects/$projectId/ready-work") {
             optionalParameter("limit", limit)
             optionalParameter("cursor", cursor)
         }
@@ -76,7 +77,8 @@ open class ProjectWorkApi @Inject constructor(
         projectId: String,
         params: ProjectIssueListParams = ProjectIssueListParams(),
     ): ProjectIssueListResponse {
-        val response = client().get("${baseUrl()}/api/projects/$projectId/issues") {
+        val (client, baseUrl) = session()
+        val response = client.get("$baseUrl/api/projects/$projectId/issues") {
             optionalParameter("status", params.status)
             optionalParameter("priority", params.priority)
             optionalParameter("assignee", params.assignee)
@@ -102,7 +104,8 @@ open class ProjectWorkApi @Inject constructor(
                 "timelineLimit=${params.timelineLimit} filters=${params.analyticsFilterLogSummary()}",
         )
         return try {
-            val response = client().get("${baseUrl()}/api/projects/$projectId/issue-analytics") {
+            val (client, baseUrl) = session()
+            val response = client.get("$baseUrl/api/projects/$projectId/issue-analytics") {
                 optionalParameter("rangeStart", params.rangeStart)
                 optionalParameter("rangeEnd", params.rangeEnd)
                 optionalParameter("granularity", params.granularity)
@@ -133,7 +136,8 @@ open class ProjectWorkApi @Inject constructor(
     }
 
     open suspend fun getIssue(issueId: String): ProjectIssueDetailResponse {
-        val response = client().get("${baseUrl()}/api/issues/$issueId")
+        val (client, baseUrl) = session()
+        val response = client.get("$baseUrl/api/issues/$issueId")
         return response.bodyOrThrow()
     }
 
@@ -161,7 +165,8 @@ open class ProjectWorkApi @Inject constructor(
         request: ProjectIssueStatusRequest,
         headers: ProjectIssueMutationHeaders,
     ): ProjectIssueMutationResponse {
-        val response = client().patch("${baseUrl()}/api/issues/$issueId/status") {
+        val (client, baseUrl) = session()
+        val response = client.patch("$baseUrl/api/issues/$issueId/status") {
             contentType(ContentType.Application.Json)
             mutationHeaders(headers)
             setBody(request)
@@ -204,12 +209,17 @@ open class ProjectWorkApi @Inject constructor(
         headers: ProjectIssueMutationHeaders,
         body: T,
     ): ProjectIssueMutationResponse {
-        val response = client().post("${baseUrl()}$path") {
+        val (client, baseUrl) = session()
+        val response = client.post("$baseUrl$path") {
             contentType(ContentType.Application.Json)
             mutationHeaders(headers)
             setBody(body)
         }
         return response.bodyOrThrow()
+    }
+
+    private suspend fun session() = apiClient.session().let {
+        it.client to it.baseUrl.trimEnd('/')
     }
 
     private suspend fun client() = apiClient.getClient()

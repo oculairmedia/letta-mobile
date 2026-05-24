@@ -227,7 +227,9 @@ private fun BackendSwitcherRow(
         ) {
             HealthDot(
                 health = config.health,
-                modifier = Modifier.padding(end = 8.dp),
+                modifier = Modifier
+                    .align(Alignment.Top)
+                    .padding(top = 7.dp, end = 8.dp),
             )
             Box(
                 modifier = Modifier.size(36.dp),

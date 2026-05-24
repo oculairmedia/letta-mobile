@@ -18,8 +18,7 @@ open class AgentApi @Inject constructor(
         offset: Int? = null,
         tags: List<String>? = null
     ): List<Agent> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/agents") {
             parameter("limit", limit)
@@ -33,8 +32,7 @@ open class AgentApi @Inject constructor(
     }
 
     open suspend fun getAgent(agentId: String): Agent {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/agents/$agentId")
         if (response.status.value !in 200..299) {
@@ -44,8 +42,7 @@ open class AgentApi @Inject constructor(
     }
 
     open suspend fun getContextWindow(agentId: String, conversationId: String? = null): ContextWindowOverview {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/agents/$agentId/context") {
             parameter("conversation_id", conversationId)
@@ -57,8 +54,7 @@ open class AgentApi @Inject constructor(
     }
 
     open suspend fun countAgents(): Int {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/agents/count")
         if (response.status.value !in 200..299) {
@@ -68,8 +64,7 @@ open class AgentApi @Inject constructor(
     }
 
     open suspend fun createAgent(params: AgentCreateParams): Agent {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/agents") {
             contentType(ContentType.Application.Json)
@@ -82,8 +77,7 @@ open class AgentApi @Inject constructor(
     }
 
     open suspend fun updateAgent(agentId: String, params: AgentUpdateParams): Agent {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/$agentId") {
             contentType(ContentType.Application.Json)
@@ -96,8 +90,7 @@ open class AgentApi @Inject constructor(
     }
 
     open suspend fun deleteAgent(agentId: String) {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/agents/$agentId")
         if (response.status.value !in 200..299) {
@@ -106,8 +99,7 @@ open class AgentApi @Inject constructor(
     }
 
     open suspend fun exportAgent(agentId: String): String {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/agents/$agentId/export")
         if (response.status.value !in 200..299) {
@@ -124,8 +116,7 @@ open class AgentApi @Inject constructor(
         projectId: String? = null,
         stripMessages: Boolean? = null,
     ): ImportedAgentsResponse {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.submitFormWithBinaryData(
             url = "$baseUrl/v1/agents/import",
@@ -147,8 +138,7 @@ open class AgentApi @Inject constructor(
     }
 
     open suspend fun attachArchive(agentId: String, archiveId: String) {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/$agentId/archives/attach/$archiveId")
         if (response.status.value !in 200..299) {
@@ -157,8 +147,7 @@ open class AgentApi @Inject constructor(
     }
 
     open suspend fun detachArchive(agentId: String, archiveId: String) {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/$agentId/archives/detach/$archiveId")
         if (response.status.value !in 200..299) {

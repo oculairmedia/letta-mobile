@@ -16,8 +16,7 @@ open class McpServerApi @Inject constructor(
         limit: Int? = null,
         offset: Int? = null
     ): List<McpServer> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/mcp-servers") {
             parameter("limit", limit)
@@ -30,8 +29,7 @@ open class McpServerApi @Inject constructor(
     }
 
     open suspend fun getMcpServer(serverId: String): McpServer {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/mcp-servers/$serverId")
         if (response.status.value !in 200..299) {
@@ -41,8 +39,7 @@ open class McpServerApi @Inject constructor(
     }
 
     open suspend fun createMcpServer(params: McpServerCreateParams): McpServer {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/mcp-servers") {
             contentType(ContentType.Application.Json)
@@ -55,8 +52,7 @@ open class McpServerApi @Inject constructor(
     }
 
     open suspend fun updateMcpServer(serverId: String, params: McpServerUpdateParams): McpServer {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/mcp-servers/$serverId") {
             contentType(ContentType.Application.Json)
@@ -69,8 +65,7 @@ open class McpServerApi @Inject constructor(
     }
 
     open suspend fun deleteMcpServer(serverId: String) {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/mcp-servers/$serverId")
         if (response.status.value !in 200..299) {
@@ -79,8 +74,7 @@ open class McpServerApi @Inject constructor(
     }
 
     open suspend fun listMcpServerTools(serverId: String): List<Tool> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/mcp-servers/$serverId/tools")
         if (response.status.value !in 200..299) {
@@ -90,8 +84,7 @@ open class McpServerApi @Inject constructor(
     }
 
     open suspend fun refreshMcpServerTools(serverId: String): McpServerResyncResult {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/mcp-servers/$serverId/refresh")
         if (response.status.value !in 200..299) {
@@ -105,8 +98,7 @@ open class McpServerApi @Inject constructor(
         toolId: String,
         params: McpToolExecuteParams,
     ): McpToolExecutionResult {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/mcp-servers/$serverId/tools/$toolId/run") {
             contentType(ContentType.Application.Json)

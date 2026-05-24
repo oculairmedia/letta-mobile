@@ -33,6 +33,7 @@ class RunApiTest : com.letta.mobile.testutil.TrackedMockClientTestSupport() {
         val apiClient = mockk<LettaApiClient> {
             coEvery { getClient() } returns client
             every { getBaseUrl() } returns "http://test"
+            coEvery { session() } returns ApiSession(client, "http://test")
         }
         return RunApi(apiClient)
     }

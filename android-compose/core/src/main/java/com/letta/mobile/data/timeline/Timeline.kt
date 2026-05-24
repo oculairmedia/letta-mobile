@@ -244,14 +244,24 @@ data class Timeline(
     /** Cursor for backfill pagination (oldest known message id). */
     val backfillCursor: String? = null,
 ) {
+    private val otidToIndex: Map<String, Int> by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        HashMap<String, Int>(events.size).also { map ->
+            events.forEachIndexed { i, e -> map[e.otid] = i }
+        }
+    }
+
+    private val serverIdToIndex: Map<String, Int> by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        HashMap<String, Int>(events.size).also { map ->
+            events.forEachIndexed { i, e ->
+                if (e is TimelineEvent.Confirmed) map[e.serverId] = i
+            }
+        }
+    }
+
     init {
-        // Defensive telemetry: log invariant violations but don't crash in production.
-        // In concurrent scenarios (e.g., reconcileAfterSend racing with stream events),
-        // position collisions or otid duplicates can occur transiently. Log them for
-        // diagnosis but allow the timeline to be constructed.
         val positionViolation = events.zipWithNext().any { (a, b) -> a.position >= b.position }
-        val otidDupes = events.size != events.map { it.otid }.toSet().size
-        
+        val otidDupes = events.size != events.distinctBy { it.otid }.size
+
         if (positionViolation) {
             Telemetry.error(
                 "Timeline", "init.positionViolation",
@@ -266,7 +276,7 @@ data class Timeline(
                 IllegalStateException("Timeline contains duplicate otids"),
                 "conversationId" to conversationId,
                 "eventCount" to events.size,
-                "uniqueOtids" to events.map { it.otid }.toSet().size,
+                "uniqueOtids" to otidToIndex.size,
             )
         }
     }
@@ -277,7 +287,7 @@ data class Timeline(
         return last + 1.0
     }
 
-    fun findByOtid(otid: String): TimelineEvent? = events.firstOrNull { it.otid == otid }
+    fun findByOtid(otid: String): TimelineEvent? = otidToIndex[otid]?.let { events[it] }
 
     /**
      * Find an event by its server message id. Used by the resume-stream
@@ -287,12 +297,12 @@ data class Timeline(
     fun findByServerId(
         serverId: String,
         messageType: TimelineMessageType? = null,
-    ): TimelineEvent.Confirmed? =
-        events.firstOrNull {
-            it is TimelineEvent.Confirmed &&
-                it.serverId == serverId &&
-                (messageType == null || it.messageType == messageType)
-        } as? TimelineEvent.Confirmed
+    ): TimelineEvent.Confirmed? {
+        val idx = serverIdToIndex[serverId] ?: return null
+        val event = events[idx] as? TimelineEvent.Confirmed ?: return null
+        if (messageType != null && event.messageType != messageType) return null
+        return event
+    }
 
 
     /**
@@ -343,8 +353,7 @@ data class Timeline(
      * the Confirmed event at its natural position instead.
      */
     fun replaceLocal(otid: String, confirmed: TimelineEvent.Confirmed): Timeline {
-        val idx = events.indexOfFirst { it.otid == otid && it is TimelineEvent.Local }
-        if (idx == -1) return insertOrdered(confirmed)
+        val idx = otidToIndex[otid]?.takeIf { events[it] is TimelineEvent.Local } ?: return insertOrdered(confirmed)
         val local = events[idx]
         val stabilized = confirmed.copy(
             position = local.position,
@@ -472,16 +481,12 @@ data class Timeline(
      * Added for letta-mobile-mge5.
      */
     fun replaceByServerId(confirmed: TimelineEvent.Confirmed): Timeline {
-        val idx = events.indexOfFirst {
-            it is TimelineEvent.Confirmed &&
-                it.serverId == confirmed.serverId &&
-                it.messageType == confirmed.messageType
-        }
-        if (idx == -1) return this
-        val existing = events[idx] as TimelineEvent.Confirmed
+        val idx = serverIdToIndex[confirmed.serverId] ?: return this
+        val existing = events[idx]
+        if (existing !is TimelineEvent.Confirmed || existing.messageType != confirmed.messageType) return this
         val stabilized = confirmed.copy(
             position = existing.position,
-            otid = existing.otid // Preserve the local otid so upsertClientModeLocal can stop updating
+            otid = existing.otid
         )
         val replaced = events.toMutableList().also { it[idx] = stabilized }
         val deduped = replaced.filterIndexed { eventIndex, event ->
@@ -516,8 +521,8 @@ data class Timeline(
         transform: (TimelineEvent.Local) -> TimelineEvent.Local,
         build: () -> TimelineEvent.Local,
     ): Timeline {
-        val idx = events.indexOfFirst { it.otid == otid }
-        if (idx >= 0) {
+        val idx = otidToIndex[otid]
+        if (idx != null) {
             val existingEvent = events[idx]
             if (existingEvent is TimelineEvent.Confirmed) {
                 // The server has already confirmed this event and we collapsed it.
@@ -580,8 +585,7 @@ data class Timeline(
     fun markFailed(otid: String): Timeline = updateLocal(otid) { it.copy(deliveryState = DeliveryState.FAILED) }
 
     private inline fun updateLocal(otid: String, transform: (TimelineEvent.Local) -> TimelineEvent.Local): Timeline {
-        val idx = events.indexOfFirst { it.otid == otid && it is TimelineEvent.Local }
-        if (idx == -1) return this
+        val idx = otidToIndex[otid]?.takeIf { events[it] is TimelineEvent.Local } ?: return this
         val local = events[idx] as TimelineEvent.Local
         return copy(events = events.toMutableList().also { it[idx] = transform(local) })
     }

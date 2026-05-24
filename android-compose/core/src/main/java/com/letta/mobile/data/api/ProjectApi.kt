@@ -61,8 +61,7 @@ open class ProjectApi @Inject constructor(
      *     back to true on the next switch.
      */
     open suspend fun probeAvailability(): Boolean {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl().trimEnd('/')
+        val (client, baseUrl) = apiClient.session()
         return try {
             val response = client.get("$baseUrl/api/projects?limit=1")
             if (response.status.value !in 200..299) {
@@ -76,8 +75,7 @@ open class ProjectApi @Inject constructor(
     }
 
     open suspend fun listProjects(): ProjectCatalog {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl().trimEnd('/')
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/api/projects")
         if (response.status.value !in 200..299) {
@@ -87,8 +85,7 @@ open class ProjectApi @Inject constructor(
     }
 
     open suspend fun getProject(identifier: String): ProjectSummary {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl().trimEnd('/')
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/api/projects/$identifier")
         if (response.status.value !in 200..299) {
@@ -98,8 +95,7 @@ open class ProjectApi @Inject constructor(
     }
 
     open suspend fun getBeadsRemoteStatus(identifier: String): BeadsRemoteStatus {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl().trimEnd('/')
+        val (client, baseUrl) = apiClient.session()
         val response = client.get("$baseUrl/api/projects/$identifier/beads-remote")
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())
@@ -111,8 +107,7 @@ open class ProjectApi @Inject constructor(
         identifier: String,
         push: Boolean = true,
     ): BeadsRemoteProvisionResponse {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl().trimEnd('/')
+        val (client, baseUrl) = apiClient.session()
         val response = client.post("$baseUrl/api/projects/$identifier/beads-remote/provision") {
             contentType(ContentType.Application.Json)
             setBody(BeadsRemoteProvisionRequest(push = push))
@@ -124,8 +119,7 @@ open class ProjectApi @Inject constructor(
     }
 
     open suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl().trimEnd('/')
+        val (client, baseUrl) = apiClient.session()
         val response = client.post("$baseUrl/api/sync/trigger") {
             contentType(ContentType.Application.Json)
             setBody(ProjectSyncTriggerRequest(projectId = identifier))
@@ -137,8 +131,7 @@ open class ProjectApi @Inject constructor(
     }
 
     open suspend fun createProject(request: ProjectCreateRequest): ProjectSummary {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl().trimEnd('/')
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/api/registry/projects") {
             contentType(ContentType.Application.Json)
@@ -151,8 +144,7 @@ open class ProjectApi @Inject constructor(
     }
 
     open suspend fun updateProject(identifier: String, request: ProjectUpdateRequest): ProjectSummary {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl().trimEnd('/')
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/api/registry/projects/$identifier") {
             contentType(ContentType.Application.Json)
@@ -172,8 +164,7 @@ open class ProjectApi @Inject constructor(
     }
 
     open suspend fun deleteProject(identifier: String) {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl().trimEnd('/')
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/api/registry/projects/$identifier")
         if (response.status.value !in 200..299) {

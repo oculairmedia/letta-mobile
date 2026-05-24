@@ -50,8 +50,7 @@ open class MessageApi @Inject constructor(
         messageLimit: Int = 20,
         beforeMessageId: String? = null,
     ): List<LettaMessage> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         // Over-fetch to account for runs containing multiple messages
         val runLimit = ((messageLimit * RUN_TO_MESSAGE_MULTIPLIER) / 4).coerceIn(messageLimit, MAX_OVER_FETCH_LIMIT)
@@ -100,8 +99,7 @@ open class MessageApi @Inject constructor(
         afterMessageId: String?,
         messageLimit: Int = 50,
     ): List<LettaMessage> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         // Over-fetch to account for runs containing multiple messages
         val runLimit = ((messageLimit * RUN_TO_MESSAGE_MULTIPLIER) / 4).coerceIn(messageLimit, MAX_OVER_FETCH_LIMIT)
@@ -128,8 +126,7 @@ open class MessageApi @Inject constructor(
     }
 
     open suspend fun sendMessage(agentId: String, request: MessageCreateRequest): LettaResponse {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/agents/$agentId/messages") {
             contentType(ContentType.Application.Json)
@@ -145,8 +142,7 @@ open class MessageApi @Inject constructor(
         conversationId: String,
         request: MessageCreateRequest
     ): ByteReadChannel {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/conversations/$conversationId/messages") {
             contentType(ContentType.Application.Json)
@@ -169,8 +165,7 @@ open class MessageApi @Inject constructor(
         conversationId: String,
         request: MessageCreateRequest,
     ): LettaResponse {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/conversations/$conversationId/messages") {
             contentType(ContentType.Application.Json)
@@ -205,8 +200,7 @@ open class MessageApi @Inject constructor(
      * client A, ~70ms later. See epic letta-mobile-mge5.
      */
     open suspend fun streamConversation(conversationId: String): ByteReadChannel {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/conversations/$conversationId/stream") {
             contentType(ContentType.Application.Json)
@@ -254,8 +248,7 @@ open class MessageApi @Inject constructor(
         order: String? = null,
         conversationId: String? = null,
     ): List<LettaMessage> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/agents/$agentId/messages") {
             parameter("limit", limit)
@@ -276,8 +269,7 @@ open class MessageApi @Inject constructor(
         after: String? = null,
         order: String? = null,
     ): List<LettaMessage> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/conversations/$conversationId/messages") {
             parameter("limit", limit)
@@ -291,8 +283,7 @@ open class MessageApi @Inject constructor(
     }
 
     open suspend fun resetMessages(agentId: String) {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/$agentId/reset-messages") {
             contentType(ContentType.Application.Json)
@@ -303,8 +294,7 @@ open class MessageApi @Inject constructor(
     }
 
     open suspend fun cancelMessage(agentId: String, runIds: List<String>? = null): Map<String, String> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/agents/$agentId/messages/cancel") {
             contentType(ContentType.Application.Json)
@@ -317,8 +307,7 @@ open class MessageApi @Inject constructor(
     }
 
     open suspend fun searchMessages(request: MessageSearchRequest): List<MessageSearchResult> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/messages/search") {
             contentType(ContentType.Application.Json)
@@ -366,8 +355,7 @@ open class MessageApi @Inject constructor(
     }
 
     open suspend fun createBatch(request: CreateBatchMessagesRequest): Job {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/messages/batches") {
             contentType(ContentType.Application.Json)
@@ -380,8 +368,7 @@ open class MessageApi @Inject constructor(
     }
 
     open suspend fun retrieveBatch(batchId: String): Job {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/messages/batches/$batchId")
         if (response.status.value !in 200..299) {
@@ -396,8 +383,7 @@ open class MessageApi @Inject constructor(
         after: String? = null,
         order: String? = null,
     ): List<Job> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/messages/batches") {
             parameter("limit", limit)
@@ -419,8 +405,7 @@ open class MessageApi @Inject constructor(
         order: String? = null,
         agentId: String? = null,
     ): BatchMessagesResponse {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/messages/batches/$batchId/messages") {
             parameter("limit", limit)
@@ -436,8 +421,7 @@ open class MessageApi @Inject constructor(
     }
 
     open suspend fun cancelBatch(batchId: String) {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/messages/batches/$batchId/cancel")
         if (response.status.value !in 200..299) {

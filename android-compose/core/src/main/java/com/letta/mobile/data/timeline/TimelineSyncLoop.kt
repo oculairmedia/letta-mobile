@@ -825,6 +825,7 @@ class TimelineSyncLoop(
                 )
             ),
             streaming = true,
+            includePings = true,
             includeReturnMessageTypes = DEFAULT_INCLUDE_TYPES,
         )
         if (BuildConfig.DEBUG) {
@@ -1104,13 +1105,15 @@ class TimelineSyncLoop(
      * user hasn't given up yet but long enough to ride out a typical blip.
      */
     private suspend fun listMessagesWithRetry(otid: String): List<LettaMessage> {
+        val afterCursor = _state.value.liveCursor
         var lastError: Throwable? = null
         for (attempt in 0 until RECONCILE_RETRY_ATTEMPTS) {
             try {
                 return messageApi.listConversationMessages(
                     conversationId = conversationId,
-                    limit = RECONCILE_LIMIT,
-                    order = "desc",
+                    limit = if (afterCursor != null) 50 else RECONCILE_LIMIT,
+                    after = afterCursor,
+                    order = if (afterCursor != null) "asc" else "desc",
                 )
             } catch (t: Throwable) {
                 if (!isRetryableReconcileError(t) || attempt == RECONCILE_RETRY_ATTEMPTS - 1) {

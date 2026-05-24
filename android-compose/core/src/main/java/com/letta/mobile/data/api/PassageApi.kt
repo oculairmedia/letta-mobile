@@ -24,8 +24,7 @@ class PassageApi @Inject constructor(
         after: String? = null,
         search: String? = null,
     ): List<Passage> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/agents/$agentId/archival-memory") {
             parameter("limit", limit)
@@ -39,8 +38,7 @@ class PassageApi @Inject constructor(
     }
 
     suspend fun createPassage(agentId: String, params: PassageCreateParams): Passage {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/agents/$agentId/archival-memory") {
             contentType(ContentType.Application.Json)
@@ -61,8 +59,7 @@ class PassageApi @Inject constructor(
     }
 
     suspend fun deletePassage(agentId: String, passageId: String) {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/agents/$agentId/archival-memory/$passageId")
         if (response.status.value !in 200..299) {

@@ -34,8 +34,7 @@ open class GroupApi @Inject constructor(
         projectId: String? = null,
         showHiddenGroups: Boolean? = null,
     ): List<Group> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/groups/") {
             parameter("manager_type", managerType)
@@ -53,8 +52,7 @@ open class GroupApi @Inject constructor(
     }
 
     open suspend fun countGroups(): Int {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/groups/count")
         if (response.status.value !in 200..299) {
@@ -64,8 +62,7 @@ open class GroupApi @Inject constructor(
     }
 
     open suspend fun retrieveGroup(groupId: String): Group {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/groups/$groupId")
         if (response.status.value !in 200..299) {
@@ -75,8 +72,7 @@ open class GroupApi @Inject constructor(
     }
 
     open suspend fun createGroup(params: GroupCreateParams): Group {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/groups/") {
             contentType(ContentType.Application.Json)
@@ -89,8 +85,7 @@ open class GroupApi @Inject constructor(
     }
 
     open suspend fun updateGroup(groupId: String, params: GroupUpdateParams): Group {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/groups/$groupId") {
             contentType(ContentType.Application.Json)
@@ -103,8 +98,7 @@ open class GroupApi @Inject constructor(
     }
 
     open suspend fun deleteGroup(groupId: String) {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/groups/$groupId")
         if (response.status.value !in 200..299) {
@@ -113,8 +107,7 @@ open class GroupApi @Inject constructor(
     }
 
     open suspend fun sendGroupMessage(groupId: String, request: MessageCreateRequest): LettaResponse {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/groups/$groupId/messages") {
             contentType(ContentType.Application.Json)
@@ -127,8 +120,7 @@ open class GroupApi @Inject constructor(
     }
 
     open suspend fun sendGroupMessageStream(groupId: String, request: MessageCreateRequest): ByteReadChannel {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/groups/$groupId/messages/stream") {
             contentType(ContentType.Application.Json)
@@ -141,8 +133,7 @@ open class GroupApi @Inject constructor(
     }
 
     open suspend fun updateGroupMessage(groupId: String, messageId: String, request: JsonElement): LettaMessage {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/groups/$groupId/messages/$messageId") {
             contentType(ContentType.Application.Json)
@@ -161,8 +152,7 @@ open class GroupApi @Inject constructor(
         after: String? = null,
         order: String? = null,
     ): List<LettaMessage> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/groups/$groupId/messages") {
             parameter("limit", limit)
@@ -177,8 +167,7 @@ open class GroupApi @Inject constructor(
     }
 
     open suspend fun resetGroupMessages(groupId: String) {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/groups/$groupId/reset-messages") {
             contentType(ContentType.Application.Json)

@@ -17,8 +17,7 @@ open class JobApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) {
     open suspend fun listJobs(params: JobListParams = JobListParams()): List<Job> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/jobs/") {
             parameter("source_id", params.sourceId)
@@ -37,8 +36,7 @@ open class JobApi @Inject constructor(
     }
 
     open suspend fun retrieveJob(jobId: String): Job {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/jobs/$jobId")
         if (response.status.value !in 200..299) {
@@ -48,8 +46,7 @@ open class JobApi @Inject constructor(
     }
 
     open suspend fun cancelJob(jobId: String): Job {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/jobs/$jobId/cancel")
         if (response.status.value !in 200..299) {
@@ -59,8 +56,7 @@ open class JobApi @Inject constructor(
     }
 
     open suspend fun deleteJob(jobId: String): Job {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/jobs/$jobId")
         if (response.status.value !in 200..299) {

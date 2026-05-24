@@ -21,8 +21,7 @@ open class ConversationApi @Inject constructor(
         order: String? = null,
         orderBy: String? = null,
     ): List<Conversation> {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/conversations") {
             parameter("agent_id", agentId)
@@ -40,8 +39,7 @@ open class ConversationApi @Inject constructor(
     }
 
     open suspend fun getConversation(conversationId: String): Conversation {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/conversations/$conversationId")
         if (response.status.value !in 200..299) {
@@ -51,8 +49,7 @@ open class ConversationApi @Inject constructor(
     }
 
     open suspend fun createConversation(params: ConversationCreateParams): Conversation {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/conversations") {
             contentType(ContentType.Application.Json)
@@ -66,8 +63,7 @@ open class ConversationApi @Inject constructor(
     }
 
     open suspend fun updateConversation(conversationId: String, params: ConversationUpdateParams): Conversation {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/conversations/$conversationId") {
             contentType(ContentType.Application.Json)
@@ -80,8 +76,7 @@ open class ConversationApi @Inject constructor(
     }
 
     open suspend fun deleteConversation(conversationId: String) {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/conversations/$conversationId")
         if (response.status.value !in 200..299) {
@@ -90,8 +85,7 @@ open class ConversationApi @Inject constructor(
     }
 
     open suspend fun forkConversation(conversationId: String, agentId: String? = null): Conversation {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/conversations/$conversationId/fork") {
             contentType(ContentType.Application.Json)
@@ -104,8 +98,7 @@ open class ConversationApi @Inject constructor(
     }
 
     open suspend fun cancelConversation(conversationId: String, agentId: String? = null) {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/conversations/$conversationId/cancel") {
             contentType(ContentType.Application.Json)
@@ -121,8 +114,7 @@ open class ConversationApi @Inject constructor(
         dryRun: Boolean = false,
         agentId: String? = null,
     ): String {
-        val client = apiClient.getClient()
-        val baseUrl = apiClient.getBaseUrl()
+        val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/conversations/$conversationId/recompile") {
             contentType(ContentType.Application.Json)
