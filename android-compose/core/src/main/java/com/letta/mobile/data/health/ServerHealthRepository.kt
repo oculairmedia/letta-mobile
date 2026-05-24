@@ -37,10 +37,10 @@ import javax.inject.Singleton
  * comes back [Health.OFFLINE] is the picker's signal to refuse the tap
  * (the row's own composable runs the shake-and-flash refusal animation).
  *
- * The probe is intentionally cheap and tolerant: any HTTP response from
- * `/v1/health/` — including 401, 404, 5xx — is treated as ONLINE because
- * the server is at least answering. Only network errors and timeouts
- * (ECONNREFUSED, UnknownHostException, etc.) drop a config to OFFLINE.
+ * The probe is intentionally cheap and tolerant for self-hosted servers: any
+ * HTTP response from `/v1/health/` is treated as ONLINE because the server is
+ * at least answering. Cloud configs are stricter for auth failures: 401/403
+ * means the saved API key cannot be used, so the row is marked OFFLINE.
  *
  * Re-probing fires (a) automatically whenever the set of configured IDs
  * changes, and (b) on demand via [refreshAll] from picker UIs that want
@@ -144,16 +144,24 @@ class ServerHealthRepository(
         } catch (t: Throwable) {
             Result.failure(t)
         }
-        val health = if (outcome.isSuccess) Health.ONLINE else Health.OFFLINE
+        val statusCode = outcome.getOrNull()?.status?.value
+        val health = if (outcome.isSuccess && !config.isCloudAuthFailure(statusCode)) {
+            Health.ONLINE
+        } else {
+            Health.OFFLINE
+        }
         _states.update { it + (config.id to health) }
         Telemetry.event(
             "Health", "probe.result",
             "configId" to config.id,
             "url" to baseUrl,
-            "status" to (outcome.getOrNull()?.status?.value ?: -1),
+            "status" to (statusCode ?: -1),
             "result" to health.name,
         )
     }
+
+    private fun LettaConfig.isCloudAuthFailure(statusCode: Int?): Boolean =
+        mode == LettaConfig.Mode.CLOUD && statusCode in setOf(401, 403)
 
     companion object {
         private const val PROBE_TIMEOUT_MS = 3_000L

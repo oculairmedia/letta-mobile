@@ -5,8 +5,8 @@ import com.letta.mobile.data.api.ApiException
 fun mapErrorToUserMessage(e: Exception, fallback: String = "Something went wrong"): String {
     return when (e) {
         is ApiException -> when (e.code) {
-            401 -> "Authentication failed. Check your API key."
-            403 -> "Access denied. You don't have permission."
+            401 -> "Authentication failed. Check your Letta API key in Settings."
+            403 -> "Access denied. This API key does not have permission for that Letta resource."
             404 -> "Not found. The item may have been deleted."
             408 -> "Request timed out. Try again."
             422 -> "Invalid request. Check your input."
