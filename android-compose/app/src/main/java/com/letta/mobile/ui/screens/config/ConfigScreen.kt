@@ -92,6 +92,7 @@ fun ConfigScreen(
 
     Scaffold(
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.common_settings)) },

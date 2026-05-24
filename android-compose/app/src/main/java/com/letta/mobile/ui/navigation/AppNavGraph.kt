@@ -190,13 +190,10 @@ fun AppNavGraph(
         onNotificationTargetConsumed()
     }
 
-    @OptIn(ExperimentalSharedTransitionApi::class)
-    SharedTransitionLayout {
-        CompositionLocalProvider(LocalSharedTransitionScope provides this) {
-            NavHost(
-                navController = navController,
-                startDestination = startDestination
-            ) {
+    NavHost(
+        navController = navController,
+        startDestination = startDestination,
+    ) {
         composable<HomeRoute> {
             // letta-mobile-2ixd: PR #56 hid the Projects tab from the bottom
             // bar / nav rail on backends without /api/projects, but the same
@@ -713,10 +710,10 @@ fun AppNavGraph(
         }
 
         chatGraph(
-            enterTransition = drillInEnter,
-            exitTransition = drillInExit,
-            popEnterTransition = drillInPopEnter,
-            popExitTransition = drillInPopExit,
+            enterTransition = { fadeIn(animationSpec = tween(150)) },
+            exitTransition = { fadeOut(animationSpec = tween(150)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(150)) },
+            popExitTransition = { fadeOut(animationSpec = tween(150)) },
             // letta-mobile: when AgentChatRoute is the cold-start landing
             // (lastChatSelection or fallbackAgentId picked it as the
             // startDestination), the back stack is empty. Fall back to the
@@ -806,8 +803,6 @@ fun AppNavGraph(
             ArchivalScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
-        }
-    }
         }
     }
 

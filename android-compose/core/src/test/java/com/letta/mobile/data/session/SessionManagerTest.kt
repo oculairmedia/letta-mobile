@@ -524,6 +524,7 @@ class SessionManagerTest {
         assertEquals(emptyList<String>(), passages.value.map { it.id })
         assertEquals(emptyList<String>(), scheduleProxy.getSchedules("agent-1").first().map { it.id })
 
+        val rebuiltPassages = passageProxy.getPassages("agent-1")
         modelProxy.refreshLlmModels()
         modelProxy.refreshEmbeddingModels()
         passageProxy.refreshPassages("agent-1")
@@ -532,7 +533,7 @@ class SessionManagerTest {
 
         assertEquals(listOf("llm-b"), modelProxy.llmModels.value.map { it.id })
         assertEquals(listOf("embedding-b"), modelProxy.embeddingModels.value.map { it.id })
-        assertEquals(listOf("passage-b"), passages.value.map { it.id })
+        assertEquals(listOf("passage-b"), rebuiltPassages.value.map { it.id })
         assertEquals(listOf("schedule-b"), scheduleProxy.getSchedules("agent-1").first().map { it.id })
     }
 
@@ -605,6 +606,8 @@ class SessionManagerTest {
         assertEquals(emptyList<String>(), mcpProxy.servers.value.map { it.id })
         assertEquals(emptyList<String>(), serverTools.first().map { it.id.value })
 
+        val rebuiltAgentTools = toolProxy.getAgentTools("agent-1")
+        val rebuiltServerTools = mcpProxy.getServerTools("server-a")
         toolProxy.refreshTools()
         toolProxy.attachTool("agent-1", "tool-b")
         mcpProxy.refreshServers()
@@ -612,9 +615,9 @@ class SessionManagerTest {
         advanceUntilIdle()
 
         assertEquals(listOf("tool-b"), toolProxy.getTools().value.map { it.id.value })
-        assertEquals(listOf("tool-b"), agentTools.first().map { it.id.value })
+        assertEquals(listOf("tool-b"), rebuiltAgentTools.first().map { it.id.value })
         assertEquals(listOf("server-b"), mcpProxy.servers.value.map { it.id })
-        assertEquals(listOf("mcp-tool-b"), serverTools.first().map { it.id.value })
+        assertEquals(listOf("mcp-tool-b"), rebuiltServerTools.first().map { it.id.value })
     }
 
     @Test
