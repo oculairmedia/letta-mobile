@@ -55,4 +55,4 @@
 
 dolt.shared-server: false
 
-sync.remote: "https://doltremoteapi.dolthub.com/oculair/letta_mobile"
+# sync.remote: "https://doltremoteapi.dolthub.com/oulair/letta_mobile"
