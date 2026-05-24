@@ -1,6 +1,5 @@
 package com.letta.mobile.feature.chat
 
-import com.letta.mobile.bot.repository.ClientModeAgentLocationRepository
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.model.ProjectBugReport
@@ -8,155 +7,25 @@ import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
 import com.letta.mobile.data.repository.api.IBugReportRepository
 import com.letta.mobile.util.mapErrorToUserMessage
-import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** Project-chat and Client Mode location side panel work kept out of the VM shell. */
 internal class ProjectChatCoordinator(
     private val scope: CoroutineScope,
     private val agentId: String,
     private val projectContext: ProjectChatContext?,
     private val uiState: MutableStateFlow<ChatUiState>,
-    private val clientModeEnabled: StateFlow<Boolean>,
-    private val clientModeAgentLocationRepository: ClientModeAgentLocationRepository,
     private val agentRepository: IAgentRepository,
     private val blockRepository: IBlockRepository,
     private val bugReportRepository: IBugReportRepository,
-    private val projectAgentActivityLoader: ProjectAgentActivityLoader,
     private val conversationId: () -> String?,
     private val setComposerError: (String) -> Unit,
     private val sendMessage: (String) -> Unit,
 ) : ChatProjectBindings {
-    override fun refreshClientModeLocation() {
-        if (agentId.isBlank() || !clientModeEnabled.value) return
-        scope.launch {
-            uiState.update {
-                it.copy(
-                    clientModeLocation = it.clientModeLocation.copy(
-                        isLoading = true,
-                        error = null,
-                        defaultPath = it.clientModeLocation.defaultPath ?: projectContext?.filesystemPath,
-                    )
-                )
-            }
-            runCatching { clientModeAgentLocationRepository.getLocation(agentId) }
-                .onSuccess { location ->
-                    uiState.update {
-                        val previous = it.clientModeLocation
-                        it.copy(
-                            clientModeLocation = previous.copy(
-                                isLoading = false,
-                                currentPath = location?.currentPath ?: previous.currentPath,
-                                defaultPath = location?.defaultPath ?: previous.defaultPath ?: projectContext?.filesystemPath,
-                                error = null,
-                            )
-                        )
-                    }
-                }
-                .onFailure { e ->
-                    uiState.update {
-                        it.copy(
-                            clientModeLocation = it.clientModeLocation.copy(
-                                isLoading = false,
-                                error = mapErrorToUserMessage(e.asException(), "Failed to refresh agent location"),
-                            )
-                        )
-                    }
-                }
-        }
-    }
-
-    override fun sendClientModeLocationChange(path: String) {
-        val normalized = path.trim()
-        if (normalized.isBlank()) return
-        if (uiState.value.isStreaming) {
-            setComposerError("Wait for the current response before changing location")
-            return
-        }
-        uiState.update {
-            it.copy(
-                clientModeLocation = it.clientModeLocation.copy(
-                    lastRequestedPath = normalized,
-                    error = null,
-                )
-            )
-        }
-        sendMessage(buildClientModeLocationPrompt(normalized))
-    }
-
-    override fun openClientModeLocationPicker() {
-        if (!clientModeEnabled.value) return
-        val initialPath = uiState.value.clientModeLocation.currentPath
-            ?: uiState.value.clientModeLocation.lastRequestedPath
-            ?: uiState.value.clientModeLocation.defaultPath
-        uiState.update {
-            it.copy(
-                clientModeFilesystemPicker = it.clientModeFilesystemPicker.copy(
-                    isVisible = true,
-                    error = null,
-                )
-            )
-        }
-        browseClientModeLocation(initialPath)
-    }
-
-    override fun closeClientModeLocationPicker() {
-        uiState.update {
-            it.copy(clientModeFilesystemPicker = it.clientModeFilesystemPicker.copy(isVisible = false))
-        }
-    }
-
-    override fun browseClientModeLocation(path: String?) {
-        if (!clientModeEnabled.value) return
-        scope.launch {
-            uiState.update {
-                it.copy(
-                    clientModeFilesystemPicker = it.clientModeFilesystemPicker.copy(
-                        isLoading = true,
-                        error = null,
-                    )
-                )
-            }
-            runCatching { clientModeAgentLocationRepository.browseDirectories(path) }
-                .onSuccess { listing ->
-                    uiState.update {
-                        it.copy(
-                            clientModeFilesystemPicker = it.clientModeFilesystemPicker.copy(
-                                isVisible = true,
-                                isLoading = false,
-                                path = listing?.path ?: path,
-                                parent = listing?.parent,
-                                entries = listing?.entries ?: persistentListOf(),
-                                truncated = listing?.truncated ?: false,
-                                error = if (listing == null) "Client-mode server is not configured" else null,
-                            )
-                        )
-                    }
-                }
-                .onFailure { e ->
-                    uiState.update {
-                        it.copy(
-                            clientModeFilesystemPicker = it.clientModeFilesystemPicker.copy(
-                                isLoading = false,
-                                error = mapErrorToUserMessage(e.asException(), "Failed to browse server filesystem"),
-                            )
-                        )
-                    }
-                }
-        }
-    }
-
-    override fun selectClientModeLocation(path: String) {
-        closeClientModeLocationPicker()
-        sendClientModeLocationChange(path)
-    }
-
     override fun refreshContextWindow() {
         if (agentId.isBlank()) return
         scope.launch {
@@ -200,28 +69,7 @@ internal class ProjectChatCoordinator(
     }
 
     override fun loadProjectAgents() {
-        val project = projectContext ?: return
-        scope.launch {
-            uiState.value = uiState.value.copy(
-                projectAgents = uiState.value.projectAgents.copy(isLoading = true, error = null)
-            )
-            try {
-                val activities = projectAgentActivityLoader.load(project, agentId)
-                uiState.value = uiState.value.copy(
-                    projectAgents = ProjectAgentsUiState(
-                        isLoading = false,
-                        agents = activities.toImmutableList(),
-                    )
-                )
-            } catch (e: Exception) {
-                uiState.value = uiState.value.copy(
-                    projectAgents = uiState.value.projectAgents.copy(
-                        isLoading = false,
-                        error = mapErrorToUserMessage(e, "Failed to load active agents"),
-                    )
-                )
-            }
-        }
+        // Agent activity loading was part of Client Mode (removed).
     }
 
     override fun loadRecentBugReports() {
@@ -409,14 +257,6 @@ private fun buildProjectBriefSections(blocks: List<Block>): Map<ProjectBriefSect
 
 private fun String.canonicalBriefLabel(): String =
     lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
-
-private fun buildClientModeLocationPrompt(path: String): String = """
-Please switch your active working directory to:
-
-$path
-
-Use this as the cwd/base path for subsequent filesystem and shell tool calls in this conversation. After switching, briefly confirm the current working directory.
-""".trim()
 
 private fun buildBugReportPrompt(draft: ProjectBugReportDraft): String {
     val title = draft.title.trim()
