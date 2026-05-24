@@ -387,7 +387,7 @@ internal class AdminChatViewModel @Inject constructor(
             observeLastChatSelection = ::observeLastChatSelection,
             seedAgentNameFromMemoryCache = ::seedAgentNameFromMemoryCache,
             observeAgentNameCache = ::observeAgentNameCache,
-            refreshClientModeLocation = { projectChatCoordinator.refreshClientModeLocation() },
+            refreshClientModeLocation = { },
             loadProjectAgents = { projectChatCoordinator.loadProjectAgents() },
             loadProjectBrief = { projectChatCoordinator.loadProjectBrief() },
             loadRecentBugReports = { projectChatCoordinator.loadRecentBugReports() },
