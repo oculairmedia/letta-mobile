@@ -141,6 +141,7 @@ class NavViewModel @Inject constructor(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun AppNavGraph(
     navController: NavHostController = rememberNavController(),
@@ -190,6 +191,8 @@ fun AppNavGraph(
         onNotificationTargetConsumed()
     }
 
+    SharedTransitionLayout {
+    CompositionLocalProvider(LocalSharedTransitionScope provides this) {
     NavHost(
         navController = navController,
         startDestination = startDestination,
@@ -804,6 +807,8 @@ fun AppNavGraph(
                 onNavigateBack = { navController.popBackStack() }
             )
         }
+    }
+    }
     }
 
     // letta-mobile-cdlk: render the backend-switcher sheet at the top level

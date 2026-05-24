@@ -4,7 +4,12 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -242,6 +247,22 @@ internal fun ToolCallCard(
                         contentDescription = "Success",
                         modifier = Modifier.size(LettaIconSizing.Inline),
                         tint = MaterialTheme.colorScheme.primary,
+                    )
+                } else {
+                    val infiniteTransition = rememberInfiniteTransition(label = "toolSpin")
+                    val angle by infiniteTransition.animateFloat(
+                        initialValue = 0f,
+                        targetValue = 360f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1200, easing = LinearEasing),
+                        ),
+                        label = "toolSpinAngle",
+                    )
+                    Icon(
+                        imageVector = LettaIcons.Refresh,
+                        contentDescription = "Running",
+                        modifier = Modifier.size(LettaIconSizing.Inline).rotate(angle),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -709,9 +730,6 @@ internal fun CompactToolCallRow(
                 )
                 toolCall.result != null -> Icon(
                     imageVector = LettaIcons.CheckCircle,
-                    // Preserve the approval semantic for screen readers even
-                    // when the visual chip is suppressed for a completed
-                    // approved row.
                     contentDescription = if (approvalState == ToolApprovalState.Approved) {
                         "Approved, success"
                     } else {
@@ -720,6 +738,23 @@ internal fun CompactToolCallRow(
                     modifier = Modifier.size(LettaIconSizing.Inline),
                     tint = MaterialTheme.colorScheme.primary,
                 )
+                else -> {
+                    val t = rememberInfiniteTransition(label = "compactSpin")
+                    val a by t.animateFloat(
+                        initialValue = 0f,
+                        targetValue = 360f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1200, easing = LinearEasing),
+                        ),
+                        label = "compactSpinAngle",
+                    )
+                    Icon(
+                        imageVector = LettaIcons.Refresh,
+                        contentDescription = "Running",
+                        modifier = Modifier.size(LettaIconSizing.Inline).rotate(a),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             Icon(
                 imageVector = LettaIcons.ExpandMore,
