@@ -1,6 +1,5 @@
 package com.letta.mobile.channel
 
-import com.letta.mobile.bot.channel.NotificationReplyStreamTracker
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.channel.NotificationCandidatePhase
 import com.letta.mobile.data.channel.NotificationCandidateSource
@@ -25,14 +24,8 @@ import javax.inject.Singleton
  * Source semantics:
  * - [NotificationCandidateSource.TimelineIngestion] is the live timeline/SSE
  *   path. Submit settled server events only.
- * - [NotificationCandidateSource.WebsocketClientMode] is a client-mode stream
- *   path. Submit partial chunks as [NotificationCandidatePhase.Partial] and the
- *   final user-visible preview as [NotificationCandidatePhase.Final]. Partials
- *   are recorded as candidates but never published prematurely.
  * - [NotificationCandidateSource.NotificationReplyStream] is a response caused
- *   by a notification RemoteInput reply. These candidates are normally
- *   suppressed while [NotificationReplyHandler.activeReplyStreams] contains the
- *   conversation, preventing the reply surface from notifying itself.
+ *   by a notification RemoteInput reply.
  * - [NotificationCandidateSource.HeartbeatFallback] is the periodic polling
  *   fallback. It shares the same duplicate state as realtime delivery so it can
  *   fill gaps without republishing messages already delivered by another path.
@@ -40,7 +33,6 @@ import javax.inject.Singleton
 @Singleton
 class NotificationDeliveryCoordinator @Inject constructor(
     private val currentConversationTracker: CurrentConversationTracker,
-    private val notificationReplyHandler: NotificationReplyStreamTracker,
     private val syncStateStore: IChannelSyncStateStore,
     private val publisher: IChannelNotificationPublisher,
 ) : NotificationDelivery {
@@ -56,13 +48,6 @@ class NotificationDeliveryCoordinator @Inject constructor(
 
         if (currentConversationTracker.current == candidate.conversationId) {
             return candidate.suppressed(NotificationSuppressionReason.ForegroundConversation, notificationId)
-        }
-
-        if (
-            candidate.source != NotificationCandidateSource.NotificationReplyStream &&
-            candidate.conversationId in notificationReplyHandler.activeReplyStreams.value
-        ) {
-            return candidate.suppressed(NotificationSuppressionReason.ActiveNotificationReplyStream, notificationId)
         }
 
         if (candidate.phase == NotificationCandidatePhase.Partial || !candidate.isFinal) {
