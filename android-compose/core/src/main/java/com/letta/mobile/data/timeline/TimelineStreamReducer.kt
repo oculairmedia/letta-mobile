@@ -139,12 +139,14 @@ internal fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutp
         }
         val oldText = existing.content
         val newText = confirmed.content
+        val canUseSnapshotMerge = existing.source == MessageSource.CLIENT_MODE_HARNESS ||
+            (existing.seqId != null && confirmed.seqId != null)
         val mergedText = when {
             newText.isEmpty() -> oldText
-            newText == oldText -> oldText
-            newText.startsWith(oldText) -> newText
-            oldText.startsWith(newText) -> oldText
-            oldText.endsWith(newText) -> oldText
+            canUseSnapshotMerge && newText == oldText -> oldText
+            canUseSnapshotMerge && newText.startsWith(oldText) -> newText
+            canUseSnapshotMerge && oldText.startsWith(newText) -> oldText
+            canUseSnapshotMerge && oldText.endsWith(newText) -> oldText
             else -> oldText + newText
         }
         val oldCalls = existing.toolCalls

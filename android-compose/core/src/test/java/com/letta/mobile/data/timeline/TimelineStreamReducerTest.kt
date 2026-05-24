@@ -118,12 +118,12 @@ class TimelineStreamReducerTest {
     @Test
     fun `cumulative frames do not double existing text`() {
         val seeded = reduce(
-            frame = AssistantMessage(id = "assistant-1", contentRaw = JsonPrimitive("Hey"))
+            frame = AssistantMessage(id = "assistant-1", contentRaw = JsonPrimitive("Hey"), seqId = 1)
         ).next
 
         val out2 = reduce(
             prev = seeded,
-            frame = AssistantMessage(id = "assistant-1", contentRaw = JsonPrimitive("Hey Emmanuel.")),
+            frame = AssistantMessage(id = "assistant-1", contentRaw = JsonPrimitive("Hey Emmanuel."), seqId = 2),
         )
         (out2.next.events.single() as TimelineEvent.Confirmed).content shouldBe "Hey Emmanuel."
 
@@ -132,6 +132,7 @@ class TimelineStreamReducerTest {
             frame = AssistantMessage(
                 id = "assistant-1",
                 contentRaw = JsonPrimitive("Hey Emmanuel. Most recent thing"),
+                seqId = 3,
             ),
         )
         (out3.next.events.single() as TimelineEvent.Confirmed).content shouldBe "Hey Emmanuel. Most recent thing"
