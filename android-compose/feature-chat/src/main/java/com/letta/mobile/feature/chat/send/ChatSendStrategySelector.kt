@@ -7,8 +7,10 @@ import kotlinx.coroutines.Job
 internal class ChatSendStrategySelector(
     private val timelineStrategy: ChatSendStrategy,
     private val wsStrategy: ChatSendStrategy,
+    private val localStrategy: ChatSendStrategy,
 ) {
     fun select(context: ChatSendContext): ChatSendStrategy = when {
+        context.isLocalRuntime -> localStrategy
         context.isShimBackend -> wsStrategy
         else -> timelineStrategy
     }
@@ -35,6 +37,7 @@ internal class ChatSendStrategySelector(
 
 private val ChatSendStrategy.routeName: String
     get() = when (this) {
+        is LocalRuntimeChatSendStrategy -> "local"
         is WsChatSendStrategy -> "ws"
         is TimelineChatSendStrategy -> "timeline"
         else -> this::class.simpleName.orEmpty()

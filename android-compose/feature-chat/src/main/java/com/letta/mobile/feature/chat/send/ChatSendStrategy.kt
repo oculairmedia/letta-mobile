@@ -7,6 +7,7 @@ internal data class ChatSendContext(
     val isClientModeEnabled: Boolean,
     val explicitConversationId: String?,
     val isShimBackend: Boolean = false,
+    val isLocalRuntime: Boolean = false,
 )
 
 internal interface ChatSendStrategy {

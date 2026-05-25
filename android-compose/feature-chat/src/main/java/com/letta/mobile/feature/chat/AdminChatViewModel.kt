@@ -29,6 +29,7 @@ import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.feature.chat.send.ChatSendContext
 import com.letta.mobile.feature.chat.send.ChatSendStrategySelector
+import com.letta.mobile.feature.chat.send.LocalRuntimeChatSendStrategy
 import com.letta.mobile.feature.chat.send.TimelineChatSendStrategy
 import com.letta.mobile.feature.chat.send.WsChatSendStrategy
 import com.letta.mobile.feature.chat.route.ChatRouteArgs
@@ -347,10 +348,27 @@ internal class AdminChatViewModel @Inject constructor(
     private val wsChatSendStrategy: WsChatSendStrategy by lazy {
         WsChatSendStrategy(wsChatSendCoordinator)
     }
+    private val localRuntimeChatSendCoordinator: LocalRuntimeChatSendCoordinator by lazy {
+        LocalRuntimeChatSendCoordinator(
+            scope = viewModelScope,
+            agentId = agentId,
+            localBackend = { sessionManager.current.localRuntimeBackend },
+            timelineRepository = timelineRepository,
+            uiState = _uiState,
+            clearComposerAfterSend = { composerController.clearAfterSend() },
+            activeConversationId = { chatConversationCoordinator.activeConversationId },
+            setActiveConversationId = chatConversationCoordinator::setActiveConversationId,
+            startTimelineObserver = ::startTimelineObserver,
+        )
+    }
+    private val localRuntimeChatSendStrategy: LocalRuntimeChatSendStrategy by lazy {
+        LocalRuntimeChatSendStrategy(localRuntimeChatSendCoordinator)
+    }
     private val chatSendStrategySelector: ChatSendStrategySelector by lazy {
         ChatSendStrategySelector(
             timelineStrategy = timelineChatSendStrategy,
             wsStrategy = wsChatSendStrategy,
+            localStrategy = localRuntimeChatSendStrategy,
         )
     }
     private val chatHistoryPager: ChatHistoryPager by lazy {
@@ -694,7 +712,7 @@ internal class AdminChatViewModel @Inject constructor(
         clearA2uiThinkingOnResponse()
         val context = chatSendContext()
         viewModelScope.launch {
-            if (context.isShimBackend) {
+            if (context.isShimBackend || context.isLocalRuntime) {
                 chatBannerController.clearStreamingAfterInterrupt()
                 chatSendStrategySelector.cancel(context)
                 return@launch
@@ -768,6 +786,7 @@ internal class AdminChatViewModel @Inject constructor(
         isClientModeEnabled = false,
         explicitConversationId = explicitConversationId,
         isShimBackend = isShimBackend.value,
+        isLocalRuntime = sessionManager.current.localRuntimeBackend != null,
     )
 
     private fun stopTimelineObserver() {
