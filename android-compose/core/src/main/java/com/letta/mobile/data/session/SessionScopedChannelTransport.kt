@@ -66,6 +66,7 @@ class SessionScopedChannelTransport internal constructor(
 
     override fun cancel(): Boolean = current.cancel()
     override fun bye(): Boolean = current.bye()
+    override fun subscribe(runId: String, cursor: Long): Boolean = current.subscribe(runId, cursor)
     override suspend fun disconnect() = sessionManager.withCurrentSession { it.channelTransport.disconnect() }
     override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult = current.sendA2uiAction(action)
 

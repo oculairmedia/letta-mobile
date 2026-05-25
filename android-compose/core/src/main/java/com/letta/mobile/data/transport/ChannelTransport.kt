@@ -79,7 +79,7 @@ class ChannelTransport internal constructor(
     private val scope: CoroutineScope,
     // letta-mobile-2rkdj: persistent per-conv {runId -> lastSeq} map
     // used to drive auto-resume on reconnect. Tests that don't
-    // exercise resume can pass [RunCursorStore.disabled].
+    // exercise resume can pass [RunCursorStore.inMemory].
     private val cursorStore: RunCursorStore,
 ) : IChannelTransport {
     @Inject

@@ -72,7 +72,7 @@ class SessionGraphFactory @Inject constructor(
     private val scheduleApi: ScheduleApi,
     private val stepApi: StepApi,
     private val toolApi: ToolApi,
-    private val runCursorStore: RunCursorStore,
+    private val runCursorStore: RunCursorStore = RunCursorStore.inMemory(),
 ) {
     private val nextId = AtomicLong(0L)
 
