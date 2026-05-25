@@ -53,16 +53,27 @@ data class ConversationInspectorMessage(
 )
 
 /**
- * Stateless HTTP client for non-streaming message operations.
+ * Stateless HTTP helper for non-streaming message endpoints.
  *
- * Streaming send + live sync are owned by
- * [com.letta.mobile.data.timeline.TimelineRepository]. This repository is
- * retained only for one-shot HTTP operations (older-message pagination,
- * approvals, search, batches, reset, inspector).
+ * `MessageRepository` is deliberately **not** the chat timeline source of
+ * truth. Streaming sends, live sync, optimistic/local writes, reconciliation,
+ * and visible conversation state are owned by
+ * [com.letta.mobile.data.timeline.TimelineRepository]. Keep chat screens wired
+ * to the timeline first; use this repository only for bounded HTTP operations
+ * that augment or administer that state:
  *
- * Phase 5 of the Timeline migration removed all in-memory state
- * (`_pendingMessages`, `_streamingMessages`, `_serverMessages`) and the
- * legacy streaming `sendMessage()` entry point.
+ * - older-message pagination that is merged back through the timeline observer
+ * - message search
+ * - approvals and cancellations
+ * - batch-message administration
+ * - agent-level reset
+ * - conversation inspector/debug reads
+ *
+ * Do not reintroduce an in-memory message cache, streaming send entry point,
+ * or conversation-state Flow here. Phase 5 of the Timeline migration removed
+ * the old `_pendingMessages`, `_streamingMessages`, `_serverMessages`, and
+ * legacy `sendMessage()` responsibilities so there is only one live timeline
+ * owner.
  */
 @Singleton
 open class MessageRepository @Inject constructor(

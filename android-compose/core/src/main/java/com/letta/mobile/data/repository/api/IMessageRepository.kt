@@ -9,15 +9,37 @@ import com.letta.mobile.data.model.MessageSearchRequest
 import com.letta.mobile.data.model.MessageSearchResult
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * Stateless HTTP message operations boundary.
+ *
+ * This interface intentionally exposes one-shot server calls only. It must not
+ * become the source of truth for live chat timeline state; streaming sends,
+ * optimistic messages, reconciliation, and conversation-state observation live
+ * behind `TimelineRepository` instead. Chat features that need historical data
+ * may page/search through this interface, but must merge those results into the
+ * timeline-backed UI model rather than replacing it.
+ */
 interface IMessageRepository : IConversationInspectorMessageRepository {
+    /**
+     * Legacy paging endpoint for admin/list surfaces, not the live chat stream.
+     */
     fun getMessagesPaged(agentId: String?, conversationId: String?): Flow<PagingData<AppMessage>>
 
+    /**
+     * Stateless recent/targeted fetch. Use only for explicit backfill or
+     * inspector-style reads; live chat observation belongs to TimelineRepository.
+     */
     suspend fun fetchMessages(
         agentId: String,
         conversationId: String,
         targetMessageId: String? = null,
     ): List<AppMessage>
 
+    /**
+     * Older-page backfill for chat history. Callers must merge returned data
+     * into the timeline projection rather than treating this as a replacement
+     * message source.
+     */
     suspend fun fetchOlderMessages(
         agentId: String,
         conversationId: String,
