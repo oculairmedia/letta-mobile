@@ -7,6 +7,7 @@ import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.local.LettaDatabase
 import com.letta.mobile.data.local.PendingLocalDao
 import com.letta.mobile.data.local.RoomPendingLocalStore
+import com.letta.mobile.data.local.RuntimeEventDao
 import com.letta.mobile.data.timeline.PendingLocalStore
 import dagger.Binds
 import dagger.Module
@@ -51,5 +52,10 @@ object DatabaseModule {
     @Provides
     fun provideConversationDao(database: LettaDatabase): ConversationDao {
         return database.conversationDao()
+    }
+
+    @Provides
+    fun provideRuntimeEventDao(database: LettaDatabase): RuntimeEventDao {
+        return database.runtimeEventDao()
     }
 }

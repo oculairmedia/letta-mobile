@@ -4,6 +4,14 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.letta.mobile.runtime.BackendId
+import com.letta.mobile.runtime.ConversationId
+import com.letta.mobile.runtime.EpochMillis
+import com.letta.mobile.runtime.RuntimeEventDraft
+import com.letta.mobile.runtime.RuntimeEventId
+import com.letta.mobile.runtime.RuntimeEventPayload
+import com.letta.mobile.runtime.RuntimeEventSource
+import com.letta.mobile.runtime.RuntimeId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -191,6 +199,40 @@ class LettaDatabaseMigrationTest {
         assertEquals(789L, db.conversationDao().getRefreshState("agent-1")?.lastRefreshAtMillis)
     }
 
+    @Test
+    fun `opens current v5 database and adds runtime event outbox`() = runTest {
+        createLegacyDatabase(version = 5) { db ->
+            createAgentsTable(db)
+            createProjectBugReportsTable(db)
+            createPendingLocalMessagesTable(db)
+            createConversationTables(db)
+        }
+
+        val db = openMigratedDatabase()
+        val outbox = RoomRuntimeEventOutbox(
+            database = db,
+            eventIdFactory = { _, offset -> RuntimeEventId("migration-event-${offset.value}") },
+            clock = { EpochMillis(1_000) },
+        )
+
+        assertTrue(db.runtimeEventDao().listAfterOffset(0).isEmpty())
+        val event = outbox.append(
+            RuntimeEventDraft(
+                backendId = BackendId("backend-1"),
+                runtimeId = RuntimeId("runtime-1"),
+                conversationId = ConversationId("conversation-1"),
+                source = RuntimeEventSource.LocalUser,
+                payload = RuntimeEventPayload.LocalUserAppend(
+                    localMessageId = "local-1",
+                    text = "hello",
+                ),
+            ),
+        )
+
+        assertEquals(1L, event.offset.value)
+        assertEquals(1, db.runtimeEventDao().listAfterOffset(0).size)
+    }
+
     private fun createLegacyDatabase(version: Int, createSchema: (SQLiteDatabase) -> Unit) {
         context.deleteDatabase(dbName)
         val db = context.openOrCreateDatabase(dbName, Context.MODE_PRIVATE, null)
@@ -259,6 +301,39 @@ class LettaDatabaseMigrationTest {
                 attachmentsJson TEXT NOT NULL,
                 sentAtEpochMs INTEGER NOT NULL,
                 PRIMARY KEY(otid)
+            )
+            """.trimIndent(),
+        )
+    }
+
+    private fun createConversationTables(db: SQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS conversations (
+                id TEXT NOT NULL,
+                agentId TEXT NOT NULL,
+                summary TEXT,
+                createdAt TEXT,
+                updatedAt TEXT,
+                lastMessageAt TEXT,
+                archived INTEGER,
+                archivedAt TEXT,
+                inContextMessageIdsJson TEXT NOT NULL,
+                isolatedBlockIdsJson TEXT NOT NULL,
+                cachedAtEpochMs INTEGER NOT NULL,
+                PRIMARY KEY(id)
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_conversations_agentId ON conversations (agentId)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_conversations_lastMessageAt ON conversations (lastMessageAt)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_conversations_createdAt ON conversations (createdAt)")
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS conversation_refresh_state (
+                agentId TEXT NOT NULL,
+                lastRefreshAtMillis INTEGER NOT NULL,
+                PRIMARY KEY(agentId)
             )
             """.trimIndent(),
         )
