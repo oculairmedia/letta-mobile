@@ -273,6 +273,6 @@ class ChatConversationCoordinatorTest {
             )
         )
         every { events } returns emptyFlow()
-        every { send(any(), any(), any(), any(), any()) } returns sendAccepted
+        every { send(any(), any(), any(), any(), any(), any()) } returns sendAccepted
     }
 }

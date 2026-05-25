@@ -333,6 +333,7 @@ class ChannelTransport internal constructor(
         // and treats this as the authoritative content. Caller is responsible
         // for shape — see [SendMessageFrame.contentParts] for the contract.
         contentParts: JsonArray?,
+        startNewConversation: Boolean,
     ): Boolean {
         if (state.value !is State.Connected) return false
         if (inFlight) return false
@@ -340,13 +341,14 @@ class ChannelTransport internal constructor(
         inFlight = true
         currentRunId.set(null)
         currentTurnId.set(null)
-        currentConversationId.set(conversationId)
+        currentConversationId.set(conversationId.takeIf { it.isNotBlank() })
         val sent = socket.sendFrame(
             SendMessageFrame(
                 id = UUID.randomUUID().toString(),
                 ts = nowIso(),
                 agentId = agentId,
                 conversationId = conversationId,
+                startNewConversation = startNewConversation,
                 text = text,
                 otid = otid,
                 contentParts = contentParts,
@@ -665,6 +667,7 @@ class ChannelTransport internal constructor(
                 // frame" dead zone.
                 currentRunId.set(frame.runId)
                 currentTurnId.set(frame.turnId)
+                currentConversationId.set(frame.conversationId)
                 drainPendingA2uiActions()
             }
 

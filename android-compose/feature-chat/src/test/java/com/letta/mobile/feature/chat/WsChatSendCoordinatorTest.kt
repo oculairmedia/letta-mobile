@@ -22,6 +22,7 @@ import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.testutil.FakeTimelineExternalTransportWriter
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -85,6 +86,63 @@ class WsChatSendCoordinatorTest {
                 attachments = emptyList(),
             )
         }
+    }
+
+    @Test
+    fun `fresh route on connected ws asks shim to create conversation and adopts turn started id`() = runTest {
+        val wsChatBridge = mockBridge(sendAccepted = true)
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val conversationRepository = stubConversationRepository(conversationId = "conv-rest-fallback")
+        var activeConversation: String? = null
+        var observedConversation: String? = null
+        var cleared = false
+        val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = wsChatBridge,
+            timelineRepository = timelineRepository,
+            conversationRepository = conversationRepository,
+            uiState = uiState,
+            clearComposerAfterSend = { cleared = true },
+            activeConversationId = { activeConversation },
+            isFreshRoute = true,
+            setActiveConversationId = { activeConversation = it },
+            startTimelineObserver = { observedConversation = it },
+            clientVersionProvider = clientVersionProvider,
+        )
+
+        coordinator.send("hello").join()
+
+        coVerify(exactly = 0) { conversationRepository.createConversation(any(), any()) }
+        assertTrue(cleared)
+        assertTrue(timelineRepository.externalLocals.isEmpty())
+        verify(exactly = 1) {
+            wsChatBridge.send(
+                agentId = "agent-1",
+                conversationId = "",
+                text = "hello",
+                otid = any(),
+                attachments = emptyList(),
+                startNewConversation = true,
+            )
+        }
+
+        coordinator.handleEvent(
+            WsTimelineEvent.TurnStarted(
+                turnId = "turn-1",
+                agentId = "agent-1",
+                conversationId = "conv-shim-created",
+                runId = "run-1",
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals("conv-shim-created", activeConversation)
+        assertEquals("conv-shim-created", observedConversation)
+        assertEquals("conv-shim-created", timelineRepository.externalLocals.single().conversationId)
+        assertEquals(ConversationState.Ready("conv-shim-created"), uiState.value.conversationState)
     }
 
     @Test
@@ -667,6 +725,6 @@ class WsChatSendCoordinatorTest {
             )
         )
         every { events } returns eventFlow
-        every { send(any(), any(), any(), any(), any()) } returnsMany sendResults
+        every { send(any(), any(), any(), any(), any(), any()) } returnsMany sendResults
     }
 }

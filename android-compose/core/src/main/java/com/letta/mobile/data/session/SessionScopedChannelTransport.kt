@@ -62,7 +62,8 @@ class SessionScopedChannelTransport internal constructor(
         text: String,
         otid: String?,
         contentParts: JsonArray?,
-    ): Boolean = current.send(agentId, conversationId, text, otid, contentParts)
+        startNewConversation: Boolean,
+    ): Boolean = current.send(agentId, conversationId, text, otid, contentParts, startNewConversation)
 
     override fun cancel(): Boolean = current.cancel()
     override fun bye(): Boolean = current.bye()

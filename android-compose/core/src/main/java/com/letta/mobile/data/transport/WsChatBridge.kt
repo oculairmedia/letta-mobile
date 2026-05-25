@@ -91,13 +91,21 @@ class WsChatBridge @Inject constructor(
         text: String,
         otid: String? = null,
         attachments: List<com.letta.mobile.data.model.MessageContentPart.Image> = emptyList(),
+        startNewConversation: Boolean = false,
     ): Boolean {
         val contentParts = if (attachments.isEmpty()) {
             null
         } else {
             buildContentParts(text, attachments).toJsonArray()
         }
-        return transport.send(agentId, conversationId, text, otid, contentParts)
+        return transport.send(
+            agentId = agentId,
+            conversationId = conversationId,
+            text = text,
+            otid = otid,
+            contentParts = contentParts,
+            startNewConversation = startNewConversation,
+        )
     }
 
     fun cancel(): Boolean = transport.cancel()

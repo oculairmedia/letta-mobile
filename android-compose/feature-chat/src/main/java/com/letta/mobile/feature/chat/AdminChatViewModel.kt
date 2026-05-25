@@ -336,6 +336,7 @@ internal class AdminChatViewModel @Inject constructor(
             uiState = _uiState,
             clearComposerAfterSend = { composerController.clearAfterSend() },
             activeConversationId = { chatConversationCoordinator.activeConversationId },
+            isFreshRoute = isFreshRoute,
             setActiveConversationId = chatConversationCoordinator::setActiveConversationId,
             startTimelineObserver = ::startTimelineObserver,
             clientVersionProvider = clientVersionProvider,
