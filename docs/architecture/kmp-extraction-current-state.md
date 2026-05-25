@@ -27,7 +27,7 @@ Koog dependencies or Koog-specific concepts to UI, repositories, or settings.
 | KMP module | `:sharedLogic` exists as a KMP library and is exposed through `:core` with `api(project(":sharedLogic"))`. |
 | Shared identity types | `AgentId`, `ProjectId`, `ToolId`, and `BlockId` live in `sharedLogic/commonMain`. Room converters stay in Android `:core`. |
 | Shared configuration value types | Backend selection (`LettaConfig`), backend labeling, theme preference enums, model configuration DTOs (`ModelSettings`, `LlmConfig`, `EmbeddingConfig`), and pure API/resource DTOs (`Agent`, `Block`, `Tool`, `Archive`, `Folder`, `Conversation`, project/work DTOs, MCP DTOs, model/provider/job/run/schedule/group/identity DTOs, message/tool-call DTOs, batch-message DTOs, passages, cron tasks, Vibesync events) live in `sharedLogic/commonMain`. |
-| Shared transport/protocol contracts | A2UI wire protocol/action DTOs, mobile WebSocket client/server frames, SSE frame contracts, and the `WsFrameMapper` projection into Letta messages live in `sharedLogic/commonMain`. Android `:core` still owns socket lifecycle, Ktor channel parsers, replay cursors, reconnects, and logging. |
+| Shared transport/protocol contracts | A2UI wire protocol/action DTOs, mobile WebSocket client/server frames, SSE frame contracts, replay cursor contract, and the `WsFrameMapper` projection into Letta messages live in `sharedLogic/commonMain`. Android `:core` still owns socket lifecycle, Ktor channel parsers, DataStore cursor persistence, reconnects, and logging. |
 | Runtime contracts | `BackendDescriptor`, `RuntimeEvent`, `RuntimeEventOutbox`, MemFS, AgentFile, tool/approval contracts, `TurnCommand`, and `TurnEngine` live in `sharedLogic/commonMain`. |
 | Runtime reducer | `RuntimeEventProjector` and common tests cover replay, delivery status, tool return folding, approvals, MemFS commits, and AgentFile import/export projection. |
 | Shared model/protocol tests | `sharedLogic/commonTest` covers domain ID serialization, backend labels, agent update wire keys, message content-part wire shape, transport protocol contracts, and runtime projector/store behavior. |
@@ -71,7 +71,7 @@ straight file move.
 | `IAllConversationsRepository` / `IMessageRepository` | Expose Android Paging and `AppMessage`; split common one-shot APIs only after timeline/common paging design is settled. |
 | `IFolderRepository` / `IGroupRepository` | Expose Ktor `ContentType` / `ByteReadChannel`; extract a common non-streaming/non-upload subset separately if another platform needs it. |
 | `SseParser.kt` / `Utf8LineReader.kt` | Ktor channel parser plus Android logging. `SseFrame` is shared; parser adapters should be platform-specific or rebuilt around a common byte/line abstraction. |
-| `ChannelTransport.kt`, `IChannelTransport`, `WsChatBridge.kt`, `RunCursorStore.kt` | Android socket lifecycle, Hilt/DataStore adapters, reconnect/cursor persistence, and logging. Shared frame contracts are already extracted. |
+| `ChannelTransport.kt`, `IChannelTransport`, `WsChatBridge.kt`, `DataStoreRunCursorStore` | Android socket lifecycle, Hilt/DataStore adapters, reconnect/cursor persistence, and logging. Shared frame/cursor contracts are already extracted. |
 | `A2uiDataModel.kt`, `A2uiSurfaceManager.kt`, `A2uiActions.kt` | Compose-backed data model observation and renderer action-context resolution. A2UI protocol/action DTOs are shared. |
 
 ## Extraction Pivot
