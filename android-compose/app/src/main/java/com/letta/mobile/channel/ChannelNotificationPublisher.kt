@@ -98,27 +98,6 @@ class ChannelNotificationPublisher @Inject constructor(
         val notificationId = notificationIdForConversation(notification.conversationId)
         val notificationTag = notificationTagForConversation(notification.conversationId)
 
-        val replyIntent = Intent(context, NotificationReplyReceiver::class.java).apply {
-            action = NotificationReplyReceiver.ACTION_REPLY
-            putExtra(NotificationReplyReceiver.EXTRA_CONVERSATION_ID, notification.conversationId)
-            putExtra(NotificationReplyReceiver.EXTRA_AGENT_ID, notification.agentId)
-            putExtra(NotificationReplyReceiver.EXTRA_NOTIFICATION_ID, notificationId)
-        }
-        val replyPendingIntent = PendingIntent.getBroadcast(
-            context,
-            notificationId,
-            replyIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
-        )
-        val remoteInput = RemoteInput.Builder(NotificationReplyReceiver.KEY_TEXT_REPLY)
-            .setLabel("Reply")
-            .build()
-        val replyAction = NotificationCompat.Action.Builder(
-            android.R.drawable.ic_menu_send,
-            "Reply",
-            replyPendingIntent,
-        ).addRemoteInput(remoteInput).build()
-
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_notify_chat)
             .setContentTitle(content.title)
@@ -128,7 +107,6 @@ class ChannelNotificationPublisher @Inject constructor(
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .addAction(replyAction)
 
         try {
             manager.notify(notificationTag, notificationId, builder.build())

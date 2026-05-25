@@ -192,33 +192,6 @@ class TimelineEventToUiMessageTest {
     }
 
     @Test
-    fun `confirmed reasoning and assistant with same server id produce unique ui ids`() {
-        val reasoning = timelineEventToUiMessage(
-            confirmed(
-                TimelineMessageType.REASONING,
-                content = "thinking",
-                serverId = "shared-step-id",
-                source = MessageSource.CLIENT_MODE_HARNESS,
-            )
-        )!!
-        val assistant = timelineEventToUiMessage(
-            confirmed(
-                TimelineMessageType.ASSISTANT,
-                content = "answer",
-                serverId = "shared-step-id",
-                source = MessageSource.CLIENT_MODE_HARNESS,
-            )
-        )!!
-
-        assertTrue(
-            "Reasoning and assistant messages sharing a Letta server id need distinct UI ids so render dedupe does not drop the final answer",
-            reasoning.id != assistant.id,
-        )
-        assertEquals("shared-step-id:REASONING", reasoning.id)
-        assertEquals("shared-step-id:ASSISTANT", assistant.id)
-    }
-
-    @Test
     fun `server reasoning and assistant with same server id produce unique ui ids`() {
         val reasoning = timelineEventToUiMessage(
             confirmed(
@@ -323,7 +296,6 @@ class TimelineEventToUiMessageTest {
             role = com.letta.mobile.data.timeline.Role.ASSISTANT,
             sentAt = completedAt.plusMillis(500),
             deliveryState = com.letta.mobile.data.timeline.DeliveryState.SENT,
-            source = MessageSource.CLIENT_MODE_HARNESS,
             messageType = TimelineMessageType.TOOL_CALL,
             toolCalls = listOf(ToolCall(toolCallId = "call-a", name = "Bash", arguments = "{}")),
             toolReturnContentByCallId = mapOf("call-a" to "ok"),

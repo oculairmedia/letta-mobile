@@ -29,7 +29,6 @@ data class NotificationDeliveryCandidate(
 
 enum class NotificationCandidateSource {
     TimelineIngestion,
-    WebsocketClientMode,
     NotificationReplyStream,
     HeartbeatFallback,
 }

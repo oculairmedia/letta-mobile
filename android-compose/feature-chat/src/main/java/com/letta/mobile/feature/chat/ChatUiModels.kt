@@ -1,7 +1,6 @@
 package com.letta.mobile.feature.chat
 
 import androidx.compose.material3.SnackbarDuration
-import com.letta.mobile.bot.repository.ClientModeDirectoryEntry
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.ProjectBugReport
@@ -127,26 +126,6 @@ internal data class ProjectAgentsUiState(
 )
 
 @androidx.compose.runtime.Immutable
-internal data class ClientModeLocationUiState(
-    val isLoading: Boolean = false,
-    val currentPath: String? = null,
-    val defaultPath: String? = null,
-    val lastRequestedPath: String? = null,
-    val error: String? = null,
-)
-
-@androidx.compose.runtime.Immutable
-internal data class ClientModeFilesystemPickerUiState(
-    val isVisible: Boolean = false,
-    val isLoading: Boolean = false,
-    val path: String? = null,
-    val parent: String? = null,
-    val entries: ImmutableList<ClientModeDirectoryEntry> = persistentListOf(),
-    val truncated: Boolean = false,
-    val error: String? = null,
-)
-
-@androidx.compose.runtime.Immutable
 internal data class ContextWindowUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
@@ -230,9 +209,6 @@ internal data class ChatUiState(
     val bugReports: ProjectBugReportUiState = ProjectBugReportUiState(),
     val projectAgents: ProjectAgentsUiState = ProjectAgentsUiState(),
     val contextWindow: ContextWindowUiState = ContextWindowUiState(),
-    val isClientModeEnabled: Boolean = false,
-    val clientModeLocation: ClientModeLocationUiState = ClientModeLocationUiState(),
-    val clientModeFilesystemPicker: ClientModeFilesystemPickerUiState = ClientModeFilesystemPickerUiState(),
     val searchQuery: String = "",
     val isSearchActive: Boolean = false,
     val isSearching: Boolean = false,
@@ -244,23 +220,4 @@ internal data class ChatUiState(
     val a2uiThinkingDelayMessage: String? = null,
     val transport: ChatTransport = ChatTransport.Rest,
     val a2uiFrameCount: Int = 0,
-    /**
-     * Surfaced when the LettaBot harness substituted a fresh conversation ID for
-     * the one we requested (i.e. our requested conv was unrecoverable on the
-     * gateway/SDK side, gateway opened a new conversation and reported it back
-     * via session_init). The original Letta-server timeline rows for the prior
-     * conversation remain visible; new client-mode turns persist under the new
-     * conversation. Dismissable. See `letta-mobile-c87t`.
-     */
-    val clientModeConversationSwap: ClientModeConversationSwap? = null,
-)
-
-/**
- * Banner state for the gateway's conversation-substitution recovery path.
- * Emitted by `AdminChatViewModel` when `session_init.conversation_id` differs
- * from the conversation we asked the gateway to resume.
- */
-internal data class ClientModeConversationSwap(
-    val requestedConversationId: String,
-    val newConversationId: String,
 )

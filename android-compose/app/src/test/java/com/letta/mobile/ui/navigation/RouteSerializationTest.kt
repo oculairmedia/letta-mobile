@@ -122,16 +122,6 @@ class RouteSerializationTest {
     }
 
     @Test
-    fun `BotConfigEditRoute with null configId round-trips`() {
-        verifyRoundTrip(BotConfigEditRoute(configId = null))
-    }
-
-    @Test
-    fun `BotConfigEditRoute with configId round-trips`() {
-        verifyRoundTrip(BotConfigEditRoute(configId = "bot-config-1"))
-    }
-
-    @Test
     fun `ShareToAgentRoute round-trips`() {
         verifyRoundTrip(ShareToAgentRoute(sharedText = "check this out: https://example.com"))
     }
@@ -159,12 +149,6 @@ class RouteSerializationTest {
         val route = EditAgentRoute(agentId = "edit-me-99")
         val decoded = decode<EditAgentRoute>(encode(route))
         assertEquals("edit-me-99", decoded.agentId)
-    }
-
-    @Test
-    fun `BotConfigEditRoute null configId encodes correctly`() {
-        val encoded = encode(BotConfigEditRoute(configId = null))
-        assertNotNull(encoded)
     }
 
     // ── Helpers ──────────────────────────────────────────────

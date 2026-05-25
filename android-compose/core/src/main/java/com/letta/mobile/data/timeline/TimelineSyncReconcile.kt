@@ -118,34 +118,6 @@ internal suspend fun applyReconcileAfterSendSnapshot(
             val byOtid = state.value.findByOtid(confirmed.otid)
             val byServerId = state.value.findByServerId(msg.id, confirmed.messageType)
             if (byOtid == null && byServerId == null) {
-                // letta-mobile-c87t: before falling through to the standard
-                // append, attempt a Client-Mode fuzzy collapse. If the user
-                // sent this message via Client Mode, there's a `cm-<uuid>`
-                // Local with matching content + recent timestamp + source
-                // == CLIENT_MODE_HARNESS in the timeline; we collapse the
-                // pair to a single Confirmed event at the Local's position
-                // so the UI doesn't transiently show two user bubbles.
-                //
-                // This path is scoped strictly via the Local's `source`
-                // field — never via ambient flags. See
-                // [Timeline.collapseClientModeFuzzyMatch] for the matcher.
-                val fuzzy = state.value.collapseClientModeFuzzyMatch(confirmed)
-                if (fuzzy.collapsed != null) {
-                    state.value = fuzzy.timeline
-                    // Meridian guardrail (2): log every fuzzy collapse at
-                    // INFO level so 8cm8 verification + duplicate-bubble
-                    // triage have data to work with.
-                    Telemetry.event(
-                        "TimelineSync", "reconcile.fuzzyCollapsed",
-                        "conversationId" to conversationId,
-                        "localOtid" to fuzzy.collapsed.localOtid,
-                        "serverId" to fuzzy.collapsed.serverId,
-                        "deltaMs" to fuzzy.collapsed.deltaMs,
-                        "contentPrefix" to fuzzy.collapsed.contentPrefix,
-                        "source" to fuzzy.collapsed.source.name,
-                    )
-                    return@forEach
-                }
                 state.value = state.value.append(confirmed)
                 appendedMissing++
             }

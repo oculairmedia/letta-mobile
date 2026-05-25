@@ -122,10 +122,6 @@ internal fun EditAgentContent(
     onCompactionModeChange: (String) -> Unit,
     onCompactionModelChange: (String) -> Unit,
     onCompactionModelSettingsJsonChange: (String) -> Unit,
-    onClientModeEnabledChange: (Boolean) -> Unit,
-    onClientModeBaseUrlChange: (String) -> Unit,
-    onClientModeApiKeyChange: (String) -> Unit,
-    onTestClientModeConnection: () -> Unit,
     onResetMessages: () -> Unit,
     onDeleteAgent: () -> Unit,
     contentPadding: PaddingValues,
@@ -616,18 +612,6 @@ internal fun EditAgentContent(
         stickyHeader(key = SectionAnchors.RUNTIME) {
             EditAgentSectionHeader(stringResource(R.string.screen_agent_edit_section_runtime))
         }
-        run {
-            item(key = "client_mode") {
-                EditAgentClientModeSection(
-                    state = state,
-                    onClientModeEnabledChange = onClientModeEnabledChange,
-                    onClientModeBaseUrlChange = onClientModeBaseUrlChange,
-                    onClientModeApiKeyChange = onClientModeApiKeyChange,
-                    onTestClientModeConnection = onTestClientModeConnection,
-                )
-            }
-        }
-
         // ── Danger Zone ──
         // letta-mobile-cygd: Reset Messages and Delete Agent moved here
         // from the top-bar action sheet so destructive actions live in a

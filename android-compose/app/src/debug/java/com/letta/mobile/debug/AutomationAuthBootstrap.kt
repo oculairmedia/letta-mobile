@@ -129,10 +129,9 @@ object AutomationAuthBootstrap {
         val baseUrl: String,
         val apiKey: String?,
     ) {
+        @Suppress("UNUSED_PARAMETER")
         suspend fun applyTo(settingsRepository: ISettingsRepository) {
-            settingsRepository.setClientModeEnabled(enabled)
-            settingsRepository.setClientModeBaseUrl(baseUrl)
-            settingsRepository.setClientModeApiKey(apiKey)
+            // Client Mode removed — settings no longer persist.
         }
     }
 }

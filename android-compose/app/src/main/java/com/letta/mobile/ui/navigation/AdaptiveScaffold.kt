@@ -299,8 +299,6 @@ private fun TopLevelDestination.isSelected(currentDestination: NavDestination?):
             AllToolsRoute::class,
             UsageRoute::class,
             SystemAccessRoute::class,
-            BotSettingsRoute::class,
-            BotConfigEditRoute::class,
             EditAgentRoute::class,
             ToolDetailRoute::class,
             ArchivalRoute::class,

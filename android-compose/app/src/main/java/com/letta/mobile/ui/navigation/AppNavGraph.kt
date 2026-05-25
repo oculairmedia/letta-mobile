@@ -41,9 +41,6 @@ import com.letta.mobile.ui.screens.projects.ProjectIssueDetailScreen
 import com.letta.mobile.ui.screens.projects.ProjectIssuesScreen
 import com.letta.mobile.ui.screens.dashboard.HomeScreen
 import com.letta.mobile.ui.screens.about.AboutScreen
-import com.letta.mobile.ui.screens.bot.BotConfigEditScreen
-import com.letta.mobile.ui.screens.bot.BotSettingsScreen
-import com.letta.mobile.ui.screens.lettabot.LettaBotConnectionScreen
 import com.letta.mobile.ui.screens.agentlist.AgentListScreen
 import com.letta.mobile.ui.screens.archives.ArchiveAdminScreen
 import com.letta.mobile.ui.screens.archival.ArchivalScreen
@@ -141,6 +138,7 @@ class NavViewModel @Inject constructor(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun AppNavGraph(
     navController: NavHostController = rememberNavController(),
@@ -316,7 +314,7 @@ fun AppNavGraph(
                 onNavigateToAbout = { navController.navigate(AboutRoute) },
                 onNavigateToTelemetry = { navController.navigate(TelemetryRoute) },
                 onNavigateToSystemAccess = { navController.navigate(SystemAccessRoute) },
-                onNavigateToBotSettings = { navController.navigate(BotSettingsRoute) },
+                onNavigateToBotSettings = { },
                 onNavigateToProjects = { navController.navigate(HomeRoute) },
                 onNavigateToModels = { navController.navigate(ModelsRoute) },
                 activeBackendLabel = activeBackendLabel,
@@ -381,7 +379,7 @@ fun AppNavGraph(
                         onNavigateToMessageBatches = { navController.navigate(MessageBatchesRoute) },
                         onNavigateToMcp = { navController.navigate(McpRoute) },
                         onNavigateToAbout = { navController.navigate(AboutRoute) },
-                        onNavigateToBotSettings = { navController.navigate(BotSettingsRoute) },
+                        onNavigateToBotSettings = { },
                         onNavigateToProjects = { navController.navigate(HomeRoute) },
                         activeBackendLabel = activeBackendLabel,
                         onNavigateToBackendSwitcher = openBackendSwitcher,
@@ -412,7 +410,7 @@ fun AppNavGraph(
                         onNavigateToMessageBatches = { navController.navigate(MessageBatchesRoute) },
                         onNavigateToMcp = { navController.navigate(McpRoute) },
                         onNavigateToAbout = { navController.navigate(AboutRoute) },
-                        onNavigateToBotSettings = { navController.navigate(BotSettingsRoute) },
+                        onNavigateToBotSettings = { },
                         onNavigateToProjects = { navController.navigate(HomeRoute) },
                         activeBackendLabel = activeBackendLabel,
                         onNavigateToBackendSwitcher = openBackendSwitcher,
@@ -482,9 +480,6 @@ fun AppNavGraph(
                 },
                 onNavigateToConfigList = {
                     navController.navigate(ConfigListRoute)
-                },
-                onNavigateToLettaBotConnection = {
-                    navController.navigate(LettaBotConnectionRoute)
                 },
                 onNavigateToSystemAccess = {
                     navController.navigate(SystemAccessRoute)
@@ -593,42 +588,6 @@ fun AppNavGraph(
 
         composable<McpServerToolsRoute> {
             McpServerToolsScreen(
-                onNavigateBack = { navController.popBackStack() },
-            )
-        }
-
-        composable<BotSettingsRoute>(
-            enterTransition = drillInEnter,
-            exitTransition = drillInExit,
-            popEnterTransition = drillInPopEnter,
-            popExitTransition = drillInPopExit,
-        ) {
-            BotSettingsScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToEdit = { configId ->
-                    navController.navigate(BotConfigEditRoute(configId))
-                },
-            )
-        }
-
-        composable<LettaBotConnectionRoute>(
-            enterTransition = drillInEnter,
-            exitTransition = drillInExit,
-            popEnterTransition = drillInPopEnter,
-            popExitTransition = drillInPopExit,
-        ) {
-            LettaBotConnectionScreen(
-                onNavigateBack = { navController.popBackStack() },
-            )
-        }
-
-        composable<BotConfigEditRoute>(
-            enterTransition = drillInEnter,
-            exitTransition = drillInExit,
-            popEnterTransition = drillInPopEnter,
-            popExitTransition = drillInPopExit,
-        ) {
-            BotConfigEditScreen(
                 onNavigateBack = { navController.popBackStack() },
             )
         }

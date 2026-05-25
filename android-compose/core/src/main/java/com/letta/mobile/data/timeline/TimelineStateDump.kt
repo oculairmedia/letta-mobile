@@ -18,7 +18,7 @@ import com.letta.mobile.util.Telemetry
  *  - position, kind (Local | Confirmed)
  *  - otid, serverId (Confirmed only), messageType
  *  - runId, stepId (Confirmed only)
- *  - source (LETTA_SERVER | CLIENT_MODE_HARNESS)
+ *  - source (LETTA_SERVER)
  *  - role (Local only — Confirmed role is implied by messageType)
  *  - contentPrefix: first [CONTENT_PREFIX_LEN] chars of `content`, with
  *    newlines normalized to spaces so it stays on one log line

@@ -72,14 +72,10 @@ internal fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutp
             if (match != null) {
                 val body = message.toolReturn.funcResponse ?: ""
                 val isError = message.isErr == true || message.status == "error"
-                val contentByCallId = if (body.isEmpty()) {
-                    match.toolReturnContentByCallId
-                } else {
-                    match.toolReturnContentByCallId + (tcid to body)
-                }
+                val contentByCallId = match.toolReturnContentByCallId + (tcid to body)
                 val updated = match.copy(
                     approvalDecided = true,
-                    toolReturnContent = body.ifEmpty { match.toolReturnContent },
+                    toolReturnContent = body.ifBlank { match.toolReturnContent ?: body },
                     toolReturnIsError = isError,
                     toolReturnContentByCallId = contentByCallId,
                     toolReturnIsErrorByCallId = match.toolReturnIsErrorByCallId + (tcid to isError),
@@ -139,8 +135,7 @@ internal fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutp
         }
         val oldText = existing.content
         val newText = confirmed.content
-        val canUseSnapshotMerge = existing.source == MessageSource.CLIENT_MODE_HARNESS ||
-            (existing.seqId != null && confirmed.seqId != null)
+        val canUseSnapshotMerge = existing.seqId != null && confirmed.seqId != null
         val mergedText = when {
             newText.isEmpty() -> oldText
             canUseSnapshotMerge && newText == oldText -> oldText
@@ -197,23 +192,6 @@ internal fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutp
             "reason" to "otidSeen",
             "otid" to confirmed.otid,
             "conversationId" to conversationId,
-        )
-        return output()
-    }
-
-    val fuzzy = timeline.collapseClientModeFuzzyMatch(confirmed)
-    if (fuzzy.collapsed != null) {
-        timeline = fuzzy.timeline
-        timeline = timeline.copy(liveCursor = confirmed.serverId)
-        pendingEvents += TimelineSyncEvent.StreamEventIngested(confirmed.serverId, message.messageType)
-        Telemetry.event(
-            "TimelineSync", "streamSubscriber.fuzzyCollapsed",
-            "conversationId" to conversationId,
-            "localOtid" to fuzzy.collapsed.localOtid,
-            "serverId" to fuzzy.collapsed.serverId,
-            "deltaMs" to fuzzy.collapsed.deltaMs,
-            "contentPrefix" to fuzzy.collapsed.contentPrefix,
-            "source" to fuzzy.collapsed.source.name,
         )
         return output()
     }

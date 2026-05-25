@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Tag
  * Two high-leverage invariants from the bead:
  *
  *  - **Pure-delta merge** (use case 1) — the contract that the merge step in
- *    [ingestStreamEvent]'s non-CLIENT_MODE_HARNESS branch is plain
+ *    [ingestStreamEvent]'s non-standard branch is plain
  *    `oldText + newText` (empty deltas no-op). This is the contract that the
  *    lcp-cv3 / lcp-pro / lcp-r0m / wucn-snapshot-recovery cascade kept breaking
  *    by trying to be clever about prefix/snapshot collisions. The property
@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Tag
 class TimelineSyncMergePropertyTest : StringSpec({
 
     "pure-delta merge fold equals direct concatenation of non-empty deltas" {
-        // Spec mirrors the non-CLIENT_MODE_HARNESS branch of the merge step
+        // Spec mirrors the non-standard branch of the merge step
         // in ingestStreamEvent: empty deltas are no-ops; every other delta
         // is appended verbatim. Changing the production code to do anything
         // else (snapshot replace, prefix-drop, etc.) must fail this property.

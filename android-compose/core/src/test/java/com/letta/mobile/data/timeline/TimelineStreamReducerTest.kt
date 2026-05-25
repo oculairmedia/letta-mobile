@@ -170,36 +170,6 @@ class TimelineStreamReducerTest {
     }
 
     @Test
-    fun `client mode fuzzy collapse swaps matching local for confirmed event`() {
-        val prev = timeline().append(
-            TimelineEvent.Local(
-                position = 1.0,
-                otid = "cm-assist-1",
-                content = "final answer",
-                role = Role.ASSISTANT,
-                sentAt = Instant.now(),
-                deliveryState = DeliveryState.SENT,
-                source = MessageSource.CLIENT_MODE_HARNESS,
-                messageType = TimelineMessageType.ASSISTANT,
-            )
-        )
-
-        val output = reduce(
-            prev = prev,
-            frame = AssistantMessage(id = "server-assist-1", contentRaw = JsonPrimitive("final answer")),
-        )
-
-        val event = output.next.events.single() as TimelineEvent.Confirmed
-        event.otid shouldBe "cm-assist-1"
-        event.serverId shouldBe "server-assist-1"
-        event.source shouldBe MessageSource.CLIENT_MODE_HARNESS
-        output.next.liveCursor shouldBe "server-assist-1"
-        output.emittedEvents shouldBe listOf(
-            TimelineSyncEvent.StreamEventIngested("server-assist-1", "assistant_message")
-        )
-    }
-
-    @Test
     fun `plain append adds new confirmed event and emits notification for assistant`() {
         val output = reduce(
             frame = AssistantMessage(id = "assistant-1", contentRaw = JsonPrimitive("hello"))

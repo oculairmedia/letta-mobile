@@ -10,7 +10,6 @@ import com.letta.mobile.testutil.FakeAgentRepository
 import com.letta.mobile.testutil.FakeChannelNotificationPublisher
 import com.letta.mobile.testutil.FakeChannelSyncStateStore
 import com.letta.mobile.testutil.FakeConversationInspectorMessageRepository
-import com.letta.mobile.testutil.FakeNotificationReplyStreamTracker
 import com.letta.mobile.testutil.FakeSettingsRepository
 import io.mockk.coEvery
 import io.mockk.mockk
@@ -118,7 +117,6 @@ class ChannelHeartbeatSyncTest {
         val agentRepository = FakeAgentRepository()
         val stateStore = FakeChannelSyncStateStore()
         val publisher = FakeChannelNotificationPublisher()
-        val replyHandler = FakeNotificationReplyStreamTracker()
         val settingsRepository = FakeSettingsRepository(
             initialActiveConfig = LettaConfig(
                 id = "test-config",
@@ -148,7 +146,6 @@ class ChannelHeartbeatSyncTest {
 
         val coordinator = NotificationDeliveryCoordinator(
             currentConversationTracker = CurrentConversationTracker(),
-            notificationReplyHandler = replyHandler,
             syncStateStore = stateStore,
             publisher = publisher,
         )

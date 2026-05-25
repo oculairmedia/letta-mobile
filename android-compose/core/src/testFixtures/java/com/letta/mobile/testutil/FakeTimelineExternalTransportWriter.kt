@@ -43,6 +43,10 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
         reconciledSends += ReconciledSend(conversationId, agentId, externalConversationId, otid)
     }
 
+    override suspend fun clearExternalTransportActive(conversationId: String) {
+        // No-op in test fake
+    }
+
     data class ExternalLocal(
         val conversationId: String,
         val content: String,

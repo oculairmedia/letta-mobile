@@ -28,4 +28,6 @@ interface TimelineExternalTransportWriter {
         externalConversationId: String,
         otid: String,
     )
+
+    suspend fun clearExternalTransportActive(conversationId: String)
 }

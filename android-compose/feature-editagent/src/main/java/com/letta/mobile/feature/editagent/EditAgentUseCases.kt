@@ -128,9 +128,6 @@ internal class EditAgentUseCases(
                     )
                 }
             }
-            settingsRepository.setClientModeEnabled(state.clientModeEnabled)
-            settingsRepository.setClientModeBaseUrl(state.clientModeBaseUrl.trim())
-            settingsRepository.setClientModeApiKey(state.clientModeApiKey.trim().ifBlank { null })
             onSuccess()
         } catch (e: CancellationException) {
             throw e

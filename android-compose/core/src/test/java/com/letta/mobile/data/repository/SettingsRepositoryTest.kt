@@ -207,14 +207,4 @@ class SettingsRepositoryTest {
         assertEquals(false, dynamicColor)
     }
 
-    @Test
-    fun `client mode settings persist with encrypted api key`() = runTest {
-        repository.setClientModeEnabled(true)
-        repository.setClientModeBaseUrl("http://192.168.50.90:8407")
-        repository.setClientModeApiKey("secret-key")
-
-        assertTrue(repository.observeClientModeEnabled().first())
-        assertEquals("http://192.168.50.90:8407", repository.observeClientModeBaseUrl().first())
-        assertEquals("secret-key", repository.getClientModeApiKey())
-    }
 }

@@ -2,7 +2,6 @@ package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.data.session.SessionManager
-import com.letta.mobile.data.timeline.api.TimelineClientModeWriter
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.util.Telemetry
 import java.util.LinkedHashMap
@@ -36,7 +35,7 @@ open class TimelineRepository @Inject constructor(
     private val messageApi: MessageApi,
     private val pendingLocalStore: PendingLocalStore,
     sessionManager: SessionManager?,
-) : TimelineClientModeWriter, TimelineExternalTransportWriter {
+) : TimelineExternalTransportWriter {
     internal constructor(
         messageApi: MessageApi,
         pendingLocalStore: PendingLocalStore,
@@ -166,29 +165,6 @@ open class TimelineRepository @Inject constructor(
     }
 
     /**
-     * letta-mobile-c87t: Append a Client-Mode optimistic Local for a user
-     * message that's being sent through the LettaBot WS gateway rather than
-     * the timeline send queue. Stamps a `cm-<uuid>` localId and tags the
-     * event as [MessageSource.CLIENT_MODE_HARNESS]. Does NOT enqueue to the
-     * outbound send queue — the gateway is responsible for delivery.
-     *
-     * Returns the generated localId so callers can correlate the event later
-     * (telemetry, retries). Subsequent reconcile / live-stream paths will
-     * fuzzy-collapse this Local against the Confirmed echo from Letta SSE
-     * via [Timeline.collapseClientModeFuzzyMatch].
-     */
-    override suspend fun appendClientModeLocal(
-        conversationId: String,
-        content: String,
-        attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>,
-    ): String = getOrCreate(conversationId).appendClientModeLocal(content, attachments)
-
-    suspend fun appendClientModeLocal(
-        conversationId: String,
-        content: String,
-    ): String = appendClientModeLocal(conversationId, content, emptyList())
-
-    /**
      * Append an optimistic user bubble for a non-REST transport that supports
      * a caller-supplied otid. The admin-shim mobile WS echoes this otid back on
      * assistant frames and stamps it to disk for reconcile, so this path uses
@@ -216,44 +192,7 @@ open class TimelineRepository @Inject constructor(
         getOrCreate(conversationId).ingestStreamEvent(message)
     }
 
-    /**
-     * letta-mobile-5s1n: upsert a Client Mode assistant-streaming Local.
-     * See [TimelineSyncLoop.upsertClientModeLocalAssistantChunk] for full
-     * contract.
-     *
-     * Caller-supplied [localId] should be stable across repeat chunks for
-     * the same logical event:
-     *  - Assistant text:  `cm-assist-<runId or stable id>`
-     *  - Reasoning:       `cm-reason-<runId or stable id>`
-     *  - Tool call:       `cm-tool-<toolCallId>`
-     */
-    override suspend fun upsertClientModeLocalAssistantChunk(
-        conversationId: String,
-        localId: String,
-        build: () -> TimelineEvent.Local,
-        transform: (TimelineEvent.Local) -> TimelineEvent.Local,
-    ): String = getOrCreate(conversationId).upsertClientModeLocalAssistantChunk(
-        localId = localId,
-        build = build,
-        transform = transform,
-    )
-
-    /** Route a typed Client Mode stream chunk through the timeline reducer. */
-    suspend fun upsertClientModeStreamChunk(
-        conversationId: String,
-        chunk: ClientModeStreamChunk,
-        assistantMessageId: String,
-    ): String? = getOrCreate(conversationId).upsertClientModeStreamChunk(
-        chunk = chunk,
-        assistantMessageId = assistantMessageId,
-    )
-
-    /**
-     * letta-mobile-iuh6: Re-run fuzzy collapse across existing events after
-     * a notification reply handler's WS stream completes. Absorbs any
-     * CLIENT_MODE_HARNESS Locals that arrived after the initial SSE reconcile.
-     */
-    override suspend fun postHandlerCollapse(conversationId: String) {
+    suspend fun postHandlerCollapse(conversationId: String) {
         val loop = loopsMutex.withLock { loops[conversationId] }
         loop?.postHandlerCollapse()
     }
@@ -278,6 +217,15 @@ open class TimelineRepository @Inject constructor(
     /** Mark an externally-queued optimistic user bubble as failed before it was dispatched. */
     override suspend fun markExternalTransportLocalFailed(conversationId: String, otid: String) {
         getOrCreate(conversationId).markExternalTransportLocalFailed(otid)
+    }
+
+    /**
+     * Signal that the external transport (WS) turn has completed for this
+     * conversation. Clears the SSE-suppression flag so the persistent SSE
+     * stream subscriber resumes ingesting messages for idle-period coverage.
+     */
+    override suspend fun clearExternalTransportActive(conversationId: String) {
+        loopsMutex.withLock { loops[conversationId] }?.clearExternalTransportActive()
     }
 
     /**

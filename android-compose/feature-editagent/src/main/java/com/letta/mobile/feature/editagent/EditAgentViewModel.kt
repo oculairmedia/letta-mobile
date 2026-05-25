@@ -12,8 +12,6 @@ import com.letta.mobile.data.repository.api.IModelRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.ui.common.UiState
-import com.letta.mobile.bot.connection.ClientModeConnectionState
-import com.letta.mobile.bot.connection.ClientModeConnectionTester
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.delay
@@ -36,7 +34,6 @@ internal class EditAgentViewModel @Inject constructor(
     private val modelRepository: IModelRepository,
     private val toolRepository: IToolRepository,
     private val settingsRepository: ISettingsRepository,
-    private val clientModeConnectionTester: ClientModeConnectionTester,
 ) : ViewModel() {
 
     private val agentId: String = requireNotNull(savedStateHandle.get<String>("agentId")) {
@@ -111,9 +108,6 @@ internal class EditAgentViewModel @Inject constructor(
                     providerType = resolvedProviderType,
                     modelHandle = agent.model ?: agent.llmConfig?.handle ?: agent.llmConfig?.model,
                 ).orEmpty()
-                val clientModeEnabled = settingsRepository.observeClientModeEnabled().first()
-                val clientModeBaseUrl = settingsRepository.observeClientModeBaseUrl().first()
-                val clientModeApiKey = settingsRepository.getClientModeApiKey().orEmpty()
                 val compactionSettings = agent.compactionSettings
                 val modelSettings = agent.modelSettings
                 originalProviderType = normalizedProviderType
@@ -180,9 +174,6 @@ internal class EditAgentViewModel @Inject constructor(
                         agentType = agent.agentType ?: "",
                         embeddingDim = agent.embeddingConfig?.embeddingDim,
                         embeddingChunkSize = agent.embeddingConfig?.embeddingChunkSize,
-                        clientModeEnabled = clientModeEnabled,
-                        clientModeBaseUrl = clientModeBaseUrl,
-                        clientModeApiKey = clientModeApiKey,
                         summarizationPrompt = compactionSettings?.prompt.orEmpty(),
                         compactionClipChars = compactionSettings?.clipChars ?: 50_000,
                         slidingWindowPercentage = compactionSettings
@@ -573,88 +564,6 @@ internal class EditAgentViewModel @Inject constructor(
     fun updateCompactionModelSettingsJson(value: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
         _uiState.value = UiState.Success(currentState.copy(compactionModelSettingsJson = value))
-    }
-
-    fun updateClientModeEnabled(value: Boolean) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(
-            currentState.copy(
-                clientModeEnabled = value,
-                clientModeConnectionState = ClientModeConnectionState.Idle,
-            )
-        )
-    }
-
-    fun updateClientModeBaseUrl(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(
-            currentState.copy(
-                clientModeBaseUrl = value,
-                clientModeConnectionState = ClientModeConnectionState.Idle,
-            )
-        )
-    }
-
-    fun updateClientModeApiKey(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(
-            currentState.copy(
-                clientModeApiKey = value,
-                clientModeConnectionState = ClientModeConnectionState.Idle,
-            )
-        )
-    }
-
-    fun testClientModeConnection() {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        val baseUrl = currentState.clientModeBaseUrl.trim()
-        val apiKey = currentState.clientModeApiKey.trim().ifBlank { null }
-
-        if (baseUrl.isBlank()) {
-            _uiState.value = UiState.Success(
-                currentState.copy(
-                    clientModeConnectionState = ClientModeConnectionState.Failure(
-                        message = "Enter a server URL first",
-                        testedAtMillis = System.currentTimeMillis(),
-                    )
-                )
-            )
-            return
-        }
-
-        viewModelScope.launch {
-            val startingState = (_uiState.value as? UiState.Success)?.data ?: return@launch
-            _uiState.value = UiState.Success(
-                startingState.copy(clientModeConnectionState = ClientModeConnectionState.Testing)
-            )
-
-            val result = clientModeConnectionTester.test(baseUrl = baseUrl, apiKey = apiKey)
-            val finishedState = (_uiState.value as? UiState.Success)?.data ?: return@launch
-            val timestamp = System.currentTimeMillis()
-            _uiState.value = UiState.Success(
-                finishedState.copy(
-                    clientModeConnectionState = result.fold(
-                        onSuccess = { ClientModeConnectionState.Success(timestamp) },
-                        onFailure = {
-                            val error = it as? Exception ?: RuntimeException(it.message ?: "Connection test failed", it)
-                            ClientModeConnectionState.Failure(
-                                message = com.letta.mobile.util.mapErrorToUserMessage(error, "Connection test failed"),
-                                testedAtMillis = timestamp,
-                            )
-                        },
-                    )
-                )
-            )
-
-            delay(5_000)
-
-            val latestState = (_uiState.value as? UiState.Success)?.data ?: return@launch
-            if (latestState.clientModeConnectionState !is ClientModeConnectionState.Testing) {
-                _uiState.value = UiState.Success(
-                    latestState.copy(clientModeConnectionState = ClientModeConnectionState.Idle)
-                )
-            }
-        }
     }
 
     fun attachTool(toolId: String) {

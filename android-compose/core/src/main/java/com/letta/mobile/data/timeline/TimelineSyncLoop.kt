@@ -137,6 +137,22 @@ class TimelineSyncLoop(
     private val _streamSubscriberActive = MutableStateFlow(false)
     internal val streamSubscriberActive: StateFlow<Boolean> = _streamSubscriberActive.asStateFlow()
 
+    /**
+     * When true, an external transport (admin-shim WS) is delivering messages
+     * for this conversation. The SSE stream subscriber suppresses message
+     * ingestion while this flag is set to avoid dual-ingest duplication —
+     * the two transports use different message IDs for the same logical
+     * events, so serverId-based dedup misses them.
+     *
+     * Auto-expires after [EXTERNAL_TRANSPORT_TIMEOUT_MS] to prevent a stuck
+     * flag from permanently suppressing SSE if TurnDone is never received
+     * (e.g., WS disconnect mid-turn).
+     */
+    @Volatile
+    private var externalTransportActive = false
+    @Volatile
+    private var externalTransportSetAtMs = 0L
+
     // Serialize all mutations so append/replace logic is safe under concurrency.
     private val writeMutex = Mutex()
 
@@ -248,34 +264,12 @@ class TimelineSyncLoop(
             val ack: CompletableDeferred<Int>,
         ) : TimelineGatewayEvent
 
-        data class ClientModeLocalAppend(
-            val localId: String,
-            val content: String,
-            val attachments: List<MessageContentPart.Image>,
-            val sentAt: Instant,
-            val ack: CompletableDeferred<String>,
-        ) : TimelineGatewayEvent
-
         data class ExternalTransportLocalAppend(
             val content: String,
             val otid: String,
             val attachments: List<MessageContentPart.Image>,
             val sentAt: Instant,
             val ack: CompletableDeferred<String>,
-        ) : TimelineGatewayEvent
-
-        data class ClientModeLocalAssistantChunk(
-            val localId: String,
-            val build: () -> TimelineEvent.Local,
-            val transform: (TimelineEvent.Local) -> TimelineEvent.Local,
-            val ack: CompletableDeferred<String>,
-        ) : TimelineGatewayEvent
-
-        data class ClientModeStreamChunkUpsert(
-            val chunk: ClientModeStreamChunk,
-            val assistantMessageId: String,
-            val sentAt: Instant,
-            val ack: CompletableDeferred<String?>,
         ) : TimelineGatewayEvent
 
         data class PostHandlerCollapse(val ack: CompletableDeferred<Unit>) : TimelineGatewayEvent
@@ -390,45 +384,6 @@ class TimelineSyncLoop(
         return otid
     }
 
-    /**
-     * letta-mobile-c87t: optimistic-append for Client Mode sends.
-     *
-     * Client Mode messages travel mobile → lettabot WS gateway → Letta Code SDK
-     * → Letta server. The SDK does not currently accept a client-supplied otid
-     * (`letta-mobile-8pyt`), so server-echoed messages won't carry our otid back
-     * for the strict swap. We give Client Mode its own append path with a
-     * `cm-<uuid>` local id to avoid any chance of conflating with the strict
-     * otid path, and tag the event with `MessageSource.CLIENT_MODE_HARNESS` so
-     * the source-scoped fuzzy matcher in the reconcile path knows it's eligible
-     * for the time+content fallback. We do NOT enqueue to `sendQueue` — the
-     * actual transport happens via `ClientModeChatSender` over WS, not the
-     * standard REST send path. Reconcile will surface the server-echoed user
-     * message as a Confirmed event with a different (server-allocated) otid;
-     * the fuzzy matcher will then collapse the pair.
-     *
-     * Returns the synthetic local id (also used as the otid for storage in the
-     * timeline so existing position/otid invariants hold). The caller must
-     * NEVER pass this id to anything that expects a server-echoed otid match.
-     */
-    suspend fun appendClientModeLocal(
-        content: String,
-        attachments: List<MessageContentPart.Image> = emptyList(),
-    ): String {
-        val localId = "cm-${UUID.randomUUID()}"
-        val sentAt = Instant.now()
-        val ack = CompletableDeferred<String>()
-        eventQueue.send(
-            TimelineGatewayEvent.ClientModeLocalAppend(
-                localId = localId,
-                content = content,
-                attachments = attachments,
-                sentAt = sentAt,
-                ack = ack,
-            )
-        )
-        return ack.await()
-    }
-
     internal suspend fun appendExternalTransportLocal(
         content: String,
         otid: String,
@@ -448,74 +403,6 @@ class TimelineSyncLoop(
         return ack.await()
     }
 
-    /**
-     * letta-mobile-5s1n: insert-or-update a Client Mode Local for assistant
-     * streaming through the WS gateway. Identified by [localId] (caller
-     * supplies a stable id per stream, e.g. `cm-assist-<runId>` for assistant
-     * text, `cm-tool-<toolCallId>` for tool calls, `cm-reason-<uuid>` for
-     * reasoning). Idempotent across repeat chunks.
-     *
-     * The first call appends a fresh Local; subsequent calls in-place update
-     * the same event so the UI sees a single bubble grow rather than a flood
-     * of new events.
-     *
-     * Stamps [MessageSource.CLIENT_MODE_HARNESS] and [DeliveryState.SENT]
-     * (the gateway is the delivery authority). Caller is responsible for
-     * choosing the appropriate [TimelineMessageType] and field shape via
-     * the [build] / [transform] callbacks.
-     */
-    suspend fun upsertClientModeLocalAssistantChunk(
-        localId: String,
-        build: () -> TimelineEvent.Local,
-        transform: (TimelineEvent.Local) -> TimelineEvent.Local,
-    ): String {
-        val ack = CompletableDeferred<String>()
-        eventQueue.send(
-            TimelineGatewayEvent.ClientModeLocalAssistantChunk(
-                localId = localId,
-                build = build,
-                transform = transform,
-                ack = ack,
-            )
-        )
-        return ack.await()
-    }
-
-    /**
-     * Fold a Client Mode assistant/reasoning/tool stream chunk through the
-     * timeline reducer. This is the typed replacement for app-layer callers
-     * supplying ad hoc build/transform lambdas.
-     */
-    suspend fun upsertClientModeStreamChunk(
-        chunk: ClientModeStreamChunk,
-        assistantMessageId: String,
-        sentAt: Instant = Instant.now(),
-    ): String? {
-        val ack = CompletableDeferred<String?>()
-        eventQueue.send(
-            TimelineGatewayEvent.ClientModeStreamChunkUpsert(
-                chunk = chunk,
-                assistantMessageId = assistantMessageId,
-                sentAt = sentAt,
-                ack = ack,
-            )
-        )
-        return ack.await()
-    }
-
-    /**
-     * letta-mobile-iuh6: Post-handler collapse — re-runs fuzzy matching
-     * across all existing Confirmed events to absorb any CLIENT_MODE_HARNESS
-     * Locals that were written AFTER the initial SSE reconcile already ran.
-     *
-     * Race condition: the notification reply handler's WS stream and the
-     * SSE subscriber race to write to the timeline. When SSE wins,
-     * [reconcileForExternalRun] inserts Confirmed events with no matching
-     * Local to collapse into. The handler's stream then writes Locals that
-     * coexist as duplicates. Re-running fuzzy collapse here absorbs them.
-     *
-     * Idempotent and safe to call at any time.
-     */
     suspend fun postHandlerCollapse() {
         val ack = CompletableDeferred<Unit>()
         eventQueue.send(TimelineGatewayEvent.PostHandlerCollapse(ack))
@@ -539,13 +426,10 @@ class TimelineSyncLoop(
                         event.ack?.complete(Unit)
                     }
                     is TimelineGatewayEvent.LocalSendAppend -> applyLocalSendAppend(event)
-                    is TimelineGatewayEvent.ClientModeLocalAppend -> applyClientModeLocalAppend(event)
                     is TimelineGatewayEvent.ExternalTransportLocalAppend -> applyExternalTransportLocalAppend(event)
-                    is TimelineGatewayEvent.ClientModeLocalAssistantChunk -> applyClientModeLocalAssistantChunk(event)
-                    is TimelineGatewayEvent.ClientModeStreamChunkUpsert -> applyClientModeStreamChunkUpsert(event)
                     is TimelineGatewayEvent.ReconcileAfterSendSnapshot -> applyReconcileAfterSendSnapshot(event)
                     is TimelineGatewayEvent.RecentMessagesSnapshot -> applyRecentMessagesSnapshot(event)
-                    is TimelineGatewayEvent.PostHandlerCollapse -> applyPostHandlerCollapse(event.ack)
+                    is TimelineGatewayEvent.PostHandlerCollapse -> event.ack.complete(Unit)
                     is TimelineGatewayEvent.RetrySend -> applyRetrySend(event)
                     is TimelineGatewayEvent.MarkSent -> applyMarkSent(event)
                     is TimelineGatewayEvent.MarkFailed -> applyMarkFailed(event)
@@ -568,10 +452,7 @@ class TimelineSyncLoop(
         when (event) {
             is TimelineGatewayEvent.StreamMessage -> event.ack?.completeExceptionally(t)
             is TimelineGatewayEvent.LocalSendAppend -> event.ack.completeExceptionally(t)
-            is TimelineGatewayEvent.ClientModeLocalAppend -> event.ack.completeExceptionally(t)
             is TimelineGatewayEvent.ExternalTransportLocalAppend -> event.ack.completeExceptionally(t)
-            is TimelineGatewayEvent.ClientModeLocalAssistantChunk -> event.ack.completeExceptionally(t)
-            is TimelineGatewayEvent.ClientModeStreamChunkUpsert -> event.ack.completeExceptionally(t)
             is TimelineGatewayEvent.ReconcileAfterSendSnapshot -> event.ack.completeExceptionally(t)
             is TimelineGatewayEvent.RecentMessagesSnapshot -> event.ack.completeExceptionally(t)
             is TimelineGatewayEvent.PostHandlerCollapse -> event.ack.completeExceptionally(t)
@@ -615,6 +496,9 @@ class TimelineSyncLoop(
             writeMutex = writeMutex,
             state = _state,
         )
+        writeMutex.withLock {
+            applyReturnsAndResponsesFromSnapshot(event.serverMessages)
+        }
         event.ack.complete(result)
     }
 
@@ -629,30 +513,6 @@ class TimelineSyncLoop(
             )
         }
         event.ack.complete(appended)
-    }
-
-    private suspend fun applyClientModeLocalAppend(event: TimelineGatewayEvent.ClientModeLocalAppend) {
-        writeMutex.withLock {
-            val local = TimelineEvent.Local(
-                position = _state.value.nextLocalPosition(),
-                otid = event.localId,
-                content = event.content,
-                role = Role.USER,
-                sentAt = event.sentAt,
-                deliveryState = DeliveryState.SENT,
-                attachments = event.attachments,
-                source = MessageSource.CLIENT_MODE_HARNESS,
-            )
-            _state.value = _state.value.append(local)
-        }
-        _events.emit(TimelineSyncEvent.LocalAppended(event.localId))
-        Telemetry.event(
-            "TimelineSync", "send.clientModeLocalAppended",
-            "localId" to event.localId,
-            "conversationId" to conversationId,
-            "contentLength" to event.content.length,
-        )
-        event.ack.complete(event.localId)
     }
 
     private suspend fun applyExternalTransportLocalAppend(event: TimelineGatewayEvent.ExternalTransportLocalAppend) {
@@ -677,68 +537,6 @@ class TimelineSyncLoop(
             "contentLength" to event.content.length,
         )
         event.ack.complete(event.otid)
-    }
-
-    private suspend fun applyClientModeLocalAssistantChunk(event: TimelineGatewayEvent.ClientModeLocalAssistantChunk) {
-        val appended = writeMutex.withLock {
-            val before = _state.value.findByOtid(event.localId) is TimelineEvent.Local
-            _state.value = _state.value.upsertClientModeLocal(
-                otid = event.localId,
-                transform = event.transform,
-                build = event.build,
-            )
-            !before
-        }
-        if (appended) {
-            _events.emit(TimelineSyncEvent.LocalAppended(event.localId))
-        }
-        event.ack.complete(event.localId)
-    }
-
-    private suspend fun applyClientModeStreamChunkUpsert(event: TimelineGatewayEvent.ClientModeStreamChunkUpsert) {
-        val reduction = writeMutex.withLock {
-            val reduced = _state.value.reduceClientModeStreamChunk(
-                chunk = event.chunk,
-                assistantMessageId = event.assistantMessageId,
-                sentAt = event.sentAt,
-            )
-            _state.value = reduced.timeline
-            reduced
-        }
-        if (reduction.appended && reduction.localId != null) {
-            _events.emit(TimelineSyncEvent.LocalAppended(reduction.localId))
-        }
-        event.ack.complete(reduction.localId)
-    }
-
-    private suspend fun applyPostHandlerCollapse(ack: CompletableDeferred<Unit>) {
-        writeMutex.withLock {
-            var collapsed = 0
-            val confirmedEvents = _state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
-            var tl = _state.value
-            for (confirmed in confirmedEvents) {
-                val fuzzy = tl.collapseClientModeFuzzyMatch(confirmed)
-                if (fuzzy.collapsed != null) {
-                    val cleaned = fuzzy.timeline.events.filter { it.otid != confirmed.otid }
-                    tl = fuzzy.timeline.copy(events = cleaned)
-                    collapsed++
-                    Telemetry.event(
-                        "TimelineSync", "postHandlerCollapse.fuzzyCollapsed",
-                        "conversationId" to conversationId,
-                        "localOtid" to fuzzy.collapsed.localOtid,
-                        "serverId" to fuzzy.collapsed.serverId,
-                        "deltaMs" to fuzzy.collapsed.deltaMs,
-                        "contentPrefix" to fuzzy.collapsed.contentPrefix,
-                        "source" to fuzzy.collapsed.source.name,
-                    )
-                }
-            }
-            if (collapsed > 0) {
-                _state.value = tl
-                Log.w(TAG, "postHandlerCollapse: collapsed $collapsed Local(s) into Confirmed events for $conversationId")
-            }
-        }
-        ack.complete(Unit)
     }
 
     private suspend fun applyRetrySend(event: TimelineGatewayEvent.RetrySend) {
@@ -1057,28 +855,6 @@ class TimelineSyncLoop(
             val byOtid = _state.value.findByOtid(confirmed.otid)
             val byServerId = _state.value.findByServerId(msg.id, confirmed.messageType)
             if (byOtid == null && byServerId == null) {
-                // Fresh Client Mode runs can finish their local WS stream before the
-                // Letta SSE subscriber opens. The first SSE frame then triggers this
-                // reconcile, whose REST snapshot contains the same user / reasoning /
-                // assistant turns that the Client Mode harness already appended locally.
-                // Collapse those local harness bubbles before the generic append path,
-                // otherwise the REST-confirmed copy is inserted beside the local copy
-                // and later SSE deltas double-merge into it.
-                val fuzzy = _state.value.collapseClientModeFuzzyMatch(confirmed)
-                if (fuzzy.collapsed != null) {
-                    _state.value = fuzzy.timeline
-                    Telemetry.event(
-                        "TimelineSync", "$telemetryName.fuzzyCollapsed",
-                        "conversationId" to conversationId,
-                        *telemetryAttrs,
-                        "localOtid" to fuzzy.collapsed.localOtid,
-                        "serverId" to fuzzy.collapsed.serverId,
-                        "deltaMs" to fuzzy.collapsed.deltaMs,
-                        "contentPrefix" to fuzzy.collapsed.contentPrefix,
-                        "source" to fuzzy.collapsed.source.name,
-                    )
-                    return@forEach
-                }
                 _state.value = _state.value.append(confirmed)
                 appended++
             }
@@ -1168,6 +944,7 @@ class TimelineSyncLoop(
     companion object {
         private const val TAG = "TimelineSync"
 
+        private const val EXTERNAL_TRANSPORT_TIMEOUT_MS = 120_000L
         private const val STREAM_DORMANT_MS = 3_000L
         private const val STREAM_HEARTBEAT_EXPECTED_MS = 30_000L
         private const val STREAM_SILENCE_TIMEOUT_MS = STREAM_HEARTBEAT_EXPECTED_MS * 3
@@ -1236,13 +1013,38 @@ class TimelineSyncLoop(
     }
 
     internal suspend fun submitStreamEvent(message: LettaMessage) {
+        if (externalTransportActive &&
+            System.currentTimeMillis() - externalTransportSetAtMs < EXTERNAL_TRANSPORT_TIMEOUT_MS
+        ) {
+            Telemetry.event(
+                "TimelineSync", "streamSubscriber.skippedDualIngest",
+                "conversationId" to conversationId,
+                "messageType" to message.messageType,
+                "messageId" to message.id,
+            )
+            return
+        }
+        if (externalTransportActive) {
+            externalTransportActive = false
+            Telemetry.event(
+                "TimelineSync", "streamSubscriber.externalTransportExpired",
+                "conversationId" to conversationId,
+                "ageMs" to (System.currentTimeMillis() - externalTransportSetAtMs),
+            )
+        }
         eventQueue.send(TimelineGatewayEvent.StreamMessage(message))
     }
 
     internal suspend fun ingestStreamEvent(message: LettaMessage) {
+        externalTransportActive = true
+        externalTransportSetAtMs = System.currentTimeMillis()
         val ack = CompletableDeferred<Unit>()
         eventQueue.send(TimelineGatewayEvent.StreamMessage(message, ack))
         ack.await()
+    }
+
+    internal fun clearExternalTransportActive() {
+        externalTransportActive = false
     }
 
     private suspend fun applyStreamEvent(message: LettaMessage) {

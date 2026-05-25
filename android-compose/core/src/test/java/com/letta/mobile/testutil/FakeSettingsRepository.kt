@@ -25,10 +25,7 @@ import kotlinx.coroutines.flow.filterNotNull
  */
 class FakeSettingsRepository(
     initialActiveConfig: LettaConfig? = null,
-    initialClientModeEnabled: Boolean = false,
     initialResumeRecentConversation: Boolean = false,
-    initialClientModeBaseUrl: String = "",
-    initialClientModeApiKey: String? = null,
 ) : ISettingsRepository {
 
     val activeConfigState: MutableStateFlow<LettaConfig?> =
@@ -37,14 +34,8 @@ class FakeSettingsRepository(
     val configsState: MutableStateFlow<List<LettaConfig>> =
         MutableStateFlow(initialActiveConfig?.let(::listOf).orEmpty())
 
-    val clientModeEnabled: MutableStateFlow<Boolean> =
-        MutableStateFlow(initialClientModeEnabled)
-
     val resumeRecentConversation: MutableStateFlow<Boolean> =
         MutableStateFlow(initialResumeRecentConversation)
-
-    val clientModeBaseUrl: MutableStateFlow<String> =
-        MutableStateFlow(initialClientModeBaseUrl)
 
     val pinnedProjectIds: MutableStateFlow<Set<String>> =
         MutableStateFlow(emptySet())
@@ -67,8 +58,6 @@ class FakeSettingsRepository(
     private val chatBackgroundKeyState = MutableStateFlow("default")
     private val chatFontScaleState = MutableStateFlow(1f)
     private val enableProjectsState = MutableStateFlow(false)
-
-    var apiKey: String? = initialClientModeApiKey
 
     override val configs: StateFlow<List<LettaConfig>> = configsState.asStateFlow()
 
@@ -114,13 +103,7 @@ class FakeSettingsRepository(
 
     override fun getDynamicColor(): Flow<Boolean> = dynamicColorState
 
-    override fun observeClientModeEnabled(): Flow<Boolean> = clientModeEnabled
-
     override fun observeResumeRecentConversation(): Flow<Boolean> = resumeRecentConversation
-
-    override fun observeClientModeBaseUrl(): Flow<String> = clientModeBaseUrl
-
-    override fun getClientModeApiKey(): String? = apiKey
 
     override fun setLastChatSelection(agentId: String, agentName: String?, conversationId: String?) {
         lastChatSelectionState.value = LastChatSelection(
@@ -231,17 +214,6 @@ class FakeSettingsRepository(
     }
 
     override fun getEnableProjects(): Flow<Boolean> = enableProjectsState
-    override suspend fun setClientModeEnabled(enabled: Boolean) {
-        clientModeEnabled.value = enabled
-    }
-
-    override suspend fun setClientModeBaseUrl(baseUrl: String) {
-        clientModeBaseUrl.value = baseUrl
-    }
-
-    override fun setClientModeApiKey(apiKey: String?) {
-        this.apiKey = apiKey
-    }
 
     override suspend fun setTheme(theme: AppTheme) {
         themeState.value = theme

@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
  * EncryptedSharedPreferences leaks across the daemon JVM — see letta-mobile-0dnn).
  *
  * Covers the reads used by:
- *  - Infra collaborators: ShimBackendDetector, ChannelHeartbeatSync, ClientModeController.
+ *  - Infra collaborators: ShimBackendDetector, ChannelHeartbeatSync.
  *  - VM-facing reads: ConversationsViewModel (pinned-conversation state) and
  *    DashboardViewModel (favorite + pinned agents + shortcuts). Adding new
  *    VM consumers should widen the interface here rather than reaching for
@@ -37,10 +37,7 @@ interface ISettingsRepository {
     fun getTheme(): Flow<AppTheme>
     fun getThemePreset(): Flow<ThemePreset>
     fun getDynamicColor(): Flow<Boolean>
-    fun observeClientModeEnabled(): Flow<Boolean>
     fun observeResumeRecentConversation(): Flow<Boolean>
-    fun observeClientModeBaseUrl(): Flow<String>
-    fun getClientModeApiKey(): String?
     fun getPinnedAgentIds(): Flow<Set<String>>
     fun getPinnedAgentOrder(): Flow<List<String>>
     fun getPinnedConversationIds(): Flow<Set<String>>
@@ -79,9 +76,6 @@ interface ISettingsRepository {
     fun getChatFontScale(): Flow<Float>
     suspend fun setChatFontScale(scale: Float)
     fun getEnableProjects(): Flow<Boolean>
-    suspend fun setClientModeEnabled(enabled: Boolean)
-    suspend fun setClientModeBaseUrl(baseUrl: String)
-    fun setClientModeApiKey(apiKey: String?)
     suspend fun setTheme(theme: AppTheme)
     suspend fun setThemePreset(themePreset: ThemePreset)
     suspend fun setDynamicColor(enabled: Boolean)

@@ -39,7 +39,7 @@ class AppStartupCoordinatorTest {
     @Test
     fun runStartupTasksContainsNonRequiredTaskFailuresAndContinues() = runTest {
         val actions = FakeStartupActions(
-            failure = StartupFailure("client mode init", IllegalStateException("boom")),
+            failure = StartupFailure("channel heartbeat scheduling", IllegalStateException("boom")),
         )
         val coordinator = AppStartupCoordinator(actions, StandardTestDispatcher(testScheduler))
 
@@ -49,7 +49,7 @@ class AppStartupCoordinatorTest {
         assertTrue(
             Telemetry.snapshot().any {
                 it.tag == "AppStartup" &&
-                    it.name == "client_mode_init:failed" &&
+                    it.name == "channel_heartbeat_scheduling:failed" &&
                     it.throwable is IllegalStateException
             },
         )
@@ -58,7 +58,7 @@ class AppStartupCoordinatorTest {
     @Test
     fun runStartupTasksDoesNotContainCancellation() = runTest {
         val actions = FakeStartupActions(
-            failure = StartupFailure("client mode init", CancellationException("cancelled")),
+            failure = StartupFailure("production jank monitor", CancellationException("cancelled")),
         )
         val coordinator = AppStartupCoordinator(actions, StandardTestDispatcher(testScheduler))
 
@@ -70,7 +70,7 @@ class AppStartupCoordinatorTest {
                 listOf(
                     "notification channel",
                     "automation auth bootstrap",
-                    "client mode init",
+                    "production jank monitor",
                 ),
                 actions.calls,
             )
@@ -89,8 +89,6 @@ class AppStartupCoordinatorTest {
 
         override suspend fun importPendingAutomationConfig() = record("automation auth bootstrap")
 
-        override suspend fun initializeClientMode() = record("client mode init")
-
         override suspend fun installProductionJankStats(application: Application) =
             record("production jank monitor")
 
@@ -98,10 +96,6 @@ class AppStartupCoordinatorTest {
             record("debug performance monitor")
 
         override suspend fun scheduleChannelHeartbeat() = record("channel heartbeat scheduling")
-
-        override suspend fun restoreBotServiceIfConfigured() = record("bot auto-start restore")
-
-        override suspend fun scheduleBotHeartbeat() = record("bot heartbeat scheduling")
 
         private fun record(name: String) {
             calls += name
@@ -120,12 +114,9 @@ class AppStartupCoordinatorTest {
         val ExpectedStartupOrder = listOf(
             "notification channel",
             "automation auth bootstrap",
-            "client mode init",
             "production jank monitor",
             "debug performance monitor",
             "channel heartbeat scheduling",
-            "bot auto-start restore",
-            "bot heartbeat scheduling",
         )
     }
 }

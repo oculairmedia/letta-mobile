@@ -5,36 +5,32 @@ import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.feature.chat.ChatConversationCoordinator
 import com.letta.mobile.feature.chat.ChatRunExpansionState
 import com.letta.mobile.feature.chat.ChatSessionResolver
-import com.letta.mobile.feature.chat.ClientModeSendCoordinator
 import com.letta.mobile.feature.chat.ProjectChatContext
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 
-/** Owns the startup wiring previously embedded in AdminChatViewModel.init. */
 internal class ChatSessionInitializer(
     private val scope: CoroutineScope,
     private val agentId: String,
     private val isFreshRoute: Boolean,
     private val explicitNewChat: Boolean,
     private val resumeCacheMaxAgeMs: Long,
-    private val projectContext: ProjectChatContext?,
+    @Suppress("UNUSED_PARAMETER") private val projectContext: ProjectChatContext?,
     private val settingsRepository: ISettingsRepository,
     private val sessionResolver: ChatSessionResolver,
     private val conversationCoordinator: ChatConversationCoordinator,
-    private val clientModeCoordinator: ClientModeSendCoordinator,
     private val runExpansionState: ChatRunExpansionState,
     private val currentConversationTracker: CurrentConversationTracker,
     private val bannerController: ChatBannerController,
-    private val setClientModeConversationId: (String?) -> Unit,
+    @Suppress("UNUSED_PARAMETER") private val setClientModeConversationId: (String?) -> Unit,
     private val refreshAvailableAgents: () -> Unit,
     private val observeLastChatSelection: () -> Unit,
     private val seedAgentNameFromMemoryCache: () -> Unit,
     private val observeAgentNameCache: () -> Unit,
-    private val refreshClientModeLocation: () -> Unit,
+    @Suppress("UNUSED_PARAMETER") private val refreshClientModeLocation: () -> Unit,
     private val loadProjectAgents: () -> Unit,
     private val loadProjectBrief: () -> Unit,
     private val loadRecentBugReports: () -> Unit,
@@ -52,16 +48,11 @@ internal class ChatSessionInitializer(
         seedAgentNameFromMemoryCache()
         observeAgentNameCache()
         runExpansionState.hydrateUiState()
-        observeClientModeEnabled()
         bootstrapProjectContext()
+        resolveConversationAndLoad(false)
     }
 
     private fun observeActiveConfigChanges() {
-        // letta-mobile-ze5l: when the active backend swaps under us, refresh
-        // the agent roster so the drawer / picker reflect the new server's
-        // agents. The conversation we're on may not exist on the new server
-        // (letta-mobile-iow7 covers the cache-invalidation story); for now
-        // we let the timeline observers naturally retry against the new URL.
         scope.launch {
             settingsRepository.activeConfigChanges.collect {
                 refreshAvailableAgents()
@@ -70,11 +61,8 @@ internal class ChatSessionInitializer(
     }
 
     private fun prepareFreshRoute() {
-        // letta-mobile-w2hx.6: route arg already pre-populated
-        // `activeConversationId` at field init; no shared singleton to seed.
         if (!isFreshRoute) return
 
-        setClientModeConversationId(null)
         currentConversationTracker.setCurrent(null)
         if (!explicitNewChat && agentId.isNotBlank()) {
             scope.launch {
@@ -89,9 +77,6 @@ internal class ChatSessionInitializer(
     }
 
     private suspend fun maybeResumeRecentConversation() {
-        // Use firstOrNull so a mocked SettingsRepository returning emptyFlow()
-        // (in unit tests) doesn't throw at VM init. Unknown-flag treated as
-        // "skip resume" — preserves pre-h2b8 fresh-route semantics for tests.
         val flagEnabled = settingsRepository.observeResumeRecentConversation().firstOrNull() ?: false
         if (!flagEnabled) return
 
@@ -117,23 +102,6 @@ internal class ChatSessionInitializer(
                 "AdminChatVM", "resumeRecent.noRecent",
                 "agentId" to agentId,
             )
-        }
-    }
-
-    private fun observeClientModeEnabled() {
-        scope.launch {
-            settingsRepository.observeClientModeEnabled()
-                .distinctUntilChanged()
-                .collect { enabled ->
-                    if (!enabled) {
-                        clientModeCoordinator.cancelActiveStream()
-                        bannerController.applyClientModeDisabled()
-                    } else {
-                        bannerController.applyClientModeEnabled(projectContext?.filesystemPath)
-                        refreshClientModeLocation()
-                    }
-                    resolveConversationAndLoad(enabled)
-                }
         }
     }
 

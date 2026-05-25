@@ -60,7 +60,6 @@ import com.letta.mobile.data.session.SessionScopedStepRepository
 import com.letta.mobile.data.session.SessionScopedToolRepository
 import com.letta.mobile.data.session.SessionScopedVibesyncEventStreamRepository
 import com.letta.mobile.data.timeline.TimelineRepository
-import com.letta.mobile.data.timeline.api.TimelineClientModeWriter
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.feature.chat.ChatClientVersionProvider
@@ -204,10 +203,6 @@ abstract class AppModule {
     abstract fun bindChannelNotificationPublisher(
         impl: ChannelNotificationPublisher,
     ): IChannelNotificationPublisher
-
-    @Binds
-    @Singleton
-    abstract fun bindTimelineClientModeWriter(impl: TimelineRepository): TimelineClientModeWriter
 
     @Binds
     @Singleton

@@ -1,5 +1,8 @@
 package com.letta.mobile.feature.chat
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -146,6 +149,19 @@ internal fun ChatScreen(
             viewModel.markA2uiActionSnackbarShown(snackbar.id)
         }
 
+        LaunchedEffect(state.error) {
+            val err = state.error ?: return@LaunchedEffect
+            if (state.messages.isNotEmpty()) {
+                snackbarDispatcher.dispatch(
+                    SnackbarMessage(
+                        message = err,
+                        duration = SnackbarDuration.Long,
+                    )
+                )
+                viewModel.clearError()
+            }
+        }
+
         LaunchedEffect(state.error, state.isAgentTyping, state.isStreaming) {
             when {
                 state.error != null -> ambientAgentStatus = "Failed"
@@ -212,58 +228,59 @@ internal fun ChatScreen(
                 )
             }
             Column(modifier = Modifier.fillMaxSize()) {
-                // letta-mobile-c87t: surfaces a non-modal banner when the
-                // lettabot WS gateway substituted a fresh conversation for the
-                // one we asked to resume. See ClientModeConversationSwapBanner.
-                val swap = state.clientModeConversationSwap
-                com.letta.mobile.ui.components.ClientModeConversationSwapBanner(
-                    visible = swap != null,
-                    onDismiss = { viewModel.dismissClientModeConversationSwap() },
-                    requestedConversationIdSuffix = swap?.requestedConversationId?.takeLast(6),
-                    newConversationIdSuffix = swap?.newConversationId?.takeLast(6),
-                )
-                when (val conversationState = state.conversationState) {
-                    ConversationState.Loading -> {
-                        MessageSkeletonList(modifier = Modifier.weight(1f))
-                    }
-                    is ConversationState.Error -> {
-                        ErrorContent(
-                            message = conversationState.message,
-                            onRetry = { viewModel.retryConversationLoad() },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    ConversationState.NoConversation -> {
-                        NoConversationChatContent(
-                            state = state,
-                            scrollToMessageId = viewModel.scrollToMessageId,
-                            onSendMessage = { viewModel.sendMessage(it) },
-                            onRerunMessage = { viewModel.rerunMessage(it) },
-                            onLoadOlderMessages = { viewModel.loadOlderMessages() },
-                            onSubmitApproval = { requestId, toolCallIds, approve, reason ->
-                                viewModel.submitApproval(requestId, toolCallIds, approve, reason)
-                            },
-                            onToggleRunCollapsed = viewModel::toggleRunCollapsed,
-                            onToggleReasoningExpanded = viewModel::toggleReasoningExpanded,
-                            onA2uiAction = viewModel::submitA2uiAction,
-                            activeFontScale = activeFontScale,
-                            onActiveFontScaleChange = { activeFontScale = it },
-                            onFontScaleChange = { viewModel.setChatFontScale(it) },
-                            chatMode = chatMode,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    is ConversationState.Ready -> {
-                        val chatError = state.error
-                        if (state.isLoadingMessages && state.messages.isEmpty()) {
-                            MessageSkeletonList(modifier = Modifier.weight(1f))
-                        } else if (chatError != null && state.messages.isEmpty()) {
+                val contentPhase = when {
+                    state.conversationState is ConversationState.Loading -> "loading"
+                    state.conversationState is ConversationState.Error -> "error"
+                    state.conversationState == ConversationState.NoConversation -> "no-conv"
+                    state.isLoadingMessages && state.messages.isEmpty() -> "loading"
+                    state.error != null && state.messages.isEmpty() -> "error"
+                    else -> "ready"
+                }
+                Crossfade(
+                    targetState = contentPhase,
+                    animationSpec = tween(durationMillis = 200),
+                    modifier = Modifier.weight(1f),
+                    label = "chat-content",
+                ) { phase ->
+                    when (phase) {
+                        "loading" -> {
+                            MessageSkeletonList(modifier = Modifier.fillMaxSize())
+                        }
+                        "error" -> {
+                            val msg = (state.conversationState as? ConversationState.Error)?.message
+                                ?: state.error ?: "Unknown error"
+                            val retry = if (state.conversationState is ConversationState.Error) {
+                                { viewModel.retryConversationLoad() }
+                            } else {
+                                { viewModel.loadMessages() }
+                            }
                             ErrorContent(
-                                message = chatError,
-                                onRetry = { viewModel.loadMessages() },
-                                modifier = Modifier.weight(1f),
+                                message = msg,
+                                onRetry = retry,
+                                modifier = Modifier.fillMaxSize(),
                             )
-                        } else {
+                        }
+                        "no-conv" -> {
+                            NoConversationChatContent(
+                                state = state,
+                                scrollToMessageId = viewModel.scrollToMessageId,
+                                onSendMessage = { viewModel.sendMessage(it) },
+                                onRerunMessage = { viewModel.rerunMessage(it) },
+                                onLoadOlderMessages = { viewModel.loadOlderMessages() },
+                                onSubmitApproval = { requestId, toolCallIds, approve, reason ->
+                                    viewModel.submitApproval(requestId, toolCallIds, approve, reason)
+                                },
+                                onToggleRunCollapsed = viewModel::toggleRunCollapsed,
+                                onToggleReasoningExpanded = viewModel::toggleReasoningExpanded,
+                                onA2uiAction = viewModel::submitA2uiAction,
+                                activeFontScale = activeFontScale,
+                                onActiveFontScaleChange = { activeFontScale = it },
+                                onFontScaleChange = { viewModel.setChatFontScale(it) },
+                                chatMode = chatMode,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                        else -> {
                             ChatContent(
                                 state = state,
                                 scrollToMessageId = viewModel.scrollToMessageId,
@@ -280,7 +297,7 @@ internal fun ChatScreen(
                                 onActiveFontScaleChange = { activeFontScale = it },
                                 onFontScaleChange = { viewModel.setChatFontScale(it) },
                                 chatMode = chatMode,
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.fillMaxSize(),
                             )
                         }
                     }
@@ -372,14 +389,6 @@ internal fun ChatScreen(
             }
         }
 
-        if (state.clientModeFilesystemPicker.isVisible) {
-            ClientModeFilesystemPickerSheet(
-                state = state.clientModeFilesystemPicker,
-                onDismiss = projectBindings::closeClientModeLocationPicker,
-                onNavigateTo = projectBindings::browseClientModeLocation,
-                onSelect = projectBindings::selectClientModeLocation,
-            )
-        }
     }
 }
 
@@ -558,101 +567,6 @@ private fun A2uiSurfaceStack(
                 onAction = onAction,
                 actionResolutionToken = resolvedActionCounters[surface.surfaceId] ?: 0,
             )
-        }
-    }
-}
-
-@Composable
-private fun ClientModeFilesystemPickerSheet(
-    state: ClientModeFilesystemPickerUiState,
-    onDismiss: () -> Unit,
-    onNavigateTo: (String?) -> Unit,
-    onSelect: (String) -> Unit,
-) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.screen_chat_client_location_picker_title),
-                style = MaterialTheme.typography.titleLarge,
-            )
-            Text(
-                text = state.path ?: stringResource(R.string.screen_chat_client_location_unknown_label),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(
-                    onClick = { state.parent?.let(onNavigateTo) },
-                    enabled = state.parent != null && !state.isLoading,
-                ) {
-                    Icon(LettaIcons.ArrowBack, contentDescription = null)
-                    Text(stringResource(R.string.screen_chat_client_location_picker_parent))
-                }
-                TextButton(
-                    onClick = { state.path?.let(onSelect) },
-                    enabled = state.path != null && !state.isLoading,
-                ) {
-                    Icon(LettaIcons.Check, contentDescription = null)
-                    Text(stringResource(R.string.screen_chat_client_location_picker_select))
-                }
-            }
-
-            state.error?.let { error ->
-                Text(
-                    text = error,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-
-            if (state.isLoading) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    CircularProgressIndicator()
-                }
-            } else if (state.entries.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.screen_chat_client_location_picker_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 24.dp),
-                )
-            } else {
-                LazyColumn(modifier = Modifier.fillMaxWidth().height(360.dp)) {
-                    items(state.entries, key = { it.path }) { entry ->
-                        ListItem(
-                            headlineContent = { Text(entry.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            supportingContent = {
-                                Text(entry.path, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            },
-                            leadingContent = { Icon(LettaIcons.Storage, contentDescription = null) },
-                            trailingContent = { Icon(LettaIcons.ChevronRight, contentDescription = null) },
-                            modifier = Modifier.clickable(enabled = !state.isLoading) { onNavigateTo(entry.path) },
-                        )
-                        HorizontalDivider()
-                    }
-                }
-            }
-
-            if (state.truncated) {
-                Text(
-                    text = stringResource(R.string.screen_chat_client_location_picker_truncated),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }

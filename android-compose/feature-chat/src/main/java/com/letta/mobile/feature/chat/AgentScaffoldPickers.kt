@@ -678,11 +678,6 @@ internal fun ContextMetricRow(label: String, value: String) {
 
 internal fun formatDrawerNumber(value: Int): String = String.format(Locale.US, "%,d", value)
 
-internal fun ClientModeLocationUiState.displayLabel(): String? {
-    val path = currentPath ?: lastRequestedPath ?: defaultPath ?: return null
-    return path.trimEnd('/').substringAfterLast('/').ifBlank { path }
-}
-
 @Composable
 internal fun contrastDrawerItemColors() =
     NavigationDrawerItemDefaults.colors(
@@ -705,9 +700,6 @@ internal fun DrawerContent(
     contextWindow: ContextWindowUiState,
     chatMode: String,
     onChatModeSelected: (String) -> Unit,
-    isClientModeEnabled: Boolean = false,
-    clientModeLocation: ClientModeLocationUiState = ClientModeLocationUiState(),
-    onOpenLocationPicker: () -> Unit = {},
     conversations: List<Conversation>,
     currentConversationId: String?,
     onNewConversation: () -> Unit,
@@ -791,25 +783,6 @@ internal fun DrawerContent(
 
         val drawerItemColors = contrastDrawerItemColors()
         Spacer(modifier = Modifier.height(16.dp))
-        if (isClientModeEnabled) {
-            AssistChip(
-                onClick = {
-                    HapticEffects.contextClick(haptic, view)
-                    onOpenLocationPicker()
-                },
-                leadingIcon = { Icon(LettaIcons.Storage, contentDescription = null) },
-                label = {
-                    Text(
-                        text = clientModeLocation.displayLabel()
-                            ?: stringResource(R.string.screen_chat_client_location_title),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-        }
         ContextWindowCard(
             state = contextWindow,
             onRefresh = onRefreshContextWindow,

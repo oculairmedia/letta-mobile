@@ -38,9 +38,6 @@ internal class AppStartupCoordinator @Inject constructor(
         AppStartupTask("automation auth bootstrap") {
             actions.importPendingAutomationConfig()
         },
-        AppStartupTask("client mode init") {
-            actions.initializeClientMode()
-        },
         AppStartupTask("production jank monitor") {
             actions.installProductionJankStats(application)
         },
@@ -49,12 +46,6 @@ internal class AppStartupCoordinator @Inject constructor(
         },
         AppStartupTask("channel heartbeat scheduling") {
             actions.scheduleChannelHeartbeat()
-        },
-        AppStartupTask("bot auto-start restore") {
-            actions.restoreBotServiceIfConfigured()
-        },
-        AppStartupTask("bot heartbeat scheduling") {
-            actions.scheduleBotHeartbeat()
         },
     )
 

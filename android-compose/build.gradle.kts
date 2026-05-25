@@ -66,7 +66,6 @@ dependencies {
     kover(project(":core"))
     kover(project(":core:domain"))
     kover(project(":designsystem"))
-    kover(project(":bot"))
     kover(project(":feature-chat"))
 }
 

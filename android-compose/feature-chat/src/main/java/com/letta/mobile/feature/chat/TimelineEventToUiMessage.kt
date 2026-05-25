@@ -315,7 +315,6 @@ internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                 // survive same-id assistant responses while legacy assistant
                 // message IDs remain stable.
                 id = if (
-                    ev.source == com.letta.mobile.data.timeline.MessageSource.CLIENT_MODE_HARNESS ||
                     ev.messageType == TimelineMessageType.REASONING
                 ) {
                     "${ev.serverId}:${ev.messageType.name}"

@@ -219,8 +219,7 @@ internal class ChatTimelineObserver(
         }
         val anyLettaServerLocalPending = timeline.events.any {
             it is TimelineEvent.Local &&
-                it.deliveryState == DeliveryState.SENDING &&
-                it.source != MessageSource.CLIENT_MODE_HARNESS
+                it.deliveryState == DeliveryState.SENDING
         }
         return TimelineProjection(
             ui = ui,

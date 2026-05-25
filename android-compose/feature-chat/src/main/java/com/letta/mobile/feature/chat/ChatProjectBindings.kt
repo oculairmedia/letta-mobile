@@ -1,18 +1,6 @@
 package com.letta.mobile.feature.chat
 
 internal interface ChatProjectBindings {
-    fun refreshClientModeLocation()
-
-    fun sendClientModeLocationChange(path: String)
-
-    fun openClientModeLocationPicker()
-
-    fun closeClientModeLocationPicker()
-
-    fun browseClientModeLocation(path: String?)
-
-    fun selectClientModeLocation(path: String)
-
     fun refreshContextWindow()
 
     fun loadProjectAgents()

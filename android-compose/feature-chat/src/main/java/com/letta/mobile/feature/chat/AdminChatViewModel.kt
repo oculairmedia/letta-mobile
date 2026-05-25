@@ -9,10 +9,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.cash.molecule.RecompositionMode.Immediate
 import app.cash.molecule.launchMolecule
-import com.letta.mobile.bot.chat.ClientModeChatSender
-import com.letta.mobile.bot.protocol.InternalBotClient
-import com.letta.mobile.bot.repository.ClientModeAgentLocationRepository
-import com.letta.mobile.bot.channel.NotificationReplyHandler
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.a2ui.A2uiFrameEvent
 import com.letta.mobile.data.a2ui.A2uiSurfaceManager
@@ -32,7 +28,6 @@ import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.feature.chat.send.ChatSendContext
 import com.letta.mobile.feature.chat.send.ChatSendStrategySelector
-import com.letta.mobile.feature.chat.send.ClientModeChatSendStrategy
 import com.letta.mobile.feature.chat.send.TimelineChatSendStrategy
 import com.letta.mobile.feature.chat.send.WsChatSendStrategy
 import com.letta.mobile.feature.chat.route.ChatRouteArgs
@@ -80,12 +75,8 @@ internal class AdminChatViewModel @Inject constructor(
     private val folderRepository: IFolderRepository,
     private val conversationRepository: IConversationRepository,
     private val settingsRepository: ISettingsRepository,
-    private val internalBotClient: InternalBotClient,
-    private val clientModeChatSender: ClientModeChatSender,
-    private val clientModeAgentLocationRepository: ClientModeAgentLocationRepository,
     private val currentConversationTracker: com.letta.mobile.data.channel.CurrentConversationTracker,
     private val notificationDeliveryCoordinator: NotificationDelivery,
-    private val notificationReplyHandler: NotificationReplyHandler,
     private val shimBackendDetector: ShimBackendDetector,
     private val wsChatBridge: WsChatBridge,
     private val clientVersionProvider: ChatClientVersionProvider,
@@ -128,32 +119,11 @@ internal class AdminChatViewModel @Inject constructor(
      */
     private val explicitNewChat: Boolean
         get() = routeArgs.explicitNewChat
-    // letta-mobile-c87t: previously this predicate was
-    //   clientModeEnabled.value && (isFreshRoute || explicitConversationId == null)
-    // which collapsed to "client mode only fires for fresh routes" — meaning any
-    // existing conversation silently bypassed Client Mode and went direct to Letta.
-    // The Client Mode toggle is global per Emmanuel's design; if it's on, ALL
-    // conversations should engage with the LettaBot harness. Existing conversations
-    // are resumed by passing the Letta conversation ID through to the gateway,
-    // which uses Letta Code SDK's resumeSession() to switch into them.
-    private val shouldUseClientModeForCurrentRoute: Boolean
-        get() = clientModeEnabled.value
-    // letta-mobile-w2hx.6: per-VM (per-chat) active conversation id. Replaces
-    // the process-wide ConversationManager singleton that was keyed only on
-    // agentId — that map could pollute one chat's resolve with another
-    // chat's resolved conv (the bug w2hx.6 explicitly calls out).
-    //
-    // The chat row IS this view-model. Its conversation_id is its own state,
-    // never shared across chats, never inherited via agent_id. Initial value
-    // comes from the route's explicit nav arg if present; otherwise null
-    // until resolveConversationAndLoad assigns one.
-    private val clientModeEnabled: StateFlow<Boolean> = settingsRepository.observeClientModeEnabled()
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     private val isShimBackend: StateFlow<Boolean> = shimBackendDetector.activeIsShimBackend
         .stateIn(viewModelScope, SharingStarted.Eagerly, shimBackendDetector.cachedActiveIsShimBackend())
     private var followingDuplicateInitialMessageInFlight = false
     val conversationId: String?
-        get() = chatConversationCoordinator.conversationId(shouldUseClientModeForCurrentRoute)
+        get() = chatConversationCoordinator.conversationId(false)
     val projectContext: ProjectChatContext? = routeArgs.projectContext
 
     private val chatSessionResolver = ChatSessionResolver(
@@ -162,11 +132,6 @@ internal class AdminChatViewModel @Inject constructor(
         backgroundRefreshScope = viewModelScope,
     )
     private val chatApprovalCoordinator = ChatApprovalCoordinator(messageRepository)
-    private val projectAgentActivityLoader = ProjectAgentActivityLoader(
-        internalBotClient = internalBotClient,
-        agentRepository = agentRepository,
-        folderRepository = folderRepository,
-    )
     private val _uiState = MutableStateFlow(
         ChatUiState(agentName = initialAgentName.orEmpty())
     )
@@ -273,22 +238,6 @@ internal class AdminChatViewModel @Inject constructor(
         next: ChatUiState,
     ): ChatUiState = runExpansionState.collapseCompletedRunsIfStreamingFinished(previous, next)
 
-    /**
-     * Fresh-route Client Mode sends do not have a timeline conversation id
-     * until the gateway echoes one. Keep exactly one quarantined optimistic
-     * USER echo so the composer has immediate feedback. Assistant, reasoning,
-     * tool-call, and tool-result chunks are never rendered here; they are
-     * buffered separately and replayed into [TimelineRepository] once the
-     * gateway returns a real conversation id.
-     */
-    private var pendingClientModeBootstrapUserMessage: UiMessage? = null
-
-    private fun pendingClientModeBootstrapMessages() =
-        listOfNotNull(pendingClientModeBootstrapUserMessage).toImmutableList()
-
-    private fun clearPendingClientModeBootstrapUserMessage() {
-        pendingClientModeBootstrapUserMessage = null
-    }
     private val chatSearchCoordinator = ChatSearchCoordinator(
         scope = viewModelScope,
         messageRepository = messageRepository,
@@ -300,9 +249,9 @@ internal class AdminChatViewModel @Inject constructor(
         scope = viewModelScope,
         timelineRepository = timelineRepository,
         currentConversationTracker = currentConversationTracker,
-        activeReplyStreams = notificationReplyHandler.activeReplyStreams,
+        activeReplyStreams = kotlinx.coroutines.flow.MutableStateFlow(emptySet()),
         uiState = _uiState,
-        isClientModeStreamInFlight = { clientModeSendCoordinator.isStreamInFlight },
+        isClientModeStreamInFlight = { false },
         a2uiThinkingStartMessageCount = { a2uiThinkingStartMessageCount },
         clearA2uiThinkingOnResponse = ::clearA2uiThinkingOnResponse,
         isFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight },
@@ -320,28 +269,28 @@ internal class AdminChatViewModel @Inject constructor(
         agentRepository = agentRepository,
         currentConversationTracker = currentConversationTracker,
         uiState = _uiState,
-        pendingClientModeBootstrapMessages = ::pendingClientModeBootstrapMessages,
-        setPendingClientModeBootstrapUserMessage = { pendingClientModeBootstrapUserMessage = it },
-        clearPendingClientModeBootstrapUserMessage = ::clearPendingClientModeBootstrapUserMessage,
-        currentClientModeConversationId = ::currentClientModeConversationId,
-        setClientModeConversationId = ::setClientModeConversationId,
+        pendingClientModeBootstrapMessages = { persistentListOf() },
+        setPendingClientModeBootstrapUserMessage = { },
+        clearPendingClientModeBootstrapUserMessage = { },
+        currentClientModeConversationId = { null },
+        setClientModeConversationId = { },
         startTimelineObserver = ::startTimelineObserver,
         stopTimelineObserver = ::stopTimelineObserver,
         reconcileRecentMessages = { convId, reason ->
             timelineRepository.reconcileRecentMessages(convId, reason)
         },
         sendMessageViaClientMode = { message ->
-            clientModeChatSendStrategy.send(
+            timelineChatSendStrategy.send(
                 text = message,
                 attachments = emptyList(),
-                context = chatSendContext(isClientModeEnabled = true),
+                context = chatSendContext(),
             )
         },
         sendMessageViaTimeline = { message ->
             timelineChatSendStrategy.send(
                 text = message,
                 attachments = emptyList(),
-                context = chatSendContext(isClientModeEnabled = false),
+                context = chatSendContext(),
             )
         },
         markFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = true },
@@ -352,29 +301,6 @@ internal class AdminChatViewModel @Inject constructor(
         uiState = _uiState,
         bannerController = chatBannerController,
         activeConversationId = { chatConversationCoordinator.activeConversationId },
-    )
-    private val clientModeSendCoordinator = ClientModeSendCoordinator(
-        scope = viewModelScope,
-        agentId = agentId,
-        clientModeChatSender = clientModeChatSender,
-        timelineRepository = timelineRepository,
-        notificationDeliveryCoordinator = notificationDeliveryCoordinator,
-        currentConversationTracker = currentConversationTracker,
-        uiState = _uiState,
-        clearComposerAfterSend = { composerController.clearAfterSend() },
-        currentClientModeConversationId = ::currentClientModeConversationId,
-        setClientModeConversationId = ::setClientModeConversationId,
-        setRouteConversationId = routeArgs::setRouteConversationId,
-        setActiveConversationId = chatConversationCoordinator::setActiveConversationId,
-        markClientModeBootstrapReady = chatConversationCoordinator::markClientModeBootstrapReady,
-        pendingBootstrapMessages = ::pendingClientModeBootstrapMessages,
-        setBootstrapUserMessage = { pendingClientModeBootstrapUserMessage = it },
-        clearBootstrapUserMessage = ::clearPendingClientModeBootstrapUserMessage,
-        showConversationSwap = chatBannerController::showClientModeConversationSwap,
-        startTimelineObserver = ::startTimelineObserver,
-        stopTimelineObserver = ::stopTimelineObserver,
-        refreshContextWindow = { projectChatCoordinator.refreshContextWindow() },
-        collapseCompletedRunsIfStreamingFinished = ::collapseCompletedRunsIfStreamingFinished,
     )
     private val timelineSendCoordinator: TimelineSendCoordinator by lazy {
         TimelineSendCoordinator(
@@ -413,13 +339,9 @@ internal class AdminChatViewModel @Inject constructor(
     private val wsChatSendStrategy: WsChatSendStrategy by lazy {
         WsChatSendStrategy(wsChatSendCoordinator)
     }
-    private val clientModeChatSendStrategy: ClientModeChatSendStrategy by lazy {
-        ClientModeChatSendStrategy(clientModeSendCoordinator)
-    }
     private val chatSendStrategySelector: ChatSendStrategySelector by lazy {
         ChatSendStrategySelector(
             timelineStrategy = timelineChatSendStrategy,
-            clientModeStrategy = clientModeChatSendStrategy,
             wsStrategy = wsChatSendStrategy,
         )
     }
@@ -438,12 +360,9 @@ internal class AdminChatViewModel @Inject constructor(
         agentId = agentId,
         projectContext = projectContext,
         uiState = _uiState,
-        clientModeEnabled = clientModeEnabled,
-        clientModeAgentLocationRepository = clientModeAgentLocationRepository,
         agentRepository = agentRepository,
         blockRepository = blockRepository,
         bugReportRepository = bugReportRepository,
-        projectAgentActivityLoader = projectAgentActivityLoader,
         conversationId = { conversationId },
         setComposerError = chatBannerController::showComposerError,
         sendMessage = ::sendMessage,
@@ -460,16 +379,15 @@ internal class AdminChatViewModel @Inject constructor(
             settingsRepository = settingsRepository,
             sessionResolver = chatSessionResolver,
             conversationCoordinator = chatConversationCoordinator,
-            clientModeCoordinator = clientModeSendCoordinator,
             runExpansionState = runExpansionState,
             currentConversationTracker = currentConversationTracker,
             bannerController = chatBannerController,
-            setClientModeConversationId = ::setClientModeConversationId,
+            setClientModeConversationId = { },
             refreshAvailableAgents = ::refreshAvailableAgents,
             observeLastChatSelection = ::observeLastChatSelection,
             seedAgentNameFromMemoryCache = ::seedAgentNameFromMemoryCache,
             observeAgentNameCache = ::observeAgentNameCache,
-            refreshClientModeLocation = { projectChatCoordinator.refreshClientModeLocation() },
+            refreshClientModeLocation = { },
             loadProjectAgents = { projectChatCoordinator.loadProjectAgents() },
             loadProjectBrief = { projectChatCoordinator.loadProjectBrief() },
             loadRecentBugReports = { projectChatCoordinator.loadRecentBugReports() },
@@ -766,18 +684,9 @@ internal class AdminChatViewModel @Inject constructor(
     fun interruptRun() {
         if (!_uiState.value.isStreaming) return
         clearA2uiThinkingOnResponse()
-        val elapsedSinceClientModeStart = android.os.SystemClock.elapsedRealtime() -
-            clientModeSendCoordinator.streamStartedAtElapsedMs
-        if (clientModeSendCoordinator.isStreamInFlight && elapsedSinceClientModeStart in 0..750) {
-            Telemetry.event(
-                "AdminChatVM", "clientMode.ignoreImmediateInterrupt",
-                "elapsedMs" to elapsedSinceClientModeStart,
-            )
-            return
-        }
         val context = chatSendContext()
         viewModelScope.launch {
-            if (context.isShimBackend && !context.isClientModeEnabled) {
+            if (context.isShimBackend) {
                 chatBannerController.clearStreamingAfterInterrupt()
                 chatSendStrategySelector.cancel(context)
                 return@launch
@@ -789,8 +698,6 @@ internal class AdminChatViewModel @Inject constructor(
             }.onFailure { e ->
                 chatBannerController.showMappedError(e.asException(), "Failed to stop run")
             }
-            runCatching { internalBotClient.abort() }
-            clientModeSendCoordinator.cancelActiveStream("User interrupted active run")
         }
     }
 
@@ -803,18 +710,18 @@ internal class AdminChatViewModel @Inject constructor(
         .take(1)
 
     private fun resolveConversationAndLoad(
-        useClientModeForResolve: Boolean = clientModeEnabled.value,
+        useClientModeForResolve: Boolean = false,
     ) = chatConversationCoordinator.resolveConversationAndLoad(useClientModeForResolve)
 
     private suspend fun loadMessagesInternal() = chatConversationCoordinator.loadMessagesInternal()
 
-    fun loadMessages() = chatConversationCoordinator.loadMessages(shouldUseClientModeForCurrentRoute)
+    fun loadMessages() = chatConversationCoordinator.loadMessages(false)
 
     fun retryConversationLoad() {
         resolveConversationAndLoad()
     }
 
-    fun loadOlderMessages() = chatHistoryPager.loadOlderMessages(clientModeEnabled.value)
+    fun loadOlderMessages() = chatHistoryPager.loadOlderMessages(false)
 
     fun sendMessage(text: String) {
         when (_uiState.value.conversationState) {
@@ -849,20 +756,11 @@ internal class AdminChatViewModel @Inject constructor(
         chatSendStrategySelector.send(text, attachments, context)
     }
 
-    private fun chatSendContext(
-        isClientModeEnabled: Boolean = shouldUseClientModeForCurrentRoute,
-    ) = ChatSendContext(
-        isClientModeEnabled = isClientModeEnabled,
+    private fun chatSendContext() = ChatSendContext(
+        isClientModeEnabled = false,
         explicitConversationId = explicitConversationId,
         isShimBackend = isShimBackend.value,
     )
-
-    private fun currentClientModeConversationId(): String? =
-        routeArgs.currentClientModeConversationId()
-
-    private fun setClientModeConversationId(conversationId: String?) {
-        routeArgs.setClientModeConversationId(conversationId)
-    }
 
     private fun stopTimelineObserver() {
         chatTimelineObserver.stop()
@@ -876,13 +774,8 @@ internal class AdminChatViewModel @Inject constructor(
         chatBannerController.clearComposerError()
     }
 
-    /**
-     * Dismiss the conversation-substitution banner emitted when the gateway
-     * substituted a fresh conversation for the one we asked it to resume.
-     * See `letta-mobile-c87t` and [ClientModeConversationSwap].
-     */
-    fun dismissClientModeConversationSwap() {
-        chatBannerController.dismissClientModeConversationSwap()
+    fun clearError() {
+        chatBannerController.clearError()
     }
 
     fun addAttachment(image: MessageContentPart.Image): Boolean =
@@ -918,10 +811,6 @@ internal class AdminChatViewModel @Inject constructor(
     ) = chatApprovalController.submitApproval(requestId, toolCallIds, approve, reason)
 
     fun resetMessages() {
-        if (shouldUseClientModeForCurrentRoute) {
-            chatConversationCoordinator.resetClientModeConversationState()
-            return
-        }
         viewModelScope.launch {
             try {
                 messageRepository.resetMessages(agentId)

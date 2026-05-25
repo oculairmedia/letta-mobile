@@ -204,6 +204,8 @@ class DashboardViewModel @Inject constructor(
                         try {
                             val fetched = agentRepository.getAgent(favId).first()
                             _uiState.value = _uiState.value.copy(favoriteAgentName = fetched.name)
+                        } catch (ce: kotlinx.coroutines.CancellationException) {
+                            throw ce
                         } catch (e: Exception) {
                             Telemetry.error("DashboardVM", "failed to fetch agent name for $favId", e)
                         }
@@ -417,6 +419,8 @@ class DashboardViewModel @Inject constructor(
                     isConnected = true,
                 )
                 agentRepository.refreshAgents()
+            } catch (ce: kotlinx.coroutines.CancellationException) {
+                throw ce
             } catch (e: Exception) {
                 Log.w("DashboardVM", "Agent count failed", e)
                 _uiState.value = _uiState.value.copy(
@@ -441,6 +445,8 @@ class DashboardViewModel @Inject constructor(
                     isConversationCountApproximate = countEstimate?.isApproximate == true,
                     isConversationCountLoading = false,
                 )
+            } catch (ce: kotlinx.coroutines.CancellationException) {
+                throw ce
             } catch (e: Exception) {
                 Log.w("DashboardVM", "Conversation count failed", e)
                 _uiState.value = _uiState.value.copy(isConversationCountLoading = false)
@@ -455,6 +461,8 @@ class DashboardViewModel @Inject constructor(
                     isToolCountLoading = false,
                 )
                 toolRepository.refreshTools()
+            } catch (ce: kotlinx.coroutines.CancellationException) {
+                throw ce
             } catch (e: Exception) {
                 Log.w("DashboardVM", "Tool count failed", e)
                 _uiState.value = _uiState.value.copy(isToolCountLoading = false)
@@ -471,6 +479,8 @@ class DashboardViewModel @Inject constructor(
                 // Also load blocks for search functionality
                 val blocks = blockRepository.listAllBlocks()
                 _cachedBlocks.value = blocks
+            } catch (ce: kotlinx.coroutines.CancellationException) {
+                throw ce
             } catch (e: Exception) {
                 Log.w("DashboardVM", "Block count failed", e)
                 _uiState.value = _uiState.value.copy(isBlockCountLoading = false)
@@ -520,6 +530,8 @@ class DashboardViewModel @Inject constructor(
                     usageSummary = DashboardUsageCalculator.calculate(steps),
                     isUsageLoading = false,
                 )
+            } catch (ce: kotlinx.coroutines.CancellationException) {
+                throw ce
             } catch (e: Exception) {
                 Log.w("DashboardVM", "Usage summary failed", e)
                 _uiState.value = _uiState.value.copy(isUsageLoading = false)

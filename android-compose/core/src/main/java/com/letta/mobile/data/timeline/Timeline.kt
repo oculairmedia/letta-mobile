@@ -42,27 +42,10 @@ sealed class TimelineEvent {
      */
     abstract val attachments: List<MessageContentPart.Image>
 
-    /**
-     * Origin of this event. Defaults to LETTA_SERVER for the strict-otid timeline
-     * path. CLIENT_MODE_HARNESS marks events that came from / were sent through
-     * the lettabot WS gateway, where strict otid reconcile isn't yet supported.
-     * See [MessageSource] kdoc for details.
-     */
     abstract val source: MessageSource
 
     /**
-     * Optimistic, not yet confirmed by server. Historically only ever USER —
-     * extended for letta-mobile-5s1n (Client Mode assistant streaming) so
-     * in-flight assistant content + reasoning + tool calls can flow through
-     * the timeline rather than the legacy in-memory `clientModeMessages` list.
-     *
-     * Strict-otid sends from Letta REST/SSE remain USER-only; the new fields
-     * default to safe values and are unused for [MessageSource.LETTA_SERVER].
-     * For [MessageSource.CLIENT_MODE_HARNESS] events that represent assistant
-     * streaming, [messageType] is set accordingly and the structured fields
-     * (toolCalls / approval / toolReturn / reasoningContent) carry the
-     * stream payload until the SSE-side Confirmed event lands and the fuzzy
-     * matcher (or future strict-otid path) collapses them.
+     * Optimistic, not yet confirmed by server.
      */
     data class Local(
         override val position: Double,
@@ -134,49 +117,15 @@ enum class Role { USER, ASSISTANT, SYSTEM }
 
 enum class DeliveryState { SENDING, SENT, FAILED }
 
-/**
- * Default window for the Client Mode fuzzy reconcile path. See
- * [Timeline.collapseClientModeFuzzyMatch]. 10s is a balance between catching
- * realistic round-trips through the lettabot WS gateway → SDK → Letta server
- * → reconcile loop and minimising the chance of false positives from the user
- * legitimately sending the same content twice in quick succession.
- *
- * Used as-is for assistant / reasoning / tool-call confirmations, whose Local
- * is created when the first stream chunk arrives — i.e. roughly co-temporal
- * with the server's run-start `date`, so the absolute delta stays small.
- */
-const val CLIENT_MODE_FUZZY_WINDOW_MS: Long = 10_000
+enum class MessageSource {
+    LETTA_SERVER,
+}
 
-/**
- * Wider window applied only to USER confirmations (letta-mobile-cdm5). The
- * USER Local is stamped `sentAt = Instant.now()` the moment the user taps
- * Send, but the server's `user_message.date` is set when the run STARTS — not
- * when the WS frame arrives. Lettabot WS gateway processing + Letta-side
- * scheduling can push that gap to many seconds (24s observed in the cdm5
- * repro). With the default 10s window the user fuzzy-collapse misses, the
- * server's user_confirmed is appended at the timeline tail (after the just-
- * collapsed assistant_confirmed), and the LazyColumn renders the user bubble
- * BELOW the assistant response instead of above it. 5 minutes accommodates
- * realistic long-running runs while still bounding false positives from
- * legitimate same-content double-sends.
- */
-const val CLIENT_MODE_USER_FUZZY_WINDOW_MS: Long = 300_000
-
-/**
- * Result of a fuzzy-collapse attempt. [collapsed] is null when no match was
- * found — caller should fall through to standard `insertOrdered` semantics.
- */
 data class FuzzyCollapseResult(
     val timeline: Timeline,
     val collapsed: FuzzyCollapseTrace?,
 )
 
-/**
- * Trace metadata for an executed fuzzy collapse. Callers MUST log this at INFO
- * level when present (Meridian guardrail (2) on letta-mobile-c87t). Used to
- * verify behavioural parity when 8cm8 lands and replaces this path with strict
- * otid reconcile, and for triaging "my message duplicated" reports.
- */
 data class FuzzyCollapseTrace(
     val localOtid: String,
     val serverId: String,
@@ -184,28 +133,6 @@ data class FuzzyCollapseTrace(
     val contentPrefix: String,
     val source: MessageSource,
 )
-
-/**
- * Origin of a timeline event. Used internally for telemetry, audit, and to scope
- * source-specific reconcile behaviour (notably: the fuzzy duplicate-match path
- * that is gated to `CLIENT_MODE_HARNESS` while `letta-mobile-8pyt`/`-26pf`/`-8cm8`
- * land and enable strict otid-by-otid reconcile through the lettabot gateway).
- *
- * NOT surfaced in the UI rendering layer — see `letta-mobile-c87t` notes. If you
- * find yourself adding a Compose if-branch keyed off this field, stop and read
- * the issue first; the value of source-scoping is keeping it OUT of presentation.
- */
-enum class MessageSource {
-    /** Standard path: mobile → Letta REST/SSE. Reconciles by otid. */
-    LETTA_SERVER,
-    /**
-     * Routed via the lettabot WS gateway → Letta Code SDK → Letta server. The
-     * SDK does not currently accept a client-supplied otid (`letta-mobile-8pyt`),
-     * so server-echoed messages won't carry our otid back. Reconciliation falls
-     * back to a 10s+content fuzzy match, scoped to this source value only.
-     */
-    CLIENT_MODE_HARNESS,
-}
 
 /**
  * Category of a timeline event. Distinct from the data-layer [com.letta.mobile.data.model.MessageType]
@@ -363,92 +290,10 @@ data class Timeline(
         return copy(events = newEvents)
     }
 
-    /**
-     * letta-mobile-c87t fuzzy reconcile path.
-     *
-     * When a Confirmed user message arrives whose otid does not match any
-     * existing Local (the strict path), this method looks for a recently-appended
-     * Client-Mode-source Local with identical content within [windowMillis] of
-     * the Confirmed event's [TimelineEvent.Confirmed.date], and if found,
-     * collapses the pair by deleting the Local and inserting the Confirmed at
-     * the Local's position (so there's no visual jump).
-     *
-     * SCOPE: scoped strictly via [TimelineEvent.Local.source] == [MessageSource.CLIENT_MODE_HARNESS].
-     * NOT keyed off any ambient flag (see Meridian guardrail (1) on
-     * letta-mobile-c87t). Adding a new caller that wants to engage this path
-     * MUST stamp `source = CLIENT_MODE_HARNESS` on the Local at construction
-     * time, or this matcher will (correctly) ignore it.
-     *
-     * TODO(letta-mobile-8cm8): replace this fuzzy match with strict otid-by-otid
-     * reconcile once 26pf (gateway forwards otid) and 8pyt (SDK accepts otid on
-     * Session.send()) land. Worst-case false positive today: the same exact
-     * text sent twice inside a [windowMillis] window under Client Mode collapses
-     * to one bubble.
-     *
-     * Returns the (possibly modified) Timeline plus a metadata payload describing
-     * the collapse for telemetry; callers should log every non-null result at
-     * INFO level (Meridian guardrail (2)). Returns null in `collapsed` when no
-     * match was found — callers fall through to `insertOrdered`.
-     */
     fun collapseClientModeFuzzyMatch(
         confirmed: TimelineEvent.Confirmed,
-        windowMillis: Long = CLIENT_MODE_FUZZY_WINDOW_MS,
-    ): FuzzyCollapseResult {
-        // In Client Mode, we must fuzzy-collapse both USER and agent-generated turns
-        // (Assistant, Reasoning, Tool Call) because they are dual-streamed locally and via SSE.
-        if (confirmed.messageType != TimelineMessageType.USER &&
-            confirmed.messageType != TimelineMessageType.ASSISTANT &&
-            confirmed.messageType != TimelineMessageType.REASONING &&
-            confirmed.messageType != TimelineMessageType.TOOL_CALL) {
-            return FuzzyCollapseResult(this, null)
-        }
-
-        val effectiveWindow = effectiveFuzzyWindow(confirmed.messageType, windowMillis)
-
-        val candidate = events.asSequence()
-            .filterIsInstance<TimelineEvent.Local>()
-            .filter { it.source == MessageSource.CLIENT_MODE_HARNESS }
-            .filter { it.isCompatibleClientModeCandidateFor(confirmed) }
-            .filter {
-                val deltaMs = kotlin.math.abs(
-                    java.time.Duration.between(it.sentAt, confirmed.date).toMillis()
-                )
-                deltaMs <= effectiveWindow
-            }
-            // Prefer the most recent matching Local, in case the user sent the
-            // same content multiple times within the window.
-            .maxByOrNull { it.sentAt }
-            ?: return FuzzyCollapseResult(this, null)
-
-        val deltaMs = java.time.Duration.between(candidate.sentAt, confirmed.date).toMillis()
-        val stabilized = confirmed.copy(
-            position = candidate.position,
-            otid = candidate.otid, // Preserve local otid so upsertClientModeLocal stops updating
-            // Preserve the Client Mode origin so later same-server-id stream /
-            // reconcile frames know this Confirmed replaced a locally streamed
-            // harness bubble. That lets the merge path treat matching content
-            // as cumulative/duplicate instead of appending it as another delta.
-            source = candidate.source,
-        )
-        val newEvents = events.toMutableList().apply {
-            removeAll { it.otid == candidate.otid }
-            // Re-insert at correct position (which may now differ since we just
-            // removed the Local). The Confirmed event's stabilized position
-            // matches the Local's, so an ordered insert places it correctly.
-            val insertIdx = indexOfFirst { it.position > stabilized.position }
-            if (insertIdx == -1) add(stabilized) else add(insertIdx, stabilized)
-        }
-        return FuzzyCollapseResult(
-            timeline = copy(events = newEvents),
-            collapsed = FuzzyCollapseTrace(
-                localOtid = candidate.otid,
-                serverId = confirmed.serverId,
-                deltaMs = deltaMs,
-                contentPrefix = candidate.content.take(40),
-                source = candidate.source,
-            ),
-        )
-    }
+        @Suppress("UNUSED_PARAMETER") windowMillis: Long = 10_000L,
+    ): FuzzyCollapseResult = FuzzyCollapseResult(this, null)
 
     /**
      * Insert a Confirmed event at its correct ordered position.
@@ -504,80 +349,6 @@ data class Timeline(
         return copy(events = deduped)
     }
 
-    /**
-     * letta-mobile-5s1n: insert-or-update a Client Mode assistant-streaming
-     * Local. Used by [TimelineSyncLoop.upsertClientModeLocalAssistantChunk]
-     * to thread incremental SSE-style chunks through the timeline.
-     *
-     * Contract: identifies the target Local by `otid`. If present, applies
-     * [transform] preserving position. If absent, builds a new Local via
-     * [build] and appends at end. Always returns a Timeline; never throws.
-     *
-     * Scoped to Locals with `source = CLIENT_MODE_HARNESS` — strict-otid
-     * USER Locals on the LETTA_SERVER path remain untouched.
-     */
-    fun upsertClientModeLocal(
-        otid: String,
-        transform: (TimelineEvent.Local) -> TimelineEvent.Local,
-        build: () -> TimelineEvent.Local,
-    ): Timeline {
-        val idx = otidToIndex[otid]
-        if (idx != null) {
-            val existingEvent = events[idx]
-            if (existingEvent is TimelineEvent.Confirmed) {
-                // The server has already confirmed this event and we collapsed it.
-                // Drop the local update so we don't recreate it.
-                return this
-            }
-            val existing = existingEvent as TimelineEvent.Local
-            if (existing.source != MessageSource.CLIENT_MODE_HARNESS) {
-                Telemetry.event(
-                    "Timeline", "upsertClientModeLocal.wrongSource",
-                    "conversationId" to conversationId,
-                    "otid" to otid,
-                    "source" to existing.source.name,
-                    level = Telemetry.Level.WARN,
-                )
-                return this
-            }
-            val updated = transform(existing).copy(
-                position = existing.position,
-                otid = existing.otid,
-                source = MessageSource.CLIENT_MODE_HARNESS,
-            )
-            return copy(events = events.toMutableList().also { it[idx] = updated })
-        }
-        val seed = build().copy(
-            otid = otid,
-            position = nextLocalPosition(),
-            source = MessageSource.CLIENT_MODE_HARNESS,
-        )
-        if (seed.source == MessageSource.CLIENT_MODE_HARNESS && hasCompatibleConfirmedForClientModeLocal(seed)) {
-            Telemetry.event(
-                "Timeline", "upsertClientModeLocal.confirmedAlreadyPresent",
-                "conversationId" to conversationId,
-                "otid" to otid,
-                "messageType" to seed.messageType.name,
-                level = Telemetry.Level.INFO,
-            )
-            return this
-        }
-        return append(seed)
-    }
-
-    private fun hasCompatibleConfirmedForClientModeLocal(
-        local: TimelineEvent.Local,
-        windowMillis: Long = CLIENT_MODE_FUZZY_WINDOW_MS,
-    ): Boolean = events.asSequence()
-        .filterIsInstance<TimelineEvent.Confirmed>()
-        .filter { confirmed -> local.isCompatibleClientModeCandidateFor(confirmed) }
-        .any { confirmed ->
-            val deltaMs = kotlin.math.abs(
-                java.time.Duration.between(local.sentAt, confirmed.date).toMillis()
-            )
-            deltaMs <= effectiveFuzzyWindow(confirmed.messageType, windowMillis)
-        }
-
     /** Mark a Local event as [DeliveryState.SENT]. No-op for Confirmed events. */
     fun markSent(otid: String): Timeline = updateLocal(otid) { it.copy(deliveryState = DeliveryState.SENT) }
 
@@ -588,84 +359,6 @@ data class Timeline(
         val idx = otidToIndex[otid]?.takeIf { events[it] is TimelineEvent.Local } ?: return this
         val local = events[idx] as TimelineEvent.Local
         return copy(events = events.toMutableList().also { it[idx] = transform(local) })
-    }
-}
-
-/**
- * Returns the fuzzy time window appropriate for [type]. USER messages get the
- * wider [CLIENT_MODE_USER_FUZZY_WINDOW_MS] because the local sentAt is set at
- * Send-time but the server's user_message.date is set at run-start; runs that
- * take longer than the default 10s window would otherwise miss fuzzy collapse
- * and produce a duplicate user bubble below the assistant response. For all
- * other compatible types ([CLIENT_MODE_FUZZY_WINDOW_MS] is appropriate because
- * the harness writes the Local in lock-step with the first stream chunk.
- *
- * Honours an explicit [explicit] override if it is already wider than either
- * default — keeps test injection of long windows working unchanged.
- */
-private fun effectiveFuzzyWindow(type: TimelineMessageType, explicit: Long): Long {
-    val base = if (type == TimelineMessageType.USER) {
-        CLIENT_MODE_USER_FUZZY_WINDOW_MS
-    } else {
-        CLIENT_MODE_FUZZY_WINDOW_MS
-    }
-    return maxOf(explicit, base)
-}
-
-private fun TimelineEvent.Local.isCompatibleClientModeCandidateFor(
-    confirmed: TimelineEvent.Confirmed,
-): Boolean {
-    if (source != MessageSource.CLIENT_MODE_HARNESS) return false
-    return when (confirmed.messageType) {
-        TimelineMessageType.USER ->
-            messageType == TimelineMessageType.USER &&
-                role == Role.USER &&
-                content.stripEnvelopeReminders() == confirmed.content.stripEnvelopeReminders()
-
-        TimelineMessageType.ASSISTANT ->
-            messageType == TimelineMessageType.ASSISTANT &&
-                role == Role.ASSISTANT &&
-                clientModeStreamTextCompatible(content, confirmed.content)
-
-        TimelineMessageType.REASONING ->
-            messageType == TimelineMessageType.REASONING &&
-                role == Role.ASSISTANT &&
-                clientModeStreamTextCompatible(reasoningContent.orEmpty().ifBlank { content }, confirmed.content)
-
-        TimelineMessageType.TOOL_CALL ->
-            messageType == TimelineMessageType.TOOL_CALL &&
-                role == Role.ASSISTANT &&
-                clientModeToolCallsCompatible(toolCalls, confirmed.toolCalls)
-
-        TimelineMessageType.TOOL_RETURN,
-        TimelineMessageType.SYSTEM,
-        TimelineMessageType.ERROR,
-        TimelineMessageType.OTHER -> false
-    }
-}
-
-private fun clientModeStreamTextCompatible(localText: String, confirmedText: String): Boolean {
-    val local = localText.stripEnvelopeReminders()
-    val confirmed = confirmedText.stripEnvelopeReminders()
-    if (local.isBlank() || confirmed.isBlank()) return false
-    return local == confirmed || local.startsWith(confirmed) || confirmed.startsWith(local)
-}
-
-private fun clientModeToolCallsCompatible(
-    localCalls: List<com.letta.mobile.data.model.ToolCall>,
-    confirmedCalls: List<com.letta.mobile.data.model.ToolCall>,
-): Boolean {
-    if (localCalls.isEmpty() || confirmedCalls.isEmpty()) return false
-    return localCalls.any { local ->
-        confirmedCalls.any { confirmed ->
-            val localId = local.effectiveId
-            val confirmedId = confirmed.effectiveId
-            when {
-                localId.isNotBlank() && confirmedId.isNotBlank() -> localId == confirmedId
-                !local.name.isNullOrBlank() && !confirmed.name.isNullOrBlank() -> local.name == confirmed.name
-                else -> false
-            }
-        }
     }
 }
 

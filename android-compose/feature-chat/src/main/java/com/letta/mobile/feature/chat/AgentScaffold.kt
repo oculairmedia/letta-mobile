@@ -196,6 +196,9 @@ internal fun AgentScaffoldContent(
         ?: hiltViewModel<ConversationPickerViewModel>().conversationRepository
     val drawerConversations by drawerConversationRepo.getConversations(viewModel.agentId)
         .collectAsStateWithLifecycle(emptyList())
+    LaunchedEffect(viewModel.agentId) {
+        runCatching { drawerConversationRepo.refreshConversationsIfStale(viewModel.agentId, maxAgeMs = 30_000L) }
+    }
 
     val agentName = uiState.agentName
     val agentId = viewModel.agentId
@@ -268,12 +271,6 @@ internal fun AgentScaffoldContent(
                     contextWindow = uiState.contextWindow,
                     chatMode = chatMode,
                     onChatModeSelected = { chatMode = it },
-                    isClientModeEnabled = uiState.isClientModeEnabled,
-                    clientModeLocation = uiState.clientModeLocation,
-                    onOpenLocationPicker = {
-                        scope.launch { drawerState.close() }
-                        projectBindings.openClientModeLocationPicker()
-                    },
                     conversations = drawerConversations,
                     currentConversationId = conversationId,
                     onNewConversation = {

@@ -45,7 +45,6 @@ import com.letta.mobile.util.Telemetry
 fun ConfigScreen(
     onNavigateBack: () -> Unit,
     onNavigateToConfigList: () -> Unit,
-    onNavigateToLettaBotConnection: () -> Unit = {},
     onNavigateToSystemAccess: () -> Unit = {},
     onNavigateToVibesyncDebug: () -> Unit = {},
     viewModel: ConfigViewModel = hiltViewModel()
@@ -151,7 +150,6 @@ fun ConfigScreen(
                         }
                     }
                 },
-                onNavigateToLettaBotConnection = onNavigateToLettaBotConnection,
                 onNavigateToSystemAccess = onNavigateToSystemAccess,
                 onNavigateToVibesyncDebug = onNavigateToVibesyncDebug,
                 onSave = {
@@ -178,7 +176,6 @@ private fun ConfigContent(
     onEnableProjectsChange: (Boolean) -> Unit,
     batteryOptimizationExempt: Boolean,
     onRequestBatteryOptimizationExemption: () -> Unit,
-    onNavigateToLettaBotConnection: () -> Unit,
     onNavigateToSystemAccess: () -> Unit,
     onNavigateToVibesyncDebug: () -> Unit,
     onSave: () -> Unit,
@@ -395,14 +392,6 @@ private fun ConfigContent(
         }
 
         CardGroup(title = { Text(stringResource(R.string.screen_config_integrations_section)) }) {
-            item(
-                onClick = onNavigateToLettaBotConnection,
-                headlineContent = { Text(stringResource(R.string.screen_lettabot_connection_title)) },
-                supportingContent = {
-                    Text(stringResource(R.string.screen_lettabot_connection_entry_description))
-                },
-                leadingContent = { Icon(LettaIcons.Link, contentDescription = null) },
-            )
             item(
                 onClick = onNavigateToSystemAccess,
                 headlineContent = { Text(stringResource(R.string.screen_system_access_title)) },

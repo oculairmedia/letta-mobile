@@ -54,11 +54,6 @@ dependencies {
     // testImplementation rather than implementation because the CLI code
     // lives in src/test (see rationale above).
     testImplementation(project(":core"))
-    // :bot brings in WsBotClient — the exact WebSocket client the
-    // Android app uses to talk to lettabot in Client Mode. We reuse it
-    // verbatim so the wsstream subcommand drives the same wire path.
-    testImplementation(project(":bot"))
-
     // CLI parsing
     testImplementation("com.github.ajalt.clikt:clikt:4.4.0")
 

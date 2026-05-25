@@ -111,8 +111,6 @@ class SettingsRepository @Inject constructor(
         // backend switch without waiting for the new server's agent
         // cache to load.
         val PINNED_AGENT_NAMES = stringPreferencesKey("pinned_agent_names")
-        val CLIENT_MODE_ENABLED = booleanPreferencesKey("client_mode_enabled")
-        val CLIENT_MODE_BASE_URL = stringPreferencesKey("client_mode_base_url")
         // letta-mobile-h2b8: feature flag for the resume-most-recent-conversation
         // behaviour. When true, opening an agent without an explicit conversation
         // id picks the most-recent non-archived conversation for that agent.
@@ -530,10 +528,6 @@ class SettingsRepository @Inject constructor(
         prefs[Keys.ENABLE_PROJECTS] ?: false
     }
 
-    override fun observeClientModeEnabled(): Flow<Boolean> = dataStore.data.map { prefs ->
-        prefs[Keys.CLIENT_MODE_ENABLED] ?: false
-    }
-
     /**
      * letta-mobile-h2b8: feature flag governing the resume-most-recent
      * conversation behaviour. Defaults to [BuildConfig.DEBUG] so internal
@@ -550,32 +544,6 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    override suspend fun setClientModeEnabled(enabled: Boolean) {
-        dataStore.edit { prefs ->
-            prefs[Keys.CLIENT_MODE_ENABLED] = enabled
-        }
-    }
-
-    override fun observeClientModeBaseUrl(): Flow<String> = dataStore.data.map { prefs ->
-        prefs[Keys.CLIENT_MODE_BASE_URL] ?: ""
-    }
-
-    override suspend fun setClientModeBaseUrl(baseUrl: String) {
-        dataStore.edit { prefs ->
-            prefs[Keys.CLIENT_MODE_BASE_URL] = baseUrl
-        }
-    }
-
-    override fun getClientModeApiKey(): String? = secureSettingsStore.getString(CLIENT_MODE_API_KEY)
-
-    override fun setClientModeApiKey(apiKey: String?) {
-        if (apiKey.isNullOrBlank()) {
-            secureSettingsStore.remove(CLIENT_MODE_API_KEY)
-        } else {
-            secureSettingsStore.putString(CLIENT_MODE_API_KEY, apiKey)
-        }
-    }
-
     override suspend fun setEnableProjects(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[Keys.ENABLE_PROJECTS] = enabled
@@ -587,7 +555,6 @@ class SettingsRepository @Inject constructor(
     }
 
     companion object {
-        private const val CLIENT_MODE_API_KEY = "client_mode_api_key"
         /** Shortcuts pinned by default on first launch. */
         val DEFAULT_PINNED_SHORTCUTS = listOf(
             "CONVERSATIONS", "AGENTS", "TOOLS", "BLOCKS",
