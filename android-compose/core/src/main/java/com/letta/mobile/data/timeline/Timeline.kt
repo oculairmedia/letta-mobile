@@ -290,7 +290,7 @@ data class Timeline(
         return copy(events = newEvents)
     }
 
-    fun collapseClientModeFuzzyMatch(
+    fun collapseExternalTransportFuzzyMatch(
         confirmed: TimelineEvent.Confirmed,
         @Suppress("UNUSED_PARAMETER") windowMillis: Long = 10_000L,
     ): FuzzyCollapseResult = FuzzyCollapseResult(this, null)
