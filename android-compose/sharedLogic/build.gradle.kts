@@ -54,6 +54,7 @@ kotlin {
             dependencies {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
                 api("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
             }
         }
 

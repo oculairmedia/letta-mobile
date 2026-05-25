@@ -26,6 +26,7 @@ Koog dependencies or Koog-specific concepts to UI, repositories, or settings.
 |---|---|
 | KMP module | `:sharedLogic` exists as a KMP library and is exposed through `:core` with `api(project(":sharedLogic"))`. |
 | Shared identity types | `AgentId`, `ProjectId`, `ToolId`, and `BlockId` live in `sharedLogic/commonMain`. Room converters stay in Android `:core`. |
+| Shared configuration value types | Backend selection (`LettaConfig`), theme preference enums, and model configuration DTOs (`ModelSettings`, `LlmConfig`, `EmbeddingConfig`) live in `sharedLogic/commonMain`. |
 | Runtime contracts | `BackendDescriptor`, `RuntimeEvent`, `RuntimeEventOutbox`, MemFS, AgentFile, tool/approval contracts, `TurnCommand`, and `TurnEngine` live in `sharedLogic/commonMain`. |
 | Runtime reducer | `RuntimeEventProjector` and common tests cover replay, delivery status, tool return folding, approvals, MemFS commits, and AgentFile import/export projection. |
 | In-memory shared implementations | `InMemoryRuntimeEventOutbox`, `InMemoryMemFsStore`, and `LocalLettaBackend` are portable and covered by common tests. |
