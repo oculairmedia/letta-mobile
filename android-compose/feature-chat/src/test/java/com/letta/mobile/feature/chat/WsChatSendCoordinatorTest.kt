@@ -1,7 +1,9 @@
 ﻿package com.letta.mobile.feature.chat
 
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.WsChatBridge
@@ -17,6 +19,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -311,6 +314,61 @@ class WsChatSendCoordinatorTest {
         assertEquals(100, uiState.value.promptTokens)
         assertEquals(50, uiState.value.completionTokens)
         assertEquals(150, uiState.value.totalTokens)
+    }
+
+    @Test
+    fun `message deltas before conversation id are buffered and replayed through timeline`() = runTest {
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = mockBridge(sendAccepted = true),
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = uiState,
+            clearComposerAfterSend = {},
+            activeConversationId = { null },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+        val reasoning = ReasoningMessage(id = "reason-1", reasoning = "thinking")
+        val assistant = AssistantMessage(id = "assistant-1", contentRaw = JsonPrimitive("answer"))
+
+        coordinator.handleEvent(WsTimelineEvent.MessageDelta(reasoning))
+        coordinator.handleEvent(WsTimelineEvent.MessageDelta(assistant))
+        advanceUntilIdle()
+
+        assertTrue(
+            "Pre-conversation assistant/reasoning deltas must not be rendered directly in ChatUiState.messages",
+            uiState.value.messages.isEmpty(),
+        )
+        assertTrue(
+            "Pre-conversation deltas must wait for the gateway conversation id before timeline ingestion",
+            timelineRepository.ingestedMessages.isEmpty(),
+        )
+
+        coordinator.handleEvent(
+            WsTimelineEvent.TurnStarted(
+                turnId = "turn-1",
+                agentId = "agent-1",
+                conversationId = "conv-created",
+                runId = "run-1",
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(
+                FakeTimelineExternalTransportWriter.IngestedMessage("conv-created", reasoning),
+                FakeTimelineExternalTransportWriter.IngestedMessage("conv-created", assistant),
+            ),
+            timelineRepository.ingestedMessages,
+        )
+        assertTrue(uiState.value.messages.isEmpty())
+        assertEquals(ConversationState.Ready("conv-created"), uiState.value.conversationState)
     }
 
     @Test

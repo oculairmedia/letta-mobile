@@ -1,7 +1,8 @@
 package com.letta.mobile.feature.chat
 
-import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.ChannelTransport
@@ -46,6 +47,7 @@ internal class WsChatSendCoordinator(
     // TurnDone arrives, so the "agent typing" indicator clears in sync with
     // the actual end-of-turn signal.
     @Volatile private var bufferedErrorMessage: String? = null
+    private val preConversationMessageDeltas = ArrayDeque<LettaMessage>()
     private val pendingSendLock = Any()
     private val pendingSends = ArrayDeque<PendingWsSend>()
 
@@ -289,9 +291,14 @@ internal class WsChatSendCoordinator(
                     isAgentTyping = true,
                     error = null,
                 )
+                drainPreConversationMessages(event.conversationId)
             }
             is WsTimelineEvent.MessageDelta -> {
-                val conversationId = activeWsConversationId ?: activeConversationId() ?: return
+                val conversationId = activeWsConversationId ?: activeConversationId()
+                if (conversationId == null) {
+                    preConversationMessageDeltas.addLast(event.message)
+                    return
+                }
                 timelineRepository.ingestExternalTransportMessage(conversationId, event.message)
             }
             is WsTimelineEvent.StopReason -> {
@@ -415,6 +422,7 @@ internal class WsChatSendCoordinator(
                 )
             }
             is WsTimelineEvent.Disconnected -> {
+                preConversationMessageDeltas.clear()
                 clearPendingSends("disconnect")
                 val conversationId = activeWsConversationId ?: activeConversationId()
                 if (conversationId != null) {
@@ -436,6 +444,13 @@ internal class WsChatSendCoordinator(
             isStreaming = false,
             isAgentTyping = false,
         )
+    }
+
+    private suspend fun drainPreConversationMessages(conversationId: String) {
+        while (true) {
+            val message = preConversationMessageDeltas.removeFirstOrNull() ?: return
+            timelineRepository.ingestExternalTransportMessage(conversationId, message)
+        }
     }
 
     private companion object {
