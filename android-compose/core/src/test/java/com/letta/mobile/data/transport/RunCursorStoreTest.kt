@@ -5,7 +5,9 @@ import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.maps.shouldBeEmpty
 import io.kotest.matchers.maps.shouldContainExactly
 import io.kotest.matchers.shouldBe
+import java.util.concurrent.CountDownLatch
 import org.junit.jupiter.api.Tag
+import kotlin.concurrent.thread
 
 /**
  * letta-mobile-2rkdj — defends the per-conv `{runId -> lastSeq}` map
@@ -36,6 +38,25 @@ class RunCursorStoreTest : WordSpec({
             store.record("conv-a", "run-1", 5L)
             store.record("conv-a", "run-1", 12L)
             store.activeRuns("conv-a") shouldContainExactly mapOf("run-1" to 12L)
+        }
+
+        "keep the highest cursor under concurrent writes" {
+            val store = RunCursorStore.inMemory()
+            val ready = CountDownLatch(20)
+            val start = CountDownLatch(1)
+            val writers = (1..20).map { seq ->
+                thread(start = true) {
+                    ready.countDown()
+                    start.await()
+                    store.record("conv-a", "run-1", seq.toLong())
+                }
+            }
+
+            ready.await()
+            start.countDown()
+            writers.forEach { it.join() }
+
+            store.activeRuns("conv-a") shouldContainExactly mapOf("run-1" to 20L)
         }
 
         "drop empty/zero arguments without throwing (defense in depth)" {

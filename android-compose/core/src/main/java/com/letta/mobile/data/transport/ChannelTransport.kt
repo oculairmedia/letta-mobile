@@ -182,6 +182,7 @@ class ChannelTransport internal constructor(
     private var listenerJob: Job? = null
     private var reconnectJob: Job? = null
     private var lastConnectionConfig: ConnectionConfig? = null
+    private val resumedRunConversationIds = ConcurrentHashMap<String, String>()
     private val pendingA2uiActionLock = Any()
     private val pendingA2uiActions = ArrayDeque<UserActionFrame>()
 
@@ -340,7 +341,7 @@ class ChannelTransport internal constructor(
         currentRunId.set(null)
         currentTurnId.set(null)
         currentConversationId.set(conversationId)
-        return socket.sendFrame(
+        val sent = socket.sendFrame(
             SendMessageFrame(
                 id = UUID.randomUUID().toString(),
                 ts = nowIso(),
@@ -351,6 +352,13 @@ class ChannelTransport internal constructor(
                 contentParts = contentParts,
             )
         )
+        if (!sent) {
+            inFlight = false
+            currentRunId.set(null)
+            currentTurnId.set(null)
+            currentConversationId.set(null)
+        }
+        return sent
     }
 
     /**
@@ -394,6 +402,7 @@ class ChannelTransport internal constructor(
      */
     override fun subscribe(runId: String, cursor: Long): Boolean {
         if (runId.isEmpty()) return false
+        if (cursor < 0L) return false
         val socket = socketRef.get() ?: return false
         if (state.value !is State.Connected) return false
         return socket.sendFrame(
@@ -666,7 +675,9 @@ class ChannelTransport internal constructor(
                 // (spec §4.7) — all terminal. Use the in-flight
                 // conversation id we cached on send.
                 val convId = currentConversationId.get()
+                    ?: resumedRunConversationIds[frame.runId]
                 if (convId != null) cursorStore.clear(convId, frame.runId)
+                resumedRunConversationIds.remove(frame.runId)
                 inFlight = false
                 currentRunId.set(null)
                 currentTurnId.set(null)
@@ -735,6 +746,7 @@ class ChannelTransport internal constructor(
                         cursorStore.clear(convId, frame.runId)
                     }
                 }
+                resumedRunConversationIds.remove(frame.runId)
                 Log.i(
                     TAG,
                     "subscribe_done runId=${frame.runId} lastSeq=${frame.lastSeq} status=${frame.status}",
@@ -782,8 +794,9 @@ class ChannelTransport internal constructor(
      * advance the cursor.
      *
      * conversation_id falls back to [currentConversationId] (set on
-     * [send]) because not every shim-emitted frame includes it
-     * explicitly — replayed frames especially.
+     * [send]) or the post-welcome resume subscription owner because
+     * not every shim-emitted frame includes it explicitly — replayed
+     * frames especially.
      */
     private fun recordCursorFromEnvelope(text: String) {
         val obj = runCatching { json.parseToJsonElement(text).jsonObject }.getOrNull() ?: return
@@ -793,6 +806,7 @@ class ChannelTransport internal constructor(
         val seq = obj["seq"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: return
         val convId = obj["conversation_id"]?.jsonPrimitive?.contentOrNull
             ?: currentConversationId.get()
+            ?: resumedRunConversationIds[runId]
             ?: return
         cursorStore.record(convId, runId, seq)
     }
@@ -811,9 +825,11 @@ class ChannelTransport internal constructor(
         var dispatched = 0
         snapshot.forEach { (convId, runs) ->
             runs.forEach { (runId, lastSeq) ->
+                resumedRunConversationIds[runId] = convId
                 if (subscribe(runId, lastSeq)) {
                     dispatched++
                 } else {
+                    resumedRunConversationIds.remove(runId)
                     Log.w(
                         TAG,
                         "resume subscribe failed convId=$convId runId=$runId cursor=$lastSeq " +

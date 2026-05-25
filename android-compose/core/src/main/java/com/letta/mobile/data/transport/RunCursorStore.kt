@@ -117,10 +117,16 @@ class DataStoreRunCursorStore @Inject constructor(
     override fun record(conversationId: String, runId: String, seq: Long) {
         if (conversationId.isEmpty() || runId.isEmpty() || seq <= 0L) return
         val perConv = active.getOrPut(conversationId) { ConcurrentHashMap() }
-        val prev = perConv[runId] ?: 0L
-        if (seq <= prev) return
-        perConv[runId] = seq
-        flushAsync()
+        var advanced = false
+        perConv.compute(runId) { _, existing ->
+            if (existing == null || seq > existing) {
+                advanced = true
+                seq
+            } else {
+                existing
+            }
+        }
+        if (advanced) flushAsync()
     }
 
     override fun clear(conversationId: String, runId: String) {
@@ -178,9 +184,9 @@ internal class InMemoryRunCursorStore : RunCursorStore {
     override fun record(conversationId: String, runId: String, seq: Long) {
         if (conversationId.isEmpty() || runId.isEmpty() || seq <= 0L) return
         val perConv = active.getOrPut(conversationId) { ConcurrentHashMap() }
-        val prev = perConv[runId] ?: 0L
-        if (seq <= prev) return
-        perConv[runId] = seq
+        perConv.compute(runId) { _, existing ->
+            if (existing == null || seq > existing) seq else existing
+        }
     }
 
     override fun clear(conversationId: String, runId: String) {
