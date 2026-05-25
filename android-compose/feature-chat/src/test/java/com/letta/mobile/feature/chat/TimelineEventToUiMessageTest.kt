@@ -74,7 +74,6 @@ class TimelineEventToUiMessageTest {
             sentAt = Instant.parse("2026-05-10T12:00:00Z"),
             deliveryState = DeliveryState.SENT,
             messageType = TimelineMessageType.TOOL_CALL,
-            source = MessageSource.CLIENT_MODE_HARNESS,
             toolReturnContent = "early result",
             toolReturnContentByCallId = mapOf("call-late" to "early result"),
         )
