@@ -121,19 +121,6 @@ enum class MessageSource {
     LETTA_SERVER,
 }
 
-data class FuzzyCollapseResult(
-    val timeline: Timeline,
-    val collapsed: FuzzyCollapseTrace?,
-)
-
-data class FuzzyCollapseTrace(
-    val localOtid: String,
-    val serverId: String,
-    val deltaMs: Long,
-    val contentPrefix: String,
-    val source: MessageSource,
-)
-
 /**
  * Category of a timeline event. Distinct from the data-layer [com.letta.mobile.data.model.MessageType]
  * which enumerates every server message kind — this is the subset we display as discrete bubbles.
@@ -289,11 +276,6 @@ data class Timeline(
         val newEvents = events.toMutableList().also { it[idx] = stabilized }
         return copy(events = newEvents)
     }
-
-    fun collapseClientModeFuzzyMatch(
-        confirmed: TimelineEvent.Confirmed,
-        @Suppress("UNUSED_PARAMETER") windowMillis: Long = 10_000L,
-    ): FuzzyCollapseResult = FuzzyCollapseResult(this, null)
 
     /**
      * Insert a Confirmed event at its correct ordered position.

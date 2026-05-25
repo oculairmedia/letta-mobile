@@ -167,9 +167,8 @@ open class TimelineRepository @Inject constructor(
     /**
      * Append an optimistic user bubble for a non-REST transport that supports
      * a caller-supplied otid. The admin-shim mobile WS echoes this otid back on
-     * assistant frames and stamps it to disk for reconcile, so this path uses
-     * the standard LETTA_SERVER source rather than the Client Mode fuzzy-match
-     * source.
+     * assistant frames and stamps it to disk for strict otid reconciliation,
+     * so this path uses the standard LETTA_SERVER source.
      */
     override suspend fun appendExternalTransportLocal(
         conversationId: String,
