@@ -29,6 +29,7 @@ Koog dependencies or Koog-specific concepts to UI, repositories, or settings.
 | Shared configuration value types | Backend selection (`LettaConfig`), theme preference enums, model configuration DTOs (`ModelSettings`, `LlmConfig`, `EmbeddingConfig`), and pure API/resource DTOs (`Agent`, `Block`, `Tool`, `Archive`, `Folder`, `Conversation`, project/work DTOs, MCP DTOs, model/provider/job/run/schedule/group/identity DTOs, message/tool-call DTOs, batch-message DTOs, passages, cron tasks, Vibesync events) live in `sharedLogic/commonMain`. |
 | Runtime contracts | `BackendDescriptor`, `RuntimeEvent`, `RuntimeEventOutbox`, MemFS, AgentFile, tool/approval contracts, `TurnCommand`, and `TurnEngine` live in `sharedLogic/commonMain`. |
 | Runtime reducer | `RuntimeEventProjector` and common tests cover replay, delivery status, tool return folding, approvals, MemFS commits, and AgentFile import/export projection. |
+| Shared repository contracts | Common-safe repository interfaces for agents, archives, blocks, conversations, identities, jobs, MCP servers, models, passages, projects, providers, runs, schedules, steps, tools, and Vibesync events live in `sharedLogic/commonMain`. Paging, upload/Ktor, settings-selection, inspector, and UI-message contracts remain Android-owned. |
 | In-memory shared implementations | `InMemoryRuntimeEventOutbox`, `InMemoryMemFsStore`, and `LocalLettaBackend` are portable and covered by common tests. |
 | Android persistence adapters | Android `:core` binds Room-backed `RuntimeEventOutbox` and `MemFsStore` implementations. |
 | Local backend selection | `LettaConfig.Mode.LOCAL` is selectable in Android settings, health checks skip HTTP probing for it, and `SessionGraphFactory` can create a `LocalLettaBackend` for local configs. |
@@ -51,7 +52,7 @@ Koog dependencies or Koog-specific concepts to UI, repositories, or settings.
 | Native targets | `:sharedLogic` currently validates JVM/Android paths. iOS/native targets are not yet part of the validated build. |
 | Letta DTO extraction | Remaining model files in Android `:core` are Android/UI/JVM helpers: Room converters, UI message models, app-message timeline projection model, and `LettaConfigLabel` URL parsing. Transport frames still live in Android `:core`. |
 | Timeline extraction | The timeline model and reducers still live in Android `:core`; moving them needs a common replacement for JVM-only time/UUID usage. |
-| Repository contracts | Repository interfaces still live in Android `:core`; shared contracts should move only after DTOs are portable. |
+| Repository contracts | Repository contracts are partially extracted. Remaining Android-owned contracts depend on Paging, Ktor upload/channel types, UI timeline models, or Android settings-selection helpers. |
 | App modules | No `iosApp`, `desktopApp`, or `webApp` module exists. This is expected until shared logic has enough value for another platform. |
 
 ## Extraction Pivot
