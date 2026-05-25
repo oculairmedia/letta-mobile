@@ -131,6 +131,7 @@ dependencies {
     testImplementation("io.kotest:kotest-property:5.9.1")
     testImplementation("org.robolectric:robolectric:4.16.1")
     testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("androidx.datastore:datastore-preferences:1.2.1")
     testImplementation("io.github.takahirom.roborazzi:roborazzi:1.10.0")
     testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.10.0")
     testImplementation("androidx.test:core-ktx:1.7.0")

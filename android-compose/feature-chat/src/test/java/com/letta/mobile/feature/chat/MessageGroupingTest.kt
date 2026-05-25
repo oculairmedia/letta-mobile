@@ -241,10 +241,9 @@ class MessageGroupingTest {
     }
 
     @Test
-    fun `contiguous assistants merge into one RunBlock regardless of runId`() {
+    fun `contiguous assistants from different runIds do not merge into one RunBlock`() {
         // Three contiguous assistant messages — two sharing runId "r2" and
-        // one in runId "r1" — merge into a single RunBlock keyed by the
-        // first (newest) runId encountered: "r2".
+        // one in runId "r1" — must not merge across the run boundary.
         val items = groupMessagesForRender(
             listOf(
                 assistant("a3b", runId = "r2") to GroupPosition.First,
@@ -252,20 +251,50 @@ class MessageGroupingTest {
                 assistant("a1", runId = "r1") to GroupPosition.None,
             ),
         )
-        assertEquals(1, items.size)
-        val block = items.single() as ChatRenderItem.RunBlock
+        assertEquals(2, items.size)
+        val block = items[0] as ChatRenderItem.RunBlock
         assertEquals("r2", block.runId)
         assertEquals("run-r2", block.key)
-        assertEquals(listOf("a1", "a3a", "a3b"), block.messages.map { it.first.id })
+        assertEquals(listOf("a3a", "a3b"), block.messages.map { it.first.id })
+
+        val single = items[1] as ChatRenderItem.Single
+        assertEquals("a1", single.message.id)
+        assertEquals("run-r1", single.key)
     }
 
     @Test
-    fun `non-contiguous RunBlocks with repeated leading runId get unique keys`() {
+    fun `current run block excludes prior-turn assistant messages from older runs`() {
+        // Newest-first reproduction of letta-mobile-m1fpc:
+        // current run C appears beside prior assistant messages A/B from older
+        // runs in the same conversation. The current run's block must not
+        // absorb those prior-run messages as steps.
+        val items = groupMessagesForRender(
+            listOf(
+                assistant("c-2", runId = "run-c") to GroupPosition.First,
+                assistant("c-1", runId = "run-c") to GroupPosition.Last,
+                assistant("b", runId = "run-b") to GroupPosition.None,
+                assistant("a", runId = "run-a") to GroupPosition.None,
+            ),
+        )
+
+        assertEquals(3, items.size)
+        val currentRun = items[0] as ChatRenderItem.RunBlock
+        assertEquals("run-c", currentRun.runId)
+        assertEquals(listOf("c-1", "c-2"), currentRun.messages.map { it.first.id })
+        assertTrue(!currentRun.containsMessageId("a"))
+        assertTrue(!currentRun.containsMessageId("b"))
+
+        val priorRunB = items[1] as ChatRenderItem.Single
+        val priorRunA = items[2] as ChatRenderItem.Single
+        assertEquals("b", priorRunB.message.id)
+        assertEquals("a", priorRunA.message.id)
+    }
+
+    @Test
+    fun `repeated runId singles separated by other runs keep unique keys`() {
         // Search/highlight hydration can surface two separate assistant groups
-        // whose newest message shares the same runId, while each group also
-        // contains tool/reasoning sub-runs. The groups must remain collapsed
-        // for realtime tool visibility, but their LazyColumn keys cannot both
-        // be `run-r1`.
+        // whose newest message shares the same runId, but each is separated
+        // by other runs. The Singles must keep unique message keys.
         val items = groupMessagesForRender(
             listOf(
                 assistant("new-tool", runId = "r1") to GroupPosition.First,
@@ -278,11 +307,12 @@ class MessageGroupingTest {
 
         val keys = items.map { it.key }
         assertEquals(keys.size, keys.toSet().size)
-        assertEquals("run-r1-new-tool", items[0].key)
-        assertEquals("msg-u1", items[1].key)
-        assertEquals("run-r1-old-tool", items[2].key)
-        assertTrue(items[0] is ChatRenderItem.RunBlock)
-        assertTrue(items[2] is ChatRenderItem.RunBlock)
+        assertEquals("msg-new-tool", items[0].key)
+        assertEquals("run-r2", items[1].key)
+        assertEquals("msg-u1", items[2].key)
+        assertEquals("msg-old-tool", items[3].key)
+        assertEquals("run-r3", items[4].key)
+        items.forEach { assertTrue(it is ChatRenderItem.Single) }
     }
 
     @Test
