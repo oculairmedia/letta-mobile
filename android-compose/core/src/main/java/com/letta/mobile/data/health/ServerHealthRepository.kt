@@ -32,9 +32,9 @@ import javax.inject.Singleton
  * letta-mobile-qmxn: per-config wake test for the backend pickers.
  *
  * Pings each configured backend with a short timeout and exposes the
- * result as a [Health] flag the UI can render as a green/red dot beside
+ * result as a [ServerHealthState] flag the UI can render as a green/red dot beside
  * the row in [BackendSwitcherSheet] / [ConfigListScreen]. A row that
- * comes back [Health.OFFLINE] is the picker's signal to refuse the tap
+ * comes back [ServerHealthState.OFFLINE] is the picker's signal to refuse the tap
  * (the row's own composable runs the shake-and-flash refusal animation).
  *
  * The probe is intentionally cheap and tolerant for self-hosted servers: any
@@ -66,10 +66,8 @@ class ServerHealthRepository(
     constructor(settingsRepository: SettingsRepository) :
         this(settingsRepository, defaultServerHealthScope())
 
-    enum class Health { UNKNOWN, PROBING, ONLINE, OFFLINE }
-
-    private val _states = MutableStateFlow<Map<String, Health>>(emptyMap())
-    override val states: StateFlow<Map<String, Health>> = _states.asStateFlow()
+    private val _states = MutableStateFlow<Map<String, ServerHealthState>>(emptyMap())
+    override val states: StateFlow<Map<String, ServerHealthState>> = _states.asStateFlow()
 
     private val refreshMutex = Mutex()
 
@@ -113,11 +111,17 @@ class ServerHealthRepository(
             val liveIds = configs.map { it.id }.toSet()
             _states.update { current ->
                 val pruned = current.filterKeys { it in liveIds }
-                pruned + configs.associate { it.id to Health.PROBING }
+                pruned + configs.associate { config ->
+                    config.id to if (config.mode == LettaConfig.Mode.LOCAL) {
+                        ServerHealthState.ONLINE
+                    } else {
+                        ServerHealthState.PROBING
+                    }
+                }
             }
 
             coroutineScope {
-                configs.map { config ->
+                configs.filterNot { it.mode == LettaConfig.Mode.LOCAL }.map { config ->
                     async { probe(config) }
                 }.awaitAll()
             }
@@ -146,9 +150,9 @@ class ServerHealthRepository(
         }
         val statusCode = outcome.getOrNull()?.status?.value
         val health = if (outcome.isSuccess && !config.isCloudAuthFailure(statusCode)) {
-            Health.ONLINE
+            ServerHealthState.ONLINE
         } else {
-            Health.OFFLINE
+            ServerHealthState.OFFLINE
         }
         _states.update { it + (config.id to health) }
         Telemetry.event(

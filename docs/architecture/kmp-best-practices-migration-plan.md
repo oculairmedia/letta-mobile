@@ -42,6 +42,10 @@ Primary references:
 - Cash App: [Molecule](https://github.com/cashapp/molecule)
 - Cash App: [Zipline](https://github.com/cashapp/zipline)
 - Cash App: [Redwood](https://github.com/cashapp/redwood)
+- Kotlin docs: [Kotlin/Native as an Apple framework](https://kotlinlang.org/docs/apple-framework.html)
+- Kotlin docs: [Interoperability with Swift/Objective-C](https://kotlinlang.org/docs/native-objc-interop.html)
+- Kotlin docs: [C, Objective-C, and Swift library import](https://kotlinlang.org/docs/native-lib-import-stability.html)
+- Touchlab: [SKIE](https://skie.touchlab.co/)
 
 The relevant points for this repo:
 
@@ -67,6 +71,10 @@ The relevant points for this repo:
   wholesale. SQLDelight is a strong persistence precedent, Molecule is a strong
   presenter/state precedent, Zipline is a strong host/guest runtime precedent,
   and Redwood is a heavier shared-presentation option for later evaluation.
+- iOS/Native targets should be added only after native dependency packaging,
+  exported framework shape, and Swift developer experience are explicit. Linker
+  and symbol issues are not a late cleanup item; they are part of the boundary
+  design.
 
 ## Cash App Lessons For This Project
 
@@ -168,6 +176,77 @@ Kotlin web can be productive, but it is not the architectural foundation for
 the agent runtime. If a web app is added later, it should be an app module that
 consumes `sharedLogic`, not the source of truth for runtime behavior.
 
+## Native Dependency And Swift Experience Gate
+
+The Touchlab/SKIE conversation adds an important constraint: KMP adoption can
+fail even when the shared Kotlin code is correct if the native dependency and
+Swift-facing API experience is poor.
+
+For this project, that means `iosMain` is not a checkbox to turn on after
+creating `commonMain`. Before adding iOS targets to a shared module, we need to
+answer:
+
+- what native Apple framework is exported
+- which shared modules are visible to Swift
+- which dependencies are compiled into that framework
+- whether dependencies are static, dynamic, or host-provided
+- whether any platform library requires cinterop
+- whether symbols and native libraries are resolvable from Xcode
+- whether Swift callers get usable APIs for suspend functions, Flow, sealed
+  hierarchies, enums, and inline value classes
+
+### Dependency Rules For Native Targets
+
+Do not add native dependencies to `commonMain` unless they are genuinely
+multiplatform and already proven on iOS.
+
+Use this split:
+
+```text
+commonMain:
+  contracts, serializers, reducers, state machines
+
+iosMain:
+  Apple filesystem, keychain, networking, native model/tool adapters
+
+jvmMain:
+  desktop/server filesystem, process, local runtime adapters
+
+androidMain:
+  Android storage, services, permissions, Room/DataStore bridges
+```
+
+If a native library is needed, configure it where it is consumed. Do not rely on
+transitive native linker behavior. Every cinterop/native dependency should have
+a small smoke test or sample build that proves Xcode can link the exported
+framework.
+
+### Swift API Rules
+
+The shared API should be designed for Swift as a first-class caller:
+
+- exported names should be stable and intentional
+- Swift should not need to know Android concepts
+- flows should represent event streams, not mutable storage internals
+- suspend functions should map cleanly to Swift async usage
+- sealed hierarchies and enums should be reviewed from Swift, not only Kotlin
+- inline value classes should be tested at the Swift boundary before becoming
+  public API
+
+SKIE should be evaluated before an iOS app consumes runtime APIs. It can improve
+Swift ergonomics for Flow, suspend functions, enums, sealed classes, and other
+Kotlin constructs, but it should be introduced by ADR because it changes the
+published framework experience.
+
+Native target exit criteria:
+
+- Android JVM/shared tests already pass
+- exported framework builds from Gradle
+- Xcode can import and link the framework
+- Swift smoke tests cover one suspend call and one event stream
+- SKIE adoption decision is recorded before exposing broad runtime APIs
+- no shared module exposes Android-only dependencies through the Apple framework
+
 ## Current Repo Shape
 
 Current Gradle root: `android-compose`.
@@ -177,7 +256,7 @@ Included modules:
 ```text
 :app
 :core
-:core:domain
+:sharedLogic
 :designsystem
 :feature-chat
 :feature-editagent
@@ -189,9 +268,10 @@ Included modules:
 Current characteristics:
 
 - `:app` is a full Android application module.
+- `:sharedLogic` is the first KMP library module and owns portable domain
+  identity value classes.
 - `:core`, `:designsystem`, `:feature-chat`, and `:feature-editagent` are
   Android library modules.
-- `:core:domain` is a JVM Kotlin module, not KMP.
 - Android packaging, signing, flavors, Sentry, baseline profile consumption,
   manifest placeholders, and version derivation live in `:app`.
 - Shared runtime concepts are currently still in Android modules:

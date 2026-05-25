@@ -4,6 +4,17 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.letta.mobile.runtime.BackendId
+import com.letta.mobile.runtime.ConversationId
+import com.letta.mobile.runtime.EpochMillis
+import com.letta.mobile.runtime.MemFsCommitId
+import com.letta.mobile.runtime.MemFsPath
+import com.letta.mobile.runtime.MemFsWriteCommand
+import com.letta.mobile.runtime.RuntimeEventDraft
+import com.letta.mobile.runtime.RuntimeEventId
+import com.letta.mobile.runtime.RuntimeEventPayload
+import com.letta.mobile.runtime.RuntimeEventSource
+import com.letta.mobile.runtime.RuntimeId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -191,6 +202,70 @@ class LettaDatabaseMigrationTest {
         assertEquals(789L, db.conversationDao().getRefreshState("agent-1")?.lastRefreshAtMillis)
     }
 
+    @Test
+    fun `opens current v5 database and adds runtime event outbox`() = runTest {
+        createLegacyDatabase(version = 5) { db ->
+            createAgentsTable(db)
+            createProjectBugReportsTable(db)
+            createPendingLocalMessagesTable(db)
+            createConversationTables(db)
+        }
+
+        val db = openMigratedDatabase()
+        val outbox = RoomRuntimeEventOutbox(
+            database = db,
+            eventIdFactory = { _, offset -> RuntimeEventId("migration-event-${offset.value}") },
+            clock = { EpochMillis(1_000) },
+        )
+
+        assertTrue(db.runtimeEventDao().listAfterOffset(0).isEmpty())
+        val event = outbox.append(
+            RuntimeEventDraft(
+                backendId = BackendId("backend-1"),
+                runtimeId = RuntimeId("runtime-1"),
+                conversationId = ConversationId("conversation-1"),
+                source = RuntimeEventSource.LocalUser,
+                payload = RuntimeEventPayload.LocalUserAppend(
+                    localMessageId = "local-1",
+                    text = "hello",
+                ),
+            ),
+        )
+
+        assertEquals(1L, event.offset.value)
+        assertEquals(1, db.runtimeEventDao().listAfterOffset(0).size)
+    }
+
+    @Test
+    fun `opens current v6 database and adds memfs tables`() = runTest {
+        createLegacyDatabase(version = 6) { db ->
+            createAgentsTable(db)
+            createProjectBugReportsTable(db)
+            createPendingLocalMessagesTable(db)
+            createConversationTables(db)
+            createRuntimeEventsTable(db)
+        }
+
+        val db = openMigratedDatabase()
+        val store = RoomMemFsStore(
+            database = db,
+            commitIdFactory = { _, revision, _ -> MemFsCommitId("migration-memfs-${revision.value}") },
+            clock = { EpochMillis(1_000) },
+        )
+
+        assertTrue(db.memFsDao().listCommitsAfter(0).isEmpty())
+        val commit = store.write(
+            MemFsWriteCommand(
+                path = MemFsPath("/memory/core.md"),
+                content = "name: Ada",
+            ),
+        )
+
+        assertEquals(1L, commit.revision.value)
+        assertEquals("name: Ada", store.read(MemFsPath("/memory/core.md"))?.content)
+        assertEquals(1, db.memFsDao().listCommitsAfter(0).size)
+    }
+
     private fun createLegacyDatabase(version: Int, createSchema: (SQLiteDatabase) -> Unit) {
         context.deleteDatabase(dbName)
         val db = context.openOrCreateDatabase(dbName, Context.MODE_PRIVATE, null)
@@ -262,5 +337,69 @@ class LettaDatabaseMigrationTest {
             )
             """.trimIndent(),
         )
+    }
+
+    private fun createConversationTables(db: SQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS conversations (
+                id TEXT NOT NULL,
+                agentId TEXT NOT NULL,
+                summary TEXT,
+                createdAt TEXT,
+                updatedAt TEXT,
+                lastMessageAt TEXT,
+                archived INTEGER,
+                archivedAt TEXT,
+                inContextMessageIdsJson TEXT NOT NULL,
+                isolatedBlockIdsJson TEXT NOT NULL,
+                cachedAtEpochMs INTEGER NOT NULL,
+                PRIMARY KEY(id)
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_conversations_agentId ON conversations (agentId)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_conversations_lastMessageAt ON conversations (lastMessageAt)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_conversations_createdAt ON conversations (createdAt)")
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS conversation_refresh_state (
+                agentId TEXT NOT NULL,
+                lastRefreshAtMillis INTEGER NOT NULL,
+                PRIMARY KEY(agentId)
+            )
+            """.trimIndent(),
+        )
+    }
+
+    private fun createRuntimeEventsTable(db: SQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS runtime_events (
+                eventOffset INTEGER NOT NULL,
+                eventId TEXT NOT NULL,
+                backendId TEXT NOT NULL,
+                runtimeId TEXT NOT NULL,
+                agentId TEXT,
+                conversationId TEXT,
+                runId TEXT,
+                createdAtEpochMs INTEGER NOT NULL,
+                source TEXT NOT NULL,
+                schemaVersion INTEGER NOT NULL,
+                payloadJson TEXT NOT NULL,
+                PRIMARY KEY(eventOffset)
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_runtime_events_eventId ON runtime_events (eventId)")
+        db.execSQL(
+            """
+            CREATE INDEX IF NOT EXISTS index_runtime_events_backendId_runtimeId_eventOffset
+            ON runtime_events (backendId, runtimeId, eventOffset)
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_runtime_events_conversationId ON runtime_events (conversationId)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_runtime_events_agentId ON runtime_events (agentId)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_runtime_events_runId ON runtime_events (runId)")
     }
 }

@@ -71,14 +71,23 @@ object AutomationAuthBootstrap {
         val clientModeApiKey: String? = null,
     ) {
         fun normalized(): AutomationAuthPayload {
-            val normalizedUrl = serverUrl.trim()
-                .ifBlank { throw IllegalArgumentException("serverUrl is required") }
-                .let { url ->
-                    if (url.startsWith("http://") || url.startsWith("https://")) url else "https://$url"
-                }
-                .removeSuffix("/")
-            val normalizedToken = accessToken.trim()
-                .ifBlank { throw IllegalArgumentException("accessToken is required") }
+            val normalizedMode = mode?.trim()?.uppercase()
+            val normalizedUrl = if (normalizedMode == LettaConfig.Mode.LOCAL.name) {
+                ConfigViewModel.LOCAL_RUNTIME_URL
+            } else {
+                serverUrl.trim()
+                    .ifBlank { throw IllegalArgumentException("serverUrl is required") }
+                    .let { url ->
+                        if (url.startsWith("http://") || url.startsWith("https://")) url else "https://$url"
+                    }
+                    .removeSuffix("/")
+            }
+            val normalizedToken = if (normalizedMode == LettaConfig.Mode.LOCAL.name) {
+                accessToken.trim()
+            } else {
+                accessToken.trim()
+                    .ifBlank { throw IllegalArgumentException("accessToken is required") }
+            }
             val normalizedId = configId.trim().ifBlank { DEFAULT_CONFIG_ID }
             return copy(
                 serverUrl = normalizedUrl,
@@ -91,6 +100,7 @@ object AutomationAuthBootstrap {
             val resolvedMode = when (mode?.trim()?.uppercase()) {
                 LettaConfig.Mode.CLOUD.name -> LettaConfig.Mode.CLOUD
                 LettaConfig.Mode.SELF_HOSTED.name -> LettaConfig.Mode.SELF_HOSTED
+                LettaConfig.Mode.LOCAL.name -> LettaConfig.Mode.LOCAL
                 null, "" -> if (serverUrl == ConfigViewModel.DEFAULT_CLOUD_URL) {
                     LettaConfig.Mode.CLOUD
                 } else {
@@ -102,7 +112,7 @@ object AutomationAuthBootstrap {
                 id = configId,
                 mode = resolvedMode,
                 serverUrl = serverUrl,
-                accessToken = accessToken,
+                accessToken = if (resolvedMode == LettaConfig.Mode.LOCAL) null else accessToken,
             )
         }
 

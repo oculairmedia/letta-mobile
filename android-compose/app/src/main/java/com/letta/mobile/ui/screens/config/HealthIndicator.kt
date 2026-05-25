@@ -23,7 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.data.health.ServerHealthRepository.Health
+import com.letta.mobile.data.health.ServerHealthState
 import kotlin.math.roundToInt
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -58,13 +58,13 @@ private object HealthDotColors {
 
 @Composable
 fun HealthDot(
-    health: Health,
+    health: ServerHealthState,
     modifier: Modifier = Modifier,
 ) {
     val color = when (health) {
-        Health.ONLINE -> HealthDotColors.online
-        Health.OFFLINE -> HealthDotColors.offline
-        Health.PROBING, Health.UNKNOWN -> HealthDotColors.unknown
+        ServerHealthState.ONLINE -> HealthDotColors.online
+        ServerHealthState.OFFLINE -> HealthDotColors.offline
+        ServerHealthState.PROBING, ServerHealthState.UNKNOWN -> HealthDotColors.unknown
     }
     Box(
         modifier = modifier

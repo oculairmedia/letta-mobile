@@ -275,6 +275,7 @@
     <string name="common_api_token">API Token</string>
     <string name="common_cloud">Cloud</string>
     <string name="common_self_hosted">Self-hosted</string>
+    <string name="common_local_runtime">Local</string>
     
     <string name="common_dark_theme">Dark Theme</string>
     <string name="common_light_theme">Light Theme</string>
@@ -689,6 +690,7 @@
     <string name="screen_drawer_backend_unknown">No backend configured</string>
     <string name="common_active">ACTIVE</string>
     <string name="common_letta_cloud">Letta Cloud</string>
+    <string name="common_local_kotlin_runtime">Local Kotlin runtime</string>
     <string name="screen_conversations_new_action">New Conversation</string>
     <string name="action_edit">Edit</string>
     <string name="action_rename">Rename</string>

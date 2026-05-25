@@ -6,7 +6,6 @@ import com.letta.mobile.feature.chat.ChatConversationCoordinator
 import com.letta.mobile.feature.chat.ChatRunExpansionState
 import com.letta.mobile.feature.chat.ChatSessionResolver
 import com.letta.mobile.feature.chat.ChatUiState
-import com.letta.mobile.feature.chat.ClientModeSendCoordinator
 import com.letta.mobile.feature.chat.ProjectChatContext
 import com.letta.mobile.feature.chat.ChatComposerController
 import com.letta.mobile.feature.chat.state.ChatBannerController
@@ -23,7 +22,6 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -43,7 +41,7 @@ class ChatSessionInitializerTest {
     }
 
     @Test
-    fun `client mode enable seeds project path and resolves conversation`() = runTest {
+    fun `project context bootstraps project data and resolves conversation`() = runTest {
         val projectContext = ProjectChatContext(
             identifier = "project-1",
             name = "Project 1",
@@ -52,16 +50,13 @@ class ChatSessionInitializerTest {
         val harness = Harness(
             scope = this,
             projectContext = projectContext,
-            clientModeEnabled = true,
         )
 
         harness.initializer.run()
         advanceUntilIdle()
 
-        assertTrue(harness.uiState.value.isClientModeEnabled)
-        assertEquals("/workspace/project-1", harness.uiState.value.clientModeLocation.defaultPath)
-        assertEquals(listOf(true), harness.resolveRequests)
-        assertEquals(1, harness.refreshClientModeLocationCount)
+        assertEquals(listOf(false), harness.resolveRequests)
+        assertEquals(0, harness.refreshClientModeLocationCount)
         assertEquals(1, harness.loadProjectAgentsCount)
         assertEquals(1, harness.loadProjectBriefCount)
         assertEquals(1, harness.loadRecentBugReportsCount)
@@ -82,7 +77,6 @@ class ChatSessionInitializerTest {
         harness.initializer.run()
         advanceUntilIdle()
 
-        assertEquals(null, harness.clientModeConversationId)
         assertEquals(null, harness.currentConversationTracker.current)
         coVerify(exactly = 1) {
             harness.sessionResolver.resolveMostRecentConversation("agent-1", 123L)
@@ -96,13 +90,11 @@ class ChatSessionInitializerTest {
         val isFreshRoute: Boolean = false,
         val explicitNewChat: Boolean = false,
         val projectContext: ProjectChatContext? = null,
-        clientModeEnabled: Boolean? = null,
         resumeRecentEnabled: Boolean? = null,
     ) {
         val settingsRepository: SettingsRepository = mockk(relaxed = true)
         val sessionResolver: ChatSessionResolver = mockk(relaxed = true)
         val conversationCoordinator: ChatConversationCoordinator = mockk(relaxed = true)
-        val clientModeCoordinator: ClientModeSendCoordinator = mockk(relaxed = true)
         val uiState = MutableStateFlow(ChatUiState())
         val runExpansionState = mockk<ChatRunExpansionState>(relaxed = true)
         val bannerController = ChatBannerController(uiState, ChatComposerController())
@@ -128,7 +120,6 @@ class ChatSessionInitializerTest {
             settingsRepository = settingsRepository,
             sessionResolver = sessionResolver,
             conversationCoordinator = conversationCoordinator,
-            clientModeCoordinator = clientModeCoordinator,
             runExpansionState = runExpansionState,
             currentConversationTracker = currentConversationTracker,
             bannerController = bannerController,
@@ -146,10 +137,6 @@ class ChatSessionInitializerTest {
 
         init {
             every { settingsRepository.activeConfigChanges } returns emptyFlow()
-            every { settingsRepository.observeClientModeEnabled() } returns when (clientModeEnabled) {
-                null -> emptyFlow()
-                else -> flowOf(clientModeEnabled)
-            }
             every { settingsRepository.observeResumeRecentConversation() } returns when (resumeRecentEnabled) {
                 null -> emptyFlow()
                 else -> flowOf(resumeRecentEnabled)

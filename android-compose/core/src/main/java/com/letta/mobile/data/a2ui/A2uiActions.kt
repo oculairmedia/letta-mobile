@@ -1,6 +1,5 @@
 package com.letta.mobile.data.a2ui
 
-import androidx.compose.runtime.Immutable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -9,25 +8,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
-
-@Immutable
-data class A2uiAction(
-    val name: String,
-    val surfaceId: String,
-    val context: JsonObject = JsonObject(emptyMap()),
-    val runId: String? = null,
-    val turnId: String? = null,
-    val actionId: String? = null,
-    val raw: JsonObject = buildJsonObject {
-        put("actionName", name)
-        put("name", name)
-        put("surfaceId", surfaceId)
-        put("context", context)
-        runId?.let { put("runId", it) }
-        turnId?.let { put("turnId", it) }
-        actionId?.let { put("actionId", it) }
-    },
-)
 
 fun resolveA2uiActionContext(
     context: JsonElement?,

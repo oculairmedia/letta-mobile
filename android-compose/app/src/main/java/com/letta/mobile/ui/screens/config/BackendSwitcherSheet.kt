@@ -40,7 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
-import com.letta.mobile.data.health.ServerHealthRepository
+import com.letta.mobile.data.health.ServerHealthState
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.icons.LettaIconSizing
@@ -186,7 +186,7 @@ private fun BackendSwitcherRow(
     onEdit: () -> Unit,
     onLongPress: () -> Unit,
 ) {
-    val isOffline = config.health == ServerHealthRepository.Health.OFFLINE
+    val isOffline = config.health == ServerHealthState.OFFLINE
     // letta-mobile-qmxn: tap-on-dead is silent-but-visible. Bumping
     // `refusalTrigger` re-fires the shake+flash animation in HealthRowShell
     // without switching active backends. Keyed by config.id so the counter
@@ -236,7 +236,11 @@ private fun BackendSwitcherRow(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = if (config.mode == ServerMode.CLOUD) LettaIcons.Cloud else LettaIcons.Storage,
+                    imageVector = when (config.mode) {
+                        ServerMode.CLOUD -> LettaIcons.Cloud
+                        ServerMode.SELF_HOSTED -> LettaIcons.Storage
+                        ServerMode.LOCAL -> LettaIcons.Psychology
+                    },
                     contentDescription = null,
                     modifier = Modifier.size(LettaIconSizing.Inline),
                 )
@@ -247,10 +251,10 @@ private fun BackendSwitcherRow(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
-                    text = if (config.mode == ServerMode.CLOUD) {
-                        stringResource(R.string.common_letta_cloud)
-                    } else {
-                        config.url.removePrefix("https://").removePrefix("http://")
+                    text = when (config.mode) {
+                        ServerMode.CLOUD -> stringResource(R.string.common_letta_cloud)
+                        ServerMode.SELF_HOSTED -> config.url.removePrefix("https://").removePrefix("http://")
+                        ServerMode.LOCAL -> stringResource(R.string.common_local_kotlin_runtime)
                     },
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = 1,

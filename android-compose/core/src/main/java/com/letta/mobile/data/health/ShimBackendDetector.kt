@@ -62,6 +62,10 @@ class ShimBackendDetector internal constructor(
 
     suspend fun refresh(config: LettaConfig): Boolean = probeMutex.withLock {
         _states.value[config.id]?.let { return@withLock it }
+        if (config.mode == LettaConfig.Mode.LOCAL) {
+            _states.value = _states.value + (config.id to false)
+            return@withLock false
+        }
 
         val detected = runCatching {
             val response = apiClient.getClient().get("v1/health")

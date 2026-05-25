@@ -33,12 +33,6 @@ import javax.inject.Singleton
 
 private const val DEFAULT_CHAT_BACKGROUND_KEY = "default"
 
-data class LastChatSelection(
-    val agentId: String,
-    val agentName: String? = null,
-    val conversationId: String? = null,
-)
-
 @Singleton
 class SettingsRepository @Inject constructor(
     private val dataStore: DataStore<Preferences>,
@@ -250,13 +244,15 @@ class SettingsRepository @Inject constructor(
         )
         _lastChatSelection.update { selection }
         secureSettingsStore.putString(Keys.LAST_CHAT_AGENT_ID.name, selection.agentId)
-        if (selection.agentName != null) {
-            secureSettingsStore.putString(Keys.LAST_CHAT_AGENT_NAME.name, selection.agentName)
+        val selectedAgentName = selection.agentName
+        if (selectedAgentName != null) {
+            secureSettingsStore.putString(Keys.LAST_CHAT_AGENT_NAME.name, selectedAgentName)
         } else {
             secureSettingsStore.remove(Keys.LAST_CHAT_AGENT_NAME.name)
         }
-        if (selection.conversationId != null) {
-            secureSettingsStore.putString(Keys.LAST_CHAT_CONVERSATION_ID.name, selection.conversationId)
+        val selectedConversationId = selection.conversationId
+        if (selectedConversationId != null) {
+            secureSettingsStore.putString(Keys.LAST_CHAT_CONVERSATION_ID.name, selectedConversationId)
         } else {
             secureSettingsStore.remove(Keys.LAST_CHAT_CONVERSATION_ID.name)
         }

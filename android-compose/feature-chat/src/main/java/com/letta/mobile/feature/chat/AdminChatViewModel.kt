@@ -25,9 +25,11 @@ import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.IFolderRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.feature.chat.send.ChatSendContext
 import com.letta.mobile.feature.chat.send.ChatSendStrategySelector
+import com.letta.mobile.feature.chat.send.LocalRuntimeChatSendStrategy
 import com.letta.mobile.feature.chat.send.TimelineChatSendStrategy
 import com.letta.mobile.feature.chat.send.WsChatSendStrategy
 import com.letta.mobile.feature.chat.route.ChatRouteArgs
@@ -37,6 +39,7 @@ import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsTimelineEvent
+import com.letta.mobile.runtime.RuntimeEventOutbox
 import com.letta.mobile.util.Telemetry
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.persistentListOf
@@ -75,6 +78,8 @@ internal class AdminChatViewModel @Inject constructor(
     private val folderRepository: IFolderRepository,
     private val conversationRepository: IConversationRepository,
     private val settingsRepository: ISettingsRepository,
+    private val sessionManager: SessionManager,
+    private val runtimeEventOutbox: RuntimeEventOutbox,
     private val currentConversationTracker: com.letta.mobile.data.channel.CurrentConversationTracker,
     private val notificationDeliveryCoordinator: NotificationDelivery,
     private val shimBackendDetector: ShimBackendDetector,
@@ -334,15 +339,36 @@ internal class AdminChatViewModel @Inject constructor(
             setActiveConversationId = chatConversationCoordinator::setActiveConversationId,
             startTimelineObserver = ::startTimelineObserver,
             clientVersionProvider = clientVersionProvider,
+            backendDescriptor = { sessionManager.current.backendDescriptor },
+            runtimeEventSink = { drafts ->
+                drafts.forEach { draft -> runtimeEventOutbox.append(draft) }
+            },
         )
     }
     private val wsChatSendStrategy: WsChatSendStrategy by lazy {
         WsChatSendStrategy(wsChatSendCoordinator)
     }
+    private val localRuntimeChatSendCoordinator: LocalRuntimeChatSendCoordinator by lazy {
+        LocalRuntimeChatSendCoordinator(
+            scope = viewModelScope,
+            agentId = agentId,
+            localBackend = { sessionManager.current.localRuntimeBackend },
+            timelineRepository = timelineRepository,
+            uiState = _uiState,
+            clearComposerAfterSend = { composerController.clearAfterSend() },
+            activeConversationId = { chatConversationCoordinator.activeConversationId },
+            setActiveConversationId = chatConversationCoordinator::setActiveConversationId,
+            startTimelineObserver = ::startTimelineObserver,
+        )
+    }
+    private val localRuntimeChatSendStrategy: LocalRuntimeChatSendStrategy by lazy {
+        LocalRuntimeChatSendStrategy(localRuntimeChatSendCoordinator)
+    }
     private val chatSendStrategySelector: ChatSendStrategySelector by lazy {
         ChatSendStrategySelector(
             timelineStrategy = timelineChatSendStrategy,
             wsStrategy = wsChatSendStrategy,
+            localStrategy = localRuntimeChatSendStrategy,
         )
     }
     private val chatHistoryPager: ChatHistoryPager by lazy {
@@ -686,7 +712,7 @@ internal class AdminChatViewModel @Inject constructor(
         clearA2uiThinkingOnResponse()
         val context = chatSendContext()
         viewModelScope.launch {
-            if (context.isShimBackend) {
+            if (context.isShimBackend || context.isLocalRuntime) {
                 chatBannerController.clearStreamingAfterInterrupt()
                 chatSendStrategySelector.cancel(context)
                 return@launch
@@ -760,6 +786,7 @@ internal class AdminChatViewModel @Inject constructor(
         isClientModeEnabled = false,
         explicitConversationId = explicitConversationId,
         isShimBackend = isShimBackend.value,
+        isLocalRuntime = sessionManager.current.localRuntimeBackend != null,
     )
 
     private fun stopTimelineObserver() {

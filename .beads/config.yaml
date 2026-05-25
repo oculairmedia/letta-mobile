@@ -55,4 +55,6 @@ no-db: true
 
 dolt.shared-server: false
 
-sync.remote: "https://doltremoteapi.dolthub.com/oulair/letta_mobile"
+# sync.remote: "https://doltremoteapi.dolthub.com/oulair/letta_mobile"
+
+federation.remote: "https://doltremoteapi.dolthub.com/oulair/letta_mobile"

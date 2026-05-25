@@ -202,7 +202,7 @@ private fun ConfigContent(
                                 HapticEffects.segmentTick(haptic, view, enabled = state.mode != ServerMode.CLOUD)
                                 onModeChange(ServerMode.CLOUD)
                             },
-                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
                             label = { Text(stringResource(R.string.common_cloud)) },
                         )
                         SegmentedButton(
@@ -211,8 +211,17 @@ private fun ConfigContent(
                                 HapticEffects.segmentTick(haptic, view, enabled = state.mode != ServerMode.SELF_HOSTED)
                                 onModeChange(ServerMode.SELF_HOSTED)
                             },
-                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
                             label = { Text(stringResource(R.string.common_self_hosted)) },
+                        )
+                        SegmentedButton(
+                            selected = state.mode == ServerMode.LOCAL,
+                            onClick = {
+                                HapticEffects.segmentTick(haptic, view, enabled = state.mode != ServerMode.LOCAL)
+                                onModeChange(ServerMode.LOCAL)
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
+                            label = { Text(stringResource(R.string.common_local_runtime)) },
                         )
                     }
                 },
@@ -220,39 +229,46 @@ private fun ConfigContent(
             item(
                 headlineContent = {
                     val isCloud = state.mode == ServerMode.CLOUD
+                    val isLocal = state.mode == ServerMode.LOCAL
                     OutlinedTextField(
-                        value = if (isCloud) ConfigViewModel.DEFAULT_CLOUD_URL else state.serverUrl,
+                        value = when {
+                            isCloud -> ConfigViewModel.DEFAULT_CLOUD_URL
+                            isLocal -> ConfigViewModel.LOCAL_RUNTIME_URL
+                            else -> state.serverUrl
+                        },
                         onValueChange = onServerUrlChange,
                         label = { Text(stringResource(R.string.common_server_url)) },
                         placeholder = { Text(stringResource(R.string.screen_config_server_url_placeholder)) },
                         modifier = Modifier.fillMaxWidth(),
                         leadingIcon = { Icon(LettaIcons.Link, null) },
-                        readOnly = isCloud,
-                        enabled = !isCloud,
+                        readOnly = isCloud || isLocal,
+                        enabled = !isCloud && !isLocal,
                     )
                 },
             )
-            item(
-                headlineContent = {
-                    var tokenVisible by remember { mutableStateOf(false) }
-                    OutlinedTextField(
-                        value = state.apiToken,
-                        onValueChange = onApiTokenChange,
-                        label = { Text(stringResource(R.string.common_api_token)) },
-                        visualTransformation = if (tokenVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth(),
-                        leadingIcon = { Icon(LettaIcons.Key, null) },
-                        trailingIcon = {
-                            IconButton(onClick = { tokenVisible = !tokenVisible }) {
-                                Icon(
-                                    imageVector = if (tokenVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                    contentDescription = if (tokenVisible) "Hide token" else "Show token",
-                                )
-                            }
-                        },
-                    )
-                },
-            )
+            if (state.mode != ServerMode.LOCAL) {
+                item(
+                    headlineContent = {
+                        var tokenVisible by remember { mutableStateOf(false) }
+                        OutlinedTextField(
+                            value = state.apiToken,
+                            onValueChange = onApiTokenChange,
+                            label = { Text(stringResource(R.string.common_api_token)) },
+                            visualTransformation = if (tokenVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth(),
+                            leadingIcon = { Icon(LettaIcons.Key, null) },
+                            trailingIcon = {
+                                IconButton(onClick = { tokenVisible = !tokenVisible }) {
+                                    Icon(
+                                        imageVector = if (tokenVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                        contentDescription = if (tokenVisible) "Hide token" else "Show token",
+                                    )
+                                }
+                            },
+                        )
+                    },
+                )
+            }
         }
 
         CardGroup(title = { Text(stringResource(R.string.screen_config_appearance_section)) }) {

@@ -3,7 +3,7 @@ package com.letta.mobile.data.model
 import androidx.room.TypeConverter
 
 /**
- * Room converters for domain identity value classes supplied by :core:domain.
+ * Room converters for domain identity value classes supplied by :sharedLogic.
  */
 class DomainIdConverters {
     @TypeConverter

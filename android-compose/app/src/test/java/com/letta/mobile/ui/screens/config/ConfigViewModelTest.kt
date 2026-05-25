@@ -113,6 +113,28 @@ class ConfigViewModelTest {
     }
 
     @Test
+    fun loadConfig_withExistingLocalConfig_mapsModeUrlAndClearsToken() = runTest {
+        val config = LettaConfig(
+            id = "config-local",
+            mode = LettaConfig.Mode.LOCAL,
+            serverUrl = ConfigViewModel.LOCAL_RUNTIME_URL,
+            accessToken = null,
+        )
+        fakeRepository.activeConfigState.value = config
+
+        viewModel.loadConfig()
+
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertTrue(state is UiState.Success)
+            val successState = (state as UiState.Success).data
+            assertEquals(ServerMode.LOCAL, successState.mode)
+            assertEquals(ConfigViewModel.LOCAL_RUNTIME_URL, successState.serverUrl)
+            assertEquals("", successState.apiToken)
+        }
+    }
+
+    @Test
     fun loadConfig_withConfigWithoutToken_mapsToEmptyString() = runTest {
         val config = LettaConfig(
             id = "config-3",
@@ -171,6 +193,31 @@ class ConfigViewModelTest {
         assertEquals(LettaConfig.Mode.SELF_HOSTED, savedConfig?.mode)
         assertEquals("http://192.168.1.100:8080", savedConfig?.serverUrl)
         assertEquals("local-token", savedConfig?.accessToken)
+        assertTrue(onSuccessCalled)
+    }
+
+    @Test
+    fun saveConfig_buildsLettaConfigFromFormState_withLocalMode() = runTest {
+        fakeRepository.activeConfigState.value = null
+        fakeValidator.result = CloudConnectionValidationResult.Failed("local should not validate cloud")
+        viewModel.loadConfig()
+
+        viewModel.updateMode(ServerMode.LOCAL)
+        viewModel.updateApiToken("ignored-local-token")
+
+        var onSuccessCalled = false
+        var errorMessage: String? = null
+        viewModel.saveConfig(
+            onSuccess = { onSuccessCalled = true },
+            onError = { errorMessage = it },
+        )
+
+        val savedConfig = fakeRepository.activeConfig.value
+        assertEquals(LettaConfig.Mode.LOCAL, savedConfig?.mode)
+        assertEquals(ConfigViewModel.LOCAL_RUNTIME_URL, savedConfig?.serverUrl)
+        assertEquals(null, savedConfig?.accessToken)
+        assertEquals(0, fakeValidator.calls)
+        assertEquals(null, errorMessage)
         assertTrue(onSuccessCalled)
     }
 
@@ -266,6 +313,14 @@ class ConfigViewModelTest {
         viewModel.updateMode(ServerMode.CLOUD)
         successState = (viewModel.uiState.value as UiState.Success).data
         assertEquals(ConfigViewModel.DEFAULT_CLOUD_URL, successState.serverUrl)
+
+        viewModel.updateMode(ServerMode.SELF_HOSTED)
+        successState = (viewModel.uiState.value as UiState.Success).data
+        assertEquals("", successState.serverUrl)
+
+        viewModel.updateMode(ServerMode.LOCAL)
+        successState = (viewModel.uiState.value as UiState.Success).data
+        assertEquals(ConfigViewModel.LOCAL_RUNTIME_URL, successState.serverUrl)
 
         viewModel.updateMode(ServerMode.SELF_HOSTED)
         successState = (viewModel.uiState.value as UiState.Success).data
@@ -385,9 +440,14 @@ class ConfigViewModelTest {
     private class FakeCloudConnectionValidator(
         var result: CloudConnectionValidationResult = CloudConnectionValidationResult.Success,
     ) : CloudConnectionValidator() {
+        var calls: Int = 0
+
         override suspend fun validate(
             baseUrl: String,
             apiToken: String,
-        ): CloudConnectionValidationResult = result
+        ): CloudConnectionValidationResult {
+            calls++
+            return result
+        }
     }
 }

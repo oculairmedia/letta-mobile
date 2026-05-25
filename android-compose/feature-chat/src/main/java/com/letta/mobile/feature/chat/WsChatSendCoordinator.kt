@@ -1,13 +1,18 @@
 package com.letta.mobile.feature.chat
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.repository.api.IConversationRepository
+import com.letta.mobile.data.runtime.toRuntimeEventDrafts
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsTimelineEvent
+import com.letta.mobile.runtime.BackendDescriptor
+import com.letta.mobile.runtime.ConversationId
+import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -33,6 +38,8 @@ internal class WsChatSendCoordinator(
     private val setActiveConversationId: (String) -> Unit,
     private val startTimelineObserver: (String) -> Unit,
     private val clientVersionProvider: ChatClientVersionProvider,
+    private val backendDescriptor: () -> BackendDescriptor? = { null },
+    private val runtimeEventSink: suspend (List<RuntimeEventDraft>) -> Unit = {},
 ) {
     @Volatile private var activeWsConversationId: String? = null
     @Volatile private var activeWsOtid: String? = null
@@ -283,6 +290,7 @@ internal class WsChatSendCoordinator(
                 stopReasonForTurn = null
                 usageRecordedForTurn = false
                 bufferedErrorMessage = null
+                recordRuntimeEvent(event)
                 setActiveConversationId(event.conversationId)
                 startTimelineObserver(event.conversationId)
                 uiState.value = uiState.value.copy(
@@ -299,9 +307,11 @@ internal class WsChatSendCoordinator(
                     preConversationMessageDeltas.addLast(event.message)
                     return
                 }
+                recordRuntimeEvent(event, conversationIdOverride = conversationId)
                 timelineRepository.ingestExternalTransportMessage(conversationId, event.message)
             }
             is WsTimelineEvent.StopReason -> {
+                recordRuntimeEvent(event)
                 // lcp-cv3 §end-of-turn ordering: stop_reason is first-wins on
                 // the shim. Defensive guard — log duplicates rather than overwrite.
                 val previous = stopReasonForTurn
@@ -323,6 +333,7 @@ internal class WsChatSendCoordinator(
                 }
             }
             is WsTimelineEvent.UsageStatistics -> {
+                recordRuntimeEvent(event)
                 // lcp-cv3 §end-of-turn ordering: usage_statistics is first-wins
                 // on the shim. Multi-step turns may produce per-step usage; the
                 // run-level record reflects the first. Drop subsequent ones.
@@ -350,6 +361,7 @@ internal class WsChatSendCoordinator(
             }
             is WsTimelineEvent.TurnDone -> {
                 val conversationId = activeWsConversationId ?: defaultShimConversationId(agentId)
+                recordRuntimeEvent(event, conversationIdOverride = conversationId)
                 if (event.lossy) {
                     Telemetry.event(
                         "AdminChatVM", "ws.turnDone.lossy",
@@ -357,14 +369,14 @@ internal class WsChatSendCoordinator(
                         "turnId" to event.turnId,
                         "runId" to event.runId,
                     )
-                }
-                activeWsOtid?.let { otid ->
-                    timelineRepository.reconcileExternalTransportSend(
-                        conversationId = conversationId,
-                        agentId = agentId,
-                        externalConversationId = defaultShimConversationId(agentId),
-                        otid = otid,
-                    )
+                    activeWsOtid?.let { otid ->
+                        timelineRepository.reconcileExternalTransportSend(
+                            conversationId = conversationId,
+                            agentId = agentId,
+                            externalConversationId = defaultShimConversationId(agentId),
+                            otid = otid,
+                        )
+                    }
                 }
                 // letta-mobile-9hcg: flip the optimistic Local user bubble
                 // from SENDING→SENT on every TurnDone. Without this, the
@@ -408,6 +420,7 @@ internal class WsChatSendCoordinator(
                 drainPendingSend()
             }
             is WsTimelineEvent.Error -> {
+                recordRuntimeEvent(event)
                 // lcp-axv: stash the error and wait for the immediately-
                 // following TurnDone to flip the UI. Surfacing the error
                 // here would race with TurnDone and could leave isStreaming
@@ -434,7 +447,7 @@ internal class WsChatSendCoordinator(
                     isAgentTyping = false,
                 )
             }
-            is WsTimelineEvent.UserActionOutcome -> Unit
+            is WsTimelineEvent.UserActionOutcome -> recordRuntimeEvent(event)
         }
     }
 
@@ -446,9 +459,30 @@ internal class WsChatSendCoordinator(
         )
     }
 
+    private suspend fun recordRuntimeEvent(
+        event: WsTimelineEvent,
+        conversationIdOverride: String? = null,
+    ) {
+        val backend = backendDescriptor() ?: return
+        val conversationId = (conversationIdOverride ?: activeWsConversationId ?: activeConversationId())
+            ?.let(::ConversationId)
+        val drafts = event.toRuntimeEventDrafts(
+            backend = backend,
+            fallbackAgentId = AgentId(agentId),
+            fallbackConversationId = conversationId,
+        )
+        if (drafts.isEmpty()) return
+        runCatching {
+            runtimeEventSink(drafts)
+        }.onFailure { error ->
+            Telemetry.error("AdminChatVM", "runtimeEvent.recordFailed", error)
+        }
+    }
+
     private suspend fun drainPreConversationMessages(conversationId: String) {
         while (true) {
             val message = preConversationMessageDeltas.removeFirstOrNull() ?: return
+            recordRuntimeEvent(WsTimelineEvent.MessageDelta(message), conversationIdOverride = conversationId)
             timelineRepository.ingestExternalTransportMessage(conversationId, message)
         }
     }

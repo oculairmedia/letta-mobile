@@ -8,17 +8,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
 
-sealed interface SseFrame {
-    data class Message(val message: LettaMessage) : SseFrame
-    data class RawEvent(
-        val event: String? = null,
-        val data: String,
-        val id: String? = null,
-    ) : SseFrame
-    data object Heartbeat : SseFrame
-    data object Done : SseFrame
-}
-
 object SseParser {
     private data class ProcessedEvent(
         val frame: SseFrame? = null,

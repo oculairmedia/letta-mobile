@@ -22,7 +22,9 @@ import java.util.UUID
 import javax.inject.Inject
 
 enum class ServerMode {
-    CLOUD, SELF_HOSTED
+    CLOUD,
+    SELF_HOSTED,
+    LOCAL,
 }
 
 @androidx.compose.runtime.Immutable
@@ -46,6 +48,7 @@ class ConfigViewModel @Inject constructor(
 
     companion object {
         const val DEFAULT_CLOUD_URL = "https://api.letta.com"
+        const val LOCAL_RUNTIME_URL = "local://device"
     }
 
     // letta-mobile-cdlk: when the route arg signals create-new mode, the
@@ -73,7 +76,7 @@ class ConfigViewModel @Inject constructor(
                 val enableProjects = settingsRepository.getEnableProjects().first()
                 val configUiState = if (activeConfig != null && !createNew) {
                     ConfigUiState(
-                        mode = if (activeConfig.mode == LettaConfig.Mode.CLOUD) ServerMode.CLOUD else ServerMode.SELF_HOSTED,
+                        mode = activeConfig.mode.toServerMode(),
                         serverUrl = activeConfig.serverUrl,
                         apiToken = activeConfig.accessToken ?: "",
                         theme = appTheme,
@@ -105,8 +108,13 @@ class ConfigViewModel @Inject constructor(
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
         val updatedUrl = when (mode) {
             ServerMode.CLOUD -> DEFAULT_CLOUD_URL
+            ServerMode.LOCAL -> LOCAL_RUNTIME_URL
             ServerMode.SELF_HOSTED ->
-                if (currentState.serverUrl == DEFAULT_CLOUD_URL) "" else currentState.serverUrl
+                if (currentState.serverUrl == DEFAULT_CLOUD_URL || currentState.serverUrl == LOCAL_RUNTIME_URL) {
+                    ""
+                } else {
+                    currentState.serverUrl
+                }
         }
         _uiState.value = UiState.Success(
             currentState.copy(mode = mode, serverUrl = updatedUrl)
@@ -165,16 +173,18 @@ class ConfigViewModel @Inject constructor(
             val state = (_uiState.value as? UiState.Success)?.data ?: return@launch
             if (state.isSaving) return@launch
             try {
-                val url = if (state.mode == ServerMode.CLOUD) {
-                    DEFAULT_CLOUD_URL
-                } else {
-                    val raw = state.serverUrl.trim()
-                    if (raw.isBlank()) {
-                        onError?.invoke("Server URL is required")
-                        return@launch
+                val url = when (state.mode) {
+                    ServerMode.CLOUD -> DEFAULT_CLOUD_URL
+                    ServerMode.LOCAL -> LOCAL_RUNTIME_URL
+                    ServerMode.SELF_HOSTED -> {
+                        val raw = state.serverUrl.trim()
+                        if (raw.isBlank()) {
+                            onError?.invoke("Server URL is required")
+                            return@launch
+                        }
+                        if (raw.startsWith("http://") || raw.startsWith("https://")) raw
+                        else "https://$raw"
                     }
-                    if (raw.startsWith("http://") || raw.startsWith("https://")) raw
-                    else "https://$raw"
                 }
                 _uiState.value = UiState.Success(state.copy(isSaving = true))
                 val apiToken = state.apiToken.trim()
@@ -202,9 +212,9 @@ class ConfigViewModel @Inject constructor(
                 val reuseId = if (createNew) null else settingsRepository.activeConfig.value?.id
                 val config = LettaConfig(
                     id = reuseId ?: UUID.randomUUID().toString(),
-                    mode = if (state.mode == ServerMode.CLOUD) LettaConfig.Mode.CLOUD else LettaConfig.Mode.SELF_HOSTED,
+                    mode = state.mode.toLettaMode(),
                     serverUrl = url,
-                    accessToken = apiToken.ifBlank { null }
+                    accessToken = if (state.mode == ServerMode.LOCAL) null else apiToken.ifBlank { null },
                 )
                 settingsRepository.saveConfig(config)
                 settingsRepository.setTheme(state.theme)
@@ -218,4 +228,16 @@ class ConfigViewModel @Inject constructor(
             }
         }
     }
+}
+
+private fun LettaConfig.Mode.toServerMode(): ServerMode = when (this) {
+    LettaConfig.Mode.CLOUD -> ServerMode.CLOUD
+    LettaConfig.Mode.SELF_HOSTED -> ServerMode.SELF_HOSTED
+    LettaConfig.Mode.LOCAL -> ServerMode.LOCAL
+}
+
+private fun ServerMode.toLettaMode(): LettaConfig.Mode = when (this) {
+    ServerMode.CLOUD -> LettaConfig.Mode.CLOUD
+    ServerMode.SELF_HOSTED -> LettaConfig.Mode.SELF_HOSTED
+    ServerMode.LOCAL -> LettaConfig.Mode.LOCAL
 }

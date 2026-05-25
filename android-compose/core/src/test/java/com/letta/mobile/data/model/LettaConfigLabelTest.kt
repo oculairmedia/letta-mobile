@@ -13,6 +13,14 @@ class LettaConfigLabelTest {
     }
 
     @Test
+    fun `local label is local kotlin runtime`() {
+        assertEquals(
+            "Local Kotlin runtime",
+            config(LettaConfig.Mode.LOCAL, "local://device").toBackendLabel(),
+        )
+    }
+
+    @Test
     fun `self hosted label removes credentials`() {
         assertEquals(
             "example.com",
