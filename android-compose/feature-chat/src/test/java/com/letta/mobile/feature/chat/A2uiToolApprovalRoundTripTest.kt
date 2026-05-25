@@ -12,6 +12,7 @@ import com.letta.mobile.data.a2ui.A2uiSurfaceManager
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.transport.ChannelTransport
+import com.letta.mobile.data.transport.RunCursorStore
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
@@ -384,7 +385,9 @@ class A2uiToolApprovalRoundTripTest {
         A2uiShimServer().also(openServers::add)
 
     private fun openTransport(): ChannelTransport =
-        ChannelTransport().also(openTransports::add)
+        // letta-mobile-2rkdj: tests don't need persisted cursors,
+        // so plug in the in-memory store implementation.
+        ChannelTransport(RunCursorStore.inMemory()).also(openTransports::add)
 }
 
 private data class AffordanceScenario(

@@ -41,6 +41,7 @@ import com.letta.mobile.data.repository.StepRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.data.repository.VibesyncEventStreamRepository
 import com.letta.mobile.data.transport.ChannelTransport
+import com.letta.mobile.data.transport.RunCursorStore
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -71,6 +72,7 @@ class SessionGraphFactory @Inject constructor(
     private val scheduleApi: ScheduleApi,
     private val stepApi: StepApi,
     private val toolApi: ToolApi,
+    private val runCursorStore: RunCursorStore,
 ) {
     private val nextId = AtomicLong(0L)
 
@@ -86,7 +88,7 @@ class SessionGraphFactory @Inject constructor(
             agentDao = agentDao,
             repositoryScope = scope,
         )
-        val channelTransport = ChannelTransport(scope)
+        val channelTransport = ChannelTransport(scope, runCursorStore)
         return SessionGraph(
             id = nextId.incrementAndGet(),
             scope = scope,
