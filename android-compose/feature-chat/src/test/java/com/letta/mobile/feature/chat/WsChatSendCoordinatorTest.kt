@@ -1,13 +1,25 @@
 ﻿package com.letta.mobile.feature.chat
 
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ReasoningMessage
+import com.letta.mobile.data.model.ToolCall
+import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsTimelineEvent
+import com.letta.mobile.runtime.BackendCapabilities
+import com.letta.mobile.runtime.BackendDescriptor
+import com.letta.mobile.runtime.BackendId
+import com.letta.mobile.runtime.BackendKind
+import com.letta.mobile.runtime.ConversationId
+import com.letta.mobile.runtime.RuntimeEventDraft
+import com.letta.mobile.runtime.RuntimeEventPayload
+import com.letta.mobile.runtime.RuntimeId
+import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.testutil.FakeTimelineExternalTransportWriter
 import io.mockk.coEvery
 import io.mockk.every
@@ -372,6 +384,64 @@ class WsChatSendCoordinatorTest {
     }
 
     @Test
+    fun `websocket lifecycle and tool events are recorded into shared runtime outbox`() = runTest {
+        val recorded = mutableListOf<RuntimeEventDraft>()
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = mockBridge(sendAccepted = true),
+            timelineRepository = FakeTimelineExternalTransportWriter(),
+            conversationRepository = stubConversationRepository(),
+            uiState = MutableStateFlow(ChatUiState(agentName = "Agent")),
+            clearComposerAfterSend = {},
+            activeConversationId = { null },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+            backendDescriptor = { backendDescriptor() },
+            runtimeEventSink = { drafts -> recorded += drafts },
+        )
+
+        coordinator.handleEvent(
+            WsTimelineEvent.TurnStarted(
+                turnId = "turn-1",
+                agentId = "agent-1",
+                conversationId = "conv-1",
+                runId = "run-1",
+            )
+        )
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                ToolCallMessage(
+                    id = "msg-tool",
+                    toolCall = ToolCall(
+                        toolCallId = "call-1",
+                        name = "bash",
+                        arguments = """{"command":"pwd"}""",
+                    ),
+                    runId = "run-1",
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(2, recorded.size)
+        assertTrue(recorded.all { it.backendId == BackendId("remote-letta:shim") })
+        assertTrue(recorded.all { it.runtimeId == RuntimeId("remote-letta:shim") })
+        assertTrue(recorded.all { it.agentId == AgentId("agent-1") })
+        assertTrue(recorded.all { it.conversationId == ConversationId("conv-1") })
+
+        val lifecycle = recorded[0].payload as RuntimeEventPayload.RunLifecycleChanged
+        assertEquals(RuntimeRunStatus.Started, lifecycle.status)
+
+        val toolCall = recorded[1].payload as RuntimeEventPayload.ToolCallObserved
+        assertEquals("call-1", toolCall.toolCallId.value)
+        assertEquals("bash", toolCall.toolName.value)
+        assertEquals("""{"command":"pwd"}""", toolCall.argumentsJson)
+    }
+
+    @Test
     fun `turn done failed surfaces an error message`() = runTest {
         val wsChatBridge = mockBridge(sendAccepted = true)
         val uiState = MutableStateFlow(ChatUiState(agentName = "Agent", isStreaming = true, isAgentTyping = true))
@@ -540,6 +610,21 @@ class WsChatSendCoordinatorTest {
             accessToken = "token",
         )
     }
+
+    private fun backendDescriptor(): BackendDescriptor = BackendDescriptor(
+        backendId = BackendId("remote-letta:shim"),
+        runtimeId = RuntimeId("remote-letta:shim"),
+        kind = BackendKind.RemoteLetta,
+        label = "localhost",
+        capabilities = BackendCapabilities(
+            supportsStreaming = true,
+            supportsMemFs = true,
+            supportsTools = true,
+            supportsApprovals = true,
+            supportsAgentFileImport = true,
+            supportsAgentFileExport = true,
+        ),
+    )
 
     /**
      * letta-mobile-vcky: WsChatSendCoordinator now mints a fresh conversation

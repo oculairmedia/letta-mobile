@@ -25,6 +25,7 @@ import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.IFolderRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.feature.chat.send.ChatSendContext
 import com.letta.mobile.feature.chat.send.ChatSendStrategySelector
@@ -37,6 +38,7 @@ import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsTimelineEvent
+import com.letta.mobile.runtime.RuntimeEventOutbox
 import com.letta.mobile.util.Telemetry
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.persistentListOf
@@ -75,6 +77,8 @@ internal class AdminChatViewModel @Inject constructor(
     private val folderRepository: IFolderRepository,
     private val conversationRepository: IConversationRepository,
     private val settingsRepository: ISettingsRepository,
+    private val sessionManager: SessionManager,
+    private val runtimeEventOutbox: RuntimeEventOutbox,
     private val currentConversationTracker: com.letta.mobile.data.channel.CurrentConversationTracker,
     private val notificationDeliveryCoordinator: NotificationDelivery,
     private val shimBackendDetector: ShimBackendDetector,
@@ -334,6 +338,10 @@ internal class AdminChatViewModel @Inject constructor(
             setActiveConversationId = chatConversationCoordinator::setActiveConversationId,
             startTimelineObserver = ::startTimelineObserver,
             clientVersionProvider = clientVersionProvider,
+            backendDescriptor = { sessionManager.current.backendDescriptor },
+            runtimeEventSink = { drafts ->
+                drafts.forEach { draft -> runtimeEventOutbox.append(draft) }
+            },
         )
     }
     private val wsChatSendStrategy: WsChatSendStrategy by lazy {
