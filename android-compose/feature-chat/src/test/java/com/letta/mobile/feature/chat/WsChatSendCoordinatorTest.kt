@@ -89,7 +89,7 @@ class WsChatSendCoordinatorTest {
     }
 
     @Test
-    fun `fresh route on connected ws pre-creates conversation before send_message`() = runTest {
+    fun `fresh route on connected ws asks shim to create conversation and adopts turn started id`() = runTest {
         val wsChatBridge = mockBridge(sendAccepted = true)
         val timelineRepository = FakeTimelineExternalTransportWriter()
         val conversationRepository = stubConversationRepository(conversationId = "conv-rest-fallback")
@@ -107,6 +107,7 @@ class WsChatSendCoordinatorTest {
             uiState = uiState,
             clearComposerAfterSend = { cleared = true },
             activeConversationId = { activeConversation },
+            isFreshRoute = true,
             setActiveConversationId = { activeConversation = it },
             startTimelineObserver = { observedConversation = it },
             clientVersionProvider = clientVersionProvider,
@@ -114,18 +115,17 @@ class WsChatSendCoordinatorTest {
 
         coordinator.send("hello").join()
 
-        coVerify(exactly = 1) { conversationRepository.createConversation("agent-1", any()) }
+        coVerify(exactly = 0) { conversationRepository.createConversation(any(), any()) }
         assertTrue(cleared)
-        assertEquals("conv-rest-fallback", activeConversation)
-        assertEquals("conv-rest-fallback", observedConversation)
-        assertEquals("conv-rest-fallback", timelineRepository.externalLocals.single().conversationId)
+        assertTrue(timelineRepository.externalLocals.isEmpty())
         verify(exactly = 1) {
             wsChatBridge.send(
                 agentId = "agent-1",
-                conversationId = "conv-rest-fallback",
+                conversationId = "",
                 text = "hello",
                 otid = any(),
                 attachments = emptyList(),
+                startNewConversation = true,
             )
         }
 
@@ -133,15 +133,16 @@ class WsChatSendCoordinatorTest {
             WsTimelineEvent.TurnStarted(
                 turnId = "turn-1",
                 agentId = "agent-1",
-                conversationId = "conv-rest-fallback",
+                conversationId = "conv-shim-created",
                 runId = "run-1",
             )
         )
         advanceUntilIdle()
 
-        assertEquals("conv-rest-fallback", activeConversation)
-        assertEquals("conv-rest-fallback", observedConversation)
-        assertEquals(ConversationState.Ready("conv-rest-fallback"), uiState.value.conversationState)
+        assertEquals("conv-shim-created", activeConversation)
+        assertEquals("conv-shim-created", observedConversation)
+        assertEquals("conv-shim-created", timelineRepository.externalLocals.single().conversationId)
+        assertEquals(ConversationState.Ready("conv-shim-created"), uiState.value.conversationState)
     }
 
     @Test

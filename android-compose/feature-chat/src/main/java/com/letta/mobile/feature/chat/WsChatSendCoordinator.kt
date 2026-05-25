@@ -35,6 +35,7 @@ internal class WsChatSendCoordinator(
     private val uiState: MutableStateFlow<ChatUiState>,
     private val clearComposerAfterSend: () -> Unit,
     private val activeConversationId: () -> String?,
+    private val isFreshRoute: Boolean = false,
     private val setActiveConversationId: (String) -> Unit,
     private val startTimelineObserver: (String) -> Unit,
     private val clientVersionProvider: ChatClientVersionProvider,
@@ -57,6 +58,7 @@ internal class WsChatSendCoordinator(
     private val preConversationMessageDeltas = ArrayDeque<LettaMessage>()
     private val pendingSendLock = Any()
     private val pendingSends = ArrayDeque<PendingWsSend>()
+    @Volatile private var pendingConversationBootstrapLocal: PendingWsSend? = null
 
     init {
         scope.launch {
@@ -86,13 +88,17 @@ internal class WsChatSendCoordinator(
         // still trips its cap we surface protocol_violation as a one-
         // shot toast via the standard Error path.
 
-        // The admin-shim WS send_message contract requires a populated
-        // conversation_id. Always mint the conversation locally before
-        // dispatching the WS frame; shim-side fresh conversation creation
-        // must not be used until both sides agree on a non-empty wire shape.
+        // letta-mobile-wdrc: when a fresh route already has a live WS,
+        // ask the shim to mint the conversation inside send_message. If
+        // the socket is not live yet, keep vcky's REST pre-create path as
+        // the compatibility fallback before connecting and sending.
         val currentConversationId = activeConversationId()
+        val startNewConversation = isFreshRoute &&
+            currentConversationId == null &&
+            wsChatBridge.state.value is ChannelTransport.State.Connected
         val conversationId = when {
             currentConversationId != null -> currentConversationId
+            startNewConversation -> NEW_CONVERSATION_PLACEHOLDER
             else -> runCatching {
                 conversationRepository.createConversation(agentId).id
             }.getOrElse { err ->
@@ -102,9 +108,11 @@ internal class WsChatSendCoordinator(
                 return@launch
             }
         }
-        activeWsConversationId = conversationId
-        setActiveConversationId(conversationId)
-        startTimelineObserver(conversationId)
+        if (!startNewConversation) {
+            activeWsConversationId = conversationId
+            setActiveConversationId(conversationId)
+            startTimelineObserver(conversationId)
+        }
 
         val connected = ensureConnected(config)
         if (!connected) {
@@ -118,8 +126,16 @@ internal class WsChatSendCoordinator(
             text = text,
             attachments = attachments,
             otid = "cm-android-${UUID.randomUUID()}",
+            startNewConversation = startNewConversation,
         )
         val accepted = dispatchPendingSend(pending, appendOptimisticLocal = true)
+        if (!accepted && startNewConversation) {
+            uiState.value = uiState.value.copy(
+                error = "WebSocket is busy; wait for the current turn to finish",
+            )
+            timer.stop("accepted" to false, "reason" to "busy_start_new")
+            return@launch
+        }
         if (!accepted && !enqueuePendingSend(pending)) {
             uiState.value = uiState.value.copy(
                 error = "WebSocket send queue is full; wait for the current turn to finish",
@@ -151,18 +167,23 @@ internal class WsChatSendCoordinator(
             text = pending.text,
             otid = pending.otid,
             attachments = pending.attachments,
+            startNewConversation = pending.startNewConversation,
         )
         if (!accepted) return false
 
         activeWsOtid = pending.otid
         activeWsConversationId = pending.conversationId.takeIf { it.isNotBlank() }
         if (appendOptimisticLocal) {
-            timelineRepository.appendExternalTransportLocal(
-                conversationId = pending.conversationId,
-                content = pending.text,
-                otid = pending.otid,
-                attachments = pending.attachments,
-            )
+            if (pending.startNewConversation) {
+                pendingConversationBootstrapLocal = pending
+            } else {
+                timelineRepository.appendExternalTransportLocal(
+                    conversationId = pending.conversationId,
+                    content = pending.text,
+                    otid = pending.otid,
+                    attachments = pending.attachments,
+                )
+            }
             clearComposerAfterSend()
         }
         uiState.value = uiState.value.copy(
@@ -239,6 +260,7 @@ internal class WsChatSendCoordinator(
     }
 
     private suspend fun clearPendingSends(reason: String) {
+        pendingConversationBootstrapLocal = null
         val dropped = synchronized(pendingSendLock) {
             val drained = mutableListOf<PendingWsSend>()
             while (true) {
@@ -296,6 +318,15 @@ internal class WsChatSendCoordinator(
                     isAgentTyping = true,
                     error = null,
                 )
+                pendingConversationBootstrapLocal?.let { pending ->
+                    timelineRepository.appendExternalTransportLocal(
+                        conversationId = event.conversationId,
+                        content = pending.text,
+                        otid = pending.otid,
+                        attachments = pending.attachments,
+                    )
+                    pendingConversationBootstrapLocal = null
+                }
                 drainPreConversationMessages(event.conversationId)
             }
             is WsTimelineEvent.MessageDelta -> {
@@ -366,14 +397,14 @@ internal class WsChatSendCoordinator(
                         "turnId" to event.turnId,
                         "runId" to event.runId,
                     )
-                    activeWsOtid?.let { otid ->
-                        timelineRepository.reconcileExternalTransportSend(
-                            conversationId = conversationId,
-                            agentId = agentId,
-                            externalConversationId = conversationId,
-                            otid = otid,
-                        )
-                    }
+                }
+                activeWsOtid?.let { otid ->
+                    timelineRepository.reconcileExternalTransportSend(
+                        conversationId = conversationId,
+                        agentId = agentId,
+                        externalConversationId = conversationId,
+                        otid = otid,
+                    )
                 }
                 // letta-mobile-9hcg: flip the optimistic Local user bubble
                 // from SENDING→SENT on every TurnDone. Without this, the
@@ -488,6 +519,7 @@ internal class WsChatSendCoordinator(
         private const val CONNECT_WAIT_MS = 1_500L
         private const val MAX_PENDING_SENDS = 10
         private const val DEQUEUE_RETRY_DELAY_MS = 50L
+        private const val NEW_CONVERSATION_PLACEHOLDER = ""
         private fun defaultShimConversationId(agentId: String): String = "conv-default-$agentId"
     }
 
@@ -496,5 +528,6 @@ internal class WsChatSendCoordinator(
         val text: String,
         val attachments: List<MessageContentPart.Image>,
         val otid: String,
+        val startNewConversation: Boolean = false,
     )
 }

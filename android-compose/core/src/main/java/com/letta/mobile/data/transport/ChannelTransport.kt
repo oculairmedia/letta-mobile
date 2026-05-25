@@ -338,12 +338,14 @@ class ChannelTransport internal constructor(
         val normalizedAgentId = agentId.trim()
         val normalizedConversationId = conversationId.trim()
         val hasPayload = text.isNotBlank() || contentParts?.isNotEmpty() == true
-        if (normalizedAgentId.isEmpty() || normalizedConversationId.isEmpty() || !hasPayload) {
+        val conversationIdAllowed = normalizedConversationId.isNotEmpty() || startNewConversation
+        if (normalizedAgentId.isEmpty() || !conversationIdAllowed || !hasPayload) {
             Log.w(
                 TAG,
                 "Rejecting malformed send_message locally: " +
                     "agentIdPresent=${normalizedAgentId.isNotEmpty()} " +
                     "conversationIdPresent=${normalizedConversationId.isNotEmpty()} " +
+                    "startNewConversation=$startNewConversation " +
                     "hasPayload=$hasPayload",
             )
             return false
@@ -354,7 +356,7 @@ class ChannelTransport internal constructor(
         inFlight = true
         currentRunId.set(null)
         currentTurnId.set(null)
-        currentConversationId.set(normalizedConversationId)
+        currentConversationId.set(normalizedConversationId.takeIf { it.isNotBlank() })
         val sent = socket.sendFrame(
             SendMessageFrame(
                 id = UUID.randomUUID().toString(),
