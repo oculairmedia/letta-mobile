@@ -117,8 +117,58 @@ Supported assertions:
 - `--assert-otid-unique`: every local optimistic id is globally unique.
 - `--assert-seq-monotonic`: reducer output and recorded run sequence numbers are
   monotonic.
+- `--assert-no-empty-bodies`: no blank UiMessage body in a run that also has a
+  non-empty UiMessage.
+- `--assert-no-prefix-orphans`: no UiMessage whose full content is a strict
+  prefix of another UiMessage in the same run.
+- `--assert-ui-message-count-per-run=N`: each run must produce exactly `N`
+  distinct UiMessages.
+- `--assert-final-status-matches=completed|cancelled|failed`: the final
+  observed run status must match the expected terminal status.
+- `--assert-no-orphan-tool-returns`: every observed tool return must have a
+  matching tool call in the same run.
 
 Use `--dump-timeline` to print the final folded timeline JSON.
+
+For incremental inspection, use one of the frame dump selectors:
+
+```powershell
+.\gradlew.bat :cli:run -PcliArgs="replay --recording recordings\conv_x.jsonl --conversation conv_x --dump-after-each-frame"
+.\gradlew.bat :cli:run -PcliArgs="replay --recording recordings\conv_x.jsonl --conversation conv_x --dump-after-frame 12"
+.\gradlew.bat :cli:run -PcliArgs="replay --recording recordings\conv_x.jsonl --conversation conv_x --dump-frames 0,12,13"
+```
+
+When a frame dump selector is active, stdout is a stable JSON array of
+per-frame snapshots and replay status lines move to stderr:
+
+```json
+[
+  {
+    "frame_index": 0,
+    "frame_type": "assistant_message",
+    "frame_id": "cm-stream-a",
+    "ingested": true,
+    "timeline": { "conversationId": "conv_x", "eventCount": 1 }
+  }
+]
+```
+
+Use `--interactive` to step through a recording and inject synthetic frames:
+
+```powershell
+.\gradlew.bat :cli:run -PcliArgs="replay --recording recordings\conv_x.jsonl --conversation conv_x --interactive"
+```
+
+Interactive commands:
+
+- `step [N]`: ingest the next recorded frame(s).
+- `dump`: print full Timeline JSON.
+- `diff`: show the first Timeline JSON change from the previous frame.
+- `inject <json>`: ingest a synthetic server frame through the same reducer
+  path.
+- `assert <name>`: run one assertion against the current state.
+- `save-fixture <path>`: write consumed and injected frames as replayable JSONL.
+- `reset`, `exit`.
 
 ### `disconnect` and `reconnect`
 

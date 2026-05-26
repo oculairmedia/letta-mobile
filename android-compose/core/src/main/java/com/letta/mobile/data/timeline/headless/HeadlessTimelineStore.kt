@@ -76,7 +76,7 @@ class HeadlessTimelineStore(
     }
 
     suspend fun dumpJson(conversationId: String, pretty: Boolean = true): String {
-        val dump = mutex.withLock { timelineLocked(conversationId).toDumpJson() }
+        val dump = dumpObject(conversationId)
         return if (pretty) {
             json.encodeToString(JsonObject.serializer(), dump)
         } else {
@@ -84,15 +84,31 @@ class HeadlessTimelineStore(
         }
     }
 
+    suspend fun dumpObject(conversationId: String): JsonObject = mutex.withLock {
+        timelineLocked(conversationId).toDumpJson()
+    }
+
     suspend fun assertTimeline(
         conversationId: String,
         assertNoDuplicateUiMessages: Boolean,
         assertOtidUnique: Boolean,
         assertSeqMonotonic: Boolean,
+    ): TimelineAssertionReport = assertTimeline(
+        conversationId = conversationId,
+        options = TimelineAssertionOptions(
+            assertNoDuplicateUiMessages = assertNoDuplicateUiMessages,
+            assertOtidUnique = assertOtidUnique,
+            assertSeqMonotonic = assertSeqMonotonic,
+        )
+    )
+
+    suspend fun assertTimeline(
+        conversationId: String,
+        options: TimelineAssertionOptions,
     ): TimelineAssertionReport = mutex.withLock {
         val timeline = timelineLocked(conversationId)
         val failures = mutableListOf<String>()
-        if (assertNoDuplicateUiMessages) {
+        if (options.assertNoDuplicateUiMessages) {
             val duplicateIds = timeline.events
                 .mapNotNull { it.uiIdentityOrNull() }
                 .groupingBy { it }
@@ -114,7 +130,7 @@ class HeadlessTimelineStore(
                 failures += "duplicate UiMessage semantic keys: ${duplicateSemanticKeys.joinToString()}"
             }
         }
-        if (assertOtidUnique) {
+        if (options.assertOtidUnique) {
             val duplicates = timeline.events
                 .map { it.otid }
                 .groupingBy { it }
@@ -126,7 +142,7 @@ class HeadlessTimelineStore(
                 failures += "duplicate otids: ${duplicates.joinToString()}"
             }
         }
-        if (assertSeqMonotonic) {
+        if (options.assertSeqMonotonic) {
             val byRun = timeline.events
                 .filterIsInstance<TimelineEvent.Confirmed>()
                 .filter { it.runId != null && it.seqId != null }
@@ -137,6 +153,15 @@ class HeadlessTimelineStore(
                     failures += "non-monotonic seq ids for run $runId: ${seqs.joinToString()}"
                 }
             }
+        }
+        if (options.assertNoEmptyBodies) {
+            failures += timeline.emptyBodyUiMessageFailures()
+        }
+        if (options.assertNoPrefixOrphans) {
+            failures += timeline.prefixOrphanFailures()
+        }
+        options.expectedUiMessageCountPerRun?.let { expected ->
+            failures += timeline.uiMessageCountFailures(expected)
         }
         TimelineAssertionReport(
             conversationId = conversationId,
@@ -208,6 +233,17 @@ data class TimelineAssertionReport(
 ) {
     val passed: Boolean get() = failures.isEmpty()
 }
+
+data class TimelineAssertionOptions(
+    val assertNoDuplicateUiMessages: Boolean = false,
+    val assertOtidUnique: Boolean = false,
+    val assertSeqMonotonic: Boolean = false,
+    val assertNoEmptyBodies: Boolean = false,
+    val assertNoPrefixOrphans: Boolean = false,
+    val expectedUiMessageCountPerRun: Int? = null,
+    val expectedFinalStatus: String? = null,
+    val assertNoOrphanToolReturns: Boolean = false,
+)
 
 private fun Timeline.toDumpJson(): JsonObject = buildJsonObject {
     put("conversationId", conversationId)
@@ -296,6 +332,56 @@ private fun TimelineEvent.uiSemanticIdentityOrNull(): String? = when (this) {
         TimelineMessageType.SYSTEM,
         TimelineMessageType.TOOL_RETURN,
         TimelineMessageType.OTHER -> null
+    }
+}
+
+private fun Timeline.emptyBodyUiMessageFailures(): List<String> {
+    val confirmedUiMessages = events
+        .filterIsInstance<TimelineEvent.Confirmed>()
+        .filter { it.uiIdentityOrNull() != null && it.runId != null }
+    val runsWithNonEmptyMessages = confirmedUiMessages
+        .filter { it.content.isNotBlank() }
+        .mapNotNull { it.runId }
+        .toSet()
+    return confirmedUiMessages
+        .filter { it.content.isBlank() && it.runId in runsWithNonEmptyMessages }
+        .map { event ->
+            "empty UiMessage body in run ${event.runId}: ${event.serverId}"
+        }
+}
+
+private fun Timeline.prefixOrphanFailures(): List<String> {
+    val byRun = events
+        .filterIsInstance<TimelineEvent.Confirmed>()
+        .filter { it.uiIdentityOrNull() != null && it.runId != null && it.content.isNotBlank() }
+        .groupBy { it.runId.orEmpty() }
+    return byRun.flatMap { (runId, runEvents) ->
+        runEvents.flatMap { candidate ->
+            runEvents
+                .filter { other ->
+                    other.serverId != candidate.serverId &&
+                        other.content.length > candidate.content.length &&
+                        other.content.startsWith(candidate.content)
+                }
+                .map { other ->
+                    "prefix orphan UiMessage in run $runId: ${candidate.serverId} is a strict prefix of ${other.serverId}"
+                }
+        }
+    }
+}
+
+private fun Timeline.uiMessageCountFailures(expected: Int): List<String> {
+    val byRun = events
+        .filterIsInstance<TimelineEvent.Confirmed>()
+        .filter { it.uiIdentityOrNull() != null && it.runId != null }
+        .groupBy { it.runId.orEmpty() }
+    return byRun.mapNotNull { (runId, runEvents) ->
+        val count = runEvents.mapNotNull { it.uiIdentityOrNull() }.distinct().size
+        if (count == expected) {
+            null
+        } else {
+            "run $runId has $count UiMessages; expected $expected"
+        }
     }
 }
 

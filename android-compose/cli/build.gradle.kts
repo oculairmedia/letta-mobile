@@ -102,6 +102,7 @@ tasks.register<JavaExec>("run") {
     )
 
     args(splitCliArgs(providers.gradleProperty("cliArgs").orElse("").get()))
+    standardInput = System.`in`
 
     outputs.upToDateWhen { false }
 }

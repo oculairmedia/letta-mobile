@@ -7,12 +7,16 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
+import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.long
 import com.letta.mobile.cli.runtime.AdminShimRecorder
 import com.letta.mobile.cli.runtime.CliRestClient
 import com.letta.mobile.cli.runtime.CliWsSession
+import com.letta.mobile.cli.runtime.ReplayInteractiveShell
+import com.letta.mobile.data.timeline.headless.HeadlessReplayDumpOptions
 import com.letta.mobile.data.timeline.headless.HeadlessTimelineReplayer
 import com.letta.mobile.data.timeline.headless.HeadlessTimelineStore
+import com.letta.mobile.data.timeline.headless.TimelineAssertionOptions
 import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.RunCursorStore
 import com.letta.mobile.data.transport.ServerFrame
@@ -143,31 +147,73 @@ internal class ReplayCommand : CliktCommand(
     private val assertNoDups by option("--assert-no-dups").flag(default = false)
     private val assertOtidUnique by option("--assert-otid-unique").flag(default = false)
     private val assertSeqMonotonic by option("--assert-seq-monotonic").flag(default = false)
+    private val assertNoEmptyBodies by option("--assert-no-empty-bodies").flag(default = false)
+    private val assertNoPrefixOrphans by option("--assert-no-prefix-orphans").flag(default = false)
+    private val assertUiMessageCountPerRun by option("--assert-ui-message-count-per-run").int()
+    private val assertFinalStatusMatches by option("--assert-final-status-matches")
+    private val assertNoOrphanToolReturns by option("--assert-no-orphan-tool-returns").flag(default = false)
     private val dumpTimeline by option("--dump-timeline").flag(default = false)
+    private val dumpAfterEachFrame by option("--dump-after-each-frame").flag(default = false)
+    private val dumpAfterFrame by option("--dump-after-frame").int()
+    private val dumpFrames by option("--dump-frames")
+    private val interactive by option("--interactive").flag(default = false)
 
     override fun run() = runBlocking {
+        val assertionOptions = TimelineAssertionOptions(
+            assertNoDuplicateUiMessages = assertNoDups,
+            assertOtidUnique = assertOtidUnique,
+            assertSeqMonotonic = assertSeqMonotonic,
+            assertNoEmptyBodies = assertNoEmptyBodies,
+            assertNoPrefixOrphans = assertNoPrefixOrphans,
+            expectedUiMessageCountPerRun = assertUiMessageCountPerRun.validatedPositiveOrNull(
+                "--assert-ui-message-count-per-run"
+            ),
+            expectedFinalStatus = assertFinalStatusMatches.validatedFinalStatusOrNull(),
+            assertNoOrphanToolReturns = assertNoOrphanToolReturns,
+        )
+        if (interactive) {
+            ReplayInteractiveShell(
+                recording = Path.of(recording),
+                conversationId = conversation,
+                defaultAssertionOptions = assertionOptions,
+            ).run()
+            return@runBlocking
+        }
+        val dumpOptions = HeadlessReplayDumpOptions(
+            dumpAfterEachFrame = dumpAfterEachFrame,
+            dumpAfterFrame = dumpAfterFrame.validatedNonNegativeOrNull("--dump-after-frame"),
+            dumpFrames = dumpFrames.parseFrameSet(),
+        )
         val result = Files.newBufferedReader(Path.of(recording)).use { reader ->
             HeadlessTimelineReplayer().replayJsonl(
                 conversationId = conversation,
                 lines = reader.lineSequence(),
-                assertNoDuplicateUiMessages = assertNoDups,
-                assertOtidUnique = assertOtidUnique,
-                assertSeqMonotonic = assertSeqMonotonic,
+                assertionOptions = assertionOptions,
+                dumpOptions = dumpOptions,
             )
         }
-        println(
+        val statusOut = if (dumpOptions.enabled) System.err else System.out
+        statusOut.println(
             "[replay] frames=${result.framesSeen} ingested=${result.messagesIngested} " +
                 "events=${result.assertionReport.eventCount}"
         )
         if (result.ignoredFrameTypes.isNotEmpty()) {
-            println("[replay] ignored=${result.ignoredFrameTypes}")
+            statusOut.println("[replay] ignored=${result.ignoredFrameTypes}")
         }
         if (!result.assertionReport.passed) {
-            result.assertionReport.failures.forEach { println("[replay] FAIL $it") }
+            result.assertionReport.failures.forEach { statusOut.println("[replay] FAIL $it") }
             throw IllegalStateException("replay assertions failed")
         }
-        println("[replay] assertions passed")
-        if (dumpTimeline) println(result.timelineJson)
+        statusOut.println("[replay] assertions passed")
+        if (dumpOptions.enabled) {
+            println(result.frameSnapshotsJson())
+            if (dumpTimeline) {
+                System.err.println("[replay] final timeline:")
+                System.err.println(result.timelineJson)
+            }
+        } else if (dumpTimeline) {
+            println(result.timelineJson)
+        }
     }
 }
 
@@ -290,4 +336,32 @@ private fun Long.validatedIntLimit(): Int {
         throw UsageError("--limit must be between 1 and ${Int.MAX_VALUE}")
     }
     return toInt()
+}
+
+private fun Int?.validatedNonNegativeOrNull(optionName: String): Int? {
+    if (this != null && this < 0) throw UsageError("$optionName must be >= 0")
+    return this
+}
+
+private fun Int?.validatedPositiveOrNull(optionName: String): Int? {
+    if (this != null && this < 1) throw UsageError("$optionName must be >= 1")
+    return this
+}
+
+private fun String?.validatedFinalStatusOrNull(): String? {
+    if (this == null) return null
+    val normalized = trim().lowercase()
+    if (normalized !in setOf("completed", "cancelled", "failed")) {
+        throw UsageError("--assert-final-status-matches must be completed, cancelled, or failed")
+    }
+    return normalized
+}
+
+private fun String?.parseFrameSet(): Set<Int> {
+    if (this.isNullOrBlank()) return emptySet()
+    return split(",").map { raw ->
+        val value = raw.trim().toIntOrNull()
+            ?: throw UsageError("--dump-frames must be a comma-separated list of frame indices")
+        value.validatedNonNegativeOrNull("--dump-frames") ?: value
+    }.toSet()
 }
