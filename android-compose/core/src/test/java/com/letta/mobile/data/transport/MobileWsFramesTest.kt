@@ -65,7 +65,23 @@ class MobileWsFramesTest : WordSpec({
             val out = frame.encodeJson(json)
             out shouldContain "\"agent_id\":\"agent-x\""
             out shouldContain "\"conversation_id\":\"conv-default-agent-x\""
+            out shouldContain "\"start_new_conversation\":false"
             out shouldContain "\"otid\":\"cm-android-abc\""
+        }
+
+        "letta-mobile-wdrc send_message — can request shim-side conversation creation" {
+            val frame = SendMessageFrame(
+                id = "fid-2-start",
+                ts = "2026-05-25T12:00:00Z",
+                agentId = "agent-x",
+                conversationId = "",
+                startNewConversation = true,
+                text = "hello",
+                otid = "cm-android-start",
+            )
+            val out = frame.encodeJson(json)
+            out shouldContain "\"conversation_id\":\"\""
+            out shouldContain "\"start_new_conversation\":true"
         }
 
         "lcp-dlj send_message — content_parts omitted when null" {

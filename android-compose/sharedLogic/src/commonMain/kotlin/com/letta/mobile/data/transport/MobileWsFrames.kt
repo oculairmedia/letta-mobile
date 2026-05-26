@@ -128,6 +128,7 @@ data class SendMessageFrame(
     override val ts: String,
     @SerialName("agent_id") val agentId: String,
     @SerialName("conversation_id") val conversationId: String,
+    @SerialName("start_new_conversation") val startNewConversation: Boolean = false,
     val text: String,
     val otid: String? = null,
     @SerialName("content_parts") val contentParts: JsonArray? = null,

@@ -31,6 +31,7 @@ interface IChannelTransport {
         text: String,
         otid: String? = null,
         contentParts: JsonArray? = null,
+        startNewConversation: Boolean = false,
     ): Boolean
 
     fun cancel(): Boolean

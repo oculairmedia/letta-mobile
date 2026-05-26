@@ -42,6 +42,7 @@ class FakeChannelTransport(
     var subscribeResult: Boolean = true
     var a2uiActionResult: A2uiActionDispatchResult = A2uiActionDispatchResult.Sent("fake-action")
 
+    val sendCalls = mutableListOf<SendCall>()
     val subscribeCalls = mutableListOf<SubscribeCall>()
 
     private val cronListResponses = mutableMapOf<CronListCall, ArrayDeque<ServerFrame.CronListResponse>>()
@@ -88,7 +89,11 @@ class FakeChannelTransport(
         text: String,
         otid: String?,
         contentParts: JsonArray?,
-    ): Boolean = sendResult
+        startNewConversation: Boolean,
+    ): Boolean {
+        sendCalls += SendCall(agentId, conversationId, text, otid, contentParts, startNewConversation)
+        return sendResult
+    }
 
     override fun cancel(): Boolean = cancelResult
 
@@ -176,6 +181,15 @@ class FakeChannelTransport(
     data class SubscribeCall(
         val runId: String,
         val cursor: Long,
+    )
+
+    data class SendCall(
+        val agentId: String,
+        val conversationId: String,
+        val text: String,
+        val otid: String?,
+        val contentParts: JsonArray?,
+        val startNewConversation: Boolean,
     )
 
     data class CronListCall(
