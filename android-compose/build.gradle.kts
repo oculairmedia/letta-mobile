@@ -50,6 +50,33 @@ subprojects {
 }
 
 // ---------------------------------------------------------------------------
+// Java 26 test runtime compatibility
+// ---------------------------------------------------------------------------
+// CI runs the Gradle unit-test tasks on Java 26. Robolectric currently brings
+// ASM 9.8 transitively, which cannot read Java 26 class files during sandbox
+// instrumentation. Keep the override scoped to the ASM module family until
+// Robolectric updates its transitive dependency.
+val java26CompatibleAsmVersion = "9.9.1"
+val java26CompatibleAsmModules = setOf(
+    "asm",
+    "asm-analysis",
+    "asm-commons",
+    "asm-tree",
+    "asm-util",
+)
+
+subprojects {
+    configurations.configureEach {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "org.ow2.asm" && requested.name in java26CompatibleAsmModules) {
+                useVersion(java26CompatibleAsmVersion)
+                because("Java 26 unit tests need ASM support for Java 26 class files.")
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Kover — aggregated code coverage reports (HTML for humans, XML for CI)
 //
 //   ./gradlew koverHtmlReport
