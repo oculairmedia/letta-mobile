@@ -13,10 +13,18 @@ class LettaConfigLabelTest {
     }
 
     @Test
-    fun `local label is local kotlin runtime`() {
+    fun `local label is local lettacode by default`() {
         assertEquals(
-            "Local Kotlin runtime",
+            "Local LettaCode",
             config(LettaConfig.Mode.LOCAL, "local://device").toBackendLabel(),
+        )
+    }
+
+    @Test
+    fun `local koog label is explicit`() {
+        assertEquals(
+            "Local Koog runtime",
+            config(LettaConfig.Mode.LOCAL, "local-koog://device").toBackendLabel(),
         )
     }
 

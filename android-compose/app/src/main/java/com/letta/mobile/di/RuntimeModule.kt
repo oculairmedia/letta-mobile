@@ -3,18 +3,22 @@ package com.letta.mobile.di
 import com.letta.mobile.data.local.LettaDatabase
 import com.letta.mobile.data.local.RoomMemFsStore
 import com.letta.mobile.data.local.RoomRuntimeEventOutbox
+import com.letta.mobile.data.session.LocalRuntimeProvider
+import com.letta.mobile.runtime.local.AndroidLettaCodeHeadlessClient
+import com.letta.mobile.runtime.local.AndroidLettaCodeRuntimeController
+import com.letta.mobile.runtime.local.LettaCodeHeadlessClient
+import com.letta.mobile.runtime.local.LettaCodeNodeBridge
+import com.letta.mobile.runtime.local.LettaCodeRuntimeController
+import com.letta.mobile.runtime.local.LocalKoogRuntimeProvider
+import com.letta.mobile.runtime.local.LocalLettaCodeRuntimeProvider
+import com.letta.mobile.runtime.local.NativeLettaCodeNodeBridge
 import com.letta.mobile.runtime.MemFsStore
-import com.letta.mobile.runtime.RuntimeEventDraft
-import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeEventOutbox
-import com.letta.mobile.runtime.RuntimeEventSource
-import com.letta.mobile.runtime.RuntimeRunStatus
-import com.letta.mobile.runtime.TurnEngine
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import kotlinx.coroutines.flow.flowOf
+import dagger.multibindings.IntoSet
 import javax.inject.Singleton
 
 @Module
@@ -32,19 +36,24 @@ object RuntimeModule {
 
     @Provides
     @Singleton
-    fun provideTurnEngine(): TurnEngine = TurnEngine { command ->
-        flowOf(
-            RuntimeEventDraft(
-                backendId = command.backendId,
-                runtimeId = command.runtimeId,
-                agentId = command.agentId,
-                conversationId = command.conversationId,
-                source = RuntimeEventSource.LocalRuntime,
-                payload = RuntimeEventPayload.RunLifecycleChanged(
-                    status = RuntimeRunStatus.Failed,
-                    reason = "Koog TurnEngine adapter is not configured yet.",
-                ),
-            )
-        )
-    }
+    fun provideLettaCodeHeadlessClient(client: AndroidLettaCodeHeadlessClient): LettaCodeHeadlessClient = client
+
+    @Provides
+    @Singleton
+    fun provideLettaCodeRuntimeController(controller: AndroidLettaCodeRuntimeController): LettaCodeRuntimeController =
+        controller
+
+    @Provides
+    @Singleton
+    fun provideLettaCodeNodeBridge(bridge: NativeLettaCodeNodeBridge): LettaCodeNodeBridge = bridge
+
+    @Provides
+    @IntoSet
+    @Singleton
+    fun provideLocalLettaCodeRuntimeProvider(provider: LocalLettaCodeRuntimeProvider): LocalRuntimeProvider = provider
+
+    @Provides
+    @IntoSet
+    @Singleton
+    fun provideLocalKoogRuntimeProvider(provider: LocalKoogRuntimeProvider): LocalRuntimeProvider = provider
 }

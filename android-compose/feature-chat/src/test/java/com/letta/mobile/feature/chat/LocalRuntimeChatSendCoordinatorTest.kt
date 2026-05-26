@@ -106,7 +106,7 @@ class LocalRuntimeChatSendCoordinatorTest {
                             source = RuntimeEventSource.LocalRuntime,
                             payload = RuntimeEventPayload.RunLifecycleChanged(
                                 status = RuntimeRunStatus.Failed,
-                                reason = "Koog TurnEngine adapter is not configured yet.",
+                                reason = "Embedded LettaCode runtime is not enabled in this build.",
                             ),
                         )
                     )
@@ -119,8 +119,8 @@ class LocalRuntimeChatSendCoordinatorTest {
         val local = timelineRepository.externalLocals.single()
         assertEquals(FakeTimelineExternalTransportWriter.LocalMarker(local.conversationId, local.otid), timelineRepository.failedLocals.single())
         val error = timelineRepository.ingestedMessages.single().message as ErrorMessage
-        assertEquals("Koog TurnEngine adapter is not configured yet.", error.text)
-        assertEquals("Koog TurnEngine adapter is not configured yet.", uiState.value.error)
+        assertEquals("Embedded LettaCode runtime is not enabled in this build.", error.text)
+        assertEquals("Embedded LettaCode runtime is not enabled in this build.", uiState.value.error)
         assertFalse(uiState.value.isStreaming)
         assertFalse(uiState.value.isAgentTyping)
     }
@@ -146,7 +146,7 @@ class LocalRuntimeChatSendCoordinatorTest {
         ).join()
 
         assertTrue(timelineRepository.externalLocals.isEmpty())
-        assertEquals("Local Kotlin runtime does not support image attachments yet", uiState.value.error)
+        assertEquals("Local runtime does not support image attachments yet", uiState.value.error)
     }
 
     private fun coordinator(
@@ -174,10 +174,10 @@ class LocalRuntimeChatSendCoordinatorTest {
         engine: TurnEngine = TurnEngine { flowOf() },
     ): LocalLettaBackend = LocalLettaBackend(
         descriptor = BackendDescriptor(
-            backendId = BackendId("local-koog:test"),
-            runtimeId = RuntimeId("local-koog:test"),
-            kind = BackendKind.LocalKoog,
-            label = "Local Koog",
+            backendId = BackendId("local-lettacode:test"),
+            runtimeId = RuntimeId("local-lettacode:test"),
+            kind = BackendKind.LocalLettaCode,
+            label = "Local LettaCode",
             capabilities = BackendCapabilities(
                 supportsStreaming = true,
                 supportsMemFs = true,

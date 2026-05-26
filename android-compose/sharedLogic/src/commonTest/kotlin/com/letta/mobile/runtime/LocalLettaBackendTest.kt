@@ -80,15 +80,31 @@ class LocalLettaBackendTest {
         assertEquals(MemFsPath("/memory/core.md"), payload.commit.path)
     }
 
+    @Test
+    fun acceptsLocalLettaCodeDescriptor() {
+        val backend = backend(
+            backendId = BackendId("local-lettacode:test"),
+            runtimeId = RuntimeId("local-lettacode:test"),
+            kind = BackendKind.LocalLettaCode,
+            label = "Local LettaCode",
+        )
+
+        assertEquals(BackendKind.LocalLettaCode, backend.descriptor.kind)
+    }
+
     private fun backend(
         engine: TurnEngine = TurnEngine { flowOf() },
         memFsStore: MemFsStore = memFsStore(),
+        backendId: BackendId = BackendId("local-koog:test"),
+        runtimeId: RuntimeId = RuntimeId("local-koog:test"),
+        kind: BackendKind = BackendKind.LocalKoog,
+        label: String = "Local Koog",
     ): LocalLettaBackend = LocalLettaBackend(
         descriptor = BackendDescriptor(
-            backendId = BackendId("local-koog:test"),
-            runtimeId = RuntimeId("local-koog:test"),
-            kind = BackendKind.LocalKoog,
-            label = "Local Koog",
+            backendId = backendId,
+            runtimeId = runtimeId,
+            kind = kind,
+            label = label,
             capabilities = BackendCapabilities(
                 supportsStreaming = true,
                 supportsMemFs = true,

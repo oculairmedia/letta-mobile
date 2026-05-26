@@ -11,7 +11,7 @@ class LocalLettaBackend(
     private val memFsStore: MemFsStore,
 ) : LettaBackend {
     init {
-        require(descriptor.kind == BackendKind.LocalKoog || descriptor.kind == BackendKind.CompatibleRuntime) {
+        require(descriptor.kind.isLocalRuntime()) {
             "LocalLettaBackend requires a local or compatible backend descriptor."
         }
     }
@@ -92,4 +92,12 @@ class LocalLettaBackend(
         conversationId = conversationId ?: command.conversationId,
         source = source,
     )
+
+    private fun BackendKind.isLocalRuntime(): Boolean = when (this) {
+        BackendKind.LocalLettaCode,
+        BackendKind.LocalKoog,
+        BackendKind.CompatibleRuntime,
+        -> true
+        BackendKind.RemoteLetta -> false
+    }
 }

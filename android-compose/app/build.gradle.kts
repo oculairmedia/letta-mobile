@@ -124,6 +124,62 @@ val computedVersionCode = computeVersionCode(computedVersionName)
 
 logger.lifecycle("[versioning] versionName=$computedVersionName versionCode=$computedVersionCode")
 
+val embeddedLettaCodeVersion = "0.26.2"
+val embeddedLettaCodeIntegrity = "sha512-J8dqAXCrQMlZNh81vTMj5q6E6iH0ZrNc8mSrWyv4h92Dq+qD4XqjC6H1f9HyX84zLIL3LcMqZk7itlDoEnHNiQ=="
+val embeddedLettaCodeNativeEnabled = providers.gradleProperty("embedLettaCodeNative")
+    .map { it.equals("true", ignoreCase = true) }
+    .orElse(false)
+val embeddedLettaCodeAssetsEnabled = providers.gradleProperty("embedLettaCodeAssets")
+    .map { it.equals("true", ignoreCase = true) }
+    .orElse(embeddedLettaCodeNativeEnabled)
+val embeddedLettaCodeAssetsDir = layout.buildDirectory.dir("generated/embedded-lettacode-assets")
+
+fun npmCommand(): String =
+    if (System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) "npm.cmd" else "npm"
+
+val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAssets") {
+    onlyIf { embeddedLettaCodeAssetsEnabled.get() }
+    outputs.dir(embeddedLettaCodeAssetsDir)
+    doLast {
+        val npmWorkDir = layout.buildDirectory.dir("embedded-lettacode/npm").get().asFile
+        val assetRoot = embeddedLettaCodeAssetsDir.get().asFile.resolve("letta-code/nodejs-project")
+        delete(npmWorkDir)
+        delete(assetRoot)
+        npmWorkDir.mkdirs()
+        assetRoot.mkdirs()
+        val npmInstall = ProcessBuilder(
+            npmCommand(),
+            "install",
+            "--ignore-scripts",
+            "--no-audit",
+            "--no-fund",
+            "--prefix",
+            npmWorkDir.absolutePath,
+            "@letta-ai/letta-code@$embeddedLettaCodeVersion",
+        )
+            .directory(projectDir)
+            .inheritIO()
+            .start()
+        check(npmInstall.waitFor() == 0) { "npm install for embedded LettaCode failed." }
+        copy {
+            from(npmWorkDir.resolve("node_modules"))
+            into(assetRoot.resolve("node_modules"))
+        }
+        assetRoot.resolve("package.json").writeText(
+            """
+            {
+              "name": "letta-mobile-embedded-lettacode",
+              "private": true,
+              "type": "module",
+              "dependencies": {
+                "@letta-ai/letta-code": "$embeddedLettaCodeVersion"
+              }
+            }
+            """.trimIndent(),
+        )
+    }
+}
+
 android {
     namespace = "com.letta.mobile"
     compileSdk = 36
@@ -149,6 +205,18 @@ android {
         resValue("string", "sentry_env", sentryEnv)
         manifestPlaceholders["SENTRY_DSN"] = sentryDsn
         manifestPlaceholders["SENTRY_ENV"] = sentryEnv
+        buildConfigField("boolean", "EMBEDDED_LETTACODE_NATIVE_ENABLED", embeddedLettaCodeNativeEnabled.get().toString())
+        buildConfigField("boolean", "EMBEDDED_LETTACODE_ASSETS_ENABLED", embeddedLettaCodeAssetsEnabled.get().toString())
+        buildConfigField("String", "EMBEDDED_LETTACODE_VERSION", "\"$embeddedLettaCodeVersion\"")
+        buildConfigField("String", "EMBEDDED_LETTACODE_INTEGRITY", "\"$embeddedLettaCodeIntegrity\"")
+
+        if (embeddedLettaCodeNativeEnabled.get()) {
+            externalNativeBuild {
+                cmake {
+                    arguments += "-DLETTACODE_LIBNODE_DIR=${projectDir.resolve("libnode").absolutePath.replace("\\", "/")}"
+                }
+            }
+        }
     }
 
     flavorDimensions += "distribution"
@@ -275,11 +343,37 @@ android {
             kotlin.directories += "src/test/java"
             kotlin.directories += "${project(":core").projectDir}/src/testFixtures/java"
         }
+        if (embeddedLettaCodeAssetsEnabled.get()) {
+            getByName("main") {
+                assets.directories.add(embeddedLettaCodeAssetsDir.get().asFile.absolutePath)
+            }
+        }
+        if (embeddedLettaCodeNativeEnabled.get()) {
+            getByName("main") {
+                jniLibs.directories.add("libnode/bin")
+            }
+        }
         // The `benchmark` buildType (macrobenchmark target) uses the same
         // no-op DebugPerformanceMonitor as release so benchmarks measure
         // the production code path, not the debug instrumentation stack.
         getByName("benchmark") {
             kotlin.directories += "src/release/java"
+        }
+    }
+
+    if (embeddedLettaCodeNativeEnabled.get()) {
+        externalNativeBuild {
+            cmake {
+                path = file("src/main/cpp/CMakeLists.txt")
+            }
+        }
+    }
+}
+
+if (embeddedLettaCodeAssetsEnabled.get()) {
+    tasks.configureEach {
+        if (name.startsWith("merge") && name.endsWith("Assets")) {
+            dependsOn(prepareEmbeddedLettaCodeAssets)
         }
     }
 }
