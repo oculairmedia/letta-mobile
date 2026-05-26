@@ -34,6 +34,7 @@ class WsFrameMapperTest : WordSpec({
             mapped.content shouldBe "pong"
             mapped.otid shouldBe "cm-android-abc"
             mapped.runId shouldBe "R"
+            mapped.date shouldBe "t"
         }
 
         "preserve toolcall- prefix on tool_call ids (spec §4.2)" {
@@ -49,6 +50,7 @@ class WsFrameMapperTest : WordSpec({
             mapped.id shouldBe "toolcall-tc-1"
             mapped.toolCall?.effectiveId shouldBe "tc-1"
             mapped.toolCall?.name shouldBe "Bash"
+            mapped.date shouldBe "t"
         }
 
         "preserve toolreturn- prefix and route stdout/stderr (spec §2.2)" {
@@ -69,6 +71,7 @@ class WsFrameMapperTest : WordSpec({
             mapped.status shouldBe "success"
             mapped.stdout shouldBe listOf("hello")
             mapped.toolReturn.funcResponse shouldBe "hello\n"
+            mapped.date shouldBe "t"
         }
 
         "map reasoning_message and propagate signature when set" {
@@ -84,6 +87,7 @@ class WsFrameMapperTest : WordSpec({
             mapped.shouldBeInstanceOf<ReasoningMessage>()
             mapped.reasoning shouldBe "thinking…"
             mapped.signature shouldBe "sig-7"
+            mapped.date shouldBe "t"
         }
 
         "return null for non-message frames so the bridge can route them elsewhere" {

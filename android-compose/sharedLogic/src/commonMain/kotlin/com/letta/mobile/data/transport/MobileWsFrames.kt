@@ -321,6 +321,7 @@ sealed interface ServerFrame {
         // catalog and is non-null only when negotiation succeeded.
         @SerialName("a2ui_negotiated") val a2uiNegotiated: Boolean = false,
         @SerialName("a2ui") val a2ui: A2uiHandshakeAck? = null,
+        @SerialName("canonical_live_transport") val canonicalLiveTransport: String? = null,
     ) : ServerFrame
 
     /**

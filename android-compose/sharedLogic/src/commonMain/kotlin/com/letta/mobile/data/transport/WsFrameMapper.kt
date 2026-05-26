@@ -35,6 +35,7 @@ object WsFrameMapper {
             // model's `contentRaw` accepts JsonElement and unwraps
             // primitive strings through extractContent.
             contentRaw = JsonPrimitive(frame.content),
+            date = frame.ts,
             runId = frame.runId,
             otid = frame.otid,
             seqId = frame.seqId,
@@ -43,6 +44,7 @@ object WsFrameMapper {
         is ServerFrame.ReasoningMessage -> ReasoningMessage(
             id = frame.id,
             reasoning = frame.reasoning,
+            date = frame.ts,
             runId = frame.runId,
             signature = frame.signature,
         )
@@ -51,6 +53,7 @@ object WsFrameMapper {
             id = frame.id,
             toolCall = frame.toolCall?.toModel(),
             toolCalls = frame.toolCalls?.map { it.toModel() },
+            date = frame.ts,
             runId = frame.runId,
         )
 
@@ -64,6 +67,7 @@ object WsFrameMapper {
             // the model's lazy `toolReturn` getter (which checks
             // `is JsonPrimitive && isString`) finds it.
             toolReturnRaw = frame.toolReturn?.let { JsonPrimitive(it) },
+            date = frame.ts,
             runId = frame.runId,
         )
 

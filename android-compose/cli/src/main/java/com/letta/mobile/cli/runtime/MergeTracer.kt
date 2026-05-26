@@ -22,15 +22,13 @@ import com.letta.mobile.data.timeline.mergeStreamText
  *
  * Branches:
  *   - INIT          first frame for this serverId
- *   - EQUAL         exact dup; no change
- *   - CUMULATIVE    incoming starts with existing; replace (server sent full snapshot)
- *   - STALE         existing starts with incoming; skip (older delta)
+ *   - EQUAL         exact duplicate; no change
+ *   - CUMULATIVE    incoming starts with existing; replace snapshot
+ *   - STALE         existing starts with incoming; skip older delta
  *   - SUFFIX_DUPLICATE existing ends with incoming; skip duplicate suffix
- *   - APPEND        unrelated; concat (delta on top of accumulated text)
- *   - GARBLE-RISK   non-empty old AND non-empty new AND new is shorter than old AND
- *                   neither prefix matches — this is the suspicious case where
- *                   we'd append a fragment that may not belong on the end. Flagged
- *                   loudly.
+ *   - APPEND        unrelated; concatenate delta
+ *   - GARBLE-RISK   non-empty old and new, new is shorter than old, and
+ *                   neither prefix matches. This is the suspicious case.
  */
 class MergeTracer(private val verbose: Boolean = true) {
 
@@ -42,15 +40,11 @@ class MergeTracer(private val verbose: Boolean = true) {
         val type = frame.messageType
         val serverId = frame.id
 
-        // Extract content. Different message types carry their text in
-        // different fields; we only really care about the streaming
-        // merge for assistant_message and reasoning_message — those are
-        // the chatty ones.
         val (incomingText, summary) = when (frame) {
             is AssistantMessage -> frame.content to "assistant"
-            is ReasoningMessage -> (frame.reasoning ?: "") to "reasoning"
+            is ReasoningMessage -> frame.reasoning.orEmpty() to "reasoning"
             is ToolCallMessage -> describeToolCall(frame) to "tool_call"
-            is ToolReturnMessage -> (runCatching { frame.toolReturn.funcResponse ?: "" }.getOrDefault("")) to "tool_return"
+            is ToolReturnMessage -> runCatching { frame.toolReturn.funcResponse }.getOrNull().orEmpty() to "tool_return"
             else -> "" to type
         }
 
@@ -73,7 +67,6 @@ class MergeTracer(private val verbose: Boolean = true) {
         }
         byServerId[serverId] = AssemblyState(
             text = mergedText,
-            messageType = type,
             summary = summary,
             frames = (prior?.frames ?: 0) + 1,
             seqId = frame.seqId,
@@ -84,7 +77,7 @@ class MergeTracer(private val verbose: Boolean = true) {
             return
         }
 
-        val flag = if (branch == "GARBLE-RISK") " ⚠️" else ""
+        val flag = if (branch == "GARBLE-RISK") " !" else ""
         println("[$frameCount] $summary  serverId=${serverId.take(12)}  branch=$branch$flag  +${incomingText.length}")
         println("    NEW: ${incomingText.take(120).debug()}")
         if (branch != "INIT") {
@@ -115,25 +108,25 @@ class MergeTracer(private val verbose: Boolean = true) {
 
     private data class AssemblyState(
         val text: String,
-        val messageType: String?,
         val summary: String,
         val frames: Int,
         val seqId: Int?,
     )
 }
 
-// Render whitespace and control chars visibly so the user can SEE if the
-// wire is sending junk like raw newlines mid-frame.
+// Render whitespace and control chars visibly so malformed wire text is obvious.
 private fun String.debug(): String = buildString {
     append('"')
     for (c in this@debug) {
-        append(when (c) {
-            '\n' -> "\\n"
-            '\r' -> "\\r"
-            '\t' -> "\\t"
-            '"' -> "\\\""
-            else -> c.toString()
-        })
+        append(
+            when (c) {
+                '\n' -> "\\n"
+                '\r' -> "\\r"
+                '\t' -> "\\t"
+                '"' -> "\\\""
+                else -> c.toString()
+            }
+        )
     }
     append('"')
 }

@@ -194,13 +194,15 @@ class MobileWsFramesTest : WordSpec({
         "spec §2.2 welcome — exposes server_id / session_id / device_id" {
             val payload = """
                 {"v":1,"type":"welcome","id":"f1","ts":"t",
-                 "server_id":"S","session_id":"sess-1","device_id":"d-1"}
+                 "server_id":"S","session_id":"sess-1","device_id":"d-1",
+                 "canonical_live_transport":"ws"}
             """.trimIndent()
             val parsed = json.decodeFromString(ServerFrameSerializer, payload)
             parsed.shouldBeInstanceOf<ServerFrame.Welcome>()
             parsed.serverId shouldBe "S"
             parsed.sessionId shouldBe "sess-1"
             parsed.deviceId shouldBe "d-1"
+            parsed.canonicalLiveTransport shouldBe "ws"
         }
 
         "letta-mobile-51xm.2 welcome — parses A2UI negotiation ack (§2.2)" {

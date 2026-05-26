@@ -1,54 +1,156 @@
 # letta-mobile-cli
 
-Headless CLI that drives the same `:core` streaming code paths the Android app uses (`SseParser`, the timeline stream text merge helper), so we can reproduce, debug, and regression-test streaming bugs without putting eyes on a device.
+Headless CLI for driving Letta Mobile transport and timeline code paths without
+using a device. It is tracked by `letta-mobile-q9t4t`.
 
-Filed for: `letta-mobile-6p4o` — SSE streaming chunks render as garbled text.
+The CLI now has two useful modes:
 
-## Build / run
+- `connect` / `send` / `record` / `replay` / `dump-timeline` exercise the
+  admin-shim mobile WebSocket and the same reducer/writer paths used by the app.
+- `stream` keeps the older direct REST/SSE tracer for low-level comparison when
+  debugging server wire frames or merge behavior.
 
-The CLI is implemented as an Android library (so it has access to `:core`'s Ktor / serialization / model classes). It's launched through a JUnit test entrypoint via a custom Gradle task:
+## Build and run
 
+The module is still an Android library because the production timeline code
+lives in `:core`, which is also Android-backed. The entrypoint is no longer a
+JUnit test: `:cli:run` is a `JavaExec` task that uses the Android unit-test
+runtime classpath only to provide Android stubs for the JVM process.
+
+```powershell
+cd android-compose
+$env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
+$env:ANDROID_HOME="$env:USERPROFILE\AppData\Local\Android\Sdk"
+.\gradlew.bat :cli:run -PcliArgs="<command> [options]"
 ```
-./gradlew :cli:run -PcliArgs="<command> [options]"
-```
 
-No args = print help.
+No args prints the short command list.
+
+## Shared options
+
+Most admin-shim commands accept:
+
+| env / flag | what |
+| --- | --- |
+| `LETTA_BASE_URL` / `--base-url` | Letta/admin-shim base URL, default `https://letta.oculair.ca` |
+| `LETTA_TOKEN` / `--token` | Bearer token |
+| `--device-id` | Device id advertised to the shim, default `letta-mobile-cli` |
+| `--client-version` | Client version advertised to the shim, default `letta-mobile-cli` |
+
+Conversation and agent commands also use:
+
+| env / flag | what |
+| --- | --- |
+| `LETTA_AGENT_ID` / `--agent` | Agent id for send/record |
+| `LETTA_CONVERSATION_ID` / `--conversation` | Conversation id for send/dump/replay/record |
 
 ## Commands
 
-### `stream` — send a message and watch every wire frame + merge
+### `connect`
 
+Open the admin-shim mobile WebSocket, print incoming frame summaries, wait for
+the welcome state, then optionally hold the connection open.
+
+```powershell
+.\gradlew.bat :cli:run -PcliArgs="connect --hold-ms 10000"
 ```
-./gradlew :cli:run -PcliArgs='stream -m "your prompt here"'
+
+The output includes the `canonical_live_transport` advertised by the welcome
+frame so transport exclusivity can be checked from scripts.
+
+### `send`
+
+Send a user message through admin-shim WS and fold the resulting frames through
+`WsChatBridge`, `ChannelTransport`, and the headless timeline store.
+
+```powershell
+.\gradlew.bat :cli:run -PcliArgs="send `"hello`" --agent agt_x --conversation conv_x --wait-for-stable --dump-timeline"
 ```
 
-Required env (or flags):
+If `--conversation` is omitted, the CLI creates one for the supplied agent via
+REST before sending.
 
-| env / flag                           | what                                              |
-| ------------------------------------ | ------------------------------------------------- |
-| `LETTA_BASE_URL` / `--base-url`      | Letta server, default `https://letta.oculair.ca`  |
-| `LETTA_TOKEN` / `--token`            | Bearer token                                      |
-| `LETTA_CONVERSATION_ID` / `--conversation` | Conversation to send into                   |
+### `dump-timeline`
 
-For each SSE frame received, prints:
-- frame index, message type, server id, merge branch (INIT / EQUAL / CUMULATIVE / STALE / APPEND / GARBLE-RISK)
-- the OLD + NEW + OUT text (with whitespace/control chars made visible)
+Fetch conversation history via REST, hydrate the headless timeline store, and
+emit stable JSON suitable for diffing.
 
-After the stream closes, prints a final per-message summary so you can verify the assembled text matches what should appear on screen.
+```powershell
+.\gradlew.bat :cli:run -PcliArgs="dump-timeline --conversation conv_x --limit 200"
+```
 
-## Bug-hunt workflow
+### `record`
 
-1. Run `./gradlew :cli:run -PcliArgs='stream -m "<the prompt that garbles in the app>"'`
-2. Look at the trace:
-   - **Wire is clean, merge is clean** → bug is downstream of merge (display layer, fuzzyCollapse, ServerEvent race in `TimelineSyncLoop`)
-   - **Wire is dirty** → bug is server / parser / transport
-   - **Wire is clean, merge is dirty** → bug is in `mergeStreamText` or the surrounding reducer state
-3. Save the trace, screenshot the device showing garbled text, byte-compare.
-4. Convert into a `TimelineSyncLoopStreamingTest` regression fixture once we have a confirmed repro.
+Capture raw admin-shim mobile WS frames as replay-compatible JSONL.
 
-## Why this design (and its caveats)
+```powershell
+.\gradlew.bat :cli:run -PcliArgs="record --conversation conv_x --out recordings\conv_x.jsonl"
+```
 
-- `:cli` is an Android library because `:core` is an Android library and pulling in `:core`'s real code from a pure-JVM module would require either fighting Gradle's variant attributes or duplicating code. The library + test-classpath trick gets us there in ~1 file.
-- The CLI lives in `src/test/` because that's the source set that gets the full Android-stub classpath when running on the JVM (provided by the unit-test setup).
-- The trade-off: we abuse JUnit-5 as our entrypoint. Output is wrapped in `CliRunnerTest > runCli() STANDARD_OUT`. Acceptable for the day-1 use case (debugging this bug). If we need pretty output later, we can swap the entrypoint to a real `application` plugin module that depends on a slimmer extracted streaming-only library.
-- The merge tracer calls the production `mergeStreamText` helper from `:core`, so CLI diagnostics and the live reducer share the same text merge branch decisions.
+To record shim replay frames for an existing run, add `--run-id` and optional
+`--cursor`:
+
+```powershell
+.\gradlew.bat :cli:run -PcliArgs="record --run-id run_x --cursor 42 --out recordings\run_x.jsonl"
+```
+
+To record a send flow, include the message and required agent/conversation:
+
+```powershell
+.\gradlew.bat :cli:run -PcliArgs="record --agent agt_x --conversation conv_x --message `"hello`" --out recordings\send.jsonl"
+```
+
+### `replay`
+
+Replay a JSONL recording through `ServerFrameSerializer`, `WsFrameMapper`, and
+the headless reducer. Assertions are opt-in so recordings can be inspected even
+when they are intentionally bad fixtures.
+
+```powershell
+.\gradlew.bat :cli:run -PcliArgs="replay --recording ..\core\src\test\resources\replay\ka770-duplicate-assistant.jsonl --conversation conv-ka770 --assert-no-dups --assert-otid-unique --assert-seq-monotonic"
+```
+
+Supported assertions:
+
+- `--assert-no-dups`: no duplicate UI ids and no duplicate semantic assistant,
+  reasoning, tool, or error messages in the same run.
+- `--assert-otid-unique`: every local optimistic id is globally unique.
+- `--assert-seq-monotonic`: reducer output and recorded run sequence numbers are
+  monotonic.
+
+Use `--dump-timeline` to print the final folded timeline JSON.
+
+### `disconnect` and `reconnect`
+
+`disconnect` verifies that the CLI can connect and close cleanly with `bye`.
+`reconnect` exercises a connect/disconnect/connect cycle, with optional run
+cursor seeding:
+
+```powershell
+.\gradlew.bat :cli:run -PcliArgs="reconnect --conversation conv_x --run-id run_x --cursor 42"
+```
+
+### `stream`
+
+Direct Letta REST/SSE tracer retained from `letta-mobile-6p4o`.
+
+```powershell
+.\gradlew.bat :cli:run -PcliArgs="stream -m `"your prompt here`""
+```
+
+For each SSE frame, it prints the message type, server id, merge branch, old
+text, new text, and output text. The tracer calls the same production
+`mergeStreamText` helper used by the live reducer, so CLI diagnostics and app
+behavior stay aligned.
+
+## Fixture workflow
+
+1. Capture a suspect mobile WS flow with `record`.
+2. Reproduce locally with `replay --dump-timeline`.
+3. Add the JSONL under `android-compose/core/src/test/resources/replay`.
+4. Add a focused replay test under
+   `android-compose/core/src/test/java/com/letta/mobile/data/timeline/headless`.
+
+The current regression seed is
+`ka770-duplicate-assistant.jsonl`, which intentionally fails
+`--assert-no-dups` to prove duplicate assistant bodies are caught.

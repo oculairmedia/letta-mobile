@@ -1,0 +1,4 @@
+{"direction":"inbound","frame":{"v":1,"type":"turn_started","id":"turn-start","ts":"2026-05-26T00:00:00Z","agent_id":"agent-1","conversation_id":"conv-ka770","turn_id":"turn-ka770","run_id":"run-ka770"}}
+{"direction":"inbound","frame":{"v":1,"type":"assistant_message","id":"cm-stream-a","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-ka770","turn_id":"turn-ka770","run_id":"run-ka770","content":"The final assistant body appears once.","seq_id":1}}
+{"direction":"inbound","frame":{"v":1,"type":"assistant_message","id":"cm-stream-b","ts":"2026-05-26T00:00:02Z","agent_id":"agent-1","conversation_id":"conv-ka770","turn_id":"turn-ka770","run_id":"run-ka770","content":"The final assistant body appears once.","seq_id":2}}
+{"direction":"inbound","frame":{"v":1,"type":"turn_done","id":"turn-done","ts":"2026-05-26T00:00:03Z","turn_id":"turn-ka770","run_id":"run-ka770","status":"completed","lossy":false,"drop_count":0}}
