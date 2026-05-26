@@ -256,7 +256,8 @@ See `gradle.properties` for IC hardening settings that reduce these failures.
 The repo defaults to `org.gradle.daemon=true` (validated by
 `letta-mobile-dbs1`: 60/60 clean runs with no IC corruption and a ~13× warm
 speedup) while keeping `org.gradle.parallel=false` and
-`org.gradle.caching=false`, because overlapped project work and cache-entry
-packing each caused reproducible Android verification failures in this
-codebase. CI reuses the Gradle daemon within each ephemeral runner so repeated
-invocations in the same job do not pay the cold-start tax.
+`org.gradle.caching=true` with a narrow main-manifest processing cache opt-out,
+because overlapped project work and broad cache-entry packing each caused
+reproducible Android verification failures in this codebase. CI reuses the
+Gradle daemon within each ephemeral runner so repeated invocations in the same
+job do not pay the cold-start tax.

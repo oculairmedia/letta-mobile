@@ -152,5 +152,20 @@ kover {
 subprojects {
     tasks.withType<Test>().configureEach {
         maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
+
+        // CI runs tests on Java 26. These flags acknowledge the reflective/native
+        // access used by current test/runtime dependencies (MockK/ByteBuddy,
+        // Conscrypt, and protobuf-backed DataStore) so warning noise does not
+        // mask real failures. Keep this conditional so local JDK 17-25 builds do
+        // not receive launcher flags they may not recognize.
+        val testJvmFeatureVersion = JavaVersion.current().majorVersion.toIntOrNull() ?: 0
+        if (testJvmFeatureVersion >= 26) {
+            jvmArgs(
+                "-Xshare:off",
+                "--enable-native-access=ALL-UNNAMED",
+                "--enable-final-field-mutation=ALL-UNNAMED",
+                "--sun-misc-unsafe-memory-access=allow",
+            )
+        }
     }
 }

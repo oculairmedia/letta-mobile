@@ -19,6 +19,12 @@ concurrency:
   group: android-apk-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Gradle's launcher JVM loads native-platform before project gradle.properties
+  # can affect the daemon. CI runs on Java 26, so acknowledge this access at the
+  # workflow boundary and keep project-level flags scoped to daemon/test workers.
+  GRADLE_OPTS: --enable-native-access=ALL-UNNAMED
+
 jobs:
   test:
     runs-on: ubuntu-latest
