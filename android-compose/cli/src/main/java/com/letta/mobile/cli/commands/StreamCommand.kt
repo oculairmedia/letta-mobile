@@ -2,10 +2,10 @@ package com.letta.mobile.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.letta.mobile.cli.runtime.MergeTracer
-import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.stream.SseParser
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -28,23 +28,11 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * `stream` — send a message into a conversation and watch the streamed
- * response chunk by chunk.
+ * Direct REST/SSE tracer retained as a low-level comparison path.
  *
- * For each frame received:
- *   1. Print the raw SSE frame (type + len + content preview)
- *   2. Apply the same merge heuristic TimelineSyncLoop uses (see
- *      MergeTracer) and print BEFORE → AFTER state
- *   3. Flag any frame that hits a non-trivial merge branch
- *
- * After [DONE] (or the connection closes), print the final assembled text.
- *
- * This is the bug-hunt's primary instrument: if wire frames are clean and
- * the inline merge produces a clean final, then the garbling Emmanuel
- * sees on device is happening downstream of the merge (display layer,
- * fuzzyCollapse, ServerEvent race). If the wire frames or inline merge
- * already produce garbage, the bug is upstream and we have a deterministic
- * repro.
+ * The admin-shim commands are the canonical mobile-path harness. This command
+ * is still useful when we need to inspect raw REST/SSE chunks or compare server
+ * wire behavior against WebSocket delivery.
  */
 class StreamCommand : CliktCommand(name = "stream") {
 
@@ -63,18 +51,19 @@ class StreamCommand : CliktCommand(name = "stream") {
     private val conversationId by option(
         "--conversation",
         envvar = "LETTA_CONVERSATION_ID",
-        help = "Conversation ID to send into. Streaming uses POST /v1/conversations/{id}/messages — same endpoint the app uses."
+        help = "Conversation ID to send into."
     ).required()
 
     private val message by option(
-        "--message", "-m",
+        "--message",
+        "-m",
         help = "User message text to send."
     ).required()
 
     private val raw by option(
         "--raw",
-        help = "If set, print only raw SSE frames without merge-trace decoration."
-    ).default("false")
+        help = "Print only raw SSE frames without merge-trace decoration."
+    ).flag(default = false)
 
     override fun run() = runBlocking {
         val client = HttpClient(OkHttp) {
@@ -85,17 +74,15 @@ class StreamCommand : CliktCommand(name = "stream") {
                     coerceInputValues = true
                 })
             }
-            // SSE streams are long-running. Default Ktor timeouts (10s
-            // request, 5s socket) kill the connection mid-stream.
             install(HttpTimeout) {
-                requestTimeoutMillis = 10 * 60 * 1000     // 10min total cap
-                connectTimeoutMillis = 30 * 1000          // 30s to connect
-                socketTimeoutMillis = 5 * 60 * 1000       // 5min idle between bytes
+                requestTimeoutMillis = 10 * 60 * 1000
+                connectTimeoutMillis = 30 * 1000
+                socketTimeoutMillis = 5 * 60 * 1000
             }
         }
 
         try {
-            val tracer = MergeTracer(verbose = raw != "true")
+            val tracer = MergeTracer(verbose = !raw)
             sendAndStream(client, tracer)
             tracer.printSummary()
         } finally {
@@ -103,13 +90,6 @@ class StreamCommand : CliktCommand(name = "stream") {
         }
     }
 
-    /**
-     * Mirrors `MessageApi.sendConversationMessage` — POST a message to
-     * `/v1/conversations/{id}/messages` and read back the SSE stream
-     * from the SAME response. The app uses exactly this endpoint to
-     * send + stream in a single call, so this is the closest possible
-     * reproduction of the bug Emmanuel sees.
-     */
     private suspend fun sendAndStream(client: HttpClient, tracer: MergeTracer) {
         println("[CLI] POST $baseUrl/v1/conversations/$conversationId/messages (SSE)")
         println("[CLI]   message=\"${message.take(80)}${if (message.length > 80) "..." else ""}\"")
@@ -122,7 +102,7 @@ class StreamCommand : CliktCommand(name = "stream") {
             })
         }.toString()
         println("[CLI] -----------------------------------------------------")
-        val response = client.post("$baseUrl/v1/conversations/$conversationId/messages") {
+        val response = client.post("${baseUrl.trimEnd('/')}/v1/conversations/$conversationId/messages") {
             header(HttpHeaders.Authorization, "Bearer $token")
             header(HttpHeaders.Accept, "text/event-stream")
             contentType(ContentType.Application.Json)

@@ -98,6 +98,7 @@ class ChannelTransport internal constructor(
             val a2uiEnabled: Boolean = false,
             val a2uiVersion: String? = null,
             val a2uiCatalog: String? = null,
+            val canonicalLiveTransport: String? = null,
             // Populated when the post-welcome a2ui_capabilities frame
             // arrives (§2.2). Informational — null until then.
             val a2uiSupportedCatalogs: List<String> = emptyList(),
@@ -635,6 +636,7 @@ class ChannelTransport internal constructor(
                     a2uiEnabled = frame.a2uiNegotiated,
                     a2uiVersion = frame.a2ui?.version,
                     a2uiCatalog = frame.a2ui?.catalogId,
+                    canonicalLiveTransport = frame.canonicalLiveTransport,
                 )
                 drainPendingA2uiActions()
                 // letta-mobile-2rkdj: post-welcome resume scan. Iterate

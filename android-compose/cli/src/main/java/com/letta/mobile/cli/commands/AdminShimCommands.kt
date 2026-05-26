@@ -1,0 +1,293 @@
+package com.letta.mobile.cli.commands
+
+import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.UsageError
+import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.flag
+import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.options.required
+import com.github.ajalt.clikt.parameters.types.long
+import com.letta.mobile.cli.runtime.AdminShimRecorder
+import com.letta.mobile.cli.runtime.CliRestClient
+import com.letta.mobile.cli.runtime.CliWsSession
+import com.letta.mobile.data.timeline.headless.HeadlessTimelineReplayer
+import com.letta.mobile.data.timeline.headless.HeadlessTimelineStore
+import com.letta.mobile.data.transport.ChannelTransport
+import com.letta.mobile.data.transport.RunCursorStore
+import com.letta.mobile.data.transport.ServerFrame
+import com.letta.mobile.data.transport.WsChatBridge
+import java.nio.file.Files
+import java.nio.file.Path
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+
+internal abstract class AdminShimCommand(
+    name: String,
+    @Suppress("unused") help: String,
+) : CliktCommand(name = name) {
+    protected val baseUrl by option(
+        "--base-url",
+        envvar = "LETTA_BASE_URL",
+        help = "Admin-shim/Letta base URL."
+    ).default("https://letta.oculair.ca")
+
+    protected val token by option(
+        "--token",
+        envvar = "LETTA_TOKEN",
+        help = "Bearer token."
+    ).required()
+
+    protected val deviceId by option("--device-id").default("letta-mobile-cli")
+    protected val clientVersion by option("--client-version").default("letta-mobile-cli")
+}
+
+internal class ConnectCommand : AdminShimCommand(
+    name = "connect",
+    help = "Open admin-shim mobile WebSocket, print welcome/session state, optionally hold.",
+) {
+    private val holdMs by option("--hold-ms", help = "Keep the socket open for this many ms after connect.").long().default(0)
+    private val timeoutMs by option("--timeout-ms").long().default(5_000)
+
+    override fun run() = runBlocking {
+        val transport = ChannelTransport(RunCursorStore.inMemory())
+        val bridge = WsChatBridge(transport)
+        val collector = launch {
+            transport.events.collect { frame -> println("[frame] ${frame.typeName()}") }
+        }
+        try {
+            bridge.connect(baseUrl, token, deviceId, clientVersion)
+            withTimeout(timeoutMs) {
+                bridge.state.filter { it is ChannelTransport.State.Connected }.first()
+            }
+            val connected = bridge.state.value as ChannelTransport.State.Connected
+            println(
+                "[connect] serverId=${connected.serverId} sessionId=${connected.sessionId} " +
+                    "deviceId=${connected.deviceId ?: "<none>"} a2ui=${connected.a2uiEnabled} " +
+                    "canonical=${connected.canonicalLiveTransport ?: "<unspecified>"}"
+            )
+            if (holdMs > 0) delay(holdMs)
+        } finally {
+            bridge.disconnect()
+            collector.cancel()
+        }
+    }
+}
+
+internal class SendCommand : AdminShimCommand(
+    name = "send",
+    help = "Send a message through admin-shim WS and fold frames into the headless timeline.",
+) {
+    private val text by argument("text")
+    private val agentId by option("--agent", envvar = "LETTA_AGENT_ID").required()
+    private val conversation by option("--conversation", envvar = "LETTA_CONVERSATION_ID")
+    private val waitForStable by option("--wait-for-stable").flag(default = false)
+    private val dumpTimeline by option("--dump-timeline").flag(default = false)
+    private val timeoutMs by option("--timeout-ms").long().default(120_000)
+
+    override fun run() = runBlocking {
+        val rest = CliRestClient(baseUrl, token)
+        try {
+            val conversationId = conversation ?: rest.createConversation(agentId).id
+            coroutineScope {
+                val session = CliWsSession(
+                    scope = this,
+                    agentId = agentId,
+                    initialConversationId = conversationId,
+                )
+                session.startCollecting()
+                try {
+                    session.connect(baseUrl, token, deviceId, clientVersion, timeoutMs = 5_000)
+                    session.send(text, waitForStable = waitForStable, timeoutMs = timeoutMs)
+                    if (dumpTimeline) println(session.dump())
+                } finally {
+                    session.disconnect()
+                }
+            }
+        } finally {
+            rest.close()
+        }
+    }
+}
+
+internal class DumpTimelineCommand : AdminShimCommand(
+    name = "dump-timeline",
+    help = "Fetch conversation history and emit stable, diffable timeline JSON.",
+) {
+    private val conversation by option("--conversation", envvar = "LETTA_CONVERSATION_ID").required()
+    private val limit by option("--limit").long().default(200)
+
+    override fun run() = runBlocking {
+        val rest = CliRestClient(baseUrl, token)
+        try {
+            val messages = rest.fetchMessages(conversation, limit.validatedIntLimit())
+            val store = HeadlessTimelineStore()
+            store.hydrate(conversation, messages)
+            println(store.dumpJson(conversation))
+        } finally {
+            rest.close()
+        }
+    }
+}
+
+internal class ReplayCommand : CliktCommand(
+    name = "replay",
+) {
+    private val recording by option("--recording").required()
+    private val conversation by option("--conversation", envvar = "LETTA_CONVERSATION_ID").required()
+    private val assertNoDups by option("--assert-no-dups").flag(default = false)
+    private val assertOtidUnique by option("--assert-otid-unique").flag(default = false)
+    private val assertSeqMonotonic by option("--assert-seq-monotonic").flag(default = false)
+    private val dumpTimeline by option("--dump-timeline").flag(default = false)
+
+    override fun run() = runBlocking {
+        val result = Files.newBufferedReader(Path.of(recording)).use { reader ->
+            HeadlessTimelineReplayer().replayJsonl(
+                conversationId = conversation,
+                lines = reader.lineSequence(),
+                assertNoDuplicateUiMessages = assertNoDups,
+                assertOtidUnique = assertOtidUnique,
+                assertSeqMonotonic = assertSeqMonotonic,
+            )
+        }
+        println(
+            "[replay] frames=${result.framesSeen} ingested=${result.messagesIngested} " +
+                "events=${result.assertionReport.eventCount}"
+        )
+        if (result.ignoredFrameTypes.isNotEmpty()) {
+            println("[replay] ignored=${result.ignoredFrameTypes}")
+        }
+        if (!result.assertionReport.passed) {
+            result.assertionReport.failures.forEach { println("[replay] FAIL $it") }
+            throw IllegalStateException("replay assertions failed")
+        }
+        println("[replay] assertions passed")
+        if (dumpTimeline) println(result.timelineJson)
+    }
+}
+
+internal class RecordCommand : AdminShimCommand(
+    name = "record",
+    help = "Record admin-shim mobile WS wire frames to replay-compatible JSONL.",
+) {
+    private val out by option("--out").required()
+    private val agentId by option("--agent", envvar = "LETTA_AGENT_ID")
+    private val conversation by option("--conversation", envvar = "LETTA_CONVERSATION_ID")
+    private val message by option("--message", "-m")
+    private val runId by option("--run-id")
+    private val cursor by option("--cursor").long().default(0)
+    private val timeoutMs by option("--timeout-ms").long().default(120_000)
+
+    override fun run() = runBlocking {
+        if (message != null && (agentId == null || conversation == null)) {
+            throw IllegalArgumentException("record --message requires --agent and --conversation")
+        }
+        val count = AdminShimRecorder().record(
+            baseUrl = baseUrl,
+            token = token,
+            agentId = agentId,
+            conversationId = conversation,
+            message = message,
+            runId = runId,
+            cursor = cursor,
+            out = Path.of(out),
+            timeoutMs = timeoutMs,
+            deviceId = deviceId,
+            clientVersion = clientVersion,
+        )
+        println("[record] wrote $count frames to $out")
+    }
+}
+
+internal class DisconnectCommand : AdminShimCommand(
+    name = "disconnect",
+    help = "Open the admin-shim WS and close it cleanly with bye.",
+) {
+    override fun run() = runBlocking {
+        val transport = ChannelTransport(RunCursorStore.inMemory())
+        val bridge = WsChatBridge(transport)
+        bridge.connect(baseUrl, token, deviceId, clientVersion)
+        withTimeout(5_000) {
+            bridge.state.filter { it is ChannelTransport.State.Connected }.first()
+        }
+        println("[disconnect] connected; sending bye")
+        bridge.bye()
+        bridge.disconnect()
+        println("[disconnect] closed")
+    }
+}
+
+internal class ReconnectCommand : AdminShimCommand(
+    name = "reconnect",
+    help = "Connect, disconnect, then reconnect; optionally seed a run cursor to exercise resume.",
+) {
+    private val conversation by option("--conversation", envvar = "LETTA_CONVERSATION_ID")
+    private val runId by option("--run-id")
+    private val cursor by option("--cursor").long().default(0)
+    private val holdMs by option("--hold-ms").long().default(1_000)
+
+    override fun run() = runBlocking {
+        val cursorStore = RunCursorStore.inMemory()
+        if (conversation != null && runId != null && cursor > 0) {
+            cursorStore.record(conversation.orEmpty(), runId.orEmpty(), cursor)
+        }
+        val transport = ChannelTransport(cursorStore)
+        val bridge = WsChatBridge(transport)
+        val collector = launch {
+            transport.events.collect { frame -> println("[frame] ${frame.typeName()}") }
+        }
+        try {
+            bridge.connect(baseUrl, token, deviceId, clientVersion)
+            withTimeout(5_000) { bridge.state.filter { it is ChannelTransport.State.Connected }.first() }
+            println("[reconnect] first connection up")
+            bridge.disconnect()
+            println("[reconnect] disconnected")
+            bridge.connect(baseUrl, token, deviceId, clientVersion)
+            withTimeout(5_000) { bridge.state.filter { it is ChannelTransport.State.Connected }.first() }
+            println("[reconnect] second connection up")
+            delay(holdMs)
+        } finally {
+            bridge.disconnect()
+            collector.cancel()
+        }
+    }
+}
+
+private fun ServerFrame.typeName(): String = when (this) {
+    is ServerFrame.Welcome -> "welcome"
+    is ServerFrame.Error -> "error:${code}"
+    is ServerFrame.Ping -> "ping"
+    is ServerFrame.TurnStarted -> "turn_started runId=$runId"
+    is ServerFrame.TurnDone -> "turn_done runId=$runId status=$status"
+    is ServerFrame.StopReason -> "stop_reason $stopReason"
+    is ServerFrame.UsageStatistics -> "usage_statistics total=$totalTokens"
+    is ServerFrame.AssistantMessage -> "assistant_message id=$id seq=${seqId ?: "<none>"}"
+    is ServerFrame.ReasoningMessage -> "reasoning_message id=$id"
+    is ServerFrame.ToolCallMessage -> "tool_call_message id=$id"
+    is ServerFrame.ToolReturnMessage -> "tool_return_message id=$id"
+    is ServerFrame.SubscribeFrameMessage -> "subscribe_frame runId=$runId seq=$seq"
+    is ServerFrame.SubscribeDone -> "subscribe_done runId=$runId lastSeq=$lastSeq"
+    is ServerFrame.A2ui -> "a2ui_frame id=$id"
+    is ServerFrame.A2uiCapabilities -> "a2ui_capabilities version=$version"
+    is ServerFrame.UserActionAck -> "user_action_ack status=$status"
+    is ServerFrame.UserActionOutcome -> "user_action_outcome outcome=$outcome"
+    is ServerFrame.CronListResponse -> "cron_list_response success=$success"
+    is ServerFrame.CronAddResponse -> "cron_add_response success=$success"
+    is ServerFrame.CronGetResponse -> "cron_get_response success=$success"
+    is ServerFrame.CronDeleteResponse -> "cron_delete_response success=$success"
+    is ServerFrame.CronDeleteAllResponse -> "cron_delete_all_response success=$success"
+    is ServerFrame.CronsUpdated -> "crons_updated reason=$reason"
+    is ServerFrame.Unknown -> "unknown:$type"
+}
+
+private fun Long.validatedIntLimit(): Int {
+    if (this !in 1..Int.MAX_VALUE.toLong()) {
+        throw UsageError("--limit must be between 1 and ${Int.MAX_VALUE}")
+    }
+    return toInt()
+}
