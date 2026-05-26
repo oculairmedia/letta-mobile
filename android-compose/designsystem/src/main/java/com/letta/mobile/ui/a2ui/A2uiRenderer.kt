@@ -2746,6 +2746,7 @@ private fun A2uiComponent.action(surface: A2uiSurfaceState, renderScope: A2uiRen
         put("name", name)
         put("surfaceId", surface.surfaceId)
         put("context", context)
+        surface.conversationId?.let { put("conversationId", it) }
         surface.runId?.let { put("runId", it) }
         surface.turnId?.let { put("turnId", it) }
         actionId?.let { put("actionId", it) }
@@ -2754,6 +2755,7 @@ private fun A2uiComponent.action(surface: A2uiSurfaceState, renderScope: A2uiRen
         name = name,
         surfaceId = surface.surfaceId,
         context = context,
+        conversationId = surface.conversationId,
         runId = surface.runId,
         turnId = surface.turnId,
         actionId = actionId,
@@ -3061,6 +3063,7 @@ private fun scheduleAction(
         put("name", name)
         put("surfaceId", surface.surfaceId)
         put("context", context)
+        surface.conversationId?.let { put("conversationId", it) }
         surface.runId?.let { put("runId", it) }
         surface.turnId?.let { put("turnId", it) }
         actionId?.let { put("actionId", it) }
@@ -3069,6 +3072,7 @@ private fun scheduleAction(
         name = name,
         surfaceId = surface.surfaceId,
         context = context,
+        conversationId = surface.conversationId,
         runId = surface.runId,
         turnId = surface.turnId,
         actionId = actionId,
@@ -3091,6 +3095,7 @@ private fun toolApprovalAction(
         put("name", ToolApprovalResponseAction)
         put("surfaceId", surface.surfaceId)
         put("context", context)
+        surface.conversationId?.let { put("conversationId", it) }
         surface.runId?.let { put("runId", it) }
         surface.turnId?.let { put("turnId", it) }
         put("actionId", callId)
@@ -3099,6 +3104,7 @@ private fun toolApprovalAction(
         name = ToolApprovalResponseAction,
         surfaceId = surface.surfaceId,
         context = context,
+        conversationId = surface.conversationId,
         runId = surface.runId,
         turnId = surface.turnId,
         actionId = callId,

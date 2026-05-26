@@ -8,6 +8,7 @@ data class A2uiAction(
     val name: String,
     val surfaceId: String,
     val context: JsonObject = JsonObject(emptyMap()),
+    val conversationId: String? = null,
     val runId: String? = null,
     val turnId: String? = null,
     val actionId: String? = null,
@@ -16,6 +17,7 @@ data class A2uiAction(
         put("name", name)
         put("surfaceId", surfaceId)
         put("context", context)
+        conversationId?.let { put("conversationId", it) }
         runId?.let { put("runId", it) }
         turnId?.let { put("turnId", it) }
         actionId?.let { put("actionId", it) }

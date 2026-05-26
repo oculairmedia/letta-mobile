@@ -95,7 +95,7 @@ class FakeChannelTransport(
         return sendResult
     }
 
-    override fun cancel(): Boolean = cancelResult
+    override fun cancel(conversationId: String): Boolean = cancelResult
 
     override fun bye(): Boolean = byeResult
 

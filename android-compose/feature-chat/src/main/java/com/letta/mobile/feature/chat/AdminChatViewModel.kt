@@ -651,20 +651,31 @@ internal class AdminChatViewModel @Inject constructor(
     }
 
     fun submitA2uiAction(action: A2uiAction) {
-        val result = wsChatBridge.sendA2uiAction(action)
+        val resolvedAction = if (action.conversationId.isNullOrBlank()) {
+            val currentConversationId = chatConversationCoordinator.activeConversationId ?: conversationId
+            if (currentConversationId.isNullOrBlank()) {
+                chatBannerController.showComposerError("Couldn't send action. No active conversation is available.")
+                return
+            }
+            action.copy(conversationId = currentConversationId)
+        } else {
+            action
+        }
+        val result = wsChatBridge.sendA2uiAction(resolvedAction)
         // letta-mobile-ykkl: log the dispatch outcome so a missing
         // user_action on the wire is diagnosable from adb logcat
         // (which side dropped it: VM, bridge, transport).
         android.util.Log.i(
             "A2UI",
-            "submitA2uiAction surfaceId=${action.surfaceId} event=${action.name} result=$result",
+            "submitA2uiAction surfaceId=${resolvedAction.surfaceId} event=${resolvedAction.name} " +
+                "conversationId=${resolvedAction.conversationId} result=$result",
         )
         when (result) {
             is A2uiActionDispatchResult.Sent -> {
-                pendingA2uiActions[result.frameId] = PendingA2uiAction(action = action)
+                pendingA2uiActions[result.frameId] = PendingA2uiAction(action = resolvedAction)
             }
             is A2uiActionDispatchResult.Queued -> {
-                pendingA2uiActions[result.frameId] = PendingA2uiAction(action = action)
+                pendingA2uiActions[result.frameId] = PendingA2uiAction(action = resolvedAction)
                 chatBannerController.showComposerError("Action queued until the chat connection returns")
             }
             A2uiActionDispatchResult.Failed -> {

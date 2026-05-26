@@ -234,6 +234,7 @@ private fun String.looksLikeMarkdownTableSeparator(): Boolean {
  *    swallow it).
  */
 private const val STREAMING_CURSOR = "\u258E" // ▎ LEFT VERTICAL BAR
+private const val MAX_HELD_TAIL_CHARS = 24
 
 internal fun streamingDisplayText(raw: String): String {
     // letta-mobile-flk2 (revision 11): markdown-stability clamp.
@@ -273,8 +274,20 @@ internal fun streamingDisplayText(raw: String): String {
     if (insideOpenCodeFence(raw)) {
         return raw
     }
-    return clampToStableMarkdown(raw)
+    return clampToWordBoundary(clampToStableMarkdown(raw))
 }
+
+private fun clampToWordBoundary(raw: String): String {
+    if (raw.isEmpty()) return raw
+    if (raw.last().isStreamingBoundary()) return raw
+    val boundary = raw.indexOfLast { it.isStreamingBoundary() }
+    if (boundary < 0) return raw
+    if (raw.length - boundary - 1 > MAX_HELD_TAIL_CHARS) return raw
+    return raw.substring(0, boundary + 1)
+}
+
+private fun Char.isStreamingBoundary(): Boolean =
+    isWhitespace() || this in setOf('.', ',', ';', ':', '!', '?', ')', ']', '}', '—', '-', '/', '\\')
 
 /**
  * Whether a streaming cursor glyph is appropriate for the supplied raw

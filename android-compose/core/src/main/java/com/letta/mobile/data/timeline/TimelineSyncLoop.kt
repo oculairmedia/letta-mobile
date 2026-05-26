@@ -845,20 +845,9 @@ class TimelineSyncLoop(
         telemetryName: String,
         telemetryAttrs: Array<Pair<String, Any?>>,
     ): Int {
-        var appended = 0
-        serverMessages.forEach { msg ->
-            // Never append a standalone TOOL_RETURN event — they
-            // attach to their TOOL_CALL below. letta-mobile-mge5.21.
-            val pos = _state.value.nextLocalPosition()
-            val confirmed = msg.toTimelineEvent(position = pos) ?: return@forEach
-            if (confirmed.messageType == TimelineMessageType.TOOL_RETURN) return@forEach
-            val byOtid = _state.value.findByOtid(confirmed.otid)
-            val byServerId = _state.value.findByServerId(msg.id, confirmed.messageType)
-            if (byOtid == null && byServerId == null) {
-                _state.value = _state.value.append(confirmed)
-                appended++
-            }
-        }
+        val mergeResult = _state.value.mergeServerMessages(serverMessages)
+        _state.value = mergeResult.first
+        val appended = mergeResult.second
         // After appending new events, apply return/response hints from
         // the full snapshot so existing TOOL_CALL bubbles pick up their
         // output + decided state. This is the key path for the UX

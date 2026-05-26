@@ -290,6 +290,100 @@ class WsChatSendCoordinatorTest {
     }
 
     @Test
+    fun `cancel clears only queued sends for active conversation`() = runTest {
+        val wsChatBridge = mockBridge(sendResults = listOf(false, false, true), cancelResult = true)
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        var activeConversation = "conv-a"
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = wsChatBridge,
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = MutableStateFlow(ChatUiState(agentName = "Agent")),
+            clearComposerAfterSend = {},
+            activeConversationId = { activeConversation },
+            setActiveConversationId = { activeConversation = it },
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+
+        coordinator.send("one").join()
+        activeConversation = "conv-b"
+        coordinator.send("two").join()
+
+        activeConversation = "conv-a"
+        assertTrue(coordinator.cancel())
+        advanceUntilIdle()
+
+        verify(exactly = 1) { wsChatBridge.cancel("conv-a") }
+
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-a", runId = "run-a", status = "cancelled"))
+        advanceUntilIdle()
+
+        verify(exactly = 1) {
+            wsChatBridge.send(
+                agentId = "agent-1",
+                conversationId = "conv-a",
+                text = "one",
+                otid = any(),
+                attachments = emptyList(),
+            )
+        }
+        verify(exactly = 2) {
+            wsChatBridge.send(
+                agentId = "agent-1",
+                conversationId = "conv-b",
+                text = "two",
+                otid = any(),
+                attachments = emptyList(),
+            )
+        }
+    }
+
+    @Test
+    fun `cancel does not clear queued sends when bridge rejects cancel`() = runTest {
+        val wsChatBridge = mockBridge(sendResults = listOf(false, true), cancelResult = false)
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        var activeConversation = "conv-a"
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = wsChatBridge,
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = MutableStateFlow(ChatUiState(agentName = "Agent")),
+            clearComposerAfterSend = {},
+            activeConversationId = { activeConversation },
+            setActiveConversationId = { activeConversation = it },
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+
+        coordinator.send("one").join()
+
+        assertEquals(false, coordinator.cancel())
+        advanceUntilIdle()
+        assertTrue(timelineRepository.failedLocals.isEmpty())
+
+        activeConversation = "conv-a"
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-a", runId = "run-a", status = "completed"))
+        advanceUntilIdle()
+
+        verify(exactly = 2) {
+            wsChatBridge.send(
+                agentId = "agent-1",
+                conversationId = "conv-a",
+                text = "one",
+                otid = any(),
+                attachments = emptyList(),
+            )
+        }
+    }
+
+    @Test
     fun `usage statistics writes tokens to ui state once per turn`() = runTest {
         val wsChatBridge = mockBridge(sendAccepted = true)
         val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
@@ -708,14 +802,17 @@ class WsChatSendCoordinatorTest {
     private fun mockBridge(
         sendAccepted: Boolean,
         eventFlow: kotlinx.coroutines.flow.Flow<WsTimelineEvent> = emptyFlow(),
+        cancelResult: Boolean = true,
     ): WsChatBridge = mockBridge(
         sendResults = listOf(sendAccepted),
         eventFlow = eventFlow,
+        cancelResult = cancelResult,
     )
 
     private fun mockBridge(
         sendResults: List<Boolean>,
         eventFlow: kotlinx.coroutines.flow.Flow<WsTimelineEvent> = emptyFlow(),
+        cancelResult: Boolean = true,
     ): WsChatBridge = mockk(relaxed = true) {
         every { state } returns MutableStateFlow(
             ChannelTransport.State.Connected(
@@ -726,5 +823,6 @@ class WsChatSendCoordinatorTest {
         )
         every { events } returns eventFlow
         every { send(any(), any(), any(), any(), any(), any()) } returnsMany sendResults
+        every { cancel(any()) } returns cancelResult
     }
 }

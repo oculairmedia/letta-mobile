@@ -37,11 +37,8 @@ class StreamingDisplayTextTest {
     }
 
     @Test
-    fun textEndingMidWord_returnsAsIs() {
-        // letta-mobile-flk2: held-tail clamp removed; smoother now
-        // delivers chars at a smoothed rate so mid-word visibility is
-        // no longer bursty enough to warrant the holdback.
-        assertEquals("Hello wor", streamingDisplayText("Hello wor"))
+    fun textEndingMidWord_holdsTrailingPartialWord() {
+        assertEquals("Hello ", streamingDisplayText("Hello wor"))
     }
 
     @Test
@@ -64,14 +61,13 @@ class StreamingDisplayTextTest {
 
     @Test
     fun shortTrailingFragment_returnsAsIs() {
-        // letta-mobile-flk2: previously held back as "Hello ".
-        assertEquals("Hello supercalifrag", streamingDisplayText("Hello supercalifrag"))
+        assertEquals("Hello ", streamingDisplayText("Hello supercalifrag"))
     }
 
     @Test
     fun newline_returnsAsIs() {
         assertEquals(
-            "Line one\nLineTwoMidWor",
+            "Line one\n",
             streamingDisplayText("Line one\nLineTwoMidWor"),
         )
     }
@@ -79,17 +75,15 @@ class StreamingDisplayTextTest {
     @Test
     fun multilineMidWord_returnsAsIs() {
         assertEquals(
-            "Line one\nLine tw",
+            "Line one\nLine ",
             streamingDisplayText("Line one\nLine tw"),
         )
     }
 
     @Test
     fun realWireFrameFromWsstreamTrace_returnsAsIs() {
-        // letta-mobile-flk2: smoother chose WHEN to paint each char, so
-        // painting the trailing "O" mid-word is no longer a bursty flash.
         val raw = "- **Lightweight threads**: thousands can run concurrently on a small thread pool — suspension is cheap, no O"
-        assertEquals(raw, streamingDisplayText(raw))
+        assertEquals("- **Lightweight threads**: thousands can run concurrently on a small thread pool — suspension is cheap, no ", streamingDisplayText(raw))
     }
 
     @Test
@@ -104,7 +98,7 @@ class StreamingDisplayTextTest {
     fun closedCodeFence_returnsClampedText() {
         // After a closing ``` the fence count is even — clamp applies again.
         val raw = "Done:\n```\nfoo\n```\nNext wo"
-        assertEquals(raw, streamingDisplayText(raw))
+        assertEquals("Done:\n```\nfoo\n```\nNext ", streamingDisplayText(raw))
     }
 
     @Test

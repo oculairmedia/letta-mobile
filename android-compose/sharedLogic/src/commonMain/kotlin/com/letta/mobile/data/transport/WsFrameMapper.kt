@@ -47,6 +47,7 @@ object WsFrameMapper {
             date = frame.ts,
             runId = frame.runId,
             signature = frame.signature,
+            seqId = frame.seqId,
         )
 
         is ServerFrame.ToolCallMessage -> ToolCallMessage(

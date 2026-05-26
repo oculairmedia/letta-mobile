@@ -297,13 +297,55 @@ class MobileWsFramesTest : WordSpec({
         "spec §4.4 usage_statistics — first-frame counters default to 0" {
             val payload = """
                 {"v":1,"type":"usage_statistics","id":"f","ts":"t",
-                 "turn_id":"T","run_id":"R","prompt_tokens":12}
+                 "turn_id":"T","run_id":"R","prompt_tokens":12,"seq":19}
             """.trimIndent()
             val parsed = json.decodeFromString(ServerFrameSerializer, payload)
             parsed.shouldBeInstanceOf<ServerFrame.UsageStatistics>()
             parsed.promptTokens shouldBe 12L
             parsed.completionTokens shouldBe 0L
             parsed.totalTokens shouldBe 0L
+            parsed.seq shouldBe 19L
+        }
+
+        "letta-mobile-2rkdj assistant and reasoning frames surface run seq metadata" {
+            val assistant = json.decodeFromString(
+                ServerFrameSerializer,
+                """
+                {"v":1,"type":"assistant_message","id":"cm-stream-1","ts":"t",
+                 "agent_id":"a","conversation_id":"c","turn_id":"T","run_id":"R",
+                 "content":"hello","seq":17,"seq_id":17}
+                """.trimIndent(),
+            )
+            assistant.shouldBeInstanceOf<ServerFrame.AssistantMessage>()
+            assistant.seq shouldBe 17L
+            assistant.seqId shouldBe 17
+
+            val reasoning = json.decodeFromString(
+                ServerFrameSerializer,
+                """
+                {"v":1,"type":"reasoning_message","id":"reason-1","ts":"t",
+                 "agent_id":"a","conversation_id":"c","turn_id":"T","run_id":"R",
+                 "reasoning":"thinking","seq":18,"seq_id":18}
+                """.trimIndent(),
+            )
+            reasoning.shouldBeInstanceOf<ServerFrame.ReasoningMessage>()
+            reasoning.seq shouldBe 18L
+            reasoning.seqId shouldBe 18
+        }
+
+        "letta-mobile-2rkdj cursor_expired error keeps resume metadata" {
+            val payload = """
+                {"v":1,"type":"error","id":"err-cursor","ts":"t",
+                 "code":"cursor_expired","message":"cursor too old",
+                 "conversation_id":"conv-1","after_seq":2,"oldest_seq":10,"last_seq":20}
+            """.trimIndent()
+            val parsed = json.decodeFromString(ServerFrameSerializer, payload)
+            parsed.shouldBeInstanceOf<ServerFrame.Error>()
+            parsed.code shouldBe "cursor_expired"
+            parsed.conversationId shouldBe "conv-1"
+            parsed.afterSeq shouldBe 2L
+            parsed.oldestSeq shouldBe 10L
+            parsed.lastSeq shouldBe 20L
         }
 
         "spec §4.1 approval_request_message folds into ToolCallMessage" {

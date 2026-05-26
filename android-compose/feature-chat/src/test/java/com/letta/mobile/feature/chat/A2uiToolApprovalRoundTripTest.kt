@@ -121,6 +121,86 @@ class A2uiToolApprovalRoundTripTest {
     }
 
     @Test
+    fun channelTransportTracksInFlightAndCancelPerConversation() = runTest {
+        val server = openServer()
+        val transport = openTransport()
+        val bridge = WsChatBridge(transport)
+        connect(transport, bridge, server)
+        withRealTimeout { server.frames.receiveOfType("hello") }
+
+        assertTrue(bridge.send(agentId = "agent-e2e", conversationId = "conv-a", text = "a"))
+        assertEquals(
+            "second send for the same conversation must be rejected while the first turn is in flight",
+            false,
+            bridge.send(agentId = "agent-e2e", conversationId = "conv-a", text = "a again"),
+        )
+        assertTrue(bridge.send(agentId = "agent-e2e", conversationId = "conv-b", text = "b"))
+        withRealTimeout { server.frames.receiveOfType("send_message") }
+        withRealTimeout { server.frames.receiveOfType("send_message") }
+
+        val convBStarted = async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+            bridge.events.first { event ->
+                (event as? WsTimelineEvent.TurnStarted)?.conversationId == "conv-b"
+            }
+        }
+        server.sendTurnStarted(conversationId = "conv-a", runId = "run-a", turnId = "turn-a")
+        server.sendTurnStarted(conversationId = "conv-b", runId = "run-b", turnId = "turn-b")
+        withRealTimeout { convBStarted.await() }
+
+        assertTrue(bridge.cancel("conv-b"))
+        val cancel = withRealTimeout { server.frames.receiveOfType("cancel") }
+        assertEquals("run-b", cancel.stringValue("run_id"))
+    }
+
+    @Test
+    fun reconnectResumeSendsSubscribeForPersistedRunCursor() = runTest {
+        val cursorStore = RunCursorStore.inMemory().apply {
+            record("conv-resume", "run-resume", 7L)
+        }
+        val server = openServer()
+        val transport = openTransport(cursorStore)
+        val bridge = WsChatBridge(transport)
+
+        connect(transport, bridge, server)
+
+        val subscribe = withRealTimeout { server.frames.receiveOfType("subscribe") }
+        assertEquals("run-resume", subscribe.stringValue("run_id"))
+        assertEquals("7", subscribe["cursor"]?.jsonPrimitive?.contentOrNull)
+    }
+
+    @Test
+    fun subscribeFrameWithMessageTypeOnlyReplaysAndAdvancesCursor() = runTest {
+        val cursorStore = RunCursorStore.inMemory().apply {
+            record("conv-resume", "run-resume", 4L)
+        }
+        val server = openServer()
+        val transport = openTransport(cursorStore)
+        val bridge = WsChatBridge(transport)
+        connect(transport, bridge, server)
+        withRealTimeout { server.frames.receiveOfType("subscribe") }
+
+        val replayed = async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+            bridge.events.first { event ->
+                val message = (event as? WsTimelineEvent.MessageDelta)?.message as? AssistantMessage
+                message?.content == "replayed delta"
+            }
+        }
+
+        server.sendRaw(
+            """
+            {"v":1,"type":"subscribe_frame","id":"sub-env-1","ts":"2026-05-17T00:00:04Z",
+             "run_id":"run-resume","seq":5,
+             "frame":{"v":1,"message_type":"assistant_message","id":"cm-stream-replay","ts":"2026-05-17T00:00:04Z",
+                      "agent_id":"agent-e2e","conversation_id":"conv-resume","turn_id":"turn-resume","run_id":"run-resume",
+                      "content":"replayed delta"}}
+            """.trimIndent()
+        )
+
+        withRealTimeout { replayed.await() }
+        assertEquals(5L, cursorStore.activeRuns("conv-resume")["run-resume"])
+    }
+
+    @Test
     fun scheduleCatalogActionsRoundTripOverAdminShimWebSocket() = runTest {
         val server = openServer()
         val transport = openTransport()
@@ -384,10 +464,10 @@ class A2uiToolApprovalRoundTripTest {
     private fun openServer(): A2uiShimServer =
         A2uiShimServer().also(openServers::add)
 
-    private fun openTransport(): ChannelTransport =
-        // letta-mobile-2rkdj: tests don't need persisted cursors,
-        // so plug in the in-memory store implementation.
-        ChannelTransport(RunCursorStore.inMemory()).also(openTransports::add)
+    private fun openTransport(cursorStore: RunCursorStore = RunCursorStore.inMemory()): ChannelTransport =
+        // letta-mobile-2rkdj: keep tests deterministic by using the
+        // in-memory cursor store, optionally pre-seeded by resume tests.
+        ChannelTransport(cursorStore).also(openTransports::add)
 }
 
 private data class AffordanceScenario(
@@ -451,6 +531,13 @@ private fun JsonObject.assertScheduleAction(
 private fun JsonObject.stringValue(key: String): String =
     this[key]?.jsonPrimitive?.contentOrNull ?: error("Missing string field $key")
 
+private suspend fun Channel<JsonObject>.receiveOfType(type: String): JsonObject {
+    while (true) {
+        val frame = receive()
+        if (frame.stringValue("type") == type) return frame
+    }
+}
+
 private fun elapsedMs(startNanos: Long): Long =
     (System.nanoTime() - startNanos) / 1_000_000
 
@@ -470,6 +557,7 @@ private class A2uiShimServer {
     private var actionCounter = 0
 
     val actions = Channel<JsonObject>(Channel.UNLIMITED)
+    val frames = Channel<JsonObject>(Channel.UNLIMITED)
     val actionCount: Int
         get() = actionCounter
 
@@ -485,6 +573,7 @@ private class A2uiShimServer {
 
                         override fun onMessage(webSocket: WebSocket, text: String) {
                             val obj = json.parseToJsonElement(text).jsonObject
+                            frames.trySend(obj)
                             when (obj.stringValue("type")) {
                                 "hello" -> webSocket.send(welcomeFrame())
                                 "user_action" -> {
@@ -530,13 +619,21 @@ private class A2uiShimServer {
         (activeSocket ?: firstSocket.await()).send(scheduleFrame(surfaceId))
     }
 
-    suspend fun sendTurnStarted() {
+    suspend fun sendTurnStarted(
+        conversationId: String = "conv-e2e",
+        runId: String = "run-e2e",
+        turnId: String = "turn-e2e",
+    ) {
         (activeSocket ?: firstSocket.await()).send(
             """
             {"v":1,"type":"turn_started","id":"turn-started-e2e","ts":"2026-05-17T00:00:00Z",
-             "agent_id":"agent-e2e","conversation_id":"conv-e2e","turn_id":"turn-e2e","run_id":"run-e2e"}
+             "agent_id":"agent-e2e","conversation_id":"$conversationId","turn_id":"$turnId","run_id":"$runId"}
             """.trimIndent()
         )
+    }
+
+    suspend fun sendRaw(frame: String) {
+        (activeSocket ?: firstSocket.await()).send(frame)
     }
 
     fun closeActiveSocket() {
@@ -545,6 +642,7 @@ private class A2uiShimServer {
 
     fun close() {
         actions.close()
+        frames.close()
         server.shutdown()
     }
 

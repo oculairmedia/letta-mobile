@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.time.Instant
 
 /**
  * Reconcile timeline state after sending a message. Swaps Local→Confirmed
@@ -111,17 +112,9 @@ internal suspend fun applyReconcileAfterSendSnapshot(
         }
 
         // 2. Pull in any server messages we don't yet have (missed stream events)
-        serverMessages.forEach { msg ->
-            val pos = state.value.nextLocalPosition()
-            val confirmed = msg.toTimelineEvent(position = pos) ?: return@forEach
-            if (confirmed.messageType == TimelineMessageType.TOOL_RETURN) return@forEach
-            val byOtid = state.value.findByOtid(confirmed.otid)
-            val byServerId = state.value.findByServerId(msg.id, confirmed.messageType)
-            if (byOtid == null && byServerId == null) {
-                state.value = state.value.append(confirmed)
-                appendedMissing++
-            }
-        }
+        val mergeResult = state.value.mergeServerMessages(serverMessages)
+        state.value = mergeResult.first
+        appendedMissing = mergeResult.second
 
         // 3. Advance liveCursor
         serverMessages.lastOrNull()?.id?.let {
@@ -135,6 +128,43 @@ internal suspend fun applyReconcileAfterSendSnapshot(
         confirmedServerId = confirmedServerId,
         shouldDeletePendingLocal = shouldDeletePendingLocal,
     )
+}
+
+internal fun Timeline.mergeServerMessages(
+    serverMessages: List<LettaMessage>,
+): Pair<Timeline, Int> {
+    var timeline = this
+    var merged = 0
+    serverMessages.forEach { msg ->
+        val pos = timeline.positionForServerMessageDate(msg)
+        val confirmed = msg.toTimelineEvent(position = pos) ?: return@forEach
+        if (confirmed.messageType == TimelineMessageType.TOOL_RETURN) return@forEach
+        val byOtid = timeline.findByOtid(confirmed.otid)
+        val byServerId = timeline.findByServerId(msg.id, confirmed.messageType)
+        if (byOtid == null && byServerId == null) {
+            timeline = timeline.insertOrdered(confirmed)
+            merged++
+        }
+    }
+    return timeline to merged
+}
+
+internal fun Timeline.positionForServerMessageDate(message: LettaMessage): Double {
+    val messageDate = message.date?.let { runCatching { Instant.parse(it) }.getOrNull() }
+        ?: return nextLocalPosition()
+    val nextIndex = events.indexOfFirst { event ->
+        val eventDate = (event as? TimelineEvent.Confirmed)?.date ?: return@indexOfFirst false
+        eventDate > messageDate
+    }
+    if (nextIndex < 0) return nextLocalPosition()
+
+    val nextPosition = events[nextIndex].position
+    val previousPosition = events.getOrNull(nextIndex - 1)?.position
+    return when {
+        previousPosition == null -> nextPosition - 1.0
+        nextPosition > previousPosition -> previousPosition + ((nextPosition - previousPosition) / 2.0)
+        else -> previousPosition + 0.000001
+    }
 }
 
 /**

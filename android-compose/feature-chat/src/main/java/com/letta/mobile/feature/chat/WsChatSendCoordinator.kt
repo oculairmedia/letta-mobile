@@ -153,8 +153,15 @@ internal class WsChatSendCoordinator(
     }
 
     fun cancel(): Boolean {
-        scope.launch { clearPendingSends("cancel") }
-        return wsChatBridge.cancel()
+        val conversationId = activeConversationId() ?: activeWsConversationId ?: return false
+        val accepted = wsChatBridge.cancel(conversationId)
+        if (accepted) {
+            val dropped = removePendingSends(conversationId)
+            if (dropped.isNotEmpty()) {
+                scope.launch { markPendingSendsFailed(dropped, "cancel", conversationId) }
+            }
+        }
+        return accepted
     }
 
     private suspend fun dispatchPendingSend(
@@ -261,22 +268,58 @@ internal class WsChatSendCoordinator(
 
     private suspend fun clearPendingSends(reason: String) {
         pendingConversationBootstrapLocal = null
-        val dropped = synchronized(pendingSendLock) {
-            val drained = mutableListOf<PendingWsSend>()
+        val dropped = removeAllPendingSends()
+        markPendingSendsFailed(dropped, reason, conversationId = null)
+    }
+
+    private fun removePendingSends(conversationId: String): List<PendingWsSend> {
+        if (pendingConversationBootstrapLocal?.conversationId == conversationId) {
+            pendingConversationBootstrapLocal = null
+        }
+        return synchronized(pendingSendLock) {
+            val matching = mutableListOf<PendingWsSend>()
+            val retained = ArrayDeque<PendingWsSend>()
             while (true) {
                 val pending = pendingSends.removeFirstOrNull() ?: break
-                drained.add(pending)
+                if (pending.conversationId == conversationId) {
+                    matching.add(pending)
+                } else {
+                    retained.addLast(pending)
+                }
             }
-            drained
+            while (true) {
+                pendingSends.addLast(retained.removeFirstOrNull() ?: break)
+            }
+            matching
         }
+    }
+
+    private fun removeAllPendingSends(): List<PendingWsSend> = synchronized(pendingSendLock) {
+        val drained = mutableListOf<PendingWsSend>()
+        while (true) {
+            val pending = pendingSends.removeFirstOrNull() ?: break
+            drained.add(pending)
+        }
+        drained
+    }
+
+    private suspend fun markPendingSendsFailed(
+        dropped: List<PendingWsSend>,
+        reason: String,
+        conversationId: String?,
+    ) {
         if (dropped.isEmpty()) return
         dropped.forEach { pending ->
             timelineRepository.markExternalTransportLocalFailed(pending.conversationId, pending.otid)
         }
+        val attrs = buildList<Pair<String, Any?>> {
+            add("reason" to reason)
+            if (conversationId != null) add("conversationId" to conversationId)
+            add("count" to dropped.size)
+        }
         Telemetry.event(
             "AdminChatVM", "ws.queue.cleared",
-            "reason" to reason,
-            "count" to dropped.size,
+            *attrs.toTypedArray(),
         )
     }
 
@@ -398,7 +441,7 @@ internal class WsChatSendCoordinator(
                         "runId" to event.runId,
                     )
                 }
-                activeWsOtid?.let { otid ->
+                if (event.lossy) activeWsOtid?.let { otid ->
                     timelineRepository.reconcileExternalTransportSend(
                         conversationId = conversationId,
                         agentId = agentId,

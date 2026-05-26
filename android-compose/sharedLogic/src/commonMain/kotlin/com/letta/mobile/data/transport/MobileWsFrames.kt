@@ -152,6 +152,7 @@ data class UserActionFrame(
     override val ts: String,
     val name: String,
     val context: JsonObject = JsonObject(emptyMap()),
+    @SerialName("conversation_id") val conversationId: String? = null,
     @SerialName("run_id") val runId: String? = null,
     @SerialName("turn_id") val turnId: String? = null,
     @SerialName("surface_id") val surfaceId: String? = null,
@@ -343,6 +344,7 @@ sealed interface ServerFrame {
         @SerialName("conversation_id") val conversationId: String? = null,
         @SerialName("turn_id") val turnId: String? = null,
         @SerialName("run_id") val runId: String? = null,
+        val seq: Long? = null,
         val otid: String? = null,
         val ok: Boolean = true,
         @SerialName("parse_error") val parseError: String? = null,
@@ -427,8 +429,12 @@ sealed interface ServerFrame {
         override val ts: String,
         val code: String,
         val message: String = "",
+        @SerialName("conversation_id") val conversationId: String? = null,
         @SerialName("turn_id") val turnId: String? = null,
         @SerialName("run_id") val runId: String? = null,
+        @SerialName("after_seq") val afterSeq: Long? = null,
+        @SerialName("oldest_seq") val oldestSeq: Long? = null,
+        @SerialName("last_seq") val lastSeq: Long? = null,
     ) : ServerFrame
 
     @Serializable
@@ -455,6 +461,7 @@ sealed interface ServerFrame {
         @SerialName("conversation_id") val conversationId: String,
         @SerialName("turn_id") val turnId: String,
         @SerialName("run_id") val runId: String,
+        val seq: Long? = null,
     ) : ServerFrame
 
     /**
@@ -474,6 +481,7 @@ sealed interface ServerFrame {
         val status: String, // "completed" | "cancelled" | "failed"
         val lossy: Boolean = false,
         @SerialName("drop_count") val dropCount: Long = 0L,
+        val seq: Long? = null,
     ) : ServerFrame
 
     /**
@@ -491,6 +499,7 @@ sealed interface ServerFrame {
         @SerialName("turn_id") val turnId: String,
         @SerialName("run_id") val runId: String,
         @SerialName("stop_reason") val stopReason: String,
+        val seq: Long? = null,
     ) : ServerFrame
 
     /**
@@ -511,6 +520,7 @@ sealed interface ServerFrame {
         @SerialName("total_tokens") val totalTokens: Long = 0,
         @SerialName("cached_input_tokens") val cachedInputTokens: Long = 0,
         @SerialName("reasoning_tokens") val reasoningTokens: Long = 0,
+        val seq: Long? = null,
     ) : ServerFrame
 
     /**
@@ -531,6 +541,7 @@ sealed interface ServerFrame {
         @SerialName("run_id") val runId: String,
         val content: String,
         val otid: String? = null,
+        val seq: Long? = null,
         @SerialName("seq_id") val seqId: Int? = null,
     ) : ServerFrame
 
@@ -546,6 +557,8 @@ sealed interface ServerFrame {
         @SerialName("run_id") val runId: String,
         val reasoning: String,
         val signature: String? = null,
+        val seq: Long? = null,
+        @SerialName("seq_id") val seqId: Int? = null,
     ) : ServerFrame
 
     /**
@@ -569,6 +582,7 @@ sealed interface ServerFrame {
         @SerialName("run_id") val runId: String,
         @SerialName("tool_call") val toolCall: ToolCallPayload? = null,
         @SerialName("tool_calls") val toolCalls: List<ToolCallPayload>? = null,
+        val seq: Long? = null,
     ) : ServerFrame
 
     @Serializable
@@ -586,6 +600,7 @@ sealed interface ServerFrame {
         @SerialName("tool_return") val toolReturn: String? = null,
         val stdout: List<String>? = null,
         val stderr: List<String>? = null,
+        val seq: Long? = null,
     ) : ServerFrame
 
     /**
@@ -806,6 +821,7 @@ private object A2uiFrameDeserializer : kotlinx.serialization.KSerializer<ServerF
             conversationId = element["conversation_id"]?.jsonPrimitive?.content,
             turnId = element["turn_id"]?.jsonPrimitive?.content,
             runId = element["run_id"]?.jsonPrimitive?.content,
+            seq = element["seq"]?.jsonPrimitive?.content?.toLongOrNull(),
             otid = element["otid"]?.jsonPrimitive?.content,
             ok = ok,
             parseError = element["parse_error"]?.jsonPrimitive?.content,

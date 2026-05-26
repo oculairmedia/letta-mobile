@@ -108,7 +108,7 @@ class WsChatBridge @Inject constructor(
         )
     }
 
-    fun cancel(): Boolean = transport.cancel()
+    fun cancel(conversationId: String): Boolean = transport.cancel(conversationId)
     fun bye(): Boolean = transport.bye()
     fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult = transport.sendA2uiAction(action)
     suspend fun disconnect(): Unit = transport.disconnect()

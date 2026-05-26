@@ -23,9 +23,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -39,6 +41,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import app.cash.turbine.test
+import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -678,6 +681,57 @@ class TimelineSyncLoopTest {
         assertTrue(swapped is TimelineEvent.Confirmed)
         assertEquals("hello", swapped!!.content)
         scope.coroutineContext.job.cancel()
+    }
+
+    @Test
+    fun `reconcile inserts missed server messages by date instead of appending`() = runBlocking {
+        val state = MutableStateFlow(
+            Timeline("conv-order")
+                .append(
+                    TimelineEvent.Confirmed(
+                        position = 1.0,
+                        otid = "older",
+                        content = "older",
+                        serverId = "older-server",
+                        messageType = TimelineMessageType.ASSISTANT,
+                        date = Instant.parse("2026-05-19T06:00:00Z"),
+                        runId = null,
+                        stepId = null,
+                    )
+                )
+                .append(
+                    TimelineEvent.Confirmed(
+                        position = 2.0,
+                        otid = "newer",
+                        content = "newer",
+                        serverId = "newer-server",
+                        messageType = TimelineMessageType.ASSISTANT,
+                        date = Instant.parse("2026-05-19T06:20:00Z"),
+                        runId = null,
+                        stepId = null,
+                    )
+                )
+        )
+
+        applyReconcileAfterSendSnapshot(
+            otid = "unmatched-local",
+            conversationId = "conv-order",
+            serverMessages = listOf(
+                AssistantMessage(
+                    id = "missed-server",
+                    contentRaw = JsonPrimitive("missed"),
+                    otid = "missed",
+                    date = "2026-05-19T06:10:00Z",
+                )
+            ),
+            writeMutex = Mutex(),
+            state = state,
+        )
+
+        val confirmed = state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
+        assertEquals(listOf("older-server", "missed-server", "newer-server"), confirmed.map { it.serverId })
+        assertTrue(confirmed[1].position > confirmed[0].position)
+        assertTrue(confirmed[1].position < confirmed[2].position)
     }
 
     @Test
