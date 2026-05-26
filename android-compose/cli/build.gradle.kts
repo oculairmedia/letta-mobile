@@ -1,6 +1,5 @@
 plugins {
     id("com.android.library")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
@@ -38,6 +37,12 @@ android {
             }
         }
     }
+
+    sourceSets {
+        getByName("test") {
+            kotlin.directories += "src/test/java"
+        }
+    }
 }
 
 kotlin {
@@ -55,27 +60,27 @@ dependencies {
     // lives in src/test (see rationale above).
     testImplementation(project(":core"))
     // CLI parsing
-    testImplementation("com.github.ajalt.clikt:clikt:4.4.0")
+    testImplementation("com.github.ajalt.clikt:clikt:5.1.0")
 
     // Coroutines
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     // JSON
     testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
 
     // OkHttp for direct API calls (mirrors what :core uses internally)
-    testImplementation("com.squareup.okhttp3:okhttp:4.12.0")
+    testImplementation("com.squareup.okhttp3:okhttp:5.3.2")
 
     // Ktor — same versions as :core / :bot. We use Ktor directly because
     // SseParser takes a Ktor ByteReadChannel.
-    testImplementation("io.ktor:ktor-client-core:3.4.2")
-    testImplementation("io.ktor:ktor-client-okhttp:3.4.2")
-    testImplementation("io.ktor:ktor-client-content-negotiation:3.4.2")
-    testImplementation("io.ktor:ktor-serialization-kotlinx-json:3.4.2")
+    testImplementation("io.ktor:ktor-client-core:3.5.0")
+    testImplementation("io.ktor:ktor-client-okhttp:3.5.0")
+    testImplementation("io.ktor:ktor-client-content-negotiation:3.5.0")
+    testImplementation("io.ktor:ktor-serialization-kotlinx-json:3.5.0")
 
     // JUnit 5 — used as a runner only.
-    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+    testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
 }
 
 // Custom task: `./gradlew :cli:run --args="stream --message hello"`

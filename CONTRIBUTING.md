@@ -48,7 +48,9 @@ The repo admin runs this once to apply / re-apply branch protection on the remot
 ## Local Android setup
 
 1. Create `android-compose/local.properties` with your Android SDK path.
-2. Point `JAVA_HOME` at Android Studio's bundled JBR.
+2. Point `JAVA_HOME` at a full JDK 26 for parity with CI. Gradle 9.4.1 can still
+   run on JDK 17-26, so Android Studio's bundled JBR remains acceptable for
+   local builds when it falls in that supported range.
 
 Example on Linux:
 
@@ -57,7 +59,7 @@ cat > android-compose/local.properties <<'EOF'
 sdk.dir=/usr/lib/android-sdk
 EOF
 
-export JAVA_HOME="/path/to/android-studio/jbr"
+export JAVA_HOME="/usr/lib/jvm/jdk-26"
 ```
 
 Example on Windows Git Bash:
@@ -67,7 +69,7 @@ cat > android-compose/local.properties <<'EOF'
 sdk.dir=C:\Users\<you>\AppData\Local\Android\Sdk
 EOF
 
-export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"
+export JAVA_HOME="/c/Program Files/Eclipse Adoptium/jdk-26"
 ```
 
 ## Recommended build checks

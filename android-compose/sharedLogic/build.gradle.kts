@@ -1,6 +1,6 @@
 plugins {
-    id("com.android.library")
     id("org.jetbrains.kotlin.multiplatform")
+    id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("io.gitlab.arturbosch.detekt")
     id("org.jetbrains.kotlinx.kover")
@@ -12,24 +12,6 @@ detekt {
     parallel = true
 }
 
-android {
-    namespace = "com.letta.mobile.sharedlogic"
-    compileSdk = 36
-
-    defaultConfig {
-        minSdk = 26
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    lint {
-        disable += "NullSafeMutableLiveData"
-    }
-}
-
 kotlin {
     compilerOptions {
         freeCompilerArgs.addAll(
@@ -37,7 +19,12 @@ kotlin {
         )
     }
 
-    androidTarget {
+    android {
+        namespace = "com.letta.mobile.sharedlogic"
+        compileSdk = 36
+        minSdk = 26
+
+        withHostTestBuilder {}
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
@@ -61,7 +48,7 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
-                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
                 api("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
             }
@@ -70,7 +57,7 @@ kotlin {
         commonTest {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
             }
         }

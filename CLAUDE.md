@@ -21,7 +21,7 @@ Native Android app for Letta AI agents, built with Kotlin and Jetpack Compose.
 ```bash
 cd android-compose
 cp local.properties.example local.properties
-export JAVA_HOME="/path/to/Android Studio/jbr"
+export JAVA_HOME="/path/to/jdk-26"
 ./gradlew :app:assembleDebug
 ```
 
@@ -53,7 +53,7 @@ The app points to: `https://letta2.oculair.ca`
 ## Recommended Build Checks
 
 ```bash
-export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export JAVA_HOME=/usr/lib/jvm/jdk-26
 cd android-compose
 ./gradlew --no-daemon :app:compileDebugKotlin
 ./gradlew --no-daemon :app:testDebugUnitTest

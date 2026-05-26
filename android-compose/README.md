@@ -40,7 +40,9 @@ Do not assume changes to one path automatically belong in the other.
 ## Prerequisites
 
 - Android Studio with Android SDK Platform 36 and Build-Tools 36 installed
-- A full JDK/JBR via Android Studio or Java 17
+- A full JDK 26 for CI parity. Gradle 9.4.1 can run on JDK 17-26, so Android
+  Studio's bundled JBR is still acceptable for local builds when it is within
+  that range.
 - `local.properties` pointing at your Android SDK
 
 ## Local setup
@@ -54,7 +56,7 @@ cp local.properties.example local.properties
 Set `JAVA_HOME` before running Gradle:
 
 ```bash
-export JAVA_HOME="/path/to/Android Studio/jbr"
+export JAVA_HOME="/path/to/jdk-26"
 ```
 
 ## Common commands

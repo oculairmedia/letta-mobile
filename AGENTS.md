@@ -65,7 +65,9 @@ When running compilation, test execution, or deployment commands, you must confi
 ### Windows Environments (PowerShell)
 Explicitly configure the environment variables in your shell session before running Gradle:
 ```powershell
-$env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
+# Prefer a full JDK 26 for CI parity. Android Studio's bundled JBR is acceptable
+# for local builds when it is a supported Gradle runtime (JDK 17-26).
+$env:JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-26"
 $env:ANDROID_HOME="$env:USERPROFILE\AppData\Local\Android\Sdk"
 ./gradlew :app:compileRootDebugKotlin
 ./gradlew :app:testRootDebugUnitTest
@@ -75,7 +77,7 @@ $env:ANDROID_HOME="$env:USERPROFILE\AppData\Local\Android\Sdk"
 Use standard Bash syntax to prefix the build command with the required paths if they are not already in your environment:
 ```bash
 # Set if not globally available:
-export JAVA_HOME="/usr/lib/jvm/default-java"  # Or your local JDK path
+export JAVA_HOME="/usr/lib/jvm/jdk-26"  # Or another supported JDK 17-26 path
 export ANDROID_HOME="$HOME/Android/Sdk"
 ./gradlew :app:compileRootDebugKotlin
 ./gradlew :app:testRootDebugUnitTest

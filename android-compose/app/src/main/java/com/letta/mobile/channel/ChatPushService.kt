@@ -39,7 +39,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-internal fun installIngestedListener(
+fun installIngestedListener(
     timelineRepository: TimelineRepository,
     listener: IngestedMessageListener,
 ): IngestedMessageListener {
@@ -47,7 +47,7 @@ internal fun installIngestedListener(
     return listener
 }
 
-internal fun clearIngestedListenerIfActive(
+fun clearIngestedListenerIfActive(
     timelineRepository: TimelineRepository,
     installedListener: IngestedMessageListener?,
 ): Boolean {

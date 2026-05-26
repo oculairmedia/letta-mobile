@@ -1,20 +1,20 @@
 plugins {
-    id("org.jetbrains.kotlinx.kover") version "0.9.1"
-    id("com.android.application") version "8.9.2" apply false
-    id("com.android.library") version "8.9.2" apply false
+    id("org.jetbrains.kotlinx.kover") version "0.9.8"
+    id("com.android.application") version "9.2.0" apply false
+    id("com.android.library") version "9.2.0" apply false
+    id("com.android.kotlin.multiplatform.library") version "9.2.0" apply false
     id("org.jetbrains.kotlin.jvm") version "2.3.20" apply false
     id("org.jetbrains.kotlin.multiplatform") version "2.3.20" apply false
-    id("app.cash.paparazzi") version "1.3.5" apply false
-    id("io.github.takahirom.roborazzi") version "1.10.0" apply false
-    id("org.jetbrains.kotlin.android") version "2.3.20" apply false
+    id("app.cash.paparazzi") version "2.0.0-alpha05" apply false
+    id("io.github.takahirom.roborazzi") version "1.63.0" apply false
     id("org.jetbrains.kotlin.plugin.compose") version "2.3.20" apply false
     id("org.jetbrains.kotlin.plugin.serialization") version "2.3.20" apply false
-    id("com.google.dagger.hilt.android") version "2.58" apply false
-    id("com.google.devtools.ksp") version "2.3.6" apply false
+    id("com.google.dagger.hilt.android") version "2.59.2" apply false
+    id("com.google.devtools.ksp") version "2.3.8" apply false
     id("io.gitlab.arturbosch.detekt") version "1.23.8" apply false
     id("org.jetbrains.kotlin.plugin.allopen") version "2.3.20" apply false
-    id("io.sentry.android.gradle") version "4.14.1" apply false
-    id("androidx.baselineprofile") version "1.4.1" apply false
+    id("io.sentry.android.gradle") version "6.8.1" apply false
+    id("androidx.baselineprofile") version "1.5.0-alpha06" apply false
 }
 
 // ---------------------------------------------------------------------------
@@ -52,11 +52,9 @@ subprojects {
 // ---------------------------------------------------------------------------
 // Kover — aggregated code coverage reports (HTML for humans, XML for CI)
 //
-//   ./gradlew koverHtmlReportRootDebugCoverage
+//   ./gradlew koverHtmlReport
 //
-// Use the RootDebug coverage variant for refactor safety checks. The default
-// total Kover tasks compile every app variant, including benchmark/release
-// unit-test variants that are not part of the normal local safety gate.
+// Use the merged total Kover report for refactor safety checks.
 //
 // The root module acts as the merging module. Submodules declare the plugin
 // without version (inherited from here). Add a kover(project(":name"))

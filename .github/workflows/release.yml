@@ -42,11 +42,11 @@ jobs:
           ref: ${{ github.event.inputs.tag || github.ref }}
           fetch-depth: 0  # full history so release-notes auto-generation can diff against the prior tag
 
-      - name: Setup Java 17
+      - name: Setup Java 26
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 26
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4

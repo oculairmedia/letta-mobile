@@ -13,7 +13,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-internal class AppStartupCoordinator @Inject constructor(
+class AppStartupCoordinator @Inject constructor(
     private val actions: AppStartupActions,
     @DefaultDispatcher dispatcher: CoroutineDispatcher,
 ) {
@@ -25,7 +25,7 @@ internal class AppStartupCoordinator @Inject constructor(
         }
     }
 
-    internal suspend fun runStartupTasks(application: Application) {
+    suspend fun runStartupTasks(application: Application) {
         startupTasks(application).forEach { task ->
             runTask(task)
         }
