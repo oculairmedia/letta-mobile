@@ -1,9 +1,9 @@
 package com.letta.mobile.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
 import com.letta.mobile.cli.commands.StreamCommand
-import com.letta.mobile.cli.commands.WsStreamCommand
 
 /**
  * letta-mobile-cli entrypoint.
@@ -29,7 +29,7 @@ object Main {
             return
         }
         LettaMobileCli()
-            .subcommands(StreamCommand(), WsStreamCommand())
+            .subcommands(StreamCommand())
             .main(args)
     }
 
@@ -43,9 +43,6 @@ object Main {
           stream      Direct Letta path: POST /v1/conversations/{id}/messages,
                       print every SSE frame + merge state. Use to debug bugs
                       that happen against direct Letta (no lettabot in front).
-          wsstream    Client-Mode path: open WebSocket to lettabot's
-                      /api/v1/agent-gateway, print every WS chunk + merge
-                      state. Use to debug Client-Mode bugs (letta-mobile-6p4o).
 
         Run with --help on any subcommand for details.
     """.trimIndent()

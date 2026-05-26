@@ -81,6 +81,7 @@ dependencies {
 
     // JUnit 5 — used as a runner only.
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.0")
 }
 
 // Custom task: `./gradlew :cli:run --args="stream --message hello"`
