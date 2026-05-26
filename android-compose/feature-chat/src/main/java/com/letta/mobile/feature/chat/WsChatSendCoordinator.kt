@@ -154,7 +154,8 @@ internal class WsChatSendCoordinator(
 
     fun cancel(): Boolean {
         scope.launch { clearPendingSends("cancel") }
-        return wsChatBridge.cancel()
+        val conversationId = activeConversationId() ?: activeWsConversationId ?: return false
+        return wsChatBridge.cancel(conversationId)
     }
 
     private suspend fun dispatchPendingSend(

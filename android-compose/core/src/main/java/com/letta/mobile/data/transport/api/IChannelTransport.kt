@@ -34,7 +34,7 @@ interface IChannelTransport {
         startNewConversation: Boolean = false,
     ): Boolean
 
-    fun cancel(): Boolean
+    fun cancel(conversationId: String): Boolean
     fun bye(): Boolean
     suspend fun disconnect()
     fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult

@@ -121,6 +121,32 @@ class A2uiToolApprovalRoundTripTest {
     }
 
     @Test
+    fun channelTransportTracksInFlightAndCancelPerConversation() = runTest {
+        val server = openServer()
+        val transport = openTransport()
+        val bridge = WsChatBridge(transport)
+        connect(transport, bridge, server)
+        withRealTimeout { server.frames.receiveOfType("hello") }
+
+        assertTrue(bridge.send(agentId = "agent-e2e", conversationId = "conv-a", text = "a"))
+        assertTrue(bridge.send(agentId = "agent-e2e", conversationId = "conv-b", text = "b"))
+        withRealTimeout { server.frames.receiveOfType("send_message") }
+        withRealTimeout { server.frames.receiveOfType("send_message") }
+
+        server.sendTurnStarted(conversationId = "conv-a", runId = "run-a", turnId = "turn-a")
+        server.sendTurnStarted(conversationId = "conv-b", runId = "run-b", turnId = "turn-b")
+        withRealTimeout {
+            bridge.events.first { event ->
+                (event as? WsTimelineEvent.TurnStarted)?.conversationId == "conv-b"
+            }
+        }
+
+        assertTrue(bridge.cancel("conv-b"))
+        val cancel = withRealTimeout { server.frames.receiveOfType("cancel") }
+        assertEquals("run-b", cancel.stringValue("run_id"))
+    }
+
+    @Test
     fun scheduleCatalogActionsRoundTripOverAdminShimWebSocket() = runTest {
         val server = openServer()
         val transport = openTransport()
@@ -451,6 +477,13 @@ private fun JsonObject.assertScheduleAction(
 private fun JsonObject.stringValue(key: String): String =
     this[key]?.jsonPrimitive?.contentOrNull ?: error("Missing string field $key")
 
+private suspend fun Channel<JsonObject>.receiveOfType(type: String): JsonObject {
+    while (true) {
+        val frame = receive()
+        if (frame.stringValue("type") == type) return frame
+    }
+}
+
 private fun elapsedMs(startNanos: Long): Long =
     (System.nanoTime() - startNanos) / 1_000_000
 
@@ -470,6 +503,7 @@ private class A2uiShimServer {
     private var actionCounter = 0
 
     val actions = Channel<JsonObject>(Channel.UNLIMITED)
+    val frames = Channel<JsonObject>(Channel.UNLIMITED)
     val actionCount: Int
         get() = actionCounter
 
@@ -485,6 +519,7 @@ private class A2uiShimServer {
 
                         override fun onMessage(webSocket: WebSocket, text: String) {
                             val obj = json.parseToJsonElement(text).jsonObject
+                            frames.trySend(obj)
                             when (obj.stringValue("type")) {
                                 "hello" -> webSocket.send(welcomeFrame())
                                 "user_action" -> {
@@ -530,11 +565,15 @@ private class A2uiShimServer {
         (activeSocket ?: firstSocket.await()).send(scheduleFrame(surfaceId))
     }
 
-    suspend fun sendTurnStarted() {
+    suspend fun sendTurnStarted(
+        conversationId: String = "conv-e2e",
+        runId: String = "run-e2e",
+        turnId: String = "turn-e2e",
+    ) {
         (activeSocket ?: firstSocket.await()).send(
             """
             {"v":1,"type":"turn_started","id":"turn-started-e2e","ts":"2026-05-17T00:00:00Z",
-             "agent_id":"agent-e2e","conversation_id":"conv-e2e","turn_id":"turn-e2e","run_id":"run-e2e"}
+             "agent_id":"agent-e2e","conversation_id":"$conversationId","turn_id":"$turnId","run_id":"$runId"}
             """.trimIndent()
         )
     }
@@ -545,6 +584,7 @@ private class A2uiShimServer {
 
     fun close() {
         actions.close()
+        frames.close()
         server.shutdown()
     }
 

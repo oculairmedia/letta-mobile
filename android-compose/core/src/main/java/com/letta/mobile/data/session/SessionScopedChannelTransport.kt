@@ -65,7 +65,7 @@ class SessionScopedChannelTransport internal constructor(
         startNewConversation: Boolean,
     ): Boolean = current.send(agentId, conversationId, text, otid, contentParts, startNewConversation)
 
-    override fun cancel(): Boolean = current.cancel()
+    override fun cancel(conversationId: String): Boolean = current.cancel(conversationId)
     override fun bye(): Boolean = current.bye()
     override fun subscribe(runId: String, cursor: Long): Boolean = current.subscribe(runId, cursor)
     override suspend fun disconnect() = sessionManager.withCurrentSession { it.channelTransport.disconnect() }
