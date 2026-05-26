@@ -2,6 +2,10 @@ package com.letta.mobile.data.timeline.headless
 
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -29,6 +33,43 @@ class HeadlessTimelineReplayTest {
         result.assertionReport.passed shouldBe true
         result.assertionReport.eventCount shouldBe 1
         result.timelineJson.contains("Hello world") shouldBe true
+    }
+
+    @Test
+    fun `replay captures timeline snapshots after selected frames`() = runTest {
+        val lines = sequenceOf(
+            recorded("""{"v":1,"type":"welcome","id":"w1","ts":"2026-05-26T00:00:00Z","server_id":"srv","session_id":"sess"}"""),
+            recorded("""{"v":1,"type":"assistant_message","id":"cm-stream-1","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"Hello","seq_id":1}"""),
+            recorded("""{"v":1,"type":"assistant_message","id":"cm-stream-1","ts":"2026-05-26T00:00:02Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"Hello world","seq_id":2}"""),
+        )
+
+        val result = HeadlessTimelineReplayer().replayJsonl(
+            conversationId = "conv-1",
+            lines = lines,
+            dumpOptions = HeadlessReplayDumpOptions(dumpAfterFrame = 1, dumpFrames = setOf(2)),
+        )
+
+        result.frameSnapshots.map { it.frameIndex } shouldBe listOf(1, 2)
+        result.frameSnapshots[0].timeline["eventCount"]?.jsonPrimitive?.content shouldBe "1"
+        result.frameSnapshots[1].timeline.toString().contains("Hello world") shouldBe true
+        Json.parseToJsonElement(result.frameSnapshotsJson()).jsonArray.size shouldBe 2
+    }
+
+    @Test
+    fun `replay captures every nonblank frame when dump each frame is enabled`() = runTest {
+        val lines = sequenceOf(
+            "",
+            recorded("""{"v":1,"type":"welcome","id":"w1","ts":"2026-05-26T00:00:00Z","server_id":"srv","session_id":"sess"}"""),
+            recorded("""{"v":1,"type":"assistant_message","id":"cm-stream-1","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"Hello","seq_id":1}"""),
+        )
+
+        val result = HeadlessTimelineReplayer().replayJsonl(
+            conversationId = "conv-1",
+            lines = lines,
+            dumpOptions = HeadlessReplayDumpOptions(dumpAfterEachFrame = true),
+        )
+
+        result.frameSnapshots.map { it.frameType } shouldBe listOf("welcome", "assistant_message")
     }
 
     @Test
@@ -66,6 +107,50 @@ class HeadlessTimelineReplayTest {
         result.assertionReport.passed shouldBe false
         result.assertionReport.failures shouldContain
             "duplicate UiMessage semantic keys: ASSISTANT|run-ka770|The final assistant body appears once."
+    }
+
+    @Test
+    fun `extended replay assertions catch empty body and prefix orphan shapes`() = runTest {
+        val lines = sequenceOf(
+            recorded("""{"v":1,"type":"assistant_message","id":"cm-empty","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"","seq_id":1}"""),
+            recorded("""{"v":1,"type":"assistant_message","id":"cm-prefix","ts":"2026-05-26T00:00:02Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"Hello","seq_id":2}"""),
+            recorded("""{"v":1,"type":"assistant_message","id":"cm-full","ts":"2026-05-26T00:00:03Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"Hello world","seq_id":3}"""),
+        )
+
+        val result = HeadlessTimelineReplayer().replayJsonl(
+            conversationId = "conv-1",
+            lines = lines,
+            assertNoEmptyBodies = true,
+            assertNoPrefixOrphans = true,
+            expectedUiMessageCountPerRun = 1,
+        )
+
+        result.assertionReport.passed shouldBe false
+        result.assertionReport.failures shouldContain "empty UiMessage body in run run-1: cm-empty"
+        result.assertionReport.failures shouldContain
+            "prefix orphan UiMessage in run run-1: cm-prefix is a strict prefix of cm-full"
+        result.assertionReport.failures shouldContain "run run-1 has 3 UiMessages; expected 1"
+    }
+
+    @Test
+    fun `extended replay assertions check final status and orphan tool returns`() = runTest {
+        val lines = sequenceOf(
+            recorded("""{"v":1,"type":"tool_return_message","id":"return-1","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","tool_call_id":"call-missing","tool_return":"ok"}"""),
+            recorded("""{"v":1,"type":"turn_done","id":"done-1","ts":"2026-05-26T00:00:02Z","turn_id":"turn-1","run_id":"run-1","status":"failed"}"""),
+        )
+
+        val result = HeadlessTimelineReplayer().replayJsonl(
+            conversationId = "conv-1",
+            lines = lines,
+            expectedFinalStatus = "completed",
+            assertNoOrphanToolReturns = true,
+        )
+
+        result.assertionReport.passed shouldBe false
+        result.assertionReport.failures shouldContain
+            "final run status failed does not match expected completed"
+        result.assertionReport.failures shouldContain
+            "orphan tool_return return-1 in run run-1: tool_call_id=call-missing"
     }
 
     private fun recorded(frameJson: String): String =
