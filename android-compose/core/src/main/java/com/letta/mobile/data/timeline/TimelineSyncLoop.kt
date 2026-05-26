@@ -849,13 +849,13 @@ class TimelineSyncLoop(
         serverMessages.forEach { msg ->
             // Never append a standalone TOOL_RETURN event — they
             // attach to their TOOL_CALL below. letta-mobile-mge5.21.
-            val pos = _state.value.nextLocalPosition()
+            val pos = _state.value.positionForServerMessageDate(msg)
             val confirmed = msg.toTimelineEvent(position = pos) ?: return@forEach
             if (confirmed.messageType == TimelineMessageType.TOOL_RETURN) return@forEach
             val byOtid = _state.value.findByOtid(confirmed.otid)
             val byServerId = _state.value.findByServerId(msg.id, confirmed.messageType)
             if (byOtid == null && byServerId == null) {
-                _state.value = _state.value.append(confirmed)
+                _state.value = _state.value.insertOrdered(confirmed)
                 appended++
             }
         }
