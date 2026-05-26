@@ -140,18 +140,26 @@ class ConfigViewModel @Inject constructor(
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
             _uiState.value = UiState.Success(currentState.copy(theme = theme))
+            viewModelScope.launch {
+                settingsRepository.setTheme(theme)
+            }
         }
     }
 
     fun updateThemePreset(themePreset: ThemePreset) {
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
+            val dynamicColor = if (themePreset == ThemePreset.DEFAULT) currentState.dynamicColor else false
             _uiState.value = UiState.Success(
                 currentState.copy(
                     themePreset = themePreset,
-                    dynamicColor = if (themePreset == ThemePreset.DEFAULT) currentState.dynamicColor else false,
+                    dynamicColor = dynamicColor,
                 )
             )
+            viewModelScope.launch {
+                settingsRepository.setThemePreset(themePreset)
+                settingsRepository.setDynamicColor(dynamicColor)
+            }
         }
     }
 
@@ -159,6 +167,9 @@ class ConfigViewModel @Inject constructor(
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
             _uiState.value = UiState.Success(currentState.copy(dynamicColor = enabled))
+            viewModelScope.launch {
+                settingsRepository.setDynamicColor(enabled)
+            }
         }
     }
 
@@ -166,6 +177,9 @@ class ConfigViewModel @Inject constructor(
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
             _uiState.value = UiState.Success(currentState.copy(enableProjects = enabled))
+            viewModelScope.launch {
+                settingsRepository.setEnableProjects(enabled)
+            }
         }
     }
 
@@ -218,10 +232,6 @@ class ConfigViewModel @Inject constructor(
                     accessToken = if (state.mode == ServerMode.LOCAL) null else apiToken.ifBlank { null },
                 )
                 settingsRepository.saveConfig(config)
-                settingsRepository.setTheme(state.theme)
-                settingsRepository.setThemePreset(state.themePreset)
-                settingsRepository.setDynamicColor(state.dynamicColor)
-                settingsRepository.setEnableProjects(state.enableProjects)
                 onSuccess()
             } catch (e: Exception) {
                 _uiState.value = UiState.Success(state.copy(isSaving = false))

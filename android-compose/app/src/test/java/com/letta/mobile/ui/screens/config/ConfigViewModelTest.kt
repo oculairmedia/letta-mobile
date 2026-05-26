@@ -282,6 +282,26 @@ class ConfigViewModelTest {
     }
 
     @Test
+    fun saveConfig_withRejectedCloudToken_keepsImmediateThemeChanges() = runTest {
+        fakeRepository.activeConfigState.value = null
+        fakeValidator.result = CloudConnectionValidationResult.Failed("bad key")
+        viewModel.loadConfig()
+
+        viewModel.updateTheme(AppTheme.DARK)
+        viewModel.updateThemePreset(ThemePreset.SAKURA)
+        viewModel.updateDynamicColor(false)
+        viewModel.updateMode(ServerMode.CLOUD)
+        viewModel.updateApiToken("bad-token")
+
+        viewModel.saveConfig(onSuccess = {}, onError = {})
+
+        assertEquals(null, fakeRepository.activeConfig.value)
+        assertEquals(AppTheme.DARK, fakeRepository.getTheme().first())
+        assertEquals(ThemePreset.SAKURA, fakeRepository.getThemePreset().first())
+        assertEquals(false, fakeRepository.getDynamicColor().first())
+    }
+
+    @Test
     fun updateMode_updatesStateCorrectly() = runTest {
         fakeRepository.activeConfigState.value = null
         viewModel.loadConfig()
@@ -370,6 +390,7 @@ class ConfigViewModelTest {
             val successState = (state as UiState.Success).data
             assertEquals(AppTheme.DARK, successState.theme)
         }
+        assertEquals(AppTheme.DARK, fakeRepository.getTheme().first())
     }
 
     @Test
@@ -386,6 +407,8 @@ class ConfigViewModelTest {
             assertEquals(ThemePreset.SAKURA, successState.themePreset)
             assertEquals(false, successState.dynamicColor)
         }
+        assertEquals(ThemePreset.SAKURA, fakeRepository.getThemePreset().first())
+        assertEquals(false, fakeRepository.getDynamicColor().first())
     }
 
     @Test
@@ -401,20 +424,33 @@ class ConfigViewModelTest {
             val successState = (state as UiState.Success).data
             assertEquals(false, successState.dynamicColor)
         }
+        assertEquals(false, fakeRepository.getDynamicColor().first())
     }
 
     @Test
-    fun saveConfig_persistsThemePresetAndDynamicColor() = runTest {
+    fun updateEnableProjects_updatesStateCorrectly() = runTest {
+        fakeRepository.activeConfigState.value = null
+        viewModel.loadConfig()
+
+        viewModel.updateEnableProjects(false)
+
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertTrue(state is UiState.Success)
+            val successState = (state as UiState.Success).data
+            assertEquals(false, successState.enableProjects)
+        }
+        assertEquals(false, fakeRepository.getEnableProjects().first())
+    }
+
+    @Test
+    fun updateThemePreset_persistsThemePresetAndDynamicColor() = runTest {
         fakeRepository.activeConfigState.value = null
         viewModel.loadConfig()
         fakeRepository.setChatBackgroundKey("solid_charcoal")
 
         viewModel.updateThemePreset(ThemePreset.AMOLED_BLACK)
         viewModel.updateDynamicColor(false)
-        viewModel.updateServerUrl("https://api.letta.com")
-        viewModel.updateApiToken("new-token")
-
-        viewModel.saveConfig(onSuccess = {})
 
         assertEquals(ThemePreset.AMOLED_BLACK, fakeRepository.getThemePreset().first())
         assertEquals(false, fakeRepository.getDynamicColor().first())
