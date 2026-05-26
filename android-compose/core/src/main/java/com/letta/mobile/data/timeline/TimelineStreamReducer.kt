@@ -136,14 +136,12 @@ internal fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutp
         val oldText = existing.content
         val newText = confirmed.content
         val canUseSnapshotMerge = existing.seqId != null && confirmed.seqId != null
-        val mergedText = when {
-            newText.isEmpty() -> oldText
-            canUseSnapshotMerge && newText == oldText -> oldText
-            canUseSnapshotMerge && newText.startsWith(oldText) -> newText
-            canUseSnapshotMerge && oldText.startsWith(newText) -> oldText
-            canUseSnapshotMerge && oldText.endsWith(newText) -> oldText
-            else -> oldText + newText
-        }
+        val textMerge = mergeStreamText(
+            existing = oldText,
+            incoming = newText,
+            canUseSnapshotMerge = canUseSnapshotMerge,
+        )
+        val mergedText = textMerge.text
         val oldCalls = existing.toolCalls
         val newCalls = confirmed.toolCalls
         val oldScore = oldCalls.count { !it.arguments.isNullOrBlank() }
@@ -178,6 +176,8 @@ internal fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutp
             "oldLen" to oldText.length,
             "newLen" to newText.length,
             "mergedLen" to mergedText.length,
+            "mergeBranch" to textMerge.branch.name,
+            "mergeGarbleRisk" to textMerge.garbleRisk,
             "oldToolCalls" to oldCalls.size,
             "newToolCalls" to newCalls.size,
             "mergedToolCalls" to mergedCalls.size,

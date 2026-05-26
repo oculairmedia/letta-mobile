@@ -1,6 +1,6 @@
 # letta-mobile-cli
 
-Headless CLI that drives the same `:core` streaming code paths the Android app uses (`SseParser`, the `TimelineSyncLoop` merge heuristic), so we can reproduce, debug, and regression-test streaming bugs without putting eyes on a device.
+Headless CLI that drives the same `:core` streaming code paths the Android app uses (`SseParser`, the timeline stream text merge helper), so we can reproduce, debug, and regression-test streaming bugs without putting eyes on a device.
 
 Filed for: `letta-mobile-6p4o` — SSE streaming chunks render as garbled text.
 
@@ -42,7 +42,7 @@ After the stream closes, prints a final per-message summary so you can verify th
 2. Look at the trace:
    - **Wire is clean, merge is clean** → bug is downstream of merge (display layer, fuzzyCollapse, ServerEvent race in `TimelineSyncLoop`)
    - **Wire is dirty** → bug is server / parser / transport
-   - **Wire is clean, merge is dirty** → bug is in the merge heuristic (lines 1132–1138 of `TimelineSyncLoop.kt`)
+   - **Wire is clean, merge is dirty** → bug is in `mergeStreamText` or the surrounding reducer state
 3. Save the trace, screenshot the device showing garbled text, byte-compare.
 4. Convert into a `TimelineSyncLoopStreamingTest` regression fixture once we have a confirmed repro.
 
@@ -51,4 +51,4 @@ After the stream closes, prints a final per-message summary so you can verify th
 - `:cli` is an Android library because `:core` is an Android library and pulling in `:core`'s real code from a pure-JVM module would require either fighting Gradle's variant attributes or duplicating code. The library + test-classpath trick gets us there in ~1 file.
 - The CLI lives in `src/test/` because that's the source set that gets the full Android-stub classpath when running on the JVM (provided by the unit-test setup).
 - The trade-off: we abuse JUnit-5 as our entrypoint. Output is wrapped in `CliRunnerTest > runCli() STANDARD_OUT`. Acceptable for the day-1 use case (debugging this bug). If we need pretty output later, we can swap the entrypoint to a real `application` plugin module that depends on a slimmer extracted streaming-only library.
-- The merge tracer is **a copy** of the `TimelineSyncLoop` heuristic, not a call into it. If the heuristic changes, update `MergeTracer.kt` to match. Better long-term: hoist the heuristic into a pure function both call. Tracked as a follow-up.
+- The merge tracer calls the production `mergeStreamText` helper from `:core`, so CLI diagnostics and the live reducer share the same text merge branch decisions.

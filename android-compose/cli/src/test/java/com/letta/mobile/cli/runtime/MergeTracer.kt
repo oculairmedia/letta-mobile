@@ -5,17 +5,14 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
+import com.letta.mobile.data.timeline.mergeStreamText
 
 /**
- * Mirrors the merge heuristic from
- * [com.letta.mobile.data.timeline.TimelineSyncLoop] (lines 1128–1138)
- * so we can observe — frame by frame — exactly what the timeline state
- * would look like in the app.
+ * Uses the production stream text merge helper so we can observe, frame by
+ * frame, exactly what the timeline state would look like in the app.
  *
- * The whole point of this class is to be a transparent observer. If
- * `TimelineSyncLoop`'s rule changes, this class must change to match
- * (or, better, the rule should be hoisted into a pure function both
- * call). For now: keep this in sync manually.
+ * The whole point of this class is to be a transparent observer over the
+ * production merge helper, not a second copy of that logic.
  *
  * Output shape per frame:
  *
@@ -28,6 +25,7 @@ import com.letta.mobile.data.model.ToolReturnMessage
  *   - EQUAL         exact dup; no change
  *   - CUMULATIVE    incoming starts with existing; replace (server sent full snapshot)
  *   - STALE         existing starts with incoming; skip (older delta)
+ *   - SUFFIX_DUPLICATE existing ends with incoming; skip duplicate suffix
  *   - APPEND        unrelated; concat (delta on top of accumulated text)
  *   - GARBLE-RISK   non-empty old AND non-empty new AND new is shorter than old AND
  *                   neither prefix matches — this is the suspicious case where
@@ -61,37 +59,24 @@ class MergeTracer(private val verbose: Boolean = true) {
 
         val branch: String
         val mergedText: String
-        when {
-            prior == null -> {
-                branch = "INIT"
-                mergedText = incomingText
-            }
-            incomingText.isEmpty() -> {
-                branch = "EMPTY-INCOMING"
-                mergedText = priorText
-            }
-            incomingText == priorText -> {
-                branch = "EQUAL"
-                mergedText = priorText
-            }
-            incomingText.startsWith(priorText) -> {
-                branch = "CUMULATIVE"
-                mergedText = incomingText
-            }
-            priorText.startsWith(incomingText) -> {
-                branch = "STALE"
-                mergedText = priorText
-            }
-            else -> {
-                branch = if (incomingText.length < priorText.length / 2) "GARBLE-RISK" else "APPEND"
-                mergedText = priorText + incomingText
-            }
+        if (prior == null) {
+            branch = "INIT"
+            mergedText = incomingText
+        } else {
+            val merge = mergeStreamText(
+                existing = priorText,
+                incoming = incomingText,
+                canUseSnapshotMerge = prior.seqId != null && frame.seqId != null,
+            )
+            branch = if (merge.garbleRisk) "GARBLE-RISK" else merge.branch.name
+            mergedText = merge.text
         }
         byServerId[serverId] = AssemblyState(
             text = mergedText,
             messageType = type,
             summary = summary,
             frames = (prior?.frames ?: 0) + 1,
+            seqId = frame.seqId,
         )
 
         if (!verbose) {
@@ -133,6 +118,7 @@ class MergeTracer(private val verbose: Boolean = true) {
         val messageType: String?,
         val summary: String,
         val frames: Int,
+        val seqId: Int?,
     )
 }
 

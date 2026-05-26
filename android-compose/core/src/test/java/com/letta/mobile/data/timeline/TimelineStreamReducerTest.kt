@@ -139,6 +139,42 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `stream text merge only uses snapshot branches when seq ids are available`() {
+        mergeStreamText(
+            existing = "Hello",
+            incoming = "Hello world",
+            canUseSnapshotMerge = true,
+        ) shouldBe StreamTextMergeResult(
+            text = "Hello world",
+            branch = StreamTextMergeBranch.CUMULATIVE,
+            garbleRisk = false,
+        )
+
+        mergeStreamText(
+            existing = "Hello",
+            incoming = "Hello world",
+            canUseSnapshotMerge = false,
+        ) shouldBe StreamTextMergeResult(
+            text = "HelloHello world",
+            branch = StreamTextMergeBranch.APPEND,
+            garbleRisk = false,
+        )
+    }
+
+    @Test
+    fun `stream text merge flags suspicious short appends for diagnostics`() {
+        mergeStreamText(
+            existing = "The previous assistant text is already long",
+            incoming = " no",
+            canUseSnapshotMerge = false,
+        ) shouldBe StreamTextMergeResult(
+            text = "The previous assistant text is already long no",
+            branch = StreamTextMergeBranch.APPEND,
+            garbleRisk = true,
+        )
+    }
+
+    @Test
     fun `seqId dedup skips already-ingested stream frame`() {
         val seeded = reduce(
             frame = AssistantMessage(id = "assistant-1", contentRaw = JsonPrimitive("Hello"), seqId = 3)
