@@ -35,11 +35,11 @@ jobs:
           # which would force the build to fall back to "0.0.0-dev".
           fetch-depth: 0
 
-      - name: Setup Java 17
+      - name: Setup Java 26
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 26
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -104,11 +104,11 @@ jobs:
           # which would force the build to fall back to "0.0.0-dev".
           fetch-depth: 0
 
-      - name: Setup Java 17
+      - name: Setup Java 26
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 26
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4

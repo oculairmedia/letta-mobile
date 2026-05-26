@@ -32,7 +32,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor setup. The short
 ```bash
 cd android-compose
 cp local.properties.example local.properties
-export JAVA_HOME="/path/to/Android Studio/jbr"
+export JAVA_HOME="/path/to/jdk-26"
 ./gradlew :app:assembleDebug
 ```
 

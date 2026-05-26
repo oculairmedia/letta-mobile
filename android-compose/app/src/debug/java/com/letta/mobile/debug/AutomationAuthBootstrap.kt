@@ -27,7 +27,7 @@ object AutomationAuthBootstrap {
         )
     }
 
-    internal fun importPendingConfig(
+    fun importPendingConfig(
         context: Context,
         saveConfig: suspend (LettaConfig) -> Unit,
         saveClientModeSettings: suspend (AutomationClientModeSettings) -> Unit = {},
@@ -134,7 +134,7 @@ object AutomationAuthBootstrap {
         }
     }
 
-    internal data class AutomationClientModeSettings(
+    data class AutomationClientModeSettings(
         val enabled: Boolean,
         val baseUrl: String,
         val apiKey: String?,

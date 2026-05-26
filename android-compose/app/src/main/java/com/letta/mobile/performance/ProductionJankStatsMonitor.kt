@@ -142,7 +142,7 @@ object ProductionJankStatsMonitor {
     }
 }
 
-internal object JankSessionSampler {
+object JankSessionSampler {
     fun shouldSample(sampleRate: Double, draw: Double = Random.nextDouble()): Boolean {
         if (sampleRate <= 0.0) return false
         if (sampleRate >= 1.0) return true
@@ -150,7 +150,7 @@ internal object JankSessionSampler {
     }
 }
 
-internal class JankMeasurementRecorder(
+class JankMeasurementRecorder(
     private val frameBudgetMs: Long,
     private val maxDetailedFrameMeasurements: Int,
 ) {

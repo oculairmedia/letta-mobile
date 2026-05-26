@@ -1,7 +1,6 @@
 plugins {
     id("com.android.library")
     id("app.cash.paparazzi")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("io.gitlab.arturbosch.detekt")
     id("org.jetbrains.kotlinx.kover") // version inherited from root
@@ -11,14 +10,6 @@ detekt {
     buildUponDefaultConfig = true
     config.setFrom("$rootDir/detekt.yml")
     parallel = true
-}
-
-kover {
-    currentProject {
-        createVariant("rootDebugCoverage") {
-            add("debug")
-        }
-    }
 }
 
 android {
@@ -62,6 +53,9 @@ android {
         getByName("main") {
             manifest.srcFile("src/main/AndroidManifest.xml")
         }
+        getByName("test") {
+            kotlin.directories += "src/test/java"
+        }
     }
 }
 
@@ -88,8 +82,8 @@ dependencies {
 
     implementation(project(":core"))
 
-    implementation("io.coil-kt.coil3:coil-compose:3.4.0")
-    implementation("io.coil-kt.coil3:coil-svg:3.4.0")
+    implementation("io.coil-kt.coil3:coil-compose:3.5.0-beta01")
+    implementation("io.coil-kt.coil3:coil-svg:3.5.0-beta01")
     implementation("androidx.compose.material3:material3:1.5.0-alpha17")
     implementation("androidx.compose.material3:material3-window-size-class:1.5.0-alpha17")
     implementation("androidx.compose.ui:ui")
@@ -97,34 +91,34 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material:material-icons-extended")
     api("com.composables:icons-lucide:1.1.0")
-    implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.38.1")
-    implementation("com.mikepenz:multiplatform-markdown-renderer-coil3:0.38.1")
-    implementation("com.mikepenz:multiplatform-markdown-renderer-code:0.38.1")
+    implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.41.0")
+    implementation("com.mikepenz:multiplatform-markdown-renderer-coil3:0.41.0")
+    implementation("com.mikepenz:multiplatform-markdown-renderer-code:0.41.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     // letta-mobile-rl0d (audio): required for HoldToDictateButton's
     // RECORD_AUDIO permission flow (rememberLauncherForActivityResult,
     // ActivityResultContracts) and ContextCompat.checkSelfPermission.
     // Designsystem stays Hilt-free — VoiceInputViewModel lives in :app.
-    implementation("androidx.activity:activity-compose:1.10.1")
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("com.google.android.material:material:1.12.0")
+    implementation("androidx.activity:activity-compose:1.13.0")
+    implementation("androidx.core:core-ktx:1.16.0")
+    implementation("com.google.android.material:material:1.14.0")
 
     testImplementation("junit:junit:4.13.2")
-    testImplementation("io.mockk:mockk:1.13.17")
-    testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.5")
-    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.10.5")
+    testImplementation("io.mockk:mockk:1.14.9")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:6.1.0")
+    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.1.0")
 }
 
 // Test tier tasks
 tasks.register<Test>("testUnit") {
     description = "Runs unit-tier tests (pure logic, <50ms per test)"
     group = "verification"
-    
+
     val testTask = tasks.named("testDebugUnitTest", Test::class).get()
     testClassesDirs = testTask.testClassesDirs
     classpath = testTask.classpath
-    
+
     useJUnitPlatform {
         includeTags("unit")
     }
@@ -135,11 +129,11 @@ tasks.register<Test>("testUnit") {
 tasks.register<Test>("testIntegration") {
     description = "Runs integration-tier tests (Robolectric, Compose, ViewModels)"
     group = "verification"
-    
+
     val testTask = tasks.named("testDebugUnitTest", Test::class).get()
     testClassesDirs = testTask.testClassesDirs
     classpath = testTask.classpath
-    
+
     useJUnitPlatform {
         includeTags("integration")
     }
@@ -150,11 +144,11 @@ tasks.register<Test>("testIntegration") {
 tasks.register<Test>("testScreenshot") {
     description = "Runs screenshot-tier tests (Paparazzi/Roborazzi visual regression)"
     group = "verification"
-    
+
     val testTask = tasks.named("testDebugUnitTest", Test::class).get()
     testClassesDirs = testTask.testClassesDirs
     classpath = testTask.classpath
-    
+
     useJUnitPlatform {
         includeTags("screenshot")
     }

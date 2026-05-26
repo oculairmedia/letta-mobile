@@ -13,7 +13,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-internal interface AppStartupActions {
+interface AppStartupActions {
     suspend fun ensureNotificationChannel()
     suspend fun importPendingAutomationConfig()
     suspend fun installProductionJankStats(application: Application)
@@ -22,8 +22,8 @@ internal interface AppStartupActions {
 }
 
 @Singleton
-internal class DefaultAppStartupActions @Inject constructor(
-    @ApplicationContext private val context: Context,
+class DefaultAppStartupActions @Inject constructor(
+    @param:ApplicationContext private val context: Context,
     private val channelNotificationPublisher: ChannelNotificationPublisher,
     private val settingsRepository: Lazy<ISettingsRepository>,
     private val channelHeartbeatScheduler: ChannelHeartbeatScheduler,

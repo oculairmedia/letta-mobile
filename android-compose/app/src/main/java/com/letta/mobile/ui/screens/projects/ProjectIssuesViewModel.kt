@@ -525,7 +525,7 @@ private fun buildFallbackProjectIssueAnalytics(
     timelineHasMore = false,
 )
 
-internal fun buildCompletedIssueTimeline(
+fun buildCompletedIssueTimeline(
     issues: List<ProjectIssueSummary>,
     limit: Int = 30,
     zoneId: ZoneId = ZoneId.systemDefault(),
@@ -552,7 +552,7 @@ internal fun buildCompletedIssueTimeline(
     .map { it.second }
     .toList()
 
-internal fun buildIssueCreationBuckets(
+fun buildIssueCreationBuckets(
     issues: List<ProjectIssueSummary>,
     maxBuckets: Int = 12,
     zoneId: ZoneId = ZoneId.systemDefault(),

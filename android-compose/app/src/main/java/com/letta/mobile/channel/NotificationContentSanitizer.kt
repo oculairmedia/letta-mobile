@@ -8,7 +8,7 @@ package com.letta.mobile.channel
  * notification look blank or broken, so callers should fall back to safe copy
  * whenever [fallbackReason] is not [NotificationTextFallbackReason.None].
  */
-internal object NotificationContentSanitizer {
+object NotificationContentSanitizer {
     private const val MIN_PREVIEW_SIGNAL_CHARS = 2
     private val whitespaceRun = Regex("\\s+")
 
@@ -66,7 +66,7 @@ internal object NotificationContentSanitizer {
     }
 }
 
-internal data class SanitizedNotificationText(
+data class SanitizedNotificationText(
     val text: String,
     val rawLength: Int,
     val normalizedLength: Int,
@@ -76,7 +76,7 @@ internal data class SanitizedNotificationText(
         get() = fallbackReason != NotificationTextFallbackReason.None
 }
 
-internal enum class NotificationTextFallbackReason {
+enum class NotificationTextFallbackReason {
     None,
     Blank,
     TooShort,

@@ -1,4 +1,4 @@
-﻿package com.letta.mobile.ui.navigation
+package com.letta.mobile.ui.navigation
 
 import android.content.Context
 import androidx.compose.animation.AnimatedContentTransitionScope
@@ -21,7 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -598,7 +598,7 @@ fun AppNavGraph(
             popEnterTransition = drillInPopEnter,
             popExitTransition = drillInPopExit,
         ) {
-            // letta-mobile-2ixd: same capability gate as HomeRoute above —
+            // letta-mobile-2ixd: same capability gate as HomeRoute above �
             // catches direct deep-links to the explicit projects route.
             val capabilities: CapabilityViewModel = hiltViewModel()
             val projectsSupported by capabilities.projectsSupported.collectAsStateWithLifecycle()

@@ -18,7 +18,7 @@ data class DashboardUsageSummary(
     val modelUsage: List<ModelTokenUsage>,
 )
 
-internal object DashboardUsageCalculator {
+object DashboardUsageCalculator {
     private const val FALLBACK_MODEL_NAME = "Unknown model"
 
     fun calculate(steps: List<Step>, windowHours: Int = 24): DashboardUsageSummary {

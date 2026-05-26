@@ -29,7 +29,7 @@ data class ChannelNotification(
     val messagePreview: String,
 )
 
-internal data class ChannelNotificationContent(
+data class ChannelNotificationContent(
     val title: String,
     val messageText: String,
     val titleText: SanitizedNotificationText,
@@ -38,7 +38,7 @@ internal data class ChannelNotificationContent(
 
 @Singleton
 class ChannelNotificationPublisher @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) : IChannelNotificationPublisher {
     fun ensureChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
@@ -139,7 +139,7 @@ class ChannelNotificationPublisher @Inject constructor(
         return true
     }
 
-    internal fun resolveContent(notification: ChannelNotification): ChannelNotificationContent {
+    fun resolveContent(notification: ChannelNotification): ChannelNotificationContent {
         val titleText = NotificationContentSanitizer.sanitizeTitle(
             raw = notification.agentName,
             fallback = context.getString(R.string.channel_notifications_fallback_title),

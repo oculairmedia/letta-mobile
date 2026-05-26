@@ -1,6 +1,5 @@
 plugins {
     id("com.android.library")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("org.jetbrains.kotlin.plugin.allopen")
     id("com.google.dagger.hilt.android")
@@ -22,14 +21,6 @@ detekt {
     buildUponDefaultConfig = true
     config.setFrom("$rootDir/detekt.yml")
     parallel = true
-}
-
-kover {
-    currentProject {
-        createVariant("rootDebugCoverage") {
-            add("debug")
-        }
-    }
 }
 
 android {
@@ -75,6 +66,9 @@ android {
         getByName("main") {
             manifest.srcFile("src/main/AndroidManifest.xml")
         }
+        getByName("test") {
+            kotlin.directories += "src/test/java"
+        }
     }
 }
 
@@ -90,8 +84,8 @@ kotlin {
 dependencies {
     api(project(":sharedLogic"))
 
-    implementation("com.google.dagger:hilt-android:2.58")
-    ksp("com.google.dagger:hilt-compiler:2.58")
+    implementation("com.google.dagger:hilt-android:2.59.2")
+    ksp("com.google.dagger:hilt-compiler:2.59.2")
 
     // Compose runtime for @Stable and @Immutable annotations
     implementation("androidx.compose.runtime:runtime:1.8.3")
@@ -102,51 +96,51 @@ dependencies {
     // endAsyncSection power the cross-coroutine Timer class.
     implementation("androidx.tracing:tracing:1.2.0")
 
-    implementation("io.ktor:ktor-client-core:3.4.2")
-    implementation("io.ktor:ktor-client-okhttp:3.4.2")
-    implementation("io.ktor:ktor-client-content-negotiation:3.4.2")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.4.2")
-    implementation("io.ktor:ktor-client-logging:3.4.2")
-    implementation("io.ktor:ktor-client-auth:3.4.2")
+    implementation("io.ktor:ktor-client-core:3.5.0")
+    implementation("io.ktor:ktor-client-okhttp:3.5.0")
+    implementation("io.ktor:ktor-client-content-negotiation:3.5.0")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.5.0")
+    implementation("io.ktor:ktor-client-logging:3.5.0")
+    implementation("io.ktor:ktor-client-auth:3.5.0")
 
     api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
-    implementation("androidx.paging:paging-runtime-ktx:3.4.2")
-    implementation("androidx.datastore:datastore-preferences:1.2.1")
+    implementation("androidx.paging:paging-runtime-ktx:3.5.0")
+    implementation("androidx.datastore:datastore-preferences:1.3.0-alpha09")
     implementation("androidx.security:security-crypto:1.1.0")
-    implementation("androidx.lifecycle:lifecycle-process:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-process:2.9.4")
     implementation("me.xdrop:fuzzywuzzy:1.4.0")
     // Material Color Utilities (HCT, Blend, Scheme) ship inside com.google.android.material
-    implementation("com.google.android.material:material:1.12.0")
+    implementation("com.google.android.material:material:1.14.0")
 
-    api("androidx.room:room-runtime:2.7.0")
-    api("androidx.room:room-ktx:2.7.0")
-    ksp("androidx.room:room-compiler:2.7.0")
+    api("androidx.room:room-runtime:2.8.4")
+    api("androidx.room:room-ktx:2.8.4")
+    ksp("androidx.room:room-compiler:2.8.4")
 
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
-    testImplementation("io.ktor:ktor-client-mock:3.4.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+    testImplementation("io.ktor:ktor-client-mock:3.5.0")
     testImplementation("app.cash.turbine:turbine:1.2.1")
-    testImplementation("io.mockk:mockk:1.13.17")
-    testImplementation("io.kotest:kotest-runner-junit5:5.9.1")
-    testImplementation("io.kotest:kotest-assertions-core:5.9.1")
-    testImplementation("io.kotest:kotest-property:5.9.1")
+    testImplementation("io.mockk:mockk:1.14.9")
+    testImplementation("io.kotest:kotest-runner-junit5:6.1.11")
+    testImplementation("io.kotest:kotest-assertions-core:6.1.11")
+    testImplementation("io.kotest:kotest-property:6.1.11")
     testImplementation("org.robolectric:robolectric:4.16.1")
     testImplementation("androidx.test:core-ktx:1.7.0")
     testImplementation("androidx.test.ext:junit-ktx:1.3.0")
-    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.10.5")
+    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.1.0")
 }
 
 // Test tier tasks
 tasks.register<Test>("testUnit") {
     description = "Runs unit-tier tests (pure logic, <50ms per test)"
     group = "verification"
-    
+
     val testTask = tasks.named("testDebugUnitTest", Test::class).get()
     testClassesDirs = testTask.testClassesDirs
     classpath = testTask.classpath
-    
+
     useJUnitPlatform {
         includeTags("unit")
     }
@@ -157,11 +151,11 @@ tasks.register<Test>("testUnit") {
 tasks.register<Test>("testIntegration") {
     description = "Runs integration-tier tests (Robolectric, Compose, ViewModels)"
     group = "verification"
-    
+
     val testTask = tasks.named("testDebugUnitTest", Test::class).get()
     testClassesDirs = testTask.testClassesDirs
     classpath = testTask.classpath
-    
+
     useJUnitPlatform {
         includeTags("integration")
     }

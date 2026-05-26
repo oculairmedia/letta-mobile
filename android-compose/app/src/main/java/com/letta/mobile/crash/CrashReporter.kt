@@ -34,7 +34,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class CrashReporter @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) {
     data class LastCrash(
         val timestamp: Long,

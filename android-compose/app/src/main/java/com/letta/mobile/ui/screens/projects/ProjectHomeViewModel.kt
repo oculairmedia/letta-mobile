@@ -115,21 +115,21 @@ data class ProjectSettingsDraft(
     fun isReadyToSubmit(): Boolean = filesystemPathValidation() == FilesystemPathValidation.Valid
 }
 
-internal enum class ProjectSettingsPathGuidance {
+enum class ProjectSettingsPathGuidance {
     Missing,
     MustBeAbsolute,
     KnownProjectPath,
     UnknownServerAccess,
 }
 
-internal fun knownProjectPathSuggestions(projects: List<ProjectSummary>): List<String> {
+fun knownProjectPathSuggestions(projects: List<ProjectSummary>): List<String> {
     return projects
         .mapNotNull { it.filesystemPath?.trim()?.takeIf(String::isNotBlank) }
         .distinct()
         .sorted()
 }
 
-internal fun projectSettingsPathGuidance(
+fun projectSettingsPathGuidance(
     draft: ProjectSettingsDraft,
     knownProjectPaths: Set<String>,
 ): ProjectSettingsPathGuidance = when (draft.filesystemPathValidation()) {
@@ -194,7 +194,7 @@ class ProjectHomeViewModel private constructor(
         externalScope = null,
     )
 
-    internal constructor(
+    constructor(
         projectRepository: IProjectRepository,
         settingsRepository: ISettingsRepository,
         coroutineScope: CoroutineScope,
@@ -729,7 +729,7 @@ class ProjectHomeViewModel private constructor(
 
 }
 
-internal fun ConversationalProjectStep.next(): ConversationalProjectStep = when (this) {
+fun ConversationalProjectStep.next(): ConversationalProjectStep = when (this) {
     ConversationalProjectStep.Goal -> ConversationalProjectStep.Name
     ConversationalProjectStep.Name -> ConversationalProjectStep.FilesystemPath
     ConversationalProjectStep.FilesystemPath -> ConversationalProjectStep.GitUrl
@@ -737,7 +737,7 @@ internal fun ConversationalProjectStep.next(): ConversationalProjectStep = when 
     ConversationalProjectStep.Review -> ConversationalProjectStep.Review
 }
 
-internal fun ConversationalProjectStep.previous(): ConversationalProjectStep = when (this) {
+fun ConversationalProjectStep.previous(): ConversationalProjectStep = when (this) {
     ConversationalProjectStep.Goal -> ConversationalProjectStep.Goal
     ConversationalProjectStep.Name -> ConversationalProjectStep.Goal
     ConversationalProjectStep.FilesystemPath -> ConversationalProjectStep.Name
