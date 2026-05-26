@@ -335,19 +335,32 @@ class ChannelTransport internal constructor(
         contentParts: JsonArray?,
         startNewConversation: Boolean,
     ): Boolean {
+        val normalizedAgentId = agentId.trim()
+        val normalizedConversationId = conversationId.trim()
+        val hasPayload = text.isNotBlank() || contentParts?.isNotEmpty() == true
+        if (normalizedAgentId.isEmpty() || normalizedConversationId.isEmpty() || !hasPayload) {
+            Log.w(
+                TAG,
+                "Rejecting malformed send_message locally: " +
+                    "agentIdPresent=${normalizedAgentId.isNotEmpty()} " +
+                    "conversationIdPresent=${normalizedConversationId.isNotEmpty()} " +
+                    "hasPayload=$hasPayload",
+            )
+            return false
+        }
         if (state.value !is State.Connected) return false
         if (inFlight) return false
         val socket = socketRef.get() ?: return false
         inFlight = true
         currentRunId.set(null)
         currentTurnId.set(null)
-        currentConversationId.set(conversationId.takeIf { it.isNotBlank() })
+        currentConversationId.set(normalizedConversationId)
         val sent = socket.sendFrame(
             SendMessageFrame(
                 id = UUID.randomUUID().toString(),
                 ts = nowIso(),
-                agentId = agentId,
-                conversationId = conversationId,
+                agentId = normalizedAgentId,
+                conversationId = normalizedConversationId,
                 startNewConversation = startNewConversation,
                 text = text,
                 otid = otid,
