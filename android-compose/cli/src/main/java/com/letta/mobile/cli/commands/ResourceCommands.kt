@@ -45,6 +45,14 @@ internal fun buildResourceCommands(): List<CliktCommand> =
 
 internal fun resourceCommandNames(): Set<String> = resourceDefinitions.mapTo(mutableSetOf()) { it.name }
 
+internal fun resourceCommandRouteKeys(): Set<String> =
+    resourceDefinitions.flatMap { definition ->
+        definition.endpoints.map { endpoint -> "${endpoint.verb} ${endpoint.pathTemplate}" }
+    }.toSet() + setOf(
+        "POST /v1/agents/import",
+        "POST /v1/folders/{folder_id}/upload",
+    )
+
 private class ResourceRootCommand(name: String) : CliktCommand(name = name) {
     override fun run() = Unit
 }
@@ -357,6 +365,7 @@ private val resourceDefinitions = listOf(
             e("recompile", "POST", "/v1/conversations/{conversation_id}/recompile", "Recompile a conversation."),
             e("messages", "GET", "/v1/conversations/{conversation_id}/messages", "List conversation messages."),
             e("send-message", "POST", "/v1/conversations/{conversation_id}/messages", "Send a conversation message."),
+            e("stream", "POST", "/v1/conversations/{conversation_id}/stream", "Resume the active conversation stream.", bodyTemplate = "{}"),
         ),
     ),
     ResourceDefinition(
@@ -451,6 +460,7 @@ private val resourceDefinitions = listOf(
             e("update", "PATCH", "/v1/groups/{group_id}", "Update a group."),
             e("delete", "DELETE", "/v1/groups/{group_id}", "Delete a group."),
             e("send-message", "POST", "/v1/groups/{group_id}/messages", "Send a group message."),
+            e("stream-message", "POST", "/v1/groups/{group_id}/messages/stream", "Stream a group message."),
             e("update-message", "PATCH", "/v1/groups/{group_id}/messages/{message_id}", "Update a group message."),
             e("messages", "GET", "/v1/groups/{group_id}/messages", "List group messages."),
             e("reset-messages", "PATCH", "/v1/groups/{group_id}/reset-messages", "Reset group messages."),

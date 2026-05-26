@@ -254,6 +254,9 @@ Core resource groups:
   beads remote, sync trigger, ready-work, issue, and analytics routes.
 - `debug` and `vibesync-admin`: health/stats and admin refresh routes.
 
+The maintained route-by-route audit lives in
+[`docs/app-parity-matrix.md`](docs/app-parity-matrix.md).
+
 Examples:
 
 ```powershell

@@ -62,4 +62,64 @@ class ResourceCommandsTest {
             )
         )
     }
+
+    @Test
+    fun `resource route registry covers app api routes`() {
+        val routes = resourceCommandRouteKeys()
+
+        val expectedRoutes = setOf(
+            "GET /v1/agents",
+            "POST /v1/agents",
+            "GET /v1/agents/{agent_id}",
+            "PATCH /v1/agents/{agent_id}",
+            "DELETE /v1/agents/{agent_id}",
+            "POST /v1/agents/import",
+            "GET /v1/conversations",
+            "POST /v1/conversations/{conversation_id}/stream",
+            "POST /v1/conversations/{conversation_id}/messages",
+            "GET /v1/tools",
+            "PUT /v1/tools",
+            "POST /v1/tools/generate-schema",
+            "GET /v1/blocks",
+            "PATCH /v1/blocks/{block_id}/identities/attach/{identity_id}",
+            "GET /v1/archives/",
+            "DELETE /v1/archives/{archive_id}/passages/{passage_id}",
+            "POST /v1/folders/{folder_id}/upload",
+            "GET /v1/groups/",
+            "POST /v1/groups/{group_id}/messages/stream",
+            "GET /v1/identities/",
+            "PUT /v1/identities/{identity_id}/properties",
+            "GET /v1/mcp-servers",
+            "POST /v1/mcp-servers/{server_id}/tools/{tool_id}/run",
+            "GET /v1/runs/",
+            "GET /v1/jobs/",
+            "GET /v1/steps/",
+            "PATCH /v1/steps/{step_id}/feedback",
+            "GET /v1/models",
+            "GET /v1/models/embedding",
+            "GET /v1/agents/{agent_id}/archival-memory",
+            "GET /v1/providers/",
+            "POST /v1/providers/check",
+            "GET /v1/agents/{agent_id}/schedule",
+            "POST /v1/messages/search",
+            "GET /v1/messages/batches",
+            "POST /v1/messages/batches",
+            "GET /api/projects",
+            "POST /api/registry/projects",
+            "PATCH /api/registry/projects/{project_id}",
+            "POST /api/sync/trigger",
+            "GET /api/agents/lookup",
+            "GET /api/projects/{project_id}/ready-work",
+            "PATCH /api/issues/{issue_id}/status",
+            "POST /api/issues/{issue_id}/notes",
+            "GET /health",
+            "GET /api/stats",
+            "POST /api/admin/agents-md/refresh",
+        )
+
+        assertTrue(
+            routes.containsAll(expectedRoutes),
+            "Missing CLI route coverage for: ${expectedRoutes - routes}",
+        )
+    }
 }
