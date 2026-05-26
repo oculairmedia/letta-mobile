@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class BackendKind {
     RemoteLetta,
+    LocalLettaCode,
     LocalKoog,
     CompatibleRuntime,
 }

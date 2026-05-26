@@ -49,12 +49,12 @@ internal class LocalRuntimeChatSendCoordinator(
             val timer = Telemetry.startTimer("AdminChatVM", "send.local.enqueue")
             val backend = localBackend()
             if (backend == null) {
-                failSend("Local Kotlin runtime is not available")
+                failSend("Local runtime is not available")
                 timer.stop("accepted" to false, "reason" to "missing_backend")
                 return@launch
             }
             if (attachments.isNotEmpty()) {
-                failSend("Local Kotlin runtime does not support image attachments yet")
+                failSend("Local runtime does not support image attachments yet")
                 timer.stop("accepted" to false, "reason" to "attachments_unsupported")
                 return@launch
             }

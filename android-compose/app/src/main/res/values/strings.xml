@@ -535,6 +535,10 @@
     <string name="push_service_channel_description">Keeps the app connected to the Letta server so incoming messages arrive in real time.</string>
     <string name="push_service_notification_title">Letta chat sync active</string>
     <string name="push_service_notification_text">Listening for new messages.</string>
+    <string name="lettacode_runtime_service_channel_name">Local LettaCode runtime</string>
+    <string name="lettacode_runtime_service_channel_description">Runs the embedded LettaCode local runtime while local chat is active.</string>
+    <string name="lettacode_runtime_service_notification_title">Local LettaCode active</string>
+    <string name="lettacode_runtime_service_notification_text">Running the embedded local agent runtime.</string>
     <string name="screen_chat_config_section">Agent Configuration</string>
     <string name="screen_chat_model_config_section">Model Config</string>
     <string name="common_context_window">Context Window</string>
@@ -690,7 +694,7 @@
     <string name="screen_drawer_backend_unknown">No backend configured</string>
     <string name="common_active">ACTIVE</string>
     <string name="common_letta_cloud">Letta Cloud</string>
-    <string name="common_local_kotlin_runtime">Local Kotlin runtime</string>
+    <string name="common_local_kotlin_runtime">Local LettaCode</string>
     <string name="screen_conversations_new_action">New Conversation</string>
     <string name="action_edit">Edit</string>
     <string name="action_rename">Rename</string>

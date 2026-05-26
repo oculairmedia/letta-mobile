@@ -52,12 +52,16 @@ import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.FakeStepApi
 import com.letta.mobile.testutil.FakeToolApi
 import com.letta.mobile.testutil.TestData
+import com.letta.mobile.runtime.BackendCapabilities
+import com.letta.mobile.runtime.BackendDescriptor
+import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.BackendKind
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.EpochMillis
 import com.letta.mobile.runtime.InMemoryMemFsStore
 import com.letta.mobile.runtime.InMemoryRuntimeEventOutbox
 import com.letta.mobile.runtime.MemFsCommitId
+import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.RuntimeEventId
 import com.letta.mobile.runtime.RuntimeEventPayload
@@ -152,12 +156,12 @@ class SessionManagerTest {
             localRuntimeOptions = localRuntimeOptions(),
         ).create()
 
-        assertEquals(BackendKind.LocalKoog, graph.backendDescriptor.kind)
-        assertEquals("local-koog:backend-a", graph.backendDescriptor.backendId.value)
-        assertEquals("local-koog:backend-a", graph.backendDescriptor.runtimeId.value)
-        assertEquals("Local Kotlin runtime", graph.backendDescriptor.label)
+        assertEquals(BackendKind.LocalLettaCode, graph.backendDescriptor.kind)
+        assertEquals("local-lettacode:backend-a", graph.backendDescriptor.backendId.value)
+        assertEquals("local-lettacode:backend-a", graph.backendDescriptor.runtimeId.value)
+        assertEquals("Local LettaCode", graph.backendDescriptor.label)
         assertTrue(graph.backendDescriptor.capabilities.supportsMemFs)
-        assertFalse(graph.backendDescriptor.capabilities.supportsTools)
+        assertTrue(graph.backendDescriptor.capabilities.supportsTools)
 
         val backend = graph.localRuntimeBackend ?: error("Expected local runtime backend")
         val emitted = backend.runTurn(
@@ -176,6 +180,52 @@ class SessionManagerTest {
         assertEquals(3, emitted.size)
         val completed = emitted.last().payload as RuntimeEventPayload.RunLifecycleChanged
         assertEquals(RuntimeRunStatus.Completed, completed.status)
+    }
+
+    @Test
+    fun `session graph can select explicit koog provider alongside lettacode provider`() = runTest {
+        val settingsRepository = FakeSettingsRepository(
+            initialActiveConfig = localConfig("backend-a", serverUrl = "local-koog://device"),
+        )
+        val graph = SessionGraphFactory(
+            FakeAgentApi(),
+            FakeAgentDao(),
+            FakeConversationApi(),
+            FakeConversationDao(),
+            FakeArchiveApi(),
+            FakeFolderApi(),
+            FakeGroupApi(),
+            FakeIdentityApi(),
+            fakeLettaApiClient(),
+            FakeMcpServerApi(),
+            FakeModelApi(),
+            FakePassageApi(),
+            FakeProjectApi(),
+            FakeProjectWorkApi(),
+            FakeRunApi(),
+            FakeJobApi(),
+            FakeProviderApi(),
+            FakeScheduleApi(),
+            FakeStepApi(),
+            FakeToolApi(),
+            settingsRepository = settingsRepository,
+            localRuntimeOptions = localRuntimeOptions(
+                localRuntimeProvider(),
+                localRuntimeProvider(
+                    providerId = "local-koog",
+                    scheme = "local-koog",
+                    kind = BackendKind.LocalKoog,
+                    label = "Local Koog runtime",
+                    supportsTools = false,
+                    priority = 10,
+                ),
+            ),
+        ).create()
+
+        assertEquals(BackendKind.LocalKoog, graph.backendDescriptor.kind)
+        assertEquals("local-koog:backend-a", graph.backendDescriptor.backendId.value)
+        assertEquals("Local Koog runtime", graph.backendDescriptor.label)
+        assertFalse(graph.backendDescriptor.capabilities.supportsTools)
     }
 
     @Test
@@ -1025,12 +1075,55 @@ class SessionManagerTest {
 
     private fun fakeLettaApiClient(): LettaApiClient = mockk(relaxed = true)
 
-    private fun localRuntimeOptions(): LocalRuntimeOptions = LocalRuntimeOptions.Enabled(
+    private fun localRuntimeOptions(
+        vararg providers: LocalRuntimeProvider = arrayOf(localRuntimeProvider()),
+    ): LocalRuntimeOptions = LocalRuntimeOptions.Enabled(
         runtimeEventOutbox = InMemoryRuntimeEventOutbox(
             eventIdFactory = { _, offset -> RuntimeEventId("local-event-${offset.value}") },
             clock = { EpochMillis(1_000) },
         ),
-        turnEngine = TurnEngine {
+        memFsStore = InMemoryMemFsStore(
+            commitIdFactory = { path, revision, operation ->
+                MemFsCommitId("${operation.name.lowercase()}-${path.value}-${revision.value}")
+            },
+            clock = { EpochMillis(1_000) },
+        ),
+        providers = providers.toSet(),
+    )
+
+    private fun localRuntimeProvider(
+        providerId: String = "local-lettacode",
+        scheme: String = "local",
+        kind: BackendKind = BackendKind.LocalLettaCode,
+        label: String = "Local LettaCode",
+        supportsTools: Boolean = true,
+        priority: Int = 100,
+    ): LocalRuntimeProvider = object : LocalRuntimeProvider {
+        override val providerId: String = providerId
+        override val priority: Int = priority
+
+        override fun supports(config: LettaConfig): Boolean =
+            config.serverUrl.startsWith("$scheme://")
+
+        override fun descriptor(config: LettaConfig): BackendDescriptor {
+            val backendKey = config.id.takeIf { it.isNotBlank() } ?: "device"
+            return BackendDescriptor(
+                backendId = BackendId("$providerId:$backendKey"),
+                runtimeId = RuntimeId("$providerId:$backendKey"),
+                kind = kind,
+                label = label,
+                capabilities = BackendCapabilities(
+                    supportsStreaming = true,
+                    supportsMemFs = true,
+                    supportsTools = supportsTools,
+                    supportsApprovals = supportsTools,
+                    supportsAgentFileImport = false,
+                    supportsAgentFileExport = false,
+                ),
+            )
+        }
+
+        override fun turnEngine(config: LettaConfig): TurnEngine = TurnEngine {
             flowOf(
                 RuntimeEventDraft(
                     backendId = it.backendId,
@@ -1041,14 +1134,8 @@ class SessionManagerTest {
                     payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed),
                 ),
             )
-        },
-        memFsStore = InMemoryMemFsStore(
-            commitIdFactory = { path, revision, operation ->
-                MemFsCommitId("${operation.name.lowercase()}-${path.value}-${revision.value}")
-            },
-            clock = { EpochMillis(1_000) },
-        ),
-    )
+        }
+    }
 
     private fun config(id: String): LettaConfig = LettaConfig(
         id = id,
@@ -1056,10 +1143,13 @@ class SessionManagerTest {
         serverUrl = "https://$id.example.test",
     )
 
-    private fun localConfig(id: String): LettaConfig = LettaConfig(
+    private fun localConfig(
+        id: String,
+        serverUrl: String = "local://device",
+    ): LettaConfig = LettaConfig(
         id = id,
         mode = LettaConfig.Mode.LOCAL,
-        serverUrl = "local://device",
+        serverUrl = serverUrl,
     )
 
     private fun sampleRun(id: String, agentId: String) = Run(

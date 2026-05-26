@@ -101,6 +101,11 @@
             android:name=".channel.ChatPushService"
             android:exported="false"
             android:foregroundServiceType="remoteMessaging" />
+
+        <service
+            android:name=".runtime.local.LocalLettaCodeService"
+            android:exported="false"
+            android:foregroundServiceType="remoteMessaging" />
     </application>
 
 </manifest>

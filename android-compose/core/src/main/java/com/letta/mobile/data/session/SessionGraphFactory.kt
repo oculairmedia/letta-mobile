@@ -52,7 +52,6 @@ import com.letta.mobile.runtime.LocalLettaBackend
 import com.letta.mobile.runtime.MemFsStore
 import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.runtime.RuntimeEventOutbox
-import com.letta.mobile.runtime.TurnEngine
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -110,8 +109,8 @@ class SessionGraphFactory internal constructor(
         stepApi: StepApi,
         toolApi: ToolApi,
         runtimeEventOutbox: RuntimeEventOutbox,
-        turnEngine: TurnEngine,
         memFsStore: MemFsStore,
+        localRuntimeProviders: Set<@JvmSuppressWildcards LocalRuntimeProvider>,
         runCursorStore: RunCursorStore = RunCursorStore.inMemory(),
         settingsRepository: ISettingsRepository? = null,
     ) : this(
@@ -139,8 +138,8 @@ class SessionGraphFactory internal constructor(
         settingsRepository = settingsRepository,
         localRuntimeOptions = LocalRuntimeOptions.Enabled(
             runtimeEventOutbox = runtimeEventOutbox,
-            turnEngine = turnEngine,
             memFsStore = memFsStore,
+            providers = localRuntimeProviders,
         ),
     )
 
@@ -212,12 +211,18 @@ class SessionGraphFactory internal constructor(
         }
         return when (this) {
             LocalRuntimeOptions.Disabled -> null
-            is LocalRuntimeOptions.Enabled -> LocalLettaBackend(
-                descriptor = localKoogDescriptor(config),
-                engine = turnEngine,
-                outbox = runtimeEventOutbox,
-                memFsStore = memFsStore,
-            )
+            is LocalRuntimeOptions.Enabled -> {
+                val provider = providers
+                    .filter { it.supports(config) }
+                    .maxWithOrNull(compareBy<LocalRuntimeProvider> { it.priority }.thenBy { it.providerId })
+                    ?: return null
+                LocalLettaBackend(
+                    descriptor = provider.descriptor(config),
+                    engine = provider.turnEngine(config),
+                    outbox = runtimeEventOutbox,
+                    memFsStore = memFsStore,
+                )
+            }
         }
     }
 
@@ -240,23 +245,6 @@ class SessionGraphFactory internal constructor(
         )
     }
 
-    private fun localKoogDescriptor(config: LettaConfig?): BackendDescriptor {
-        val backendKey = config?.id?.takeIf { it.isNotBlank() } ?: "device"
-        return BackendDescriptor(
-            backendId = BackendId("local-koog:$backendKey"),
-            runtimeId = RuntimeId("local-koog:$backendKey"),
-            kind = BackendKind.LocalKoog,
-            label = "Local Kotlin runtime",
-            capabilities = BackendCapabilities(
-                supportsStreaming = true,
-                supportsMemFs = true,
-                supportsTools = false,
-                supportsApprovals = false,
-                supportsAgentFileImport = false,
-                supportsAgentFileExport = false,
-            ),
-        )
-    }
 }
 
 internal sealed interface LocalRuntimeOptions {
@@ -264,7 +252,7 @@ internal sealed interface LocalRuntimeOptions {
 
     data class Enabled(
         val runtimeEventOutbox: RuntimeEventOutbox,
-        val turnEngine: TurnEngine,
         val memFsStore: MemFsStore,
+        val providers: Set<LocalRuntimeProvider>,
     ) : LocalRuntimeOptions
 }

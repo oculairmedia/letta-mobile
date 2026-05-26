@@ -48,7 +48,8 @@ class ConfigViewModel @Inject constructor(
 
     companion object {
         const val DEFAULT_CLOUD_URL = "https://api.letta.com"
-        const val LOCAL_RUNTIME_URL = "local://device"
+        const val LOCAL_RUNTIME_URL = "local-lettacode://device"
+        private const val LEGACY_LOCAL_RUNTIME_URL = "local://device"
     }
 
     // letta-mobile-cdlk: when the route arg signals create-new mode, the
@@ -110,7 +111,7 @@ class ConfigViewModel @Inject constructor(
             ServerMode.CLOUD -> DEFAULT_CLOUD_URL
             ServerMode.LOCAL -> LOCAL_RUNTIME_URL
             ServerMode.SELF_HOSTED ->
-                if (currentState.serverUrl == DEFAULT_CLOUD_URL || currentState.serverUrl == LOCAL_RUNTIME_URL) {
+                if (currentState.serverUrl in setOf(DEFAULT_CLOUD_URL, LOCAL_RUNTIME_URL, LEGACY_LOCAL_RUNTIME_URL)) {
                     ""
                 } else {
                     currentState.serverUrl

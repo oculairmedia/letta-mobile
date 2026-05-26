@@ -5,8 +5,13 @@ fun LettaConfig?.toBackendLabel(): String? {
     return when (config.mode) {
         LettaConfig.Mode.CLOUD -> "Cloud"
         LettaConfig.Mode.SELF_HOSTED -> config.serverUrl.toSelfHostedBackendLabel()
-        LettaConfig.Mode.LOCAL -> "Local Kotlin runtime"
+        LettaConfig.Mode.LOCAL -> config.serverUrl.toLocalRuntimeLabel()
     }
+}
+
+private fun String.toLocalRuntimeLabel(): String = when (localRuntimeScheme()) {
+    "local-koog" -> "Local Koog runtime"
+    else -> "Local LettaCode"
 }
 
 private fun String.toSelfHostedBackendLabel(): String {
@@ -39,3 +44,6 @@ private fun parsedHostLabel(value: String): String? {
         else -> authority
     }
 }
+
+private fun String.localRuntimeScheme(): String =
+    trim().substringBefore("://", missingDelimiterValue = trim()).lowercase()
