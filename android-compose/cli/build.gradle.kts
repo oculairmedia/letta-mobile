@@ -80,6 +80,9 @@ fun splitCliArgs(input: String): List<String> {
             else -> cur.append(c)
         }
     }
+    if (inQuote) {
+        throw IllegalArgumentException("Unbalanced quotes in cliArgs")
+    }
     if (cur.isNotEmpty()) out += cur.toString()
     return out
 }

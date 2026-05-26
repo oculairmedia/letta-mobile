@@ -28,7 +28,7 @@ internal class CliWsSession(
     private val activeConversationId = AtomicReference(initialConversationId)
     private val activeOtid = AtomicReference<String?>(null)
     private var collector: Job? = null
-    private var turnDone = CompletableDeferred<Unit>()
+    private var turnDone = CompletableDeferred<Unit>().apply { complete(Unit) }
     private var lastError: String? = null
 
     val conversationId: String get() = activeConversationId.get()
@@ -64,6 +64,9 @@ internal class CliWsSession(
     }
 
     suspend fun send(text: String, waitForStable: Boolean, timeoutMs: Long): HeadlessTimelineStore {
+        if (!turnDone.isCompleted) {
+            turnDone.completeExceptionally(IllegalStateException("send called while previous turn in-flight"))
+        }
         turnDone = CompletableDeferred()
         lastError = null
         val otid = newCliOtid()

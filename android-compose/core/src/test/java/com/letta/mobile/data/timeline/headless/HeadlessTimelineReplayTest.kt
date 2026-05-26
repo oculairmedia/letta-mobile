@@ -53,7 +53,7 @@ class HeadlessTimelineReplayTest {
     fun `ka770 replay fixture detects duplicate assistant body in one run`() = runTest {
         val lines = requireNotNull(
             javaClass.classLoader?.getResourceAsStream("replay/ka770-duplicate-assistant.jsonl")
-        ).bufferedReader().lineSequence().toList()
+        ).bufferedReader().use { it.lineSequence().toList() }
 
         val result = HeadlessTimelineReplayer().replayJsonl(
             conversationId = "conv-ka770",

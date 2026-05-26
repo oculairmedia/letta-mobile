@@ -1,6 +1,7 @@
 package com.letta.mobile.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.UsageError
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
@@ -100,10 +101,13 @@ internal class SendCommand : AdminShimCommand(
                     initialConversationId = conversationId,
                 )
                 session.startCollecting()
-                session.connect(baseUrl, token, deviceId, clientVersion, timeoutMs = 5_000)
-                session.send(text, waitForStable = waitForStable, timeoutMs = timeoutMs)
-                if (dumpTimeline) println(session.dump())
-                session.disconnect()
+                try {
+                    session.connect(baseUrl, token, deviceId, clientVersion, timeoutMs = 5_000)
+                    session.send(text, waitForStable = waitForStable, timeoutMs = timeoutMs)
+                    if (dumpTimeline) println(session.dump())
+                } finally {
+                    session.disconnect()
+                }
             }
         } finally {
             rest.close()
@@ -121,7 +125,7 @@ internal class DumpTimelineCommand : AdminShimCommand(
     override fun run() = runBlocking {
         val rest = CliRestClient(baseUrl, token)
         try {
-            val messages = rest.fetchMessages(conversation, limit.toInt())
+            val messages = rest.fetchMessages(conversation, limit.validatedIntLimit())
             val store = HeadlessTimelineStore()
             store.hydrate(conversation, messages)
             println(store.dumpJson(conversation))
@@ -142,13 +146,15 @@ internal class ReplayCommand : CliktCommand(
     private val dumpTimeline by option("--dump-timeline").flag(default = false)
 
     override fun run() = runBlocking {
-        val result = HeadlessTimelineReplayer().replayJsonl(
-            conversationId = conversation,
-            lines = Files.readAllLines(Path.of(recording)).asSequence(),
-            assertNoDuplicateUiMessages = assertNoDups,
-            assertOtidUnique = assertOtidUnique,
-            assertSeqMonotonic = assertSeqMonotonic,
-        )
+        val result = Files.newBufferedReader(Path.of(recording)).use { reader ->
+            HeadlessTimelineReplayer().replayJsonl(
+                conversationId = conversation,
+                lines = reader.lineSequence(),
+                assertNoDuplicateUiMessages = assertNoDups,
+                assertOtidUnique = assertOtidUnique,
+                assertSeqMonotonic = assertSeqMonotonic,
+            )
+        }
         println(
             "[replay] frames=${result.framesSeen} ingested=${result.messagesIngested} " +
                 "events=${result.assertionReport.eventCount}"
@@ -277,4 +283,11 @@ private fun ServerFrame.typeName(): String = when (this) {
     is ServerFrame.CronDeleteAllResponse -> "cron_delete_all_response success=$success"
     is ServerFrame.CronsUpdated -> "crons_updated reason=$reason"
     is ServerFrame.Unknown -> "unknown:$type"
+}
+
+private fun Long.validatedIntLimit(): Int {
+    if (this !in 1..Int.MAX_VALUE.toLong()) {
+        throw UsageError("--limit must be between 1 and ${Int.MAX_VALUE}")
+    }
+    return toInt()
 }
