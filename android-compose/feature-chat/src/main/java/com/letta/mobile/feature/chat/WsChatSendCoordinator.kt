@@ -441,7 +441,7 @@ internal class WsChatSendCoordinator(
                         "runId" to event.runId,
                     )
                 }
-                activeWsOtid?.let { otid ->
+                if (event.lossy) activeWsOtid?.let { otid ->
                     timelineRepository.reconcileExternalTransportSend(
                         conversationId = conversationId,
                         agentId = agentId,
