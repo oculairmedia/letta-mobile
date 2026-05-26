@@ -12,6 +12,8 @@ The CLI now has two useful modes:
 - Typed resource command groups wrap the app's main REST-backed admin surfaces
   so agents, conversations, tools, memory, files, projects, MCP, runs, jobs, and
   related resources can be managed without opening the Android UI.
+- `setup apply` / `setup export` provide a declarative JSON/YAML format for
+  replaying profile and server setup from a workstation.
 - `stream` keeps the older direct REST/SSE tracer for low-level comparison when
   debugging server wire frames or merge behavior.
 
@@ -263,6 +265,63 @@ Examples:
 .\gradlew.bat :cli:run -PcliArgs="projects sync-trigger project_x"
 .\gradlew.bat :cli:run -PcliArgs="project-work status issue_x --header If-Match=abc --header Idempotency-Key=run-1 --body '{`"status`":`"closed`"}'"
 ```
+
+### `setup`
+
+Apply or export a whole CLI/app setup without touching a device. Input files may
+be JSON or YAML; export currently writes JSON.
+
+```powershell
+.\gradlew.bat :cli:run -PcliArgs="setup apply --file setup.yaml --dry-run"
+.\gradlew.bat :cli:run -PcliArgs="setup apply --file setup.yaml"
+.\gradlew.bat :cli:run -PcliArgs="setup export --out current-setup.json"
+.\gradlew.bat :cli:run -PcliArgs="setup export --profiles-only --redact-token"
+```
+
+Top-level setup shape:
+
+```json
+{
+  "activeProfile": "dev",
+  "profiles": [
+    {
+      "name": "dev",
+      "baseUrl": "https://letta.oculair.ca",
+      "defaultAgentId": "agt_x",
+      "defaultProjectId": "project_x",
+      "prefs": { "enableProjects": true }
+    }
+  ],
+  "resources": {
+    "agents": [
+      { "ref": "primary", "id": "agt_x", "body": { "name": "Primary" } }
+    ],
+    "tools": [],
+    "blocks": [],
+    "archives": [],
+    "folders": [],
+    "groups": [],
+    "identities": [],
+    "providers": [],
+    "mcpServers": [],
+    "projects": [],
+    "schedules": [
+      { "agentRef": "primary", "body": { "message": "standup", "cron": "0 9 * * *" } }
+    ]
+  },
+  "links": {
+    "agentTools": [
+      { "agentRef": "primary", "toolId": "tool_x" }
+    ]
+  }
+}
+```
+
+Resource entries are upserted when they have an `id`; missing ids are created.
+Use `ref` to connect resources created in the same file through `links` or
+agent-scoped schedules. `--dry-run` prints the mutation plan without changing
+profiles or server state. Server mutations require a token; profile-only setup
+does not.
 
 ### `stream`
 

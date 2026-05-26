@@ -68,6 +68,8 @@ internal abstract class AdminShimCommand(
             "Missing token. Pass --token, set LETTA_TOKEN, or configure a CLI profile."
         )
 
+    protected val optionalToken: String? get() = connection.token
+
     protected fun defaultAgentId(): String? = connection.profile?.defaultAgentId
 
     protected fun defaultConversationId(): String? = connection.profile?.defaultConversationId

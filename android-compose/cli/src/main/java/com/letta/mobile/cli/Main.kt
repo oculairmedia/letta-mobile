@@ -24,6 +24,9 @@ import com.letta.mobile.cli.commands.RestPostCommand
 import com.letta.mobile.cli.commands.RestPutCommand
 import com.letta.mobile.cli.commands.ReplayCommand
 import com.letta.mobile.cli.commands.SendCommand
+import com.letta.mobile.cli.commands.SetupApplyCommand
+import com.letta.mobile.cli.commands.SetupCommand
+import com.letta.mobile.cli.commands.SetupExportCommand
 import com.letta.mobile.cli.commands.StreamCommand
 import com.letta.mobile.cli.commands.buildResourceCommands
 
@@ -63,6 +66,10 @@ object Main {
                     ProfileExportCommand(),
                     ProfileImportCommand(),
                 ),
+                SetupCommand().subcommands(
+                    SetupApplyCommand(),
+                    SetupExportCommand(),
+                ),
                 *buildResourceCommands().toTypedArray(),
                 StreamCommand(),
             )
@@ -85,6 +92,7 @@ object Main {
           reconnect      Exercise disconnect/reconnect and optional run resume.
           rest           Call arbitrary authenticated Letta REST endpoints.
           profile        Manage local CLI backend profiles and defaults.
+          setup          Apply/export declarative CLI app/server setup files.
           agents         Manage agents and agent-scoped attachments/messages.
           conversations  Manage conversations and conversation messages.
           tools          Manage tools and tool-agent attachments.
