@@ -28,9 +28,12 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -708,6 +711,9 @@ class ChannelTransport internal constructor(
             }
 
             is ServerFrame.Error -> {
+                if (frame.code == CURSOR_EXPIRED_ERROR_CODE) {
+                    clearExpiredCursor(frame)
+                }
                 // Errors that close the socket are reported via the
                 // listener's onClosed/onFailure separately. For the
                 // soft-error case (single-flight, missing fields,
@@ -736,7 +742,11 @@ class ChannelTransport internal constructor(
                 // same code path (spec §11). Also broadcast the
                 // wrapper itself so cursor-aware observers can persist
                 // {run_id, seq} for the next resume.
-                val innerText = frame.frame.toString()
+                resumedRunConversationIds[frame.runId]?.let { convId ->
+                    cursorStore.record(convId, frame.runId, frame.seq)
+                }
+                val innerFrame = frame.frame.withProtocolTypeAlias()
+                val innerText = innerFrame.toString()
                 runCatching {
                     json.decodeFromString(ServerFrameSerializer, innerText)
                 }.onSuccess { inner ->
@@ -811,8 +821,8 @@ class ChannelTransport internal constructor(
      *  - `welcome`, `ping`, `a2ui_capabilities`, `user_action_ack`,
      *    `user_action_outcome`, `error` (control plane, not run-scoped)
      *  - `cron_*_response`, `crons_updated` (cron RPC, separate channel)
-     *  - `subscribe_frame`, `subscribe_done` (the wrapper carries seq
-     *    but the inner re-routed frame will record on its own pass)
+     *  - `subscribe_frame`, `subscribe_done` (the wrapper is recorded in
+     *    the typed branch using its owning resume subscription)
      *
      * Also skips frames missing any of the three required fields —
      * `record()` itself guards against that, but the early return
@@ -829,12 +839,53 @@ class ChannelTransport internal constructor(
         val type = obj["type"]?.jsonPrimitive?.contentOrNull ?: return
         if (type in SKIP_CURSOR_TYPES) return
         val runId = obj["run_id"]?.jsonPrimitive?.contentOrNull ?: return
-        val seq = obj["seq"]?.jsonPrimitive?.contentOrNull?.toLongOrNull() ?: return
+        val seq = obj["seq"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+            ?: obj["seq_id"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+            ?: return
         val convId = obj["conversation_id"]?.jsonPrimitive?.contentOrNull
             ?: activeConversationForRun(runId)
             ?: resumedRunConversationIds[runId]
             ?: return
         cursorStore.record(convId, runId, seq)
+    }
+
+    private fun clearExpiredCursor(frame: ServerFrame.Error) {
+        val cleared = mutableListOf<String>()
+        val conversationId = frame.conversationId
+        val runId = frame.runId
+        if (!conversationId.isNullOrEmpty() && !runId.isNullOrEmpty()) {
+            cursorStore.clear(conversationId, runId)
+            resumedRunConversationIds.remove(runId)
+            cleared += "$conversationId/$runId"
+        } else if (!conversationId.isNullOrEmpty()) {
+            cursorStore.activeRuns(conversationId).keys.forEach { activeRunId ->
+                cursorStore.clear(conversationId, activeRunId)
+                resumedRunConversationIds.remove(activeRunId)
+                cleared += "$conversationId/$activeRunId"
+            }
+        } else if (!runId.isNullOrEmpty()) {
+            cursorStore.allActiveRuns().forEach { (activeConversationId, runs) ->
+                if (runs.containsKey(runId)) {
+                    cursorStore.clear(activeConversationId, runId)
+                    resumedRunConversationIds.remove(runId)
+                    cleared += "$activeConversationId/$runId"
+                }
+            }
+        }
+        Log.w(
+            TAG,
+            "cursor_expired afterSeq=${frame.afterSeq} oldestSeq=${frame.oldestSeq} " +
+                "lastSeq=${frame.lastSeq} cleared=${cleared.ifEmpty { listOf("<none>") }}",
+        )
+    }
+
+    private fun JsonObject.withProtocolTypeAlias(): JsonObject {
+        if (containsKey("type")) return this
+        val messageType = this["message_type"]?.jsonPrimitive?.contentOrNull ?: return this
+        return buildJsonObject {
+            this@withProtocolTypeAlias.forEach { (key, value) -> put(key, value) }
+            put("type", JsonPrimitive(messageType))
+        }
     }
 
     /**
@@ -1031,6 +1082,7 @@ class ChannelTransport internal constructor(
     companion object {
         private const val TAG = "ChannelTransport"
         private const val NORMAL_CLOSE = 1000
+        private const val CURSOR_EXPIRED_ERROR_CODE = "cursor_expired"
         private const val MAX_PENDING_A2UI_ACTIONS = 16
         private const val NEW_CONVERSATION_STATE_KEY = "__new_conversation__"
 

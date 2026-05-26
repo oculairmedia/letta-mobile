@@ -153,6 +153,54 @@ class A2uiToolApprovalRoundTripTest {
     }
 
     @Test
+    fun reconnectResumeSendsSubscribeForPersistedRunCursor() = runTest {
+        val cursorStore = RunCursorStore.inMemory().apply {
+            record("conv-resume", "run-resume", 7L)
+        }
+        val server = openServer()
+        val transport = openTransport(cursorStore)
+        val bridge = WsChatBridge(transport)
+
+        connect(transport, bridge, server)
+
+        val subscribe = withRealTimeout { server.frames.receiveOfType("subscribe") }
+        assertEquals("run-resume", subscribe.stringValue("run_id"))
+        assertEquals("7", subscribe["cursor"]?.jsonPrimitive?.contentOrNull)
+    }
+
+    @Test
+    fun subscribeFrameWithMessageTypeOnlyReplaysAndAdvancesCursor() = runTest {
+        val cursorStore = RunCursorStore.inMemory().apply {
+            record("conv-resume", "run-resume", 4L)
+        }
+        val server = openServer()
+        val transport = openTransport(cursorStore)
+        val bridge = WsChatBridge(transport)
+        connect(transport, bridge, server)
+        withRealTimeout { server.frames.receiveOfType("subscribe") }
+
+        val replayed = async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+            bridge.events.first { event ->
+                val message = (event as? WsTimelineEvent.MessageDelta)?.message as? AssistantMessage
+                message?.content == "replayed delta"
+            }
+        }
+
+        server.sendRaw(
+            """
+            {"v":1,"type":"subscribe_frame","id":"sub-env-1","ts":"2026-05-17T00:00:04Z",
+             "run_id":"run-resume","seq":5,
+             "frame":{"v":1,"message_type":"assistant_message","id":"cm-stream-replay","ts":"2026-05-17T00:00:04Z",
+                      "agent_id":"agent-e2e","conversation_id":"conv-resume","turn_id":"turn-resume","run_id":"run-resume",
+                      "content":"replayed delta"}}
+            """.trimIndent()
+        )
+
+        withRealTimeout { replayed.await() }
+        assertEquals(5L, cursorStore.activeRuns("conv-resume")["run-resume"])
+    }
+
+    @Test
     fun scheduleCatalogActionsRoundTripOverAdminShimWebSocket() = runTest {
         val server = openServer()
         val transport = openTransport()
@@ -416,10 +464,10 @@ class A2uiToolApprovalRoundTripTest {
     private fun openServer(): A2uiShimServer =
         A2uiShimServer().also(openServers::add)
 
-    private fun openTransport(): ChannelTransport =
-        // letta-mobile-2rkdj: tests don't need persisted cursors,
-        // so plug in the in-memory store implementation.
-        ChannelTransport(RunCursorStore.inMemory()).also(openTransports::add)
+    private fun openTransport(cursorStore: RunCursorStore = RunCursorStore.inMemory()): ChannelTransport =
+        // letta-mobile-2rkdj: keep tests deterministic by using the
+        // in-memory cursor store, optionally pre-seeded by resume tests.
+        ChannelTransport(cursorStore).also(openTransports::add)
 }
 
 private data class AffordanceScenario(
@@ -582,6 +630,10 @@ private class A2uiShimServer {
              "agent_id":"agent-e2e","conversation_id":"$conversationId","turn_id":"$turnId","run_id":"$runId"}
             """.trimIndent()
         )
+    }
+
+    suspend fun sendRaw(frame: String) {
+        (activeSocket ?: firstSocket.await()).send(frame)
     }
 
     fun closeActiveSocket() {
