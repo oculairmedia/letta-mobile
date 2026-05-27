@@ -399,6 +399,7 @@ internal class WsChatSendCoordinator(
                         "runId" to event.runId,
                     )
                 }
+                markTurnVisuallyComplete(reason = "stopReason")
             }
             is WsTimelineEvent.UsageStatistics -> {
                 recordRuntimeEvent(event)
@@ -524,6 +525,26 @@ internal class WsChatSendCoordinator(
             error = message,
             isStreaming = false,
             isAgentTyping = false,
+        )
+    }
+
+    private suspend fun markTurnVisuallyComplete(reason: String) {
+        val conversationId = activeWsConversationId
+            ?: activeConversationId()
+            ?: defaultShimConversationId(agentId)
+        activeWsOtid?.let { otid ->
+            timelineRepository.markExternalTransportLocalSent(conversationId, otid)
+        }
+        timelineRepository.clearExternalTransportActive(conversationId)
+        uiState.value = uiState.value.copy(
+            isStreaming = false,
+            isAgentTyping = false,
+        )
+        Telemetry.event(
+            "AdminChatVM", "ws.turnVisuallyComplete",
+            "conversationId" to conversationId,
+            "reason" to reason,
+            "turnId" to (activeWsTurnId ?: ""),
         )
     }
 

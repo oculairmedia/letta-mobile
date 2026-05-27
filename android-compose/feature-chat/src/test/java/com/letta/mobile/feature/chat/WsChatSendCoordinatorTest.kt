@@ -440,6 +440,49 @@ class WsChatSendCoordinatorTest {
     }
 
     @Test
+    fun `stop reason clears streaming state before turn done arrives`() = runTest {
+        val wsChatBridge = mockBridge(sendAccepted = true)
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = wsChatBridge,
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = uiState,
+            clearComposerAfterSend = {},
+            activeConversationId = { "conv-1" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+
+        coordinator.send("hello").join()
+        val local = timelineRepository.externalLocals.single()
+        assertEquals(true, uiState.value.isStreaming)
+        assertEquals(true, uiState.value.isAgentTyping)
+
+        coordinator.handleEvent(
+            WsTimelineEvent.StopReason(
+                turnId = "turn-1",
+                runId = "run-1",
+                stopReason = "end_turn",
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(false, uiState.value.isStreaming)
+        assertEquals(false, uiState.value.isAgentTyping)
+        assertEquals(
+            listOf(FakeTimelineExternalTransportWriter.LocalMarker("conv-1", local.otid)),
+            timelineRepository.sentLocals,
+        )
+        assertEquals(listOf("conv-1"), timelineRepository.clearedActiveConversations)
+    }
+
+    @Test
     fun `turn started resets per turn first wins state`() = runTest {
         val wsChatBridge = mockBridge(sendAccepted = true)
         val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))

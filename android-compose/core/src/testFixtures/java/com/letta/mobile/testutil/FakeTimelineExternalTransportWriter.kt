@@ -11,6 +11,7 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
     val sentLocals: MutableList<LocalMarker> = mutableListOf()
     val failedLocals: MutableList<LocalMarker> = mutableListOf()
     val reconciledSends: MutableList<ReconciledSend> = mutableListOf()
+    val clearedActiveConversations: MutableList<String> = mutableListOf()
 
     override suspend fun appendExternalTransportLocal(
         conversationId: String,
@@ -44,7 +45,7 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
     }
 
     override suspend fun clearExternalTransportActive(conversationId: String) {
-        // No-op in test fake
+        clearedActiveConversations += conversationId
     }
 
     data class ExternalLocal(
