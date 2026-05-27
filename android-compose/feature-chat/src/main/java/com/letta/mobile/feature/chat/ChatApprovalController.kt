@@ -11,6 +11,7 @@ internal class ChatApprovalController(
     private val coordinator: ChatApprovalCoordinator,
     private val uiState: MutableStateFlow<ChatUiState>,
     private val bannerController: ChatBannerController,
+    private val agentId: String,
     private val activeConversationId: () -> String?,
 ) {
     fun submitApproval(
@@ -24,6 +25,7 @@ internal class ChatApprovalController(
 
             try {
                 when (val result = coordinator.submitApproval(
+                    agentId = agentId,
                     activeConversationId = activeConversationId(),
                     requestId = requestId,
                     toolCallIds = toolCallIds,
@@ -31,6 +33,8 @@ internal class ChatApprovalController(
                     reason = reason,
                 )) {
                     ChatApprovalResult.Submitted -> Unit
+                    ChatApprovalResult.MissingActiveAgent ->
+                        bannerController.showError("No active agent available for approval")
                     ChatApprovalResult.MissingActiveConversation ->
                         bannerController.showError("No active conversation available for approval")
                     is ChatApprovalResult.Failed ->

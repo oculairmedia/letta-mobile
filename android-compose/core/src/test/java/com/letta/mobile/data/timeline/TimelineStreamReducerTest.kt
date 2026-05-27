@@ -7,6 +7,9 @@ import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.model.UserMessage
+import com.letta.mobile.data.transport.ServerFrame
+import com.letta.mobile.data.transport.ToolCallPayload
+import com.letta.mobile.data.transport.WsFrameMapper
 import com.letta.mobile.util.Telemetry
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
@@ -20,6 +23,28 @@ class TimelineStreamReducerTest {
     @After
     fun tearDown() {
         Telemetry.clear()
+    }
+
+    @Test
+    fun `ws approval request maps through timeline with approval request id`() {
+        val mapped = WsFrameMapper.toLettaMessage(
+            ServerFrame.ToolCallMessage(
+                type = "approval_request_message",
+                id = "approval-1",
+                ts = "2026-05-23T00:00:00Z",
+                agentId = "agent-1",
+                conversationId = "conv-1",
+                turnId = "turn-1",
+                runId = "run-1",
+                toolCall = ToolCallPayload(toolCallId = "call-approval", name = "danger", arguments = "{}"),
+            )
+        )!!
+
+        val event = mapped.toTimelineEvent(position = 1.0)!!
+
+        event.serverId shouldBe "approval-1"
+        event.approvalRequestId shouldBe "approval-1"
+        event.toolCalls.single().effectiveId shouldBe "call-approval"
     }
 
     @Test

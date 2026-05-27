@@ -305,6 +305,7 @@ internal class AdminChatViewModel @Inject constructor(
         coordinator = chatApprovalCoordinator,
         uiState = _uiState,
         bannerController = chatBannerController,
+        agentId = agentId,
         activeConversationId = { chatConversationCoordinator.activeConversationId },
     )
     private val timelineSendCoordinator: TimelineSendCoordinator by lazy {

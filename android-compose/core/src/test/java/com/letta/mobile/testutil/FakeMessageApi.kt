@@ -38,6 +38,8 @@ class FakeMessageApi : MessageApi(mockk(relaxed = true)) {
     var lastNoStreamRequest: MessageCreateRequest? = null
     var lastStreamConversationId: String? = null
     var lastStreamRequest: MessageCreateRequest? = null
+    var lastSendAgentId: String? = null
+    var lastSendRequest: MessageCreateRequest? = null
     var lastSearchRequest: MessageSearchRequest? = null
     var lastCreateBatchRequest: CreateBatchMessagesRequest? = null
     var lastResetAgentId: String? = null
@@ -110,6 +112,18 @@ class FakeMessageApi : MessageApi(mockk(relaxed = true)) {
         if (shouldFail) throw ApiException(500, "Server error")
         lastNoStreamConversationId = conversationId
         lastNoStreamRequest = request
+        return LettaResponse(
+            messages = emptyList(),
+            stopReason = StopReason(reason = "end_turn"),
+            usage = UsageStatistics(totalTokens = 0),
+        )
+    }
+
+    override suspend fun sendMessage(agentId: String, request: MessageCreateRequest): LettaResponse {
+        calls.add("sendMessage:$agentId")
+        if (shouldFail) throw ApiException(500, "Server error")
+        lastSendAgentId = agentId
+        lastSendRequest = request
         return LettaResponse(
             messages = emptyList(),
             stopReason = StopReason(reason = "end_turn"),

@@ -7,9 +7,9 @@ import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.data.mapper.toAppMessages
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.ApprovalCreate
-import com.letta.mobile.data.model.ApprovalResult
 import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.ApprovalResponseMessage
+import com.letta.mobile.data.model.ApprovalSubmission
 import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.BatchMessagesResponse
@@ -427,35 +427,35 @@ open class MessageRepository @Inject constructor(
     }
 
     override suspend fun submitApproval(
-        conversationId: String,
+        agentId: String,
         approvalRequestId: String,
         toolCallIds: List<String>,
         approve: Boolean,
         reason: String?,
     ) {
+        val trimmedReason = reason?.takeIf { it.isNotBlank() }
         val request = MessageCreateRequest(
             messages = listOf(
                 json.encodeToJsonElement(
                     ApprovalCreate.serializer(),
                     ApprovalCreate(
                         approvals = toolCallIds.map { toolCallId ->
-                            ApprovalResult(
+                            ApprovalSubmission(
                                 toolCallId = toolCallId,
                                 approve = approve,
-                                reason = reason?.takeIf { it.isNotBlank() },
-                                status = if (approve) "approved" else "rejected",
+                                reason = trimmedReason,
                             )
                         },
                         approve = approve,
                         approvalRequestId = approvalRequestId,
-                        reason = reason?.takeIf { it.isNotBlank() },
+                        reason = trimmedReason,
                     )
                 )
             ),
             streaming = false,
         )
 
-        messageApi.sendConversationMessage(conversationId, request)
+        messageApi.sendMessage(agentId, request)
     }
 
     override suspend fun resetMessages(agentId: String) {

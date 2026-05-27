@@ -17,6 +17,7 @@ class ChatApprovalCoordinatorTest {
     @Test
     fun `submitApproval returns missing active conversation without repository call`() = runTest {
         val result = coordinator.submitApproval(
+            agentId = "agent-1",
             activeConversationId = null,
             requestId = "approval-1",
             toolCallIds = listOf("tool-1"),
@@ -29,8 +30,24 @@ class ChatApprovalCoordinatorTest {
     }
 
     @Test
+    fun `submitApproval returns missing active agent without repository call`() = runTest {
+        val result = coordinator.submitApproval(
+            agentId = "",
+            activeConversationId = "conv-1",
+            requestId = "approval-1",
+            toolCallIds = listOf("tool-1"),
+            approve = true,
+            reason = null,
+        )
+
+        assertEquals(ChatApprovalResult.MissingActiveAgent, result)
+        coVerify(exactly = 0) { messageRepository.submitApproval(any(), any(), any(), any(), any()) }
+    }
+
+    @Test
     fun `submitApproval forwards decision to repository`() = runTest {
         val result = coordinator.submitApproval(
+            agentId = "agent-1",
             activeConversationId = "conv-1",
             requestId = "approval-1",
             toolCallIds = listOf("tool-1", "tool-2"),
@@ -41,7 +58,7 @@ class ChatApprovalCoordinatorTest {
         assertEquals(ChatApprovalResult.Submitted, result)
         coVerify(exactly = 1) {
             messageRepository.submitApproval(
-                conversationId = "conv-1",
+                agentId = "agent-1",
                 approvalRequestId = "approval-1",
                 toolCallIds = listOf("tool-1", "tool-2"),
                 approve = false,
@@ -55,6 +72,7 @@ class ChatApprovalCoordinatorTest {
         coEvery { messageRepository.submitApproval(any(), any(), any(), any(), any()) } throws IllegalStateException("boom")
 
         val result = coordinator.submitApproval(
+            agentId = "agent-1",
             activeConversationId = "conv-1",
             requestId = "approval-1",
             toolCallIds = listOf("tool-1"),

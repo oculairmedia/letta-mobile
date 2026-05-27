@@ -983,7 +983,6 @@ class TimelineSyncLoop(
             activeStreamCount = activeStreamCount,
             events = _events,
             seenRunIds = seenRunIds,
-            loopScope = loopScope,
             streamSilenceTimeoutMs = streamSilenceTimeoutMs,
             reconcileForExternalRun = ::reconcileForExternalRun,
             ingestStreamEvent = ::submitStreamEvent,

@@ -1,7 +1,6 @@
 package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.api.ApiException
-import com.letta.mobile.data.model.ApprovalCreate
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.BatchMessageRequest
 import com.letta.mobile.data.model.CreateBatchMessagesRequest
@@ -12,11 +11,14 @@ import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.testutil.FakeMessageApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -27,7 +29,6 @@ import org.junit.jupiter.api.Tag
 @Tag("integration")
 class MessageRepositoryTest {
 
-    private val json = Json { ignoreUnknownKeys = true }
     private lateinit var fakeApi: FakeMessageApi
     private lateinit var repository: MessageRepository
 
@@ -95,24 +96,35 @@ class MessageRepositoryTest {
     }
 
     @Test
-    fun `submitApproval builds approval response with optional reason trimmed by blankness`() = runTest {
+    fun `submitApproval sends agent-scoped approval JSON without response-only fields`() = runTest {
         repository.submitApproval(
-            conversationId = "conv-1",
+            agentId = "agent-1",
             approvalRequestId = "approval-1",
             toolCallIds = listOf("tool-a", "tool-b"),
             approve = false,
             reason = " ",
         )
 
-        assertEquals("conv-1", fakeApi.lastStreamConversationId)
-        assertEquals(false, fakeApi.lastStreamRequest?.streaming)
-        val approval = json.decodeFromJsonElement<ApprovalCreate>(fakeApi.lastStreamRequest!!.messages!!.single())
-        assertEquals(false, approval.approve)
-        assertEquals("approval-1", approval.approvalRequestId)
-        assertEquals(null, approval.reason)
-        val approvals = approval.approvals.orEmpty()
-        assertEquals(listOf("tool-a", "tool-b"), approvals.map { it.toolCallId })
-        assertTrue(approvals.all { it.status == "rejected" && it.approve == false })
+        assertEquals("agent-1", fakeApi.lastSendAgentId)
+        assertEquals(null, fakeApi.lastStreamConversationId)
+        assertEquals(false, fakeApi.lastSendRequest?.streaming)
+        val approval = fakeApi.lastSendRequest!!.messages!!.single().jsonObject
+        assertEquals("approval", approval["type"]?.jsonPrimitive?.content)
+        assertEquals(false, approval["approve"]?.jsonPrimitive?.boolean)
+        assertEquals("approval-1", approval["approval_request_id"]?.jsonPrimitive?.content)
+        assertEquals(null, approval["reason"])
+
+        val raw = approval.toString()
+        assertTrue(raw.contains("\"type\":\"approval\""))
+        assertFalse(raw.contains("\"status\""))
+        assertFalse(raw.contains("\"tool_return\""))
+        assertFalse(raw.contains("\"stdout\""))
+        assertFalse(raw.contains("\"stderr\""))
+
+        val approvals = approval["approvals"]!!.jsonArray.map { it.jsonObject }
+        assertEquals(listOf("tool-a", "tool-b"), approvals.map { it["tool_call_id"]?.jsonPrimitive?.content })
+        assertTrue(approvals.all { it["approve"]?.jsonPrimitive?.boolean == false })
+        assertTrue(approvals.all { it["reason"] == null })
     }
 
     @Test

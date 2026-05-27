@@ -1,6 +1,7 @@
 package com.letta.mobile.data.transport
 
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.ToolCall
@@ -50,13 +51,7 @@ object WsFrameMapper {
             seqId = frame.seqId,
         )
 
-        is ServerFrame.ToolCallMessage -> ToolCallMessage(
-            id = frame.id,
-            toolCall = frame.toolCall?.toModel(),
-            toolCalls = frame.toolCalls?.map { it.toModel() },
-            date = frame.ts,
-            runId = frame.runId,
-        )
+        is ServerFrame.ToolCallMessage -> frame.toLettaToolMessage()
 
         is ServerFrame.ToolReturnMessage -> ToolReturnMessage(
             id = frame.id,
@@ -104,4 +99,26 @@ object WsFrameMapper {
         name = name,
         arguments = arguments,
     )
+
+    private fun ServerFrame.ToolCallMessage.toLettaToolMessage(): LettaMessage {
+        val toolCall = toolCall?.toModel()
+        val toolCalls = toolCalls?.map { it.toModel() }
+        return if (type == "approval_request_message") {
+            ApprovalRequestMessage(
+                id = id,
+                toolCall = toolCall,
+                toolCalls = toolCalls,
+                date = ts,
+                runId = runId,
+            )
+        } else {
+            ToolCallMessage(
+                id = id,
+                toolCall = toolCall,
+                toolCalls = toolCalls,
+                date = ts,
+                runId = runId,
+            )
+        }
+    }
 }

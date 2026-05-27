@@ -3,7 +3,6 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.api.NoActiveRunException
 import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.model.StopReason
 import com.letta.mobile.data.stream.SseFrame
 import com.letta.mobile.data.stream.SseParser
 import com.letta.mobile.util.Telemetry
@@ -17,7 +16,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.random.Random
@@ -32,7 +30,6 @@ internal suspend fun runStreamSubscriber(
     activeStreamCount: AtomicInteger,
     events: MutableSharedFlow<TimelineSyncEvent>,
     seenRunIds: MutableSet<String>,
-    loopScope: CoroutineScope,
     streamSilenceTimeoutMs: Long,
     reconcileForExternalRun: suspend (String) -> Unit,
     ingestStreamEvent: suspend (LettaMessage) -> Unit,
@@ -145,26 +142,6 @@ internal suspend fun runStreamSubscriber(
                                     }
                                 }
                                 ingestStreamEvent(message)
-                                // letta-mobile-mge5.21: the server emits stop_reason=
-                                // requires_approval then FINISHES the stream without
-                                // ever sending tool_return/approval_response frames,
-                                // even though these land in REST storage shortly after.
-                                // Schedule a delayed reconcile to pick them up.
-                                if (message is StopReason && message.reason == "requires_approval" && runId != null) {
-                                    val capturedRunId2 = runId
-                                    loopScope.launch {
-                                        kotlinx.coroutines.delay(1500)
-                                        runCatching { reconcileForExternalRun(capturedRunId2) }.onFailure { t ->
-                                            Telemetry.error(
-                                                "TimelineSync", "postApprovalReconcile.failed", t,
-                                                "runId" to capturedRunId2,
-                                            )
-                                        }
-                                        // And one more a little later for long-running tools.
-                                        kotlinx.coroutines.delay(3500)
-                                        runCatching { reconcileForExternalRun(capturedRunId2) }
-                                    }
-                                }
                             }
                             is SseFrame.RawEvent -> Unit
                             SseFrame.Done -> Unit

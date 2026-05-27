@@ -6,18 +6,19 @@ internal class ChatApprovalCoordinator(
     private val messageRepository: MessageRepository,
 ) {
     suspend fun submitApproval(
+        agentId: String,
         activeConversationId: String?,
         requestId: String,
         toolCallIds: List<String>,
         approve: Boolean,
         reason: String?,
     ): ChatApprovalResult {
-        val conversationId = activeConversationId
-            ?: return ChatApprovalResult.MissingActiveConversation
+        if (activeConversationId.isNullOrBlank()) return ChatApprovalResult.MissingActiveConversation
+        if (agentId.isBlank()) return ChatApprovalResult.MissingActiveAgent
 
         return try {
             messageRepository.submitApproval(
-                conversationId = conversationId,
+                agentId = agentId,
                 approvalRequestId = requestId,
                 toolCallIds = toolCallIds,
                 approve = approve,
@@ -31,6 +32,7 @@ internal class ChatApprovalCoordinator(
 }
 
 internal sealed interface ChatApprovalResult {
+    data object MissingActiveAgent : ChatApprovalResult
     data object MissingActiveConversation : ChatApprovalResult
     data object Submitted : ChatApprovalResult
     data class Failed(val message: String) : ChatApprovalResult

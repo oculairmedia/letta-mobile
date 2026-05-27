@@ -1,5 +1,6 @@
 package com.letta.mobile.data.model
 
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -365,6 +366,13 @@ data class ApprovalResult(
     val stderr: List<String>? = null,
 )
 
+@Serializable
+data class ApprovalSubmission(
+    @SerialName("tool_call_id") val toolCallId: String,
+    val approve: Boolean,
+    val reason: String? = null,
+)
+
 /**
  * Server-emitted error frame on the SSE stream. Letta sends an
  * `error_message` (sometimes `error`) when a run aborts mid-flight —
@@ -464,8 +472,9 @@ data class MessageCreate(
 
 @Serializable
 data class ApprovalCreate(
+    @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     val type: String = "approval",
-    val approvals: List<ApprovalResult>? = null,
+    val approvals: List<ApprovalSubmission>? = null,
     val approve: Boolean? = null,
     @SerialName("approval_request_id") val approvalRequestId: String? = null,
     val reason: String? = null,

@@ -55,7 +55,7 @@ interface IMessageRepository : IConversationInspectorMessageRepository {
     suspend fun cancelBatch(batchId: String)
 
     suspend fun submitApproval(
-        conversationId: String,
+        agentId: String,
         approvalRequestId: String,
         toolCallIds: List<String>,
         approve: Boolean,
