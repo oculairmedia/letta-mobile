@@ -20,12 +20,20 @@ internal data class StreamingMarkdownRenderPlan(
 internal data class ParsedMarkdownTable(
     val header: List<String>,
     val rows: List<ParsedTableRow>,
+    val alignments: List<ParsedTableColumnAlignment>,
+    val columnWidths: List<Int>,
 )
 
 internal data class ParsedTableRow(
     val key: String,
     val cells: List<String>,
 )
+
+internal enum class ParsedTableColumnAlignment {
+    Start,
+    Center,
+    End,
+}
 
 /**
  * One renderable block emitted by [splitMarkdownBlocks]. The [key] is
@@ -174,19 +182,79 @@ internal fun parseMarkdownTable(text: String): ParsedMarkdownTable? {
 
     val columnCount = maxOf(header.size, separator.size)
     val normalizedHeader = header.normalizeTableCells(columnCount)
-    val rows = lines.drop(2).mapIndexed { index, line ->
-        if (!line.contains('|')) return null
-        val cells = splitMarkdownTableRow(line).normalizeTableCells(columnCount)
-        ParsedTableRow(
-            key = stableMarkdownTableRowKey(index, cells),
-            cells = cells,
-        )
-    }
+    val alignments = separator
+        .normalizeTableCells(columnCount)
+        .map { it.toParsedTableColumnAlignment() }
+    val rows = lines
+        .drop(2)
+        .filterNot { lineLooksLikeTableSeparator(it, 0, it.length) }
+        .mapIndexed { index, line ->
+            if (!line.contains('|')) return null
+            val cells = splitMarkdownTableRow(line).normalizeTableCells(columnCount)
+            ParsedTableRow(
+                key = stableMarkdownTableRowKey(index, cells),
+                cells = cells,
+            )
+        }
+    val tableRows = listOf(normalizedHeader) + rows.map { it.cells }
     return ParsedMarkdownTable(
         header = normalizedHeader,
         rows = rows,
+        alignments = alignments,
+        columnWidths = markdownTableColumnWidths(tableRows, columnCount),
     )
 }
+
+private fun String.toParsedTableColumnAlignment(): ParsedTableColumnAlignment {
+    val trimmed = trim()
+    return when {
+        trimmed.startsWith(':') && trimmed.endsWith(':') -> ParsedTableColumnAlignment.Center
+        trimmed.endsWith(':') -> ParsedTableColumnAlignment.End
+        else -> ParsedTableColumnAlignment.Start
+    }
+}
+
+internal fun markdownTableColumnWidths(
+    rows: List<List<String>>,
+    columnCount: Int,
+): List<Int> {
+    if (columnCount <= 0) return emptyList()
+    val scores = MutableList(columnCount) { MIN_TABLE_COLUMN_WIDTH_DP }
+    rows.forEach { row ->
+        row.take(columnCount).forEachIndexed { index, cell ->
+            scores[index] = maxOf(scores[index], cell.markdownTableCellWidthScore())
+        }
+    }
+    return scores.map { it.coerceIn(MIN_TABLE_COLUMN_WIDTH_DP, MAX_TABLE_COLUMN_WIDTH_DP) }
+}
+
+private fun String.markdownTableCellWidthScore(): Int {
+    val plain = stripTableCellMarkdown()
+    val longestWord = plain
+        .split(Regex("\\s+"))
+        .maxOfOrNull { it.length }
+        ?: 0
+    val lineLength = plain.length.coerceAtMost(56)
+    return BASE_TABLE_CELL_WIDTH_DP +
+        (longestWord * TABLE_CELL_WORD_WIDTH_STEP_DP) +
+        (lineLength * TABLE_CELL_LINE_WIDTH_STEP_DP)
+}
+
+private fun String.stripTableCellMarkdown(): String =
+    replace(markdownLinkSourceRegex) { match -> match.groupValues[1] }
+        .replace(markdownCodeSourceRegex) { match -> match.groupValues[1] }
+        .replace(markdownMarkerSourceRegex, "")
+        .trim()
+
+private const val MIN_TABLE_COLUMN_WIDTH_DP = 96
+private const val MAX_TABLE_COLUMN_WIDTH_DP = 360
+private const val BASE_TABLE_CELL_WIDTH_DP = 64
+private const val TABLE_CELL_WORD_WIDTH_STEP_DP = 5
+private const val TABLE_CELL_LINE_WIDTH_STEP_DP = 2
+
+private val markdownLinkSourceRegex = Regex("""\[([^\]]+)]\([^)]+\)""")
+private val markdownCodeSourceRegex = Regex("""`([^`\n]+)`""")
+private val markdownMarkerSourceRegex = Regex("""\*\*|__|\*|_|~~""")
 
 internal fun buildStreamingMarkdownRenderPlan(
     partition: StreamingMarkdownPartition,

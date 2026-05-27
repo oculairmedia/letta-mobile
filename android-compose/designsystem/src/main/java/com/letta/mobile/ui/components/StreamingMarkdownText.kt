@@ -5,12 +5,14 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,6 +35,7 @@ import com.letta.mobile.ui.text.rememberChatTextGeometryMeasurer
 import com.letta.mobile.ui.theme.LocalChatFontScale
 import com.letta.mobile.ui.theme.LocalChatIsPinching
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
@@ -250,7 +253,9 @@ fun StreamingMarkdownText(
             activeLineCount = activeLineCount,
         )
     }
-    val heightFloorModifier = if (stableFloorHeightPx > 0) {
+    // This floor is a streaming-only stabilizer. Once the smoother catches up, drop it so a
+    // table's intermediate/tall measured height cannot leave phantom space after the content.
+    val heightFloorModifier = if (isStreaming && stableFloorHeightPx > 0) {
         with(density) { Modifier.heightIn(min = stableFloorHeightPx.toDp()) }
     } else {
         Modifier
@@ -292,6 +297,7 @@ fun StreamingMarkdownText(
             blocks = blocksForRender,
             textColor = textColor,
             stabilizeTables = stabilizeTables,
+            isStreaming = isStreaming,
             tailTransform = tailTransform,
             cursorText = cursorText,
             cursorAlpha = cursorAlpha,
@@ -307,6 +313,7 @@ private fun StreamingMarkdownDocumentBlocks(
     blocks: List<StreamingMarkdownDocumentBlock>,
     textColor: Color,
     stabilizeTables: Boolean,
+    isStreaming: Boolean,
     tailTransform: (String) -> String,
     cursorText: String?,
     cursorAlpha: Float,
@@ -350,6 +357,7 @@ private fun StreamingMarkdownDocumentBlocks(
                 StreamingMarkdownTable(
                     table = parsedTable,
                     textColor = textColor,
+                    useContentColumnWidths = !(isStreaming && isActiveBlock),
                 )
             }
         } else {
@@ -367,14 +375,22 @@ private fun StreamingMarkdownDocumentBlocks(
 private fun StreamingMarkdownTable(
     table: ParsedMarkdownTable,
     textColor: Color,
+    useContentColumnWidths: Boolean,
 ) {
     val outlineColor = MaterialTheme.colorScheme.outlineVariant
     val headerContainer = MaterialTheme.colorScheme.surfaceContainerHigh
     val bodyContainer = LettaCardDefaults.listContainerColor
     val cellTextStyle = MaterialTheme.typography.bodySmall
+    val inlineCodeBackground = MaterialTheme.colorScheme.surfaceVariant
+    val columnWeights = if (useContentColumnWidths) {
+        table.columnWidths
+    } else {
+        emptyList()
+    }
 
     Column(
         modifier = Modifier
+            .fillMaxWidth()
             .padding(vertical = 4.dp)
             .border(1.dp, outlineColor),
     ) {
@@ -386,6 +402,9 @@ private fun StreamingMarkdownTable(
                 outlineColor = outlineColor,
                 fontWeight = FontWeight.SemiBold,
                 cellTextStyle = cellTextStyle,
+                alignments = table.alignments,
+                columnWeights = columnWeights,
+                inlineCodeBackground = inlineCodeBackground,
             )
         }
         table.rows.forEach { row ->
@@ -397,6 +416,9 @@ private fun StreamingMarkdownTable(
                     outlineColor = outlineColor,
                     fontWeight = null,
                     cellTextStyle = cellTextStyle,
+                    alignments = table.alignments,
+                    columnWeights = columnWeights,
+                    inlineCodeBackground = inlineCodeBackground,
                 )
             }
         }
@@ -411,19 +433,49 @@ private fun StreamingMarkdownTableRow(
     outlineColor: Color,
     fontWeight: FontWeight?,
     cellTextStyle: androidx.compose.ui.text.TextStyle,
+    alignments: List<ParsedTableColumnAlignment>,
+    columnWeights: List<Int>,
+    inlineCodeBackground: Color,
 ) {
-    Row(modifier = Modifier.background(containerColor)) {
-        cells.forEach { cell ->
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min)
+            .background(containerColor),
+    ) {
+        cells.forEachIndexed { index, cell ->
+            val textAlign = alignments.getOrElse(index) { ParsedTableColumnAlignment.Start }.toTextAlign()
+            val columnWeight = columnWeights
+                .getOrElse(index) { DEFAULT_TABLE_COLUMN_WEIGHT }
+                .toFloat()
             Text(
-                text = cell,
+                text = remember(cell, inlineCodeBackground) {
+                    buildTableCellAnnotatedString(
+                        source = cell,
+                        inlineCodeBackground = inlineCodeBackground,
+                    )
+                },
                 color = textColor,
-                style = if (fontWeight != null) cellTextStyle.copy(fontWeight = fontWeight) else cellTextStyle,
+                style = if (fontWeight != null) {
+                    cellTextStyle.copy(fontWeight = fontWeight, textAlign = textAlign)
+                } else {
+                    cellTextStyle.copy(textAlign = textAlign)
+                },
                 modifier = Modifier
-                    .weight(1f)
-                    .widthIn(min = 56.dp)
+                    .weight(columnWeight)
+                    .fillMaxHeight()
                     .border(0.5.dp, outlineColor)
                     .padding(horizontal = 8.dp, vertical = 6.dp),
             )
         }
     }
 }
+
+private fun ParsedTableColumnAlignment.toTextAlign(): TextAlign =
+    when (this) {
+        ParsedTableColumnAlignment.Start -> TextAlign.Start
+        ParsedTableColumnAlignment.Center -> TextAlign.Center
+        ParsedTableColumnAlignment.End -> TextAlign.End
+    }
+
+private const val DEFAULT_TABLE_COLUMN_WEIGHT = 1

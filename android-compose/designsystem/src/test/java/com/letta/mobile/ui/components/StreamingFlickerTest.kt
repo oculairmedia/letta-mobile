@@ -338,6 +338,14 @@ class StreamingFlickerTest {
         requireNotNull(table)
         assertEquals(listOf("left", "right", "center"), table.header)
         assertEquals(listOf("a", "b", "c"), table.rows.single().cells)
+        assertEquals(
+            listOf(
+                ParsedTableColumnAlignment.Start,
+                ParsedTableColumnAlignment.End,
+                ParsedTableColumnAlignment.Center,
+            ),
+            table.alignments,
+        )
     }
 
     @Test
@@ -352,6 +360,39 @@ class StreamingFlickerTest {
         assertEquals(first.rows[0].key, second.rows[0].key)
         assertEquals(first.rows[0].cells, second.rows[0].cells)
         assertEquals(2, second.rows.size)
+    }
+
+    @Test
+    fun `table parser skips separator-like body rows without changing existing row keys`() {
+        val first = parseMarkdownTable("| a | b |\n| --- | --- |\n| 1 | 2 |\n")
+        val withExtraSeparator = parseMarkdownTable("| a | b |\n| --- | --- |\n| 1 | 2 |\n| --- | --- |\n")
+        val withNextRow = parseMarkdownTable("| a | b |\n| --- | --- |\n| 1 | 2 |\n| --- | --- |\n| 3 | 4 |\n")
+
+        assertNotNull(first)
+        assertNotNull(withExtraSeparator)
+        assertNotNull(withNextRow)
+        requireNotNull(first)
+        requireNotNull(withExtraSeparator)
+        requireNotNull(withNextRow)
+
+        assertEquals(first.rows, withExtraSeparator.rows)
+        assertEquals(first.rows[0].key, withNextRow.rows[0].key)
+        assertEquals(listOf("3", "4"), withNextRow.rows[1].cells)
+    }
+
+    @Test
+    fun `table parser gives prose-heavy columns more settled width`() {
+        val table = parseMarkdownTable(
+            "| Gate | What |\n" +
+                "| --- | --- |\n" +
+                "| Build flavor | Handler ProGuard'd out of `play-release` entirely; debug/internal only |\n" +
+                "| Runtime toggle | Settings flag, default off, confirm modal to enable |\n",
+        )
+
+        assertNotNull(table)
+        requireNotNull(table)
+        assertEquals(2, table.columnWidths.size)
+        assertTrue(table.columnWidths[1] > table.columnWidths[0])
     }
 
     @Test

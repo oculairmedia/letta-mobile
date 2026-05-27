@@ -157,6 +157,23 @@ class ChatMessageListScrollTest {
     }
 
     @Test
+    fun `streaming geometry measurement does not seed settled exact height for same content`() {
+        val state = ChatMessageGeometryState(maxEntries = 8)
+        val tableMessage = geometrySignature(
+            content = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\nAfter table",
+        )
+
+        state.recordMeasuredHeight(tableMessage, heightPx = 420, isStreaming = true)
+
+        assertEquals(420, state.heightFloorFor(tableMessage, isStreaming = true))
+        assertEquals(0, state.heightFloorFor(tableMessage, isStreaming = false))
+
+        state.recordMeasuredHeight(tableMessage, heightPx = 180, isStreaming = false)
+
+        assertEquals(180, state.heightFloorFor(tableMessage, isStreaming = false))
+    }
+
+    @Test
     fun `inactive streaming geometry buckets are pruned`() {
         val state = ChatMessageGeometryState(maxEntries = 8)
         val first = geometrySignature(renderKey = "msg-first", content = "first")

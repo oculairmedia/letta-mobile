@@ -47,13 +47,14 @@ internal class ChatMessageGeometryState(
         isStreaming: Boolean,
     ) {
         val safeHeight = heightPx.coerceAtLeast(0)
-        exactHeights[signature] = safeHeight
         if (isStreaming) {
             val current = streamingFloors[signature.bucket] ?: 0
             if (safeHeight > current) {
                 streamingFloors[signature.bucket] = safeHeight
             }
+            return
         }
+        exactHeights[signature] = safeHeight
     }
 
     fun retainStreamingBuckets(activeBuckets: Set<ChatMessageGeometryBucket>) {
