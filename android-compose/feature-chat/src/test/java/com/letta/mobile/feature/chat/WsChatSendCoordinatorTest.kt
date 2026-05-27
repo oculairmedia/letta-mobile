@@ -10,6 +10,7 @@ import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.WsChatBridge
+import com.letta.mobile.data.transport.WsConnectionState
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.runtime.BackendCapabilities
 import com.letta.mobile.runtime.BackendDescriptor
@@ -822,6 +823,11 @@ class WsChatSendCoordinatorTest {
             )
         )
         every { events } returns eventFlow
+        every { isConnected() } returns true
+        coEvery { awaitConnected() } returns WsConnectionState.Connected(
+            a2uiEnabled = false,
+            catalog = null,
+        )
         every { send(any(), any(), any(), any(), any(), any()) } returnsMany sendResults
         every { cancel(any()) } returns cancelResult
     }
