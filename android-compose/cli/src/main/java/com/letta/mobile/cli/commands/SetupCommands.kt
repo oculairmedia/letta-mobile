@@ -74,7 +74,7 @@ internal class SetupExportCommand : AdminShimCommand(
             val path = Path.of(out)
             path.parent?.let { Files.createDirectories(it) }
             Files.write(path, output.toByteArray(Charsets.UTF_8))
-            println("""{"exported":"$path"}""")
+            println(jsonStatus("exported", path.toString()))
         }
     }
 }
@@ -143,6 +143,9 @@ private class CliSetupApplier(
             val target = "$group:${id ?: resource.ref ?: "<new>"}"
             if (resource.ref != null && id != null) refs[resource.ref] = id
             if (dryRun) {
+                if (resource.ref != null && id == null) {
+                    refs[resource.ref] = "<planned:$group:${resource.ref}>"
+                }
                 steps += CliSetupPlanStep(if (id == null) "create" else "upsert", target)
                 continue
             }
@@ -235,6 +238,11 @@ private class CliSetupApplier(
                 if (get.status.value in 200..299) {
                     steps += CliSetupPlanStep("exists", "schedule:${schedule.id}", "agent=$agentId")
                     return@forEach
+                }
+                if (get.status.value != 404) {
+                    throw UsageError(
+                        "schedule lookup ${schedule.id} failed: HTTP ${get.status.value} ${get.bodyAsText()}"
+                    )
                 }
             }
             steps += CliSetupPlanStep(if (dryRun) "create" else "create", "schedule:${schedule.id ?: schedule.ref ?: "<new>"}", "agent=$agentId")

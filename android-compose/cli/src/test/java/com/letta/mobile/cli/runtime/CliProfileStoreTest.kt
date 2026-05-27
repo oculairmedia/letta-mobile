@@ -1,8 +1,10 @@
 package com.letta.mobile.cli.runtime
 
+import com.github.ajalt.clikt.core.UsageError
 import java.nio.file.Files
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 
 class CliProfileStoreTest {
@@ -73,5 +75,41 @@ class CliProfileStoreTest {
 
         assertEquals(CliProfileStore.DEFAULT_BASE_URL, connection.baseUrl)
         assertNull(connection.token)
+    }
+
+    @Test
+    fun `explicit missing profile fails instead of falling back`() {
+        val path = Files.createTempDirectory("cli-profile-store").resolve("profiles.json")
+        val store = CliProfileStore(path)
+        store.upsert(CliProfile(name = "dev", baseUrl = "https://profile"), makeActive = true)
+
+        assertThrows(UsageError::class.java) {
+            store.resolve(
+                profileName = "prod",
+                explicitBaseUrl = null,
+                explicitToken = null,
+            )
+        }
+    }
+
+    @Test
+    fun `replace normalizes dangling active profile`() {
+        val path = Files.createTempDirectory("cli-profile-store").resolve("profiles.json")
+        val store = CliProfileStore(path)
+
+        val document = store.replace(
+            CliProfileDocument(
+                activeProfile = "missing",
+                profiles = listOf(
+                    CliProfile(name = "prod"),
+                    CliProfile(name = "dev"),
+                    CliProfile(name = "prod", baseUrl = "https://duplicate"),
+                ),
+            )
+        )
+
+        assertEquals("dev", document.activeProfile)
+        assertEquals(listOf("dev", "prod"), document.profiles.map { it.name })
+        assertEquals(document, store.load())
     }
 }

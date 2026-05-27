@@ -91,8 +91,8 @@ private abstract class BaseResourceEndpointCommand(
             val text = response.bodyAsText()
             if (response.status.value !in 200..299) {
                 System.err.println("[$groupName:${endpoint.name}] HTTP ${response.status.value} ${response.status.description}")
-                if (text.isNotBlank()) System.err.println(text)
                 if (!allowError) {
+                    if (text.isNotBlank()) System.err.println(text)
                     throw IllegalStateException("${endpoint.name} failed: HTTP ${response.status.value}")
                 }
             }
@@ -171,8 +171,10 @@ private class AgentImportCommand : AdminShimCommand(
             val text = response.bodyAsText()
             if (response.status.value !in 200..299) {
                 System.err.println("[agents:import] HTTP ${response.status.value} ${response.status.description}")
-                if (text.isNotBlank()) System.err.println(text)
-                if (!allowError) throw IllegalStateException("agent import failed: HTTP ${response.status.value}")
+                if (!allowError) {
+                    if (text.isNotBlank()) System.err.println(text)
+                    throw IllegalStateException("agent import failed: HTTP ${response.status.value}")
+                }
             }
             formatJsonResponse(text, compact, raw)?.let(::println)
         } finally {
@@ -222,8 +224,10 @@ private class FolderUploadCommand : AdminShimCommand(
             val text = response.bodyAsText()
             if (response.status.value !in 200..299) {
                 System.err.println("[folders:upload] HTTP ${response.status.value} ${response.status.description}")
-                if (text.isNotBlank()) System.err.println(text)
-                if (!allowError) throw IllegalStateException("folder upload failed: HTTP ${response.status.value}")
+                if (!allowError) {
+                    if (text.isNotBlank()) System.err.println(text)
+                    throw IllegalStateException("folder upload failed: HTTP ${response.status.value}")
+                }
             }
             formatJsonResponse(text, compact, raw)?.let(::println)
         } finally {

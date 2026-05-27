@@ -14,7 +14,7 @@ Status legend:
 
 | App API | App routes | CLI coverage | Status |
 | --- | --- | --- | --- |
-| `AgentApi` | `GET/POST /v1/agents`, `GET/PATCH/DELETE /v1/agents/{id}`, `GET /context`, `GET /count`, `GET /export`, `PATCH /archives/attach|detach/{id}` | `agents list/get/create/update/delete/context/count/export/attach-archive/detach-archive` | typed |
+| `AgentApi` | `GET/POST /v1/agents`, `GET/PATCH/DELETE /v1/agents/{id}`, `GET /context`, `GET /count`, `GET /export`, `PATCH /archives/attach\|detach/{id}` | `agents list/get/create/update/delete/context/count/export/attach-archive/detach-archive` | typed |
 | `AgentApi.importAgent` | `POST /v1/agents/import` multipart | `agents import --file ...` | multipart |
 | `ArchiveApi` | `GET/POST /v1/archives/`, `GET/PATCH/DELETE /v1/archives/{id}`, `GET /agents`, `DELETE /passages/{id}` | `archives list/get/create/update/delete/agents/delete-passage` | typed/setup |
 | `BlockApi` | Agent core-memory block routes, `/v1/blocks` CRUD/count/agents, block identity attach/detach | `agents blocks/get-block/update-block/attach-block/detach-block`, `blocks list/get/count/create/update/delete/agents/attach-identity/detach-identity` | typed/setup |

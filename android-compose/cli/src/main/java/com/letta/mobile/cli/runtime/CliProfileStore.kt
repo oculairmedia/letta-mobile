@@ -1,5 +1,6 @@
 package com.letta.mobile.cli.runtime
 
+import com.github.ajalt.clikt.core.UsageError
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -86,12 +87,15 @@ internal class CliProfileStore(
         return document.copy(activeProfile = active, profiles = profiles).also(::save)
     }
 
-    fun replace(document: CliProfileDocument) {
-        save(
-            document.copy(
-                profiles = document.profiles.distinctBy { it.name }.sortedBy { it.name },
-            )
-        )
+    fun replace(document: CliProfileDocument): CliProfileDocument {
+        val normalizedProfiles = document.profiles.distinctBy { it.name }.sortedBy { it.name }
+        val normalizedActive = document.activeProfile
+            ?.takeIf { active -> normalizedProfiles.any { it.name == active } }
+            ?: normalizedProfiles.firstOrNull()?.name
+        return document.copy(
+            activeProfile = normalizedActive,
+            profiles = normalizedProfiles,
+        ).also(::save)
     }
 
     fun resolve(
@@ -102,6 +106,9 @@ internal class CliProfileStore(
         val document = load()
         val resolvedProfileName = profileName ?: document.activeProfile
         val profile = resolvedProfileName?.let { name -> document.profiles.find { it.name == name } }
+        if (profileName != null && profile == null) {
+            throw UsageError("profile not found: $profileName")
+        }
         return CliConnection(
             profileName = resolvedProfileName,
             baseUrl = explicitBaseUrl ?: profile?.baseUrl ?: DEFAULT_BASE_URL,

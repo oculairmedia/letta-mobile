@@ -99,7 +99,7 @@ internal class ProfileUseCommand : CliktCommand(name = "use") {
 
     override fun run() {
         CliProfileStore.default().setActive(name)
-        println("""{"activeProfile":"$name"}""")
+        println(jsonStatus("activeProfile", name))
     }
 }
 
@@ -125,7 +125,7 @@ internal class ProfileExportCommand : CliktCommand(name = "export") {
             val path = Path.of(out)
             path.parent?.let { Files.createDirectories(it) }
             Files.write(path, json.toByteArray(Charsets.UTF_8))
-            println("""{"exported":"$path"}""")
+            println(jsonStatus("exported", path.toString()))
         }
     }
 }
@@ -137,8 +137,8 @@ internal class ProfileImportCommand : CliktCommand(name = "import") {
         val document = CliJson.decodeFromString<CliProfileDocument>(
             String(Files.readAllBytes(Path.of(file)), Charsets.UTF_8)
         )
-        CliProfileStore.default().replace(document)
-        println(profileJson(document.redacted(unless = false)))
+        val normalized = CliProfileStore.default().replace(document)
+        println(profileJson(normalized.redacted(unless = false)))
     }
 }
 

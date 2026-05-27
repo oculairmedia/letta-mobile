@@ -1,5 +1,6 @@
 package com.letta.mobile.cli.runtime
 
+import com.github.ajalt.clikt.core.UsageError
 import io.ktor.client.HttpClient
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
@@ -23,44 +24,50 @@ internal suspend fun HttpClient.executeJsonRestRequest(
     token: String,
     body: String?,
     headers: List<CliHeaderParam> = emptyList(),
-): HttpResponse = when (verb.uppercase()) {
-    "GET" -> get(url) {
-        bearerAuth(token)
-        jsonHeaders(headers)
+): HttpResponse {
+    val normalizedVerb = verb.uppercase()
+    if (normalizedVerb == "GET" && body != null) {
+        throw UsageError("GET does not support --body or --body-file")
     }
-    "POST" -> post(url) {
-        bearerAuth(token)
-        jsonHeaders(headers)
-        body?.let {
-            contentType(ContentType.Application.Json)
-            setBody(it)
+    return when (normalizedVerb) {
+        "GET" -> get(url) {
+            bearerAuth(token)
+            jsonHeaders(headers)
         }
-    }
-    "PUT" -> put(url) {
-        bearerAuth(token)
-        jsonHeaders(headers)
-        body?.let {
-            contentType(ContentType.Application.Json)
-            setBody(it)
+        "POST" -> post(url) {
+            bearerAuth(token)
+            jsonHeaders(headers)
+            body?.let {
+                contentType(ContentType.Application.Json)
+                setBody(it)
+            }
         }
-    }
-    "PATCH" -> patch(url) {
-        bearerAuth(token)
-        jsonHeaders(headers)
-        body?.let {
-            contentType(ContentType.Application.Json)
-            setBody(it)
+        "PUT" -> put(url) {
+            bearerAuth(token)
+            jsonHeaders(headers)
+            body?.let {
+                contentType(ContentType.Application.Json)
+                setBody(it)
+            }
         }
-    }
-    "DELETE" -> delete(url) {
-        bearerAuth(token)
-        jsonHeaders(headers)
-        body?.let {
-            contentType(ContentType.Application.Json)
-            setBody(it)
+        "PATCH" -> patch(url) {
+            bearerAuth(token)
+            jsonHeaders(headers)
+            body?.let {
+                contentType(ContentType.Application.Json)
+                setBody(it)
+            }
         }
+        "DELETE" -> delete(url) {
+            bearerAuth(token)
+            jsonHeaders(headers)
+            body?.let {
+                contentType(ContentType.Application.Json)
+                setBody(it)
+            }
+        }
+        else -> error("Unsupported REST verb: $verb")
     }
-    else -> error("Unsupported REST verb: $verb")
 }
 
 internal fun formatJsonResponse(text: String, compact: Boolean, raw: Boolean): String? {

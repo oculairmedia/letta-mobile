@@ -1,6 +1,7 @@
 package com.letta.mobile.cli.runtime
 
 import com.github.ajalt.clikt.core.UsageError
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -66,7 +67,13 @@ internal fun resolveRequestBody(
     }
     return when {
         inlineBody != null -> inlineBody
-        bodyFile != null -> String(Files.readAllBytes(Path.of(bodyFile)), Charsets.UTF_8)
+        bodyFile != null -> try {
+            String(Files.readAllBytes(Path.of(bodyFile)), Charsets.UTF_8)
+        } catch (error: IOException) {
+            throw UsageError("Unable to read --body-file '$bodyFile': ${error.message}")
+        } catch (error: RuntimeException) {
+            throw UsageError("Unable to read --body-file '$bodyFile': ${error.message}")
+        }
         else -> null
     }
 }

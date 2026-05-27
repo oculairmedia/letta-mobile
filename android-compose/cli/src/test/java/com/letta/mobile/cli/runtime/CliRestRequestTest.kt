@@ -50,4 +50,13 @@ class CliRestRequestTest {
             resolveRequestBody("{}", "body.json")
         }
     }
+
+    @Test
+    fun `resolveRequestBody wraps body file read failures as usage errors`() {
+        val missingFile = Files.createTempDirectory("cli-rest-request").resolve("missing.json")
+
+        assertThrows(UsageError::class.java) {
+            resolveRequestBody(null, missingFile.toString())
+        }
+    }
 }

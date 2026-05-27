@@ -46,8 +46,8 @@ internal abstract class RestVerbCommand(
             val text = response.bodyAsText()
             if (response.status.value !in 200..299) {
                 System.err.println("[rest] HTTP ${response.status.value} ${response.status.description}")
-                if (text.isNotBlank()) System.err.println(text)
                 if (!allowError) {
+                    if (text.isNotBlank()) System.err.println(text)
                     throw IllegalStateException("REST request failed: HTTP ${response.status.value}")
                 }
             }
