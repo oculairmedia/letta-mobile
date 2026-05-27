@@ -18,6 +18,11 @@ class WsChatBridgeTest {
         assertEquals(WsConnectionState.Idle, bridge.connection.first())
         assertFalse(bridge.isConnected())
 
+        transport.state.value = ChannelTransport.State.Connecting
+
+        assertEquals(WsConnectionState.Connecting, bridge.connection.first())
+        assertFalse(bridge.isConnected())
+
         transport.state.value = ChannelTransport.State.Connected(
             serverId = "server",
             sessionId = "session",
@@ -31,6 +36,18 @@ class WsChatBridgeTest {
             bridge.connection.first(),
         )
         assertTrue(bridge.isConnected())
+
+        transport.state.value = ChannelTransport.State.Disconnected(
+            code = 1008,
+            reason = "unauthorized",
+            isAuthFailure = true,
+        )
+
+        assertEquals(
+            WsConnectionState.Disconnected(code = 1008, reason = "unauthorized", isAuthFailure = true),
+            bridge.connection.first(),
+        )
+        assertFalse(bridge.isConnected())
     }
 
     @Test
