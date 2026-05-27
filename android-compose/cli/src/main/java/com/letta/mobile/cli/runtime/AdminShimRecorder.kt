@@ -1,5 +1,8 @@
 package com.letta.mobile.cli.runtime
 
+import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.buildContentParts
+import com.letta.mobile.data.model.toJsonArray
 import com.letta.mobile.data.transport.HelloFrame
 import com.letta.mobile.data.transport.PongFrame
 import com.letta.mobile.data.transport.SendMessageFrame
@@ -32,6 +35,7 @@ internal class AdminShimRecorder {
         agentId: String?,
         conversationId: String?,
         message: String?,
+        attachments: List<MessageContentPart.Image>,
         runId: String?,
         cursor: Long,
         out: Path,
@@ -48,6 +52,7 @@ internal class AdminShimRecorder {
         )
         val done = CompletableDeferred<Unit>()
         val counter = FrameCounter()
+        val shouldSendMessage = message != null || attachments.isNotEmpty()
         val client = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.MILLISECONDS)
@@ -88,14 +93,20 @@ internal class AdminShimRecorder {
                             recordRaw(writer, counter.next(), "outbound", subscribe)
                             webSocket.send(subscribe)
                         }
-                        if (message != null && agentId != null && conversationId != null) {
+                        if (shouldSendMessage && agentId != null && conversationId != null) {
+                            val text = message.orEmpty()
                             val send = SendMessageFrame(
                                 id = UUID.randomUUID().toString(),
                                 ts = nowIso(),
                                 agentId = agentId,
                                 conversationId = conversationId,
-                                text = message,
+                                text = text,
                                 otid = newCliOtid(),
+                                contentParts = if (attachments.isEmpty()) {
+                                    null
+                                } else {
+                                    buildContentParts(text, attachments).toJsonArray()
+                                },
                             ).encodeJson(CliJson)
                             recordRaw(writer, counter.next(), "outbound", send)
                             webSocket.send(send)
@@ -110,7 +121,7 @@ internal class AdminShimRecorder {
                         webSocket.send(pong)
                     }
                     is ServerFrame.TurnDone -> {
-                        if (message != null) {
+                        if (shouldSendMessage) {
                             webSocket.close(1000, "record complete")
                             done.complete(Unit)
                         }
@@ -143,7 +154,7 @@ internal class AdminShimRecorder {
             try {
                 withTimeout(timeoutMs) { done.await() }
             } catch (e: TimeoutCancellationException) {
-                if (message != null) throw e
+                if (shouldSendMessage) throw e
             }
         } finally {
             socketRef?.close(1000, "record done")

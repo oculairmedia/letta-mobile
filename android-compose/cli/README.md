@@ -94,6 +94,14 @@ Send a user message through admin-shim WS and fold the resulting frames through
 .\gradlew.bat :cli:run -PcliArgs="send `"hello`" --agent agt_x --conversation conv_x --wait-for-stable --dump-timeline"
 ```
 
+Attach inline images with `--image` / `-i`. Values may be local image paths or
+`data:image/*;base64,...` URLs; the CLI sends them as Letta `content_parts`, not
+as text placeholders.
+
+```powershell
+.\gradlew.bat :cli:run -PcliArgs="send `"describe this`" --image .\screenshot.png --agent agt_x --conversation conv_x"
+```
+
 If `--conversation` is omitted, the CLI creates one for the supplied agent via
 REST before sending.
 
@@ -126,6 +134,9 @@ To record a send flow, include the message and required agent/conversation:
 ```powershell
 .\gradlew.bat :cli:run -PcliArgs="record --agent agt_x --conversation conv_x --message `"hello`" --out recordings\send.jsonl"
 ```
+
+`record --message` accepts the same repeatable `--image` / `-i` option as
+`send`, and records the outbound `content_parts` frame for replay.
 
 ### `replay`
 

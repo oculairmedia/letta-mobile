@@ -1,5 +1,6 @@
 package com.letta.mobile.cli.runtime
 
+import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.headless.HeadlessTimelineStore
 import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.RunCursorStore
@@ -63,7 +64,12 @@ internal class CliWsSession(
         )
     }
 
-    suspend fun send(text: String, waitForStable: Boolean, timeoutMs: Long): HeadlessTimelineStore {
+    suspend fun send(
+        text: String,
+        attachments: List<MessageContentPart.Image>,
+        waitForStable: Boolean,
+        timeoutMs: Long,
+    ): HeadlessTimelineStore {
         if (!turnDone.isCompleted) {
             turnDone.completeExceptionally(IllegalStateException("send called while previous turn in-flight"))
         }
@@ -75,6 +81,7 @@ internal class CliWsSession(
             conversationId = conversationId,
             text = text,
             otid = otid,
+            attachments = attachments,
         )
         if (!sent) {
             store.markExternalTransportLocalFailed(conversationId, otid)
@@ -85,8 +92,9 @@ internal class CliWsSession(
             conversationId = conversationId,
             content = text,
             otid = otid,
+            attachments = attachments,
         )
-        println("[ws] sent otid=$otid conversationId=$conversationId")
+        println("[ws] sent otid=$otid conversationId=$conversationId attachments=${attachments.size}")
         if (waitForStable) {
             try {
                 withTimeout(timeoutMs) { turnDone.await() }

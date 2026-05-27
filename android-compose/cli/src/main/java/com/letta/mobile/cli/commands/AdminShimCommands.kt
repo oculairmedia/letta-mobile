@@ -3,8 +3,10 @@ package com.letta.mobile.cli.commands
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.UsageError
 import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.arguments.optional
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
+import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.int
@@ -15,6 +17,7 @@ import com.letta.mobile.cli.runtime.CliProfileStore
 import com.letta.mobile.cli.runtime.CliRestClient
 import com.letta.mobile.cli.runtime.CliWsSession
 import com.letta.mobile.cli.runtime.ReplayInteractiveShell
+import com.letta.mobile.cli.runtime.readImageAttachments
 import com.letta.mobile.data.timeline.headless.HeadlessReplayDumpOptions
 import com.letta.mobile.data.timeline.headless.HeadlessTimelineReplayer
 import com.letta.mobile.data.timeline.headless.HeadlessTimelineStore
@@ -123,9 +126,14 @@ internal class SendCommand : AdminShimCommand(
     name = "send",
     help = "Send a message through admin-shim WS and fold frames into the headless timeline.",
 ) {
-    private val text by argument("text")
+    private val text by argument("text").optional()
     private val agentId by option("--agent", envvar = "LETTA_AGENT_ID")
     private val conversation by option("--conversation", envvar = "LETTA_CONVERSATION_ID")
+    private val images by option(
+        "--image",
+        "-i",
+        help = "Image file path or data:image/*;base64,... URL. Repeatable.",
+    ).multiple()
     private val waitForStable by option("--wait-for-stable").flag(default = false)
     private val dumpTimeline by option("--dump-timeline").flag(default = false)
     private val timeoutMs by option("--timeout-ms").long().default(120_000)
@@ -135,6 +143,11 @@ internal class SendCommand : AdminShimCommand(
         try {
             val resolvedAgentId = requireAgentId(agentId)
             val conversationId = conversation ?: defaultConversationId() ?: rest.createConversation(resolvedAgentId).id
+            val attachments = readImageAttachments(images)
+            val messageText = text.orEmpty()
+            if (messageText.isBlank() && attachments.isEmpty()) {
+                throw UsageError("Pass text, --image, or both")
+            }
             coroutineScope {
                 val session = CliWsSession(
                     scope = this,
@@ -144,7 +157,12 @@ internal class SendCommand : AdminShimCommand(
                 session.startCollecting()
                 try {
                     session.connect(baseUrl, token, deviceId, clientVersion, timeoutMs = 5_000)
-                    session.send(text, waitForStable = waitForStable, timeoutMs = timeoutMs)
+                    session.send(
+                        text = messageText,
+                        attachments = attachments,
+                        waitForStable = waitForStable,
+                        timeoutMs = timeoutMs,
+                    )
                     if (dumpTimeline) println(session.dump())
                 } finally {
                     session.disconnect()
@@ -266,13 +284,20 @@ internal class RecordCommand : AdminShimCommand(
     private val agentId by option("--agent", envvar = "LETTA_AGENT_ID")
     private val conversation by option("--conversation", envvar = "LETTA_CONVERSATION_ID")
     private val message by option("--message", "-m")
+    private val images by option(
+        "--image",
+        "-i",
+        help = "Image file path or data:image/*;base64,... URL to send with --message. Repeatable.",
+    ).multiple()
     private val runId by option("--run-id")
     private val cursor by option("--cursor").long().default(0)
     private val timeoutMs by option("--timeout-ms").long().default(120_000)
 
     override fun run() = runBlocking {
-        val resolvedAgentId = if (message != null) requireAgentId(agentId) else agentId ?: defaultAgentId()
-        val resolvedConversationId = if (message != null) {
+        val attachments = readImageAttachments(images)
+        val shouldSendMessage = message != null || attachments.isNotEmpty()
+        val resolvedAgentId = if (shouldSendMessage) requireAgentId(agentId) else agentId ?: defaultAgentId()
+        val resolvedConversationId = if (shouldSendMessage) {
             requireConversationId(conversation)
         } else {
             conversation ?: defaultConversationId()
@@ -283,6 +308,7 @@ internal class RecordCommand : AdminShimCommand(
             agentId = resolvedAgentId,
             conversationId = resolvedConversationId,
             message = message,
+            attachments = attachments,
             runId = runId,
             cursor = cursor,
             out = Path.of(out),
