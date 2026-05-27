@@ -51,6 +51,27 @@ class MobileWsFramesTest : WordSpec({
             out shouldContain "\"theme_hints\""
             out shouldContain LETTA_TOOL_APPROVAL_WIDGET_ID
             (out.contains("\"a2ui_capability\"")) shouldBe false
+            (out.contains("\"resume\"")) shouldBe false
+        }
+
+        "letta-mobile-24c7x hello — serializes conversation resume cursors when present" {
+            val frame = HelloFrame(
+                id = "fid-1",
+                ts = "2026-05-15T12:00:00Z",
+                token = "secret",
+                resume = listOf(
+                    ResumeCursor(conversationId = "conv-a", afterSeq = 12L),
+                    ResumeCursor(conversationId = "conv-b", afterSeq = 44L),
+                ),
+            )
+
+            val out = frame.encodeJson(json)
+
+            out shouldContain "\"resume\":["
+            out shouldContain "\"conv_id\":\"conv-a\""
+            out shouldContain "\"after_seq\":12"
+            out shouldContain "\"conv_id\":\"conv-b\""
+            out shouldContain "\"after_seq\":44"
         }
 
         "spec §2.1 send_message — round-trips otid via snake_case" {

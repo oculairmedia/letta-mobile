@@ -11,6 +11,8 @@ import androidx.compose.ui.test.performClick
 import com.letta.mobile.data.a2ui.A2uiSurfaceManager
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.timeline.ConversationCursorStore
+import com.letta.mobile.data.timeline.NoOpConversationCursorStore
 import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.RunCursorStore
 import com.letta.mobile.data.transport.WsChatBridge
@@ -21,16 +23,22 @@ import com.letta.mobile.ui.test.setLettaTestContent
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.Response
@@ -42,6 +50,7 @@ import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -166,6 +175,78 @@ class A2uiToolApprovalRoundTripTest {
         val subscribe = withRealTimeout { server.frames.receiveOfType("subscribe") }
         assertEquals("run-resume", subscribe.stringValue("run_id"))
         assertEquals("7", subscribe["cursor"]?.jsonPrimitive?.contentOrNull)
+    }
+
+    @Test
+    fun connectSendsHelloResumeForPersistedConversationCursors() = runTest {
+        val conversationCursorStore = FakeConversationCursorStore(
+            "conv-resume-a" to 7L,
+            "conv-resume-b" to 11L,
+        )
+        val server = openServer()
+        val transport = openTransport(conversationCursorStore = conversationCursorStore)
+        val bridge = WsChatBridge(transport)
+
+        connect(transport, bridge, server)
+
+        val hello = withRealTimeout { server.frames.receiveOfType("hello") }
+        val resume = hello["resume"]!!.jsonArray.map { it.jsonObject }
+        assertEquals(listOf("conv-resume-a", "conv-resume-b"), resume.map { it.stringValue("conv_id") })
+        assertEquals(listOf("7", "11"), resume.map { it["after_seq"]!!.jsonPrimitive.content })
+    }
+
+    @Test
+    fun connectOmitsHelloResumeForEmptyConversationCursorStore() = runTest {
+        val server = openServer()
+        val transport = openTransport(conversationCursorStore = FakeConversationCursorStore())
+        val bridge = WsChatBridge(transport)
+
+        connect(transport, bridge, server)
+
+        val hello = withRealTimeout { server.frames.receiveOfType("hello") }
+        assertNull(hello["resume"])
+        assertNull(server.frames.receiveOrNullWithin())
+    }
+
+    @Test
+    fun helloResumeReplayedFramesStayInWireOrderBeforeLiveFrames() = runTest {
+        val conversationCursorStore = FakeConversationCursorStore("conv-resume" to 10L)
+        val server = openServer()
+        val transport = openTransport(conversationCursorStore = conversationCursorStore)
+        val bridge = WsChatBridge(transport)
+        connect(transport, bridge, server)
+
+        val observed = async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+            bridge.events
+                .mapNotNull { event -> (event as? WsTimelineEvent.MessageDelta)?.message as? AssistantMessage }
+                .map { it.content }
+                .take(3)
+                .toList()
+        }
+
+        server.sendRaw(
+            """
+            {"v":1,"type":"assistant_message","id":"cm-stream-replay-1","ts":"2026-05-17T00:00:04Z",
+             "agent_id":"agent-e2e","conversation_id":"conv-resume","turn_id":"turn-resume","run_id":"run-resume",
+             "content":"replay 1","seq":11}
+            """.trimIndent()
+        )
+        server.sendRaw(
+            """
+            {"v":1,"type":"assistant_message","id":"cm-stream-replay-2","ts":"2026-05-17T00:00:05Z",
+             "agent_id":"agent-e2e","conversation_id":"conv-resume","turn_id":"turn-resume","run_id":"run-resume",
+             "content":"replay 2","seq":12}
+            """.trimIndent()
+        )
+        server.sendRaw(
+            """
+            {"v":1,"type":"assistant_message","id":"cm-stream-live","ts":"2026-05-17T00:00:06Z",
+             "agent_id":"agent-e2e","conversation_id":"conv-resume","turn_id":"turn-resume","run_id":"run-resume",
+             "content":"live","seq":13}
+            """.trimIndent()
+        )
+
+        assertEquals(listOf("replay 1", "replay 2", "live"), withRealTimeout { observed.await() })
     }
 
     @Test
@@ -464,10 +545,29 @@ class A2uiToolApprovalRoundTripTest {
     private fun openServer(): A2uiShimServer =
         A2uiShimServer().also(openServers::add)
 
-    private fun openTransport(cursorStore: RunCursorStore = RunCursorStore.inMemory()): ChannelTransport =
+    private fun openTransport(
+        cursorStore: RunCursorStore = RunCursorStore.inMemory(),
+        conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
+    ): ChannelTransport =
         // letta-mobile-2rkdj: keep tests deterministic by using the
         // in-memory cursor store, optionally pre-seeded by resume tests.
-        ChannelTransport(cursorStore).also(openTransports::add)
+        ChannelTransport(cursorStore, conversationCursorStore).also(openTransports::add)
+}
+
+private class FakeConversationCursorStore(
+    vararg cursors: Pair<String, Long>,
+) : ConversationCursorStore {
+    private val highestByConversation = LinkedHashMap(cursors.toMap())
+
+    override suspend fun recordFrame(conversationId: String, seq: Long) {
+        highestByConversation[conversationId] = maxOf(highestByConversation[conversationId] ?: Long.MIN_VALUE, seq)
+    }
+
+    override suspend fun getCursor(conversationId: String): Long? =
+        highestByConversation[conversationId]
+
+    override suspend fun getAllCursors(): Map<String, Long> =
+        highestByConversation.toMap()
 }
 
 private data class AffordanceScenario(
@@ -537,6 +637,13 @@ private suspend fun Channel<JsonObject>.receiveOfType(type: String): JsonObject 
         if (frame.stringValue("type") == type) return frame
     }
 }
+
+private suspend fun Channel<JsonObject>.receiveOrNullWithin(timeoutMs: Long = 250L): JsonObject? =
+    try {
+        withRealTimeout { withTimeout(timeoutMs) { receive() } }
+    } catch (_: TimeoutCancellationException) {
+        null
+    }
 
 private fun elapsedMs(startNanos: Long): Long =
     (System.nanoTime() - startNanos) / 1_000_000

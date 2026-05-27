@@ -2,7 +2,10 @@ package com.letta.mobile.data.transport
 
 import android.util.Log
 import com.letta.mobile.data.a2ui.A2uiAction
+import com.letta.mobile.data.timeline.ConversationCursorStore
+import com.letta.mobile.data.timeline.NoOpConversationCursorStore
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -84,9 +87,23 @@ class ChannelTransport internal constructor(
     // used to drive auto-resume on reconnect. Tests that don't
     // exercise resume can pass [RunCursorStore.inMemory].
     private val cursorStore: RunCursorStore,
+    private val conversationCursorStore: ConversationCursorStore,
 ) : IChannelTransport {
     @Inject
-    constructor(cursorStore: RunCursorStore) : this(defaultChannelTransportScope(), cursorStore)
+    constructor(
+        cursorStore: RunCursorStore,
+        conversationCursorStore: ConversationCursorStore,
+    ) : this(
+        defaultChannelTransportScope(),
+        cursorStore,
+        conversationCursorStore,
+    )
+
+    constructor(cursorStore: RunCursorStore) : this(
+        defaultChannelTransportScope(),
+        cursorStore,
+        NoOpConversationCursorStore,
+    )
 
     sealed interface State {
         data object Idle : State
@@ -164,6 +181,8 @@ class ChannelTransport internal constructor(
     private var reconnectJob: Job? = null
     private var lastConnectionConfig: ConnectionConfig? = null
     private val resumedRunConversationIds = ConcurrentHashMap<String, String>()
+    private val helloResumeAfterSeqByConversation = ConcurrentHashMap<String, Long>()
+    private val helloResumeReplayCountsByConversation = ConcurrentHashMap<String, Long>()
     private val pendingA2uiActionLock = Any()
 
     // letta-mobile-d52f.1: request_id correlation for cron WS round-trips.
@@ -220,6 +239,7 @@ class ChannelTransport internal constructor(
         // letta-mobile-2rkdj: eagerly load persisted cursors so the
         // upcoming welcome handler can iterate them synchronously.
         cursorStore.ensureLoaded()
+        val helloResume = loadHelloResumeCursors()
 
         val wsUrl = baseShimUrl.trimEnd('/').toWsUrl() + "/shim/v1/mobile"
         val request = Request.Builder().url(wsUrl).build()
@@ -233,6 +253,7 @@ class ChannelTransport internal constructor(
                         token = token,
                         deviceId = deviceId,
                         clientVersion = clientVersion,
+                        resume = helloResume.takeIf { it.isNotEmpty() },
                     ).encodeJson(json)
                 )
             }
@@ -602,6 +623,7 @@ class ChannelTransport internal constructor(
         // shim emits without a seq stamp (welcome, ping, cron RPC,
         // subscribe wrappers — see anti-double-record note below).
         recordCursorFromEnvelope(text)
+        recordHelloResumeReplayTelemetry(frame, text)
 
         when (frame) {
             is ServerFrame.Welcome -> {
@@ -784,6 +806,27 @@ class ChannelTransport internal constructor(
         return send(frame.encodeJson(json))
     }
 
+    private suspend fun loadHelloResumeCursors(): List<ResumeCursor> {
+        val cursors = runCatching { conversationCursorStore.getAllCursors() }
+            .onFailure { Log.w(TAG, "Failed to load conversation cursors for hello resume: ${it.message}", it) }
+            .getOrDefault(emptyMap())
+            .filterValues { it >= 0L }
+            .toSortedMap()
+        helloResumeAfterSeqByConversation.clear()
+        helloResumeReplayCountsByConversation.clear()
+        helloResumeAfterSeqByConversation.putAll(cursors)
+        if (cursors.isNotEmpty()) {
+            Telemetry.event(
+                "ChannelTransport", "helloResume.requested",
+                "conversationCount" to cursors.size,
+                "maxAfterSeq" to cursors.values.maxOrNull(),
+            )
+        }
+        return cursors.map { (conversationId, afterSeq) ->
+            ResumeCursor(conversationId = conversationId, afterSeq = afterSeq)
+        }
+    }
+
     /**
      * letta-mobile-2rkdj: pull `(run_id, seq, conversation_id)` from
      * the raw envelope JSON and record it into [cursorStore].
@@ -818,6 +861,31 @@ class ChannelTransport internal constructor(
             ?: resumedRunConversationIds[runId]
             ?: return
         cursorStore.record(convId, runId, seq)
+    }
+
+    private fun recordHelloResumeReplayTelemetry(frame: ServerFrame, text: String) {
+        if (helloResumeAfterSeqByConversation.isEmpty()) return
+        val convId = frame.conversationIdOrNull()
+            ?: runCatching { json.parseToJsonElement(text).jsonObject["conversation_id"]?.jsonPrimitive?.contentOrNull }
+                .getOrNull()
+            ?: return
+        val afterSeq = helloResumeAfterSeqByConversation[convId] ?: return
+        val seq = frame.seqOrNull()
+            ?: runCatching {
+                val obj = json.parseToJsonElement(text).jsonObject
+                obj["seq"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+                    ?: obj["seq_id"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+            }.getOrNull()
+            ?: return
+        if (seq <= afterSeq) return
+        val count = helloResumeReplayCountsByConversation.merge(convId, 1L) { old, inc -> old + inc } ?: 1L
+        Telemetry.event(
+            "ChannelTransport", "helloResume.replayedFrame",
+            "conversationId" to convId,
+            "afterSeq" to afterSeq,
+            "seq" to seq,
+            "replayedFrameCount" to count,
+        )
     }
 
     private fun clearExpiredCursor(frame: ServerFrame.Error) {
@@ -1130,6 +1198,19 @@ class ChannelTransport internal constructor(
             is ServerFrame.ToolReturnMessage -> conversationId
             is ServerFrame.A2ui -> conversationId
             is ServerFrame.UserActionOutcome -> conversationId
+            else -> null
+        }
+
+        private fun ServerFrame.seqOrNull(): Long? = when (this) {
+            is ServerFrame.TurnStarted -> seq
+            is ServerFrame.AssistantMessage -> seq ?: seqId?.toLong()
+            is ServerFrame.ReasoningMessage -> seq ?: seqId?.toLong()
+            is ServerFrame.ToolCallMessage -> seq
+            is ServerFrame.ToolReturnMessage -> seq
+            is ServerFrame.A2ui -> seq
+            is ServerFrame.StopReason -> seq
+            is ServerFrame.UsageStatistics -> seq
+            is ServerFrame.TurnDone -> seq
             else -> null
         }
 

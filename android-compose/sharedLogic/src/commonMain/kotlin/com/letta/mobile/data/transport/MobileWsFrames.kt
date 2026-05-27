@@ -96,7 +96,14 @@ data class HelloFrame(
     @SerialName("supported_catalogs") val supportedCatalogs: List<String> = A2UI_DEFAULT_SUPPORTED_CATALOGS,
     @SerialName("supported_widgets") val supportedWidgets: List<String> = A2UI_DEFAULT_SUPPORTED_WIDGETS,
     @SerialName("theme_hints") val themeHints: A2uiThemeHints = A2uiThemeHints(),
+    val resume: List<ResumeCursor>? = null,
 ) : ClientFrame
+
+@Serializable
+data class ResumeCursor(
+    @SerialName("conv_id") val conversationId: String,
+    @SerialName("after_seq") val afterSeq: Long,
+)
 
 /**
  * lcp-dlj: multimodal sends carry [contentParts] alongside [text].
