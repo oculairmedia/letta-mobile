@@ -42,6 +42,8 @@ import com.letta.mobile.data.repository.StepRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.data.repository.VibesyncEventStreamRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.timeline.ConversationCursorStore
+import com.letta.mobile.data.timeline.NoOpConversationCursorStore
 import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.RunCursorStore
 import com.letta.mobile.runtime.BackendCapabilities
@@ -83,6 +85,7 @@ class SessionGraphFactory internal constructor(
     private val stepApi: StepApi,
     private val toolApi: ToolApi,
     private val runCursorStore: RunCursorStore = RunCursorStore.inMemory(),
+    private val conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
     private val settingsRepository: ISettingsRepository? = null,
     private val localRuntimeOptions: LocalRuntimeOptions = LocalRuntimeOptions.Disabled,
 ) {
@@ -112,6 +115,7 @@ class SessionGraphFactory internal constructor(
         memFsStore: MemFsStore,
         localRuntimeProviders: Set<@JvmSuppressWildcards LocalRuntimeProvider>,
         runCursorStore: RunCursorStore = RunCursorStore.inMemory(),
+        conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
         settingsRepository: ISettingsRepository? = null,
     ) : this(
         agentApi = agentApi,
@@ -135,6 +139,7 @@ class SessionGraphFactory internal constructor(
         stepApi = stepApi,
         toolApi = toolApi,
         runCursorStore = runCursorStore,
+        conversationCursorStore = conversationCursorStore,
         settingsRepository = settingsRepository,
         localRuntimeOptions = LocalRuntimeOptions.Enabled(
             runtimeEventOutbox = runtimeEventOutbox,
@@ -160,7 +165,7 @@ class SessionGraphFactory internal constructor(
             agentDao = agentDao,
             repositoryScope = scope,
         )
-        val channelTransport = ChannelTransport(scope, runCursorStore)
+        val channelTransport = ChannelTransport(scope, runCursorStore, conversationCursorStore)
         return SessionGraph(
             id = graphId,
             backendDescriptor = localRuntimeBackend?.descriptor ?: remoteLettaDescriptor(activeConfig),

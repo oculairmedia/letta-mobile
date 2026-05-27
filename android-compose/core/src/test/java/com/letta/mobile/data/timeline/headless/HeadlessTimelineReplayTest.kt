@@ -344,6 +344,27 @@ class HeadlessTimelineReplayTest {
     }
 
     @Test
+    fun `replay drops late assistant prefix orphan after full assistant`() = runTest {
+        val lines = sequenceOf(
+            recorded("""{"v":1,"type":"assistant_message","id":"cm-full","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"Hello world","seq_id":1}"""),
+            recorded("""{"v":1,"type":"assistant_message","id":"cm-prefix","ts":"2026-05-26T00:00:02Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"Hello","seq_id":2}"""),
+        )
+
+        val result = HeadlessTimelineReplayer().replayJsonl(
+            conversationId = "conv-1",
+            lines = lines,
+            assertNoEmptyBodies = true,
+            assertNoPrefixOrphans = true,
+            expectedUiMessageCountPerRun = 1,
+        )
+
+        result.assertionReport.passed shouldBe true
+        result.assertionReport.eventCount shouldBe 1
+        result.timelineJson.contains("cm-prefix") shouldBe false
+        result.timelineJson.contains("Hello world") shouldBe true
+    }
+
+    @Test
     fun `extended replay assertions check final status and orphan tool returns`() = runTest {
         val lines = sequenceOf(
             recorded("""{"v":1,"type":"tool_return_message","id":"return-1","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","tool_call_id":"call-missing","tool_return":"ok"}"""),
