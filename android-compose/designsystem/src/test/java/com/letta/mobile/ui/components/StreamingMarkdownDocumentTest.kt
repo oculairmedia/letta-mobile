@@ -105,6 +105,35 @@ class StreamingMarkdownDocumentTest {
     }
 
     @Test
+    fun `stable height token can include active paragraph line count`() {
+        val doc = StreamingMarkdownDocumentState()
+            .write("First.\n\nSecond paragraph")
+
+        assertEquals(
+            "${doc.blocks.first().key}|${doc.blocks.last().key}:lines=3",
+            doc.stableHeightToken(isStreaming = true, activeLineCount = 3),
+        )
+    }
+
+    @Test
+    fun `plain text height prediction only applies to simple paragraphs`() {
+        val state = StreamingMarkdownDocumentState()
+
+        assertEquals(
+            true,
+            state.update("Plain streaming prose.").blocks.single().supportsPlainTextHeightPrediction(),
+        )
+        assertEquals(
+            false,
+            state.update("Here is **bold** text").blocks.single().supportsPlainTextHeightPrediction(),
+        )
+        assertEquals(
+            false,
+            state.update("```kotlin\nval x = 1").blocks.single().supportsPlainTextHeightPrediction(),
+        )
+    }
+
+    @Test
     fun `table is parsed as a stable table block once separator arrives`() {
         val doc = StreamingMarkdownDocumentState()
             .write("| A | B |\n| - | - |\n| 1 | 2 |")

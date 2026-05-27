@@ -8,6 +8,7 @@ import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -17,25 +18,33 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.feature.chat.R
 import com.letta.mobile.data.tooloutput.DiffLine
 import com.letta.mobile.data.tooloutput.DiffLineType
 import com.letta.mobile.data.tooloutput.ToolOutputBlock
 import com.letta.mobile.data.tooloutput.ToolOutputDocument
 import com.letta.mobile.data.tooloutput.ToolOutputParser
+import com.letta.mobile.feature.chat.R
+import com.letta.mobile.ui.text.ChatTextLayoutMode
+import com.letta.mobile.ui.text.ChatTextVisualClip
+import com.letta.mobile.ui.text.rememberChatTextGeometryMeasurer
 import com.letta.mobile.ui.theme.LocalChatFontScale
 import com.letta.mobile.ui.theme.LocalChatIsPinching
 import com.letta.mobile.ui.theme.chatTypography
@@ -228,96 +237,139 @@ private fun CodeOutputSurface(
     highlightMode: ToolOutputHighlightMode = ToolOutputHighlightMode.None,
     languageHint: String? = null,
 ) {
-    val limited = remember(text, maxRenderedLines, maxRenderedChars) {
-        limitRenderedText(text, maxLines = maxRenderedLines, maxChars = maxRenderedChars)
-    }
     val syntaxColors = toolOutputSyntaxColors(isError)
-    val highlightInBackground = limited.text.length > ToolOutputBackgroundHighlightThresholdChars &&
-        highlightMode != ToolOutputHighlightMode.None
-    val highlightCacheKey = remember(limited.text, highlightMode, languageHint) {
-        ToolOutputHighlightCacheKey(
-            content = limited.text.toolOutputContentKey(),
-            mode = highlightMode,
-            languageHint = languageHint,
-        )
-    }
-    val cachedSpans = remember(highlightCacheKey) { ToolOutputCaches.getHighlightSpans(highlightCacheKey) }
-    val initialAnnotatedText = remember(
-        limited.text,
-        highlightMode,
-        languageHint,
-        syntaxColors,
-        highlightInBackground,
-        cachedSpans,
-    ) {
-        when {
-            highlightMode == ToolOutputHighlightMode.None -> AnnotatedString(limited.text)
-            cachedSpans != null -> annotatedToolOutputText(
-                text = limited.text,
-                spans = cachedSpans,
-                colors = syntaxColors,
-            )
-            highlightInBackground -> AnnotatedString(limited.text)
-            else -> annotatedToolOutputText(
-                text = limited.text,
-                spans = cachedToolOutputHighlightSpans(
-                    text = limited.text,
-                    mode = highlightMode,
-                    languageHint = languageHint,
-                ),
-                colors = syntaxColors,
-            )
-        }
-    }
-    val annotatedText by produceState(
-        initialValue = initialAnnotatedText,
-        limited.text,
-        highlightMode,
-        languageHint,
-        syntaxColors,
-        highlightInBackground,
-        cachedSpans,
-    ) {
-        if (highlightInBackground && cachedSpans == null) {
-            val spans = withContext(Dispatchers.Default) {
-                cachedToolOutputHighlightSpans(
-                    text = limited.text,
-                    mode = highlightMode,
-                    languageHint = languageHint,
-                )
-            }
-            value = annotatedToolOutputText(
-                text = limited.text,
-                spans = spans,
-                colors = syntaxColors,
-            )
-        }
-    }
+    val textStyle = toolOutputTextStyle()
+    val geometryMeasurer = rememberChatTextGeometryMeasurer()
+    val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
+    var measuredContentWidthPx by remember { mutableIntStateOf(0) }
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(6.dp),
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
         tonalElevation = 0.dp,
     ) {
-        Column(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp, vertical = 7.dp),
-            verticalArrangement = Arrangement.spacedBy(5.dp),
         ) {
-            MonospaceText(
-                text = annotatedText,
-                color = syntaxColors.default,
-                maxLines = maxLines,
-            )
-            if (showLimitNotice) {
+            val constrainedWidthPx = remember(maxWidth, density) {
+                if (maxWidth.value.isFinite()) {
+                    with(density) { maxWidth.roundToPx() }
+                } else {
+                    0
+                }
+            }
+            val contentWidthPx = measuredContentWidthPx.takeIf { it > 0 } ?: constrainedWidthPx
+            val limited = remember(
+                text,
+                maxRenderedLines,
+                maxRenderedChars,
+                contentWidthPx,
+                textStyle,
+                density.density,
+                density.fontScale,
+                layoutDirection,
+                geometryMeasurer,
+            ) {
+                if (contentWidthPx > 0) {
+                    geometryMeasurer.clipToVisualLines(
+                        text = text,
+                        style = textStyle,
+                        widthPx = contentWidthPx,
+                        density = density,
+                        layoutDirection = layoutDirection,
+                        mode = ChatTextLayoutMode.Code,
+                        maxLines = maxRenderedLines,
+                        maxChars = maxRenderedChars,
+                    ).toLimitedText()
+                } else {
+                    limitRenderedText(text, maxLines = maxRenderedLines, maxChars = maxRenderedChars)
+                }
+            }
+            val highlightInBackground = limited.text.length > ToolOutputBackgroundHighlightThresholdChars &&
+                highlightMode != ToolOutputHighlightMode.None
+            val highlightCacheKey = remember(limited.text, highlightMode, languageHint) {
+                ToolOutputHighlightCacheKey(
+                    content = limited.text.toolOutputContentKey(),
+                    mode = highlightMode,
+                    languageHint = languageHint,
+                )
+            }
+            val cachedSpans = remember(highlightCacheKey) { ToolOutputCaches.getHighlightSpans(highlightCacheKey) }
+            val initialAnnotatedText = remember(
+                limited.text,
+                highlightMode,
+                languageHint,
+                syntaxColors,
+                highlightInBackground,
+                cachedSpans,
+            ) {
                 when {
-                    limited.omittedLines > 0 -> ToolOutputLimitNotice(
-                        text = stringResource(R.string.screen_chat_tool_output_lines_omitted, limited.omittedLines),
+                    highlightMode == ToolOutputHighlightMode.None -> AnnotatedString(limited.text)
+                    cachedSpans != null -> annotatedToolOutputText(
+                        text = limited.text,
+                        spans = cachedSpans,
+                        colors = syntaxColors,
                     )
-                    limited.omittedChars > 0 -> ToolOutputLimitNotice(
-                        text = stringResource(R.string.screen_chat_tool_output_chars_omitted, limited.omittedChars),
+                    highlightInBackground -> AnnotatedString(limited.text)
+                    else -> annotatedToolOutputText(
+                        text = limited.text,
+                        spans = cachedToolOutputHighlightSpans(
+                            text = limited.text,
+                            mode = highlightMode,
+                            languageHint = languageHint,
+                        ),
+                        colors = syntaxColors,
                     )
+                }
+            }
+            val annotatedText by produceState(
+                initialValue = initialAnnotatedText,
+                limited.text,
+                highlightMode,
+                languageHint,
+                syntaxColors,
+                highlightInBackground,
+                cachedSpans,
+            ) {
+                if (highlightInBackground && cachedSpans == null) {
+                    val spans = withContext(Dispatchers.Default) {
+                        cachedToolOutputHighlightSpans(
+                            text = limited.text,
+                            mode = highlightMode,
+                            languageHint = languageHint,
+                        )
+                    }
+                    value = annotatedToolOutputText(
+                        text = limited.text,
+                        spans = spans,
+                        colors = syntaxColors,
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onSizeChanged { size -> measuredContentWidthPx = size.width },
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                MonospaceText(
+                    text = annotatedText,
+                    color = syntaxColors.default,
+                    maxLines = maxLines,
+                    style = textStyle,
+                )
+                if (showLimitNotice) {
+                    when {
+                        limited.omittedLines > 0 -> ToolOutputLimitNotice(
+                            text = stringResource(R.string.screen_chat_tool_output_lines_omitted, limited.omittedLines),
+                        )
+                        limited.omittedChars > 0 -> ToolOutputLimitNotice(
+                            text = stringResource(R.string.screen_chat_tool_output_chars_omitted, limited.omittedChars),
+                        )
+                    }
                 }
             }
         }
@@ -462,12 +514,11 @@ private fun MonospaceText(
     color: Color,
     modifier: Modifier = Modifier,
     maxLines: Int = Int.MAX_VALUE,
+    style: TextStyle = toolOutputTextStyle(),
 ) {
     Text(
         text = text,
-        style = MaterialTheme.typography.listItemSupporting
-            .copy(fontFamily = MaterialTheme.chatTypography.codeBlock.fontFamily ?: LettaCodeFont)
-            .scaledBy(LocalChatFontScale.current),
+        style = style,
         color = color,
         maxLines = maxLines,
         overflow = TextOverflow.Ellipsis,
@@ -475,6 +526,12 @@ private fun MonospaceText(
         modifier = modifier.fillMaxWidth(),
     )
 }
+
+@Composable
+private fun toolOutputTextStyle(): TextStyle =
+    MaterialTheme.typography.listItemSupporting
+        .copy(fontFamily = MaterialTheme.chatTypography.codeBlock.fontFamily ?: LettaCodeFont)
+        .scaledBy(LocalChatFontScale.current)
 
 @Composable
 private fun ToolOutputLimitNotice(text: String) {
@@ -527,3 +584,10 @@ private fun ToolOutputSyntaxColors.colorFor(kind: ToolOutputHighlightKind): Colo
     ToolOutputHighlightKind.Error -> error
     ToolOutputHighlightKind.Header -> header
 }
+
+private fun ChatTextVisualClip.toLimitedText(): LimitedText =
+    LimitedText(
+        text = text,
+        omittedLines = omittedLines,
+        omittedChars = omittedChars,
+    )

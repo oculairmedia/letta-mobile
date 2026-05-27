@@ -130,6 +130,7 @@ dependencies {
     testImplementation("androidx.test.ext:junit-ktx:1.3.0")
     testImplementation("com.google.dagger:hilt-android-testing:2.59.2")
     kspTest("com.google.dagger:hilt-compiler:2.59.2")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.0")
     testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.1.0")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")

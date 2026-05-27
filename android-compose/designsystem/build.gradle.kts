@@ -107,6 +107,7 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("io.mockk:mockk:1.14.9")
     testImplementation("org.junit.jupiter:junit-jupiter-api:6.1.0")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.0")
     testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.1.0")
 }
 

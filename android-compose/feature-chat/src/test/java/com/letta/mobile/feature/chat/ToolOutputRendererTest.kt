@@ -1,5 +1,7 @@
 package com.letta.mobile.feature.chat
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -13,6 +15,8 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.tooloutput.DiffFile
@@ -76,6 +80,32 @@ class ToolOutputRendererTest {
         )
 
         composeRule.onNodeWithText("ordinary prose output").assertIsDisplayed()
+    }
+
+    @Test
+    fun collapsedPreviewClipsLongLogicalLineByVisualLines() {
+        val raw = (0..220).joinToString(" ") { index -> "token$index" }
+
+        composeRule.setContent {
+            LettaTheme(
+                appTheme = AppTheme.LIGHT,
+                themePreset = ThemePreset.DEFAULT,
+                dynamicColor = false,
+            ) {
+                LettaChatTheme {
+                    Box(modifier = Modifier.width(180.dp)) {
+                        ToolOutputRenderer(
+                            raw = raw,
+                            expanded = false,
+                            isError = false,
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("token0", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("token80", substring = true).assertDoesNotExist()
     }
 
     @Test
