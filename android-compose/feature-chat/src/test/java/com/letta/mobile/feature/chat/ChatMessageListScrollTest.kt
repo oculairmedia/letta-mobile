@@ -2,6 +2,9 @@ package com.letta.mobile.feature.chat
 
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
+import kotlinx.collections.immutable.persistentSetOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
@@ -126,11 +129,76 @@ class ChatMessageListScrollTest {
         assertEquals(before, after)
     }
 
+    @Test
+    fun `streaming geometry floor follows render bucket across content growth`() {
+        val state = ChatMessageGeometryState(maxEntries = 8)
+        val short = geometrySignature(content = "Hello")
+        val longer = geometrySignature(content = "Hello, this is still streaming")
+
+        state.recordMeasuredHeight(short, heightPx = 120, isStreaming = true)
+        state.recordMeasuredHeight(longer, heightPx = 96, isStreaming = true)
+
+        assertEquals(120, state.heightFloorFor(longer, isStreaming = true))
+
+        state.recordMeasuredHeight(longer, heightPx = 148, isStreaming = true)
+
+        assertEquals(148, state.heightFloorFor(longer, isStreaming = true))
+    }
+
+    @Test
+    fun `streaming geometry floor does not constrain settled content`() {
+        val state = ChatMessageGeometryState(maxEntries = 8)
+        val short = geometrySignature(content = "Hello")
+        val longer = geometrySignature(content = "Hello after the stream ends")
+
+        state.recordMeasuredHeight(short, heightPx = 120, isStreaming = true)
+
+        assertEquals(0, state.heightFloorFor(longer, isStreaming = false))
+    }
+
+    @Test
+    fun `inactive streaming geometry buckets are pruned`() {
+        val state = ChatMessageGeometryState(maxEntries = 8)
+        val first = geometrySignature(renderKey = "msg-first", content = "first")
+        val firstGrown = geometrySignature(renderKey = "msg-first", content = "first after more tokens")
+        val second = geometrySignature(renderKey = "msg-second", content = "second")
+        val secondGrown = geometrySignature(renderKey = "msg-second", content = "second after more tokens")
+
+        state.recordMeasuredHeight(first, heightPx = 120, isStreaming = true)
+        state.recordMeasuredHeight(second, heightPx = 80, isStreaming = true)
+        state.retainStreamingBuckets(setOf(second.bucket))
+
+        assertEquals(0, state.heightFloorFor(firstGrown, isStreaming = true))
+        assertEquals(80, state.heightFloorFor(secondGrown, isStreaming = true))
+    }
+
+    @Test
+    fun `render item geometry signature changes for width scale direction expansion and content`() {
+        val item = single("assistant", content = "hello")
+        val base = item.chatGeometrySignature()
+
+        assertNotEquals(base, item.chatGeometrySignature(widthPx = 480))
+        assertNotEquals(base, item.chatGeometrySignature(activeFontScale = 1.2f))
+        assertNotEquals(base, item.chatGeometrySignature(layoutDirection = LayoutDirection.Rtl))
+        assertNotEquals(base, single("assistant", content = "hello world").chatGeometrySignature())
+
+        val reasoning = single("reasoning", content = "thinking").copy(
+            message = message(id = "reasoning", content = "thinking", isReasoning = true),
+        )
+        val collapsed = reasoning.chatGeometrySignature(state = ChatUiState())
+        val expanded = reasoning.chatGeometrySignature(
+            state = ChatUiState(expandedReasoningMessageIds = persistentSetOf("reasoning")),
+        )
+
+        assertNotEquals(collapsed, expanded)
+    }
+
     private fun single(
         id: String,
-        ts: String,
+        ts: String = "2026-04-20T12:00:00Z",
+        content: String = id,
     ): ChatRenderItem.Single = ChatRenderItem.Single(
-        message = message(id = id, ts = ts),
+        message = message(id = id, ts = ts, content = content),
         groupPosition = GroupPosition.None,
     )
 
@@ -146,10 +214,47 @@ class ChatMessageListScrollTest {
         id: String,
         ts: String = "2026-04-20T12:00:00Z",
         content: String = id,
+        isReasoning: Boolean = false,
     ) = UiMessage(
         id = id,
         role = "assistant",
         content = content,
         timestamp = ts,
+        isReasoning = isReasoning,
     )
+
+    private fun geometrySignature(
+        renderKey: String = "msg-assistant",
+        content: String,
+        widthPx: Int = 320,
+    ): ChatRenderItemGeometrySignature =
+        ChatRenderItemGeometrySignature(
+            bucket = ChatMessageGeometryBucket(
+                renderKey = renderKey,
+                widthPx = widthPx,
+                densityBucket = 2000,
+                fontScaleBucket = 1000,
+                chatFontScaleBucket = 1000,
+                layoutDirection = LayoutDirection.Ltr,
+                chatMode = "interactive",
+                expansionHash = 17,
+            ),
+            contentLength = content.length,
+            contentHash = content.hashCode(),
+        )
+
+    private fun ChatRenderItem.chatGeometrySignature(
+        state: ChatUiState = ChatUiState(),
+        widthPx: Int = 320,
+        activeFontScale: Float = 1f,
+        layoutDirection: LayoutDirection = LayoutDirection.Ltr,
+    ): ChatRenderItemGeometrySignature =
+        chatGeometrySignature(
+            state = state,
+            chatMode = "interactive",
+            widthPx = widthPx,
+            density = Density(density = 2f, fontScale = 1f),
+            layoutDirection = layoutDirection,
+            activeFontScale = activeFontScale,
+        )
 }

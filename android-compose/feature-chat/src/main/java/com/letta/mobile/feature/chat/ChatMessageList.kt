@@ -7,12 +7,14 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -40,6 +42,9 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontFamily
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
@@ -76,6 +81,9 @@ internal fun ChatMessageList(
     val scope = rememberCoroutineScope()
     val chatDimens = MaterialTheme.chatDimens
     val chatShapes = MaterialTheme.chatShapes
+    val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
+    val itemGeometryState = remember { ChatMessageGeometryState() }
     var highlightedMessageId by remember { mutableStateOf<String?>(null) }
     var hasScrolledToTarget by remember { mutableStateOf(false) }
     var showFontIndicator by remember { mutableStateOf(false) }
@@ -175,7 +183,7 @@ internal fun ChatMessageList(
         }
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .pointerInput(Unit) {
@@ -213,6 +221,48 @@ internal fun ChatMessageList(
                 }
             },
     ) {
+        val contentWidthPx = with(density) {
+            (maxWidth - chatDimens.contentPaddingHorizontal - chatDimens.contentPaddingHorizontal)
+                .roundToPx()
+                .coerceAtLeast(0)
+        }
+        val newestMessageId = state.messages.lastOrNull()?.id
+        val activeStreamingGeometryBuckets = remember(
+            state.isStreaming,
+            newestMessageId,
+            renderItems,
+            contentWidthPx,
+            activeFontScale,
+            density.density,
+            density.fontScale,
+            layoutDirection,
+            chatMode,
+            state.collapsedRunIds,
+            state.expandedReasoningMessageIds,
+            state.activeApprovalRequestId,
+        ) {
+            if (!state.isStreaming || newestMessageId == null) {
+                emptySet()
+            } else {
+                renderItems
+                    .filter { it.containsMessageId(newestMessageId) }
+                    .map {
+                        it.chatGeometrySignature(
+                            state = state,
+                            chatMode = chatMode,
+                            widthPx = contentWidthPx,
+                            density = density,
+                            layoutDirection = layoutDirection,
+                            activeFontScale = activeFontScale,
+                        ).bucket
+                    }
+                    .toSet()
+            }
+        }
+        SideEffect {
+            itemGeometryState.retainStreamingBuckets(activeStreamingGeometryBuckets)
+        }
+
         // letta-mobile-5e0f.r2: provide LocalChatIsPinching to
         // the entire chat content tree so animateContentSize
         // sites can suppress themselves during the gesture.
@@ -248,9 +298,25 @@ internal fun ChatMessageList(
                         is ChatRenderItem.Single -> "single"
                         is ChatRenderItem.RunBlock -> "runblock"
                     }) {
+                        val geometrySignature = renderItem.chatGeometrySignature(
+                            state = state,
+                            chatMode = chatMode,
+                            widthPx = contentWidthPx,
+                            density = density,
+                            layoutDirection = layoutDirection,
+                            activeFontScale = activeFontScale,
+                        )
+                        val isStreamingRenderItem = state.isStreaming &&
+                            newestMessageId != null &&
+                            renderItem.containsMessageId(newestMessageId)
                         // letta-mobile-lbur follow-up: log render item keys for dedup analysis
-                        when (renderItem) {
-                            is ChatRenderItem.Single -> {
+                        MeasuredChatRenderItem(
+                            signature = geometrySignature,
+                            geometryState = itemGeometryState,
+                            isStreaming = isStreamingRenderItem,
+                        ) {
+                            when (renderItem) {
+                                is ChatRenderItem.Single -> {
                                 // letta-mobile-m772.4 follow-up: reasoning bubbles that
                                 // land as Single (because their run had only one message,
                                 // or because the message predates runId tracking) still
@@ -313,7 +379,7 @@ internal fun ChatMessageList(
                                 }
                             }
 
-                            is ChatRenderItem.RunBlock -> {
+                                is ChatRenderItem.RunBlock -> {
                                 val isHighlighted = renderItem.containsMessageId(highlightedMessageId.orEmpty())
                                 val highlightModifier = if (isHighlighted) {
                                     Modifier.background(
@@ -345,7 +411,8 @@ internal fun ChatMessageList(
                                         onToggleReasoning = { onToggleReasoningExpanded(message.id) },
                                         modifier = rowModifier,
                                     )
-                        }
+                                }
+                            }
                         }
                     }
                     }
@@ -407,6 +474,37 @@ internal fun ChatMessageList(
                     .padding(horizontal = LettaSpacing.innerPadding + LettaSpacing.cardGap, vertical = LettaSpacing.innerPaddingSmall),
             )
         }
+    }
+}
+
+@Composable
+private fun MeasuredChatRenderItem(
+    signature: ChatRenderItemGeometrySignature,
+    geometryState: ChatMessageGeometryState,
+    isStreaming: Boolean,
+    content: @Composable () -> Unit,
+) {
+    val density = LocalDensity.current
+    val heightFloorPx = geometryState.heightFloorFor(signature, isStreaming)
+    val minHeightModifier = if (heightFloorPx > 0) {
+        Modifier.heightIn(min = with(density) { heightFloorPx.toDp() })
+    } else {
+        Modifier
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(minHeightModifier)
+            .onSizeChanged { size ->
+                geometryState.recordMeasuredHeight(
+                    signature = signature,
+                    heightPx = size.height,
+                    isStreaming = isStreaming,
+                )
+            },
+    ) {
+        content()
     }
 }
 

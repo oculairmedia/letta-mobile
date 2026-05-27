@@ -68,7 +68,47 @@ class ChatTextGeometryCacheTest {
         assertNotEquals(base, base.copy(mode = ChatTextLayoutMode.Code))
     }
 
-    private fun geometryKey(text: String, widthPx: Int): ChatTextGeometryKey =
+    @Test
+    fun `prepared content key covers representative chat text corpus`() {
+        val samples = listOf(
+            "Plain English assistant prose with punctuation and wrapping.",
+            "中文段落需要按字符换行，同时保持缓存键稳定。",
+            "مرحبا، هذا نص عربي لاختبار اتجاه الكتابة.",
+            "Emoji mix: hello 👋🏽 world 🌍 with family 👨‍👩‍👧‍👦.",
+            "https://example.com/a/very/long/path?query=chat-text-geometry-cache#section",
+            "```kotlin\nval answer = listOf(1, 2, 3).sum()\n```",
+            (1..40).joinToString(separator = "\n") { index -> "log line $index: ${"x".repeat(index % 17 + 3)}" },
+        )
+
+        val keys = samples.map { it.chatTextContentKey() }
+
+        assertEquals(samples.size, keys.toSet().size)
+        samples.zip(keys).forEach { (sample, key) ->
+            assertEquals(sample.length, key.length)
+            assertEquals(sample.hashCode(), key.hash)
+            assertEquals(sample.take(96), key.prefix)
+            assertEquals(sample.takeLast(96), key.suffix)
+        }
+    }
+
+    @Test
+    fun `geometry keys distinguish corpus layout modes`() {
+        val prose = geometryKey("hello world", widthPx = 240, mode = ChatTextLayoutMode.Plain)
+        val markdown = geometryKey("**hello** world", widthPx = 240, mode = ChatTextLayoutMode.MarkdownParagraph)
+        val code = geometryKey("hello_world = true", widthPx = 240, mode = ChatTextLayoutMode.Code)
+        val preWrap = geometryKey("line 1\nline 2", widthPx = 240, mode = ChatTextLayoutMode.PreWrap)
+
+        assertNotEquals(prose, markdown)
+        assertNotEquals(prose, code)
+        assertNotEquals(prose, preWrap)
+        assertNotEquals(code, preWrap)
+    }
+
+    private fun geometryKey(
+        text: String,
+        widthPx: Int,
+        mode: ChatTextLayoutMode = ChatTextLayoutMode.Plain,
+    ): ChatTextGeometryKey =
         ChatTextGeometryKey(
             content = text.chatTextContentKey(),
             widthPx = widthPx,
@@ -76,7 +116,7 @@ class ChatTextGeometryCacheTest {
             fontScale = 1f,
             layoutDirection = LayoutDirection.Ltr,
             styleFingerprint = 7,
-            mode = ChatTextLayoutMode.Plain,
+            mode = mode,
             softWrap = true,
             maxLines = Int.MAX_VALUE,
         )
