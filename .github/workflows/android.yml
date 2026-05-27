@@ -161,6 +161,10 @@ jobs:
           SENTRY_URL: ${{ github.event_name != 'pull_request' && secrets.SENTRY_URL || '' }}
         run: ./gradlew ${{ matrix.gradle_task }} --build-cache
 
+      - name: Validate play-release APK size and R8 config
+        if: matrix.variant == 'play-release'
+        run: bash ../scripts/ci/validate-android-release-apk.sh
+
       - name: Remove signing keystore
         # Same hygiene as the release workflow -- runner is ephemeral but
         # don't leave the decoded keystore on disk longer than needed.
