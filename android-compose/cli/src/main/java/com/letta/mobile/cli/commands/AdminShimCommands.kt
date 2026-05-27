@@ -191,6 +191,12 @@ internal class ReplayCommand : AdminShimCommand(
     private val assertUiMessageCountPerRun by option("--assert-ui-message-count-per-run").int()
     private val assertFinalStatusMatches by option("--assert-final-status-matches")
     private val assertNoOrphanToolReturns by option("--assert-no-orphan-tool-returns").flag(default = false)
+    private val assertRunCompletes by option("--assert-run-completes").flag(default = false)
+    private val assertNoAbandonedToolCalls by option("--assert-no-abandoned-tool-calls").flag(default = false)
+    private val assertApprovalToolReturnOnApprovalRun by option(
+        "--assert-approval-tool-return-on-approval-run"
+    ).flag(default = false)
+    private val assertOtidStableAcrossRetry by option("--assert-otid-stable-across-retry").flag(default = false)
     private val dumpTimeline by option("--dump-timeline").flag(default = false)
     private val dumpAfterEachFrame by option("--dump-after-each-frame").flag(default = false)
     private val dumpAfterFrame by option("--dump-after-frame").int()
@@ -209,6 +215,10 @@ internal class ReplayCommand : AdminShimCommand(
             ),
             expectedFinalStatus = assertFinalStatusMatches.validatedFinalStatusOrNull(),
             assertNoOrphanToolReturns = assertNoOrphanToolReturns,
+            assertRunCompletes = assertRunCompletes,
+            assertNoAbandonedToolCalls = assertNoAbandonedToolCalls,
+            assertApprovalToolReturnOnApprovalRun = assertApprovalToolReturnOnApprovalRun,
+            assertOtidStableAcrossRetry = assertOtidStableAcrossRetry,
         )
         if (interactive) {
             val conversationId = requireConversationId(conversation)

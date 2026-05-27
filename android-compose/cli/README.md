@@ -154,6 +154,14 @@ Supported assertions:
   observed run status must match the expected terminal status.
 - `--assert-no-orphan-tool-returns`: every observed tool return must have a
   matching tool call in the same run.
+- `--assert-run-completes`: every observed run must reach `completed`,
+  `cancelled`, or `failed`.
+- `--assert-no-abandoned-tool-calls`: terminal runs must not leave any
+  timeline tool-call event without an attached tool return.
+- `--assert-approval-tool-return-on-approval-run`: tool returns for approval
+  requests must stay on the approval run that emitted the request.
+- `--assert-otid-stable-across-retry`: the same server message id/type must not
+  be observed with multiple OTIDs across retry/replay boundaries.
 
 Use `--dump-timeline` to print the final folded timeline JSON.
 

@@ -243,6 +243,10 @@ data class TimelineAssertionOptions(
     val expectedUiMessageCountPerRun: Int? = null,
     val expectedFinalStatus: String? = null,
     val assertNoOrphanToolReturns: Boolean = false,
+    val assertRunCompletes: Boolean = false,
+    val assertNoAbandonedToolCalls: Boolean = false,
+    val assertApprovalToolReturnOnApprovalRun: Boolean = false,
+    val assertOtidStableAcrossRetry: Boolean = false,
 )
 
 private fun Timeline.toDumpJson(): JsonObject = buildJsonObject {

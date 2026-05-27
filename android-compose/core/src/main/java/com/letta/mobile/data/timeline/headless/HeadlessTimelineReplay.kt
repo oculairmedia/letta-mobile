@@ -1,5 +1,8 @@
 package com.letta.mobile.data.timeline.headless
 
+import com.letta.mobile.data.timeline.Timeline
+import com.letta.mobile.data.timeline.TimelineEvent
+import com.letta.mobile.data.timeline.TimelineMessageType
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.ServerFrameSerializer
 import com.letta.mobile.data.transport.WsFrameMapper
@@ -28,6 +31,10 @@ class HeadlessTimelineReplayer(
         expectedUiMessageCountPerRun: Int? = null,
         expectedFinalStatus: String? = null,
         assertNoOrphanToolReturns: Boolean = false,
+        assertRunCompletes: Boolean = false,
+        assertNoAbandonedToolCalls: Boolean = false,
+        assertApprovalToolReturnOnApprovalRun: Boolean = false,
+        assertOtidStableAcrossRetry: Boolean = false,
         dumpOptions: HeadlessReplayDumpOptions = HeadlessReplayDumpOptions(),
     ): HeadlessReplayResult {
         val assertionOptions = TimelineAssertionOptions(
@@ -39,6 +46,10 @@ class HeadlessTimelineReplayer(
             expectedUiMessageCountPerRun = expectedUiMessageCountPerRun,
             expectedFinalStatus = expectedFinalStatus,
             assertNoOrphanToolReturns = assertNoOrphanToolReturns,
+            assertRunCompletes = assertRunCompletes,
+            assertNoAbandonedToolCalls = assertNoAbandonedToolCalls,
+            assertApprovalToolReturnOnApprovalRun = assertApprovalToolReturnOnApprovalRun,
+            assertOtidStableAcrossRetry = assertOtidStableAcrossRetry,
         )
         return replayJsonl(
             conversationId = conversationId,
@@ -88,8 +99,11 @@ class HeadlessTimelineReplaySession(
     private val ignoredTypes = linkedMapOf<String, Int>()
     private val seqsByRun = linkedMapOf<String, MutableList<Long>>()
     private val finalStatusesByRun = linkedMapOf<String, String>()
+    private val observedRunIds = linkedSetOf<String>()
     private val toolCallIdsByRun = linkedMapOf<String?, MutableSet<String>>()
     private val toolReturns = mutableListOf<ObservedToolReturn>()
+    private val approvalRunByToolCallId = linkedMapOf<String, String>()
+    private val otidsByMessageKey = linkedMapOf<String, MutableSet<String>>()
 
     suspend fun ingestLine(
         line: String,
@@ -147,7 +161,7 @@ class HeadlessTimelineReplaySession(
 
         val (innerFrame, innerJson) = innerPair
         if (frame is ServerFrame.SubscribeFrameMessage) seqsByRun.recordSeq(innerJson)
-        recordObservedFrame(innerFrame)
+        recordObservedFrame(innerFrame, innerJson)
         val message = WsFrameMapper.toLettaMessage(innerFrame)
         val frameType = innerJson.typeName()
         val frameId = innerJson.frameId()
@@ -183,6 +197,7 @@ class HeadlessTimelineReplaySession(
             conversationId = conversationId,
             options = options,
         )
+        val timeline = store.snapshot(conversationId)
         val failures = timelineReport.failures.toMutableList()
         if (options.assertSeqMonotonic) {
             failures += rawSeqFailures()
@@ -195,6 +210,18 @@ class HeadlessTimelineReplaySession(
         }
         if (options.assertNoOrphanToolReturns) {
             failures += orphanToolReturnFailures()
+        }
+        if (options.assertRunCompletes) {
+            failures += runCompletionFailures(timeline)
+        }
+        if (options.assertNoAbandonedToolCalls) {
+            failures += abandonedToolCallFailures(timeline)
+        }
+        if (options.assertApprovalToolReturnOnApprovalRun) {
+            failures += approvalToolReturnRunFailures(timeline)
+        }
+        if (options.assertOtidStableAcrossRetry) {
+            failures += otidStabilityFailures()
         }
         return timelineReport.copy(failures = failures)
     }
@@ -245,7 +272,9 @@ class HeadlessTimelineReplaySession(
         )
     }
 
-    private fun recordObservedFrame(frame: ServerFrame) {
+    private fun recordObservedFrame(frame: ServerFrame, frameJson: JsonObject) {
+        frame.runIdForAssertionOrNull()?.let { observedRunIds += it }
+        recordMessageOtid(frameJson)
         when (frame) {
             is ServerFrame.TurnDone -> finalStatusesByRun[frame.runId] = frame.status
             is ServerFrame.SubscribeDone -> finalStatusesByRun[frame.runId] = frame.status
@@ -254,6 +283,9 @@ class HeadlessTimelineReplaySession(
                 val runKey = frame.runId
                 frame.toolCallIds().forEach { id ->
                     toolCallIdsByRun.getOrPut(runKey) { linkedSetOf() } += id
+                    if (frame.type == "approval_request_message") {
+                        approvalRunByToolCallId[id] = frame.runId
+                    }
                 }
             }
             is ServerFrame.ToolReturnMessage -> {
@@ -282,6 +314,81 @@ class HeadlessTimelineReplaySession(
         } else {
             "orphan tool_return ${toolReturn.frameId} in run ${toolReturn.runId}: tool_call_id=${toolReturn.toolCallId}"
         }
+    }
+
+    private fun runCompletionFailures(timeline: Timeline): List<String> {
+        val timelineRunIds = timeline.events
+            .filterIsInstance<TimelineEvent.Confirmed>()
+            .mapNotNull { it.runId }
+        val runIds = (observedRunIds + timelineRunIds).sorted()
+        return runIds.mapNotNull { runId ->
+            val status = finalStatusesByRun[runId]
+            if (status in TERMINAL_RUN_STATUSES) {
+                null
+            } else {
+                "run $runId did not reach terminal status (last status=${status ?: "<none>"})"
+            }
+        }
+    }
+
+    private fun abandonedToolCallFailures(timeline: Timeline): List<String> {
+        val terminalRunIds = finalStatusesByRun
+            .filterValues { it in TERMINAL_RUN_STATUSES }
+            .keys
+            .toSet()
+        return timeline.events
+            .filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.TOOL_CALL && it.runId in terminalRunIds }
+            .flatMap { event ->
+                event.toolCalls.mapNotNull { toolCall ->
+                    val callId = toolCall.effectiveId.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                    if (callId in event.toolReturnContentByCallId) {
+                        null
+                    } else {
+                        "abandoned tool_call $callId in run ${event.runId}: ${event.serverId} reached " +
+                            "${finalStatusesByRun[event.runId]}"
+                    }
+                }
+            }
+    }
+
+    private fun approvalToolReturnRunFailures(timeline: Timeline): List<String> {
+        val approvalRunByCallId = timeline.events
+            .filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.approvalRequestId != null && it.runId != null }
+            .flatMap { event ->
+                event.toolCalls.mapNotNull { toolCall ->
+                    val callId = toolCall.effectiveId.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                    callId to event.runId.orEmpty()
+                }
+            }
+            .toMap()
+            .let { fromTimeline -> approvalRunByToolCallId + fromTimeline }
+        return toolReturns.mapNotNull { toolReturn ->
+            val approvalRunId = approvalRunByCallId[toolReturn.toolCallId] ?: return@mapNotNull null
+            if (toolReturn.runId == approvalRunId) {
+                null
+            } else {
+                "approval tool_return ${toolReturn.frameId} for tool_call_id=${toolReturn.toolCallId} " +
+                    "landed on run ${toolReturn.runId ?: "<none>"} instead of approval run $approvalRunId"
+            }
+        }
+    }
+
+    private fun otidStabilityFailures(): List<String> =
+        otidsByMessageKey.mapNotNull { (messageKey, otids) ->
+            if (otids.size <= 1) {
+                null
+            } else {
+                "message $messageKey observed with multiple otids: ${otids.sorted().joinToString()}"
+            }
+        }
+
+    private fun recordMessageOtid(frameJson: JsonObject) {
+        val otid = frameJson["otid"]?.jsonPrimitive?.contentOrNull ?: return
+        val type = frameJson.typeName()
+        val id = frameJson.frameId() ?: return
+        otidsByMessageKey.getOrPut("$type/$id") { linkedSetOf() } += otid
     }
 }
 
@@ -347,6 +454,8 @@ private data class ObservedToolReturn(
     val toolCallId: String,
 )
 
+private val TERMINAL_RUN_STATUSES = setOf("completed", "cancelled", "failed")
+
 private fun String.toRecordedFrameJsonOrNull(): JsonObject? {
     val element = runCatching { replayJson.parseToJsonElement(this).jsonObject }.getOrNull() ?: return null
     val raw = element["raw"]?.jsonPrimitive?.contentOrNull
@@ -383,6 +492,21 @@ private fun ServerFrame.conversationIdOrNull(): String? = when (this) {
     is ServerFrame.ToolCallMessage -> conversationId
     is ServerFrame.ToolReturnMessage -> conversationId
     is ServerFrame.A2ui -> conversationId
+    else -> null
+}
+
+private fun ServerFrame.runIdForAssertionOrNull(): String? = when (this) {
+    is ServerFrame.TurnStarted -> runId
+    is ServerFrame.TurnDone -> runId
+    is ServerFrame.SubscribeDone -> runId
+    is ServerFrame.AssistantMessage -> runId
+    is ServerFrame.ReasoningMessage -> runId
+    is ServerFrame.ToolCallMessage -> runId
+    is ServerFrame.ToolReturnMessage -> runId
+    is ServerFrame.StopReason -> runId
+    is ServerFrame.UsageStatistics -> runId
+    is ServerFrame.Error -> runId
+    is ServerFrame.A2ui -> runId
     else -> null
 }
 

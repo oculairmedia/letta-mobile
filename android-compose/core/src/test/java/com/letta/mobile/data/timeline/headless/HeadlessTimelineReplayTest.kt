@@ -153,6 +153,51 @@ class HeadlessTimelineReplayTest {
             "orphan tool_return return-1 in run run-1: tool_call_id=call-missing"
     }
 
+    @Test
+    fun `run shape assertions catch incomplete runs and abandoned tool calls`() = runTest {
+        val lines = sequenceOf(
+            recorded("""{"v":1,"type":"turn_started","id":"start-1","ts":"2026-05-26T00:00:00Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-open"}"""),
+            recorded("""{"v":1,"type":"assistant_message","id":"cm-open","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-open","content":"still running","seq_id":1}"""),
+            recorded("""{"v":1,"type":"tool_call_message","id":"toolcall-1","ts":"2026-05-26T00:00:02Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-2","run_id":"run-done","tool_call":{"tool_call_id":"call-1","name":"Bash","arguments":"{}"}}"""),
+            recorded("""{"v":1,"type":"turn_done","id":"done-1","ts":"2026-05-26T00:00:03Z","turn_id":"turn-2","run_id":"run-done","status":"completed"}"""),
+        )
+
+        val result = HeadlessTimelineReplayer().replayJsonl(
+            conversationId = "conv-1",
+            lines = lines,
+            assertRunCompletes = true,
+            assertNoAbandonedToolCalls = true,
+        )
+
+        result.assertionReport.passed shouldBe false
+        result.assertionReport.failures shouldContain
+            "run run-open did not reach terminal status (last status=<none>)"
+        result.assertionReport.failures shouldContain
+            "abandoned tool_call call-1 in run run-done: toolcall-1 reached completed"
+    }
+
+    @Test
+    fun `run shape assertions catch approval run mismatch and otid drift`() = runTest {
+        val lines = sequenceOf(
+            recorded("""{"v":1,"type":"approval_request_message","id":"toolcall-approval","ts":"2026-05-26T00:00:00Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-approval","run_id":"run-approval","tool_call":{"tool_call_id":"approval-call","name":"Bash","arguments":"{}"},"otid":"stable-1"}"""),
+            recorded("""{"v":1,"type":"approval_request_message","id":"toolcall-approval","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-approval","run_id":"run-approval","tool_call":{"tool_call_id":"approval-call","name":"Bash","arguments":"{}"},"otid":"stable-2"}"""),
+            recorded("""{"v":1,"type":"tool_return_message","id":"return-approval","ts":"2026-05-26T00:00:02Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-primary","run_id":"run-primary","tool_call_id":"approval-call","tool_return":"ok"}"""),
+        )
+
+        val result = HeadlessTimelineReplayer().replayJsonl(
+            conversationId = "conv-1",
+            lines = lines,
+            assertApprovalToolReturnOnApprovalRun = true,
+            assertOtidStableAcrossRetry = true,
+        )
+
+        result.assertionReport.passed shouldBe false
+        result.assertionReport.failures shouldContain
+            "approval tool_return return-approval for tool_call_id=approval-call landed on run run-primary instead of approval run run-approval"
+        result.assertionReport.failures shouldContain
+            "message approval_request_message/toolcall-approval observed with multiple otids: stable-1, stable-2"
+    }
+
     private fun recorded(frameJson: String): String =
         """{"direction":"inbound","frame":$frameJson}"""
 }
