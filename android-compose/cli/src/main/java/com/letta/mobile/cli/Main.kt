@@ -16,6 +16,7 @@ import com.letta.mobile.cli.commands.ProfileSetCommand
 import com.letta.mobile.cli.commands.ProfileShowCommand
 import com.letta.mobile.cli.commands.ProfileUseCommand
 import com.letta.mobile.cli.commands.RecordCommand
+import com.letta.mobile.cli.commands.RecordCursorStateCommand
 import com.letta.mobile.cli.commands.ReconnectCommand
 import com.letta.mobile.cli.commands.RestCommand
 import com.letta.mobile.cli.commands.RestDeleteCommand
@@ -50,6 +51,7 @@ object Main {
                 DumpTimelineCommand(),
                 ReplayCommand(),
                 RecordCommand(),
+                RecordCursorStateCommand(),
                 DisconnectCommand(),
                 ReconnectCommand(),
                 RestCommand().subcommands(
@@ -91,6 +93,7 @@ object Main {
           dump-timeline  Fetch conversation history and emit stable timeline JSON.
           replay         Replay a recorded WS JSONL fixture through the reducer.
           record         Capture admin-shim WS wire frames as replay-compatible JSONL.
+          record-cursor-state  Snapshot highest observed run cursors from a JSONL fixture.
           disconnect     Open WS and close it cleanly.
           reconnect      Exercise disconnect/reconnect and optional run resume.
           rest           Call arbitrary authenticated Letta REST endpoints.

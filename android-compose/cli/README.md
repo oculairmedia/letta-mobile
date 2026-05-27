@@ -76,10 +76,14 @@ explicit flags/env vars are omitted.
 ### `connect`
 
 Open the admin-shim mobile WebSocket, print incoming frame summaries, wait for
-the welcome state, then optionally hold the connection open.
+the welcome state, then optionally hold the connection open. Use
+`--conversation`, `--run-id`, and `--resume-cursor` to seed the same
+`RunCursorStore` path the app uses; after welcome, `ChannelTransport` dispatches
+the production resume `subscribe(run_id, cursor)` frame.
 
 ```powershell
 .\gradlew.bat :cli:run -PcliArgs="connect --hold-ms 10000"
+.\gradlew.bat :cli:run -PcliArgs="connect --conversation conv_x --run-id run_x --resume-cursor 42 --hold-ms 10000"
 ```
 
 The output includes the `canonical_live_transport` advertised by the welcome
@@ -125,6 +129,12 @@ To record a send flow, include the message and required agent/conversation:
 
 ```powershell
 .\gradlew.bat :cli:run -PcliArgs="record --agent agt_x --conversation conv_x --message `"hello`" --out recordings\send.jsonl"
+```
+
+Snapshot the highest observed cursor state from a capture/recording with:
+
+```powershell
+.\gradlew.bat :cli:run -PcliArgs="record-cursor-state --recording recordings\resume.jsonl"
 ```
 
 ### `capture`
@@ -180,6 +190,14 @@ Supported assertions:
   requests must stay on the approval run that emitted the request.
 - `--assert-otid-stable-across-retry`: the same server message id/type must not
   be observed with multiple OTIDs across retry/replay boundaries.
+- `--resume-from-cursor=N`: treat frames with `seq <= N` as already applied and
+  skip them during replay, matching a resumed client tail.
+- `--assert-no-gap-on-resume`: with `--resume-from-cursor`, post-resume seqs
+  must start at `N+1` and remain contiguous.
+- `--assert-no-dup-on-resume`: with `--resume-from-cursor`, the recording must
+  not include any replayed seq `<= N`.
+- `--assert-cursor-expired-graceful`: assert a `cursor_expired` error is
+  observed and the recording continues afterward, proving the socket stayed up.
 
 Use `--dump-timeline` to print the final folded timeline JSON.
 

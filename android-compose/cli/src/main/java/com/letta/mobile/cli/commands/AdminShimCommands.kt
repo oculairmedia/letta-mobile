@@ -10,6 +10,7 @@ import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.long
 import com.letta.mobile.cli.runtime.AdminShimRecorder
+import com.letta.mobile.cli.runtime.CliJson
 import com.letta.mobile.cli.runtime.CliConnection
 import com.letta.mobile.cli.runtime.CliProfileStore
 import com.letta.mobile.cli.runtime.CliRestClient
@@ -32,6 +33,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 internal abstract class AdminShimCommand(
     name: String,
@@ -93,9 +100,18 @@ internal class ConnectCommand : AdminShimCommand(
 ) {
     private val holdMs by option("--hold-ms", help = "Keep the socket open for this many ms after connect.").long().default(0)
     private val timeoutMs by option("--timeout-ms").long().default(5_000)
+    private val conversation by option("--conversation", envvar = "LETTA_CONVERSATION_ID")
+    private val runId by option("--run-id")
+    private val resumeCursor by option("--resume-cursor").long()
 
     override fun run() = runBlocking {
-        val transport = ChannelTransport(RunCursorStore.inMemory())
+        val cursorStore = RunCursorStore.inMemory()
+        if (resumeCursor != null || runId != null) {
+            val resolvedRunId = runId ?: throw UsageError("--resume-cursor requires --run-id")
+            val resolvedConversationId = requireConversationId(conversation)
+            cursorStore.record(resolvedConversationId, resolvedRunId, resumeCursor ?: 0)
+        }
+        val transport = ChannelTransport(cursorStore)
         val bridge = WsChatBridge(transport)
         val collector = launch {
             transport.events.collect { frame -> println("[frame] ${frame.typeName()}") }
@@ -263,12 +279,20 @@ internal class ReplayCommand : AdminShimCommand(
     private val interactive by option("--interactive").flag(default = false)
     private val bisectFrame by option("--bisect-frame").flag(default = false)
     private val bisectOut by option("--bisect-out")
+    private val resumeFromCursor by option("--resume-from-cursor").long()
+    private val assertNoGapOnResume by option("--assert-no-gap-on-resume").flag(default = false)
+    private val assertNoDupOnResume by option("--assert-no-dup-on-resume").flag(default = false)
+    private val assertCursorExpiredGraceful by option("--assert-cursor-expired-graceful").flag(default = false)
 
     override fun run() = runBlocking {
         val assertionOptions = TimelineAssertionOptions(
             assertNoDuplicateUiMessages = assertNoDups,
             assertOtidUnique = assertOtidUnique,
             assertSeqMonotonic = assertSeqMonotonic,
+            resumeFromCursor = resumeFromCursor.validatedNonNegativeLongOrNull("--resume-from-cursor"),
+            assertNoGapOnResume = assertNoGapOnResume,
+            assertNoDupOnResume = assertNoDupOnResume,
+            assertCursorExpiredGraceful = assertCursorExpiredGraceful,
             assertNoEmptyBodies = assertNoEmptyBodies,
             assertNoPrefixOrphans = assertNoPrefixOrphans,
             expectedUiMessageCountPerRun = assertUiMessageCountPerRun.validatedPositiveOrNull(
@@ -282,6 +306,7 @@ internal class ReplayCommand : AdminShimCommand(
             assertOtidStableAcrossRetry = assertOtidStableAcrossRetry,
         )
         if (interactive) {
+            validateResumeAssertions(assertionOptions)
             val conversationId = requireConversationId(conversation)
             ReplayInteractiveShell(
                 recording = Path.of(recording),
@@ -291,6 +316,7 @@ internal class ReplayCommand : AdminShimCommand(
             return@runBlocking
         }
         val conversationId = requireConversationId(conversation)
+        validateResumeAssertions(assertionOptions)
         if (bisectFrame) {
             if (!assertionOptions.hasAssertions()) {
                 throw UsageError("--bisect-frame requires at least one replay assertion flag")
@@ -389,6 +415,15 @@ internal class RecordCommand : AdminShimCommand(
             clientVersion = clientVersion,
         )
         println("[record] wrote $count frames to $out")
+    }
+}
+
+internal class RecordCursorStateCommand : CliktCommand(name = "record-cursor-state") {
+    private val recording by option("--recording").required()
+
+    override fun run() {
+        val output = buildCursorStateSnapshot(Files.readAllLines(Path.of(recording)))
+        println(CliJson.encodeToString(JsonObject.serializer(), output))
     }
 }
 
@@ -491,6 +526,11 @@ private fun Int?.validatedPositiveOrNull(optionName: String): Int? {
     return this
 }
 
+private fun Long?.validatedNonNegativeLongOrNull(optionName: String): Long? {
+    if (this != null && this < 0) throw UsageError("$optionName must be >= 0")
+    return this
+}
+
 private fun String?.validatedFinalStatusOrNull(): String? {
     if (this == null) return null
     val normalized = trim().lowercase()
@@ -513,6 +553,9 @@ private fun TimelineAssertionOptions.hasAssertions(): Boolean =
     assertNoDuplicateUiMessages ||
         assertOtidUnique ||
         assertSeqMonotonic ||
+        assertNoGapOnResume ||
+        assertNoDupOnResume ||
+        assertCursorExpiredGraceful ||
         assertNoEmptyBodies ||
         assertNoPrefixOrphans ||
         expectedUiMessageCountPerRun != null ||
@@ -522,3 +565,51 @@ private fun TimelineAssertionOptions.hasAssertions(): Boolean =
         assertNoAbandonedToolCalls ||
         assertApprovalToolReturnOnApprovalRun ||
         assertOtidStableAcrossRetry
+
+private fun validateResumeAssertions(options: TimelineAssertionOptions) {
+    if ((options.assertNoGapOnResume || options.assertNoDupOnResume) && options.resumeFromCursor == null) {
+        throw UsageError("--assert-no-gap-on-resume/--assert-no-dup-on-resume require --resume-from-cursor")
+    }
+}
+
+internal fun buildCursorStateSnapshot(lines: Iterable<String>): JsonObject {
+    val cursors = linkedMapOf<String, LinkedHashMap<String, Long>>()
+    lines.forEach { line ->
+        val obj = runCatching { CliJson.parseToJsonElement(line).jsonObject }.getOrNull()
+            ?: return@forEach
+        val cursorEvent = obj.takeIf { it["kind"]?.jsonPrimitive?.contentOrNull == "cursor" }
+        if (cursorEvent != null) {
+            cursorEvent.recordCursorInto(cursors)
+            return@forEach
+        }
+        val frame = (obj["frame"] as? JsonObject) ?: obj.takeIf { it["type"] != null } ?: return@forEach
+        frame.recordCursorInto(cursors)
+    }
+    return buildJsonObject {
+        cursors.forEach { (conversationId, runs) ->
+            put(conversationId, buildJsonObject {
+                runs.forEach { (runId, seq) -> put(runId, seq) }
+            })
+        }
+    }
+}
+
+private fun JsonObject.recordCursorInto(cursors: MutableMap<String, LinkedHashMap<String, Long>>) {
+    val innerFrame = this["frame"] as? JsonObject
+    val conversationId = this["conversation_id"]?.jsonPrimitive?.contentOrNull
+        ?: innerFrame?.get("conversation_id")?.jsonPrimitive?.contentOrNull
+        ?: return
+    val runId = this["run_id"]?.jsonPrimitive?.contentOrNull
+        ?: innerFrame?.get("run_id")?.jsonPrimitive?.contentOrNull
+        ?: return
+    val seq = this["seq"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+        ?: innerFrame?.get("seq")?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+        ?: this["seq_id"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+        ?: innerFrame?.get("seq_id")?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+        ?: return
+    val perConversation = cursors.getOrPut(conversationId) { linkedMapOf() }
+    val existing = perConversation[runId]
+    if (existing == null || seq > existing) {
+        perConversation[runId] = seq
+    }
+}

@@ -29,6 +29,10 @@ class HeadlessTimelineReplayer(
         assertNoDuplicateUiMessages: Boolean = false,
         assertOtidUnique: Boolean = false,
         assertSeqMonotonic: Boolean = false,
+        resumeFromCursor: Long? = null,
+        assertNoGapOnResume: Boolean = false,
+        assertNoDupOnResume: Boolean = false,
+        assertCursorExpiredGraceful: Boolean = false,
         assertNoEmptyBodies: Boolean = false,
         assertNoPrefixOrphans: Boolean = false,
         expectedUiMessageCountPerRun: Int? = null,
@@ -44,6 +48,10 @@ class HeadlessTimelineReplayer(
             assertNoDuplicateUiMessages = assertNoDuplicateUiMessages,
             assertOtidUnique = assertOtidUnique,
             assertSeqMonotonic = assertSeqMonotonic,
+            resumeFromCursor = resumeFromCursor,
+            assertNoGapOnResume = assertNoGapOnResume,
+            assertNoDupOnResume = assertNoDupOnResume,
+            assertCursorExpiredGraceful = assertCursorExpiredGraceful,
             assertNoEmptyBodies = assertNoEmptyBodies,
             assertNoPrefixOrphans = assertNoPrefixOrphans,
             expectedUiMessageCountPerRun = expectedUiMessageCountPerRun,
@@ -72,6 +80,7 @@ class HeadlessTimelineReplayer(
             conversationId = conversationId,
             store = store,
             json = json,
+            resumeFromCursor = assertionOptions.resumeFromCursor,
         )
         val snapshots = mutableListOf<HeadlessReplayFrameSnapshot>()
         lines.forEach { line ->
@@ -147,6 +156,7 @@ class HeadlessTimelineReplaySession(
     private val conversationId: String,
     private val store: HeadlessTimelineStore = HeadlessTimelineStore(),
     private val json: Json = replayJson,
+    private val resumeFromCursor: Long? = null,
 ) {
     var framesSeen: Int = 0
         private set
@@ -155,12 +165,15 @@ class HeadlessTimelineReplaySession(
 
     private val ignoredTypes = linkedMapOf<String, Int>()
     private val seqsByRun = linkedMapOf<String, MutableList<Long>>()
+    private val resumeSeqsByRun = linkedMapOf<String, MutableList<Long>>()
     private val finalStatusesByRun = linkedMapOf<String, String>()
     private val observedRunIds = linkedSetOf<String>()
     private val toolCallIdsByRun = linkedMapOf<String?, MutableSet<String>>()
     private val toolReturns = mutableListOf<ObservedToolReturn>()
     private val approvalRunByToolCallId = linkedMapOf<String, String>()
     private val otidsByMessageKey = linkedMapOf<String, MutableSet<String>>()
+    private var cursorExpiredFrameIndex: Int? = null
+    private var sawFrameAfterCursorExpired: Boolean = false
 
     suspend fun ingestLine(
         line: String,
@@ -223,6 +236,24 @@ class HeadlessTimelineReplaySession(
             )
         }
 
+        recordResumeSeq(frameJson)
+        if (cursorExpiredFrameIndex != null && frameIndex > cursorExpiredFrameIndex!!) {
+            sawFrameAfterCursorExpired = true
+        }
+        val resumeCursor = resumeFromCursor
+        if (resumeCursor != null && frameJson.seqOrNull()?.let { it <= resumeCursor } == true) {
+            val frameType = frameJson.typeName()
+            ignoredTypes.increment("pre_resume_cursor")
+            return step(
+                frameIndex = frameIndex,
+                frameType = frameType,
+                frameId = frameJson.frameId(),
+                ingested = false,
+                ignoredReason = "pre-resume-cursor",
+                captureTimeline = captureTimeline,
+            )
+        }
+
         seqsByRun.recordSeq(frameJson)
         val frame = runCatching {
             json.decodeFromString(ServerFrameSerializer, frameJson.toString())
@@ -239,6 +270,9 @@ class HeadlessTimelineReplaySession(
             )
         }
 
+        if (frame is ServerFrame.Error && frame.code == CURSOR_EXPIRED_ERROR_CODE) {
+            cursorExpiredFrameIndex = frameIndex
+        }
         val innerPair = if (frame is ServerFrame.SubscribeFrameMessage) {
             runCatching {
                 json.decodeFromString(ServerFrameSerializer, frame.frame.toString()) to frame.frame
@@ -300,6 +334,15 @@ class HeadlessTimelineReplaySession(
         val failures = timelineReport.failures.toMutableList()
         if (options.assertSeqMonotonic) {
             failures += rawSeqFailures()
+        }
+        if (options.assertNoDupOnResume) {
+            failures += resumeDuplicateFailures(options.resumeFromCursor)
+        }
+        if (options.assertNoGapOnResume) {
+            failures += resumeGapFailures(options.resumeFromCursor)
+        }
+        if (options.assertCursorExpiredGraceful) {
+            failures += cursorExpiredGracefulFailures()
         }
         options.expectedFinalStatus?.let { expected ->
             val actual = finalStatusesByRun.entries.lastOrNull()?.value
@@ -406,6 +449,47 @@ class HeadlessTimelineReplaySession(
         }
     }
 
+    private fun resumeDuplicateFailures(cursor: Long?): List<String> {
+        if (cursor == null) return listOf("--assert-no-dup-on-resume requires --resume-from-cursor")
+        return resumeSeqsByRun.flatMap { (runId, seqs) ->
+            val duplicates = seqs.filter { it <= cursor }
+            if (duplicates.isEmpty()) {
+                emptyList()
+            } else {
+                listOf("resume for run $runId replayed seq <= cursor $cursor: ${duplicates.joinToString()}")
+            }
+        }
+    }
+
+    private fun resumeGapFailures(cursor: Long?): List<String> {
+        if (cursor == null) return listOf("--assert-no-gap-on-resume requires --resume-from-cursor")
+        val postResumeSeqs = resumeSeqsByRun.mapValues { (_, seqs) ->
+            seqs.filter { it > cursor }.distinct().sorted()
+        }.filterValues { it.isNotEmpty() }
+        if (postResumeSeqs.isEmpty()) {
+            return listOf("resume cursor $cursor observed no post-resume frames")
+        }
+        return postResumeSeqs.flatMap { (runId, seqs) ->
+            val expectedFirst = cursor + 1
+            val failures = mutableListOf<String>()
+            if (seqs.first() != expectedFirst) {
+                failures += "resume for run $runId starts at seq ${seqs.first()} instead of $expectedFirst"
+            }
+            seqs.zipWithNext().forEach { (prev, next) ->
+                if (next != prev + 1) {
+                    failures += "resume for run $runId has gap between seq $prev and $next"
+                }
+            }
+            failures
+        }
+    }
+
+    private fun cursorExpiredGracefulFailures(): List<String> = when {
+        cursorExpiredFrameIndex == null -> listOf("cursor_expired error was not observed")
+        !sawFrameAfterCursorExpired -> listOf("cursor_expired was terminal in the recording; expected socket to stay open")
+        else -> emptyList()
+    }
+
     private fun orphanToolReturnFailures(): List<String> = toolReturns.mapNotNull { toolReturn ->
         val matchingCalls = toolCallIdsByRun[toolReturn.runId].orEmpty()
         if (toolReturn.toolCallId in matchingCalls) {
@@ -489,6 +573,12 @@ class HeadlessTimelineReplaySession(
         val id = frameJson.frameId() ?: return
         otidsByMessageKey.getOrPut("$type/$id") { linkedSetOf() } += otid
     }
+
+    private fun recordResumeSeq(frameJson: JsonObject) {
+        val runId = frameJson["run_id"]?.jsonPrimitive?.contentOrNull ?: return
+        val seq = frameJson.seqOrNull() ?: return
+        resumeSeqsByRun.getOrPut(runId) { mutableListOf() } += seq
+    }
 }
 
 data class HeadlessReplayDumpOptions(
@@ -570,6 +660,7 @@ private data class ObservedToolReturn(
 )
 
 private val TERMINAL_RUN_STATUSES = setOf("completed", "cancelled", "failed")
+private const val CURSOR_EXPIRED_ERROR_CODE = "cursor_expired"
 
 private fun String.toRecordedFrameJsonOrNull(): JsonObject? {
     val element = runCatching { replayJson.parseToJsonElement(this).jsonObject }.getOrNull() ?: return null
@@ -592,11 +683,13 @@ private fun MutableMap<String, Int>.increment(key: String) {
 
 private fun MutableMap<String, MutableList<Long>>.recordSeq(frame: JsonObject) {
     val runId = frame["run_id"]?.jsonPrimitive?.contentOrNull ?: return
-    val seq = frame["seq"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
-        ?: frame["seq_id"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
-        ?: return
+    val seq = frame.seqOrNull() ?: return
     getOrPut(runId) { mutableListOf() } += seq
 }
+
+private fun JsonObject.seqOrNull(): Long? =
+    this["seq"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+        ?: this["seq_id"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
 
 private fun JsonObject.typeName(): String =
     this["type"]?.jsonPrimitive?.contentOrNull ?: "<unknown>"
