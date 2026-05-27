@@ -301,6 +301,13 @@ internal class ReplayCommand : AdminShimCommand(
     private val assertNoGapOnResume by option("--assert-no-gap-on-resume").flag(default = false)
     private val assertNoDupOnResume by option("--assert-no-dup-on-resume").flag(default = false)
     private val assertCursorExpiredGraceful by option("--assert-cursor-expired-graceful").flag(default = false)
+    private val assertIsStreamingClears by option("--assert-isStreaming-clears-by-terminal-frame").flag(default = false)
+    private val assertNoLocksHeldAfterTerminal by option("--assert-no-locks-held-after-terminal").flag(default = false)
+    private val assertTypingIndicatorState by option("--assert-typing-indicator-state").flag(default = false)
+    private val assertNoOrphanedRunTracker by option("--assert-no-orphaned-run-tracker").flag(default = false)
+    private val assertTerminalFrameReceived by option("--assert-terminal-frame-received").flag(default = false)
+    private val assertAllState by option("--assert-all").flag(default = false)
+    private val traceStateTransitions by option("--trace-state-transitions").flag(default = false)
 
     override fun run() = runBlocking {
         val assertionOptions = TimelineAssertionOptions(
@@ -311,6 +318,12 @@ internal class ReplayCommand : AdminShimCommand(
             assertNoGapOnResume = assertNoGapOnResume,
             assertNoDupOnResume = assertNoDupOnResume,
             assertCursorExpiredGraceful = assertCursorExpiredGraceful,
+            assertIsStreamingClearsByTerminalFrame = assertIsStreamingClears || assertAllState,
+            assertNoLocksHeldAfterTerminal = assertNoLocksHeldAfterTerminal || assertAllState,
+            assertTypingIndicatorState = assertTypingIndicatorState || assertAllState,
+            assertNoOrphanedRunTracker = assertNoOrphanedRunTracker || assertAllState,
+            assertTerminalFrameReceived = assertTerminalFrameReceived || assertAllState,
+            traceStateTransitions = traceStateTransitions,
             assertNoEmptyBodies = assertNoEmptyBodies,
             assertNoPrefixOrphans = assertNoPrefixOrphans,
             expectedUiMessageCountPerRun = assertUiMessageCountPerRun.validatedPositiveOrNull(
@@ -382,6 +395,12 @@ internal class ReplayCommand : AdminShimCommand(
         )
         if (result.ignoredFrameTypes.isNotEmpty()) {
             statusOut.println("[replay] ignored=${result.ignoredFrameTypes}")
+        }
+        if (traceStateTransitions) {
+            result.stateTransitions.forEach { statusOut.println("[state] ${it.toTraceLine()}") }
+            if (result.stateTransitions.isEmpty()) {
+                statusOut.println("[state] no state transitions observed")
+            }
         }
         if (!result.assertionReport.passed) {
             result.assertionReport.failures.forEach { statusOut.println("[replay] FAIL $it") }
@@ -582,6 +601,11 @@ private fun TimelineAssertionOptions.hasAssertions(): Boolean =
         assertNoGapOnResume ||
         assertNoDupOnResume ||
         assertCursorExpiredGraceful ||
+        assertIsStreamingClearsByTerminalFrame ||
+        assertNoLocksHeldAfterTerminal ||
+        assertTypingIndicatorState ||
+        assertNoOrphanedRunTracker ||
+        assertTerminalFrameReceived ||
         assertNoEmptyBodies ||
         assertNoPrefixOrphans ||
         expectedUiMessageCountPerRun != null ||

@@ -209,6 +209,19 @@ Supported assertions:
   not include any replayed seq `<= N`.
 - `--assert-cursor-expired-graceful`: assert a `cursor_expired` error is
   observed and the recording continues afterward, proving the socket stayed up.
+- `--assert-isStreaming-clears-by-terminal-frame`: after a terminal run frame,
+  the replayed chat streaming state must be idle.
+- `--assert-no-locks-held-after-terminal`: after a terminal run frame, the
+  headless timeline write lock must be released.
+- `--assert-typing-indicator-state`: streaming and typing-indicator state must
+  move together at every traced transition.
+- `--assert-no-orphaned-run-tracker`: started runs must not remain active after
+  replay reaches the end of the recording.
+- `--assert-terminal-frame-received`: every started run must receive a terminal
+  `turn_done` or `subscribe_done` frame.
+- `--assert-all`: enable the state-machine assertion bundle above.
+- `--trace-state-transitions`: print streaming/typing/run-tracker transitions
+  while replaying a fixture.
 
 Use `--dump-timeline` to print the final folded timeline JSON.
 

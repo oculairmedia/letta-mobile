@@ -11,6 +11,7 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -33,6 +34,12 @@ class HeadlessTimelineReplayer(
         assertNoGapOnResume: Boolean = false,
         assertNoDupOnResume: Boolean = false,
         assertCursorExpiredGraceful: Boolean = false,
+        assertIsStreamingClearsByTerminalFrame: Boolean = false,
+        assertNoLocksHeldAfterTerminal: Boolean = false,
+        assertTypingIndicatorState: Boolean = false,
+        assertNoOrphanedRunTracker: Boolean = false,
+        assertTerminalFrameReceived: Boolean = false,
+        traceStateTransitions: Boolean = false,
         assertNoEmptyBodies: Boolean = false,
         assertNoPrefixOrphans: Boolean = false,
         expectedUiMessageCountPerRun: Int? = null,
@@ -52,6 +59,12 @@ class HeadlessTimelineReplayer(
             assertNoGapOnResume = assertNoGapOnResume,
             assertNoDupOnResume = assertNoDupOnResume,
             assertCursorExpiredGraceful = assertCursorExpiredGraceful,
+            assertIsStreamingClearsByTerminalFrame = assertIsStreamingClearsByTerminalFrame,
+            assertNoLocksHeldAfterTerminal = assertNoLocksHeldAfterTerminal,
+            assertTypingIndicatorState = assertTypingIndicatorState,
+            assertNoOrphanedRunTracker = assertNoOrphanedRunTracker,
+            assertTerminalFrameReceived = assertTerminalFrameReceived,
+            traceStateTransitions = traceStateTransitions,
             assertNoEmptyBodies = assertNoEmptyBodies,
             assertNoPrefixOrphans = assertNoPrefixOrphans,
             expectedUiMessageCountPerRun = expectedUiMessageCountPerRun,
@@ -172,8 +185,14 @@ class HeadlessTimelineReplaySession(
     private val toolReturns = mutableListOf<ObservedToolReturn>()
     private val approvalRunByToolCallId = linkedMapOf<String, String>()
     private val otidsByMessageKey = linkedMapOf<String, MutableSet<String>>()
+    private val startedRunIds = linkedSetOf<String>()
+    private val terminalFrameRunIds = linkedSetOf<String>()
+    private val activeRunTracker = linkedSetOf<String>()
+    private val stateTransitions = mutableListOf<HeadlessReplayStateTransition>()
     private var cursorExpiredFrameIndex: Int? = null
     private var sawFrameAfterCursorExpired: Boolean = false
+    private var replayIsStreaming: Boolean = false
+    private var replayIsAgentTyping: Boolean = false
 
     suspend fun ingestLine(
         line: String,
@@ -294,6 +313,7 @@ class HeadlessTimelineReplaySession(
 
         val (innerFrame, innerJson) = innerPair
         if (frame is ServerFrame.SubscribeFrameMessage) seqsByRun.recordSeq(innerJson)
+        recordStateTransition(innerFrame, innerJson, frameIndex)
         recordObservedFrame(innerFrame, innerJson)
         val message = WsFrameMapper.toLettaMessage(innerFrame)
         val frameType = innerJson.typeName()
@@ -344,6 +364,21 @@ class HeadlessTimelineReplaySession(
         if (options.assertCursorExpiredGraceful) {
             failures += cursorExpiredGracefulFailures()
         }
+        if (options.assertIsStreamingClearsByTerminalFrame) {
+            failures += streamingStateFailures()
+        }
+        if (options.assertNoLocksHeldAfterTerminal) {
+            failures += lockStateFailures()
+        }
+        if (options.assertTypingIndicatorState) {
+            failures += typingIndicatorFailures()
+        }
+        if (options.assertNoOrphanedRunTracker) {
+            failures += orphanedRunTrackerFailures()
+        }
+        if (options.assertTerminalFrameReceived) {
+            failures += terminalFrameFailures()
+        }
         options.expectedFinalStatus?.let { expected ->
             val actual = finalStatusesByRun.entries.lastOrNull()?.value
             if (actual != expected) {
@@ -381,6 +416,7 @@ class HeadlessTimelineReplaySession(
             assertionReport = report,
             timelineJson = store.dumpJson(conversationId),
             frameSnapshots = frameSnapshots,
+            stateTransitions = if (assertionOptions.traceStateTransitions) stateTransitions.toList() else emptyList(),
         )
     }
 
@@ -490,6 +526,43 @@ class HeadlessTimelineReplaySession(
         else -> emptyList()
     }
 
+    private fun streamingStateFailures(): List<String> = when {
+        terminalFrameRunIds.isEmpty() -> listOf("isStreaming could not clear: no terminal frame was observed")
+        replayIsStreaming -> listOf(
+            "isStreaming remained true after terminal frame; active runs=${activeRunTracker.sorted().joinToString()}"
+        )
+        else -> emptyList()
+    }
+
+    private fun lockStateFailures(): List<String> = when {
+        terminalFrameRunIds.isEmpty() -> emptyList()
+        store.isWriteLockedForAssertions() -> listOf("timeline write lock is still held after terminal frame")
+        else -> emptyList()
+    }
+
+    private fun typingIndicatorFailures(): List<String> =
+        stateTransitions.mapNotNull { transition ->
+            if (transition.isStreaming == transition.isAgentTyping) {
+                null
+            } else {
+                "typing indicator mismatch at frame ${transition.frameIndex}: " +
+                    "isStreaming=${transition.isStreaming} isAgentTyping=${transition.isAgentTyping}"
+            }
+        }
+
+    private fun orphanedRunTrackerFailures(): List<String> =
+        if (activeRunTracker.isEmpty()) {
+            emptyList()
+        } else {
+            listOf("orphaned run tracker entries after replay: ${activeRunTracker.sorted().joinToString()}")
+        }
+
+    private fun terminalFrameFailures(): List<String> =
+        startedRunIds
+            .filterNot { it in terminalFrameRunIds }
+            .sorted()
+            .map { "run $it did not receive a terminal frame" }
+
     private fun orphanToolReturnFailures(): List<String> = toolReturns.mapNotNull { toolReturn ->
         val matchingCalls = toolCallIdsByRun[toolReturn.runId].orEmpty()
         if (toolReturn.toolCallId in matchingCalls) {
@@ -574,6 +647,49 @@ class HeadlessTimelineReplaySession(
         otidsByMessageKey.getOrPut("$type/$id") { linkedSetOf() } += otid
     }
 
+    private fun recordStateTransition(frame: ServerFrame, frameJson: JsonObject, frameIndex: Int) {
+        val runId = frame.runIdForAssertionOrNull()
+        val reason = when (frame) {
+            is ServerFrame.TurnStarted -> {
+                startedRunIds += frame.runId
+                activeRunTracker += frame.runId
+                replayIsStreaming = true
+                replayIsAgentTyping = true
+                "turn_started"
+            }
+            is ServerFrame.TurnDone -> {
+                terminalFrameRunIds += frame.runId
+                activeRunTracker.remove(frame.runId)
+                if (activeRunTracker.isEmpty()) {
+                    replayIsStreaming = false
+                    replayIsAgentTyping = false
+                }
+                "turn_done:${frame.status}"
+            }
+            is ServerFrame.SubscribeDone -> {
+                terminalFrameRunIds += frame.runId
+                activeRunTracker.remove(frame.runId)
+                if (activeRunTracker.isEmpty()) {
+                    replayIsStreaming = false
+                    replayIsAgentTyping = false
+                }
+                "subscribe_done:${frame.status}"
+            }
+            else -> return
+        }
+        stateTransitions += HeadlessReplayStateTransition(
+            frameIndex = frameIndex,
+            frameType = frameJson.typeName(),
+            frameId = frameJson.frameId(),
+            frameTimestamp = frameJson.frameTimestamp(),
+            runId = runId,
+            reason = reason,
+            isStreaming = replayIsStreaming,
+            isAgentTyping = replayIsAgentTyping,
+            activeRunIds = activeRunTracker.toList(),
+        )
+    }
+
     private fun recordResumeSeq(frameJson: JsonObject) {
         val runId = frameJson["run_id"]?.jsonPrimitive?.contentOrNull ?: return
         val seq = frameJson.seqOrNull() ?: return
@@ -619,6 +735,36 @@ data class HeadlessReplayFrameSnapshot(
     }
 }
 
+data class HeadlessReplayStateTransition(
+    val frameIndex: Int,
+    val frameType: String,
+    val frameId: String?,
+    val frameTimestamp: String?,
+    val runId: String?,
+    val reason: String,
+    val isStreaming: Boolean,
+    val isAgentTyping: Boolean,
+    val activeRunIds: List<String>,
+) {
+    fun toJsonObject(): JsonObject = buildJsonObject {
+        put("frame_index", frameIndex)
+        put("frame_type", frameType)
+        put("frame_id", frameId)
+        put("ts", frameTimestamp)
+        put("run_id", runId)
+        put("reason", reason)
+        put("isStreaming", isStreaming)
+        put("isAgentTyping", isAgentTyping)
+        put("activeRunIds", buildJsonArray { activeRunIds.forEach { add(JsonPrimitive(it)) } })
+    }
+
+    fun toTraceLine(): String =
+        "frame=$frameIndex ts=${frameTimestamp ?: "<none>"} type=$frameType " +
+            "run=${runId ?: "<none>"} reason=$reason " +
+            "isStreaming=$isStreaming isAgentTyping=$isAgentTyping " +
+            "activeRuns=${activeRunIds.joinToString(prefix = "[", postfix = "]")}"
+}
+
 data class HeadlessReplayResult(
     val conversationId: String,
     val framesSeen: Int,
@@ -627,10 +773,19 @@ data class HeadlessReplayResult(
     val assertionReport: TimelineAssertionReport,
     val timelineJson: String,
     val frameSnapshots: List<HeadlessReplayFrameSnapshot> = emptyList(),
+    val stateTransitions: List<HeadlessReplayStateTransition> = emptyList(),
 ) {
     fun frameSnapshotsJson(pretty: Boolean = true): String {
         val array = buildJsonArray {
             frameSnapshots.forEach { add(it.toJsonObject()) }
+        }
+        val encoder = if (pretty) prettyJson else compactJson
+        return encoder.encodeToString(JsonArray.serializer(), array)
+    }
+
+    fun stateTransitionsJson(pretty: Boolean = true): String {
+        val array = buildJsonArray {
+            stateTransitions.forEach { add(it.toJsonObject()) }
         }
         val encoder = if (pretty) prettyJson else compactJson
         return encoder.encodeToString(JsonArray.serializer(), array)
@@ -696,6 +851,9 @@ private fun JsonObject.typeName(): String =
 
 private fun JsonObject.frameId(): String? =
     this["id"]?.jsonPrimitive?.contentOrNull
+
+private fun JsonObject.frameTimestamp(): String? =
+    this["ts"]?.jsonPrimitive?.contentOrNull
 
 private fun JsonObject.kindName(): String =
     this["kind"]?.jsonPrimitive?.contentOrNull ?: "<unknown>"
