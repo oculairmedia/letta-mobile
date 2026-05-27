@@ -88,6 +88,8 @@ class HeadlessTimelineStore(
         timelineLocked(conversationId).toDumpJson()
     }
 
+    internal fun isWriteLockedForAssertions(): Boolean = mutex.isLocked
+
     suspend fun assertTimeline(
         conversationId: String,
         assertNoDuplicateUiMessages: Boolean,
@@ -238,6 +240,16 @@ data class TimelineAssertionOptions(
     val assertNoDuplicateUiMessages: Boolean = false,
     val assertOtidUnique: Boolean = false,
     val assertSeqMonotonic: Boolean = false,
+    val resumeFromCursor: Long? = null,
+    val assertNoGapOnResume: Boolean = false,
+    val assertNoDupOnResume: Boolean = false,
+    val assertCursorExpiredGraceful: Boolean = false,
+    val assertIsStreamingClearsByTerminalFrame: Boolean = false,
+    val assertNoLocksHeldAfterTerminal: Boolean = false,
+    val assertTypingIndicatorState: Boolean = false,
+    val assertNoOrphanedRunTracker: Boolean = false,
+    val assertTerminalFrameReceived: Boolean = false,
+    val traceStateTransitions: Boolean = false,
     val assertNoEmptyBodies: Boolean = false,
     val assertNoPrefixOrphans: Boolean = false,
     val expectedUiMessageCountPerRun: Int? = null,
