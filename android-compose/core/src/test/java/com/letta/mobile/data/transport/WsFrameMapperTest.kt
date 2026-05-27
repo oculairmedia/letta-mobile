@@ -109,6 +109,54 @@ class WsFrameMapperTest : WordSpec({
             mapped.date shouldBe "t"
         }
 
+        "map wire seq into LettaMessage seqId for cursor persistence" {
+            val assistant = WsFrameMapper.toLettaMessage(
+                ServerFrame.AssistantMessage(
+                    id = "cm-stream-letta-msg-3",
+                    ts = "t",
+                    agentId = "a", conversationId = "c",
+                    turnId = "T", runId = "R",
+                    content = "pong",
+                    seq = 11L,
+                )
+            ).shouldBeInstanceOf<AssistantMessage>()
+            val reasoning = WsFrameMapper.toLettaMessage(
+                ServerFrame.ReasoningMessage(
+                    id = "letta-reason-1",
+                    ts = "t",
+                    agentId = "a", conversationId = "c",
+                    turnId = "T", runId = "R",
+                    reasoning = "thinking",
+                    seq = 12L,
+                )
+            ).shouldBeInstanceOf<ReasoningMessage>()
+            val toolCall = WsFrameMapper.toLettaMessage(
+                ServerFrame.ToolCallMessage(
+                    id = "toolcall-tc-1",
+                    ts = "t",
+                    agentId = "a", conversationId = "c",
+                    turnId = "T", runId = "R",
+                    toolCall = ToolCallPayload(toolCallId = "tc-1", name = "Bash", arguments = "{}"),
+                    seq = 13L,
+                )
+            ).shouldBeInstanceOf<ToolCallMessage>()
+            val toolReturn = WsFrameMapper.toLettaMessage(
+                ServerFrame.ToolReturnMessage(
+                    id = "toolreturn-tc-1",
+                    ts = "t",
+                    agentId = "a", conversationId = "c",
+                    turnId = "T", runId = "R",
+                    toolCallId = "tc-1",
+                    seq = 14L,
+                )
+            ).shouldBeInstanceOf<ToolReturnMessage>()
+
+            assistant.seqId shouldBe 11
+            reasoning.seqId shouldBe 12
+            toolCall.seqId shouldBe 13
+            toolReturn.seqId shouldBe 14
+        }
+
         "return null for non-message frames so the bridge can route them elsewhere" {
             WsFrameMapper.toLettaMessage(
                 ServerFrame.Welcome(id = "f", ts = "t", serverId = "S", sessionId = "sess")

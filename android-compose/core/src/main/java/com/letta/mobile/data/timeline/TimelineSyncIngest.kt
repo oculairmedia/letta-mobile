@@ -20,6 +20,7 @@ internal suspend fun ingestStreamEvent(
     events: MutableSharedFlow<TimelineSyncEvent>,
     pendingToolReturnsByCallId: LinkedHashMap<String, ToolReturnMessage>,
     conversationId: String,
+    conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
 ): PendingIngestNotification? {
     // letta-mobile-rnyg: collect events to emit inside the writeMutex so we
     // can publish them AFTER releasing the lock. MutableSharedFlow.emit can
@@ -33,6 +34,9 @@ internal suspend fun ingestStreamEvent(
                 pendingToolReturnsByCallId = pendingToolReturnsByCallId.toMap(),
             )
         )
+        message.seqId?.takeIf { it >= 0 }?.let { seq ->
+            conversationCursorStore.recordFrame(conversationId, seq.toLong())
+        }
         state.value = out.next
         // Keep the loop-owned LinkedHashMap in reducer-return order so buffered
         // tool returns preserve insertion order across frames.

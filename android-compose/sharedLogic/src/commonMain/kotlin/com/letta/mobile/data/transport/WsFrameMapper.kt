@@ -39,7 +39,7 @@ object WsFrameMapper {
             date = frame.ts,
             runId = frame.runId,
             otid = frame.otid,
-            seqId = frame.seqId,
+            seqId = frame.seqId ?: frame.seq.toSeqId(),
         )
 
         is ServerFrame.ReasoningMessage -> ReasoningMessage(
@@ -48,7 +48,7 @@ object WsFrameMapper {
             date = frame.ts,
             runId = frame.runId,
             signature = frame.signature,
-            seqId = frame.seqId,
+            seqId = frame.seqId ?: frame.seq.toSeqId(),
         )
 
         is ServerFrame.ToolCallMessage -> frame.toLettaToolMessage()
@@ -65,6 +65,7 @@ object WsFrameMapper {
             toolReturnRaw = frame.toolReturn?.let { JsonPrimitive(it) },
             date = frame.ts,
             runId = frame.runId,
+            seqId = frame.seq.toSeqId(),
         )
 
         is ServerFrame.Welcome,
@@ -103,6 +104,7 @@ object WsFrameMapper {
     private fun ServerFrame.ToolCallMessage.toLettaToolMessage(): LettaMessage {
         val toolCall = toolCall?.toModel()
         val toolCalls = toolCalls?.map { it.toModel() }
+        val resolvedSeqId = seq.toSeqId()
         return if (type == "approval_request_message") {
             ApprovalRequestMessage(
                 id = id,
@@ -110,6 +112,7 @@ object WsFrameMapper {
                 toolCalls = toolCalls,
                 date = ts,
                 runId = runId,
+                seqId = resolvedSeqId,
             )
         } else {
             ToolCallMessage(
@@ -118,7 +121,11 @@ object WsFrameMapper {
                 toolCalls = toolCalls,
                 date = ts,
                 runId = runId,
+                seqId = resolvedSeqId,
             )
         }
     }
+
+    private fun Long?.toSeqId(): Int? =
+        this?.takeIf { it in 0L..Int.MAX_VALUE.toLong() }?.toInt()
 }

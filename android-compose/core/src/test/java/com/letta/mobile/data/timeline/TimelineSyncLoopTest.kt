@@ -484,6 +484,32 @@ class TimelineSyncLoopTest {
         assertEquals("Hello world", assistant.content)
         scope.coroutineContext.job.cancel()
     }
+
+    @Test
+    fun `ingested stream frame persists conversation cursor`() = runTest {
+        val api = FakeSyncApi()
+        val cursorStore = RecordingConversationCursorStore()
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
+        val sync = TimelineSyncLoop(
+            messageApi = api,
+            conversationId = "conv-cursor",
+            scope = scope,
+            conversationCursorStore = cursorStore,
+        )
+
+        sync.ingestStreamEvent(
+            AssistantMessage(
+                id = "assistant-cursor",
+                contentRaw = JsonPrimitive("cursor-bearing frame"),
+                seqId = 17,
+            )
+        )
+
+        assertEquals(listOf("conv-cursor" to 17L), cursorStore.records)
+        assertEquals(17L, cursorStore.getCursor("conv-cursor"))
+        scope.coroutineContext.job.cancel()
+    }
     @Test
     fun `external transport local sent and failed markers fold through serialized gateway`() = runTest {
         val api = FakeSyncApi()
@@ -1845,6 +1871,19 @@ private class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
 
 private fun <T> List<T>.randomOrNull(random: Random): T? =
     if (isEmpty()) null else this[random.nextInt(size)]
+
+private class RecordingConversationCursorStore : ConversationCursorStore {
+    val records = mutableListOf<Pair<String, Long>>()
+    private val highestByConversation = mutableMapOf<String, Long>()
+
+    override suspend fun recordFrame(conversationId: String, seq: Long) {
+        records += conversationId to seq
+        highestByConversation[conversationId] = maxOf(highestByConversation[conversationId] ?: Long.MIN_VALUE, seq)
+    }
+
+    override suspend fun getCursor(conversationId: String): Long? =
+        highestByConversation[conversationId]?.takeIf { it != Long.MIN_VALUE }
+}
 
 private val kotlinx.serialization.json.JsonPrimitive.contentOrNull: String?
     get() = if (isString) content else content.takeIf { it != "null" }

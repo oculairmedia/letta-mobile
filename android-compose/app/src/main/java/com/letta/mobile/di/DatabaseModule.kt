@@ -3,12 +3,15 @@ package com.letta.mobile.di
 import android.content.Context
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.BugReportDao
+import com.letta.mobile.data.local.ConversationCursorDao
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.local.LettaDatabase
 import com.letta.mobile.data.local.MemFsDao
 import com.letta.mobile.data.local.PendingLocalDao
+import com.letta.mobile.data.local.RoomConversationCursorStore
 import com.letta.mobile.data.local.RoomPendingLocalStore
 import com.letta.mobile.data.local.RuntimeEventDao
+import com.letta.mobile.data.timeline.ConversationCursorStore
 import com.letta.mobile.data.timeline.PendingLocalStore
 import dagger.Binds
 import dagger.Module
@@ -24,6 +27,10 @@ abstract class PendingLocalStoreModule {
     @Binds
     @Singleton
     abstract fun bindPendingLocalStore(impl: RoomPendingLocalStore): PendingLocalStore
+
+    @Binds
+    @Singleton
+    abstract fun bindConversationCursorStore(impl: RoomConversationCursorStore): ConversationCursorStore
 }
 
 @Module
@@ -53,6 +60,11 @@ object DatabaseModule {
     @Provides
     fun provideConversationDao(database: LettaDatabase): ConversationDao {
         return database.conversationDao()
+    }
+
+    @Provides
+    fun provideConversationCursorDao(database: LettaDatabase): ConversationCursorDao {
+        return database.conversationCursorDao()
     }
 
     @Provides

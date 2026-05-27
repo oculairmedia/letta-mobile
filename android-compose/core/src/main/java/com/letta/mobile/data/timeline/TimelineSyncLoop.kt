@@ -119,6 +119,7 @@ class TimelineSyncLoop(
     // records carrying non-text content. Defaults to no-op for tests that
     // don't care about persistence.
     private val pendingLocalStore: PendingLocalStore = NoOpPendingLocalStore,
+    private val conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
     // Production default expects 25-30s server heartbeats; tests can inject a
     // shorter budget without changing the public repository API.
     private val streamSilenceTimeoutMs: Long = STREAM_SILENCE_TIMEOUT_MS,
@@ -1043,6 +1044,7 @@ class TimelineSyncLoop(
             events = _events,
             pendingToolReturnsByCallId = pendingToolReturnsByCallId,
             conversationId = conversationId,
+            conversationCursorStore = conversationCursorStore,
         )
         loopScope.launch { ingestNotificationDispatcher.dispatch(notification) }
         // letta-mobile-t0vha (oc8j Phase 2): fan the same frame into the

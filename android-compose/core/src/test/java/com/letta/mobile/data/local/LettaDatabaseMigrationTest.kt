@@ -266,6 +266,50 @@ class LettaDatabaseMigrationTest {
         assertEquals(1, db.memFsDao().listCommitsAfter(0).size)
     }
 
+    @Test
+    fun `opens current v7 database and adds conversation cursor table`() = runTest {
+        createLegacyDatabase(version = 7) { db ->
+            createAgentsTable(db)
+            createProjectBugReportsTable(db)
+            createPendingLocalMessagesTable(db)
+            createConversationTables(db)
+            createRuntimeEventsTable(db)
+            createMemFsTables(db)
+            db.execSQL(
+                """
+                INSERT INTO conversations (
+                    id, agentId, summary, createdAt, updatedAt, lastMessageAt,
+                    archived, archivedAt, inContextMessageIdsJson,
+                    isolatedBlockIdsJson, cachedAtEpochMs
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """.trimIndent(),
+                arrayOf<Any?>(
+                    "conversation-1",
+                    "agent-1",
+                    "Existing conversation",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    "[]",
+                    "[]",
+                    1_000L,
+                ),
+            )
+        }
+
+        val db = openMigratedDatabase()
+
+        assertEquals(null, db.conversationCursorDao().getCursor("conversation-1"))
+        db.conversationCursorDao().upsertCursor(
+            conversationId = "conversation-1",
+            highestSeenSeq = 42L,
+            updatedAt = 2_000L,
+        )
+        assertEquals(42L, db.conversationCursorDao().getCursor("conversation-1")?.highestSeenSeq)
+    }
+
     private fun createLegacyDatabase(version: Int, createSchema: (SQLiteDatabase) -> Unit) {
         context.deleteDatabase(dbName)
         val db = context.openOrCreateDatabase(dbName, Context.MODE_PRIVATE, null)
@@ -401,5 +445,33 @@ class LettaDatabaseMigrationTest {
         db.execSQL("CREATE INDEX IF NOT EXISTS index_runtime_events_conversationId ON runtime_events (conversationId)")
         db.execSQL("CREATE INDEX IF NOT EXISTS index_runtime_events_agentId ON runtime_events (agentId)")
         db.execSQL("CREATE INDEX IF NOT EXISTS index_runtime_events_runId ON runtime_events (runId)")
+    }
+
+    private fun createMemFsTables(db: SQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS memfs_files (
+                path TEXT NOT NULL,
+                revision INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                metadataJson TEXT NOT NULL,
+                PRIMARY KEY(path)
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS memfs_commits (
+                revision INTEGER NOT NULL,
+                commitId TEXT NOT NULL,
+                path TEXT NOT NULL,
+                operation TEXT NOT NULL,
+                createdAtEpochMs INTEGER NOT NULL,
+                PRIMARY KEY(revision)
+            )
+            """.trimIndent(),
+        )
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_memfs_commits_commitId ON memfs_commits (commitId)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_memfs_commits_path ON memfs_commits (path)")
     }
 }
