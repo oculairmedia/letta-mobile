@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -25,6 +26,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.Density
+import com.letta.mobile.ui.text.ChatTextLayoutMode
+import com.letta.mobile.ui.text.rememberChatTextGeometryMeasurer
+import com.letta.mobile.ui.theme.LocalChatFontScale
 import com.letta.mobile.ui.theme.LocalChatIsPinching
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -183,6 +189,45 @@ fun StreamingMarkdownText(
     val document = remember(displayed) { documentState.update(displayed) }
     val blocksForRender = document.blocks
     val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
+    val chatFontScale = LocalChatFontScale.current
+    val geometryMeasurer = rememberChatTextGeometryMeasurer()
+    val activeTextStyle = MaterialTheme.typography.bodyMedium.copy(color = textColor)
+    val scaledDensity = remember(density, chatFontScale) {
+        Density(
+            density = density.density,
+            fontScale = density.fontScale * chatFontScale,
+        )
+    }
+    var measuredContentWidthPx by remember { mutableIntStateOf(0) }
+    val activeLineCount = remember(
+        blocksForRender,
+        measuredContentWidthPx,
+        activeTextStyle,
+        scaledDensity.density,
+        scaledDensity.fontScale,
+        layoutDirection,
+        isStreaming,
+    ) {
+        val activeBlock = blocksForRender.lastOrNull()
+        if (
+            isStreaming &&
+            measuredContentWidthPx > 0 &&
+            activeBlock != null &&
+            activeBlock.supportsPlainTextHeightPrediction()
+        ) {
+            geometryMeasurer.measure(
+                text = activeBlock.source,
+                style = activeTextStyle,
+                widthPx = measuredContentWidthPx,
+                density = scaledDensity,
+                layoutDirection = layoutDirection,
+                mode = ChatTextLayoutMode.MarkdownParagraph,
+            ).lineCount
+        } else {
+            null
+        }
+    }
     // letta-mobile-mmnn fix: stable height floor that only updates at committed-block boundaries.
     //
     // The original heightIn(min=settledPx) caused flicker because settledHeightPx changed on
@@ -193,13 +238,17 @@ fun StreamingMarkdownText(
     // (e.g. 43px) and nothing rendered until scrolling forced a re-measure.
     //
     // This approach: heightIn(min=stableFloor) where stableFloor only updates when committed
-    // block keys change (paragraph boundary or completed table-row advance). Between boundary
-    // changes, active-tail growth must NOT change the heightIn modifier; otherwise LazyColumn
-    // remeasures the whole message at the paint cadence and styled tables visibly flash.
+    // block keys change (paragraph boundary or completed table-row advance) or, for simple
+    // active prose, when the geometry cache says the visual line count changed. Between those
+    // geometry boundaries, active-tail growth must NOT change the heightIn modifier; otherwise
+    // LazyColumn remeasures the whole message at the paint cadence and styled tables visibly flash.
     var stableFloorHeightPx by remember { mutableStateOf(0) }
     var stableFloorBoundaryToken by remember { mutableStateOf<String?>(null) }
-    val committedBoundaryToken = remember(document, isStreaming) {
-        document.stableHeightToken(isStreaming = isStreaming)
+    val committedBoundaryToken = remember(document, isStreaming, activeLineCount) {
+        document.stableHeightToken(
+            isStreaming = isStreaming,
+            activeLineCount = activeLineCount,
+        )
     }
     val heightFloorModifier = if (stableFloorHeightPx > 0) {
         with(density) { Modifier.heightIn(min = stableFloorHeightPx.toDp()) }
@@ -229,6 +278,7 @@ fun StreamingMarkdownText(
             .then(heightFloorModifier)
             .then(heightAnimation)
             .onSizeChanged { size ->
+                measuredContentWidthPx = size.width
                 if (committedBoundaryToken != stableFloorBoundaryToken) {
                     stableFloorBoundaryToken = committedBoundaryToken
                     // Only grow the floor upward. Never shrink it.

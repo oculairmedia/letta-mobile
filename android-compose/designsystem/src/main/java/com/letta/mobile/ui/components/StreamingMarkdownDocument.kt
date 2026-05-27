@@ -11,13 +11,21 @@ package com.letta.mobile.ui.components
 internal data class StreamingMarkdownDocument(
     val blocks: List<StreamingMarkdownDocumentBlock>,
 ) {
-    fun stableHeightToken(isStreaming: Boolean): String {
+    fun stableHeightToken(
+        isStreaming: Boolean,
+        activeLineCount: Int? = null,
+    ): String {
         val stableBlocks = if (isStreaming && blocks.isNotEmpty()) {
             blocks.dropLast(1)
         } else {
             blocks
         }
-        return stableBlocks.joinToString(separator = "|") { it.key }
+        val stableToken = stableBlocks.joinToString(separator = "|") { it.key }
+        val activeToken = activeLineCount
+            ?.takeIf { isStreaming && blocks.isNotEmpty() }
+            ?.let { lineCount -> "${blocks.last().key}:lines=$lineCount" }
+        return listOfNotNull(stableToken.takeIf { it.isNotEmpty() }, activeToken)
+            .joinToString(separator = "|")
     }
 }
 
@@ -54,6 +62,29 @@ internal val StreamingMarkdownDocumentBlock.allowsInlineCursor: Boolean
 internal fun StreamingMarkdownDocumentBlock.renderMarkdownSource(sourceOverride: String = source): String {
     return repairIncompleteMarkdownForStreaming(sourceOverride)
 }
+
+internal fun StreamingMarkdownDocumentBlock.supportsPlainTextHeightPrediction(
+    sourceOverride: String = source,
+): Boolean =
+    kind == StreamingMarkdownBlockKind.Paragraph &&
+        sourceOverride.isPlainStreamingProse()
+
+private fun String.isPlainStreamingProse(): Boolean {
+    if (isBlank()) return false
+    return none { char -> char in markdownLayoutChangingChars }
+}
+
+private val markdownLayoutChangingChars = setOf(
+    '`',
+    '*',
+    '_',
+    '[',
+    ']',
+    '#',
+    '|',
+    '~',
+    '<',
+)
 
 /**
  * Stateful identity layer around the pure parser.
