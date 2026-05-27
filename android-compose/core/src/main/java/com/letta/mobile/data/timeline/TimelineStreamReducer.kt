@@ -196,6 +196,20 @@ internal fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutp
         return output()
     }
 
+    val prefixOrphanTarget = timeline.findSameRunAssistantPrefixOrBlankTarget(confirmed)
+    if (prefixOrphanTarget != null) {
+        Telemetry.event(
+            "TimelineSync", "streamSubscriber.assistantPrefixOrphanSkipped",
+            "incomingServerId" to confirmed.serverId,
+            "existingServerId" to prefixOrphanTarget.serverId,
+            "runId" to (confirmed.runId ?: "<null>"),
+            "incomingLen" to confirmed.content.length,
+            "existingLen" to prefixOrphanTarget.content.length,
+            "conversationId" to conversationId,
+        )
+        return output()
+    }
+
     timeline = timeline.append(applyPendingToolReturns(confirmed, pendingToolReturnsByCallId))
     timeline = timeline.copy(liveCursor = confirmed.serverId)
     pendingEvents += TimelineSyncEvent.StreamEventIngested(confirmed.serverId, message.messageType)
@@ -217,6 +231,27 @@ internal fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutp
             null
         }
     )
+}
+
+private fun Timeline.findSameRunAssistantPrefixOrBlankTarget(
+    incoming: TimelineEvent.Confirmed,
+): TimelineEvent.Confirmed? {
+    if (incoming.messageType != TimelineMessageType.ASSISTANT) return null
+    val incomingRunId = incoming.runId?.takeIf { it.isNotBlank() } ?: return null
+    val incomingText = incoming.content.trim()
+    return events
+        .asSequence()
+        .filterIsInstance<TimelineEvent.Confirmed>()
+        .firstOrNull { existing ->
+            if (existing.messageType != TimelineMessageType.ASSISTANT) return@firstOrNull false
+            if (existing.serverId == incoming.serverId) return@firstOrNull false
+            if (existing.runId != incomingRunId) return@firstOrNull false
+
+            val existingText = existing.content.trim()
+            existingText.isNotBlank() &&
+                (incomingText.isBlank() ||
+                    (existingText.length > incomingText.length && existingText.startsWith(incomingText)))
+        }
 }
 
 /**
