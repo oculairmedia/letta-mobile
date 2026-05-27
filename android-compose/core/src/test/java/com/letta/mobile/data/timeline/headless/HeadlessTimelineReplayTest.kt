@@ -127,6 +127,67 @@ class HeadlessTimelineReplayTest {
             "non-monotonic recorded seq for run run-1: 2, 1"
     }
 
+    fun `hydration order can force REST before or after WS frames`() = runTest {
+        val hydrate = restHydrate(
+            messagesJson = """
+                [
+                  {"id":"msg-rest-user","message_type":"user_message","content":"hello","date":"2026-05-26T00:00:00Z"},
+                  {"id":"msg-rest-assistant","message_type":"assistant_message","content":"rest answer","date":"2026-05-26T00:00:01Z","run_id":"run-1","seq_id":1}
+                ]
+            """.trimIndent()
+        )
+        val ws = recorded("""{"v":1,"type":"assistant_message","id":"cm-live","ts":"2026-05-26T00:00:02Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"live answer","seq_id":2}""")
+        val lines = sequenceOf(hydrate, ws)
+
+        val restFirst = HeadlessTimelineReplayer().replayJsonl(
+            conversationId = "conv-1",
+            lines = lines,
+            hydrationOrder = HydrationReplayOrder.REST_FIRST,
+            dumpOptions = HeadlessReplayDumpOptions(dumpAfterEachFrame = true),
+        )
+        val wsFirst = HeadlessTimelineReplayer().replayJsonl(
+            conversationId = "conv-1",
+            lines = sequenceOf(hydrate, ws),
+            hydrationOrder = HydrationReplayOrder.WS_FIRST,
+            dumpOptions = HeadlessReplayDumpOptions(dumpAfterEachFrame = true),
+        )
+
+        restFirst.frameSnapshots.map { it.frameType } shouldBe listOf("rest_hydrate", "assistant_message")
+        wsFirst.frameSnapshots.map { it.frameType } shouldBe listOf("assistant_message", "rest_hydrate")
+        restFirst.hydrationsApplied shouldBe 1
+        restFirst.messagesHydrated shouldBe 2
+        restFirst.messagesIngested shouldBe 1
+    }
+
+    @Test
+    fun `x22f fixture interleaves REST hydration by timestamp with WS frames`() = runTest {
+        val lines = requireNotNull(
+            javaClass.classLoader?.getResourceAsStream("replay/x22f-rest-ws-interleave.jsonl")
+        ).bufferedReader().use { it.lineSequence().toList() }
+
+        val result = HeadlessTimelineReplayer().replayJsonl(
+            conversationId = "conv-x22f",
+            lines = lines.asSequence(),
+            assertNoDuplicateUiMessages = true,
+            assertOtidUnique = true,
+            assertSeqMonotonic = true,
+            hydrationOrder = HydrationReplayOrder.INTERLEAVED,
+            dumpOptions = HeadlessReplayDumpOptions(dumpAfterEachFrame = true),
+        )
+
+        result.framesSeen shouldBe 2
+        result.hydrationsApplied shouldBe 1
+        result.messagesHydrated shouldBe 2
+        result.messagesIngested shouldBe 1
+        result.frameSnapshots.map { it.frameType } shouldBe listOf("rest_hydrate", "assistant_message")
+        result.assertionReport.passed shouldBe true
+        Json.parseToJsonElement(result.timelineJson)
+            .jsonObject["events"]!!
+            .jsonArray
+            .map { it.jsonObject["content"]?.jsonPrimitive?.content }
+            .shouldContain("Fresh live response from reopen.")
+    }
+
     @Test
     fun `resume replay assertions pass for contiguous post-cursor frames`() = runTest {
         val lines = sequenceOf(
@@ -347,6 +408,12 @@ class HeadlessTimelineReplayTest {
         result.assertionReport.failures shouldContain
             "message approval_request_message/toolcall-approval observed with multiple otids: stable-1, stable-2"
     }
+
+    private fun restHydrate(
+        id: String = "hydrate-1",
+        ts: String = "2026-05-26T00:00:01Z",
+        messagesJson: String,
+    ): String = """{"direction":"rest_hydrate","id":"$id","ts":"$ts","messages":$messagesJson}"""
 
     private fun recorded(frameJson: String): String =
         """{"direction":"inbound","frame":$frameJson}"""

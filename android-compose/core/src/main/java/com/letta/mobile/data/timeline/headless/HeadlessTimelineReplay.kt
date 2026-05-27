@@ -20,6 +20,17 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+enum class HydrationReplayOrder(val cliValue: String) {
+    REST_FIRST("rest-first"),
+    WS_FIRST("ws-first"),
+    INTERLEAVED("interleaved");
+
+    companion object {
+        fun fromCliValue(value: String): HydrationReplayOrder? =
+            values().firstOrNull { it.cliValue == value.trim().lowercase() }
+    }
+}
+
 class HeadlessTimelineReplayer(
     private val store: HeadlessTimelineStore = HeadlessTimelineStore(),
     private val json: Json = replayJson,
@@ -49,6 +60,7 @@ class HeadlessTimelineReplayer(
         assertNoAbandonedToolCalls: Boolean = false,
         assertApprovalToolReturnOnApprovalRun: Boolean = false,
         assertOtidStableAcrossRetry: Boolean = false,
+        hydrationOrder: HydrationReplayOrder = HydrationReplayOrder.INTERLEAVED,
         dumpOptions: HeadlessReplayDumpOptions = HeadlessReplayDumpOptions(),
     ): HeadlessReplayResult {
         val assertionOptions = TimelineAssertionOptions(
@@ -79,6 +91,7 @@ class HeadlessTimelineReplayer(
             conversationId = conversationId,
             lines = lines,
             assertionOptions = assertionOptions,
+            hydrationOrder = hydrationOrder,
             dumpOptions = dumpOptions,
         )
     }
@@ -87,6 +100,7 @@ class HeadlessTimelineReplayer(
         conversationId: String,
         lines: Sequence<String>,
         assertionOptions: TimelineAssertionOptions,
+        hydrationOrder: HydrationReplayOrder = HydrationReplayOrder.INTERLEAVED,
         dumpOptions: HeadlessReplayDumpOptions = HeadlessReplayDumpOptions(),
     ): HeadlessReplayResult {
         val session = HeadlessTimelineReplaySession(
@@ -96,12 +110,15 @@ class HeadlessTimelineReplayer(
             resumeFromCursor = assertionOptions.resumeFromCursor,
         )
         val snapshots = mutableListOf<HeadlessReplayFrameSnapshot>()
-        lines.forEach { line ->
+        val replayEvents = lines.mapIndexedNotNull { index, line ->
+            line.toReplayEventOrNull(sourceIndex = index, json = json)
+        }.toList()
+        replayEvents.orderedFor(hydrationOrder).forEach { event ->
             val nextIndex = session.framesSeen
-            val step = session.ingestLine(
-                line = line,
+            val step = session.ingestEvent(
+                event = event,
                 captureTimeline = dumpOptions.shouldCapture(nextIndex),
-            ) ?: return@forEach
+            )
             step.snapshot?.let { snapshots += it }
         }
         return session.result(
@@ -175,6 +192,10 @@ class HeadlessTimelineReplaySession(
         private set
     var messagesIngested: Int = 0
         private set
+    var hydrationsApplied: Int = 0
+        private set
+    var messagesHydrated: Int = 0
+        private set
 
     private val ignoredTypes = linkedMapOf<String, Int>()
     private val seqsByRun = linkedMapOf<String, MutableList<Long>>()
@@ -198,63 +219,55 @@ class HeadlessTimelineReplaySession(
         line: String,
         captureTimeline: Boolean = false,
     ): HeadlessReplayStep? {
-        val rawLine = line.trim()
-        if (rawLine.isEmpty()) return null
+        val event = line.toReplayEventOrNull(sourceIndex = framesSeen, json = json) ?: return null
+        return ingestEvent(event, captureTimeline)
+    }
+
+    suspend fun ingestEvent(
+        event: HeadlessReplayEvent,
+        captureTimeline: Boolean = false,
+    ): HeadlessReplayStep {
         val frameIndex = framesSeen++
-        val captureEvent = rawLine.toCaptureEventJsonOrNull()
-        if (captureEvent?.kindName() == "rest_messages") {
-            val messages = runCatching {
-                json.decodeFromJsonElement(
-                    ListSerializer(LettaMessage.serializer()),
-                    captureEvent["messages"] ?: JsonArray(emptyList()),
-                )
-            }.getOrElse {
-                ignoredTypes.increment("rest_messages")
-                return step(
+        return when (event) {
+            is HeadlessReplayEvent.Invalid -> {
+                ignoredTypes.increment(event.frameType)
+                step(
                     frameIndex = frameIndex,
-                    frameType = "rest_messages",
-                    frameId = null,
+                    frameType = event.frameType,
+                    frameId = event.frameId,
                     ingested = false,
-                    ignoredReason = "decode-error",
+                    ignoredReason = event.reason,
                     captureTimeline = captureTimeline,
                 )
             }
-            val targetConversation = captureEvent["conversation_id"]?.jsonPrimitive?.contentOrNull ?: conversationId
-            store.hydrate(targetConversation, messages)
-            messagesIngested += messages.size
-            return step(
+            is HeadlessReplayEvent.RestHydrate -> {
+                store.hydrate(conversationId, event.messages)
+                hydrationsApplied++
+                messagesHydrated += event.messages.size
+                if (event.countAsIngested) messagesIngested += event.messages.size
+                step(
+                    frameIndex = frameIndex,
+                    frameType = event.frameType,
+                    frameId = event.frameId,
+                    ingested = true,
+                    ignoredReason = null,
+                    captureTimeline = captureTimeline,
+                )
+            }
+            is HeadlessReplayEvent.WsFrame -> ingestFrameEvent(
+                event = event,
                 frameIndex = frameIndex,
-                frameType = "rest_messages",
-                frameId = null,
-                ingested = true,
-                ignoredReason = null,
                 captureTimeline = captureTimeline,
             )
         }
-        if (captureEvent != null && captureEvent.kindName() != "ws_frame") {
-            val kind = captureEvent.kindName()
-            ignoredTypes.increment(kind)
-            return step(
-                frameIndex = frameIndex,
-                frameType = kind,
-                frameId = null,
-                ingested = false,
-                ignoredReason = "metadata",
-                captureTimeline = captureTimeline,
-            )
-        }
-        val frameJson = rawLine.toRecordedFrameJsonOrNull() ?: run {
-            ignoredTypes.increment("<invalid>")
-            return step(
-                frameIndex = frameIndex,
-                frameType = "<invalid>",
-                frameId = null,
-                ingested = false,
-                ignoredReason = "invalid json",
-                captureTimeline = captureTimeline,
-            )
-        }
+    }
 
+    private suspend fun ingestFrameEvent(
+        event: HeadlessReplayEvent.WsFrame,
+        frameIndex: Int,
+        captureTimeline: Boolean,
+    ): HeadlessReplayStep {
+        val frameJson = event.frameJson
         recordResumeSeq(frameJson)
         if (cursorExpiredFrameIndex != null && frameIndex > cursorExpiredFrameIndex!!) {
             sawFrameAfterCursorExpired = true
@@ -272,7 +285,6 @@ class HeadlessTimelineReplaySession(
                 captureTimeline = captureTimeline,
             )
         }
-
         seqsByRun.recordSeq(frameJson)
         val frame = runCatching {
             json.decodeFromString(ServerFrameSerializer, frameJson.toString())
@@ -412,6 +424,8 @@ class HeadlessTimelineReplaySession(
             conversationId = conversationId,
             framesSeen = framesSeen,
             messagesIngested = messagesIngested,
+            hydrationsApplied = hydrationsApplied,
+            messagesHydrated = messagesHydrated,
             ignoredFrameTypes = ignoredTypes.toMap(),
             assertionReport = report,
             timelineJson = store.dumpJson(conversationId),
@@ -769,6 +783,8 @@ data class HeadlessReplayResult(
     val conversationId: String,
     val framesSeen: Int,
     val messagesIngested: Int,
+    val hydrationsApplied: Int = 0,
+    val messagesHydrated: Int = 0,
     val ignoredFrameTypes: Map<String, Int>,
     val assertionReport: TimelineAssertionReport,
     val timelineJson: String,
@@ -817,20 +833,167 @@ private data class ObservedToolReturn(
 private val TERMINAL_RUN_STATUSES = setOf("completed", "cancelled", "failed")
 private const val CURSOR_EXPIRED_ERROR_CODE = "cursor_expired"
 
+sealed class HeadlessReplayEvent {
+    abstract val sourceIndex: Int
+    abstract val timestamp: String?
+
+    data class WsFrame(
+        override val sourceIndex: Int,
+        val frameJson: JsonObject,
+        override val timestamp: String?,
+    ) : HeadlessReplayEvent()
+
+    data class RestHydrate(
+        override val sourceIndex: Int,
+        val messages: List<LettaMessage>,
+        val frameId: String?,
+        val frameType: String = "rest_hydrate",
+        val countAsIngested: Boolean = false,
+        override val timestamp: String?,
+    ) : HeadlessReplayEvent()
+
+    data class Invalid(
+        override val sourceIndex: Int,
+        val frameType: String,
+        val frameId: String?,
+        val reason: String,
+        override val timestamp: String?,
+    ) : HeadlessReplayEvent()
+}
+
+private fun String.toReplayEventOrNull(
+    sourceIndex: Int,
+    json: Json,
+): HeadlessReplayEvent? {
+    val rawLine = trim()
+    if (rawLine.isEmpty()) return null
+    val element = runCatching { replayJson.parseToJsonElement(rawLine).jsonObject }.getOrNull()
+        ?: return HeadlessReplayEvent.Invalid(
+            sourceIndex = sourceIndex,
+            frameType = "<invalid>",
+            frameId = null,
+            reason = "invalid json",
+            timestamp = null,
+        )
+    val captureKind = element["kind"]?.jsonPrimitive?.contentOrNull
+    if (captureKind == "rest_messages") {
+        val messagesJson = element["messages"] as? JsonArray
+            ?: return HeadlessReplayEvent.Invalid(
+                sourceIndex = sourceIndex,
+                frameType = captureKind,
+                frameId = element.frameId(),
+                reason = "missing messages",
+                timestamp = element.eventTimestamp(),
+            )
+        val messages = runCatching {
+            json.decodeFromJsonElement(ListSerializer(LettaMessage.serializer()), messagesJson)
+        }.getOrElse {
+            return HeadlessReplayEvent.Invalid(
+                sourceIndex = sourceIndex,
+                frameType = captureKind,
+                frameId = element.frameId(),
+                reason = "decode-error",
+                timestamp = element.eventTimestamp(),
+            )
+        }
+        return HeadlessReplayEvent.RestHydrate(
+            sourceIndex = sourceIndex,
+            messages = messages,
+            frameId = element.frameId(),
+            frameType = captureKind,
+            countAsIngested = true,
+            timestamp = element.eventTimestamp(),
+        )
+    }
+    if (captureKind != null && captureKind != "ws_frame") {
+        return HeadlessReplayEvent.Invalid(
+            sourceIndex = sourceIndex,
+            frameType = captureKind,
+            frameId = element.frameId(),
+            reason = "metadata",
+            timestamp = element.eventTimestamp(),
+        )
+    }
+    if (element["direction"]?.jsonPrimitive?.contentOrNull == "rest_hydrate") {
+        val messagesJson = element["messages"] as? JsonArray
+            ?: return HeadlessReplayEvent.Invalid(
+                sourceIndex = sourceIndex,
+                frameType = "rest_hydrate",
+                frameId = element.frameId(),
+                reason = "missing messages",
+                timestamp = element.eventTimestamp(),
+            )
+        val messages = runCatching {
+            json.decodeFromJsonElement(ListSerializer(LettaMessage.serializer()), messagesJson)
+        }.getOrElse {
+            return HeadlessReplayEvent.Invalid(
+                sourceIndex = sourceIndex,
+                frameType = "rest_hydrate",
+                frameId = element.frameId(),
+                reason = "decode-error",
+                timestamp = element.eventTimestamp(),
+            )
+        }
+        return HeadlessReplayEvent.RestHydrate(
+            sourceIndex = sourceIndex,
+            messages = messages,
+            frameId = element.frameId(),
+            timestamp = element.eventTimestamp(),
+        )
+    }
+    val frameJson = element.toRecordedFrameJsonOrNull() ?: return HeadlessReplayEvent.Invalid(
+        sourceIndex = sourceIndex,
+        frameType = "<invalid>",
+        frameId = null,
+        reason = "invalid json",
+        timestamp = element.eventTimestamp(),
+    )
+    return HeadlessReplayEvent.WsFrame(
+        sourceIndex = sourceIndex,
+        frameJson = frameJson,
+        timestamp = frameJson.eventTimestamp() ?: element.eventTimestamp(),
+    )
+}
+
+private fun List<HeadlessReplayEvent>.orderedFor(order: HydrationReplayOrder): List<HeadlessReplayEvent> =
+    when (order) {
+        HydrationReplayOrder.REST_FIRST -> sortedWith(
+            compareBy<HeadlessReplayEvent> { if (it is HeadlessReplayEvent.RestHydrate) 0 else 1 }
+                .thenBy { it.sourceIndex }
+        )
+        HydrationReplayOrder.WS_FIRST -> sortedWith(
+            compareBy<HeadlessReplayEvent> { if (it is HeadlessReplayEvent.RestHydrate) 1 else 0 }
+                .thenBy { it.sourceIndex }
+        )
+        HydrationReplayOrder.INTERLEAVED -> sortedWith(::compareInterleavedEvents)
+    }
+
+private fun compareInterleavedEvents(
+    left: HeadlessReplayEvent,
+    right: HeadlessReplayEvent,
+): Int {
+    val leftTimestamp = left.timestamp
+    val rightTimestamp = right.timestamp
+    if (leftTimestamp != null && rightTimestamp != null && leftTimestamp != rightTimestamp) {
+        return leftTimestamp.compareTo(rightTimestamp)
+    }
+    return left.sourceIndex.compareTo(right.sourceIndex)
+}
+
 private fun String.toRecordedFrameJsonOrNull(): JsonObject? {
     val element = runCatching { replayJson.parseToJsonElement(this).jsonObject }.getOrNull() ?: return null
-    val raw = element["raw"]?.jsonPrimitive?.contentOrNull
+    return element.toRecordedFrameJsonOrNull()
+}
+
+private fun JsonObject.toRecordedFrameJsonOrNull(): JsonObject? {
+    val raw = this["raw"]?.jsonPrimitive?.contentOrNull
     if (raw != null) {
         return runCatching { replayJson.parseToJsonElement(raw).jsonObject }.getOrNull()
     }
-    val frame = element["frame"]
+    val frame = this["frame"]
     if (frame is JsonObject) return frame
-    return element.takeIf { it["type"] != null }
+    return this.takeIf { it["type"] != null }
 }
-
-private fun String.toCaptureEventJsonOrNull(): JsonObject? =
-    runCatching { replayJson.parseToJsonElement(this).jsonObject }.getOrNull()
-        ?.takeIf { it["kind"] != null }
 
 private fun MutableMap<String, Int>.increment(key: String) {
     this[key] = (this[key] ?: 0) + 1
@@ -855,8 +1018,10 @@ private fun JsonObject.frameId(): String? =
 private fun JsonObject.frameTimestamp(): String? =
     this["ts"]?.jsonPrimitive?.contentOrNull
 
-private fun JsonObject.kindName(): String =
-    this["kind"]?.jsonPrimitive?.contentOrNull ?: "<unknown>"
+private fun JsonObject.eventTimestamp(): String? =
+    this["ts"]?.jsonPrimitive?.contentOrNull
+        ?: this["timestamp"]?.jsonPrimitive?.contentOrNull
+        ?: this["date"]?.jsonPrimitive?.contentOrNull
 
 private fun ServerFrame.conversationIdOrNull(): String? = when (this) {
     is ServerFrame.TurnStarted -> conversationId

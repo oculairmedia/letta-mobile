@@ -22,6 +22,7 @@ import com.letta.mobile.cli.runtime.readImageAttachments
 import com.letta.mobile.data.timeline.headless.HeadlessReplayDumpOptions
 import com.letta.mobile.data.timeline.headless.HeadlessTimelineReplayer
 import com.letta.mobile.data.timeline.headless.HeadlessTimelineStore
+import com.letta.mobile.data.timeline.headless.HydrationReplayOrder
 import com.letta.mobile.data.timeline.headless.TimelineAssertionOptions
 import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.RunCursorStore
@@ -295,6 +296,10 @@ internal class ReplayCommand : AdminShimCommand(
     private val dumpAfterEachFrame by option("--dump-after-each-frame").flag(default = false)
     private val dumpAfterFrame by option("--dump-after-frame").int()
     private val dumpFrames by option("--dump-frames")
+    private val hydrationOrder by option(
+        "--hydration-order",
+        help = "REST/WS sequencing for mixed hydration recordings: rest-first, ws-first, or interleaved."
+    ).default(HydrationReplayOrder.INTERLEAVED.cliValue)
     private val interactive by option("--interactive").flag(default = false)
     private val bisectFrame by option("--bisect-frame").flag(default = false)
     private val bisectOut by option("--bisect-out")
@@ -311,6 +316,7 @@ internal class ReplayCommand : AdminShimCommand(
     private val traceStateTransitions by option("--trace-state-transitions").flag(default = false)
 
     override fun run() = runBlocking {
+        val replayOrder = hydrationOrder.validatedHydrationOrder()
         val assertionOptions = TimelineAssertionOptions(
             assertNoDuplicateUiMessages = assertNoDups,
             assertOtidUnique = assertOtidUnique,
@@ -386,12 +392,18 @@ internal class ReplayCommand : AdminShimCommand(
                 conversationId = conversationId,
                 lines = reader.lineSequence(),
                 assertionOptions = assertionOptions,
+                hydrationOrder = replayOrder,
                 dumpOptions = dumpOptions,
             )
         }
         val statusOut = if (dumpOptions.enabled) System.err else System.out
+        val hydrationStatus = if (result.hydrationsApplied > 0) {
+            " hydrations=${result.hydrationsApplied} hydrated_messages=${result.messagesHydrated}"
+        } else {
+            ""
+        }
         statusOut.println(
-            "[replay] frames=${result.framesSeen} ingested=${result.messagesIngested} " +
+            "[replay] frames=${result.framesSeen} ingested=${result.messagesIngested}$hydrationStatus " +
                 "events=${result.assertionReport.eventCount}"
         )
         if (result.ignoredFrameTypes.isNotEmpty()) {
@@ -585,6 +597,11 @@ private fun String?.validatedFinalStatusOrNull(): String? {
     }
     return normalized
 }
+
+private fun String.validatedHydrationOrder(): HydrationReplayOrder =
+    HydrationReplayOrder.fromCliValue(this) ?: throw UsageError(
+        "--hydration-order must be rest-first, ws-first, or interleaved"
+    )
 
 private fun String?.parseFrameSet(): Set<Int> {
     if (this.isNullOrBlank()) return emptySet()

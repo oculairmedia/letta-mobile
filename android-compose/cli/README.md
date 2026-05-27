@@ -176,6 +176,17 @@ when they are intentionally bad fixtures.
 .\gradlew.bat :cli:run -PcliArgs="replay --recording ..\core\src\test\resources\replay\ka770-duplicate-assistant.jsonl --conversation conv-ka770 --assert-no-dups --assert-otid-unique --assert-seq-monotonic"
 ```
 
+Mixed REST/WS hydration fixtures can include REST snapshot lines alongside
+inbound WS frames:
+
+```jsonl
+{"direction":"rest_hydrate","messages":[{"id":"user-1","message_type":"user_message","content":"Hi"}]}
+{"direction":"inbound","frame":{"v":1,"type":"assistant_message","id":"cm-1","conversation_id":"conv_x","run_id":"run_x","content":"Hello","seq_id":1}}
+```
+
+Use `--hydration-order=rest-first|ws-first|interleaved` to apply REST snapshots
+before WS frames, after WS frames, or by recording timestamp order.
+
 Supported assertions:
 
 - `--assert-no-dups`: no duplicate UI ids and no duplicate semantic assistant,
