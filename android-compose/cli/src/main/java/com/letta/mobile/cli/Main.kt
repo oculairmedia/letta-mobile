@@ -4,6 +4,7 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
 import com.letta.mobile.cli.commands.ConnectCommand
+import com.letta.mobile.cli.commands.CaptureCommand
 import com.letta.mobile.cli.commands.DisconnectCommand
 import com.letta.mobile.cli.commands.DumpTimelineCommand
 import com.letta.mobile.cli.commands.ProfileCommand
@@ -15,6 +16,7 @@ import com.letta.mobile.cli.commands.ProfileSetCommand
 import com.letta.mobile.cli.commands.ProfileShowCommand
 import com.letta.mobile.cli.commands.ProfileUseCommand
 import com.letta.mobile.cli.commands.RecordCommand
+import com.letta.mobile.cli.commands.RecordCursorStateCommand
 import com.letta.mobile.cli.commands.ReconnectCommand
 import com.letta.mobile.cli.commands.RestCommand
 import com.letta.mobile.cli.commands.RestDeleteCommand
@@ -44,10 +46,12 @@ object Main {
         LettaMobileCli()
             .subcommands(
                 ConnectCommand(),
+                CaptureCommand(),
                 SendCommand(),
                 DumpTimelineCommand(),
                 ReplayCommand(),
                 RecordCommand(),
+                RecordCursorStateCommand(),
                 DisconnectCommand(),
                 ReconnectCommand(),
                 RestCommand().subcommands(
@@ -84,10 +88,12 @@ object Main {
 
         Commands:
           connect        Open admin-shim mobile WS and print welcome/session state.
+          capture        Capture REST hydrate snapshots and WS frames as replayable JSONL.
           send           Send through admin-shim WS and fold frames into a headless timeline.
           dump-timeline  Fetch conversation history and emit stable timeline JSON.
           replay         Replay a recorded WS JSONL fixture through the reducer.
           record         Capture admin-shim WS wire frames as replay-compatible JSONL.
+          record-cursor-state  Snapshot highest observed run cursors from a JSONL fixture.
           disconnect     Open WS and close it cleanly.
           reconnect      Exercise disconnect/reconnect and optional run resume.
           rest           Call arbitrary authenticated Letta REST endpoints.

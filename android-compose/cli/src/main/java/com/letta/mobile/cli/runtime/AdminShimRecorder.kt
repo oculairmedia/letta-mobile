@@ -1,5 +1,6 @@
 package com.letta.mobile.cli.runtime
 
+import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.buildContentParts
 import com.letta.mobile.data.model.toJsonArray
@@ -19,8 +20,12 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -42,6 +47,8 @@ internal class AdminShimRecorder {
         timeoutMs: Long,
         deviceId: String,
         clientVersion: String,
+        restSnapshot: List<LettaMessage>? = null,
+        recordCursorEvents: Boolean = false,
     ): Int {
         Files.createDirectories(out.toAbsolutePath().parent)
         val writer = Files.newBufferedWriter(
@@ -62,6 +69,9 @@ internal class AdminShimRecorder {
             .url(baseUrl.trimEnd('/').toWsUrl() + "/shim/v1/mobile")
             .build()
         var socketRef: WebSocket? = null
+        if (restSnapshot != null && conversationId != null) {
+            recordRestSnapshot(writer, counter.next(), conversationId, restSnapshot)
+        }
         val listener = object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 socketRef = webSocket
@@ -77,7 +87,10 @@ internal class AdminShimRecorder {
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
-                recordRaw(writer, counter.next(), "inbound", text)
+                val frameJson = recordRaw(writer, counter.next(), "inbound", text)
+                if (recordCursorEvents && frameJson != null) {
+                    recordCursor(writer, counter, frameJson)
+                }
                 val frame = runCatching {
                     CliJson.decodeFromString(ServerFrameSerializer, text)
                 }.getOrNull()
@@ -166,14 +179,66 @@ internal class AdminShimRecorder {
         return counter.value
     }
 
-    private fun recordRaw(writer: BufferedWriter, index: Int, direction: String, raw: String) {
+    private fun recordRestSnapshot(
+        writer: BufferedWriter,
+        index: Int,
+        conversationId: String,
+        messages: List<LettaMessage>,
+    ) {
+        val obj = buildJsonObject {
+            put("index", index)
+            put("kind", "rest_messages")
+            put("direction", "inbound")
+            put("recordedAt", nowIso())
+            put("conversation_id", conversationId)
+            put("route", "/v1/conversations/$conversationId/messages")
+            put("messages", CliJson.encodeToJsonElement(ListSerializer(LettaMessage.serializer()), messages))
+        }
+        writeJsonLine(writer, obj)
+    }
+
+    private fun recordRaw(writer: BufferedWriter, index: Int, direction: String, raw: String): JsonObject? {
         val frame = runCatching { CliJson.parseToJsonElement(raw).jsonObjectOrNull() }.getOrNull()
         val obj = buildJsonObject {
             put("index", index)
+            put("kind", "ws_frame")
             put("direction", direction)
             put("recordedAt", nowIso())
             if (frame != null) put("frame", frame) else put("raw", raw)
         }
+        writeJsonLine(writer, obj)
+        return frame
+    }
+
+    private fun recordCursor(
+        writer: BufferedWriter,
+        counter: FrameCounter,
+        frame: JsonObject,
+    ) {
+        val innerFrame = frame["frame"] as? JsonObject
+        val seq = frame["seq"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+            ?: innerFrame?.get("seq")?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+            ?: frame["seq_id"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+            ?: innerFrame?.get("seq_id")?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+            ?: return
+        val conversationId = frame["conversation_id"]?.jsonPrimitive?.contentOrNull
+            ?: innerFrame?.get("conversation_id")?.jsonPrimitive?.contentOrNull
+            ?: return
+        val runId = frame["run_id"]?.jsonPrimitive?.contentOrNull
+            ?: innerFrame?.get("run_id")?.jsonPrimitive?.contentOrNull
+        val obj = buildJsonObject {
+            put("index", counter.next())
+            put("kind", "cursor")
+            put("direction", "local")
+            put("recordedAt", nowIso())
+            put("conversation_id", conversationId)
+            put("run_id", runId)
+            put("seq", seq)
+        }
+        writeJsonLine(writer, obj)
+    }
+
+    private fun writeJsonLine(writer: BufferedWriter, obj: JsonObject) {
         synchronized(writer) {
             writer.write(CliJson.encodeToString(JsonObject.serializer(), obj))
             writer.newLine()

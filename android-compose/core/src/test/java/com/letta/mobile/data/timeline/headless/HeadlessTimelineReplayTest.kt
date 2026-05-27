@@ -73,6 +73,43 @@ class HeadlessTimelineReplayTest {
     }
 
     @Test
+    fun `replay hydrates captured rest snapshots and ignores cursor metadata`() = runTest {
+        val lines = sequenceOf(
+            """{"index":1,"kind":"rest_messages","conversation_id":"conv-1","messages":[{"id":"cm-rest","message_type":"assistant_message","date":"2026-05-26T00:00:00Z","content":"from rest"}]}""",
+            """{"index":2,"kind":"cursor","conversation_id":"conv-1","run_id":"run-1","seq":4}""",
+        )
+
+        val result = HeadlessTimelineReplayer().replayJsonl(
+            conversationId = "conv-1",
+            lines = lines,
+        )
+
+        result.messagesIngested shouldBe 1
+        result.ignoredFrameTypes["cursor"] shouldBe 1
+        result.timelineJson.contains("from rest") shouldBe true
+    }
+
+    @Test
+    fun `bisect minimizes failing replay fixture against assertions`() = runTest {
+        val lines = listOf(
+            recorded("""{"v":1,"type":"welcome","id":"w1","ts":"2026-05-26T00:00:00Z","server_id":"srv","session_id":"sess"}"""),
+            recorded("""{"v":1,"type":"assistant_message","id":"cm-a","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"second","seq_id":2}"""),
+            recorded("""{"v":1,"type":"assistant_message","id":"cm-b","ts":"2026-05-26T00:00:02Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"first","seq_id":1}"""),
+        )
+
+        val result = HeadlessTimelineReplayer().bisectFailingJsonl(
+            conversationId = "conv-1",
+            lines = lines,
+            assertionOptions = TimelineAssertionOptions(assertSeqMonotonic = true),
+        )
+
+        result.fullReplayPassed shouldBe false
+        result.keptOriginalIndexes shouldBe listOf(1, 2)
+        result.removedOriginalIndexes shouldBe listOf(0)
+        result.finalFailures shouldContain "non-monotonic recorded seq for run run-1: 2, 1"
+    }
+
+    @Test
     fun `replay assertion catches non monotonic recorded seq ids`() = runTest {
         val lines = sequenceOf(
             recorded("""{"v":1,"type":"assistant_message","id":"cm-stream-2","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"second","seq_id":2}"""),
@@ -88,6 +125,119 @@ class HeadlessTimelineReplayTest {
         result.assertionReport.passed shouldBe false
         result.assertionReport.failures shouldContain
             "non-monotonic recorded seq for run run-1: 2, 1"
+    }
+
+    @Test
+    fun `resume replay assertions pass for contiguous post-cursor frames`() = runTest {
+        val lines = sequenceOf(
+            recorded("""{"v":1,"type":"assistant_message","id":"cm-stream-2","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"second","seq_id":2}"""),
+            recorded("""{"v":1,"type":"assistant_message","id":"cm-stream-3","ts":"2026-05-26T00:00:02Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"third","seq_id":3}"""),
+        )
+
+        val result = HeadlessTimelineReplayer().replayJsonl(
+            conversationId = "conv-1",
+            lines = lines,
+            resumeFromCursor = 1,
+            assertNoGapOnResume = true,
+            assertNoDupOnResume = true,
+        )
+
+        result.assertionReport.passed shouldBe true
+        result.messagesIngested shouldBe 2
+    }
+
+    @Test
+    fun `resume replay assertions catch duplicate and gap shapes`() = runTest {
+        val lines = sequenceOf(
+            recorded("""{"v":1,"type":"assistant_message","id":"cm-stream-1","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"first","seq_id":1}"""),
+            recorded("""{"v":1,"type":"assistant_message","id":"cm-stream-3","ts":"2026-05-26T00:00:02Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"third","seq_id":3}"""),
+        )
+
+        val result = HeadlessTimelineReplayer().replayJsonl(
+            conversationId = "conv-1",
+            lines = lines,
+            resumeFromCursor = 1,
+            assertNoGapOnResume = true,
+            assertNoDupOnResume = true,
+        )
+
+        result.assertionReport.passed shouldBe false
+        result.assertionReport.failures shouldContain "resume for run run-1 replayed seq <= cursor 1: 1"
+        result.assertionReport.failures shouldContain "resume for run run-1 starts at seq 3 instead of 2"
+        result.ignoredFrameTypes["pre_resume_cursor"] shouldBe 1
+    }
+
+    @Test
+    fun `cursor expired assertion requires a non-terminal recording`() = runTest {
+        val terminal = HeadlessTimelineReplayer().replayJsonl(
+            conversationId = "conv-1",
+            lines = sequenceOf(recorded("""{"v":1,"type":"error","id":"err-1","ts":"2026-05-26T00:00:00Z","code":"cursor_expired","message":"too old","run_id":"run-1"}""")),
+            assertCursorExpiredGraceful = true,
+        )
+        terminal.assertionReport.failures shouldContain
+            "cursor_expired was terminal in the recording; expected socket to stay open"
+
+        val graceful = HeadlessTimelineReplayer().replayJsonl(
+            conversationId = "conv-1",
+            lines = sequenceOf(
+                recorded("""{"v":1,"type":"error","id":"err-1","ts":"2026-05-26T00:00:00Z","code":"cursor_expired","message":"too old","run_id":"run-1"}"""),
+                recorded("""{"v":1,"type":"ping","id":"ping-1","ts":"2026-05-26T00:00:01Z"}"""),
+            ),
+            assertCursorExpiredGraceful = true,
+        )
+        graceful.assertionReport.passed shouldBe true
+    }
+
+    @Test
+    fun `state machine assertions pass when terminal frame clears streaming state`() = runTest {
+        val lines = sequenceOf(
+            recorded("""{"v":1,"type":"turn_started","id":"start-1","ts":"2026-05-26T00:00:00Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1"}"""),
+            recorded("""{"v":1,"type":"assistant_message","id":"cm-stream-1","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-1","content":"done","seq_id":1}"""),
+            recorded("""{"v":1,"type":"stop_reason","id":"stop-1","ts":"2026-05-26T00:00:02Z","turn_id":"turn-1","run_id":"run-1","stop_reason":"end_turn"}"""),
+            recorded("""{"v":1,"type":"turn_done","id":"done-1","ts":"2026-05-26T00:00:03Z","turn_id":"turn-1","run_id":"run-1","status":"completed"}"""),
+        )
+
+        val result = HeadlessTimelineReplayer().replayJsonl(
+            conversationId = "conv-1",
+            lines = lines,
+            assertIsStreamingClearsByTerminalFrame = true,
+            assertNoLocksHeldAfterTerminal = true,
+            assertTypingIndicatorState = true,
+            assertNoOrphanedRunTracker = true,
+            assertTerminalFrameReceived = true,
+            traceStateTransitions = true,
+        )
+
+        result.assertionReport.passed shouldBe true
+        result.stateTransitions.map { it.reason } shouldBe listOf("turn_started", "turn_done:completed")
+        result.stateTransitions.last().isStreaming shouldBe false
+        result.stateTransitionsJson().contains("turn_done:completed") shouldBe true
+    }
+
+    @Test
+    fun `state machine assertions catch missing terminal frame`() = runTest {
+        val lines = sequenceOf(
+            recorded("""{"v":1,"type":"turn_started","id":"start-1","ts":"2026-05-26T00:00:00Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-open"}"""),
+            recorded("""{"v":1,"type":"assistant_message","id":"cm-open","ts":"2026-05-26T00:00:01Z","agent_id":"agent-1","conversation_id":"conv-1","turn_id":"turn-1","run_id":"run-open","content":"still running","seq_id":1}"""),
+        )
+
+        val result = HeadlessTimelineReplayer().replayJsonl(
+            conversationId = "conv-1",
+            lines = lines,
+            assertIsStreamingClearsByTerminalFrame = true,
+            assertNoOrphanedRunTracker = true,
+            assertTerminalFrameReceived = true,
+            traceStateTransitions = true,
+        )
+
+        result.assertionReport.passed shouldBe false
+        result.assertionReport.failures shouldContain
+            "isStreaming could not clear: no terminal frame was observed"
+        result.assertionReport.failures shouldContain
+            "orphaned run tracker entries after replay: run-open"
+        result.assertionReport.failures shouldContain
+            "run run-open did not receive a terminal frame"
+        result.stateTransitions.single().isStreaming shouldBe true
     }
 
     @Test

@@ -5,7 +5,7 @@ using a device. It is tracked by `letta-mobile-q9t4t`.
 
 The CLI now has two useful modes:
 
-- `connect` / `send` / `record` / `replay` / `dump-timeline` exercise the
+- `connect` / `send` / `capture` / `record` / `replay` / `dump-timeline` exercise the
   admin-shim mobile WebSocket and the same reducer/writer paths used by the app.
 - `rest` exposes generic authenticated JSON access to any Letta REST endpoint,
   which is the foundation for the broader device-free admin/provisioning CLI.
@@ -67,8 +67,8 @@ configuration for CLI runs.
 .\gradlew.bat :cli:run -PcliArgs="profile import --file cli-profiles.json"
 ```
 
-Profile defaults are used by `send`, `dump-timeline`, `replay`, `record`,
-`reconnect`, `stream`, `rest`, and the typed resource command groups when
+Profile defaults are used by `send`, `dump-timeline`, `replay`, `capture`,
+`record`, `reconnect`, `stream`, `rest`, and the typed resource command groups when
 explicit flags/env vars are omitted.
 
 ## Commands
@@ -76,10 +76,14 @@ explicit flags/env vars are omitted.
 ### `connect`
 
 Open the admin-shim mobile WebSocket, print incoming frame summaries, wait for
-the welcome state, then optionally hold the connection open.
+the welcome state, then optionally hold the connection open. Use
+`--conversation`, `--run-id`, and `--resume-cursor` to seed the same
+`RunCursorStore` path the app uses; after welcome, `ChannelTransport` dispatches
+the production resume `subscribe(run_id, cursor)` frame.
 
 ```powershell
 .\gradlew.bat :cli:run -PcliArgs="connect --hold-ms 10000"
+.\gradlew.bat :cli:run -PcliArgs="connect --conversation conv_x --run-id run_x --resume-cursor 42 --hold-ms 10000"
 ```
 
 The output includes the `canonical_live_transport` advertised by the welcome
@@ -138,6 +142,30 @@ To record a send flow, include the message and required agent/conversation:
 `record --message` accepts the same repeatable `--image` / `-i` option as
 `send`, and records the outbound `content_parts` frame for replay.
 
+Snapshot the highest observed cursor state from a capture/recording with:
+
+```powershell
+.\gradlew.bat :cli:run -PcliArgs="record-cursor-state --recording recordings\resume.jsonl"
+```
+
+### `capture`
+
+Capture a replay fixture from the same admin-shim mobile WS path, with an
+initial REST hydrate snapshot and local cursor observations included as metadata
+events. WS entries remain replay-compatible; `replay` hydrates `rest_messages`
+entries and ignores cursor metadata unless an assertion consumes frame seq data.
+
+```powershell
+.\gradlew.bat :cli:run -PcliArgs="capture --shim https://letta.oculair.ca --conversation conv_x --output recordings\conv_x.jsonl --timeout-ms 30000"
+.\gradlew.bat :cli:run -PcliArgs="capture --conversation conv_x --agent agt_x --message `"repro prompt`" --output recordings\send.jsonl"
+.\gradlew.bat :cli:run -PcliArgs="capture --conversation conv_x --run-id run_x --cursor 42 --output recordings\resume.jsonl"
+```
+
+Use `--skip-rest-snapshot` for a WS-only fixture, and `--rest-limit` to cap the
+initial hydrate snapshot. `--from-phone` / `--adb` are reserved for a future
+device diagnostic channel; the current supported capture path is shim WS plus
+REST snapshot.
+
 ### `replay`
 
 Replay a JSONL recording through `ServerFrameSerializer`, `WsFrameMapper`, and
@@ -173,8 +201,37 @@ Supported assertions:
   requests must stay on the approval run that emitted the request.
 - `--assert-otid-stable-across-retry`: the same server message id/type must not
   be observed with multiple OTIDs across retry/replay boundaries.
+- `--resume-from-cursor=N`: treat frames with `seq <= N` as already applied and
+  skip them during replay, matching a resumed client tail.
+- `--assert-no-gap-on-resume`: with `--resume-from-cursor`, post-resume seqs
+  must start at `N+1` and remain contiguous.
+- `--assert-no-dup-on-resume`: with `--resume-from-cursor`, the recording must
+  not include any replayed seq `<= N`.
+- `--assert-cursor-expired-graceful`: assert a `cursor_expired` error is
+  observed and the recording continues afterward, proving the socket stayed up.
+- `--assert-isStreaming-clears-by-terminal-frame`: after a terminal run frame,
+  the replayed chat streaming state must be idle.
+- `--assert-no-locks-held-after-terminal`: after a terminal run frame, the
+  headless timeline write lock must be released.
+- `--assert-typing-indicator-state`: streaming and typing-indicator state must
+  move together at every traced transition.
+- `--assert-no-orphaned-run-tracker`: started runs must not remain active after
+  replay reaches the end of the recording.
+- `--assert-terminal-frame-received`: every started run must receive a terminal
+  `turn_done` or `subscribe_done` frame.
+- `--assert-all`: enable the state-machine assertion bundle above.
+- `--trace-state-transitions`: print streaming/typing/run-tracker transitions
+  while replaying a fixture.
 
 Use `--dump-timeline` to print the final folded timeline JSON.
+
+Use `--bisect-frame` with one or more assertions to greedily remove unnecessary
+recording lines while preserving the failure. Add `--bisect-out` to write the
+minimized fixture:
+
+```powershell
+.\gradlew.bat :cli:run -PcliArgs="replay --recording recordings\conv_x.jsonl --conversation conv_x --assert-no-dups --bisect-frame --bisect-out recordings\conv_x.min.jsonl"
+```
 
 For incremental inspection, use one of the frame dump selectors:
 
@@ -360,10 +417,12 @@ behavior stay aligned.
 
 ## Fixture workflow
 
-1. Capture a suspect mobile WS flow with `record`.
+1. Capture a suspect flow with `capture` (REST snapshot + WS) or `record`
+   (WS-only).
 2. Reproduce locally with `replay --dump-timeline`.
-3. Add the JSONL under `android-compose/core/src/test/resources/replay`.
-4. Add a focused replay test under
+3. Minimize noisy fixtures with `replay --bisect-frame --bisect-out`.
+4. Add the JSONL under `android-compose/core/src/test/resources/replay`.
+5. Add a focused replay test under
    `android-compose/core/src/test/java/com/letta/mobile/data/timeline/headless`.
 
 The current regression seed is
