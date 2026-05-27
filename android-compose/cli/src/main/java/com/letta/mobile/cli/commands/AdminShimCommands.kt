@@ -10,6 +10,8 @@ import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.long
 import com.letta.mobile.cli.runtime.AdminShimRecorder
+import com.letta.mobile.cli.runtime.CliConnection
+import com.letta.mobile.cli.runtime.CliProfileStore
 import com.letta.mobile.cli.runtime.CliRestClient
 import com.letta.mobile.cli.runtime.CliWsSession
 import com.letta.mobile.cli.runtime.ReplayInteractiveShell
@@ -35,20 +37,54 @@ internal abstract class AdminShimCommand(
     name: String,
     @Suppress("unused") help: String,
 ) : CliktCommand(name = name) {
-    protected val baseUrl by option(
+    private val baseUrlOption by option(
         "--base-url",
         envvar = "LETTA_BASE_URL",
         help = "Admin-shim/Letta base URL."
-    ).default("https://letta.oculair.ca")
+    )
 
-    protected val token by option(
+    private val tokenOption by option(
         "--token",
         envvar = "LETTA_TOKEN",
         help = "Bearer token."
-    ).required()
+    )
+
+    private val profileName by option(
+        "--profile",
+        envvar = "LETTA_PROFILE",
+        help = "CLI profile name. Defaults to active profile."
+    )
 
     protected val deviceId by option("--device-id").default("letta-mobile-cli")
     protected val clientVersion by option("--client-version").default("letta-mobile-cli")
+
+    protected val connection: CliConnection
+        get() = CliProfileStore.default().resolve(profileName, baseUrlOption, tokenOption)
+
+    protected val baseUrl: String get() = connection.baseUrl
+
+    protected val token: String
+        get() = connection.token ?: throw UsageError(
+            "Missing token. Pass --token, set LETTA_TOKEN, or configure a CLI profile."
+        )
+
+    protected val optionalToken: String? get() = connection.token
+
+    protected fun defaultAgentId(): String? = connection.profile?.defaultAgentId
+
+    protected fun defaultConversationId(): String? = connection.profile?.defaultConversationId
+
+    protected fun defaultProjectId(): String? = connection.profile?.defaultProjectId
+
+    protected fun requireAgentId(value: String?): String =
+        value ?: defaultAgentId() ?: throw UsageError(
+            "Missing agent id. Pass --agent, set LETTA_AGENT_ID, or configure profile --agent."
+        )
+
+    protected fun requireConversationId(value: String?): String =
+        value ?: defaultConversationId() ?: throw UsageError(
+            "Missing conversation id. Pass --conversation, set LETTA_CONVERSATION_ID, or configure profile --conversation."
+        )
 }
 
 internal class ConnectCommand : AdminShimCommand(
@@ -88,7 +124,7 @@ internal class SendCommand : AdminShimCommand(
     help = "Send a message through admin-shim WS and fold frames into the headless timeline.",
 ) {
     private val text by argument("text")
-    private val agentId by option("--agent", envvar = "LETTA_AGENT_ID").required()
+    private val agentId by option("--agent", envvar = "LETTA_AGENT_ID")
     private val conversation by option("--conversation", envvar = "LETTA_CONVERSATION_ID")
     private val waitForStable by option("--wait-for-stable").flag(default = false)
     private val dumpTimeline by option("--dump-timeline").flag(default = false)
@@ -97,11 +133,12 @@ internal class SendCommand : AdminShimCommand(
     override fun run() = runBlocking {
         val rest = CliRestClient(baseUrl, token)
         try {
-            val conversationId = conversation ?: rest.createConversation(agentId).id
+            val resolvedAgentId = requireAgentId(agentId)
+            val conversationId = conversation ?: defaultConversationId() ?: rest.createConversation(resolvedAgentId).id
             coroutineScope {
                 val session = CliWsSession(
                     scope = this,
-                    agentId = agentId,
+                    agentId = resolvedAgentId,
                     initialConversationId = conversationId,
                 )
                 session.startCollecting()
@@ -123,27 +160,29 @@ internal class DumpTimelineCommand : AdminShimCommand(
     name = "dump-timeline",
     help = "Fetch conversation history and emit stable, diffable timeline JSON.",
 ) {
-    private val conversation by option("--conversation", envvar = "LETTA_CONVERSATION_ID").required()
+    private val conversation by option("--conversation", envvar = "LETTA_CONVERSATION_ID")
     private val limit by option("--limit").long().default(200)
 
     override fun run() = runBlocking {
         val rest = CliRestClient(baseUrl, token)
         try {
-            val messages = rest.fetchMessages(conversation, limit.validatedIntLimit())
+            val conversationId = requireConversationId(conversation)
+            val messages = rest.fetchMessages(conversationId, limit.validatedIntLimit())
             val store = HeadlessTimelineStore()
-            store.hydrate(conversation, messages)
-            println(store.dumpJson(conversation))
+            store.hydrate(conversationId, messages)
+            println(store.dumpJson(conversationId))
         } finally {
             rest.close()
         }
     }
 }
 
-internal class ReplayCommand : CliktCommand(
+internal class ReplayCommand : AdminShimCommand(
     name = "replay",
+    help = "Replay a recorded WS JSONL fixture through the reducer.",
 ) {
     private val recording by option("--recording").required()
-    private val conversation by option("--conversation", envvar = "LETTA_CONVERSATION_ID").required()
+    private val conversation by option("--conversation", envvar = "LETTA_CONVERSATION_ID")
     private val assertNoDups by option("--assert-no-dups").flag(default = false)
     private val assertOtidUnique by option("--assert-otid-unique").flag(default = false)
     private val assertSeqMonotonic by option("--assert-seq-monotonic").flag(default = false)
@@ -172,13 +211,15 @@ internal class ReplayCommand : CliktCommand(
             assertNoOrphanToolReturns = assertNoOrphanToolReturns,
         )
         if (interactive) {
+            val conversationId = requireConversationId(conversation)
             ReplayInteractiveShell(
                 recording = Path.of(recording),
-                conversationId = conversation,
+                conversationId = conversationId,
                 defaultAssertionOptions = assertionOptions,
             ).run()
             return@runBlocking
         }
+        val conversationId = requireConversationId(conversation)
         val dumpOptions = HeadlessReplayDumpOptions(
             dumpAfterEachFrame = dumpAfterEachFrame,
             dumpAfterFrame = dumpAfterFrame.validatedNonNegativeOrNull("--dump-after-frame"),
@@ -186,7 +227,7 @@ internal class ReplayCommand : CliktCommand(
         )
         val result = Files.newBufferedReader(Path.of(recording)).use { reader ->
             HeadlessTimelineReplayer().replayJsonl(
-                conversationId = conversation,
+                conversationId = conversationId,
                 lines = reader.lineSequence(),
                 assertionOptions = assertionOptions,
                 dumpOptions = dumpOptions,
@@ -230,14 +271,17 @@ internal class RecordCommand : AdminShimCommand(
     private val timeoutMs by option("--timeout-ms").long().default(120_000)
 
     override fun run() = runBlocking {
-        if (message != null && (agentId == null || conversation == null)) {
-            throw IllegalArgumentException("record --message requires --agent and --conversation")
+        val resolvedAgentId = if (message != null) requireAgentId(agentId) else agentId ?: defaultAgentId()
+        val resolvedConversationId = if (message != null) {
+            requireConversationId(conversation)
+        } else {
+            conversation ?: defaultConversationId()
         }
         val count = AdminShimRecorder().record(
             baseUrl = baseUrl,
             token = token,
-            agentId = agentId,
-            conversationId = conversation,
+            agentId = resolvedAgentId,
+            conversationId = resolvedConversationId,
             message = message,
             runId = runId,
             cursor = cursor,
@@ -278,9 +322,10 @@ internal class ReconnectCommand : AdminShimCommand(
     private val holdMs by option("--hold-ms").long().default(1_000)
 
     override fun run() = runBlocking {
+        val conversationId = conversation ?: defaultConversationId()
         val cursorStore = RunCursorStore.inMemory()
-        if (conversation != null && runId != null && cursor > 0) {
-            cursorStore.record(conversation.orEmpty(), runId.orEmpty(), cursor)
+        if (conversationId != null && runId != null && cursor > 0) {
+            cursorStore.record(conversationId, runId.orEmpty(), cursor)
         }
         val transport = ChannelTransport(cursorStore)
         val bridge = WsChatBridge(transport)

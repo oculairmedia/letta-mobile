@@ -7,6 +7,13 @@ The CLI now has two useful modes:
 
 - `connect` / `send` / `record` / `replay` / `dump-timeline` exercise the
   admin-shim mobile WebSocket and the same reducer/writer paths used by the app.
+- `rest` exposes generic authenticated JSON access to any Letta REST endpoint,
+  which is the foundation for the broader device-free admin/provisioning CLI.
+- Typed resource command groups wrap the app's main REST-backed admin surfaces
+  so agents, conversations, tools, memory, files, projects, MCP, runs, jobs, and
+  related resources can be managed without opening the Android UI.
+- `setup apply` / `setup export` provide a declarative JSON/YAML format for
+  replaying profile and server setup from a workstation.
 - `stream` keeps the older direct REST/SSE tracer for low-level comparison when
   debugging server wire frames or merge behavior.
 
@@ -33,7 +40,8 @@ Most admin-shim commands accept:
 | env / flag | what |
 | --- | --- |
 | `LETTA_BASE_URL` / `--base-url` | Letta/admin-shim base URL, default `https://letta.oculair.ca` |
-| `LETTA_TOKEN` / `--token` | Bearer token |
+| `LETTA_TOKEN` / `--token` | Bearer token; falls back to the selected CLI profile |
+| `LETTA_PROFILE` / `--profile` | CLI profile name; defaults to the active profile |
 | `--device-id` | Device id advertised to the shim, default `letta-mobile-cli` |
 | `--client-version` | Client version advertised to the shim, default `letta-mobile-cli` |
 
@@ -43,6 +51,25 @@ Conversation and agent commands also use:
 | --- | --- |
 | `LETTA_AGENT_ID` / `--agent` | Agent id for send/record |
 | `LETTA_CONVERSATION_ID` / `--conversation` | Conversation id for send/dump/replay/record |
+
+## Profiles
+
+Profiles live in `%USERPROFILE%\.letta-mobile-cli\profiles.json` by default
+or under `LETTA_MOBILE_CLI_HOME` when set. They provide device-free backend
+configuration for CLI runs.
+
+```powershell
+.\gradlew.bat :cli:run -PcliArgs="profile set dev --base-url https://letta.oculair.ca --token $env:LETTA_TOKEN --agent agt_x --conversation conv_x --active"
+.\gradlew.bat :cli:run -PcliArgs="profile list"
+.\gradlew.bat :cli:run -PcliArgs="profile show dev --show-token"
+.\gradlew.bat :cli:run -PcliArgs="profile use dev"
+.\gradlew.bat :cli:run -PcliArgs="profile export --out cli-profiles.json"
+.\gradlew.bat :cli:run -PcliArgs="profile import --file cli-profiles.json"
+```
+
+Profile defaults are used by `send`, `dump-timeline`, `replay`, `record`,
+`reconnect`, `stream`, `rest`, and the typed resource command groups when
+explicit flags/env vars are omitted.
 
 ## Commands
 
@@ -179,6 +206,125 @@ cursor seeding:
 ```powershell
 .\gradlew.bat :cli:run -PcliArgs="reconnect --conversation conv_x --run-id run_x --cursor 42"
 ```
+
+### `rest`
+
+Call arbitrary Letta REST endpoints with the same base URL/token flags as the
+admin-shim commands. This is the escape hatch for app/server functionality that
+does not yet have a typed CLI wrapper.
+
+```powershell
+.\gradlew.bat :cli:run -PcliArgs="rest get /v1/agents --query limit=20"
+.\gradlew.bat :cli:run -PcliArgs="rest post /v1/agents --body-file agent-create.json"
+.\gradlew.bat :cli:run -PcliArgs="rest put /v1/tools --body-file tool.json"
+.\gradlew.bat :cli:run -PcliArgs="rest patch /v1/agents/agt_x --body '{`"name`":`"CLI agent`"}'"
+.\gradlew.bat :cli:run -PcliArgs="rest delete /v1/tools/tool_x"
+```
+
+Supported options:
+
+- `--query name=value`: repeatable query parameters.
+- `--header name=value`: repeatable request headers, useful for mutation
+  contracts such as `If-Match` and `Idempotency-Key`.
+- `--body <json>` / `--body-file <path>`: request body for POST/PUT/PATCH/DELETE.
+- `--compact`: compact JSON response output.
+- `--raw`: print response without JSON formatting.
+- `--allow-error`: print non-2xx response body without failing the process.
+
+### Typed resources
+
+Typed resource groups use the same profile/base-url/token options as `rest` and
+share its JSON output flags. They are thin wrappers over the production app API
+routes, so `--query`, `--header`, `--body`, and `--body-file` pass through to the
+server contract. Positional `agent_id`, `conversation_id`, and `project_id`
+values fall back to the selected profile defaults when omitted.
+
+Core resource groups:
+
+- `agents`: list/get/create/update/delete/export/import, context, core-memory
+  blocks, archive/tool/identity/block attachments, and agent message actions.
+- `conversations`: list/get/create/update/delete, fork/cancel/recompile, and
+  conversation messages.
+- `tools`, `blocks`, `archives`, `passages`, `folders`, `groups`,
+  `identities`, `schedules`, `mcp`, `models`, and `providers`: app admin
+  surfaces exposed as first-class CLI groups.
+- `runs`, `jobs`, `steps`, `messages`, and `message-batches`: operational
+  inspection and mutation routes.
+- `projects`, `project-agents`, and `project-work`: Vibesync project registry,
+  beads remote, sync trigger, ready-work, issue, and analytics routes.
+- `debug` and `vibesync-admin`: health/stats and admin refresh routes.
+
+The maintained route-by-route audit lives in
+[`docs/app-parity-matrix.md`](docs/app-parity-matrix.md).
+
+Examples:
+
+```powershell
+.\gradlew.bat :cli:run -PcliArgs="agents list --query limit=20"
+.\gradlew.bat :cli:run -PcliArgs="agents update agt_x --body-file agent-update.json"
+.\gradlew.bat :cli:run -PcliArgs="agents attach-tool agt_x tool_x"
+.\gradlew.bat :cli:run -PcliArgs="agents import --file agent-export.json --override-name `"CLI import`""
+.\gradlew.bat :cli:run -PcliArgs="folders upload folder_x --file .\notes.md --duplicate-handling replace"
+.\gradlew.bat :cli:run -PcliArgs="projects sync-trigger project_x"
+.\gradlew.bat :cli:run -PcliArgs="project-work status issue_x --header If-Match=abc --header Idempotency-Key=run-1 --body '{`"status`":`"closed`"}'"
+```
+
+### `setup`
+
+Apply or export a whole CLI/app setup without touching a device. Input files may
+be JSON or YAML; export currently writes JSON.
+
+```powershell
+.\gradlew.bat :cli:run -PcliArgs="setup apply --file setup.yaml --dry-run"
+.\gradlew.bat :cli:run -PcliArgs="setup apply --file setup.yaml"
+.\gradlew.bat :cli:run -PcliArgs="setup export --out current-setup.json"
+.\gradlew.bat :cli:run -PcliArgs="setup export --profiles-only --redact-token"
+```
+
+Top-level setup shape:
+
+```json
+{
+  "activeProfile": "dev",
+  "profiles": [
+    {
+      "name": "dev",
+      "baseUrl": "https://letta.oculair.ca",
+      "defaultAgentId": "agt_x",
+      "defaultProjectId": "project_x",
+      "prefs": { "enableProjects": true }
+    }
+  ],
+  "resources": {
+    "agents": [
+      { "ref": "primary", "id": "agt_x", "body": { "name": "Primary" } }
+    ],
+    "tools": [],
+    "blocks": [],
+    "archives": [],
+    "folders": [],
+    "groups": [],
+    "identities": [],
+    "providers": [],
+    "mcpServers": [],
+    "projects": [],
+    "schedules": [
+      { "agentRef": "primary", "body": { "message": "standup", "cron": "0 9 * * *" } }
+    ]
+  },
+  "links": {
+    "agentTools": [
+      { "agentRef": "primary", "toolId": "tool_x" }
+    ]
+  }
+}
+```
+
+Resource entries are upserted when they have an `id`; missing ids are created.
+Use `ref` to connect resources created in the same file through `links` or
+agent-scoped schedules. `--dry-run` prints the mutation plan without changing
+profiles or server state. Server mutations require a token; profile-only setup
+does not.
 
 ### `stream`
 

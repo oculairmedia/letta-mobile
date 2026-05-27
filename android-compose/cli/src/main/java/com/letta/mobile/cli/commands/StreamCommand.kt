@@ -1,7 +1,5 @@
 package com.letta.mobile.cli.commands
 
-import com.github.ajalt.clikt.core.CliktCommand
-import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
@@ -34,25 +32,16 @@ import kotlinx.serialization.json.put
  * is still useful when we need to inspect raw REST/SSE chunks or compare server
  * wire behavior against WebSocket delivery.
  */
-class StreamCommand : CliktCommand(name = "stream") {
-
-    private val baseUrl by option(
-        "--base-url",
-        envvar = "LETTA_BASE_URL",
-        help = "Letta server base URL. Default: https://letta.oculair.ca"
-    ).default("https://letta.oculair.ca")
-
-    private val token by option(
-        "--token",
-        envvar = "LETTA_TOKEN",
-        help = "Bearer token for the Letta API. Required."
-    ).required()
+internal class StreamCommand : AdminShimCommand(
+    name = "stream",
+    help = "Direct Letta REST/SSE path for low-level comparison.",
+) {
 
     private val conversationId by option(
         "--conversation",
         envvar = "LETTA_CONVERSATION_ID",
         help = "Conversation ID to send into."
-    ).required()
+    )
 
     private val message by option(
         "--message",
@@ -91,7 +80,8 @@ class StreamCommand : CliktCommand(name = "stream") {
     }
 
     private suspend fun sendAndStream(client: HttpClient, tracer: MergeTracer) {
-        println("[CLI] POST $baseUrl/v1/conversations/$conversationId/messages (SSE)")
+        val resolvedConversationId = requireConversationId(conversationId)
+        println("[CLI] POST $baseUrl/v1/conversations/$resolvedConversationId/messages (SSE)")
         println("[CLI]   message=\"${message.take(80)}${if (message.length > 80) "..." else ""}\"")
         val payload = buildJsonObject {
             put("messages", buildJsonArray {
@@ -102,7 +92,7 @@ class StreamCommand : CliktCommand(name = "stream") {
             })
         }.toString()
         println("[CLI] -----------------------------------------------------")
-        val response = client.post("${baseUrl.trimEnd('/')}/v1/conversations/$conversationId/messages") {
+        val response = client.post("${baseUrl.trimEnd('/')}/v1/conversations/$resolvedConversationId/messages") {
             header(HttpHeaders.Authorization, "Bearer $token")
             header(HttpHeaders.Accept, "text/event-stream")
             contentType(ContentType.Application.Json)
