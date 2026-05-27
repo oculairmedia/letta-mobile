@@ -291,7 +291,11 @@ class TimelineSyncLoop(
      * Replaces the current timeline entirely. Should be called once when a
      * conversation is opened.
      */
-    suspend fun hydrate(limit: Int = 50) {
+    suspend fun hydrate(
+        limit: Int = 50,
+        recordConversationCursor: Boolean = false,
+        fallbackCursorSeq: Long? = null,
+    ) {
         val timer = Telemetry.startTimer("TimelineSync", "hydrate")
         val timelineBeforeFetch = writeMutex.withLock { _state.value }
         try {
@@ -312,6 +316,13 @@ class TimelineSyncLoop(
             )
             val diskRecords = runCatching { pendingLocalStore.load(conversationId) }
                 .getOrDefault(emptyList())
+            val hydrateEndSeq = if (recordConversationCursor) {
+                response.mapNotNull { it.seqId?.toLong() }
+                    .plus(listOfNotNull(fallbackCursorSeq))
+                    .maxOrNull()
+            } else {
+                null
+            }
 
             val hydrated = writeMutex.withLock {
                 TimelineHydrationReducer.reduce(
@@ -332,11 +343,22 @@ class TimelineSyncLoop(
                     holderHydrationSeed.value = result.timeline
                 }
             }
+            if (recordConversationCursor) {
+                if (hydrateEndSeq != null) {
+                    conversationCursorStore.recordFrame(conversationId, hydrateEndSeq)
+                }
+                Telemetry.event(
+                    "TimelineSync", "hydrate.cursorRepaired",
+                    "conversationId" to conversationId,
+                    "cursorSeq" to (hydrateEndSeq ?: -1L),
+                )
+            }
             _events.emit(TimelineSyncEvent.Hydrated(hydrated.visibleEventCount))
             timer.stop(
                 "conversationId" to conversationId,
                 "rawCount" to response.size,
                 "eventCount" to hydrated.visibleEventCount,
+                "cursorSeq" to (hydrateEndSeq ?: -1L),
             )
             dumpTimelineState("hydrate", conversationId, _state.value)
         } catch (t: Throwable) {
@@ -729,10 +751,14 @@ class TimelineSyncLoop(
         )
     }
 
-    internal suspend fun reconcileRecentMessages(reason: String) {
+    internal suspend fun reconcileRecentMessages(
+        reason: String,
+        forceRefresh: Boolean = false,
+    ) {
         reconcileRecentMessagesFromServer(
             telemetryName = "recentReconcile",
             telemetryAttrs = arrayOf("reason" to reason),
+            allowWhileStreamActive = forceRefresh,
         )
     }
 
@@ -794,11 +820,12 @@ class TimelineSyncLoop(
     private suspend fun reconcileRecentMessagesFromServer(
         telemetryName: String,
         telemetryAttrs: Array<Pair<String, Any?>>,
+        allowWhileStreamActive: Boolean = false,
     ) {
         val timer = Telemetry.startTimer("TimelineSync", telemetryName)
         var appended = 0
         try {
-            if (_streamSubscriberActive.value) {
+            if (_streamSubscriberActive.value && !allowWhileStreamActive) {
                 Telemetry.event(
                     "TimelineSync", "$telemetryName.skipped",
                     "conversationId" to conversationId,

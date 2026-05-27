@@ -210,8 +210,12 @@ sealed interface WsTimelineEvent {
     data class Error(
         val code: String,
         val message: String,
-        val turnId: String?,
-        val runId: String?,
+        val conversationId: String? = null,
+        val turnId: String? = null,
+        val runId: String? = null,
+        val afterSeq: Long? = null,
+        val oldestSeq: Long? = null,
+        val lastSeq: Long? = null,
     ) : WsTimelineEvent
 
     data class Disconnected(
@@ -262,8 +266,12 @@ private fun ServerFrame.toTimelineEvent(): WsTimelineEvent? = when (this) {
     is ServerFrame.Error -> WsTimelineEvent.Error(
         code = code,
         message = message,
+        conversationId = conversationId,
         turnId = turnId,
         runId = runId,
+        afterSeq = afterSeq,
+        oldestSeq = oldestSeq,
+        lastSeq = lastSeq,
     )
     is ServerFrame.UserActionOutcome -> WsTimelineEvent.UserActionOutcome(
         frameId = frameId,

@@ -222,6 +222,8 @@ class HeadlessTimelineStore(
         markExternalTransportLocalSent(conversationId, otid)
     }
 
+    override suspend fun repairExpiredConversationCursor(conversationId: String, fallbackSeq: Long?) = Unit
+
     override suspend fun clearExternalTransportActive(conversationId: String) = Unit
 
     private fun timelineLocked(conversationId: String): Timeline =

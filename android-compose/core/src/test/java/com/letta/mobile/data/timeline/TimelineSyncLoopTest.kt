@@ -31,6 +31,9 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
@@ -511,6 +514,45 @@ class TimelineSyncLoopTest {
         assertEquals(17L, cursorStore.getCursor("conv-cursor"))
         scope.coroutineContext.job.cancel()
     }
+
+    @Test
+    fun `cursor repair hydrate records hydrate-end cursor without duplicating events`() = runTest {
+        val api = FakeSyncApi()
+        api.addStoredMessage(
+            AssistantMessage(
+                id = "assistant-repair-1",
+                contentRaw = JsonPrimitive("first repaired frame"),
+                seqId = 11,
+            )
+        )
+        api.addStoredMessage(
+            AssistantMessage(
+                id = "assistant-repair-2",
+                contentRaw = JsonPrimitive("second repaired frame"),
+                seqId = 12,
+            )
+        )
+        val cursorStore = RecordingConversationCursorStore()
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
+        val sync = TimelineSyncLoop(
+            messageApi = api,
+            conversationId = "conv-cursor-repair",
+            scope = scope,
+            conversationCursorStore = cursorStore,
+        )
+
+        sync.hydrate(recordConversationCursor = true, fallbackCursorSeq = 10L)
+        sync.hydrate(recordConversationCursor = true, fallbackCursorSeq = 12L)
+
+        assertEquals(12L, cursorStore.getCursor("conv-cursor-repair"))
+        assertEquals(
+            listOf("assistant-repair-1", "assistant-repair-2"),
+            sync.state.value.events.map { (it as TimelineEvent.Confirmed).serverId },
+        )
+        scope.coroutineContext.job.cancel()
+    }
+
     @Test
     fun `external transport local sent and failed markers fold through serialized gateway`() = runTest {
         val api = FakeSyncApi()
@@ -984,6 +1026,61 @@ class TimelineSyncLoopTest {
         val confirmed = sync.state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
         assertEquals(listOf("older-user", "fresh-user-no-otid"), confirmed.map { it.serverId })
         assertEquals("fresh server prompt", confirmed.last().content)
+        scope.coroutineContext.job.cancel()
+    }
+
+    @Test
+    fun `recent reconcile skips REST snapshot while stream subscriber is active`() = runTest {
+        val api = FakeSyncApi()
+        api.streamConversationReturnsOpenChannel = true
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
+        val sync = TimelineSyncLoop(api, "conv-live-skip", scope)
+
+        runCurrent()
+        assertTrue("stream subscriber should be active before reconcile", sync.streamSubscriberActive.value)
+
+        api.addStoredMessage(
+            UserMessage(
+                id = "fresh-user-no-otid",
+                contentRaw = JsonPrimitive("fresh server prompt"),
+                date = "2026-05-19T06:25:00Z",
+            )
+        )
+
+        sync.reconcileRecentMessages("open")
+        runCurrent()
+
+        assertEquals("active stream should remain the only live writer", 0, api.listMessagesCalls)
+        assertTrue(sync.state.value.events.isEmpty())
+        scope.coroutineContext.job.cancel()
+    }
+
+    @Test
+    fun `forced recent reconcile fetches exactly once while stream subscriber is active`() = runTest {
+        val api = FakeSyncApi()
+        api.streamConversationReturnsOpenChannel = true
+        api.addStoredMessage(
+            UserMessage(
+                id = "fresh-user-no-otid",
+                contentRaw = JsonPrimitive("fresh server prompt"),
+                date = "2026-05-19T06:25:00Z",
+            )
+        )
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
+        val sync = TimelineSyncLoop(api, "conv-live-refresh", scope)
+
+        runCurrent()
+        assertTrue("stream subscriber should be active before forced reconcile", sync.streamSubscriberActive.value)
+
+        val reconcile = async { sync.reconcileRecentMessages("pull-to-refresh", forceRefresh = true) }
+        runCurrent()
+        reconcile.await()
+
+        assertEquals("pull-to-refresh should perform one REST snapshot", 1, api.listMessagesCalls)
+        val confirmed = sync.state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
+        assertEquals(listOf("fresh-user-no-otid"), confirmed.map { it.serverId })
         scope.coroutineContext.job.cancel()
     }
 
@@ -1783,6 +1880,7 @@ private class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
     var lastConversationLimit: Int? = null
     val conversationLimits = mutableListOf<Int?>()
     val conversationOrders = mutableListOf<String?>()
+    var streamConversationReturnsOpenChannel: Boolean = false
 
     fun addStoredMessage(msg: LettaMessage) {
         stored.add(msg)
@@ -1795,6 +1893,9 @@ private class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
     // that never exercises the subscriber). Idle here instead so the loop
     // suspends until the test's scope is cancelled. letta-mobile-o8pr.
     override suspend fun streamConversation(conversationId: String): ByteReadChannel {
+        if (streamConversationReturnsOpenChannel) {
+            return ByteChannel()
+        }
         kotlinx.coroutines.awaitCancellation()
     }
 
@@ -1887,6 +1988,10 @@ private class RecordingConversationCursorStore : ConversationCursorStore {
 
     override suspend fun getAllCursors(): Map<String, Long> =
         highestByConversation.filterValues { it != Long.MIN_VALUE }
+
+    override suspend fun clearCursor(conversationId: String) {
+        highestByConversation.remove(conversationId)
+    }
 }
 
 private val kotlinx.serialization.json.JsonPrimitive.contentOrNull: String?

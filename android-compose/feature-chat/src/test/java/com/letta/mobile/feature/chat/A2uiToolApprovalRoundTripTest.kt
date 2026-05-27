@@ -568,6 +568,10 @@ private class FakeConversationCursorStore(
 
     override suspend fun getAllCursors(): Map<String, Long> =
         highestByConversation.toMap()
+
+    override suspend fun clearCursor(conversationId: String) {
+        highestByConversation.remove(conversationId)
+    }
 }
 
 private data class AffordanceScenario(

@@ -21,4 +21,8 @@ class RoomConversationCursorStore @Inject constructor(
 
     override suspend fun getAllCursors(): Map<String, Long> =
         dao.listCursors().associate { it.conversationId to it.highestSeenSeq }
+
+    override suspend fun clearCursor(conversationId: String) {
+        dao.deleteCursor(conversationId)
+    }
 }

@@ -890,24 +890,41 @@ class ChannelTransport internal constructor(
 
     private fun clearExpiredCursor(frame: ServerFrame.Error) {
         val cleared = mutableListOf<String>()
+        val expiredConversationIds = linkedSetOf<String>()
         val conversationId = frame.conversationId
         val runId = frame.runId
         if (!conversationId.isNullOrEmpty() && !runId.isNullOrEmpty()) {
             cursorStore.clear(conversationId, runId)
             resumedRunConversationIds.remove(runId)
             cleared += "$conversationId/$runId"
+            expiredConversationIds += conversationId
         } else if (!conversationId.isNullOrEmpty()) {
             cursorStore.activeRuns(conversationId).keys.forEach { activeRunId ->
                 cursorStore.clear(conversationId, activeRunId)
                 resumedRunConversationIds.remove(activeRunId)
                 cleared += "$conversationId/$activeRunId"
             }
+            expiredConversationIds += conversationId
         } else if (!runId.isNullOrEmpty()) {
             cursorStore.allActiveRuns().forEach { (activeConversationId, runs) ->
                 if (runs.containsKey(runId)) {
                     cursorStore.clear(activeConversationId, runId)
                     resumedRunConversationIds.remove(runId)
                     cleared += "$activeConversationId/$runId"
+                    expiredConversationIds += activeConversationId
+                }
+            }
+        }
+        if (expiredConversationIds.isNotEmpty()) {
+            scope.launch {
+                expiredConversationIds.forEach { expiredConversationId ->
+                    runCatching { conversationCursorStore.clearCursor(expiredConversationId) }
+                        .onFailure { t ->
+                            Telemetry.error(
+                                "ChannelTransport", "cursorExpired.clearConversationCursorFailed", t,
+                                "conversationId" to expiredConversationId,
+                            )
+                        }
                 }
             }
         }
