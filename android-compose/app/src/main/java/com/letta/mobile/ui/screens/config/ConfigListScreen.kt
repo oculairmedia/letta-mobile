@@ -34,8 +34,6 @@ fun ConfigListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // letta-mobile-qmxn: re-probe on screen open so the dot is fresh.
-    LaunchedEffect(Unit) { viewModel.refreshHealth() }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 

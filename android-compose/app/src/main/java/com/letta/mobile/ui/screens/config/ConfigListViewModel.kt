@@ -63,6 +63,12 @@ class ConfigListViewModel @Inject constructor(
 
     private val _actionError = MutableStateFlow<String?>(null)
 
+    init {
+        // letta-mobile-qmxn: probe health on ViewModel init (not LaunchedEffect)
+        // so the dots reflect current state instead of cached state.
+        refreshHealth()
+    }
+
     // letta-mobile-rl0d: must be Immediate, not ContextClock. viewModelScope
     // uses Dispatchers.Main.immediate which carries no MonotonicFrameClock,
     // so ContextClock crashes with "A MonotonicFrameClock is not available
