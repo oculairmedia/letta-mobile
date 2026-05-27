@@ -29,5 +29,7 @@ interface TimelineExternalTransportWriter {
         otid: String,
     )
 
+    suspend fun repairExpiredConversationCursor(conversationId: String, fallbackSeq: Long?)
+
     suspend fun clearExternalTransportActive(conversationId: String)
 }

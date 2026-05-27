@@ -4,10 +4,12 @@ interface ConversationCursorStore {
     suspend fun recordFrame(conversationId: String, seq: Long)
     suspend fun getCursor(conversationId: String): Long?
     suspend fun getAllCursors(): Map<String, Long>
+    suspend fun clearCursor(conversationId: String)
 }
 
 object NoOpConversationCursorStore : ConversationCursorStore {
     override suspend fun recordFrame(conversationId: String, seq: Long) = Unit
     override suspend fun getCursor(conversationId: String): Long? = null
     override suspend fun getAllCursors(): Map<String, Long> = emptyMap()
+    override suspend fun clearCursor(conversationId: String) = Unit
 }

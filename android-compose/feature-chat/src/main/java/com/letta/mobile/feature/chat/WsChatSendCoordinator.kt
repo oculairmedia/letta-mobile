@@ -496,6 +496,35 @@ internal class WsChatSendCoordinator(
                 drainPendingSend()
             }
             is WsTimelineEvent.Error -> {
+                if (event.code == CURSOR_EXPIRED_ERROR_CODE) {
+                    val conversationId = event.conversationId ?: activeWsConversationId ?: activeConversationId()
+                    if (conversationId != null) {
+                        runCatching {
+                            timelineRepository.repairExpiredConversationCursor(
+                                conversationId = conversationId,
+                                fallbackSeq = event.lastSeq,
+                            )
+                        }.onSuccess {
+                            Telemetry.event(
+                                "AdminChatVM", "ws.cursorExpired.repaired",
+                                "conversationId" to conversationId,
+                                "afterSeq" to (event.afterSeq ?: -1L),
+                                "oldestSeq" to (event.oldestSeq ?: -1L),
+                                "lastSeq" to (event.lastSeq ?: -1L),
+                            )
+                            uiState.value = uiState.value.copy(error = null)
+                        }.onFailure { t ->
+                            Telemetry.error(
+                                "AdminChatVM", "ws.cursorExpired.repairFailed", t,
+                                "conversationId" to conversationId,
+                            )
+                            uiState.value = uiState.value.copy(
+                                error = "Timeline repair failed: ${t.message ?: "unknown"}",
+                            )
+                        }
+                        return
+                    }
+                }
                 recordRuntimeEvent(event)
                 // lcp-axv: stash the error and wait for the immediately-
                 // following TurnDone to flip the UI. Surfacing the error
@@ -590,6 +619,7 @@ internal class WsChatSendCoordinator(
         private const val NEW_CONVERSATION_PLACEHOLDER = ""
         private const val BARE_STOP_REASON_ERROR_MESSAGE =
             "Agent run failed after your message was sent. No error details were provided by the shim."
+        private const val CURSOR_EXPIRED_ERROR_CODE = "cursor_expired"
         private fun defaultShimConversationId(agentId: String): String = "conv-default-$agentId"
     }
 

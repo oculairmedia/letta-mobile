@@ -69,6 +69,17 @@ class RoomConversationCursorStoreTest {
         assertEquals(10L, cursor?.highestSeenSeq)
     }
 
+    @Test
+    fun `clearCursor drops a stale conversation cursor`() = runTest {
+        val db = inMemoryDatabase()
+        val store = RoomConversationCursorStore(db.conversationCursorDao())
+
+        store.recordFrame("conversation-1", 10L)
+        store.clearCursor("conversation-1")
+
+        assertEquals(null, store.getCursor("conversation-1"))
+    }
+
     private fun inMemoryDatabase(): LettaDatabase {
         val context = ApplicationProvider.getApplicationContext<Context>()
         return Room.inMemoryDatabaseBuilder(context, LettaDatabase::class.java)

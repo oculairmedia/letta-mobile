@@ -829,6 +829,51 @@ class WsChatSendCoordinatorTest {
         assertEquals(false, uiState.value.isAgentTyping)
     }
 
+    @Test
+    fun `cursor expired error repairs timeline without surfacing buffered failure`() = runTest {
+        val wsChatBridge = mockBridge(sendAccepted = true)
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val uiState = MutableStateFlow(ChatUiState(agentName = "Agent", error = "old error"))
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = wsChatBridge,
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = uiState,
+            clearComposerAfterSend = {},
+            activeConversationId = { "conv-active" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+
+        coordinator.handleEvent(
+            WsTimelineEvent.Error(
+                code = "cursor_expired",
+                message = "cursor too old",
+                conversationId = "conv-expired",
+                runId = "run-expired",
+                afterSeq = 4L,
+                oldestSeq = 8L,
+                lastSeq = 12L,
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(FakeTimelineExternalTransportWriter.CursorRepair("conv-expired", 12L)),
+            timelineRepository.repairedCursors,
+        )
+        assertNull(uiState.value.error)
+
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "failed"))
+        advanceUntilIdle()
+
+        assertEquals("Turn failed", uiState.value.error)
+    }
+
     private fun settingsRepository(): () -> LettaConfig? = {
         LettaConfig(
             id = "shim",

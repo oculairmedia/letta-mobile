@@ -511,6 +511,45 @@ class TimelineSyncLoopTest {
         assertEquals(17L, cursorStore.getCursor("conv-cursor"))
         scope.coroutineContext.job.cancel()
     }
+
+    @Test
+    fun `cursor repair hydrate records hydrate-end cursor without duplicating events`() = runTest {
+        val api = FakeSyncApi()
+        api.addStoredMessage(
+            AssistantMessage(
+                id = "assistant-repair-1",
+                contentRaw = JsonPrimitive("first repaired frame"),
+                seqId = 11,
+            )
+        )
+        api.addStoredMessage(
+            AssistantMessage(
+                id = "assistant-repair-2",
+                contentRaw = JsonPrimitive("second repaired frame"),
+                seqId = 12,
+            )
+        )
+        val cursorStore = RecordingConversationCursorStore()
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
+        val sync = TimelineSyncLoop(
+            messageApi = api,
+            conversationId = "conv-cursor-repair",
+            scope = scope,
+            conversationCursorStore = cursorStore,
+        )
+
+        sync.hydrate(recordConversationCursor = true, fallbackCursorSeq = 10L)
+        sync.hydrate(recordConversationCursor = true, fallbackCursorSeq = 12L)
+
+        assertEquals(12L, cursorStore.getCursor("conv-cursor-repair"))
+        assertEquals(
+            listOf("assistant-repair-1", "assistant-repair-2"),
+            sync.state.value.events.map { (it as TimelineEvent.Confirmed).serverId },
+        )
+        scope.coroutineContext.job.cancel()
+    }
+
     @Test
     fun `external transport local sent and failed markers fold through serialized gateway`() = runTest {
         val api = FakeSyncApi()
@@ -1887,6 +1926,10 @@ private class RecordingConversationCursorStore : ConversationCursorStore {
 
     override suspend fun getAllCursors(): Map<String, Long> =
         highestByConversation.filterValues { it != Long.MIN_VALUE }
+
+    override suspend fun clearCursor(conversationId: String) {
+        highestByConversation.remove(conversationId)
+    }
 }
 
 private val kotlinx.serialization.json.JsonPrimitive.contentOrNull: String?
