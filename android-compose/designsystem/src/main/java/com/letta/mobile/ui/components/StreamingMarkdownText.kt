@@ -8,7 +8,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -28,7 +27,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import com.letta.mobile.ui.text.ChatTextLayoutMode
 import com.letta.mobile.ui.text.rememberChatTextGeometryMeasurer
@@ -388,8 +386,6 @@ private fun StreamingMarkdownTable(
                 outlineColor = outlineColor,
                 fontWeight = FontWeight.SemiBold,
                 cellTextStyle = cellTextStyle,
-                columnWeights = table.columnWeights,
-                alignments = table.alignments,
             )
         }
         table.rows.forEach { row ->
@@ -401,8 +397,6 @@ private fun StreamingMarkdownTable(
                     outlineColor = outlineColor,
                     fontWeight = null,
                     cellTextStyle = cellTextStyle,
-                    columnWeights = table.columnWeights,
-                    alignments = table.alignments,
                 )
             }
         }
@@ -417,68 +411,19 @@ private fun StreamingMarkdownTableRow(
     outlineColor: Color,
     fontWeight: FontWeight?,
     cellTextStyle: androidx.compose.ui.text.TextStyle,
-    columnWeights: List<Float>,
-    alignments: List<ParsedTableColumnAlignment>,
 ) {
     Row(modifier = Modifier.background(containerColor)) {
-        cells.forEachIndexed { index, cell ->
-            val textAlign = alignments.getOrElse(index) { ParsedTableColumnAlignment.Start }.toTextAlign()
-            val style = if (fontWeight != null) {
-                cellTextStyle.copy(fontWeight = fontWeight, textAlign = textAlign)
-            } else {
-                cellTextStyle.copy(textAlign = textAlign)
-            }
-            Box(
+        cells.forEach { cell ->
+            Text(
+                text = cell,
+                color = textColor,
+                style = if (fontWeight != null) cellTextStyle.copy(fontWeight = fontWeight) else cellTextStyle,
                 modifier = Modifier
-                    .weight(columnWeights.getOrElse(index) { 1f })
+                    .weight(1f)
                     .widthIn(min = 56.dp)
                     .border(0.5.dp, outlineColor)
                     .padding(horizontal = 8.dp, vertical = 6.dp),
-            ) {
-                StreamingMarkdownTableCell(
-                    cell = cell,
-                    textColor = textColor,
-                    style = style,
-                    textAlign = textAlign,
-                )
-            }
+            )
         }
     }
 }
-
-@Composable
-private fun StreamingMarkdownTableCell(
-    cell: String,
-    textColor: Color,
-    style: androidx.compose.ui.text.TextStyle,
-    textAlign: TextAlign,
-) {
-    if (cell.hasTableCellInlineMarkdown()) {
-        MarkdownTextRaw(
-            text = cell,
-            textColor = textColor,
-            textStyle = style,
-            textAlign = textAlign,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    } else {
-        Text(
-            text = cell,
-            color = textColor,
-            style = style,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-}
-
-private fun ParsedTableColumnAlignment.toTextAlign(): TextAlign =
-    when (this) {
-        ParsedTableColumnAlignment.Start -> TextAlign.Start
-        ParsedTableColumnAlignment.Center -> TextAlign.Center
-        ParsedTableColumnAlignment.End -> TextAlign.End
-    }
-
-private fun String.hasTableCellInlineMarkdown(): Boolean =
-    any { it in tableCellInlineMarkdownChars }
-
-private val tableCellInlineMarkdownChars = setOf('*', '_', '`', '[', ']', '~')

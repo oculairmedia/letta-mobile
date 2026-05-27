@@ -27,7 +27,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -368,12 +367,10 @@ private fun findMarkdownLinkRanges(text: String): List<IntRange> {
 
 /** Internal renderer that handles a single non-math chunk via the Markdown lib. */
 @Composable
-internal fun MarkdownTextRaw(
+private fun MarkdownTextRaw(
     text: String,
     modifier: Modifier = Modifier,
     textColor: Color = MaterialTheme.colorScheme.onSurface,
-    textStyle: TextStyle = MaterialTheme.typography.bodyMedium,
-    textAlign: TextAlign? = null,
 ) {
     // Auto-linkify bare URLs before passing to the markdown renderer
     val linkedText = remember(text) { autolinkBareUrls(text) }
@@ -444,9 +441,6 @@ internal fun MarkdownTextRaw(
     }
 
     CompositionLocalProvider(LocalDensity provides scaledDensity) {
-        val resolvedTextStyle = textStyle
-            .copy(color = textColor)
-            .let { style -> if (textAlign != null) style.copy(textAlign = textAlign) else style }
         CoreMarkdown(
             content = linkedText,
             modifier = modifier.fillMaxWidth(),
@@ -460,7 +454,7 @@ internal fun MarkdownTextRaw(
                 dividerColor = MaterialTheme.colorScheme.outlineVariant,
             ),
             typography = markdownTypography(
-                text = resolvedTextStyle,
+                text = MaterialTheme.typography.bodyMedium.copy(color = textColor),
                 // letta-mobile-pcir: code style for fenced blocks. Tuned for
                 // ASCII-art alignment:
                 //   - JetBrains Mono via LettaCodeFont (full Unicode coverage

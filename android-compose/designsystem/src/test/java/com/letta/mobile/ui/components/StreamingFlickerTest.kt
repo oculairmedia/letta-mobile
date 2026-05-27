@@ -338,14 +338,6 @@ class StreamingFlickerTest {
         requireNotNull(table)
         assertEquals(listOf("left", "right", "center"), table.header)
         assertEquals(listOf("a", "b", "c"), table.rows.single().cells)
-        assertEquals(
-            listOf(
-                ParsedTableColumnAlignment.Start,
-                ParsedTableColumnAlignment.End,
-                ParsedTableColumnAlignment.Center,
-            ),
-            table.alignments,
-        )
     }
 
     @Test
@@ -360,42 +352,6 @@ class StreamingFlickerTest {
         assertEquals(first.rows[0].key, second.rows[0].key)
         assertEquals(first.rows[0].cells, second.rows[0].cells)
         assertEquals(2, second.rows.size)
-    }
-
-    @Test
-    fun `table parser skips separator-like body rows`() {
-        val table = parseMarkdownTable("| a | b |\n| --- | --- |\n| 1 | 2 |\n| --- | --- |\n| 3 | 4 |\n")
-
-        assertNotNull(table)
-        requireNotNull(table)
-        assertEquals(2, table.rows.size)
-        assertEquals(listOf("1", "2"), table.rows[0].cells)
-        assertEquals(listOf("3", "4"), table.rows[1].cells)
-    }
-
-    @Test
-    fun `table parser preserves inline markdown cell source`() {
-        val table = parseMarkdownTable(
-            "| Feature | Result |\n| --- | --- |\n| **Streaming markdown layout** | `stable` and _balanced_ |\n",
-        )
-
-        assertNotNull(table)
-        requireNotNull(table)
-        assertEquals("**Streaming markdown layout**", table.rows.single().cells[0])
-        assertEquals("`stable` and _balanced_", table.rows.single().cells[1])
-    }
-
-    @Test
-    fun `table parser assigns wider weight to content-heavy columns`() {
-        val table = parseMarkdownTable(
-            "| Feature | Status | Notes |\n| --- | --- | --- |\n| Streaming markdown layout stability | Done | OK |\n",
-        )
-
-        assertNotNull(table)
-        requireNotNull(table)
-        assertEquals(3, table.columnWeights.size)
-        assertTrue(table.columnWeights[0] > table.columnWeights[1])
-        assertTrue(table.columnWeights[0] > table.columnWeights[2])
     }
 
     @Test
