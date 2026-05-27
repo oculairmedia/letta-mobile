@@ -119,13 +119,6 @@ fun AgentListScreen(
     viewModel: AgentListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var showCreateDialog by remember { mutableStateOf(false) }
-    var showImportDialog by remember { mutableStateOf(false) }
-    var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
-    var showGrid by rememberSaveable { mutableStateOf(false) }
-    var pendingImportName by remember { mutableStateOf<String?>(null) }
-    var pendingImportOverrideTools by remember { mutableStateOf(true) }
-    var pendingImportStripMessages by remember { mutableStateOf(false) }
     val snackbar = LocalSnackbarDispatcher.current
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
@@ -152,9 +145,9 @@ fun AgentListScreen(
             viewModel.importAgent(
                 fileName = fileName,
                 fileBytes = bytes,
-                overrideName = pendingImportName,
-                overrideExistingTools = pendingImportOverrideTools,
-                stripMessages = pendingImportStripMessages,
+                overrideName = uiState.pendingImportName,
+                overrideExistingTools = uiState.pendingImportOverrideTools,
+                stripMessages = uiState.pendingImportStripMessages,
             ) { response ->
                 val importedId = response.agentIds.firstOrNull()
                 snackbar.dispatch(
@@ -163,7 +156,7 @@ fun AgentListScreen(
                         response.agentIds.size,
                     )
                 )
-                importedId?.let { onNavigateToAgent(it, pendingImportName) }
+                importedId?.let { onNavigateToAgent(it, uiState.pendingImportName) }
             }
         }
     }
@@ -201,8 +194,8 @@ fun AgentListScreen(
                             query = uiState.searchQuery,
                             onQueryChange = viewModel::updateSearchQuery,
                             onClear = { viewModel.updateSearchQuery("") },
-                            expanded = isSearchExpanded,
-                            onExpandedChange = { isSearchExpanded = it },
+                            expanded = uiState.isSearchExpanded,
+                            onExpandedChange = { viewModel.setSearchExpanded(it) },
                             placeholder = stringResource(R.string.screen_agents_search_hint),
                             openSearchContentDescription = stringResource(R.string.action_search),
                             closeSearchContentDescription = stringResource(R.string.action_close),
@@ -220,7 +213,7 @@ fun AgentListScreen(
                     },
                     actions = {
                         if (!isShareMode) {
-                            IconButton(onClick = { showImportDialog = true }) {
+                            IconButton(onClick = { viewModel.showImportDialog() }) {
                                 Icon(
                                     LettaIcons.FileOpen,
                                     contentDescription = stringResource(R.string.action_import_agent),
@@ -233,7 +226,7 @@ fun AgentListScreen(
                     query = uiState.searchQuery,
                     onQueryChange = viewModel::updateSearchQuery,
                     onClear = { viewModel.updateSearchQuery("") },
-                    expanded = isSearchExpanded,
+                    expanded = uiState.isSearchExpanded,
                     placeholder = stringResource(R.string.screen_agents_search_hint),
                 )
 
@@ -243,19 +236,19 @@ fun AgentListScreen(
                         .padding(horizontal = 16.dp, vertical = 4.dp),
                 ) {
                     SegmentedButton(
-                        selected = !showGrid,
+                        selected = !uiState.showGrid,
                         onClick = {
-                            HapticEffects.segmentTick(haptic, view, enabled = showGrid)
-                            showGrid = false
+                            HapticEffects.segmentTick(haptic, view, enabled = uiState.showGrid)
+                            viewModel.setShowGrid(false)
                         },
                         shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                         label = { Text(stringResource(R.string.screen_agents_view_list)) },
                     )
                     SegmentedButton(
-                        selected = showGrid,
+                        selected = uiState.showGrid,
                         onClick = {
-                            HapticEffects.segmentTick(haptic, view, enabled = !showGrid)
-                            showGrid = true
+                            HapticEffects.segmentTick(haptic, view, enabled = !uiState.showGrid)
+                            viewModel.setShowGrid(true)
                         },
                         shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                         label = { Text(stringResource(R.string.screen_agents_view_grid)) },
@@ -309,7 +302,7 @@ fun AgentListScreen(
         },
         floatingActionButton = {
             if (!isShareMode) {
-                FloatingActionButton(onClick = { showCreateDialog = true }) {
+                FloatingActionButton(onClick = { viewModel.showCreateDialog() }) {
                     Icon(LettaIcons.Add, "Create Agent")
                 }
             }
@@ -344,7 +337,7 @@ fun AgentListScreen(
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {
-                        if (showGrid) {
+                        if (uiState.showGrid) {
                             val minTileWidth = if (LocalWindowSizeClass.current.isExpandedWidth) 220.dp else 150.dp
                             LazyVerticalGrid(
                                 state = gridState,
@@ -441,32 +434,32 @@ fun AgentListScreen(
         }
     }
 
-    if (showCreateDialog) {
+    if (uiState.showCreateDialog) {
         CreateAgentDialog(
-            onDismiss = { showCreateDialog = false },
+            onDismiss = { viewModel.hideCreateDialog() },
             availableTools = uiState.availableTools,
             llmModels = uiState.llmModels,
             embeddingModels = uiState.embeddingModels,
             onLoadModels = { viewModel.loadAvailableModels() },
             onCreate = { params ->
                 viewModel.createAgent(params) { agentId ->
-                    showCreateDialog = false
+                    viewModel.hideCreateDialog()
                     onNavigateToAgent(agentId, params.name)
                 }
             },
         )
     }
 
-    if (showImportDialog) {
+    if (uiState.showImportDialog) {
         ImportAgentDialog(
             isImporting = uiState.isImporting,
-            onDismiss = { showImportDialog = false },
+            onDismiss = { viewModel.hideImportDialog() },
             onImport = { overrideName, overrideExistingTools, stripMessages ->
-                pendingImportName = overrideName
-                pendingImportOverrideTools = overrideExistingTools
-                pendingImportStripMessages = stripMessages
+                viewModel.setPendingImportName(overrideName)
+                viewModel.setPendingImportOverrideTools(overrideExistingTools)
+                viewModel.setPendingImportStripMessages(stripMessages)
                 importLauncher.launch(arrayOf("application/json", "text/plain"))
-                showImportDialog = false
+                viewModel.hideImportDialog()
             },
         )
     }
