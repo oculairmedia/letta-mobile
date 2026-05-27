@@ -27,7 +27,7 @@ internal fun defaultSessionScopedAgentRepositoryScope(): CoroutineScope =
 class SessionScopedAgentRepository internal constructor(
     private val sessionManager: SessionManager,
     private val proxyScope: CoroutineScope,
-) : IAgentRepository {
+) : IAgentRepository, BackendScopedCache {
     @Inject
     constructor(
         sessionManager: SessionManager,
@@ -58,6 +58,12 @@ class SessionScopedAgentRepository internal constructor(
     override suspend fun countAgents(): Int = sessionManager.withCurrentSession { it.agentRepository.countAgents() }
 
     override suspend fun refreshAgents() = sessionManager.withCurrentSession { it.agentRepository.refreshAgents() }
+
+    override suspend fun clearForBackendSwitch() {
+        _agents.value = emptyList()
+        _isRefreshing.value = false
+        sessionManager.current.agentRepository.clearForBackendSwitch()
+    }
 
     override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = sessionManager.withCurrentSession { it.agentRepository.refreshAgentsIfStale(maxAgeMs) }
 

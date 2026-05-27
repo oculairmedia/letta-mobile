@@ -9,6 +9,7 @@ import com.letta.mobile.chat.BuildConfigChatClientVersionProvider
 import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.health.IServerHealthRepository
 import com.letta.mobile.data.health.ServerHealthRepository
+import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.BugReportRepository
 import com.letta.mobile.data.repository.MessageRepository
@@ -79,6 +80,7 @@ import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import dagger.multibindings.IntoSet
 import javax.inject.Singleton
 
 @Module
@@ -87,6 +89,11 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindBlockRepository(impl: BlockRepository): IBlockRepository
+
+    @Binds
+    @IntoSet
+    @Singleton
+    abstract fun bindBlockBackendScopedCache(impl: BlockRepository): BackendScopedCache
 
     @Binds
     @Singleton
@@ -110,8 +117,18 @@ abstract class AppModule {
     abstract fun bindAgentRepository(impl: SessionScopedAgentRepository): IAgentRepository
 
     @Binds
+    @IntoSet
+    @Singleton
+    abstract fun bindAgentBackendScopedCache(impl: SessionScopedAgentRepository): BackendScopedCache
+
+    @Binds
     @Singleton
     abstract fun bindConversationRepository(impl: SessionScopedConversationRepository): IConversationRepository
+
+    @Binds
+    @IntoSet
+    @Singleton
+    abstract fun bindConversationBackendScopedCache(impl: SessionScopedConversationRepository): BackendScopedCache
 
     @Binds
     @Singleton
@@ -126,6 +143,11 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindAllConversationsRepository(impl: SessionScopedAllConversationsRepository): IAllConversationsRepository
+
+    @Binds
+    @IntoSet
+    @Singleton
+    abstract fun bindAllConversationsBackendScopedCache(impl: SessionScopedAllConversationsRepository): BackendScopedCache
 
     @Binds
     @Singleton
@@ -182,6 +204,11 @@ abstract class AppModule {
     abstract fun bindPassageRepository(impl: SessionScopedPassageRepository): IPassageRepository
 
     @Binds
+    @IntoSet
+    @Singleton
+    abstract fun bindPassageBackendScopedCache(impl: SessionScopedPassageRepository): BackendScopedCache
+
+    @Binds
     @Singleton
     abstract fun bindProviderRepository(impl: SessionScopedProviderRepository): IProviderRepository
 
@@ -214,6 +241,11 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindTimelineExternalTransportWriter(impl: TimelineRepository): TimelineExternalTransportWriter
+
+    @Binds
+    @IntoSet
+    @Singleton
+    abstract fun bindTimelineBackendScopedCache(impl: TimelineRepository): BackendScopedCache
 
     @Binds
     @Singleton

@@ -26,7 +26,7 @@ internal fun defaultSessionScopedAllConversationsRepositoryScope(): CoroutineSco
 class SessionScopedAllConversationsRepository internal constructor(
     private val sessionManager: SessionManager,
     private val proxyScope: CoroutineScope,
-) : IAllConversationsRepository {
+) : IAllConversationsRepository, BackendScopedCache {
     @Inject
     constructor(
         sessionManager: SessionManager,
@@ -65,6 +65,12 @@ class SessionScopedAllConversationsRepository internal constructor(
 
     override suspend fun loadNextPage() = sessionManager.withCurrentSession { it.allConversationsRepository.loadNextPage() }
     override suspend fun refresh() = sessionManager.withCurrentSession { it.allConversationsRepository.refresh() }
+    override suspend fun clearForBackendSwitch() {
+        _conversations.value = emptyList()
+        _hasMore.value = true
+        sessionManager.current.allConversationsRepository.clearForBackendSwitch()
+    }
+
     override fun hasFreshConversations(maxAgeMs: Long): Boolean = current.hasFreshConversations(maxAgeMs)
     override suspend fun refreshIfStale(maxAgeMs: Long): Boolean = sessionManager.withCurrentSession { it.allConversationsRepository.refreshIfStale(maxAgeMs) }
     override fun handleOptimisticUpdate(conversation: Conversation) = current.handleOptimisticUpdate(conversation)

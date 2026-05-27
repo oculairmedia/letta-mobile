@@ -6,13 +6,16 @@ import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.repository.api.IBlockRepository
+import com.letta.mobile.data.session.BackendScopedCache
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class BlockRepository @Inject constructor(
     private val blockApi: BlockApi,
-) : IBlockRepository {
+) : IBlockRepository, BackendScopedCache {
+    override suspend fun clearForBackendSwitch() = Unit
+
     override suspend fun getBlocks(agentId: String): List<Block> {
         return blockApi.listBlocks(agentId)
     }

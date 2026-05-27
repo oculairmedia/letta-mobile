@@ -10,6 +10,7 @@ import com.letta.mobile.data.model.ConversationCreateParams
 import com.letta.mobile.data.model.ConversationUpdateParams
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
+import com.letta.mobile.data.session.BackendScopedCache
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -29,7 +30,7 @@ open class ConversationRepository(
     private val agentRepository: IAgentRepository,
     private val conversationDao: ConversationDao,
     private val repositoryScope: CoroutineScope = defaultConversationRepositoryScope(),
-) : IConversationRepository {
+) : IConversationRepository, BackendScopedCache {
     private val _conversationsByAgent = MutableStateFlow<Map<String, List<Conversation>>>(emptyMap())
     private val refreshMutex = Mutex()
     private val lastRefreshAtMillisByAgent = mutableMapOf<String, Long>()
@@ -60,6 +61,19 @@ open class ConversationRepository(
 
     override suspend fun refreshConversations(agentId: String) = refreshMutex.withLock {
         refreshConversationsLocked(agentId)
+    }
+
+    override suspend fun clearForBackendSwitch() {
+        refreshMutex.withLock {
+            _conversationsByAgent.value = emptyMap()
+            lastRefreshAtMillisByAgent.clear()
+            runCatching {
+                conversationDao.deleteAll()
+                conversationDao.deleteAllRefreshStates()
+            }.onFailure { error ->
+                Log.w(TAG, "Failed to clear cached conversations for backend switch", error)
+            }
+        }
     }
 
     private suspend fun refreshConversationsLocked(agentId: String) {

@@ -13,6 +13,7 @@ import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.paging.AgentPagingSource
+import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
@@ -36,7 +37,7 @@ open class AgentRepository(
     private val agentApi: AgentApi,
     private val agentDao: AgentDao,
     private val repositoryScope: CoroutineScope = defaultAgentRepositoryScope(),
-) : IAgentRepository {
+) : IAgentRepository, BackendScopedCache {
     private val _agents = MutableStateFlow<List<Agent>>(emptyList())
     override open val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
     private val _isRefreshing = MutableStateFlow(false)
@@ -76,6 +77,19 @@ open class AgentRepository(
             refreshAgentsLocked()
         } finally {
             _isRefreshing.value = false
+        }
+    }
+
+    override suspend fun clearForBackendSwitch() {
+        refreshMutex.withLock {
+            _agents.value = emptyList()
+            _isRefreshing.value = false
+            lastRefreshAtMillis = 0L
+            runCatching {
+                agentDao.deleteAll()
+            }.onFailure { error ->
+                Log.w("AgentRepository", "Failed to clear cached agents for backend switch", error)
+            }
         }
     }
 

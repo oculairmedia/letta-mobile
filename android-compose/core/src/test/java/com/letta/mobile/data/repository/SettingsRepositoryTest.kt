@@ -108,6 +108,47 @@ class SettingsRepositoryTest {
     }
 
     @Test
+    fun `active backend change clears backend-scoped caches before active config update`() = runTest {
+        lateinit var scopedRepository: SettingsRepository
+        val activeIdsAtClear = mutableListOf<String?>()
+        scopedRepository = SettingsRepository(
+            dataStore = createTestPreferencesDataStore(),
+            secureSettingsStore = InMemorySecureSettingsStore(),
+            clearBackendScopedCaches = {
+                activeIdsAtClear += scopedRepository.activeConfig.value?.id
+            },
+        )
+
+        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://one.com")
+        val c2 = LettaConfig(id = "c2", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "http://two.com")
+
+        scopedRepository.saveConfig(c1)
+        activeIdsAtClear.clear()
+
+        scopedRepository.saveConfig(c2)
+
+        assertEquals(listOf("c1"), activeIdsAtClear)
+        assertEquals("c2", scopedRepository.activeConfig.value?.id)
+
+        activeIdsAtClear.clear()
+        scopedRepository.setActiveConfigId("c1")
+
+        assertEquals(listOf("c2"), activeIdsAtClear)
+        assertEquals("c1", scopedRepository.activeConfig.value?.id)
+
+        activeIdsAtClear.clear()
+        scopedRepository.saveConfig(c2.copy(accessToken = "rotated-token"))
+
+        assertEquals(listOf("c1"), activeIdsAtClear)
+        assertEquals("c2", scopedRepository.activeConfig.value?.id)
+
+        activeIdsAtClear.clear()
+        scopedRepository.saveConfig(c2.copy(accessToken = "rotated-token-2"))
+
+        assertTrue(activeIdsAtClear.isEmpty())
+    }
+
+    @Test
     fun `setActiveConfigId with nonexistent id does nothing`() = runTest {
         val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://one.com")
         repository.saveConfig(c1)

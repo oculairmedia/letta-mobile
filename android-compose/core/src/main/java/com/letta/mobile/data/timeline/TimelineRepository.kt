@@ -1,6 +1,7 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.api.MessageApi
+import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.util.Telemetry
@@ -35,7 +36,7 @@ open class TimelineRepository @Inject constructor(
     private val messageApi: MessageApi,
     private val pendingLocalStore: PendingLocalStore,
     sessionManager: SessionManager?,
-) : TimelineExternalTransportWriter {
+) : TimelineExternalTransportWriter, BackendScopedCache {
     internal constructor(
         messageApi: MessageApi,
         pendingLocalStore: PendingLocalStore,
@@ -140,6 +141,8 @@ open class TimelineRepository @Inject constructor(
         loops.clear()
         Telemetry.event("TimelineRepo", "clearAll", "clearedLoopCount" to count)
     }
+
+    override suspend fun clearForBackendSwitch() = clearAll()
 
     /** Observe a conversation's timeline state. */
     suspend fun observe(conversationId: String): StateFlow<Timeline> =

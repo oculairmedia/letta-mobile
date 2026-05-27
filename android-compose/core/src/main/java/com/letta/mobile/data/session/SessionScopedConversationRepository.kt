@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 @Singleton
 class SessionScopedConversationRepository @Inject constructor(
     private val sessionManager: SessionManager,
-) : IConversationRepository {
+) : IConversationRepository, BackendScopedCache {
     private val current: IConversationRepository
         get() = sessionManager.current.conversationRepository
 
@@ -26,6 +26,10 @@ class SessionScopedConversationRepository @Inject constructor(
 
     override suspend fun refreshConversations(agentId: String) =
         sessionManager.withCurrentSession { it.conversationRepository.refreshConversations(agentId) }
+
+    override suspend fun clearForBackendSwitch() {
+        sessionManager.current.conversationRepository.clearForBackendSwitch()
+    }
 
     override suspend fun refreshConversationsIfStale(agentId: String, maxAgeMs: Long): Boolean =
         sessionManager.withCurrentSession { it.conversationRepository.refreshConversationsIfStale(agentId, maxAgeMs) }

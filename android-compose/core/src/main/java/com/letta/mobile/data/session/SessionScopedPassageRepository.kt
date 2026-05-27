@@ -25,7 +25,7 @@ internal fun defaultSessionScopedPassageRepositoryScope(): CoroutineScope =
 class SessionScopedPassageRepository internal constructor(
     private val sessionManager: SessionManager,
     private val proxyScope: CoroutineScope,
-) : IPassageRepository {
+) : IPassageRepository, BackendScopedCache {
     @Inject
     constructor(
         sessionManager: SessionManager,
@@ -42,12 +42,7 @@ class SessionScopedPassageRepository internal constructor(
         sessionManager.currentGraph
             .drop(1)
             .onEach {
-                synchronized(cacheLock) {
-                    passageJobsByAgent.values.forEach { it.cancel() }
-                    passageJobsByAgent.clear()
-                    passageFlowsByAgent.values.forEach { it.value = emptyList() }
-                    passageFlowsByAgent.clear()
-                }
+                clearTrackedFlows()
             }
             .launchIn(proxyScope)
     }
@@ -70,6 +65,11 @@ class SessionScopedPassageRepository internal constructor(
 
     override suspend fun refreshPassages(agentId: String) = sessionManager.withCurrentSession { it.passageRepository.refreshPassages(agentId) }
 
+    override suspend fun clearForBackendSwitch() {
+        clearTrackedFlows()
+        sessionManager.current.passageRepository.clearForBackendSwitch()
+    }
+
     override suspend fun createPassage(agentId: String, text: String): Passage = sessionManager.withCurrentSession { it.passageRepository.createPassage(agentId, text) }
 
     override suspend fun deletePassage(agentId: String, passageId: String) =
@@ -79,4 +79,13 @@ class SessionScopedPassageRepository internal constructor(
         sessionManager.withCurrentSession { it.passageRepository.searchArchival(agentId, query) }
 
     fun close() { proxyScope.cancel() }
+
+    private fun clearTrackedFlows() {
+        synchronized(cacheLock) {
+            passageJobsByAgent.values.forEach { it.cancel() }
+            passageJobsByAgent.clear()
+            passageFlowsByAgent.values.forEach { it.value = emptyList() }
+            passageFlowsByAgent.clear()
+        }
+    }
 }

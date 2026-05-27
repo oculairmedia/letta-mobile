@@ -4,13 +4,14 @@ import com.letta.mobile.data.api.PassageApi
 import com.letta.mobile.data.model.Passage
 import com.letta.mobile.data.model.PassageCreateParams
 import com.letta.mobile.data.repository.api.IPassageRepository
+import com.letta.mobile.data.session.BackendScopedCache
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 open class PassageRepository(
     private val passageApi: PassageApi,
-) : IPassageRepository {
+) : IPassageRepository, BackendScopedCache {
     private val cacheLock = Any()
     private val _passages = MutableStateFlow<Map<String, List<Passage>>>(emptyMap())
     private val passageFlowsByAgent = mutableMapOf<String, MutableStateFlow<List<Passage>>>()
@@ -26,6 +27,14 @@ open class PassageRepository(
     override open suspend fun refreshPassages(agentId: String) {
         val passages = passageApi.listPassages(agentId, limit = 100)
         replaceCachedPassages(agentId, passages)
+    }
+
+    override suspend fun clearForBackendSwitch() {
+        synchronized(cacheLock) {
+            _passages.value = emptyMap()
+            passageFlowsByAgent.values.forEach { it.value = emptyList() }
+            passageFlowsByAgent.clear()
+        }
     }
 
     override open suspend fun createPassage(agentId: String, text: String): Passage {
