@@ -330,6 +330,93 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `late same-run assistant prefix with a new server id is dropped`() {
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "assistant-full",
+                contentRaw = JsonPrimitive("Opening line\n\nFinal body"),
+                runId = "run-1",
+                seqId = 20,
+            )
+        ).next
+
+        val output = reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "assistant-prefix",
+                contentRaw = JsonPrimitive("Opening line"),
+                runId = "run-1",
+                seqId = 21,
+            ),
+        )
+
+        output.next.events shouldHaveSize 1
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.serverId shouldBe "assistant-full"
+        event.content shouldBe "Opening line\n\nFinal body"
+        output.next.liveCursor shouldBe "assistant-full"
+        output.emittedEvents shouldBe emptyList()
+        output.notification shouldBe null
+    }
+
+    @Test
+    fun `late same-run blank assistant with a new server id is dropped after nonblank assistant`() {
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "assistant-full",
+                contentRaw = JsonPrimitive("Opening line\n\nFinal body"),
+                runId = "run-1",
+                seqId = 20,
+            )
+        ).next
+
+        val output = reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "assistant-empty",
+                contentRaw = JsonPrimitive(""),
+                runId = "run-1",
+                seqId = 21,
+            ),
+        )
+
+        output.next.events shouldHaveSize 1
+        (output.next.events.single() as TimelineEvent.Confirmed).serverId shouldBe "assistant-full"
+        output.emittedEvents shouldBe emptyList()
+        output.notification shouldBe null
+    }
+
+    @Test
+    fun `assistant prefix from a different run is preserved`() {
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "assistant-full",
+                contentRaw = JsonPrimitive("Opening line\n\nFinal body"),
+                runId = "run-1",
+                seqId = 20,
+            )
+        ).next
+
+        val output = reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "assistant-prefix-next-run",
+                contentRaw = JsonPrimitive("Opening line"),
+                runId = "run-2",
+                seqId = 1,
+            ),
+        )
+
+        output.next.events shouldHaveSize 2
+        val event = output.next.events.last() as TimelineEvent.Confirmed
+        event.serverId shouldBe "assistant-prefix-next-run"
+        event.content shouldBe "Opening line"
+        output.emittedEvents shouldBe listOf(
+            TimelineSyncEvent.StreamEventIngested("assistant-prefix-next-run", "assistant_message")
+        )
+    }
+
+    @Test
     fun `plain append adds new confirmed event and emits notification for assistant`() {
         val output = reduce(
             frame = AssistantMessage(id = "assistant-1", contentRaw = JsonPrimitive("hello"))

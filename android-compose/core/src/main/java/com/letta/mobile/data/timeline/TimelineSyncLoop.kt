@@ -751,10 +751,14 @@ class TimelineSyncLoop(
         )
     }
 
-    internal suspend fun reconcileRecentMessages(reason: String) {
+    internal suspend fun reconcileRecentMessages(
+        reason: String,
+        forceRefresh: Boolean = false,
+    ) {
         reconcileRecentMessagesFromServer(
             telemetryName = "recentReconcile",
             telemetryAttrs = arrayOf("reason" to reason),
+            allowWhileStreamActive = forceRefresh,
         )
     }
 
@@ -816,11 +820,12 @@ class TimelineSyncLoop(
     private suspend fun reconcileRecentMessagesFromServer(
         telemetryName: String,
         telemetryAttrs: Array<Pair<String, Any?>>,
+        allowWhileStreamActive: Boolean = false,
     ) {
         val timer = Telemetry.startTimer("TimelineSync", telemetryName)
         var appended = 0
         try {
-            if (_streamSubscriberActive.value) {
+            if (_streamSubscriberActive.value && !allowWhileStreamActive) {
                 Telemetry.event(
                     "TimelineSync", "$telemetryName.skipped",
                     "conversationId" to conversationId,

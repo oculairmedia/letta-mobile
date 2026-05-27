@@ -204,9 +204,18 @@ open class TimelineRepository @Inject constructor(
         loop?.postHandlerCollapse()
     }
 
-    /** Pull recent server messages into an existing or newly-created timeline loop. */
-    suspend fun reconcileRecentMessages(conversationId: String, reason: String) {
-        getOrCreate(conversationId).reconcileRecentMessages(reason)
+    /**
+     * Pull recent server messages into an existing or newly-created timeline loop.
+     *
+     * Normal callers leave [forceRefresh] false so a healthy live stream remains
+     * the single writer. User-initiated refresh/repair flows may set it true.
+     */
+    suspend fun reconcileRecentMessages(
+        conversationId: String,
+        reason: String,
+        forceRefresh: Boolean = false,
+    ) {
+        getOrCreate(conversationId).reconcileRecentMessages(reason, forceRefresh)
     }
 
     /**
