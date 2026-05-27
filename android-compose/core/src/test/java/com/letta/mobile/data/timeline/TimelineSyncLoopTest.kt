@@ -22,19 +22,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
@@ -242,22 +237,23 @@ class TimelineSyncLoopTest {
     }
 
     @Test
-    fun `send with image attachments posts Letta content parts`() = runBlocking {
+    fun `send with image attachments posts Letta content parts`() = runTest {
         val api = FakeSyncApi()
         api.nextStreamMessages = listOf(
             AssistantMessage(id = "reply-image", contentRaw = JsonPrimitive("I see it"), otid = "reply-otid")
         )
-        val scope = CoroutineScope(Dispatchers.IO)
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
         val sync = TimelineSyncLoop(api, "conv-image", scope)
 
-        sync.send(
-            content = "describe this image",
-            attachments = listOf(MessageContentPart.Image(base64 = "AAAA", mediaType = "image/png")),
-        )
-
-        withTimeout(5_000) {
-            while (api.lastSendRequest == null) delay(10)
+        val send = async {
+            sync.send(
+                content = "describe this image",
+                attachments = listOf(MessageContentPart.Image(base64 = "AAAA", mediaType = "image/png")),
+            )
         }
+        advanceUntilIdle()
+        send.await()
 
         val firstMessage = api.lastSendRequest!!.messages!!.single().jsonObject
         val contentParts = firstMessage["content"]!!.jsonArray
@@ -272,19 +268,18 @@ class TimelineSyncLoopTest {
     }
 
     @Test
-    fun `send without attachments keeps legacy string content`() = runBlocking {
+    fun `send without attachments keeps legacy string content`() = runTest {
         val api = FakeSyncApi()
         api.nextStreamMessages = listOf(
             AssistantMessage(id = "reply-text", contentRaw = JsonPrimitive("OK"), otid = "reply-otid")
         )
-        val scope = CoroutineScope(Dispatchers.IO)
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
         val sync = TimelineSyncLoop(api, "conv-text", scope)
 
-        sync.send("plain text")
-
-        withTimeout(5_000) {
-            while (api.lastSendRequest == null) delay(10)
-        }
+        val send = async { sync.send("plain text") }
+        advanceUntilIdle()
+        send.await()
 
         val firstMessage = api.lastSendRequest!!.messages!!.single().jsonObject
         assertEquals(JsonPrimitive("plain text"), firstMessage["content"])
@@ -308,7 +303,7 @@ class TimelineSyncLoopTest {
      *     (destructive-replace branch)
      */
     @Test
-    fun `streaming assistant text deltas concatenate byte-for-byte under prefix collisions`() = runBlocking {
+    fun `streaming assistant text deltas concatenate byte-for-byte under prefix collisions`() = runTest {
         val fragments = listOf(
             "The ",
             "quick brown fox ",
@@ -331,23 +326,13 @@ class TimelineSyncLoopTest {
                 otid = if (idx == 0) "reply-otid-uww11" else null,
             )
         }
-        val scope = CoroutineScope(Dispatchers.IO)
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
         val sync = TimelineSyncLoop(api, "conv1", scope)
 
-        sync.send("hello")
-
-        // Wait until the queued gateway worker has folded every stream frame.
-        // A length-stability heuristic is too weak here because queued chunks
-        // can be briefly stable between eventQueue drains.
-        withTimeout(5_000) {
-            while (true) {
-                val content = sync.state.value.events.firstOrNull {
-                    it is TimelineEvent.Confirmed && it.serverId == "reply-stream"
-                }?.content
-                if (content == expected) break
-                delay(10)
-            }
-        }
+        val send = async { sync.send("hello") }
+        advanceUntilIdle()
+        send.await()
 
         val assistant = sync.state.value.events.firstOrNull {
             it is TimelineEvent.Confirmed && it.serverId == "reply-stream"
@@ -367,8 +352,8 @@ class TimelineSyncLoopTest {
      * Asserts the same pure-delta concat contract the polling-loop sibling
      * test covers above (lcp-cv3 / lcp-pro / lcp-r0m / wucn-snapshot-recovery
      * cascade), but via [app.cash.turbine.test] on the [TimelineSyncLoop.state]
-     * StateFlow — no `delay(10)` polling, no manual stability heuristic, no
-     * arbitrary `withTimeout(5_000)`. Each `awaitItem()` is bounded by
+     * StateFlow — no real-time polling, no manual stability heuristic, no
+     * arbitrary wall-clock timeout. Each `awaitItem()` is bounded by
      * Turbine's default 1s timeout, so a broken merge surfaces as a clear
      * "expected item but no emission" failure instead of a stable-content
      * heuristic that quietly passes on the wrong content.
@@ -377,7 +362,7 @@ class TimelineSyncLoopTest {
      * and the pattern this test demonstrates.
      */
     @Test
-    fun `Turbine - pure-delta merge yields concatenated assistant content`() = runBlocking {
+    fun `Turbine - pure-delta merge yields concatenated assistant content`() = runTest {
         val fragments = listOf("Hello ", "world", "!")
         val expected = fragments.joinToString("")
 
@@ -389,14 +374,17 @@ class TimelineSyncLoopTest {
                 otid = if (idx == 0) "reply-otid-turbine" else null,
             )
         }
-        val scope = CoroutineScope(Dispatchers.IO)
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
         val sync = TimelineSyncLoop(api, "conv1", scope)
 
         sync.state.test {
             // Initial empty timeline before send.
             assertEquals(0, awaitItem().events.size)
 
-            sync.send("hello")
+            val send = async { sync.send("hello") }
+            advanceUntilIdle()
+            send.await()
 
             // Walk emissions until the assistant event reaches the full
             // concatenated content. Conflation may drop intermediate states,
@@ -417,7 +405,7 @@ class TimelineSyncLoopTest {
     }
 
     @Test
-    fun `duplicate assistant stream seq does not append terminal snapshot`() = runBlocking {
+    fun `duplicate assistant stream seq does not append terminal snapshot`() = runTest {
         val first = "The command results are:\n"
         val second = "- pwd: /opt/stacks/letta-mobile\n- whoami: root\n"
         val full = first + second
@@ -442,20 +430,13 @@ class TimelineSyncLoopTest {
                 seqId = 2,
             ),
         )
-        val scope = CoroutineScope(Dispatchers.IO)
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
         val sync = TimelineSyncLoop(api, "conv1", scope)
 
-        sync.send("run tools")
-
-        withTimeout(5_000) {
-            while (sync.state.value.findByOtid("reply-otid-dup-seq") == null) delay(10)
-            while ((sync.state.value.events.firstOrNull {
-                    it is TimelineEvent.Confirmed && it.serverId == "reply-stream"
-                }?.content?.length ?: 0) < full.length) {
-                delay(10)
-            }
-            delay(50)
-        }
+        val send = async { sync.send("run tools") }
+        advanceUntilIdle()
+        send.await()
 
         val assistant = sync.state.value.events.firstOrNull {
             it is TimelineEvent.Confirmed && it.serverId == "reply-stream"
@@ -570,7 +551,7 @@ class TimelineSyncLoopTest {
     }
 
     @Test
-    fun `streamed reasoning and assistant frames with same server id stay separate`() = runBlocking {
+    fun `streamed reasoning and assistant frames with same server id stay separate`() = runTest {
         val api = FakeSyncApi()
         api.nextStreamMessages = listOf(
             ReasoningMessage(
@@ -582,22 +563,13 @@ class TimelineSyncLoopTest {
                 contentRaw = JsonPrimitive("final answer"),
             ),
         )
-        val scope = CoroutineScope(Dispatchers.IO)
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
         val sync = TimelineSyncLoop(api, "conv1", scope)
 
-        sync.send("hello")
-
-        withTimeout(5_000) {
-            while (true) {
-                val confirmed = sync.state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
-                    .filter { it.serverId == "shared-step-id" }
-                if (
-                    confirmed.any { it.messageType == TimelineMessageType.REASONING } &&
-                    confirmed.any { it.messageType == TimelineMessageType.ASSISTANT }
-                ) break
-                delay(10)
-            }
-        }
+        val send = async { sync.send("hello") }
+        advanceUntilIdle()
+        send.await()
 
         val confirmed = sync.state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
             .filter { it.serverId == "shared-step-id" }
@@ -620,7 +592,7 @@ class TimelineSyncLoopTest {
      * we'd catch a regression of the original screenshot.
      */
     @Test
-    fun `streaming mermaid block character-by-character reassembles byte-perfectly`() = runBlocking {
+    fun `streaming mermaid block character-by-character reassembles byte-perfectly`() = runTest {
         val mermaid = "A[LLM snapshots] --> B[Coalesce?]"
         val api = FakeSyncApi()
         api.nextStreamMessages = mermaid.mapIndexed { idx, ch ->
@@ -630,20 +602,13 @@ class TimelineSyncLoopTest {
                 otid = if (idx == 0) "mermaid-otid" else null,
             )
         }
-        val scope = CoroutineScope(Dispatchers.IO)
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
         val sync = TimelineSyncLoop(api, "conv1", scope)
 
-        sync.send("draw it")
-
-        withTimeout(5_000) {
-            while (true) {
-                val content = sync.state.value.events.firstOrNull {
-                    it is TimelineEvent.Confirmed && it.serverId == "reply-mermaid"
-                }?.content
-                if (content == mermaid) break
-                delay(10)
-            }
-        }
+        val send = async { sync.send("draw it") }
+        advanceUntilIdle()
+        send.await()
 
         val assistant = sync.state.value.events.firstOrNull {
             it is TimelineEvent.Confirmed && it.serverId == "reply-mermaid"
@@ -669,22 +634,21 @@ class TimelineSyncLoopTest {
     }
 
     @Test
-    fun `reconcile swaps local user event to confirmed`() = runBlocking {
+    fun `reconcile swaps local user event to confirmed`() = runTest {
         val api = FakeSyncApi()
         api.nextStreamMessages = listOf(
             AssistantMessage(id = "reply-1", contentRaw = JsonPrimitive("OK"), otid = "reply-otid")
         )
-        val scope = CoroutineScope(Dispatchers.IO)
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
         val sync = TimelineSyncLoop(api, "conv1", scope)
 
-        val userOtid = sync.send("hello")
+        val send = async { sync.send("hello") }
+        advanceUntilIdle()
+        val userOtid = send.await()
 
         // When stream completes, the fake copies sent message + nextStreamMessages into store
         // with our client otid preserved — reconcile should then find it and swap
-        withTimeout(5_000) {
-            while (sync.state.value.findByOtid(userOtid) !is TimelineEvent.Confirmed) delay(20)
-        }
-
         val swapped = sync.state.value.findByOtid(userOtid)
         assertTrue(swapped is TimelineEvent.Confirmed)
         assertEquals("hello", swapped!!.content)
@@ -743,18 +707,17 @@ class TimelineSyncLoopTest {
     }
 
     @Test
-    fun `reconcile preserves multimodal attachments on confirmed user event`() = runBlocking {
+    fun `reconcile preserves multimodal attachments on confirmed user event`() = runTest {
         val api = FakeSyncApi()
         api.nextStreamMessages = emptyList()
-        val scope = CoroutineScope(Dispatchers.IO)
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
         val sync = TimelineSyncLoop(api, "conv1", scope)
 
         val image = MessageContentPart.Image(base64 = "AAAA", mediaType = "image/jpeg")
-        val userOtid = sync.send("caption", attachments = listOf(image))
-
-        withTimeout(5_000) {
-            while (sync.state.value.findByOtid(userOtid) !is TimelineEvent.Confirmed) delay(20)
-        }
+        val send = async { sync.send("caption", attachments = listOf(image)) }
+        advanceUntilIdle()
+        val userOtid = send.await()
 
         val swapped = sync.state.value.findByOtid(userOtid) as? TimelineEvent.Confirmed
         assertNotNull(swapped)
@@ -766,16 +729,20 @@ class TimelineSyncLoopTest {
     }
 
     @Test
-    fun `identical content sent twice produces two local events`() = runBlocking {
+    fun `identical content sent twice produces two local events`() = runTest {
         val api = FakeSyncApi()
         api.nextStreamMessages = listOf(
             AssistantMessage(id = "reply-1", contentRaw = JsonPrimitive("OK"), otid = "r1")
         )
-        val scope = CoroutineScope(Dispatchers.IO)
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
         val sync = TimelineSyncLoop(api, "conv1", scope)
 
-        val otid1 = sync.send("same")
-        val otid2 = sync.send("same")
+        val send1 = async { sync.send("same") }
+        val send2 = async { sync.send("same") }
+        advanceUntilIdle()
+        val otid1 = send1.await()
+        val otid2 = send2.await()
 
         assertTrue(otid1 != otid2)
         val e1 = sync.state.value.findByOtid(otid1)
@@ -788,17 +755,19 @@ class TimelineSyncLoopTest {
     }
 
     @Test
-    fun `concurrent sends do not collide on position or otid`() = runBlocking {
+    fun `concurrent sends do not collide on position or otid`() = runTest {
         val api = FakeSyncApi()
         api.nextStreamMessages = emptyList()   // no stream body to simplify
-        val scope = CoroutineScope(Dispatchers.IO)
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
         val sync = TimelineSyncLoop(api, "conv1", scope)
 
         // Fire 10 concurrent sends
-        val jobs = (1..10).map { i ->
-            scope.launch { sync.send("msg $i") }
+        val sends = (1..10).map { i ->
+            async { sync.send("msg $i") }
         }
-        jobs.forEach { it.join() }
+        advanceUntilIdle()
+        sends.forEach { it.await() }
 
         val timeline = sync.state.value
         assertEquals(10, timeline.events.size)
@@ -811,7 +780,7 @@ class TimelineSyncLoopTest {
     }
 
     @Test
-    fun `reconcile recovers when transient listMessages failure is followed by success`() = runBlocking {
+    fun `reconcile recovers when transient listMessages failure is followed by success`() = runTest {
         // letta-mobile-j44j: reconcileAfterSend retries transient failures
         // (IOException, 5xx) with exponential backoff before giving up.
         // With 2 injected failures and 3 total attempts configured, the
@@ -824,7 +793,8 @@ class TimelineSyncLoopTest {
         api.listMessagesFailuresBeforeSuccess = 2  // two 503s, then succeed
         api.listMessagesFailure = ApiException(503, "Service Unavailable")
 
-        val scope = CoroutineScope(Dispatchers.IO)
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
         val sync = TimelineSyncLoop(api, "conv1", scope)
 
         val collectedErrors = mutableListOf<TimelineSyncEvent.ReconcileError>()
@@ -834,14 +804,14 @@ class TimelineSyncLoopTest {
             }
         }
 
-        val userOtid = sync.send("hello")
+        val send = async { sync.send("hello") }
+        advanceUntilIdle()
+        val userOtid = send.await()
 
         // Confirmed swap only happens after retry-then-success — if retry
         // were missing, the first 503 would fall straight through to the
         // error branch and the Local would never become Confirmed.
-        withTimeout(10_000) {
-            while (sync.state.value.findByOtid(userOtid) !is TimelineEvent.Confirmed) delay(20)
-        }
+        assertTrue(sync.state.value.findByOtid(userOtid) is TimelineEvent.Confirmed)
 
         assertEquals(
             "listConversationMessages should have been called 3x (2 failures + 1 success)",
@@ -858,7 +828,7 @@ class TimelineSyncLoopTest {
     }
 
     @Test
-    fun `reconcile emits ReconcileError when retries are exhausted`() = runBlocking {
+    fun `reconcile emits ReconcileError when retries are exhausted`() = runTest {
         // letta-mobile-j44j: if listMessages keeps failing past the retry
         // budget, the loop surfaces a ReconcileError event so the UI can
         // show an error + clear the typing indicator. The streamed assistant
@@ -872,7 +842,8 @@ class TimelineSyncLoopTest {
         api.listMessagesFailuresBeforeSuccess = Int.MAX_VALUE
         api.listMessagesFailure = java.io.IOException("simulated network blip")
 
-        val scope = CoroutineScope(Dispatchers.IO)
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
         val sync = TimelineSyncLoop(api, "conv1", scope)
 
         val collectedErrors = mutableListOf<TimelineSyncEvent.ReconcileError>()
@@ -882,11 +853,9 @@ class TimelineSyncLoopTest {
             }
         }
 
-        sync.send("hello")
-
-        withTimeout(10_000) {
-            while (collectedErrors.isEmpty()) delay(20)
-        }
+        val send = async { sync.send("hello") }
+        advanceUntilIdle()
+        send.await()
 
         assertEquals(
             "Should attempt exactly 3 times before giving up",
@@ -992,7 +961,7 @@ class TimelineSyncLoopTest {
     }
 
     @Test
-    fun `reconcile does not retry on 4xx permanent errors`() = runBlocking {
+    fun `reconcile does not retry on 4xx permanent errors`() = runTest {
         // letta-mobile-j44j: 4xx responses (auth, validation) won't become
         // true on retry, so we fail fast to avoid wasting up to 1.4s of
         // backoff sleeping on a permanent error.
@@ -1001,7 +970,8 @@ class TimelineSyncLoopTest {
         api.listMessagesFailuresBeforeSuccess = Int.MAX_VALUE
         api.listMessagesFailure = ApiException(401, "Unauthorized")
 
-        val scope = CoroutineScope(Dispatchers.IO)
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
         val sync = TimelineSyncLoop(api, "conv1", scope)
 
         val collectedErrors = mutableListOf<TimelineSyncEvent.ReconcileError>()
@@ -1011,11 +981,9 @@ class TimelineSyncLoopTest {
             }
         }
 
-        sync.send("hello")
-
-        withTimeout(10_000) {
-            while (collectedErrors.isEmpty()) delay(20)
-        }
+        val send = async { sync.send("hello") }
+        advanceUntilIdle()
+        send.await()
 
         assertEquals(
             "Permanent 4xx should fail on the first attempt, no retry",
@@ -1029,7 +997,7 @@ class TimelineSyncLoopTest {
     }
 
     @Test
-    fun `retry on non-FAILED event is a no-op`() = runBlocking {
+    fun `retry on non-FAILED event is a no-op`() = runTest {
         // letta-mobile-lbmy: the fix moves the read of findByOtid inside
         // writeMutex.withLock. The test here is a behavioural check that
         // retry() on a non-existent otid returns without mutating state —
@@ -1038,12 +1006,15 @@ class TimelineSyncLoopTest {
         // TOCTOU property itself.
         val api = FakeSyncApi()
         api.nextStreamMessages = emptyList()
-        val scope = CoroutineScope(Dispatchers.IO)
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
         val sync = TimelineSyncLoop(api, "conv1", scope)
 
         // Retry on an otid that doesn't exist at all — must not throw, must not
         // mutate state.
-        sync.retry("client-nonexistent")
+        val retry = async { sync.retry("client-nonexistent") }
+        advanceUntilIdle()
+        retry.await()
         assertEquals(0, sync.state.value.events.size)
 
         scope.coroutineContext.job.cancel()
@@ -1139,7 +1110,7 @@ class TimelineSyncLoopTest {
     }
 
     @Test
-    fun `streamed tool_return attaches to tool_call event and flips approvalDecided`() = runBlocking {
+    fun `streamed tool_return attaches to tool_call event and flips approvalDecided`() = runTest {
         val api = FakeSyncApi()
         val reqId = "req-2"
         val tcid = "toolu_xyz"
@@ -1157,20 +1128,13 @@ class TimelineSyncLoopTest {
                 toolReturnRaw = JsonPrimitive("file_a\nfile_b\n"),
             ),
         )
-        val scope = CoroutineScope(Dispatchers.IO)
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
         val sync = TimelineSyncLoop(api, "conv1", scope)
 
-        sync.send("list files")
-
-        // Wait for the stream to drain and ingest.
-        withTimeout(2000) {
-            while (true) {
-                val confirmed = sync.state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
-                val tc = confirmed.firstOrNull { it.messageType == TimelineMessageType.TOOL_CALL }
-                if (tc != null && tc.toolReturnContent != null) break
-                delay(20)
-            }
-        }
+        val send = async { sync.send("list files") }
+        advanceUntilIdle()
+        send.await()
 
         val confirmed = sync.state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
         val bubbleByType = confirmed.groupBy { it.messageType }
@@ -1428,24 +1392,21 @@ class TimelineSyncLoopTest {
      * and must NOT emit `streamSubscriber.error` or `streamSubscriber.networkError`.
      */
     @Test
-    fun `EXPIRED run is classified as idle, not error`() = runBlocking {
+    fun `EXPIRED run is classified as idle, not error`() = runTest {
         // Clear the Telemetry ring so we can look at an empty slate. This is
         // necessary because other tests sharing the same JVM worker may have
         // left unrelated events behind.
         com.letta.mobile.util.Telemetry.clear()
 
         val api = ExpiredThenIdleApi()
-        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
 
         // Instantiating TimelineSyncLoop starts the subscriber coroutine in init{}.
-        val sync = TimelineSyncLoop(api, "conv-gqz3", scope)
+        TimelineSyncLoop(api, "conv-gqz3", scope)
 
         // Let the subscriber attempt one stream call.
-        withTimeout(2_000) {
-            while (api.streamCallCount < 1) delay(10)
-        }
-        // Let the catch branch complete its Telemetry emission.
-        delay(100)
+        advanceUntilIdle()
 
         // Telemetry ring is newest-first (addFirst semantics), so we just
         // filter the whole thing by (tag, name) rather than slicing.
@@ -1985,7 +1946,6 @@ class TimelineSyncLoopImageRestoreTest {
         val sync = TimelineSyncLoop(api, "conv-text", scope, pendingLocalStore = store)
 
         sync.send(content = "just words")
-        kotlinx.coroutines.delay(50)
         scope.coroutineContext.job.cancel()
 
         assertEquals("Text-only sends must not be persisted", 0, store.rows.size)
