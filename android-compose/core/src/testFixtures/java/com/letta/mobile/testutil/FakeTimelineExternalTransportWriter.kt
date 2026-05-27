@@ -11,6 +11,7 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
     val sentLocals: MutableList<LocalMarker> = mutableListOf()
     val failedLocals: MutableList<LocalMarker> = mutableListOf()
     val reconciledSends: MutableList<ReconciledSend> = mutableListOf()
+    val repairedCursors: MutableList<CursorRepair> = mutableListOf()
 
     override suspend fun appendExternalTransportLocal(
         conversationId: String,
@@ -43,6 +44,10 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
         reconciledSends += ReconciledSend(conversationId, agentId, externalConversationId, otid)
     }
 
+    override suspend fun repairExpiredConversationCursor(conversationId: String, fallbackSeq: Long?) {
+        repairedCursors += CursorRepair(conversationId, fallbackSeq)
+    }
+
     override suspend fun clearExternalTransportActive(conversationId: String) {
         // No-op in test fake
     }
@@ -69,5 +74,10 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
         val agentId: String,
         val externalConversationId: String,
         val otid: String,
+    )
+
+    data class CursorRepair(
+        val conversationId: String,
+        val fallbackSeq: Long?,
     )
 }

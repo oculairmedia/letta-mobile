@@ -85,29 +85,7 @@ open class TimelineRepository @Inject constructor(
             )
             return it
         }
-        // Mutex protects the map-insert critical section only (not hydrate).
-        // Hydrate used to run inside the mutex which serialized all concurrent
-        // warmup calls — an observed cause of "oldish state": conv-1598043a
-        // wasn't hydrated until ~15s after app start because earlier slots in
-        // the warmup list each held the lock for ~500ms. letta-mobile-mge5.
-        val loop = loopsMutex.withLock {
-            loops[conversationId]?.let { return@withLock it }
-            Telemetry.event(
-                "TimelineRepo", "getOrCreate.cacheMiss",
-                "conversationId" to conversationId,
-            )
-            val created = TimelineSyncLoop(
-                messageApi = messageApi,
-                conversationId = conversationId,
-                scope = scope,
-                ingestedListenerProvider = { ingestedListener },
-                pendingLocalStore = pendingLocalStore,
-                conversationCursorStore = conversationCursorStore,
-            )
-            loops[conversationId] = created
-            evictEldestLoopsIfNeededLocked()
-            created
-        }
+        val loop = getOrCreateLoopWithoutHydrate(conversationId)
         // Hydrate OUTSIDE the mutex so parallel callers don't block each other.
         // If two callers race on the same conversationId, the second will find
         // the loop in the map and short-circuit at the fast path — hydrate
@@ -126,6 +104,31 @@ open class TimelineRepository @Inject constructor(
         }
         return loop
     }
+
+    private suspend fun getOrCreateLoopWithoutHydrate(conversationId: String): TimelineSyncLoop =
+        // Mutex protects the map-insert critical section only (not hydrate).
+        // Hydrate used to run inside the mutex which serialized all concurrent
+        // warmup calls — an observed cause of "oldish state": conv-1598043a
+        // wasn't hydrated until ~15s after app start because earlier slots in
+        // the warmup list each held the lock for ~500ms. letta-mobile-mge5.
+        loopsMutex.withLock {
+            loops[conversationId]?.let { return@withLock it }
+            Telemetry.event(
+                "TimelineRepo", "getOrCreate.cacheMiss",
+                "conversationId" to conversationId,
+            )
+            val created = TimelineSyncLoop(
+                messageApi = messageApi,
+                conversationId = conversationId,
+                scope = scope,
+                ingestedListenerProvider = { ingestedListener },
+                pendingLocalStore = pendingLocalStore,
+                conversationCursorStore = conversationCursorStore,
+            )
+            loops[conversationId] = created
+            evictEldestLoopsIfNeededLocked()
+            created
+        }
 
     /**
      * Number of cached sync loops currently owned by the singleton registry.
@@ -247,6 +250,33 @@ open class TimelineRepository @Inject constructor(
         )
     }
 
+    override suspend fun repairExpiredConversationCursor(conversationId: String, fallbackSeq: Long?) {
+        conversationCursorStore.clearCursor(conversationId)
+        val loop = getOrCreateLoopWithoutHydrate(conversationId)
+        runCatching {
+            withContext(Dispatchers.IO) {
+                loop.hydrate(
+                    limit = CURSOR_REPAIR_HYDRATE_LIMIT,
+                    recordConversationCursor = true,
+                    fallbackCursorSeq = fallbackSeq,
+                )
+            }
+        }.onSuccess {
+            Telemetry.event(
+                "TimelineRepo", "cursorExpired.repaired",
+                "conversationId" to conversationId,
+                "fallbackSeq" to (fallbackSeq ?: -1L),
+            )
+        }.onFailure { t ->
+            Telemetry.error(
+                "TimelineRepo", "cursorExpired.repairFailed", t,
+                "conversationId" to conversationId,
+                "fallbackSeq" to (fallbackSeq ?: -1L),
+            )
+            throw t
+        }
+    }
+
     /** Force a reload — clears the cached loop for the conversation. */
     suspend fun clear(conversationId: String) = loopsMutex.withLock {
         loops.remove(conversationId)?.let { loop ->
@@ -275,5 +305,6 @@ open class TimelineRepository @Inject constructor(
 
     private companion object {
         const val DEFAULT_MAX_CACHED_LOOPS = 32
+        const val CURSOR_REPAIR_HYDRATE_LIMIT = 100
     }
 }
