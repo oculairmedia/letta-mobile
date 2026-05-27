@@ -183,6 +183,17 @@ internal fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutp
             "mergedToolCalls" to mergedCalls.size,
             "conversationId" to conversationId,
         )
+        textMerge.defensiveTelemetryName()?.let { eventName ->
+            Telemetry.event(
+                "TimelineSync", eventName,
+                "serverId" to confirmed.serverId,
+                "messageType" to message.messageType,
+                "oldLen" to oldText.length,
+                "newLen" to newText.length,
+                "mergedLen" to mergedText.length,
+                "conversationId" to conversationId,
+            )
+        }
         return output()
     }
 
@@ -217,6 +228,15 @@ internal fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutp
             null
         }
     )
+}
+
+private fun StreamTextMergeResult.defensiveTelemetryName(): String? = when (branch) {
+    StreamTextMergeBranch.CUMULATIVE -> "streamSubscriber.cumulativeSnapshotReplaced"
+    StreamTextMergeBranch.STALE -> "streamSubscriber.staleFrameDropped"
+    StreamTextMergeBranch.SUFFIX_DUPLICATE -> "streamSubscriber.endsWithDropped"
+    StreamTextMergeBranch.EMPTY_INCOMING,
+    StreamTextMergeBranch.EQUAL,
+    StreamTextMergeBranch.APPEND -> null
 }
 
 /**

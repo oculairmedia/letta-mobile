@@ -7,15 +7,20 @@ import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.model.UserMessage
+import com.letta.mobile.util.Telemetry
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
-import java.time.Instant
 import kotlinx.serialization.json.JsonPrimitive
+import org.junit.After
 import org.junit.Test
 import org.junit.jupiter.api.Tag
 
 @Tag("unit")
 class TimelineStreamReducerTest {
+    @After
+    fun tearDown() {
+        Telemetry.clear()
+    }
 
     @Test
     fun `approval response marks matching approval request decided`() {
@@ -139,6 +144,62 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `stale cumulative prefix frames are dropped instead of appended`() {
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "assistant-1",
+                contentRaw = JsonPrimitive("Standing by. Send a message."),
+                seqId = 1,
+            )
+        ).next
+
+        val output = reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "assistant-1",
+                contentRaw = JsonPrimitive("Standing by."),
+                seqId = 2,
+            ),
+        )
+
+        (output.next.events.single() as TimelineEvent.Confirmed).content shouldBe
+            "Standing by. Send a message."
+    }
+
+    @Test
+    fun `matching-tail frames are dropped instead of duplicated`() {
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "assistant-1",
+                contentRaw = JsonPrimitive("Standing by. Send a message."),
+                seqId = 1,
+            )
+        ).next
+
+        val output = reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "assistant-1",
+                contentRaw = JsonPrimitive("Send a message."),
+                seqId = 2,
+            ),
+        )
+
+        (output.next.events.single() as TimelineEvent.Confirmed).content shouldBe
+            "Standing by. Send a message."
+    }
+
+    @Test
+    fun `defensive stream merge branches emit named telemetry`() {
+        telemetryNamesForMerge("Stand", "Standing by.")
+            .contains("streamSubscriber.cumulativeSnapshotReplaced") shouldBe true
+        telemetryNamesForMerge("Standing by.", "Stand")
+            .contains("streamSubscriber.staleFrameDropped") shouldBe true
+        telemetryNamesForMerge("Standing by.", "by.")
+            .contains("streamSubscriber.endsWithDropped") shouldBe true
+    }
+
+    @Test
     fun `stream text merge only uses snapshot branches when seq ids are available`() {
         mergeStreamText(
             existing = "Hello",
@@ -238,4 +299,24 @@ class TimelineStreamReducerTest {
     )
 
     private fun timeline(): Timeline = Timeline(conversationId = "conv-test")
+
+    private fun telemetryNamesForMerge(existing: String, incoming: String): Set<String> {
+        Telemetry.clear()
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "assistant-telemetry",
+                contentRaw = JsonPrimitive(existing),
+                seqId = 1,
+            )
+        ).next
+        reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "assistant-telemetry",
+                contentRaw = JsonPrimitive(incoming),
+                seqId = 2,
+            ),
+        )
+        return Telemetry.snapshot().map { it.name }.toSet()
+    }
 }
