@@ -244,9 +244,10 @@ class HeadlessTimelineReplaySession(
                 store.hydrate(conversationId, event.messages)
                 hydrationsApplied++
                 messagesHydrated += event.messages.size
+                if (event.countAsIngested) messagesIngested += event.messages.size
                 step(
                     frameIndex = frameIndex,
-                    frameType = "rest_hydrate",
+                    frameType = event.frameType,
                     frameId = event.frameId,
                     ingested = true,
                     ignoredReason = null,
@@ -846,6 +847,8 @@ sealed class HeadlessReplayEvent {
         override val sourceIndex: Int,
         val messages: List<LettaMessage>,
         val frameId: String?,
+        val frameType: String = "rest_hydrate",
+        val countAsIngested: Boolean = false,
         override val timestamp: String?,
     ) : HeadlessReplayEvent()
 
@@ -897,6 +900,8 @@ private fun String.toReplayEventOrNull(
             sourceIndex = sourceIndex,
             messages = messages,
             frameId = element.frameId(),
+            frameType = captureKind,
+            countAsIngested = true,
             timestamp = element.eventTimestamp(),
         )
     }
@@ -989,10 +994,6 @@ private fun JsonObject.toRecordedFrameJsonOrNull(): JsonObject? {
     if (frame is JsonObject) return frame
     return this.takeIf { it["type"] != null }
 }
-
-private fun String.toCaptureEventJsonOrNull(): JsonObject? =
-    runCatching { replayJson.parseToJsonElement(this).jsonObject }.getOrNull()
-        ?.takeIf { it["kind"] != null }
 
 private fun MutableMap<String, Int>.increment(key: String) {
     this[key] = (this[key] ?: 0) + 1
