@@ -145,14 +145,23 @@ class TimelineSyncLoop(
      * the two transports use different message IDs for the same logical
      * events, so serverId-based dedup misses them.
      *
-     * Auto-expires after [EXTERNAL_TRANSPORT_TIMEOUT_MS] to prevent a stuck
-     * flag from permanently suppressing SSE if TurnDone is never received
-     * (e.g., WS disconnect mid-turn).
+     * letta-mobile-y8tvn: this flag used to auto-expire after 120s as a
+     * fallback against "stuck flag if TurnDone never arrives." That fallback
+     * is no longer needed and was actively harmful — it killed conversations
+     * after exactly 120s of idle because the flag would expire, SSE would
+     * resume ingesting, and the next WS-delivered turn would get dual-
+     * ingested with different ids on each transport (dedup misses).
+     *
+     * The flag is now structurally owned: it is set when WS ingests a frame
+     * for this conversation, and cleared only by explicit
+     * [clearExternalTransportActive] calls from the send coordinator on
+     * disconnect / send-error / completion. The shim's transport-exclusivity
+     * contract (welcome handshake) + WS keepalive (lcp-fwo) make this safe:
+     * a half-open connection is now structurally detected via WS keepalive
+     * within ~40s and triggers a real disconnect → real explicit clear.
      */
     @Volatile
     private var externalTransportActive = false
-    @Volatile
-    private var externalTransportSetAtMs = 0L
 
     // Serialize all mutations so append/replace logic is safe under concurrency.
     private val writeMutex = Mutex()
@@ -961,7 +970,6 @@ class TimelineSyncLoop(
     companion object {
         private const val TAG = "TimelineSync"
 
-        private const val EXTERNAL_TRANSPORT_TIMEOUT_MS = 120_000L
         private const val STREAM_DORMANT_MS = 3_000L
         private const val STREAM_HEARTBEAT_EXPECTED_MS = 30_000L
         private const val STREAM_SILENCE_TIMEOUT_MS = STREAM_HEARTBEAT_EXPECTED_MS * 3
@@ -1029,9 +1037,12 @@ class TimelineSyncLoop(
     }
 
     internal suspend fun submitStreamEvent(message: LettaMessage) {
-        if (externalTransportActive &&
-            System.currentTimeMillis() - externalTransportSetAtMs < EXTERNAL_TRANSPORT_TIMEOUT_MS
-        ) {
+        // letta-mobile-y8tvn: the flag is structurally owned by the WS
+        // session — set on every WS ingest, cleared only by explicit
+        // clearExternalTransportActive() from the send coordinator. No
+        // timer-based auto-expiry: that previously killed conversations
+        // exactly 120s after the last WS frame.
+        if (externalTransportActive) {
             Telemetry.event(
                 "TimelineSync", "streamSubscriber.skippedDualIngest",
                 "conversationId" to conversationId,
@@ -1040,20 +1051,11 @@ class TimelineSyncLoop(
             )
             return
         }
-        if (externalTransportActive) {
-            externalTransportActive = false
-            Telemetry.event(
-                "TimelineSync", "streamSubscriber.externalTransportExpired",
-                "conversationId" to conversationId,
-                "ageMs" to (System.currentTimeMillis() - externalTransportSetAtMs),
-            )
-        }
         eventQueue.send(TimelineGatewayEvent.StreamMessage(message))
     }
 
     internal suspend fun ingestStreamEvent(message: LettaMessage) {
         externalTransportActive = true
-        externalTransportSetAtMs = System.currentTimeMillis()
         val ack = CompletableDeferred<Unit>()
         eventQueue.send(TimelineGatewayEvent.StreamMessage(message, ack))
         ack.await()

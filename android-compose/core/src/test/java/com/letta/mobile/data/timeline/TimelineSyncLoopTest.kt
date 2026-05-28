@@ -29,6 +29,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.runCurrent
@@ -486,6 +487,64 @@ class TimelineSyncLoopTest {
         val assistant = sync.state.value.events.single() as TimelineEvent.Confirmed
         assertEquals("gateway-otid", assistant.otid)
         assertEquals("Hello world", assistant.content)
+        scope.coroutineContext.job.cancel()
+    }
+
+    @Test
+    fun `externalTransportActive does not auto-expire after long idle (letta-mobile-y8tvn)`() = runTest {
+        val api = FakeSyncApi()
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
+        val sync = TimelineSyncLoop(api, "conv-no-expiry", scope)
+
+        // Establish WS as the canonical transport: one WS ingest sets the
+        // externalTransportActive flag for this conversation.
+        sync.ingestStreamEvent(
+            AssistantMessage(
+                id = "ws-first",
+                contentRaw = JsonPrimitive("delivered via WS"),
+                otid = "otid-ws-first",
+            )
+        )
+        advanceUntilIdle()
+        assertEquals(1, sync.state.value.events.size)
+
+        // Simulate a long idle window — much longer than the previously-
+        // hardcoded 120s auto-expiry. The flag must stay set because no
+        // explicit clearExternalTransportActive() has been called.
+        advanceTimeBy(kotlin.time.Duration.parse("200s"))
+
+        // SSE delivers what would be a duplicate of the WS-ingested message
+        // (different id but same logical content — exactly the dual-ingest
+        // class we suppress). The flag should still be active, so SSE is
+        // suppressed and no second event is appended.
+        sync.submitStreamEvent(
+            AssistantMessage(
+                id = "sse-dup-attempt",
+                contentRaw = JsonPrimitive("delivered via WS"),
+                otid = "otid-sse-dup",
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(
+            "SSE frame must be suppressed even after >120s idle — flag is structurally owned, not timer-based",
+            1,
+            sync.state.value.events.size,
+        )
+
+        // Explicit clear restores SSE ingestion.
+        sync.clearExternalTransportActive()
+        sync.submitStreamEvent(
+            AssistantMessage(
+                id = "sse-after-clear",
+                contentRaw = JsonPrimitive("delivered via SSE"),
+                otid = "otid-sse-clear",
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(2, sync.state.value.events.size)
         scope.coroutineContext.job.cancel()
     }
 
