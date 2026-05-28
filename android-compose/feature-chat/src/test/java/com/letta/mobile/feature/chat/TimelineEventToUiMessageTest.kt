@@ -305,6 +305,26 @@ class TimelineEventToUiMessageTest {
     }
 
     @Test
+    fun `failed USER Local events render as error bubbles`() {
+        val ev = TimelineEvent.Local(
+            position = 1.0,
+            otid = "cm-android-failed",
+            content = "did this land?",
+            role = Role.USER,
+            sentAt = Instant.parse("2026-05-27T12:00:00Z"),
+            deliveryState = DeliveryState.FAILED,
+            messageType = TimelineMessageType.USER,
+        )
+
+        val ui = timelineEventToUiMessage(ev)!!
+
+        assertEquals("user", ui.role)
+        assertEquals("did this land?", ui.content)
+        assertFalse(ui.isPending)
+        assertTrue(ui.isError)
+    }
+
+    @Test
     fun `client mode local tool call uses per-call completed timestamp for execution time`() {
         val startedAt = Instant.parse("2026-05-10T12:00:00Z")
         val completedAt = startedAt.plusMillis(250)

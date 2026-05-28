@@ -5,7 +5,6 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.buildContentParts
 import com.letta.mobile.data.model.toJsonArray
 import com.letta.mobile.data.transport.HelloFrame
-import com.letta.mobile.data.transport.PongFrame
 import com.letta.mobile.data.transport.SendMessageFrame
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.ServerFrameSerializer
@@ -63,6 +62,7 @@ internal class AdminShimRecorder {
         val client = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.MILLISECONDS)
+            // Protocol-level WS ping/pong is handled by OkHttp; JSON frames never see control frames.
             .pingInterval(45, TimeUnit.SECONDS)
             .build()
         val request = Request.Builder()
@@ -124,14 +124,6 @@ internal class AdminShimRecorder {
                             recordRaw(writer, counter.next(), "outbound", send)
                             webSocket.send(send)
                         }
-                    }
-                    is ServerFrame.Ping -> {
-                        val pong = PongFrame(
-                            id = UUID.randomUUID().toString(),
-                            ts = nowIso(),
-                        ).encodeJson(CliJson)
-                        recordRaw(writer, counter.next(), "outbound", pong)
-                        webSocket.send(pong)
                     }
                     is ServerFrame.TurnDone -> {
                         if (shouldSendMessage) {

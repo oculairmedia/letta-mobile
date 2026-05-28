@@ -291,6 +291,47 @@ class WsChatSendCoordinatorTest {
     }
 
     @Test
+    fun `keepalive disconnect marks active send failed without timeout banner`() = runTest {
+        val wsChatBridge = mockBridge(sendAccepted = true)
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val uiState = MutableStateFlow(ChatUiState(agentName = "Agent", isStreaming = true, isAgentTyping = true))
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = wsChatBridge,
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = uiState,
+            clearComposerAfterSend = {},
+            activeConversationId = { "conv-1" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+
+        coordinator.send("one").join()
+        val local = timelineRepository.externalLocals.single()
+
+        coordinator.handleEvent(
+            WsTimelineEvent.Disconnected(
+                code = ChannelTransport.KEEPALIVE_PONG_TIMEOUT_CLOSE_CODE,
+                reason = "pong timeout",
+            )
+        )
+        advanceUntilIdle()
+
+        assertNull(uiState.value.error)
+        assertEquals(false, uiState.value.isStreaming)
+        assertEquals(false, uiState.value.isAgentTyping)
+        assertEquals(
+            listOf(FakeTimelineExternalTransportWriter.LocalMarker("conv-1", local.otid)),
+            timelineRepository.failedLocals,
+        )
+        assertEquals(listOf("conv-1"), timelineRepository.clearedActiveConversations)
+    }
+
+    @Test
     fun `cancel clears only queued sends for active conversation`() = runTest {
         val wsChatBridge = mockBridge(sendResults = listOf(false, false, true), cancelResult = true)
         val timelineRepository = FakeTimelineExternalTransportWriter()

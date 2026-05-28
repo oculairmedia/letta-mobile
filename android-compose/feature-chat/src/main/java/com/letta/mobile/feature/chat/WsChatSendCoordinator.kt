@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.runtime.toRuntimeEventDrafts
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
+import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.runtime.BackendDescriptor
@@ -540,17 +541,38 @@ internal class WsChatSendCoordinator(
                 )
             }
             is WsTimelineEvent.Disconnected -> {
+                val conversationId = activeWsConversationId ?: activeConversationId()
+                activeWsOtid?.let { otid ->
+                    if (conversationId != null) {
+                        timelineRepository.markExternalTransportLocalFailed(conversationId, otid)
+                    } else {
+                        Telemetry.event(
+                            "AdminChatVM", "ws.activeSend.failedWithoutConversation",
+                            "otid" to otid,
+                            "disconnectCode" to event.code,
+                        )
+                    }
+                }
                 preConversationMessageDeltas.clear()
                 clearPendingSends("disconnect")
-                val conversationId = activeWsConversationId ?: activeConversationId()
                 if (conversationId != null) {
                     timelineRepository.clearExternalTransportActive(conversationId)
                 }
+                val nextError = if (event.code == ChannelTransport.KEEPALIVE_PONG_TIMEOUT_CLOSE_CODE) {
+                    null
+                } else {
+                    event.reason.ifBlank { "WebSocket disconnected" }
+                }
                 uiState.value = uiState.value.copy(
-                    error = event.reason.ifBlank { "WebSocket disconnected" },
+                    error = nextError,
                     isStreaming = false,
                     isAgentTyping = false,
                 )
+                activeWsOtid = null
+                activeWsTurnId = null
+                stopReasonForTurn = null
+                usageRecordedForTurn = false
+                bufferedErrorMessage = null
             }
             is WsTimelineEvent.UserActionOutcome -> recordRuntimeEvent(event)
         }

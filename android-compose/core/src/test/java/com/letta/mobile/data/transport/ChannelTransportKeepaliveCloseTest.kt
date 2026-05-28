@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport
 
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -19,12 +20,12 @@ import okhttp3.mockwebserver.RecordedRequest
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-private const val PING_TEST_TIMEOUT_MS = 2_000L
+private const val KEEPALIVE_CLOSE_TEST_TIMEOUT_MS = 5_000L
 
-class ChannelTransportPingTest {
+class ChannelTransportKeepaliveCloseTest {
     @Test
-    fun `responds to shim ping with app-level pong`() = runBlocking {
-        val shim = PingShimServer()
+    fun `redials when shim closes for protocol keepalive timeout`() = runBlocking {
+        val shim = KeepaliveCloseShimServer()
         val transport = ChannelTransport(RunCursorStore.inMemory())
 
         try {
@@ -35,39 +36,51 @@ class ChannelTransportPingTest {
                 clientVersion = "test",
             )
 
-            withTimeout(PING_TEST_TIMEOUT_MS) {
+            val firstHello = shim.frames.receiveType("hello")
+            withTimeout(KEEPALIVE_CLOSE_TEST_TIMEOUT_MS) {
+                transport.state.first { it is ChannelTransport.State.Connected }
+            }
+            shim.closeFirstSocketAsKeepaliveTimeout()
+            val secondHello = shim.frames.receiveType("hello")
+
+            withTimeout(KEEPALIVE_CLOSE_TEST_TIMEOUT_MS) {
                 transport.state.first { it is ChannelTransport.State.Connected }
             }
 
-            val pong = shim.frames.receiveType("pong")
-
-            assertEquals("pong", pong.stringValue("type"))
-            assertEquals("ping-1", pong.stringValue("id"))
+            assertEquals("hello", firstHello.stringValue("type"))
+            assertEquals("hello", secondHello.stringValue("type"))
+            assertEquals(2, shim.helloCount.get())
         } finally {
             transport.disconnect()
             shim.close()
         }
     }
 
-    private class PingShimServer {
+    private class KeepaliveCloseShimServer {
         private val json = Json {
             ignoreUnknownKeys = true
             explicitNulls = false
         }
         private val server = MockWebServer()
         val frames = Channel<JsonObject>(Channel.UNLIMITED)
+        private val sockets = Channel<WebSocket>(Channel.UNLIMITED)
+        val helloCount = AtomicInteger(0)
 
         init {
             server.dispatcher = object : Dispatcher() {
                 override fun dispatch(request: RecordedRequest): MockResponse =
                     MockResponse().withWebSocketUpgrade(
                         object : WebSocketListener() {
+                            override fun onOpen(webSocket: WebSocket, response: Response) {
+                                sockets.trySend(webSocket)
+                            }
+
                             override fun onMessage(webSocket: WebSocket, text: String) {
                                 val frame = json.parseToJsonElement(text).jsonObject
                                 frames.trySend(frame)
                                 if (frame.stringValue("type") == "hello") {
-                                    webSocket.send(welcomeFrame())
-                                    webSocket.send(pingFrame())
+                                    val count = helloCount.incrementAndGet()
+                                    webSocket.send(welcomeFrame(count))
                                 }
                             }
 
@@ -84,27 +97,31 @@ class ChannelTransportPingTest {
 
         fun baseUrl(): String = server.url("/").toString().removeSuffix("/")
 
+        suspend fun closeFirstSocketAsKeepaliveTimeout() {
+            withTimeout(KEEPALIVE_CLOSE_TEST_TIMEOUT_MS) {
+                sockets.receive()
+            }.close(
+                ChannelTransport.KEEPALIVE_PONG_TIMEOUT_CLOSE_CODE,
+                "pong timeout",
+            )
+        }
+
         fun close() {
             frames.close()
+            sockets.close()
             server.shutdown()
         }
 
-        private fun welcomeFrame(): String =
+        private fun welcomeFrame(index: Int): String =
             """
-            {"v":1,"type":"welcome","id":"welcome-1","ts":"2026-05-27T00:00:00Z",
-             "server_id":"server","session_id":"session"}
-            """.trimIndent()
-
-        private fun pingFrame(): String =
-            """
-            {"v":1,"type":"ping","id":"ping-1","ts":"2026-05-27T00:00:01Z"}
+            {"v":1,"type":"welcome","id":"welcome-$index","ts":"2026-05-27T00:00:00Z",
+             "server_id":"server","session_id":"session-$index"}
             """.trimIndent()
     }
-
 }
 
 private suspend fun Channel<JsonObject>.receiveType(type: String): JsonObject =
-    withTimeout(PING_TEST_TIMEOUT_MS) {
+    withTimeout(KEEPALIVE_CLOSE_TEST_TIMEOUT_MS) {
         while (true) {
             val frame = receive()
             if (frame.stringValue("type") == type) return@withTimeout frame
