@@ -521,7 +521,20 @@ private fun MeasuredChatRenderItem(
     content: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
-    val heightFloorPx = geometryState.heightFloorFor(signature, isStreaming)
+    val isPinching = LocalChatIsPinching.current
+    // letta-mobile-8vivd: while the user is actively pinching, suppress the
+    // height-floor from the geometry cache. The floor exists to keep streaming
+    // items stable across re-measures (so a bubble that just landed at H px
+    // can't suddenly report H-30 mid-stream and jitter), but during pinch the
+    // user explicitly asked everything to be smaller — applying the floor at
+    // the previous-scale value leaves a phantom gap at the bottom of the
+    // LazyColumn because items can't shrink below the cached floor.
+    //
+    // Skipping the floor during pinch lets items take their actual reflowed
+    // size each frame. The cache itself is unchanged (signature already keys
+    // on chatFontScaleBucket, so the committed scale's floor is still valid
+    // and ready to apply the moment the gesture ends).
+    val heightFloorPx = if (isPinching) 0 else geometryState.heightFloorFor(signature, isStreaming)
     val minHeightModifier = if (heightFloorPx > 0) {
         Modifier.heightIn(min = with(density) { heightFloorPx.toDp() })
     } else {
@@ -533,11 +546,19 @@ private fun MeasuredChatRenderItem(
             .fillMaxWidth()
             .then(minHeightModifier)
             .onSizeChanged { size ->
-                geometryState.recordMeasuredHeight(
-                    signature = signature,
-                    heightPx = size.height,
-                    isStreaming = isStreaming,
-                )
+                // letta-mobile-8vivd: don't record measurements taken during a
+                // pinch into the cache — those heights are the live (mid-
+                // gesture) values which would corrupt the committed-scale
+                // cache entries. Once the gesture ends and content re-measures
+                // at the committed scale, the next onSizeChanged seeds the
+                // cache cleanly.
+                if (!isPinching) {
+                    geometryState.recordMeasuredHeight(
+                        signature = signature,
+                        heightPx = size.height,
+                        isStreaming = isStreaming,
+                    )
+                }
             },
     ) {
         content()
