@@ -109,6 +109,44 @@ internal fun ChatMessageList(
         pinchFontScaleController.syncCommittedScale(activeFontScale)
     }
 
+    // letta-mobile-8u662: viewport-bounded scale window for live pinch
+    // reflow. During a pinch we only need to drive real text re-layout for
+    // items the user can see — items composed off-screen by the LazyColumn
+    // for prefetch keep their cached committed-scale geometry until the
+    // gesture commits or they enter the window via scroll.
+    //
+    // The window is the currently-visible LazyColumn item range plus a
+    // margin proportional to the gesture's scale ratio: less margin when
+    // scaling DOWN (fewer items fit on screen so cost is bounded anyway),
+    // more margin when scaling UP (items get larger and the user might
+    // scroll mid-gesture, so prefetched items at the edges should already
+    // be at the live scale).
+    //
+    // Outside this window items see activeFontScale (the committed value)
+    // and reuse their cached geometry; inside they see liveFontScale and
+    // reflow every pointer frame. When the gesture ends, every item
+    // converges on the new committed scale and the cache re-seeds per
+    // letta-mobile-8vivd.
+    //
+    // Date separators, loading indicators, and other cheap items are
+    // outside renderItems and just see liveFontScale via the existing
+    // CompositionLocalProvider — they're one-line labels, free to reflow.
+    val scaleWindowIndexRange: IntRange = if (pinchFontScaleController.isPinching) {
+        val visible = listState.layoutInfo.visibleItemsInfo
+        if (visible.isEmpty()) {
+            IntRange.EMPTY
+        } else {
+            val visibleCount = visible.size
+            val scaleRatio = if (activeFontScale > 0f) liveFontScale / activeFontScale else 1f
+            val marginItems = (visibleCount * scaleRatio).toInt().coerceAtLeast(2)
+            val firstIdx = visible.first().index
+            val lastIdx = visible.last().index
+            (firstIdx - marginItems).coerceAtLeast(0)..(lastIdx + marginItems)
+        }
+    } else {
+        IntRange.EMPTY
+    }
+
     LaunchedEffect(pinchTick) {
         if (pinchTick > 0) {
             showFontIndicator = true
@@ -343,6 +381,23 @@ internal fun ChatMessageList(
                         val isStreamingRenderItem = state.isStreaming &&
                             newestMessageId != null &&
                             renderItem.containsMessageId(newestMessageId)
+                        // letta-mobile-8u662: during a pinch, items outside
+                        // the viewport-bounded scale window keep the committed
+                        // activeFontScale (reusing cached geometry) instead of
+                        // tracking the live gesture. The CompositionLocalProvider
+                        // up the tree provides liveFontScale globally; here we
+                        // override BACK to activeFontScale for off-window items.
+                        // The renderItems index is approximate (date separators
+                        // are injected into the LazyColumn between them, so
+                        // visible indices don't map 1:1) — the margin already
+                        // absorbs this drift.
+                        val itemSeesLiveScale = !pinchFontScaleController.isPinching ||
+                            scaleWindowIndexRange.isEmpty() ||
+                            index in scaleWindowIndexRange
+                        val perItemFontScale = if (itemSeesLiveScale) liveFontScale else activeFontScale
+                        CompositionLocalProvider(
+                            LocalChatFontScale provides perItemFontScale,
+                        ) {
                         // letta-mobile-lbur follow-up: log render item keys for dedup analysis
                         MeasuredChatRenderItem(
                             signature = geometrySignature,
@@ -449,6 +504,7 @@ internal fun ChatMessageList(
                             }
                         }
                     }
+                        } // letta-mobile-8u662: end CompositionLocalProvider(LocalChatFontScale)
                     }
 
                     if (showDate) {
