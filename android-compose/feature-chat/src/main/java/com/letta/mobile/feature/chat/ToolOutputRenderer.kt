@@ -105,7 +105,8 @@ internal fun ToolOutputRenderer(
                     (ChatMotion.instantEnter() togetherWith ChatMotion.instantExit())
                         .using(SizeTransform(clip = true) { _, _ -> ChatMotion.instantSizeSpec })
                 } else {
-                    (ChatMotion.expandEnter() togetherWith ChatMotion.expandExit())
+                    // letta-mobile-vui8q: unfurl from leading edge instead of plain vertical expand.
+                    (ChatMotion.unfurlEnter() togetherWith ChatMotion.unfurlExit())
                         .using(SizeTransform(clip = true) { _, _ -> ChatMotion.contentSizeSpec })
                 }
             },

@@ -15,10 +15,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
@@ -128,12 +130,36 @@ internal fun MessageBubbleSurface(
     // collapse/reasoning animations downstream. The Surface stays
     // size-stable; only mid-stream growth is animated.
     val isPinchingForBubble = LocalChatIsPinching.current
-    val bubbleSizeAnimation = if (isLastAssistant && !isPinchingForBubble) {
+    // letta-mobile-4ouwd: gate animateContentSize on 'has been mounted at
+    // a stable size for at least one frame.' First-paint composition can
+    // produce a measurable size delta when content does multi-pass layout
+    // (tables compute column widths in a second pass; some markdown blocks
+    // similarly). Without this gate, animateContentSize latches onto that
+    // first-paint delta and the user sees the bubble 'grow up' to its
+    // final size for table-containing messages.
+    //
+    // The flag flips on the second non-zero size measurement, so the
+    // mid-stream growth animation (the original reason this exists) still
+    // fires for subsequent text chunks landing in the streaming bubble.
+    val hasFirstPaintSettled = remember(message.id) { mutableStateOf(false) }
+    val lastObservedHeight = remember(message.id) { mutableStateOf(0) }
+    val bubbleSizeAnimation = if (isLastAssistant && !isPinchingForBubble && hasFirstPaintSettled.value) {
         Modifier.animateContentSize(
             animationSpec = ChatMotion.streamingSizeSpec,
         )
     } else {
         Modifier
+    }
+    val firstPaintGate = Modifier.onSizeChanged { size ->
+        val height = size.height
+        if (height <= 0) return@onSizeChanged
+        if (lastObservedHeight.value == 0) {
+            lastObservedHeight.value = height
+        } else if (!hasFirstPaintSettled.value) {
+            // Saw at least two non-zero measurements → first paint settled.
+            hasFirstPaintSettled.value = true
+            lastObservedHeight.value = height
+        }
     }
 
     val contentColumn: @Composable () -> Unit = {
@@ -147,7 +173,7 @@ internal fun MessageBubbleSurface(
                     horizontal = dimens.bubblePaddingHorizontal,
                     vertical = dimens.bubblePaddingVertical,
                 )
-            }).then(bubbleSizeAnimation),
+            }).then(bubbleSizeAnimation).then(firstPaintGate),
             verticalArrangement = Arrangement.spacedBy(dimens.messageSpacing),
         ) {
             // Suppress the role label header for bubble-less assistant prose

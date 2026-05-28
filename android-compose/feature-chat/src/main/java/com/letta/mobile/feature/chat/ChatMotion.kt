@@ -73,6 +73,33 @@ internal object ChatMotion {
                 shrinkTowards = shrinkTowards,
             )
 
+    // letta-mobile-vui8q: tool card unfurl. Horizontal expand from the
+    // leading edge (Alignment.Start in LTR, mirrored in RTL by Compose)
+    // combined with vertical expand for the content height, plus a soft
+    // fadeIn. Visually communicates 'the card is opening' rather than
+    // 'content appeared.' Mirrored cleanly on collapse.
+    fun unfurlEnter(): EnterTransition =
+        fadeIn(animationSpec = tween(durationMillis = EnterMillis, easing = LinearOutSlowInEasing)) +
+            expandHorizontally(
+                animationSpec = tween(durationMillis = EnterMillis, easing = LinearOutSlowInEasing),
+                expandFrom = Alignment.Start,
+            ) +
+            expandVertically(
+                animationSpec = tween(durationMillis = EnterMillis, easing = LinearOutSlowInEasing),
+                expandFrom = Alignment.Top,
+            )
+
+    fun unfurlExit(): ExitTransition =
+        fadeOut(animationSpec = tween(durationMillis = FastFadeOutMillis, easing = FastOutLinearInEasing)) +
+            shrinkHorizontally(
+                animationSpec = tween(durationMillis = ExitMillis, easing = FastOutLinearInEasing),
+                shrinkTowards = Alignment.Start,
+            ) +
+            shrinkVertically(
+                animationSpec = tween(durationMillis = ExitMillis, easing = FastOutLinearInEasing),
+                shrinkTowards = Alignment.Top,
+            )
+
     fun instantEnter(): EnterTransition = EnterTransition.None
 
     fun instantExit(): ExitTransition = ExitTransition.None

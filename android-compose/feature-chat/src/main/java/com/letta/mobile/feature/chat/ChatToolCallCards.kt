@@ -287,7 +287,12 @@ internal fun ToolCallCard(
                         (ChatMotion.instantEnter() togetherWith ChatMotion.instantExit())
                             .using(SizeTransform(clip = true) { _, _ -> ChatMotion.instantSizeSpec })
                     } else {
-                        (ChatMotion.expandEnter() togetherWith ChatMotion.expandExit())
+                        // letta-mobile-vui8q: tool card disclosure now unfurls
+                        // from the leading edge (horizontal + vertical expand
+                        // + fade) instead of a plain vertical expand. Reads
+                        // as 'the card is opening' rather than 'content
+                        // appeared.'
+                        (ChatMotion.unfurlEnter() togetherWith ChatMotion.unfurlExit())
                             .using(SizeTransform(clip = true) { _, _ -> ChatMotion.contentSizeSpec })
                     }
                 },
