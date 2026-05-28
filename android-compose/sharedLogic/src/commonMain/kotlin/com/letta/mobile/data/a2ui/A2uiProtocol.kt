@@ -76,6 +76,7 @@ val A2UI_DEFAULT_SUPPORTED_WIDGETS: List<String> = listOf(
     "Badge",
     "Tabs",
     "Accordion",
+    "Icon",
     "Image",
     "List",
     A2UI_LIST_VIEW_WIDGET_ID,

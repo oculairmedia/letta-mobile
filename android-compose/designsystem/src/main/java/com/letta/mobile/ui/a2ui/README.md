@@ -96,8 +96,8 @@ Use the Basic catalog when the UI is a generic Material control or layout
 primitive. Current Basic widget support is declared by
 `A2UI_DEFAULT_SUPPORTED_WIDGETS` and includes:
 
-- Layout and display: `Text`, `Column`, `Row`, `Card`, `Divider`, `Image`,
-  `Modal`, `Video`, `AudioPlayer`
+- Layout and display: `Text`, `Column`, `Row`, `Card`, `Divider`, `Icon`,
+  `Image`, `Modal`, `Video`, `AudioPlayer`
 - Inputs: `TextField`, `DateTimeInput`, `Checkbox`, `Switch`, `Radio`,
   `Slider`, `Stepper`, `Dropdown`, `Select`, `ChoicePicker`
 - Status and selection: `LinearProgress`, `CircularProgress`, `Chip`,
@@ -127,6 +127,55 @@ Basic-widget implementation checklist:
   filter chips; `display: "list"` or larger option sets render list rows.
 - Prefer existing typography, colors, haptics, and test-tag patterns from this
   renderer. Do not introduce one-off raw colors.
+
+## Icon Widget
+
+`Icon` renders a named vector from `LettaIcons` without fetching network media.
+Use it for status, type, and action affordance iconography inside A2UI
+surfaces.
+
+Example:
+
+```json
+{
+  "id": "statusIcon",
+  "component": "Icon",
+  "name": "Cloud",
+  "contentDescription": "Cloud status",
+  "size": "sm",
+  "tint": "primary"
+}
+```
+
+Props:
+
+- `name` or `icon`: required icon name. Lookup is case-insensitive and ignores
+  punctuation, so `CheckCircle`, `check-circle`, and `check_circle` resolve to
+  the same icon.
+- `contentDescription`, `description`, or `label`: accessibility text. If
+  omitted, the renderer uses `name`.
+- `size`: `xs`, `sm`, `md`, `lg`, a numeric dp value, or `sizeDp` / `size_dp` /
+  `dp`.
+- `tint` or `color`: Material theme role. Supported roles include `primary`,
+  `secondary`, `tertiary`, `error`, `onSurface`, `onSurfaceVariant`, `outline`,
+  container roles, and matching `on*` roles.
+
+Unknown names render an icon-sized placeholder and log an A2UI warning. Wrap
+the `Icon` in a `Button`, `Chip`, or other interactive component instead of
+adding click handlers directly to the icon.
+
+Available names:
+
+`AccessTime`, `AccountCircle`, `Add`, `Agent`, `Apps`, `Archive`,
+`ArrowBack`, `ArrowDropDown`, `ArrowDropUp`, `AutoAwesome`, `Chat`,
+`ChatOutline`, `Check`, `CheckCircle`, `ChevronDown`, `ChevronRight`,
+`ChevronUp`, `Circle`, `Clear`, `Close`, `Cloud`, `Code`, `Copy`, `Dashboard`,
+`Database`, `Delete`, `Edit`, `Error`, `ExpandLess`, `ExpandMore`,
+`ExternalLink`, `Favorite`, `FavoriteBorder`, `FileOpen`, `ForkRight`, `Help`,
+`Info`, `Inventory`, `KeyboardArrowDown`, `Key`, `Lightbulb`, `Link`,
+`LinkOff`, `ListIcon`, `ManageSearch`, `Menu`, `MoreVert`, `People`, `Pin`,
+`PinOff`, `Play`, `Psychology`, `Refresh`, `Save`, `Schema`, `Search`, `Send`,
+`Settings`, `Share`, `Sparkles`, `Star`, `Storage`, `Tool`, `ViewModule`.
 
 ## Binding Patterns
 

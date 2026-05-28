@@ -42,6 +42,7 @@ import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -109,6 +110,7 @@ import com.letta.mobile.data.a2ui.LETTA_SCHEDULE_CARD_WIDGET_ID
 import com.letta.mobile.data.a2ui.LETTA_SCHEDULE_SELECTOR_WIDGET_ID
 import com.letta.mobile.data.a2ui.resolveA2uiActionContext
 import com.letta.mobile.ui.haptics.HapticEffects
+import com.letta.mobile.ui.icons.LettaIcons
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -206,6 +208,8 @@ object A2uiTestTags {
     const val Badge = "a2ui_badge"
     const val Tabs = "a2ui_tabs"
     const val Accordion = "a2ui_accordion"
+    const val Icon = "a2ui_icon"
+    const val MissingIcon = "a2ui_missing_icon"
     const val ScheduleCard = "a2ui_schedule_card"
     const val ScheduleSelectorInput = "a2ui_schedule_selector_input"
     const val Divider = "a2ui_divider"
@@ -272,6 +276,73 @@ class A2uiLocalStateScope private constructor(
 }
 
 val LocalA2uiLocalState = compositionLocalOf<A2uiLocalStateScope?> { null }
+
+private val A2uiLettaIconsByName = mapOf(
+    "ArrowBack" to LettaIcons.ArrowBack,
+    "Close" to LettaIcons.Close,
+    "Menu" to LettaIcons.Menu,
+    "ChevronRight" to LettaIcons.ChevronRight,
+    "ChevronDown" to LettaIcons.ChevronDown,
+    "ChevronUp" to LettaIcons.ChevronUp,
+    "ExpandMore" to LettaIcons.ExpandMore,
+    "ExpandLess" to LettaIcons.ExpandLess,
+    "ArrowDropDown" to LettaIcons.ArrowDropDown,
+    "ArrowDropUp" to LettaIcons.ArrowDropUp,
+    "KeyboardArrowDown" to LettaIcons.KeyboardArrowDown,
+    "ListIcon" to LettaIcons.ListIcon,
+    "Add" to LettaIcons.Add,
+    "Edit" to LettaIcons.Edit,
+    "Delete" to LettaIcons.Delete,
+    "Save" to LettaIcons.Save,
+    "Search" to LettaIcons.Search,
+    "Clear" to LettaIcons.Clear,
+    "Refresh" to LettaIcons.Refresh,
+    "Send" to LettaIcons.Send,
+    "Copy" to LettaIcons.Copy,
+    "Share" to LettaIcons.Share,
+    "MoreVert" to LettaIcons.MoreVert,
+    "Play" to LettaIcons.Play,
+    "ManageSearch" to LettaIcons.ManageSearch,
+    "Check" to LettaIcons.Check,
+    "CheckCircle" to LettaIcons.CheckCircle,
+    "Error" to LettaIcons.Error,
+    "Info" to LettaIcons.Info,
+    "Help" to LettaIcons.Help,
+    "Circle" to LettaIcons.Circle,
+    "Agent" to LettaIcons.Agent,
+    "Tool" to LettaIcons.Tool,
+    "Chat" to LettaIcons.Chat,
+    "ChatOutline" to LettaIcons.ChatOutline,
+    "Settings" to LettaIcons.Settings,
+    "Key" to LettaIcons.Key,
+    "People" to LettaIcons.People,
+    "Cloud" to LettaIcons.Cloud,
+    "Storage" to LettaIcons.Storage,
+    "Code" to LettaIcons.Code,
+    "Schema" to LettaIcons.Schema,
+    "Dashboard" to LettaIcons.Dashboard,
+    "Apps" to LettaIcons.Apps,
+    "ViewModule" to LettaIcons.ViewModule,
+    "FileOpen" to LettaIcons.FileOpen,
+    "Inventory" to LettaIcons.Inventory,
+    "Archive" to LettaIcons.Archive,
+    "ForkRight" to LettaIcons.ForkRight,
+    "Database" to LettaIcons.Database,
+    "Favorite" to LettaIcons.Favorite,
+    "FavoriteBorder" to LettaIcons.FavoriteBorder,
+    "Star" to LettaIcons.Star,
+    "Sparkles" to LettaIcons.Sparkles,
+    "AutoAwesome" to LettaIcons.AutoAwesome,
+    "Lightbulb" to LettaIcons.Lightbulb,
+    "Psychology" to LettaIcons.Psychology,
+    "AccountCircle" to LettaIcons.AccountCircle,
+    "AccessTime" to LettaIcons.AccessTime,
+    "Link" to LettaIcons.Link,
+    "LinkOff" to LettaIcons.LinkOff,
+    "ExternalLink" to LettaIcons.ExternalLink,
+    "Pin" to LettaIcons.Pin,
+    "PinOff" to LettaIcons.PinOff,
+).mapKeys { (name, _) -> name.a2uiIconKey() }
 
 private data class A2uiLocalStateKey(
     val surfaceId: String,
@@ -451,6 +522,12 @@ private fun A2uiComponentNodeContent(
             modifier = modifier,
             renderScope = renderScope,
         )
+        "Icon" -> A2uiIcon(
+            component = component,
+            surface = surface,
+            modifier = modifier,
+            renderScope = renderScope,
+        )
         "Tabs" -> A2uiTabs(
             component = component,
             surface = surface,
@@ -575,6 +652,47 @@ private fun A2uiComponentNodeContent(
         )
         else -> A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
     }
+}
+
+@Composable
+private fun A2uiIcon(
+    component: A2uiComponent,
+    surface: A2uiSurfaceState,
+    modifier: Modifier = Modifier,
+    renderScope: A2uiRenderScope,
+) {
+    val name = resolveBindingText(component.raw["name"] ?: component.raw["icon"], surface, renderScope)
+        ?.takeIf { it.isNotBlank() }
+    val size = component.iconSize()
+    val imageVector = name?.let(::lookupA2uiIcon)
+
+    if (name == null || imageVector == null) {
+        LaunchedEffect(component.id, name) {
+            android.util.Log.w(
+                "A2UI",
+                "Unsupported A2UI Icon name=${name.orEmpty()} componentId=${component.id}",
+            )
+        }
+        A2uiSkeletonIcon(
+            modifier = modifier.testTag(A2uiTestTags.MissingIcon),
+            size = size,
+        )
+        return
+    }
+
+    val contentDescription = resolveBindingText(
+        component.raw["contentDescription"] ?: component.raw["description"] ?: component.raw["label"],
+        surface,
+        renderScope,
+    ) ?: name
+    Icon(
+        imageVector = imageVector,
+        contentDescription = contentDescription,
+        modifier = modifier
+            .size(size)
+            .testTag(A2uiTestTags.Icon),
+        tint = component.iconTint(),
+    )
 }
 
 @Composable
@@ -1926,6 +2044,19 @@ private fun A2uiSkeletonImage(modifier: Modifier = Modifier) {
 }
 
 @Composable
+private fun A2uiSkeletonIcon(
+    modifier: Modifier = Modifier,
+    size: Dp,
+) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.16f)),
+    )
+}
+
+@Composable
 private fun A2uiComponent.textStyle(): TextStyle = when (raw.stringValue("variant")) {
     "h1" -> MaterialTheme.typography.displaySmall
     "h2" -> MaterialTheme.typography.headlineLarge
@@ -3114,6 +3245,48 @@ private fun A2uiComponent.contentScale(): ContentScale =
         "none" -> ContentScale.None
         else -> ContentScale.Crop
     }
+
+private fun A2uiComponent.iconSize(): Dp =
+    raw.dpValue("sizeDp", "size_dp", "dp") ?: when (raw.stringValue("size")?.trim()?.lowercase()) {
+        "xs" -> 12.dp
+        "sm" -> 16.dp
+        "md", null, "" -> 24.dp
+        "lg" -> 32.dp
+        else -> raw.dpValue("size") ?: 24.dp
+    }
+
+@Composable
+private fun A2uiComponent.iconTint(): Color =
+    when (raw.stringValue("tint", "color")?.trim()) {
+        "primary" -> MaterialTheme.colorScheme.primary
+        "onPrimary" -> MaterialTheme.colorScheme.onPrimary
+        "primaryContainer" -> MaterialTheme.colorScheme.primaryContainer
+        "onPrimaryContainer" -> MaterialTheme.colorScheme.onPrimaryContainer
+        "secondary" -> MaterialTheme.colorScheme.secondary
+        "onSecondary" -> MaterialTheme.colorScheme.onSecondary
+        "secondaryContainer" -> MaterialTheme.colorScheme.secondaryContainer
+        "onSecondaryContainer" -> MaterialTheme.colorScheme.onSecondaryContainer
+        "tertiary" -> MaterialTheme.colorScheme.tertiary
+        "onTertiary" -> MaterialTheme.colorScheme.onTertiary
+        "tertiaryContainer" -> MaterialTheme.colorScheme.tertiaryContainer
+        "onTertiaryContainer" -> MaterialTheme.colorScheme.onTertiaryContainer
+        "error" -> MaterialTheme.colorScheme.error
+        "onError" -> MaterialTheme.colorScheme.onError
+        "errorContainer" -> MaterialTheme.colorScheme.errorContainer
+        "onErrorContainer" -> MaterialTheme.colorScheme.onErrorContainer
+        "surface" -> MaterialTheme.colorScheme.surface
+        "onSurface" -> MaterialTheme.colorScheme.onSurface
+        "surfaceVariant" -> MaterialTheme.colorScheme.surfaceVariant
+        "onSurfaceVariant", null, "" -> MaterialTheme.colorScheme.onSurfaceVariant
+        "outline" -> MaterialTheme.colorScheme.outline
+        "outlineVariant" -> MaterialTheme.colorScheme.outlineVariant
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+private fun lookupA2uiIcon(name: String) = A2uiLettaIconsByName[name.a2uiIconKey()]
+
+private fun String.a2uiIconKey(): String =
+    filter { it.isLetterOrDigit() }.lowercase()
 
 private fun A2uiComponent.inputValue(
     value: String,

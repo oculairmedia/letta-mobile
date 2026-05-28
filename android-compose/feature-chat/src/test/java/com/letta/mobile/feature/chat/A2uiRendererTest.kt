@@ -1436,6 +1436,29 @@ class A2uiRendererTest {
     }
 
     @Test
+    fun iconWidgetRendersKnownLettaIconName() {
+        val manager = iconSurfaceManager(name = "Cloud", contentDescription = "Cloud status")
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+        }
+
+        composeRule.onNodeWithTag(A2uiTestTags.Icon).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Cloud status").assertIsDisplayed()
+    }
+
+    @Test
+    fun iconWidgetRendersPlaceholderForUnknownName() {
+        val manager = iconSurfaceManager(name = "NotARealIcon")
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(surfaceId = SurfaceId, surfaceManager = manager)
+        }
+
+        composeRule.onNodeWithTag(A2uiTestTags.MissingIcon).assertIsDisplayed()
+    }
+
+    @Test
     fun buttonActionResolvesBoundContextAgainstCurrentDataModel() {
         val manager = bookingFormSurfaceManager()
         val actions = mutableListOf<A2uiAction>()
@@ -2276,6 +2299,29 @@ private fun chipSurfaceManager(root: String): A2uiSurfaceManager {
                   ]}},
                   {"version":"v0.9","updateDataModel":{"surfaceId":"$SurfaceId","path":"/filters/done","value":false}},
                   {"version":"v0.9","updateDataModel":{"surfaceId":"$SurfaceId","path":"/unreadCount","value":2}}
+                ]
+                """.trimIndent(),
+            ),
+        )
+    )
+    return manager
+}
+
+private fun iconSurfaceManager(
+    name: String,
+    contentDescription: String = name,
+): A2uiSurfaceManager {
+    val manager = A2uiSurfaceManager()
+    manager.applyMessages(
+        decodeA2uiMessages(
+            A2uiProtocolJson.Default,
+            A2uiProtocolJson.Default.parseToJsonElement(
+                """
+                [
+                  {"version":"v0.9","createSurface":{"surfaceId":"$SurfaceId","catalogId":"basic"}},
+                  {"version":"v0.9","updateComponents":{"surfaceId":"$SurfaceId","root":"statusIcon","components":[
+                    {"id":"statusIcon","component":"Icon","name":"$name","contentDescription":"$contentDescription","size":"sm","tint":"primary"}
+                  ]}}
                 ]
                 """.trimIndent(),
             ),
