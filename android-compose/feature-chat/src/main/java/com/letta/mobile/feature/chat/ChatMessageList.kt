@@ -586,11 +586,20 @@ private fun MeasuredChatRenderItem(
     // the previous-scale value leaves a phantom gap at the bottom of the
     // LazyColumn because items can't shrink below the cached floor.
     //
-    // Skipping the floor during pinch lets items take their actual reflowed
-    // size each frame. The cache itself is unchanged (signature already keys
-    // on chatFontScaleBucket, so the committed scale's floor is still valid
-    // and ready to apply the moment the gesture ends).
-    val heightFloorPx = if (isPinching) 0 else geometryState.heightFloorFor(signature, isStreaming)
+    // letta-mobile-75nad: the height floor also leaks across user-driven
+    // expand/collapse events for items whose expansion state is NOT in the
+    // chat UI state (notably tool cards, which use local `var expanded by
+    // remember` for their disclosure toggle). The streaming floor is bucket-
+    // keyed (without tool card expansion in the key) and monotone-up, so
+    // collapsing a tool card leaves it floored at its expanded height ->
+    // dead space below the item.
+    //
+    // Fix: only apply the floor while the item is STREAMING. Non-streaming
+    // items rely on Compose's natural measurement (the cache is still seeded
+    // via onSizeChanged for streaming-stability lookups; we just don't force
+    // a min size on items that aren't actively growing).
+    val applyFloor = isStreaming && !isPinching
+    val heightFloorPx = if (applyFloor) geometryState.heightFloorFor(signature, isStreaming) else 0
     val minHeightModifier = if (heightFloorPx > 0) {
         Modifier.heightIn(min = with(density) { heightFloorPx.toDp() })
     } else {
