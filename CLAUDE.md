@@ -36,6 +36,7 @@ export JAVA_HOME="/path/to/jdk-26"
 | `android-compose/app/` | UI screens, ViewModels, navigation, Hilt DI |
 
 **Important Directories:**
+- `designsystem/src/main/java/com/letta/mobile/ui/a2ui/README.md` - A2UI renderer and catalog authoring guide
 - `app/src/main/java/com/letta/mobile/ui/screens/` — All screen composables
 - `app/src/main/java/com/letta/mobile/ui/navigation/` — Nav graph, shared transitions
 - `core/src/main/java/com/letta/mobile/data/api/` — Letta API client and endpoint interfaces

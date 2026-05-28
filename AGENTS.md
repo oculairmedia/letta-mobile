@@ -162,6 +162,10 @@ The `.github/workflows/release.yml` workflow picks up the tag, builds the signed
 
 Use these rules for all new UI work and UI refactors in this repo. The app already uses Material 3 broadly; the goal is to use it **systematically**.
 
+For A2UI renderer or catalog-authoring work, read
+[`android-compose/designsystem/src/main/java/com/letta/mobile/ui/a2ui/README.md`](android-compose/designsystem/src/main/java/com/letta/mobile/ui/a2ui/README.md)
+before changing widget payloads, catalog IDs, bindings, or renderer dispatch.
+
 ### 1. Stable chrome, expressive content
 
 - Treat app bars, drawers, and other navigation chrome as **stable structure**.
