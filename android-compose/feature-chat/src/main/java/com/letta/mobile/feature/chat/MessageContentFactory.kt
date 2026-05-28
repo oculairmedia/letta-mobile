@@ -20,49 +20,8 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.components.MarkdownText
 import com.letta.mobile.ui.components.StreamingMarkdownText
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
-import com.letta.mobile.ui.theme.LocalChatFontScale
 import com.letta.mobile.ui.theme.chatTypography
-import com.letta.mobile.ui.theme.scaledBy
 import kotlinx.collections.immutable.toImmutableList
-
-internal object GeneratedUiRenderer : MessageContentRenderer {
-    override fun canRender(message: UiMessage): Boolean = message.generatedUi != null
-
-    @Composable
-    override fun Render(
-        message: UiMessage,
-        textColor: Color,
-        modifier: Modifier,
-        onGeneratedUiMessage: ((String) -> Unit)?,
-        isStreaming: Boolean,
-    ) {
-        val generatedUi = message.generatedUi ?: return
-        Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (message.content.isNotBlank()) {
-                if (message.role == "assistant") {
-                    AssistantResponseText(
-                        messageId = message.id,
-                        text = message.content,
-                        textColor = textColor,
-                        isStreaming = isStreaming,
-                    )
-                } else {
-                    MarkdownText(text = message.content, textColor = textColor)
-                }
-            }
-
-            val renderer = GeneratedUiRegistry.resolve(generatedUi.name)
-            if (renderer != null) {
-                renderer.Render(
-                    component = generatedUi,
-                    onGeneratedUiMessage = onGeneratedUiMessage,
-                )
-            } else {
-                GeneratedUiFallbackCard(component = generatedUi)
-            }
-        }
-    }
-}
 
 internal interface MessageContentRenderer {
     fun canRender(message: UiMessage): Boolean
@@ -656,22 +615,7 @@ internal object ToolCallRenderer : MessageContentRenderer {
 
 internal fun shouldAnimateToolCallEntrance(isStreaming: Boolean): Boolean = isStreaming
 
-@Composable
-private fun GeneratedUiFallbackCard(component: com.letta.mobile.data.model.UiGeneratedComponent) {
-    val fontScale = LocalChatFontScale.current
-    GeneratedUiCard(title = component.name) {
-        component.fallbackText?.takeIf { it.isNotBlank() }?.let {
-            Text(text = it, style = MaterialTheme.typography.bodyMedium.scaledBy(fontScale))
-        }
-        Text(
-            text = component.propsJson,
-            style = MaterialTheme.typography.bodySmall.scaledBy(fontScale),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-internal val defaultRenderers = listOf(GeneratedUiRenderer, ToolCallRenderer, TextMessageRenderer)
+internal val defaultRenderers = listOf(ToolCallRenderer, TextMessageRenderer)
 
 internal fun resolveRenderer(message: UiMessage): MessageContentRenderer {
     return defaultRenderers.firstOrNull { it.canRender(message) } ?: TextMessageRenderer
