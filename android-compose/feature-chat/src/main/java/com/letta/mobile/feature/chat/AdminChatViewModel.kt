@@ -480,10 +480,30 @@ internal class AdminChatViewModel @Inject constructor(
                 shimBackendDetector.refresh(config)
             }
         }
+        observeA2uiSurfaceState()
         observeA2uiEvents()
         observeA2uiActionOutcomes()
         observeTransportState()
         chatSessionInitializer.run()
+    }
+
+    private fun observeA2uiSurfaceState() {
+        viewModelScope.launch {
+            a2uiSurfaceManager.surfaces.collect { surfaces ->
+                publishA2uiSurfaces(surfaces)
+            }
+        }
+    }
+
+    private fun publishA2uiSurfaces(surfaces: Map<String, A2uiSurfaceState>) {
+        val next = surfaces.toPersistentMap()
+        _uiState.update { current ->
+            if (current.a2uiSurfaces == next) {
+                current
+            } else {
+                current.copy(a2uiSurfaces = next)
+            }
+        }
     }
 
     private fun observeA2uiEvents() {
@@ -492,10 +512,11 @@ internal class AdminChatViewModel @Inject constructor(
                 event.conversationId?.let(::ensureA2uiConversation)
                 a2uiLiveEventSeen = true
                 a2uiSurfaceManager.apply(event)
+                val surfaces = a2uiSurfaceManager.surfaces.value.toPersistentMap()
                 val frames = event.toDebugFrames()
                 _uiState.update { current ->
                     current.copy(
-                        a2uiSurfaces = a2uiSurfaceManager.surfaces.value.toPersistentMap(),
+                        a2uiSurfaces = surfaces,
                         a2uiDebugFrames = if (frames.isEmpty()) {
                             current.a2uiDebugFrames
                         } else {

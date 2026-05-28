@@ -5,9 +5,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,12 +14,10 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -37,6 +32,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -75,6 +71,7 @@ import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.isExpandedWidth
+import kotlinx.collections.immutable.ImmutableMap
 import kotlin.math.max
 
 /**
@@ -541,7 +538,7 @@ private fun ChatContent(
                 )
             }
             A2uiSurfaceStack(
-                surfaces = state.a2uiSurfaces.values,
+                surfaces = state.a2uiSurfaces,
                 resolvedActionCounters = state.a2uiResolvedActionCounters,
                 onAction = onA2uiAction,
                 modifier = Modifier
@@ -555,53 +552,29 @@ private fun ChatContent(
 
 @Composable
 private fun A2uiSurfaceStack(
-    surfaces: Collection<A2uiSurfaceState>,
+    surfaces: ImmutableMap<String, A2uiSurfaceState>,
     resolvedActionCounters: Map<String, Int>,
     onAction: (A2uiAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (surfaces.isEmpty()) return
-    val orderedSurfaces = remember(surfaces) { surfaces.sortedBy(A2uiSurfaceState::surfaceId) }
+    val orderedSurfaces = surfaces.values.sortedBy(A2uiSurfaceState::surfaceId)
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         orderedSurfaces.forEach { surface ->
             key(surface.surfaceId) {
-                val scrollState = rememberScrollState()
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = A2uiSurfaceMaxHeight),
-                ) {
-                    A2uiSurfaceRenderer(
-                        surface = surface,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(scrollState)
-                            .padding(end = 6.dp),
-                        onAction = onAction,
-                        actionResolutionToken = resolvedActionCounters[surface.surfaceId] ?: 0,
-                    )
-                    if (scrollState.maxValue > 0) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.CenterEnd)
-                                .width(3.dp)
-                                .height(48.dp)
-                                .background(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.48f),
-                                    shape = RoundedCornerShape(2.dp),
-                                ),
-                        )
-                    }
-                }
+                A2uiSurfaceRenderer(
+                    surface = surface,
+                    modifier = Modifier.fillMaxWidth(),
+                    onAction = onAction,
+                    actionResolutionToken = resolvedActionCounters[surface.surfaceId] ?: 0,
+                )
             }
         }
     }
 }
-
-private val A2uiSurfaceMaxHeight = 420.dp
 
 @Composable
 private fun ErrorContent(
