@@ -4,10 +4,13 @@ import com.letta.mobile.ui.theme.LettaCodeFont
 
 import android.util.Patterns
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -16,9 +19,13 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -59,15 +66,21 @@ fun MarkdownText(
 ) {
     if (text.isBlank()) return
 
+    val renderText = remember(text) { exposeA2uiJsonTagsAsCodeFences(text) }
+    if (renderText != text) {
+        MarkdownTextRaw(text = renderText, modifier = modifier, textColor = textColor)
+        return
+    }
+
     // Pre-pass: if the text contains display-math fences ($$…$$) OR a
     // plausible inline-math span ($…$), split into alternating Markdown /
     // MathBlock segments. Display-math is block-level (stacked column);
     // inline-math is interleaved with prose (wrapping row). Cheap fast-path
     // when neither marker is present.
-    val hasDisplay = text.contains("$$")
-    val hasInline = !hasDisplay && text.contains('$') && containsLikelyInlineMath(text)
+    val hasDisplay = renderText.contains("$$")
+    val hasInline = !hasDisplay && renderText.contains('$') && containsLikelyInlineMath(renderText)
     if (hasDisplay || hasInline) {
-        val blockSegments = remember(text) { splitDisplayMathSegments(text) }
+        val blockSegments = remember(renderText) { splitDisplayMathSegments(renderText) }
         val hasBlockSplit = blockSegments.any { it is MathSegment.Math } && blockSegments.size > 1
         val hasAnyInline = blockSegments
             .filterIsInstance<MathSegment.Text>()
@@ -97,7 +110,7 @@ fun MarkdownText(
         }
     }
 
-    MarkdownTextRaw(text = text, modifier = modifier, textColor = textColor)
+    MarkdownTextRaw(text = renderText, modifier = modifier, textColor = textColor)
 }
 
 /**
@@ -322,6 +335,49 @@ internal fun autolinkBareUrls(text: String): String {
     return result.toString()
 }
 
+internal fun exposeA2uiJsonTagsAsCodeFences(text: String): String {
+    if (!text.contains("<a2ui-json", ignoreCase = true)) return text
+
+    val ignoredRanges = findCodeFenceRanges(text) + findInlineCodeRanges(text)
+    val result = StringBuilder()
+    var lastEnd = 0
+    var changed = false
+
+    for (match in a2uiJsonTagRegex.findAll(text)) {
+        val tagStart = match.range.first
+        if (ignoredRanges.any { tagStart in it }) continue
+
+        result.append(text.substring(lastEnd, tagStart))
+        result.append(wrapA2uiJsonFallbackCodeFence(match.groupValues[1]))
+        lastEnd = match.range.last + 1
+        changed = true
+    }
+
+    if (!changed) return text
+    result.append(text.substring(lastEnd))
+    return result.toString()
+}
+
+private fun wrapA2uiJsonFallbackCodeFence(rawContent: String): String {
+    val content = rawContent.trim().ifEmpty { "{}" }
+    val fence = "`".repeat((content.longestBacktickRun() + 1).coerceAtLeast(3))
+    return "\n\n${fence}a2ui-json\n$content\n$fence\n\n"
+}
+
+private fun String.longestBacktickRun(): Int {
+    var longest = 0
+    var current = 0
+    forEach { char ->
+        if (char == '`') {
+            current += 1
+            longest = maxOf(longest, current)
+        } else {
+            current = 0
+        }
+    }
+    return longest
+}
+
 /**
  * Strip trailing punctuation commonly not part of URLs.
  * Common cases: "Check https://example.com." or "See (https://example.com)."
@@ -337,7 +393,7 @@ private fun stripTrailingPunctuation(url: String): String {
 /** Find ranges of code fences (```...```) to exclude from URL linkification. */
 private fun findCodeFenceRanges(text: String): List<IntRange> {
     val ranges = mutableListOf<IntRange>()
-    val regex = Regex("```[\\s\\S]*?```")
+    val regex = Regex("""(?m)^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1\s*$""")
     for (match in regex.findAll(text)) {
         ranges.add(match.range)
     }
@@ -364,6 +420,11 @@ private fun findMarkdownLinkRanges(text: String): List<IntRange> {
     }
     return ranges
 }
+
+private val a2uiJsonTagRegex = Regex(
+    pattern = """<a2ui-json\b[^>]*>([\s\S]*?)</a2ui-json>""",
+    options = setOf(RegexOption.IGNORE_CASE),
+)
 
 /** Internal renderer that handles a single non-math chunk via the Markdown lib. */
 @Composable
@@ -503,6 +564,11 @@ private fun CodeFenceWithHeader(
     val (language, codeText) = remember(content, node) {
         extractCodeFenceInfo(content, node)
     }
+    val capA2uiFallback = language.equals("a2ui-json", ignoreCase = true) &&
+        (codeText.length > A2UI_JSON_FALLBACK_COLLAPSE_CHAR_LIMIT ||
+            codeText.lineSequence().count() > A2UI_JSON_FALLBACK_COLLAPSE_LINE_LIMIT)
+    var expanded by remember(content) { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
 
     Surface(
         shape = RoundedCornerShape(8.dp),
@@ -523,6 +589,11 @@ private fun CodeFenceWithHeader(
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         modifier = Modifier.weight(1f),
                     )
+                    if (capA2uiFallback) {
+                        TextButton(onClick = { expanded = !expanded }) {
+                            Text(if (expanded) "Show less" else "Show all")
+                        }
+                    }
                     IconButton(
                         onClick = {
                             clipboardManager.setText(AnnotatedString(codeText))
@@ -555,6 +626,15 @@ private fun CodeFenceWithHeader(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .then(
+                        if (capA2uiFallback && !expanded) {
+                            Modifier
+                                .heightIn(max = A2UI_JSON_FALLBACK_COLLAPSED_MAX_HEIGHT)
+                                .verticalScroll(scrollState)
+                        } else {
+                            Modifier
+                        }
+                    )
                     .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
                 contentAlignment = Alignment.TopCenter,
             ) {
@@ -593,3 +673,7 @@ private fun extractCodeFenceInfo(content: String, node: ASTNode): Pair<String, S
     val codeText = codeLines.joinToString("").trimEnd()
     return language to codeText
 }
+
+private val A2UI_JSON_FALLBACK_COLLAPSED_MAX_HEIGHT = 240.dp
+private const val A2UI_JSON_FALLBACK_COLLAPSE_CHAR_LIMIT = 1_600
+private const val A2UI_JSON_FALLBACK_COLLAPSE_LINE_LIMIT = 18

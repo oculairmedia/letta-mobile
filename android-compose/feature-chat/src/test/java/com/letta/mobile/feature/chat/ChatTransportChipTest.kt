@@ -19,6 +19,34 @@ class ChatTransportChipTest {
     val composeRule = createComposeRule()
 
     @Test
+    fun restTransportChipIsVisible() {
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            ChatTransportChip(
+                transport = ChatTransport.Rest,
+                a2uiFrameCount = 0,
+            )
+        }
+
+        composeRule
+            .onNodeWithContentDescription("Chat transport: REST")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun wsA2uiTransportChipShowsCatalogAndFrameCount() {
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            ChatTransportChip(
+                transport = ChatTransport.WsConnected(a2uiEnabled = true, catalog = "basic"),
+                a2uiFrameCount = 3,
+            )
+        }
+
+        composeRule
+            .onNodeWithContentDescription("Chat transport: WS · A2UI basic · 3")
+            .assertIsDisplayed()
+    }
+
+    @Test
     fun cleanWsCloseIsDistinguishedFromAbnormalClose() {
         composeRule.setLettaTestContent(useChatTheme = false) {
             ChatTransportChip(
