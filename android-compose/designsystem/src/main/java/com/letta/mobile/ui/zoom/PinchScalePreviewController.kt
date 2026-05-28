@@ -25,8 +25,27 @@ class PinchScalePreviewController(
     var transientScale by mutableFloatStateOf(1f)
         private set
 
-    private var baseScale = 1f
+    private var _baseScale by mutableFloatStateOf(1f)
     private var pendingCommittedScale: Float? = null
+
+    private var baseScale: Float
+        get() = _baseScale
+        set(value) {
+            _baseScale = value
+        }
+
+    /**
+     * The live effective scale during a pinch — i.e. `baseScale * transientScale`,
+     * clamped to [minScale, maxScale]. While [isPinching] is true this value
+     * tracks the gesture per-frame and is what callers should use to drive
+     * real text re-layout (as opposed to a `graphicsLayer` bitmap-scale).
+     *
+     * While not pinching this returns the most recent committed scale, so
+     * readers can use it as a single source of truth and don't have to
+     * conditionally fall back to the hoisted activeFontScale.
+     */
+    val effectiveScale: Float
+        get() = (baseScale * transientScale).coerceIn(minScale, maxScale)
 
     fun begin(activeScale: Float) {
         baseScale = activeScale.coerceIn(minScale, maxScale)

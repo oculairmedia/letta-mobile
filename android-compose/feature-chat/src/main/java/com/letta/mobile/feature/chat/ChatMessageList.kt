@@ -38,8 +38,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -51,6 +49,7 @@ import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.DateSeparator
 import com.letta.mobile.ui.components.ScrollToBottomFab
 import com.letta.mobile.ui.theme.LettaSpacing
+import com.letta.mobile.ui.theme.LocalChatFontScale
 import com.letta.mobile.ui.theme.LocalChatIsPinching
 import com.letta.mobile.ui.theme.chatDimens
 import com.letta.mobile.ui.theme.chatShapes
@@ -93,7 +92,18 @@ internal fun ChatMessageList(
     val pinchFontScaleController = remember {
         PinchScalePreviewController(minScale = 0.7f, maxScale = 1.6f, step = 0.02f)
     }
-    val visualFontScale = pinchFontScaleController.visualScaleFor(activeFontScale)
+    // letta-mobile-6261e: drive real text re-layout during pinch instead of a
+    // graphicsLayer bitmap scale. During a gesture the controller's
+    // effectiveScale tracks the pointer frame-by-frame; we re-provide
+    // LocalChatFontScale below so every Text/markdown block reads the live
+    // value and Compose re-measures + reflows per frame. When not pinching,
+    // effectiveScale equals the committed activeFontScale, so this path is
+    // safe steady-state too.
+    val liveFontScale = if (pinchFontScaleController.isPinching) {
+        pinchFontScaleController.effectiveScale
+    } else {
+        activeFontScale
+    }
     SideEffect {
         pinchFontScaleController.syncCommittedScale(activeFontScale)
     }
@@ -266,7 +276,22 @@ internal fun ChatMessageList(
         // letta-mobile-5e0f.r2: provide LocalChatIsPinching to
         // the entire chat content tree so animateContentSize
         // sites can suppress themselves during the gesture.
-        CompositionLocalProvider(LocalChatIsPinching provides suppressPinchLayoutAnimations) {
+        //
+        // letta-mobile-6261e: also override LocalChatFontScale with the
+        // controller's live effectiveScale so text re-measures + reflows
+        // every pointer frame during a pinch. The previous implementation
+        // applied a `graphicsLayer { scaleX = visualFontScale ... }` to
+        // the LazyColumn which bitmap-scaled the rendered output without
+        // re-laying out. That looked OK but felt static — text didn't
+        // reflow until the gesture committed. Now reflow is continuous.
+        // ChatTypography is already memoized on fontScale in LettaChatTheme,
+        // so feeding distinct values per frame allocates one ChatTypography
+        // per unique scale and downstream readers recompose only when the
+        // scale actually changes.
+        CompositionLocalProvider(
+            LocalChatIsPinching provides suppressPinchLayoutAnimations,
+            LocalChatFontScale provides liveFontScale,
+        ) {
             LazyColumn(
                 state = listState,
                 // Use the chat theme's compact gutter so assistant prose,
@@ -277,11 +302,6 @@ internal fun ChatMessageList(
                     vertical = LettaSpacing.cardGap,
                 ),
                 reverseLayout = true,
-                modifier = Modifier.graphicsLayer {
-                    scaleX = visualFontScale
-                    scaleY = visualFontScale
-                    transformOrigin = TransformOrigin(0.5f, 0.5f)
-                },
             ) {
                 // letta-mobile-vcky.b2: the thinking glow moved out of the
                 // list and into a Box overlay above the ChatComposer (see
@@ -458,11 +478,13 @@ internal fun ChatMessageList(
         )
 
         if (showFontIndicator) {
-            // The indicator reflects the committed font scale. During the
-            // active gesture, visual scaling comes from transientPinchScale;
-            // activeFontScale changes when the pinch commits on lift.
+            // letta-mobile-6261e: indicator now tracks the live effective
+            // scale during a gesture (so the user sees the real % they're
+            // pinching toward) and falls back to the committed scale when
+            // not pinching. Previously it only updated on commit because
+            // the visual scaling was bitmap-based and indicator could lie.
             Text(
-                text = "${(activeFontScale * 100).toInt()}%",
+                text = "${(liveFontScale * 100).toInt()}%",
                 style = MaterialTheme.typography.headlineMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
