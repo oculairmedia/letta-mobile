@@ -1,72 +1,39 @@
 package com.letta.mobile.feature.chat
 
-import com.letta.mobile.data.a2ui.A2uiSurfaceManager
-import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.a2ui.A2uiMessage
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class A2uiHistoryExtractorTest {
     @Test
-    fun `extract strips historical tags and replays surface messages`() {
+    fun `extract strips valid a2ui blocks and returns decoded messages`() {
         val extraction = A2uiHistoryExtractor.extract(
-            listOf(
-                message(
-                    content = """
-                    Before
-                    <a2ui-json>
-                    [
-                      {"version":"v0.9","createSurface":{"surfaceId":"surface-1","catalogId":"basic"}},
-                      {"version":"v0.9","updateComponents":{"surfaceId":"surface-1","root":"title","components":[
-                        {"id":"title","component":"Text","text":{"literalString":"Recovered surface"}}
-                      ]}}
-                    ]
-                    </a2ui-json>
-                    After
-                    """.trimIndent(),
-                )
-            )
+            """
+            Intro
+            <a2ui-json>
+            [
+              {"version":"v0.9","createSurface":{"surfaceId":"s1","catalogId":"basic"}},
+              {"version":"v0.9","deleteSurface":{"surfaceId":"s1"}}
+            ]
+            </a2ui-json>
+            Outro
+            """.trimIndent()
         )
 
-        assertFalse(extraction.messages.single().content.contains("<a2ui-json>"))
-        assertFalse(extraction.messages.single().content.contains("Recovered surface"))
-        assertTrue(extraction.messages.single().content.contains("Before"))
-        assertEquals(2, extraction.a2uiMessages.size)
-
-        val manager = A2uiSurfaceManager()
-        manager.applyMessages(extraction.a2uiMessages)
-        assertEquals("title", manager.surface("surface-1")!!.rootComponentId)
+        assertEquals("Intro\n\nOutro", extraction.content)
+        assertEquals(2, extraction.messages.size)
+        assertTrue(extraction.messages[0] is A2uiMessage.CreateSurface)
+        assertTrue(extraction.messages[1] is A2uiMessage.DeleteSurface)
     }
 
     @Test
-    fun `extract preserves deleteSurface order so deleted history does not resurrect`() {
-        val extraction = A2uiHistoryExtractor.extract(
-            listOf(
-                message(
-                    content = """
-                    <a2ui-json>
-                    [
-                      {"version":"v0.9","createSurface":{"surfaceId":"surface-1","catalogId":"basic"}},
-                      {"version":"v0.9","deleteSurface":{"surfaceId":"surface-1"}}
-                    ]
-                    </a2ui-json>
-                    """.trimIndent(),
-                )
-            )
-        )
+    fun `extract leaves invalid a2ui block visible`() {
+        val raw = "<a2ui-json>{not-json}</a2ui-json>"
 
-        val manager = A2uiSurfaceManager()
-        manager.applyMessages(extraction.a2uiMessages)
+        val extraction = A2uiHistoryExtractor.extract(raw)
 
-        assertNull(manager.surface("surface-1"))
+        assertEquals(raw, extraction.content)
+        assertEquals(emptyList<A2uiMessage>(), extraction.messages)
     }
-
-    private fun message(content: String): UiMessage = UiMessage(
-        id = "msg-1",
-        role = "assistant",
-        content = content,
-        timestamp = "2026-05-28T00:00:00Z",
-    )
 }

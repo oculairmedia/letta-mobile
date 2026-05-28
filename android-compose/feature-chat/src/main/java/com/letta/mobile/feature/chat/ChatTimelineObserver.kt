@@ -42,7 +42,8 @@ internal class ChatTimelineObserver(
     private val isFollowingDuplicateInitialMessageInFlight: () -> Boolean,
     private val clearFollowingDuplicateInitialMessageInFlight: () -> Unit,
     private val collapseCompletedRunsIfStreamingFinished: (previous: ChatUiState, next: ChatUiState) -> ChatUiState,
-    private val replayA2uiHistory: (List<A2uiMessage>) -> Map<String, A2uiSurfaceState>,
+    private val syncA2uiHistorySnapshot: (conversationId: String, messages: List<A2uiMessage>) -> Map<String, A2uiSurfaceState> =
+        { _, _ -> emptyMap() },
     private val projectionDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     private var observerJob: Job? = null
@@ -127,11 +128,8 @@ internal class ChatTimelineObserver(
                             prefix = prefix,
                         )
                     }
-                    val extraction = A2uiHistoryExtractor.extract(projection.ui)
-                    val ui = extraction.messages
-                    val replayedA2uiSurfaces = extraction.a2uiMessages
-                        .takeIf { it.isNotEmpty() }
-                        ?.let(replayA2uiHistory)
+                    val ui = projection.ui
+                    val a2uiSurfaces = syncA2uiHistorySnapshot(conversationId, projection.a2uiMessages)
                     val tailIsAssistant = projection.tailIsAssistant
                     val anyLettaServerLocalPending = projection.anyLettaServerLocalPending
                     val clearLoading = ui.isNotEmpty()
@@ -166,8 +164,8 @@ internal class ChatTimelineObserver(
                     uiState.value = collapseCompletedRunsIfStreamingFinished(
                         prev,
                         prev.copy(
-                            messages = ui.toImmutableList(),
-                            a2uiSurfaces = replayedA2uiSurfaces?.toPersistentMap() ?: prev.a2uiSurfaces,
+                            messages = ui,
+                            a2uiSurfaces = a2uiSurfaces.toPersistentMap(),
                             isLoadingMessages = if (clearLoading) false else prev.isLoadingMessages,
                             isStreaming = nextIsStreaming,
                             isAgentTyping = nextIsAgentTyping,
@@ -220,7 +218,12 @@ internal class ChatTimelineObserver(
         timeline: Timeline,
         prefix: List<UiMessage>,
     ): TimelineProjection {
-        val live = timeline.events.mapNotNull { timelineEventToUiMessage(it) }
+        val a2uiMessages = mutableListOf<A2uiMessage>()
+        val live = timeline.events.mapNotNull { event ->
+            val uiMessage = timelineEventToUiMessage(event) ?: return@mapNotNull null
+            val normalized = uiMessage.extractA2uiHistoryInto(a2uiMessages)
+            normalized.takeUnless { it.isEmptyAfterA2uiExtraction() }
+        }
         val combined = combineOlderPrefix(prefix, live)
         val ui = combined.toImmutableList()
         val tailIsAssistant = timeline.events.lastOrNull().let {
@@ -235,13 +238,31 @@ internal class ChatTimelineObserver(
             tailIsAssistant = tailIsAssistant,
             anyLettaServerLocalPending = anyLettaServerLocalPending,
             anyConfirmed = ui.any { !it.isPending },
+            a2uiMessages = a2uiMessages,
         )
     }
+
+    private fun UiMessage.extractA2uiHistoryInto(out: MutableList<A2uiMessage>): UiMessage {
+        if (role != "assistant" || content.isBlank()) return this
+        val extraction = A2uiHistoryExtractor.extract(content)
+        if (extraction.messages.isEmpty()) return this
+        out += extraction.messages
+        return copy(content = extraction.content)
+    }
+
+    private fun UiMessage.isEmptyAfterA2uiExtraction(): Boolean =
+        content.isBlank() &&
+            generatedUi == null &&
+            toolCalls.isNullOrEmpty() &&
+            approvalRequest == null &&
+            approvalResponse == null &&
+            attachments.isEmpty()
 
     private data class TimelineProjection(
         val ui: ImmutableList<UiMessage>,
         val tailIsAssistant: Boolean,
         val anyLettaServerLocalPending: Boolean,
         val anyConfirmed: Boolean,
+        val a2uiMessages: List<A2uiMessage>,
     )
 }

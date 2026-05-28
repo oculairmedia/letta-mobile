@@ -144,9 +144,10 @@ internal class AdminChatViewModel @Inject constructor(
         ChatUiState(agentName = initialAgentName.orEmpty())
     )
     private val a2uiSurfaceManager = A2uiSurfaceManager()
-    private var a2uiHistoryConversationId: String? = null
-    private var a2uiHistorySurfaces: Map<String, A2uiSurfaceState> = emptyMap()
     private val pendingA2uiActions = mutableMapOf<String, PendingA2uiAction>()
+    private var a2uiConversationId: String? = null
+    private var a2uiHistorySignature: Int? = null
+    private var a2uiLiveEventSeen = false
     private var a2uiThinkingTimeoutJob: Job? = null
     private var a2uiThinkingStartMessageCount: Int? = null
     private var nextA2uiDebugFrameId = 0L
@@ -268,7 +269,7 @@ internal class AdminChatViewModel @Inject constructor(
         isFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight },
         clearFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = false },
         collapseCompletedRunsIfStreamingFinished = ::collapseCompletedRunsIfStreamingFinished,
-        replayA2uiHistory = ::replayA2uiHistory,
+        syncA2uiHistorySnapshot = ::syncA2uiHistorySnapshot,
     )
     private val chatConversationCoordinator = ChatConversationCoordinator(
         scope = viewModelScope,
@@ -488,11 +489,13 @@ internal class AdminChatViewModel @Inject constructor(
     private fun observeA2uiEvents() {
         viewModelScope.launch {
             wsChatBridge.a2uiEvents.collect { event ->
+                event.conversationId?.let(::ensureA2uiConversation)
+                a2uiLiveEventSeen = true
                 a2uiSurfaceManager.apply(event)
                 val frames = event.toDebugFrames()
                 _uiState.update { current ->
                     current.copy(
-                        a2uiSurfaces = mergedA2uiSurfaces().toPersistentMap(),
+                        a2uiSurfaces = a2uiSurfaceManager.surfaces.value.toPersistentMap(),
                         a2uiDebugFrames = if (frames.isEmpty()) {
                             current.a2uiDebugFrames
                         } else {
@@ -506,16 +509,6 @@ internal class AdminChatViewModel @Inject constructor(
             }
         }
     }
-
-    private fun replayA2uiHistory(messages: List<A2uiMessage>): Map<String, A2uiSurfaceState> {
-        val historyManager = A2uiSurfaceManager()
-        historyManager.applyMessages(messages)
-        a2uiHistorySurfaces = historyManager.surfaces.value
-        return mergedA2uiSurfaces()
-    }
-
-    private fun mergedA2uiSurfaces(): Map<String, A2uiSurfaceState> =
-        a2uiHistorySurfaces + a2uiSurfaceManager.surfaces.value
 
     /**
      * Derives the [ChatTransport] surfaced in the top-bar chip from the
@@ -565,6 +558,30 @@ internal class AdminChatViewModel @Inject constructor(
             conversationId = conversationId,
             requestId = requestId,
         )
+    }
+
+    private fun ensureA2uiConversation(conversationId: String) {
+        if (a2uiConversationId == conversationId) return
+        a2uiConversationId = conversationId
+        a2uiHistorySignature = null
+        a2uiLiveEventSeen = false
+        a2uiSurfaceManager.clear()
+        _uiState.update { it.copy(a2uiSurfaces = persistentMapOf()) }
+    }
+
+    private fun syncA2uiHistorySnapshot(
+        conversationId: String,
+        messages: List<A2uiMessage>,
+    ): Map<String, A2uiSurfaceState> {
+        ensureA2uiConversation(conversationId)
+        if (!a2uiLiveEventSeen) {
+            val signature = messages.hashCode()
+            if (signature != a2uiHistorySignature) {
+                a2uiSurfaceManager.replaceWith(messages)
+                a2uiHistorySignature = signature
+            }
+        }
+        return a2uiSurfaceManager.surfaces.value
     }
 
     private fun observeA2uiActionOutcomes() {
@@ -878,14 +895,7 @@ internal class AdminChatViewModel @Inject constructor(
      * left the UI locked onto the first-selected conversation's timeline.
      */
     private fun startTimelineObserver(conversationId: String) {
-        if (a2uiHistoryConversationId != conversationId) {
-            a2uiHistoryConversationId = conversationId
-            a2uiHistorySurfaces = emptyMap()
-            a2uiSurfaceManager.clear()
-            _uiState.update { current ->
-                current.copy(a2uiSurfaces = persistentMapOf())
-            }
-        }
+        ensureA2uiConversation(conversationId)
         chatTimelineObserver.start(conversationId)
     }
 

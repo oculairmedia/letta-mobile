@@ -81,6 +81,42 @@ class A2uiSurfaceManagerTest : WordSpec({
             surface.components["root"]!!.children shouldBe listOf("title", "cta")
         }
 
+        "replace and clear surface snapshots" {
+            val manager = A2uiSurfaceManager()
+            val messages = decodeA2uiMessages(
+                json,
+                json.parseToJsonElement(
+                    """
+                    [
+                      {"version":"v0.9","createSurface":{"surfaceId":"s1","catalogId":"basic"}},
+                      {"version":"v0.9","createSurface":{"surfaceId":"s2","catalogId":"basic"}},
+                      {"version":"v0.9","deleteSurface":{"surfaceId":"s1"}}
+                    ]
+                    """.trimIndent(),
+                ),
+            )
+
+            manager.applyMessages(
+                decodeA2uiMessages(
+                    json,
+                    json.parseToJsonElement(
+                        """
+                        [{"version":"v0.9","createSurface":{"surfaceId":"stale","catalogId":"basic"}}]
+                        """.trimIndent(),
+                    ),
+                )
+            )
+            manager.replaceWith(messages)
+
+            manager.surface("stale").shouldBeNull()
+            manager.surface("s1").shouldBeNull()
+            manager.surface("s2")!!.catalogId shouldBe A2UI_BASIC_CATALOG_ID
+
+            manager.clear()
+
+            manager.surfaces.value shouldBe emptyMap()
+        }
+
         "distinguish omitted data model values from explicit JSON null" {
             val manager = A2uiSurfaceManager()
             manager.applyMessages(

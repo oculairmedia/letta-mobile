@@ -67,6 +67,10 @@ class A2uiSurfaceManager(
         applyMessages(listOf(message))
     }
 
+    fun replaceWith(messages: Iterable<A2uiMessage>) {
+        _surfaces.value = messages.fold(emptyMap()) { surfaces, message -> surfaces.applyMessage(message) }
+    }
+
     fun clear() {
         _surfaces.value = emptyMap()
     }

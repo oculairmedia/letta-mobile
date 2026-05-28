@@ -1,6 +1,10 @@
 package com.letta.mobile.feature.chat
 
 import com.letta.mobile.data.channel.CurrentConversationTracker
+import com.letta.mobile.data.a2ui.A2uiBindingResolver
+import com.letta.mobile.data.a2ui.A2uiMessage
+import com.letta.mobile.data.a2ui.A2uiSurfaceManager
+import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.timeline.DeliveryState
 import com.letta.mobile.data.timeline.MessageSource
@@ -17,6 +21,7 @@ import io.mockk.every
 import io.mockk.mockk
 import java.time.Instant
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -157,6 +162,73 @@ class ChatTimelineObserverTest {
         assertFalse(harness.uiState.value.isAgentTyping)
     }
 
+    @Test
+    fun `historical a2ui blocks fold into one surface snapshot without rendering raw blocks`() = runTest {
+        val manager = A2uiSurfaceManager()
+        val harness = Harness(
+            scope = backgroundScope,
+            syncA2uiHistorySnapshot = { _, messages ->
+                manager.replaceWith(messages)
+                manager.surfaces.value
+            },
+        )
+        harness.seedTimeline(
+            "conv-1",
+            listOf(
+                confirmed(
+                    id = "assistant-1",
+                    content = a2uiBlock(
+                        """
+                        [
+                          {"version":"v0.9","createSurface":{"surfaceId":"old","catalogId":"basic"}},
+                          {"version":"v0.9","updateComponents":{"surfaceId":"old","root":"oldText","components":[
+                            {"id":"oldText","component":"Text","text":{"literalString":"Old"}}
+                          ]}}
+                        ]
+                        """.trimIndent(),
+                    ),
+                    messageType = TimelineMessageType.ASSISTANT,
+                ),
+                confirmed(
+                    id = "assistant-2",
+                    content = a2uiBlock(
+                        """
+                        {"version":"v0.9","deleteSurface":{"surfaceId":"old"}}
+                        """.trimIndent(),
+                    ),
+                    messageType = TimelineMessageType.ASSISTANT,
+                ),
+                confirmed(
+                    id = "assistant-3",
+                    content = a2uiBlock(
+                        """
+                        [
+                          {"version":"v0.9","createSurface":{"surfaceId":"live","catalogId":"basic"}},
+                          {"version":"v0.9","updateComponents":{"surfaceId":"live","root":"body","components":[
+                            {"id":"body","component":"Text","text":{"path":"/message"}}
+                          ]}},
+                          {"version":"v0.9","updateDataModel":{"surfaceId":"live","path":"/message","value":"Final"}}
+                        ]
+                        """.trimIndent(),
+                    ),
+                    messageType = TimelineMessageType.ASSISTANT,
+                ),
+            ),
+        )
+
+        harness.observer.start("conv-1")
+        runCurrent()
+
+        assertEquals(emptyList<String>(), harness.uiState.value.messages.map { it.content })
+        assertFalse(harness.uiState.value.a2uiSurfaces.containsKey("old"))
+        val live = harness.uiState.value.a2uiSurfaces.getValue("live")
+        assertEquals("body", live.rootComponentId)
+        assertEquals(
+            "Final",
+            A2uiBindingResolver.resolvePath(live.dataModel, "/message")!!.jsonPrimitive.content,
+        )
+    }
+
     private class Harness(
         scope: CoroutineScope,
         activeReplyConversationIds: Set<String> = emptySet(),
@@ -164,6 +236,8 @@ class ChatTimelineObserverTest {
         clearA2uiThinkingOnResponse: () -> Unit = {},
         isFollowingDuplicateInitialMessageInFlight: () -> Boolean = { false },
         clearFollowingDuplicateInitialMessageInFlight: () -> Unit = {},
+        syncA2uiHistorySnapshot: (String, List<A2uiMessage>) -> Map<String, A2uiSurfaceState> =
+            { _, _ -> emptyMap() },
     ) {
         val timelineRepository: TimelineRepository = mockk()
         val currentConversationTracker = CurrentConversationTracker()
@@ -186,7 +260,7 @@ class ChatTimelineObserverTest {
             isFollowingDuplicateInitialMessageInFlight = isFollowingDuplicateInitialMessageInFlight,
             clearFollowingDuplicateInitialMessageInFlight = clearFollowingDuplicateInitialMessageInFlight,
             collapseCompletedRunsIfStreamingFinished = { _, next -> next },
-            replayA2uiHistory = { emptyMap() },
+            syncA2uiHistorySnapshot = syncA2uiHistorySnapshot,
             projectionDispatcher = scope.coroutineContext[ContinuationInterceptor] as? CoroutineDispatcher
                 ?: Dispatchers.Default,
         )
@@ -230,6 +304,13 @@ class ChatTimelineObserverTest {
         stepId = null,
         source = MessageSource.LETTA_SERVER,
     )
+
+    private fun a2uiBlock(payload: String): String =
+        """
+        <a2ui-json>
+        $payload
+        </a2ui-json>
+        """.trimIndent()
 
     @Suppress("unused")
     private fun localPending(id: String, content: String) = TimelineEvent.Local(
