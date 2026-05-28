@@ -23,7 +23,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * `dedupeOptimisticContentTwins` (content-based on assistants) and
  * `distinctBy { id }` (id-based on tools) rely on them being intact.
  *
- * Frames without a LettaMessage analogue (Welcome, Error, Ping,
+ * Frames without a LettaMessage analogue (Welcome, Error,
  * TurnStarted, TurnDone, StopReason, UsageStatistics, Unknown) return
  * null — the caller routes those to non-timeline state machines
  * (run state, error banner, usage tally, etc.).
@@ -70,7 +70,6 @@ object WsFrameMapper {
 
         is ServerFrame.Welcome,
         is ServerFrame.Error,
-        is ServerFrame.Ping,
         is ServerFrame.TurnStarted,
         is ServerFrame.TurnDone,
         is ServerFrame.StopReason,

@@ -158,7 +158,7 @@ private fun ChannelTransport.State.Connected.toConnectionState(): WsConnectionSt
 /**
  * Higher-level event stream for chat ViewModels. Each entry maps
  * 1:1 to a [ServerFrame] except where the frame had no chat-relevant
- * payload (Welcome, Ping, Unknown — those don't appear here).
+ * payload (Welcome, Unknown — those don't appear here).
  */
 sealed interface WsTimelineEvent {
     data class TurnStarted(
@@ -291,11 +291,10 @@ private fun ServerFrame.toTimelineEvent(): WsTimelineEvent? = when (this) {
         WsTimelineEvent.MessageDelta(it)
     }
     // Welcome carries connection metadata, not chat content; surface via state.
-    // Ping / A2UI frames / capabilities / acks / Unknown are silent for chat consumers.
+    // A2UI frames / capabilities / acks / Unknown are silent for chat consumers.
     // Cron frames (letta-mobile-d52f.1) are observed directly off
     // ChannelTransport.events by the cron repository — not chat content.
     is ServerFrame.Welcome,
-    is ServerFrame.Ping,
     is ServerFrame.A2ui,
     is ServerFrame.A2uiCapabilities,
     is ServerFrame.UserActionAck,

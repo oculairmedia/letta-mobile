@@ -543,7 +543,6 @@ internal class ReconnectCommand : AdminShimCommand(
 private fun ServerFrame.typeName(): String = when (this) {
     is ServerFrame.Welcome -> "welcome"
     is ServerFrame.Error -> "error:${code}"
-    is ServerFrame.Ping -> "ping"
     is ServerFrame.TurnStarted -> "turn_started runId=$runId"
     is ServerFrame.TurnDone -> "turn_done runId=$runId status=$status"
     is ServerFrame.StopReason -> "stop_reason $stopReason"

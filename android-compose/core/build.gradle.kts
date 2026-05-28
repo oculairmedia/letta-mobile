@@ -122,6 +122,7 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-api:6.1.0")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation("io.ktor:ktor-client-mock:3.5.0")
+    testImplementation("com.squareup.okhttp3:mockwebserver:5.3.2")
     testImplementation("app.cash.turbine:turbine:1.2.1")
     testImplementation("io.mockk:mockk:1.14.9")
     testImplementation("io.kotest:kotest-runner-junit5:6.1.11")

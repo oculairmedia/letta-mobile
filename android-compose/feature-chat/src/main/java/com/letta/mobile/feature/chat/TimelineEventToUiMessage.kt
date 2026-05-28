@@ -198,7 +198,8 @@ internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                 timestamp = ev.sentAt.toString(),
                 isPending = ev.deliveryState == DeliveryState.SENDING,
                 isReasoning = ev.messageType == TimelineMessageType.REASONING,
-                isError = ev.messageType == TimelineMessageType.ERROR,
+                isError = ev.messageType == TimelineMessageType.ERROR ||
+                    ev.deliveryState == DeliveryState.FAILED,
                 toolCalls = uiToolCalls,
                 approvalRequest = uiApproval,
                 approvalResponse = null,

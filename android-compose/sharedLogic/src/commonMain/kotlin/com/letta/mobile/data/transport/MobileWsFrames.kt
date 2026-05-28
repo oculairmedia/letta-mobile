@@ -28,7 +28,7 @@ import kotlinx.serialization.json.jsonPrimitive
  * **Why a separate envelope layer:** the WS protocol wraps the
  * existing inner [com.letta.mobile.data.model.LettaMessage] payloads
  * with routing metadata (`turn_id`, `run_id`) and adds non-LettaMessage
- * frames (welcome, error, ping, turn_started, stop_reason,
+ * frames (welcome, error, turn_started, stop_reason,
  * usage_statistics, turn_done). Rather than reshape the LettaMessage
  * sealed hierarchy, we keep it intact and define this thin wrapper.
  *
@@ -67,7 +67,6 @@ fun ClientFrame.encodeJson(json: Json): String = when (this) {
     is CancelFrame -> json.encodeToString(CancelFrame.serializer(), this)
     is SubscribeFrame -> json.encodeToString(SubscribeFrame.serializer(), this)
     is ByeFrame -> json.encodeToString(ByeFrame.serializer(), this)
-    is PongFrame -> json.encodeToString(PongFrame.serializer(), this)
     is CronListFrame -> json.encodeToString(CronListFrame.serializer(), this)
     is CronAddFrame -> json.encodeToString(CronAddFrame.serializer(), this)
     is CronGetFrame -> json.encodeToString(CronGetFrame.serializer(), this)
@@ -203,14 +202,6 @@ data class SubscribeFrame(
 data class ByeFrame(
     override val v: Int = 1,
     override val type: String = "bye",
-    override val id: String,
-    override val ts: String,
-) : ClientFrame
-
-@Serializable
-data class PongFrame(
-    override val v: Int = 1,
-    override val type: String = "pong",
     override val id: String,
     override val ts: String,
 ) : ClientFrame
@@ -442,14 +433,6 @@ sealed interface ServerFrame {
         @SerialName("after_seq") val afterSeq: Long? = null,
         @SerialName("oldest_seq") val oldestSeq: Long? = null,
         @SerialName("last_seq") val lastSeq: Long? = null,
-    ) : ServerFrame
-
-    @Serializable
-    data class Ping(
-        override val v: Int = 1,
-        val type: String = "ping",
-        override val id: String,
-        override val ts: String,
     ) : ServerFrame
 
     /**
@@ -780,7 +763,6 @@ object ServerFrameSerializer : JsonContentPolymorphicSerializer<ServerFrame>(Ser
         return when (type) {
             "welcome" -> ServerFrame.Welcome.serializer()
             "error" -> ServerFrame.Error.serializer()
-            "ping" -> ServerFrame.Ping.serializer()
             "turn_started" -> ServerFrame.TurnStarted.serializer()
             "turn_done" -> ServerFrame.TurnDone.serializer()
             "stop_reason" -> ServerFrame.StopReason.serializer()

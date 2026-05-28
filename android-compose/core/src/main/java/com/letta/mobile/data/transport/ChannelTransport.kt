@@ -145,15 +145,15 @@ class ChannelTransport internal constructor(
     }
 
     // OkHttp HTTP client tuned for a long-lived WS — no read timeout
-    // (the server pings every 25s; a finite read timeout would force
-    // a needless close on idle), generous connect timeout for slow
-    // mobile networks, and HTTP/1.1 only (the shim doesn't speak h2
-    // over WS upgrade).
+    // (protocol-level WS keepalive is handled by OkHttp; JSON frames
+    // never see ping/pong control frames), generous connect timeout
+    // for slow mobile networks, and HTTP/1.1 only (the shim doesn't
+    // speak h2 over WS upgrade).
     private val httpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.MILLISECONDS)
-            .pingInterval(45, TimeUnit.SECONDS) // TCP-level ping; defense-in-depth alongside server-side WS pings
+            .pingInterval(30, TimeUnit.SECONDS)
             .build()
     }
 
@@ -275,7 +275,8 @@ class ChannelTransport internal constructor(
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                val initiator = if (clientInitiatedClose) "client" else "server"
+                val wasClientInitiatedClose = clientInitiatedClose
+                val initiator = if (wasClientInitiatedClose) "client" else "server"
                 Log.i(
                     TAG,
                     "WS closed code=$code reason=${reason.ifEmpty { "<empty>" }} initiator=$initiator " +
@@ -283,12 +284,21 @@ class ChannelTransport internal constructor(
                 )
                 if (!socketRef.compareAndSet(webSocket, null)) {
                     Log.i(TAG, "Ignoring close from superseded WS socket")
+                    if (wasClientInitiatedClose) clientInitiatedClose = false
                     return
                 }
                 _state.value = State.Disconnected(code, reason)
                 conversationStateManager.clearAllTurnState()
                 clientInitiatedClose = false
                 cancelPendingCronRequests("WS closed: code=$code reason=$reason")
+                if (!wasClientInitiatedClose && code == KEEPALIVE_PONG_TIMEOUT_CLOSE_CODE) {
+                    Telemetry.event(
+                        "ChannelTransport", "keepalive.pongTimeout",
+                        "code" to code,
+                        "reason" to reason,
+                    )
+                    requestReconnect("shim keepalive pong timeout")
+                }
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
@@ -296,6 +306,7 @@ class ChannelTransport internal constructor(
                 Log.w(TAG, "WS failure: ${t.message} (httpCode=$httpCode)", t)
                 if (!socketRef.compareAndSet(webSocket, null)) {
                     Log.i(TAG, "Ignoring failure from superseded WS socket")
+                    if (clientInitiatedClose) clientInitiatedClose = false
                     return
                 }
                 val isAuth = httpCode == 401 || httpCode == 403
@@ -592,13 +603,14 @@ class ChannelTransport internal constructor(
     }
 
     private fun teardownLocked(reason: String) {
-        clientInitiatedClose = true
+        val socket = socketRef.getAndSet(null)
+        clientInitiatedClose = socket != null
         Log.i(
             TAG,
             "WS teardown (client-initiated) reason=$reason " +
                 "activeConversations=${conversationStateManager.activeConversationCount()}",
         )
-        socketRef.getAndSet(null)?.close(NORMAL_CLOSE, reason)
+        socket?.close(NORMAL_CLOSE, reason)
         listenerJob?.cancel()
         listenerJob = null
         if (_state.value !is State.Disconnected) {
@@ -620,7 +632,7 @@ class ChannelTransport internal constructor(
         // the persistent cursor store BEFORE typed dispatch so the
         // mutation lands even if the typed branch is a no-op
         // (e.g. unknown frames, A2UI frames, etc.). Skips frames the
-        // shim emits without a seq stamp (welcome, ping, cron RPC,
+        // shim emits without a seq stamp (welcome, cron RPC,
         // subscribe wrappers — see anti-double-record note below).
         recordCursorFromEnvelope(text)
         recordHelloResumeReplayTelemetry(frame, text)
@@ -832,7 +844,7 @@ class ChannelTransport internal constructor(
      * the raw envelope JSON and record it into [cursorStore].
      *
      * Skips frames the shim never stamps with `seq`:
-     *  - `welcome`, `ping`, `a2ui_capabilities`, `user_action_ack`,
+     *  - `welcome`, `a2ui_capabilities`, `user_action_ack`,
      *    `user_action_outcome`, `error` (control plane, not run-scoped)
      *  - `cron_*_response`, `crons_updated` (cron RPC, separate channel)
      *  - `subscribe_frame`, `subscribe_done` (the wrapper is recorded in
@@ -1071,13 +1083,13 @@ class ChannelTransport internal constructor(
     private fun requestReconnect(reason: String) {
         val config = lastConnectionConfig
         if (config == null) {
-            Log.w(TAG, "user_action queued but reconnect unavailable: no prior connection config")
+            Log.w(TAG, "WS reconnect unavailable: no prior connection config")
             return
         }
         if (state.value is State.Connecting) return
         if (reconnectJob?.isActive == true) return
         reconnectJob = scope.launch {
-            Log.i(TAG, "redialing WS for queued user_action: $reason")
+            Log.i(TAG, "redialing WS: $reason")
             connect(
                 baseShimUrl = config.baseShimUrl,
                 token = config.token,
@@ -1138,6 +1150,7 @@ class ChannelTransport internal constructor(
         private const val CURSOR_EXPIRED_ERROR_CODE = "cursor_expired"
         private const val MAX_PENDING_A2UI_ACTIONS = 16
         private const val NEW_CONVERSATION_STATE_KEY = "__new_conversation__"
+        const val KEEPALIVE_PONG_TIMEOUT_CLOSE_CODE = 4001
 
         /**
          * letta-mobile-2rkdj: envelope `type` values that the shim
@@ -1149,7 +1162,6 @@ class ChannelTransport internal constructor(
          */
         private val SKIP_CURSOR_TYPES: Set<String> = setOf(
             "welcome",
-            "ping",
             "a2ui_capabilities",
             "user_action_ack",
             "user_action_outcome",

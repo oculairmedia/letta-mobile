@@ -197,12 +197,11 @@ internal fun MessageBubbleSurface(
                 MessageAttachmentsGrid(attachments = stableAttachments)
             }
 
-            val textColor = if (bubbleLess) {
-                MaterialTheme.colorScheme.onSurface
-            } else if (isUser) {
-                colors.userText
-            } else {
-                colors.agentText
+            val textColor = when {
+                message.isError -> MaterialTheme.colorScheme.onErrorContainer
+                bubbleLess -> MaterialTheme.colorScheme.onSurface
+                isUser -> colors.userText
+                else -> colors.agentText
             }
             if (message.content.isNotBlank() || message.attachments.isEmpty()) {
                 // letta-mobile-6p4o.1: forward isStreaming to renderers so
