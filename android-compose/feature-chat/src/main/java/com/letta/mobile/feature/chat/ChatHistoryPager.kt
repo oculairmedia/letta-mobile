@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat
 
 import com.letta.mobile.data.mapper.toUiMessages
+import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.toImmutableList
@@ -74,9 +75,20 @@ internal class ChatHistoryPager(
             return
         }
 
+        // letta-mobile-doq50: prefer a real server message ID (user / assistant)
+        // over synthetic IDs like `toolreturn-...` that the WS frame mapper
+        // generates locally to dedup tool returns. The server doesn't
+        // recognize synthetic IDs as cursors, so older-message fetches with
+        // such an ID either silently no-op or return the same page that's
+        // already loaded — which the merge then filters out, leaving the
+        // visible message count unchanged.
+        //
+        // Fallback to the original "first non-pending" if no real ID is found
+        // so the bug surface is bounded by content shape rather than crashing.
         val oldestLoadedMessageId = currentState.messages
-            .firstOrNull { !it.isPending }
+            .firstOrNull { !it.isPending && it.isPaginationCursorEligible() }
             ?.id
+            ?: currentState.messages.firstOrNull { !it.isPending }?.id
         if (oldestLoadedMessageId == null) {
             Telemetry.event(
                 "ChatHistoryPager", "loadSkipped",
@@ -87,11 +99,13 @@ internal class ChatHistoryPager(
             return
         }
 
+        val cursorIsSynthetic = oldestLoadedMessageId.startsWith("toolreturn-")
         Telemetry.event(
             "ChatHistoryPager", "loadAttempting",
             "conversationId" to conversationId,
             "beforeMessageId" to oldestLoadedMessageId,
             "currentMessageCount" to currentState.messages.size,
+            "cursorIsSynthetic" to cursorIsSynthetic,
         )
 
         scope.launch {
@@ -111,13 +125,22 @@ internal class ChatHistoryPager(
                     return@launch
                 }
 
+                val previousCount = uiState.value.messages.size
                 val olderUi = olderMessages.toUiMessages()
                 val mergedMessages = chatTimelineObserver.mergeOlderPage(
                     conversationId = conversationId,
                     olderMessages = olderUi,
                     existingMessages = uiState.value.messages,
                 )
-                val newHasMore = olderMessages.size >= MessageRepository.OLDER_MESSAGES_PAGE_SIZE
+                // letta-mobile-doq50: if a fetch returns messages but the
+                // merge filters all of them as duplicates of what's already
+                // loaded, the cursor is broken (server returned the same
+                // page). Mark pagination terminal to prevent an infinite
+                // spinner-then-clear loop. The user can still pull-to-
+                // refresh to retry.
+                val mergeAddedMessages = mergedMessages.size > previousCount
+                val newHasMore = mergeAddedMessages &&
+                    olderMessages.size >= MessageRepository.OLDER_MESSAGES_PAGE_SIZE
                 uiState.value = uiState.value.copy(
                     messages = mergedMessages.toImmutableList(),
                     isLoadingOlderMessages = false,
@@ -127,8 +150,10 @@ internal class ChatHistoryPager(
                     "ChatHistoryPager", "loadSucceeded",
                     "conversationId" to conversationId,
                     "fetchedCount" to olderMessages.size,
+                    "mergedAddedCount" to (mergedMessages.size - previousCount),
                     "mergedTotalCount" to mergedMessages.size,
                     "hasMoreAfter" to newHasMore,
+                    "filteredAllDuplicates" to (olderMessages.isNotEmpty() && !mergeAddedMessages),
                 )
             } catch (e: Exception) {
                 Telemetry.error(
@@ -143,4 +168,19 @@ internal class ChatHistoryPager(
             }
         }
     }
+}
+
+/**
+ * letta-mobile-doq50: a UiMessage is eligible as a pagination cursor only if
+ * its [UiMessage.id] is a real server-issued ID, not a locally-synthesized
+ * one (like the `toolreturn-` prefix the WS frame mapper applies to dedup
+ * tool returns into their corresponding tool call). The server only
+ * recognizes its own message IDs as `before` cursors; passing a synthetic
+ * ID silently returns the wrong page.
+ */
+private fun UiMessage.isPaginationCursorEligible(): Boolean {
+    val id = id
+    // Known synthetic prefixes used by the mobile client to construct
+    // stable local IDs. Extend this list if other synthetic schemes appear.
+    return !id.startsWith("toolreturn-")
 }
