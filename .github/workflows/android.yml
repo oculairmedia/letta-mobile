@@ -75,11 +75,11 @@ jobs:
             ${{ runner.os }}-gradle-project-v1-${{ hashFiles('android-compose/gradle/wrapper/gradle-wrapper.properties', 'android-compose/settings.gradle.kts', 'android-compose/**/*.gradle.kts', 'android-compose/gradle/libs.versions.toml', 'android-compose/gradle.properties') }}-
 
       - name: Compile all debug variants
-        run: ./gradlew :core:compileDebugKotlin :app:compileRootDebugKotlin :app:compileSideloadDebugKotlin :app:compilePlayDebugKotlin
+        run: ./gradlew :core:domain:compileKotlin :core:data:compileDebugKotlin :core:testutil:compileDebugKotlin :app:compileRootDebugKotlin :app:compileSideloadDebugKotlin :app:compilePlayDebugKotlin
 
       - name: Run unit tests
         run: |
-          ./gradlew :core:testDebugUnitTest :app:testRootDebugUnitTest
+          ./gradlew :core:data:testDebugUnitTest :app:testRootDebugUnitTest
           ./gradlew :app:testScreenshot
 
   build-apk:
