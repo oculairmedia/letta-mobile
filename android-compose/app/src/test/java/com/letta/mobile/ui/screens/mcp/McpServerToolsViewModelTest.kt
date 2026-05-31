@@ -3,10 +3,12 @@ package com.letta.mobile.ui.screens.mcp
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.letta.mobile.data.model.McpServer
+import com.letta.mobile.data.model.McpServerId
 import com.letta.mobile.data.model.McpServerResyncResult
 import com.letta.mobile.data.model.McpToolExecuteParams
 import com.letta.mobile.data.model.McpToolExecutionResult
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.repository.McpServerRepository
 import com.letta.mobile.testutil.FakeMcpServerApi
 import com.letta.mobile.testutil.TestData
@@ -59,7 +61,7 @@ class McpServerToolsViewModelTest {
         val server = TestData.mcpServer(id = "s1", serverName = "Server 1")
         val tool = TestData.tool(id = "t1", name = "tool1")
         fakeRepo.setServers(listOf(server))
-        fakeRepo.setServerTools("s1", listOf(tool))
+        fakeRepo.setServerTools(McpServerId("s1"), listOf(tool))
 
         viewModel.loadServerTools()
 
@@ -84,31 +86,31 @@ class McpServerToolsViewModelTest {
     @Test
     fun `refreshServerTools stores resync summary`() = runTest {
         fakeRepo.setServers(listOf(TestData.mcpServer(id = "s1", serverName = "Server 1")))
-        fakeRepo.setServerTools("s1", listOf(TestData.tool(id = "t1")))
-        fakeRepo.resyncResult = McpServerResyncResult(added = listOf("t2"), updated = listOf("t1"))
+        fakeRepo.setServerTools(McpServerId("s1"), listOf(TestData.tool(id = "t1")))
+        fakeRepo.resyncResult = McpServerResyncResult(added = listOf(ToolId("t2")), updated = listOf(ToolId("t1")))
 
         viewModel.loadServerTools()
         viewModel.refreshServerTools()
 
         viewModel.uiState.test {
             val state = awaitItem() as UiState.Success
-            assertEquals(listOf("t2"), state.data.refreshSummary?.added)
-            assertEquals(listOf("t1"), state.data.refreshSummary?.updated)
+            assertEquals(listOf(ToolId("t2")), state.data.refreshSummary?.added)
+            assertEquals(listOf(ToolId("t1")), state.data.refreshSummary?.updated)
         }
     }
 
     @Test
     fun `runTool stores execution result on success`() = runTest {
         fakeRepo.setServers(listOf(TestData.mcpServer(id = "s1", serverName = "Server 1")))
-        fakeRepo.setServerTools("s1", listOf(TestData.tool(id = "t1", name = "tool1")))
+        fakeRepo.setServerTools(McpServerId("s1"), listOf(TestData.tool(id = "t1", name = "tool1")))
         fakeRepo.executionResult = TestData.mcpToolExecutionResult(status = "success", funcReturn = "done")
 
         viewModel.loadServerTools()
-        viewModel.runTool("t1", "{\"query\":\"hello\"}")
+        viewModel.runTool(ToolId("t1"), "{\"query\":\"hello\"}")
 
         viewModel.uiState.test {
             val state = awaitItem() as UiState.Success
-            assertEquals("t1", state.data.toolRunState.activeToolId)
+            assertEquals(ToolId("t1"), state.data.toolRunState.activeToolId)
             assertEquals("success", state.data.toolRunState.result?.status)
             assertEquals("done", state.data.toolRunState.result?.funcReturn?.toString()?.trim('"'))
         }
@@ -117,10 +119,10 @@ class McpServerToolsViewModelTest {
     @Test
     fun `runTool rejects invalid json object args`() = runTest {
         fakeRepo.setServers(listOf(TestData.mcpServer(id = "s1", serverName = "Server 1")))
-        fakeRepo.setServerTools("s1", listOf(TestData.tool(id = "t1", name = "tool1")))
+        fakeRepo.setServerTools(McpServerId("s1"), listOf(TestData.tool(id = "t1", name = "tool1")))
 
         viewModel.loadServerTools()
-        viewModel.runTool("t1", "not-json")
+        viewModel.runTool(ToolId("t1"), "not-json")
 
         viewModel.uiState.test {
             val state = awaitItem() as UiState.Success
@@ -130,7 +132,7 @@ class McpServerToolsViewModelTest {
 
     private class FakeMcpRepo : McpServerRepository(FakeMcpServerApi()) {
         private val _servers = MutableStateFlow<List<McpServer>>(emptyList())
-        private val _toolsByServer = MutableStateFlow<Map<String, List<Tool>>>(emptyMap())
+        private val _toolsByServer = MutableStateFlow<Map<McpServerId, List<Tool>>>(emptyMap())
         override val servers: StateFlow<List<McpServer>> = _servers.asStateFlow()
 
         var resyncResult: McpServerResyncResult = McpServerResyncResult()
@@ -139,28 +141,28 @@ class McpServerToolsViewModelTest {
 
         fun setServers(list: List<McpServer>) { _servers.value = list }
 
-        fun setServerTools(serverId: String, tools: List<Tool>) {
+        fun setServerTools(serverId: McpServerId, tools: List<Tool>) {
             _toolsByServer.value = _toolsByServer.value + (serverId to tools)
         }
 
         override suspend fun refreshServers() {}
 
-        override suspend fun refreshServerTools(serverId: String) {}
+        override suspend fun refreshServerTools(serverId: McpServerId) {}
 
-        override suspend fun resyncServerTools(serverId: String): McpServerResyncResult {
+        override suspend fun resyncServerTools(serverId: McpServerId): McpServerResyncResult {
             return resyncResult
         }
 
         override suspend fun runServerTool(
-            serverId: String,
-            toolId: String,
+            serverId: McpServerId,
+            toolId: ToolId,
             params: McpToolExecuteParams,
         ): McpToolExecutionResult {
             lastRunArgs = params.args
             return executionResult
         }
 
-        override fun getServerTools(serverId: String): Flow<List<Tool>> {
+        override fun getServerTools(serverId: McpServerId): Flow<List<Tool>> {
             return _toolsByServer.map { it[serverId] ?: emptyList() }
         }
     }

@@ -134,7 +134,7 @@ internal fun ToolCard(
             parent?.let {
                 Spacer(modifier = Modifier.height(8.dp))
                 AssistChip(
-                    onClick = { onNavigateToServerTools(it.serverId) },
+                    onClick = { onNavigateToServerTools(it.serverId.value) },
                     label = {
                         Text(
                             stringResource(R.string.screen_mcp_tool_parent_server, it.serverName),

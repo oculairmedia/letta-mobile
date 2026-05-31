@@ -332,7 +332,7 @@ private fun ProviderDetailDialog(
                 provider.id?.let { id ->
                     item(
                         headlineContent = { Text(stringResource(R.string.screen_providers_id_label, "")) },
-                        supportingContent = { Text(id, style = MaterialTheme.typography.listItemSupporting) },
+                        supportingContent = { Text(id.value, style = MaterialTheme.typography.listItemSupporting) },
                     )
                 }
                 item(

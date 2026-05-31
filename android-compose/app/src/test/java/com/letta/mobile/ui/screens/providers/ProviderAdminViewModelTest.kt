@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.screens.providers
 
 import com.letta.mobile.data.model.Provider
+import com.letta.mobile.data.model.ProviderId
 import com.letta.mobile.data.repository.ProviderRepository
 import com.letta.mobile.testutil.FakeProviderApi
 import kotlinx.coroutines.Dispatchers
@@ -31,8 +32,8 @@ class ProviderAdminViewModelTest {
         fakeApi = FakeProviderApi()
         fakeApi.providers.addAll(
             listOf(
-                Provider(id = "provider-1", name = "OpenAI", providerType = "openai", baseUrl = "https://api.openai.com", region = "us"),
-                Provider(id = "provider-2", name = "Anthropic", providerType = "anthropic", baseUrl = "https://api.anthropic.com", region = "global"),
+                Provider(id = ProviderId("provider-1"), name = "OpenAI", providerType = "openai", baseUrl = "https://api.openai.com", region = "us"),
+                Provider(id = ProviderId("provider-2"), name = "Anthropic", providerType = "anthropic", baseUrl = "https://api.anthropic.com", region = "global"),
             )
         )
         repository = ProviderRepository(fakeApi)
@@ -59,20 +60,20 @@ class ProviderAdminViewModelTest {
 
         val filtered = viewModel.getFilteredProviders()
         assertEquals(1, filtered.size)
-        assertEquals("provider-2", filtered.first().id)
+        assertEquals(ProviderId("provider-2"), filtered.first().id)
     }
 
     @Test
     fun `inspectProvider loads provider details`() = runTest {
-        viewModel.inspectProvider("provider-1")
+        viewModel.inspectProvider(ProviderId("provider-1"))
 
         val state = viewModel.uiState.value as com.letta.mobile.ui.common.UiState.Success
-        assertEquals("provider-1", state.data.selectedProvider?.id)
+        assertEquals(ProviderId("provider-1"), state.data.selectedProvider?.id)
     }
 
     @Test
     fun `checkProvider delegates to repository`() = runTest {
-        viewModel.checkProvider("provider-1")
+        viewModel.checkProvider(ProviderId("provider-1"))
 
         val state = viewModel.uiState.value as com.letta.mobile.ui.common.UiState.Success
         assertTrue(fakeApi.calls.contains("checkExistingProvider:provider-1"))
@@ -81,7 +82,7 @@ class ProviderAdminViewModelTest {
 
     @Test
     fun `deleteProvider removes provider`() = runTest {
-        viewModel.deleteProvider("provider-1")
+        viewModel.deleteProvider(ProviderId("provider-1"))
 
         val state = viewModel.uiState.value as com.letta.mobile.ui.common.UiState.Success
         assertEquals(1, state.data.providers.size)

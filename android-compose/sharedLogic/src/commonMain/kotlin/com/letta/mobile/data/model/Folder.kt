@@ -6,7 +6,7 @@ import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class Folder(
-    val id: String,
+    val id: FolderId,
     val name: String,
     val description: String? = null,
     val instructions: String? = null,
@@ -43,7 +43,7 @@ data class FolderUpdateParams(
 @Serializable
 data class FileMetadata(
     val id: String,
-    @SerialName("source_id") val sourceId: String,
+    @SerialName("source_id") val sourceId: FolderId,
     @SerialName("file_name") val fileName: String? = null,
     @SerialName("original_file_name") val originalFileName: String? = null,
     @SerialName("file_path") val filePath: String? = null,
@@ -70,10 +70,10 @@ data class FileStats(
 
 @Serializable
 data class SourceStats(
-    @SerialName("source_id") val sourceId: String,
+    @SerialName("source_id") val sourceId: FolderId,
     @SerialName("source_name") val sourceName: String,
-    @SerialName("file_count") val fileCount: Int = 0,
-    @SerialName("total_size") val totalSize: Int = 0,
+    val fileCount: Int = 0,
+    val totalSize: Int = 0,
     val files: List<FileStats> = emptyList(),
 )
 

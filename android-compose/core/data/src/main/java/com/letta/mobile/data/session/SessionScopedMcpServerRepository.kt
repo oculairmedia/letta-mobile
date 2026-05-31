@@ -2,11 +2,13 @@ package com.letta.mobile.data.session
 
 import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.McpServerCreateParams
+import com.letta.mobile.data.model.McpServerId
 import com.letta.mobile.data.model.McpServerResyncResult
 import com.letta.mobile.data.model.McpServerUpdateParams
 import com.letta.mobile.data.model.McpToolExecuteParams
 import com.letta.mobile.data.model.McpToolExecutionResult
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.repository.api.IMcpServerRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -45,8 +47,8 @@ class SessionScopedMcpServerRepository internal constructor(
     override val servers: StateFlow<List<McpServer>> = _servers.asStateFlow()
 
     private val cacheLock = Any()
-    private val serverToolFlows = mutableMapOf<String, MutableStateFlow<List<Tool>>>()
-    private val serverToolJobs = mutableMapOf<String, Job>()
+    private val serverToolFlows = mutableMapOf<McpServerId, MutableStateFlow<List<Tool>>>()
+    private val serverToolJobs = mutableMapOf<McpServerId, Job>()
 
     init {
         sessionManager.currentGraph
@@ -71,7 +73,7 @@ class SessionScopedMcpServerRepository internal constructor(
 
     override fun getServers(): Flow<List<McpServer>> = servers
 
-    override fun getServerTools(serverId: String): Flow<List<Tool>> = synchronized(cacheLock) {
+    override fun getServerTools(serverId: McpServerId): Flow<List<Tool>> = synchronized(cacheLock) {
         val flow = serverToolFlows.getOrPut(serverId) {
             MutableStateFlow(emptyList())
         }
@@ -85,20 +87,20 @@ class SessionScopedMcpServerRepository internal constructor(
     }
 
     override suspend fun refreshServers() = sessionManager.withCurrentSession { it.mcpServerRepository.refreshServers() }
-    override suspend fun refreshServerTools(serverId: String) = sessionManager.withCurrentSession { it.mcpServerRepository.refreshServerTools(serverId) }
-    override suspend fun resyncServerTools(serverId: String): McpServerResyncResult =
+    override suspend fun refreshServerTools(serverId: McpServerId) = sessionManager.withCurrentSession { it.mcpServerRepository.refreshServerTools(serverId) }
+    override suspend fun resyncServerTools(serverId: McpServerId): McpServerResyncResult =
         sessionManager.withCurrentSession { it.mcpServerRepository.resyncServerTools(serverId) }
 
     override suspend fun runServerTool(
-        serverId: String,
-        toolId: String,
+        serverId: McpServerId,
+        toolId: ToolId,
         params: McpToolExecuteParams,
     ): McpToolExecutionResult = sessionManager.withCurrentSession { it.mcpServerRepository.runServerTool(serverId, toolId, params) }
 
     override suspend fun fetchAllMcpTools(): List<Tool> = sessionManager.withCurrentSession { it.mcpServerRepository.fetchAllMcpTools() }
     override suspend fun createServer(params: McpServerCreateParams): McpServer = sessionManager.withCurrentSession { it.mcpServerRepository.createServer(params) }
-    override suspend fun updateServer(id: String, params: McpServerUpdateParams): McpServer = sessionManager.withCurrentSession { it.mcpServerRepository.updateServer(id, params) }
-    override suspend fun deleteServer(id: String) = sessionManager.withCurrentSession { it.mcpServerRepository.deleteServer(id) }
+    override suspend fun updateServer(id: McpServerId, params: McpServerUpdateParams): McpServer = sessionManager.withCurrentSession { it.mcpServerRepository.updateServer(id, params) }
+    override suspend fun deleteServer(id: McpServerId) = sessionManager.withCurrentSession { it.mcpServerRepository.deleteServer(id) }
 
     fun close() { proxyScope.cancel() }
 }

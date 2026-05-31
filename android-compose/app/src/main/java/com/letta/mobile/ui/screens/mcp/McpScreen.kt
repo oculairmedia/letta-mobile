@@ -30,7 +30,9 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.McpServer
+import com.letta.mobile.data.model.McpServerId
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
@@ -134,7 +136,7 @@ fun McpScreen(
                 initialFormOverride = null
             },
             onUpdate = { serverId, params ->
-                viewModel.updateServer(serverId, params)
+                viewModel.updateServer(McpServerId(serverId), params)
                 showServerDialog = false
                 editingServer = null
                 initialFormOverride = null
@@ -167,7 +169,7 @@ private fun McpContent(
     onConnectPhone: () -> Unit,
     onDeleteServer: (McpServer) -> Unit,
     onEditServer: (McpServer) -> Unit,
-    onCheckServer: (String) -> Unit,
+    onCheckServer: (McpServerId) -> Unit,
     onNavigateToServerTools: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -207,7 +209,7 @@ private fun McpContent(
 @Composable
 private fun ToolsTab(
     tools: List<Tool>,
-    toolParents: Map<String, McpToolParent>,
+    toolParents: Map<ToolId, McpToolParent>,
     onNavigateToServerTools: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -226,7 +228,7 @@ private fun ToolsTab(
             items(tools, key = { it.id.value }) { tool ->
                 ToolCard(
                     tool = tool,
-                    parent = toolParents[tool.id.value],
+                    parent = toolParents[tool.id],
                     onNavigateToServerTools = onNavigateToServerTools,
                 )
             }
@@ -237,12 +239,12 @@ private fun ToolsTab(
 @Composable
 private fun ServersTab(
     servers: List<McpServer>,
-    serverTools: Map<String, List<Tool>>,
-    serverChecks: Map<String, McpServerCheckState>,
+    serverTools: Map<McpServerId, List<Tool>>,
+    serverChecks: Map<McpServerId, McpServerCheckState>,
     onConnectPhone: () -> Unit,
     onDeleteServer: (McpServer) -> Unit,
     onEditServer: (McpServer) -> Unit,
-    onCheckServer: (String) -> Unit,
+    onCheckServer: (McpServerId) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {

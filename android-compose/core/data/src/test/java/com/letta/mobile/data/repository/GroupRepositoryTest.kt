@@ -1,7 +1,9 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Group
 import com.letta.mobile.data.model.GroupCreateParams
+import com.letta.mobile.data.model.GroupId
 import com.letta.mobile.data.model.GroupUpdateParams
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.testutil.FakeGroupApi
@@ -28,7 +30,7 @@ class GroupRepositoryTest {
 
     @Test
     fun `refreshGroups updates state flow`() = runTest {
-        fakeApi.groups.add(Group(id = "group-1", managerType = "round_robin", description = "Test", agentIds = listOf("agent-1")))
+        fakeApi.groups.add(Group(id = GroupId("group-1"), managerType = "round_robin", description = "Test", agentIds = listOf(AgentId("agent-1"))))
 
         repository.refreshGroups()
 
@@ -37,7 +39,7 @@ class GroupRepositoryTest {
 
     @Test
     fun `createGroup upserts cache`() = runTest {
-        val created = repository.createGroup(GroupCreateParams(agentIds = listOf("agent-1"), description = "Test group"))
+        val created = repository.createGroup(GroupCreateParams(agentIds = listOf(AgentId("agent-1")), description = "Test group"))
 
         assertEquals("Test group", created.description)
         assertEquals(1, repository.groups.first().size)
@@ -45,17 +47,17 @@ class GroupRepositoryTest {
 
     @Test
     fun `updateGroup updates cache`() = runTest {
-        fakeApi.groups.add(Group(id = "group-1", managerType = "round_robin", description = "Old", agentIds = listOf("agent-1")))
+        fakeApi.groups.add(Group(id = GroupId("group-1"), managerType = "round_robin", description = "Old", agentIds = listOf(AgentId("agent-1"))))
         repository.refreshGroups()
 
-        repository.updateGroup("group-1", GroupUpdateParams(description = "New"))
+        repository.updateGroup(GroupId("group-1"), GroupUpdateParams(description = "New"))
 
         assertEquals("New", repository.groups.first().first().description)
     }
 
     @Test
     fun `sendGroupMessage delegates to api`() = runTest {
-        repository.sendGroupMessage("group-1", MessageCreateRequest(input = "hello"))
+        repository.sendGroupMessage(GroupId("group-1"), MessageCreateRequest(input = "hello"))
 
         assertTrue(fakeApi.calls.contains("sendGroupMessage:group-1"))
     }

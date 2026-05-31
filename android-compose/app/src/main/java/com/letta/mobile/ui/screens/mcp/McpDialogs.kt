@@ -98,7 +98,7 @@ internal fun ServerFormDialog(
                 )
             } else {
                 onUpdate(
-                    initialServer.id,
+                    initialServer.id.value,
                     McpServerUpdateParams(
                         serverName = formState.serverName.trim(),
                         config = config,

@@ -36,3 +36,34 @@ value class ToolId(val value: String) {
 value class BlockId(val value: String) {
     override fun toString(): String = value
 }
+
+@JvmInline
+@Serializable
+value class FolderId(val value: String) {
+    override fun toString(): String = value
+}
+
+@JvmInline
+@Serializable
+value class ProviderId(val value: String) {
+    override fun toString(): String = value
+}
+
+@JvmInline
+@Serializable
+value class IdentityId(val value: String) {
+    override fun toString(): String = value
+}
+
+@JvmInline
+@Serializable
+value class McpServerId(val value: String) {
+    override fun toString(): String = value
+}
+
+@JvmInline
+@Serializable
+value class GroupId(val value: String) {
+    override fun toString(): String = value
+}
+

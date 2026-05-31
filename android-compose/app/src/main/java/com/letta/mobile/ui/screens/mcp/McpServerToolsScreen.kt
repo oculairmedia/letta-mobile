@@ -50,6 +50,7 @@ import com.letta.mobile.R
 import com.letta.mobile.data.model.McpServerResyncResult
 import com.letta.mobile.data.model.McpToolExecutionResult
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.model.effectiveServerType
 import com.letta.mobile.data.model.effectiveServerUrl
 import com.letta.mobile.ui.common.UiState
@@ -140,7 +141,7 @@ fun McpServerToolsScreen(
                             items(state.data.tools, key = { it.id.value }) { tool ->
                                 McpServerToolCard(
                                     tool = tool,
-                                    isRunning = state.data.toolRunState.activeToolId == tool.id.value && state.data.toolRunState.result == null && state.data.toolRunState.errorMessage == null,
+                                    isRunning = state.data.toolRunState.activeToolId == tool.id && state.data.toolRunState.result == null && state.data.toolRunState.errorMessage == null,
                                     onRun = { pendingRunTool = tool },
                                 )
                             }
@@ -158,7 +159,7 @@ fun McpServerToolsScreen(
             tool = runTool,
             onDismiss = { pendingRunTool = null },
             onRun = { rawArgs ->
-                viewModel.runTool(runTool.id.value, rawArgs)
+                viewModel.runTool(runTool.id, rawArgs)
                 pendingRunTool = null
             },
         )

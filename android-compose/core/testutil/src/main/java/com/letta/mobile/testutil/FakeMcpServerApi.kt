@@ -4,6 +4,7 @@ import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.api.McpServerApi
 import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.McpServerCreateParams
+import com.letta.mobile.data.model.McpServerId
 import com.letta.mobile.data.model.McpServerResyncResult
 import com.letta.mobile.data.model.McpServerUpdateParams
 import com.letta.mobile.data.model.McpToolExecuteParams
@@ -33,7 +34,7 @@ class FakeMcpServerApi : McpServerApi(mockk(relaxed = true)) {
         if (shouldFail) throw ApiException(500, "Server error")
         val config = params.config
         val server = McpServer(
-            id = "new-${servers.size}",
+            id = McpServerId("new-${servers.size}"),
             serverName = params.serverName,
             serverUrl = config["server_url"]?.toString()?.trim('"'),
             command = config["command"]?.toString()?.trim('"'),
@@ -59,7 +60,7 @@ class FakeMcpServerApi : McpServerApi(mockk(relaxed = true)) {
     override suspend fun updateMcpServer(serverId: String, params: McpServerUpdateParams): McpServer {
         calls.add("updateMcpServer:$serverId")
         if (shouldFail) throw ApiException(500, "Server error")
-        val current = servers.firstOrNull { it.id == serverId } ?: throw ApiException(404, "Server not found")
+        val current = servers.firstOrNull { it.id.value == serverId } ?: throw ApiException(404, "Server not found")
         val config = params.config ?: current.config
         val updated = current.copy(
             serverName = params.serverName ?: current.serverName,
@@ -81,14 +82,14 @@ class FakeMcpServerApi : McpServerApi(mockk(relaxed = true)) {
             mcpServerType = config?.get("mcp_server_type")?.toString()?.trim('"') ?: current.mcpServerType,
             config = config,
         )
-        servers = servers.map { if (it.id == serverId) updated else it }.toMutableList()
+        servers = servers.map { if (it.id.value == serverId) updated else it }.toMutableList()
         return updated
     }
 
     override suspend fun deleteMcpServer(serverId: String) {
         calls.add("deleteMcpServer:$serverId")
         if (shouldFail) throw ApiException(500, "Server error")
-        servers.removeAll { it.id == serverId }
+        servers.removeAll { it.id.value == serverId }
     }
 
     override suspend fun listMcpServerTools(serverId: String): List<Tool> {

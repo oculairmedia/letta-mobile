@@ -10,7 +10,7 @@ import kotlinx.serialization.json.jsonPrimitive
 
 @Serializable
 data class McpServer(
-    val id: String,
+    val id: McpServerId,
     @SerialName("server_name") val serverName: String,
     @SerialName("server_url") val serverUrl: String? = null,
     val command: String? = null,
@@ -46,9 +46,9 @@ data class McpServerUpdateParams(
 
 @Serializable
 data class McpServerResyncResult(
-    val deleted: List<String> = emptyList(),
-    val updated: List<String> = emptyList(),
-    val added: List<String> = emptyList(),
+    val deleted: List<ToolId> = emptyList(),
+    val updated: List<ToolId> = emptyList(),
+    val added: List<ToolId> = emptyList(),
 )
 
 @Serializable

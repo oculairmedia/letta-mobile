@@ -29,4 +29,34 @@ class DomainIdConverters {
 
     @TypeConverter
     fun stringToBlockId(value: String): BlockId = BlockId(value)
+
+    @TypeConverter
+    fun folderIdToString(id: FolderId): String = id.value
+
+    @TypeConverter
+    fun stringToFolderId(value: String): FolderId = FolderId(value)
+
+    @TypeConverter
+    fun providerIdToString(id: ProviderId): String = id.value
+
+    @TypeConverter
+    fun stringToProviderId(value: String): ProviderId = ProviderId(value)
+
+    @TypeConverter
+    fun identityIdToString(id: IdentityId): String = id.value
+
+    @TypeConverter
+    fun stringToIdentityId(value: String): IdentityId = IdentityId(value)
+
+    @TypeConverter
+    fun mcpServerIdToString(id: McpServerId): String = id.value
+
+    @TypeConverter
+    fun stringToMcpServerId(value: String): McpServerId = McpServerId(value)
+
+    @TypeConverter
+    fun groupIdToString(id: GroupId): String = id.value
+
+    @TypeConverter
+    fun stringToGroupId(value: String): GroupId = GroupId(value)
 }

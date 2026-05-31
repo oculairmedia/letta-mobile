@@ -13,13 +13,13 @@ data class IdentityProperty(
 
 @Serializable
 data class Identity(
-    val id: String,
+    val id: IdentityId,
     @SerialName("identifier_key") val identifierKey: String,
     val name: String,
     @SerialName("identity_type") val identityType: String,
-    @SerialName("project_id") val projectId: String? = null,
-    @SerialName("agent_ids") val agentIds: List<String> = emptyList(),
-    @SerialName("block_ids") val blockIds: List<String> = emptyList(),
+    @SerialName("project_id") val projectId: ProjectId? = null,
+    @SerialName("agent_ids") val agentIds: List<AgentId> = emptyList(),
+    @SerialName("block_ids") val blockIds: List<BlockId> = emptyList(),
     @SerialName("organization_id") val organizationId: String? = null,
     val properties: List<IdentityProperty> = emptyList(),
 )
@@ -29,9 +29,9 @@ data class IdentityCreateParams(
     @SerialName("identifier_key") val identifierKey: String,
     val name: String,
     @SerialName("identity_type") val identityType: String,
-    @SerialName("project_id") val projectId: String? = null,
-    @SerialName("agent_ids") val agentIds: List<String>? = null,
-    @SerialName("block_ids") val blockIds: List<String>? = null,
+    @SerialName("project_id") val projectId: ProjectId? = null,
+    @SerialName("agent_ids") val agentIds: List<AgentId>? = null,
+    @SerialName("block_ids") val blockIds: List<BlockId>? = null,
     val properties: List<IdentityProperty>? = null,
 )
 
@@ -40,9 +40,9 @@ data class IdentityUpsertParams(
     @SerialName("identifier_key") val identifierKey: String,
     val name: String,
     @SerialName("identity_type") val identityType: String,
-    @SerialName("project_id") val projectId: String? = null,
-    @SerialName("agent_ids") val agentIds: List<String>? = null,
-    @SerialName("block_ids") val blockIds: List<String>? = null,
+    @SerialName("project_id") val projectId: ProjectId? = null,
+    @SerialName("agent_ids") val agentIds: List<AgentId>? = null,
+    @SerialName("block_ids") val blockIds: List<BlockId>? = null,
     val properties: List<IdentityProperty>? = null,
 )
 
@@ -51,7 +51,7 @@ data class IdentityUpdateParams(
     @SerialName("identifier_key") val identifierKey: String? = null,
     val name: String? = null,
     @SerialName("identity_type") val identityType: String? = null,
-    @SerialName("agent_ids") val agentIds: List<String>? = null,
-    @SerialName("block_ids") val blockIds: List<String>? = null,
+    @SerialName("agent_ids") val agentIds: List<AgentId>? = null,
+    @SerialName("block_ids") val blockIds: List<BlockId>? = null,
     val properties: List<IdentityProperty>? = null,
 )

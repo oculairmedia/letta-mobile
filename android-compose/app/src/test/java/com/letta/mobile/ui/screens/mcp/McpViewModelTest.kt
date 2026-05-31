@@ -3,9 +3,11 @@ package com.letta.mobile.ui.screens.mcp
 import app.cash.turbine.test
 import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.McpServerCreateParams
+import com.letta.mobile.data.model.McpServerId
 import com.letta.mobile.data.model.McpServerResyncResult
 import com.letta.mobile.data.model.McpServerUpdateParams
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.model.effectiveAuthHeader
 import com.letta.mobile.data.model.effectiveAuthToken
 import com.letta.mobile.data.model.effectiveCustomHeaders
@@ -61,7 +63,7 @@ class McpViewModelTest {
         val server = TestData.mcpServer(id = "s1")
         val tool = TestData.tool(id = "t1")
         fakeMcpRepo.setServers(listOf(server))
-        fakeMcpRepo.setServerTools("s1", listOf(tool))
+        fakeMcpRepo.setServerTools(McpServerId("s1"), listOf(tool))
         fakeToolRepo.setTools(listOf(tool))
         viewModel.loadData()
         viewModel.uiState.test {
@@ -69,7 +71,7 @@ class McpViewModelTest {
             assertEquals(1, state.data.servers.size)
             assertEquals(1, state.data.allTools.size)
             assertEquals(1, state.data.serverTools.size)
-            assertEquals(listOf(tool), state.data.serverTools["s1"])
+            assertEquals(listOf(tool), state.data.serverTools[McpServerId("s1")])
         }
     }
 
@@ -94,8 +96,8 @@ class McpViewModelTest {
     fun `deleteServer calls repo`() = runTest {
         fakeMcpRepo.setServers(listOf(TestData.mcpServer(id = "s1")))
         viewModel.loadData()
-        viewModel.deleteServer("s1")
-        assertTrue(fakeMcpRepo.deleteCalls.contains("s1"))
+        viewModel.deleteServer(McpServerId("s1"))
+        assertTrue(fakeMcpRepo.deleteCalls.contains(McpServerId("s1")))
     }
 
     @Test
@@ -116,7 +118,7 @@ class McpViewModelTest {
     fun `updateServer calls repo`() = runTest {
         fakeMcpRepo.setServers(listOf(TestData.mcpServer(id = "s1")))
         viewModel.updateServer(
-            "s1",
+            McpServerId("s1"),
             McpServerUpdateParams(
                 serverName = "Updated",
                 config = buildJsonObject {
@@ -125,7 +127,7 @@ class McpViewModelTest {
                 }
             )
         )
-        assertTrue(fakeMcpRepo.updateCalls.contains("s1"))
+        assertTrue(fakeMcpRepo.updateCalls.contains(McpServerId("s1")))
     }
 
     @Test
@@ -136,8 +138,8 @@ class McpViewModelTest {
         val toolsForS2 = listOf(TestData.tool(id = "t2", name = "tool2"))
         
         fakeMcpRepo.setServers(listOf(server1, server2))
-        fakeMcpRepo.setServerTools("s1", toolsForS1)
-        fakeMcpRepo.setServerTools("s2", toolsForS2)
+        fakeMcpRepo.setServerTools(McpServerId("s1"), toolsForS1)
+        fakeMcpRepo.setServerTools(McpServerId("s2"), toolsForS2)
         fakeToolRepo.setTools(emptyList())
         
         viewModel.loadData()
@@ -145,8 +147,8 @@ class McpViewModelTest {
             val state = awaitItem() as UiState.Success
             assertEquals(2, state.data.servers.size)
             assertEquals(2, state.data.serverTools.size)
-            assertEquals(toolsForS1, state.data.serverTools["s1"])
-            assertEquals(toolsForS2, state.data.serverTools["s2"])
+            assertEquals(toolsForS1, state.data.serverTools[McpServerId("s1")])
+            assertEquals(toolsForS2, state.data.serverTools[McpServerId("s2")])
         }
     }
 
@@ -154,16 +156,16 @@ class McpViewModelTest {
     fun `checkServer marks server reachable on success`() = runTest {
         val server = TestData.mcpServer(id = "s1")
         fakeMcpRepo.setServers(listOf(server))
-        fakeMcpRepo.setServerTools("s1", listOf(TestData.tool(id = "t1")))
-        fakeMcpRepo.resyncResult = McpServerResyncResult(added = listOf("t1"))
+        fakeMcpRepo.setServerTools(McpServerId("s1"), listOf(TestData.tool(id = "t1")))
+        fakeMcpRepo.resyncResult = McpServerResyncResult(added = listOf(ToolId("t1")))
         viewModel.loadData()
 
-        viewModel.checkServer("s1")
+        viewModel.checkServer(McpServerId("s1"))
 
         viewModel.uiState.test {
             val state = awaitItem() as UiState.Success
-            assertTrue(state.data.serverChecks["s1"]?.isReachable == true)
-            assertTrue(state.data.serverChecks["s1"]?.message?.contains("+1 added") == true)
+            assertTrue(state.data.serverChecks[McpServerId("s1")]?.isReachable == true)
+            assertTrue(state.data.serverChecks[McpServerId("s1")]?.message?.contains("+1 added") == true)
         }
     }
 
@@ -175,11 +177,11 @@ class McpViewModelTest {
 
         fakeMcpRepo.failServerChecks = true
 
-        viewModel.checkServer("s1")
+        viewModel.checkServer(McpServerId("s1"))
 
         viewModel.uiState.test {
             val state = awaitItem() as UiState.Success
-            assertTrue(state.data.serverChecks["s1"]?.isReachable == false)
+            assertTrue(state.data.serverChecks[McpServerId("s1")]?.isReachable == false)
         }
     }
 
@@ -188,15 +190,15 @@ class McpViewModelTest {
         val server = TestData.mcpServer(id = "s1", serverName = "Server 1")
         val tool = TestData.tool(id = "t1", name = "tool1")
         fakeMcpRepo.setServers(listOf(server))
-        fakeMcpRepo.setServerTools("s1", listOf(tool))
+        fakeMcpRepo.setServerTools(McpServerId("s1"), listOf(tool))
         fakeToolRepo.setTools(listOf(tool))
 
         viewModel.loadData()
 
         viewModel.uiState.test {
             val state = awaitItem() as UiState.Success
-            assertEquals("s1", state.data.toolParents["t1"]?.serverId)
-            assertEquals("Server 1", state.data.toolParents["t1"]?.serverName)
+            assertEquals(McpServerId("s1"), state.data.toolParents[ToolId("t1")]?.serverId)
+            assertEquals("Server 1", state.data.toolParents[ToolId("t1")]?.serverName)
         }
     }
 
@@ -231,33 +233,33 @@ class McpViewModelTest {
 
     private class FakeMcpRepo : McpServerRepository(FakeMcpServerApi()) {
         private val _servers = MutableStateFlow<List<McpServer>>(emptyList())
-        private val _toolsByServer = MutableStateFlow<Map<String, List<Tool>>>(emptyMap())
+        private val _toolsByServer = MutableStateFlow<Map<McpServerId, List<Tool>>>(emptyMap())
         override val servers: StateFlow<List<McpServer>> = _servers.asStateFlow()
         var shouldFail = false
         var failServerChecks = false
         var resyncResult = McpServerResyncResult()
-        val deleteCalls = mutableListOf<String>()
+        val deleteCalls = mutableListOf<McpServerId>()
         val createCalls = mutableListOf<String>()
-        val updateCalls = mutableListOf<String>()
+        val updateCalls = mutableListOf<McpServerId>()
 
         fun setServers(list: List<McpServer>) { _servers.value = list }
-        fun setServerTools(serverId: String, tools: List<Tool>) {
+        fun setServerTools(serverId: McpServerId, tools: List<Tool>) {
             _toolsByServer.value = _toolsByServer.value.toMutableMap().apply {
                 put(serverId, tools)
             }
         }
         override suspend fun refreshServers() { if (shouldFail) throw Exception("Failed") }
-        override suspend fun refreshServerTools(serverId: String) {
+        override suspend fun refreshServerTools(serverId: McpServerId) {
             if (failServerChecks) throw Exception("check failed")
         }
-        override suspend fun resyncServerTools(serverId: String): McpServerResyncResult {
+        override suspend fun resyncServerTools(serverId: McpServerId): McpServerResyncResult {
             if (failServerChecks) throw Exception("check failed")
             return resyncResult
         }
-        override fun getServerTools(serverId: String): Flow<List<Tool>> {
+        override fun getServerTools(serverId: McpServerId): Flow<List<Tool>> {
             return _toolsByServer.map { it[serverId] ?: emptyList() }
         }
-        override suspend fun deleteServer(id: String) {
+        override suspend fun deleteServer(id: McpServerId) {
             deleteCalls.add(id)
             _servers.value = _servers.value.filter { it.id != id }
             _toolsByServer.value = _toolsByServer.value.toMutableMap().apply { remove(id) }
@@ -266,10 +268,10 @@ class McpViewModelTest {
             createCalls.add(params.serverName)
             return TestData.mcpServer(serverName = params.serverName)
         }
-        override suspend fun updateServer(id: String, params: McpServerUpdateParams): McpServer {
+        override suspend fun updateServer(id: McpServerId, params: McpServerUpdateParams): McpServer {
             updateCalls.add(id)
             val updated = TestData.mcpServer(
-                id = id,
+                id = id.value,
                 serverName = params.serverName ?: "Updated",
                 serverUrl = params.config?.get("server_url")?.toString()?.trim('"')
             )

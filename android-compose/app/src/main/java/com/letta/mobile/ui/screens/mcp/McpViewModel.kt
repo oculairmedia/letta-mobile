@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.McpServerCreateParams
+import com.letta.mobile.data.model.McpServerId
 import com.letta.mobile.data.model.McpServerUpdateParams
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.repository.api.IMcpServerRepository
 import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.ui.common.UiState
@@ -30,7 +32,7 @@ data class McpServerCheckState(
 
 @androidx.compose.runtime.Immutable
 data class McpToolParent(
-    val serverId: String,
+    val serverId: McpServerId,
     val serverName: String,
 )
 
@@ -39,9 +41,9 @@ data class McpUiState(
     val selectedTab: Int = 0,
     val servers: ImmutableList<McpServer> = persistentListOf(),
     val allTools: ImmutableList<Tool> = persistentListOf(),
-    val serverTools: Map<String, List<Tool>> = emptyMap(),
-    val serverChecks: Map<String, McpServerCheckState> = emptyMap(),
-    val toolParents: Map<String, McpToolParent> = emptyMap(),
+    val serverTools: Map<McpServerId, List<Tool>> = emptyMap(),
+    val serverChecks: Map<McpServerId, McpServerCheckState> = emptyMap(),
+    val toolParents: Map<ToolId, McpToolParent> = emptyMap(),
 )
 
 @HiltViewModel
@@ -66,8 +68,8 @@ class McpViewModel @Inject constructor(
                 toolRepository.refreshTools()
                 
                 val servers = mcpServerRepository.servers.value
-                val serverToolsMap = mutableMapOf<String, List<Tool>>()
-                val toolParents = mutableMapOf<String, McpToolParent>()
+                val serverToolsMap = mutableMapOf<McpServerId, List<Tool>>()
+                val toolParents = mutableMapOf<ToolId, McpToolParent>()
                 
                 servers.forEach { server ->
                     mcpServerRepository.refreshServerTools(server.id)
@@ -75,7 +77,7 @@ class McpViewModel @Inject constructor(
                     serverToolsMap[server.id] = tools
                     tools.forEach { tool ->
                         toolParents.putIfAbsent(
-                            tool.id.value,
+                            tool.id,
                             McpToolParent(serverId = server.id, serverName = server.serverName),
                         )
                     }
@@ -106,7 +108,7 @@ class McpViewModel @Inject constructor(
         }
     }
 
-    fun deleteServer(serverId: String) {
+    fun deleteServer(serverId: McpServerId) {
         viewModelScope.launch {
             try {
                 mcpServerRepository.deleteServer(serverId)
@@ -132,7 +134,7 @@ class McpViewModel @Inject constructor(
         }
     }
 
-    fun updateServer(serverId: String, params: McpServerUpdateParams) {
+    fun updateServer(serverId: McpServerId, params: McpServerUpdateParams) {
         viewModelScope.launch {
             try {
                 mcpServerRepository.updateServer(serverId, params)
@@ -149,7 +151,7 @@ class McpViewModel @Inject constructor(
         loadData()
     }
 
-    fun checkServer(serverId: String) {
+    fun checkServer(serverId: McpServerId) {
         viewModelScope.launch {
             val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
             _uiState.value = UiState.Success(

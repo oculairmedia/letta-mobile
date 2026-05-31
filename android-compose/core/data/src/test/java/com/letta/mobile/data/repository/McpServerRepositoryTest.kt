@@ -1,9 +1,11 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.model.McpServerId
 import com.letta.mobile.data.model.McpServerCreateParams
 import com.letta.mobile.data.model.McpServerResyncResult
 import com.letta.mobile.data.model.McpServerUpdateParams
 import com.letta.mobile.data.model.McpToolExecuteParams
+import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.model.effectiveServerType
 import com.letta.mobile.testutil.FakeMcpServerApi
 import com.letta.mobile.testutil.TestData
@@ -59,7 +61,7 @@ class McpServerRepositoryTest {
             }
         )
 
-        val updated = repository.updateServer("s1", params)
+        val updated = repository.updateServer(McpServerId("s1"), params)
 
         assertEquals("Updated Server", updated.serverName)
         assertEquals("https://example.com/mcp", updated.serverUrl)
@@ -72,14 +74,14 @@ class McpServerRepositoryTest {
     fun `deleteServer removes and cleans tools`() = runTest {
         fakeApi.servers.add(TestData.mcpServer(id = "s1"))
         repository.refreshServers()
-        repository.deleteServer("s1")
-        assertTrue(repository.servers.value.none { it.id == "s1" })
+        repository.deleteServer(McpServerId("s1"))
+        assertTrue(repository.servers.value.none { it.id == McpServerId("s1") })
     }
 
     @Test
     fun `refreshServerTools loads tools`() = runTest {
         fakeApi.serverTools["s1"] = listOf(TestData.tool(id = "t1"))
-        repository.refreshServerTools("s1")
+        repository.refreshServerTools(McpServerId("s1"))
         assertTrue(fakeApi.calls.contains("listMcpServerTools:s1"))
     }
 
@@ -93,16 +95,16 @@ class McpServerRepositoryTest {
         val refreshedTools = listOf(TestData.tool(id = "tool-2", name = "updatedTool"))
         fakeApi.serverTools["s1"] = refreshedTools
         fakeApi.resyncResults["s1"] = McpServerResyncResult(
-            deleted = listOf("oldTool"),
-            updated = listOf("updatedTool"),
-            added = listOf("newTool"),
+            deleted = listOf(ToolId("oldTool")),
+            updated = listOf(ToolId("updatedTool")),
+            added = listOf(ToolId("newTool")),
         )
 
-        val result = repository.resyncServerTools("s1")
+        val result = repository.resyncServerTools(McpServerId("s1"))
 
-        assertEquals(listOf("oldTool"), result.deleted)
-        assertEquals(listOf("updatedTool"), result.updated)
-        assertEquals(listOf("newTool"), result.added)
+        assertEquals(listOf(ToolId("oldTool")), result.deleted)
+        assertEquals(listOf(ToolId("updatedTool")), result.updated)
+        assertEquals(listOf(ToolId("newTool")), result.added)
         assertTrue(fakeApi.calls.contains("refreshMcpServerTools:s1"))
     }
 
@@ -111,8 +113,8 @@ class McpServerRepositoryTest {
         fakeApi.toolExecutionResults["s1" to "tool-1"] = TestData.mcpToolExecutionResult(status = "success")
 
         val result = repository.runServerTool(
-            serverId = "s1",
-            toolId = "tool-1",
+            serverId = McpServerId("s1"),
+            toolId = ToolId("tool-1"),
             params = McpToolExecuteParams(
                 buildJsonObject {
                     put("query", "hello")

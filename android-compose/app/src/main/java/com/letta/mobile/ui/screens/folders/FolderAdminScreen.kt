@@ -324,7 +324,7 @@ private fun FolderDetailDialog(
             CardGroup {
                 item(
                     headlineContent = { Text(stringResource(R.string.screen_folders_id_label, "")) },
-                    supportingContent = { Text(folder.id, style = MaterialTheme.typography.bodySmall, fontFamily = LettaCodeFont) },
+                    supportingContent = { Text(folder.id.value, style = MaterialTheme.typography.bodySmall, fontFamily = LettaCodeFont) },
                 )
                 folder.description?.let { description ->
                     item(

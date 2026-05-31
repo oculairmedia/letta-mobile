@@ -1,7 +1,9 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Identity
 import com.letta.mobile.data.model.IdentityCreateParams
+import com.letta.mobile.data.model.IdentityId
 import com.letta.mobile.data.model.IdentityUpdateParams
 import com.letta.mobile.data.model.IdentityUpsertParams
 import com.letta.mobile.testutil.FakeIdentityApi
@@ -51,7 +53,7 @@ class IdentityRepositoryTest {
         fakeApi.identities.add(sampleIdentity("identity-1"))
         repository.refreshIdentities()
 
-        val updated = repository.updateIdentity("identity-1", IdentityUpdateParams(name = "Updated"))
+        val updated = repository.updateIdentity(IdentityId("identity-1"), IdentityUpdateParams(name = "Updated"))
 
         assertEquals("Updated", updated.name)
         assertEquals("Updated", repository.identities.first().first().name)
@@ -62,20 +64,20 @@ class IdentityRepositoryTest {
         fakeApi.identities.add(sampleIdentity("identity-1"))
         repository.refreshIdentities()
 
-        repository.deleteIdentity("identity-1")
+        repository.deleteIdentity(IdentityId("identity-1"))
 
         assertTrue(repository.identities.first().isEmpty())
     }
 
     @Test
     fun `attachIdentity delegates to api`() = runTest {
-        repository.attachIdentity("agent-1", "identity-1")
+        repository.attachIdentity(AgentId("agent-1"), IdentityId("identity-1"))
         assertTrue(fakeApi.calls.contains("attachIdentity:agent-1:identity-1"))
     }
 
     @Test
     fun `detachIdentity delegates to api`() = runTest {
-        repository.detachIdentity("agent-1", "identity-1")
+        repository.detachIdentity(AgentId("agent-1"), IdentityId("identity-1"))
         assertTrue(fakeApi.calls.contains("detachIdentity:agent-1:identity-1"))
     }
 
@@ -93,13 +95,13 @@ class IdentityRepositoryTest {
     fun `getIdentity retrieves identity by id`() = runTest {
         fakeApi.identities.add(sampleIdentity("identity-1"))
 
-        val identity = repository.getIdentity("identity-1")
+        val identity = repository.getIdentity(IdentityId("identity-1"))
 
-        assertEquals("identity-1", identity.id)
+        assertEquals(IdentityId("identity-1"), identity.id)
     }
 
     private fun sampleIdentity(id: String) = Identity(
-        id = id,
+        id = IdentityId(id),
         identifierKey = "user-1",
         name = "User One",
         identityType = "user",

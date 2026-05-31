@@ -4,6 +4,7 @@ import com.letta.mobile.data.api.FolderApi
 import com.letta.mobile.data.model.FileMetadata
 import com.letta.mobile.data.model.Folder
 import com.letta.mobile.data.model.FolderCreateParams
+import com.letta.mobile.data.model.FolderId
 import com.letta.mobile.data.model.FolderUpdateParams
 import com.letta.mobile.data.model.OrganizationSourcesStats
 import com.letta.mobile.data.model.Passage
@@ -26,8 +27,8 @@ class FolderRepository(
 
     override suspend fun countFolders(): Int = folderApi.countFolders()
 
-    override suspend fun getFolder(folderId: String): Folder {
-        return folderApi.retrieveFolder(folderId)
+    override suspend fun getFolder(folderId: FolderId): Folder {
+        return folderApi.retrieveFolder(folderId.value)
     }
 
     override suspend fun getFolderMetadata(includeDetailedPerSourceMetadata: Boolean): OrganizationSourcesStats {
@@ -40,42 +41,42 @@ class FolderRepository(
         return folder
     }
 
-    override suspend fun updateFolder(folderId: String, params: FolderUpdateParams): Folder {
-        val folder = folderApi.updateFolder(folderId, params)
+    override suspend fun updateFolder(folderId: FolderId, params: FolderUpdateParams): Folder {
+        val folder = folderApi.updateFolder(folderId.value, params)
         upsertFolder(folder)
         return folder
     }
 
-    override suspend fun deleteFolder(folderId: String) {
-        folderApi.deleteFolder(folderId)
+    override suspend fun deleteFolder(folderId: FolderId) {
+        folderApi.deleteFolder(folderId.value)
         _folders.update { current -> current.filterNot { it.id == folderId } }
     }
 
     override suspend fun uploadFileToFolder(
-        folderId: String,
+        folderId: FolderId,
         fileName: String,
         fileBytes: ByteArray,
         duplicateHandling: String?,
         customName: String?,
         contentType: ContentType,
     ): FileMetadata {
-        return folderApi.uploadFileToFolder(folderId, fileName, fileBytes, duplicateHandling, customName, contentType)
+        return folderApi.uploadFileToFolder(folderId.value, fileName, fileBytes, duplicateHandling, customName, contentType)
     }
 
-    override suspend fun listAgentsForFolder(folderId: String): List<String> {
-        return folderApi.listAgentsForFolder(folderId = folderId, limit = 1000)
+    override suspend fun listAgentsForFolder(folderId: FolderId): List<String> {
+        return folderApi.listAgentsForFolder(folderId = folderId.value, limit = 1000)
     }
 
-    override suspend fun listFolderPassages(folderId: String): List<Passage> {
-        return folderApi.listFolderPassages(folderId = folderId, limit = 1000)
+    override suspend fun listFolderPassages(folderId: FolderId): List<Passage> {
+        return folderApi.listFolderPassages(folderId = folderId.value, limit = 1000)
     }
 
-    override suspend fun listFolderFiles(folderId: String, includeContent: Boolean): List<FileMetadata> {
-        return folderApi.listFolderFiles(folderId = folderId, limit = 1000, includeContent = includeContent)
+    override suspend fun listFolderFiles(folderId: FolderId, includeContent: Boolean): List<FileMetadata> {
+        return folderApi.listFolderFiles(folderId = folderId.value, limit = 1000, includeContent = includeContent)
     }
 
-    override suspend fun deleteFileFromFolder(folderId: String, fileId: String) {
-        folderApi.deleteFileFromFolder(folderId, fileId)
+    override suspend fun deleteFileFromFolder(folderId: FolderId, fileId: String) {
+        folderApi.deleteFileFromFolder(folderId.value, fileId)
     }
 
     private fun upsertFolder(folder: Folder) {

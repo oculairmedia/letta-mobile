@@ -8,6 +8,7 @@ import com.letta.mobile.data.model.BlockId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.McpServer
+import com.letta.mobile.data.model.McpServerId
 import com.letta.mobile.data.model.McpToolExecutionResult
 import com.letta.mobile.data.model.MessageType
 import com.letta.mobile.data.model.Tool
@@ -93,7 +94,7 @@ object TestData {
         serverName: String = "Test MCP",
         serverUrl: String? = "http://localhost:8080",
     ) = McpServer(
-        id = id,
+        id = McpServerId(id),
         serverName = serverName,
         serverUrl = serverUrl,
         type = "streamable_http",

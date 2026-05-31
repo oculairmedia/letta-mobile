@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.FileMetadata
 import com.letta.mobile.data.model.Folder
 import com.letta.mobile.data.model.FolderCreateParams
+import com.letta.mobile.data.model.FolderId
 import com.letta.mobile.data.model.FolderUpdateParams
 import com.letta.mobile.data.model.OrganizationSourcesStats
 import com.letta.mobile.data.model.Passage
@@ -92,7 +93,7 @@ class FolderAdminViewModel @Inject constructor(
         }
     }
 
-    fun inspectFolder(folderId: String) {
+    fun inspectFolder(folderId: FolderId) {
         viewModelScope.launch {
             val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
             try {
@@ -144,7 +145,7 @@ class FolderAdminViewModel @Inject constructor(
         }
     }
 
-    fun updateFolder(folderId: String, name: String, description: String?, instructions: String?, onSuccess: () -> Unit = {}) {
+    fun updateFolder(folderId: FolderId, name: String, description: String?, instructions: String?, onSuccess: () -> Unit = {}) {
         viewModelScope.launch {
             try {
                 val folder = folderRepository.updateFolder(
@@ -173,7 +174,7 @@ class FolderAdminViewModel @Inject constructor(
         }
     }
 
-    fun deleteFolder(folderId: String) {
+    fun deleteFolder(folderId: FolderId) {
         viewModelScope.launch {
             try {
                 folderRepository.deleteFolder(folderId)

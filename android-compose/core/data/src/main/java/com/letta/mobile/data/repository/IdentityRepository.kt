@@ -2,9 +2,11 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.api.IdentityApi
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.Identity
 import com.letta.mobile.data.model.IdentityCreateParams
+import com.letta.mobile.data.model.IdentityId
 import com.letta.mobile.data.model.IdentityProperty
 import com.letta.mobile.data.model.IdentityUpdateParams
 import com.letta.mobile.data.model.IdentityUpsertParams
@@ -28,8 +30,8 @@ class IdentityRepository(
         return identityApi.countIdentities()
     }
 
-    override suspend fun getIdentity(identityId: String): Identity {
-        return identityApi.retrieveIdentity(identityId)
+    override suspend fun getIdentity(identityId: IdentityId): Identity {
+        return identityApi.retrieveIdentity(identityId.value)
     }
 
     override suspend fun createIdentity(params: IdentityCreateParams): Identity {
@@ -44,37 +46,37 @@ class IdentityRepository(
         return identity
     }
 
-    override suspend fun updateIdentity(identityId: String, params: IdentityUpdateParams): Identity {
-        val identity = identityApi.updateIdentity(identityId, params)
+    override suspend fun updateIdentity(identityId: IdentityId, params: IdentityUpdateParams): Identity {
+        val identity = identityApi.updateIdentity(identityId.value, params)
         upsertIdentityInCache(identity)
         return identity
     }
 
-    override suspend fun upsertIdentityProperties(identityId: String, properties: List<IdentityProperty>): Identity {
-        val identity = identityApi.upsertIdentityProperties(identityId, properties)
+    override suspend fun upsertIdentityProperties(identityId: IdentityId, properties: List<IdentityProperty>): Identity {
+        val identity = identityApi.upsertIdentityProperties(identityId.value, properties)
         upsertIdentityInCache(identity)
         return identity
     }
 
-    override suspend fun deleteIdentity(identityId: String) {
-        identityApi.deleteIdentity(identityId)
+    override suspend fun deleteIdentity(identityId: IdentityId) {
+        identityApi.deleteIdentity(identityId.value)
         _identities.update { current -> current.filterNot { it.id == identityId } }
     }
 
-    override suspend fun attachIdentity(agentId: String, identityId: String) {
-        identityApi.attachIdentity(agentId, identityId)
+    override suspend fun attachIdentity(agentId: AgentId, identityId: IdentityId) {
+        identityApi.attachIdentity(agentId.value, identityId.value)
     }
 
-    override suspend fun detachIdentity(agentId: String, identityId: String) {
-        identityApi.detachIdentity(agentId, identityId)
+    override suspend fun detachIdentity(agentId: AgentId, identityId: IdentityId) {
+        identityApi.detachIdentity(agentId.value, identityId.value)
     }
 
-    override suspend fun listAgentsForIdentity(identityId: String): List<Agent> {
-        return identityApi.listAgentsForIdentity(identityId = identityId, limit = 1000)
+    override suspend fun listAgentsForIdentity(identityId: IdentityId): List<Agent> {
+        return identityApi.listAgentsForIdentity(identityId = identityId.value, limit = 1000)
     }
 
-    override suspend fun listBlocksForIdentity(identityId: String): List<Block> {
-        return identityApi.listBlocksForIdentity(identityId = identityId, limit = 1000)
+    override suspend fun listBlocksForIdentity(identityId: IdentityId): List<Block> {
+        return identityApi.listBlocksForIdentity(identityId = identityId.value, limit = 1000)
     }
 
     private fun upsertIdentityInCache(identity: Identity) {

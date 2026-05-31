@@ -3,6 +3,7 @@ package com.letta.mobile.data.repository
 import com.letta.mobile.data.model.Provider
 import com.letta.mobile.data.model.ProviderCheckParams
 import com.letta.mobile.data.model.ProviderCreateParams
+import com.letta.mobile.data.model.ProviderId
 import com.letta.mobile.data.model.ProviderUpdateParams
 import com.letta.mobile.testutil.FakeProviderApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -28,7 +29,7 @@ class ProviderRepositoryTest {
 
     @Test
     fun `refreshProviders updates state flow`() = runTest {
-        fakeApi.providers.add(Provider(id = "provider-1", name = "OpenAI", providerType = "openai"))
+        fakeApi.providers.add(Provider(id = ProviderId("provider-1"), name = "OpenAI", providerType = "openai"))
 
         repository.refreshProviders()
 
@@ -45,10 +46,10 @@ class ProviderRepositoryTest {
 
     @Test
     fun `updateProvider updates cache`() = runTest {
-        fakeApi.providers.add(Provider(id = "provider-1", name = "OpenAI", providerType = "openai", apiKey = "old"))
+        fakeApi.providers.add(Provider(id = ProviderId("provider-1"), name = "OpenAI", providerType = "openai", apiKey = "old"))
         repository.refreshProviders()
 
-        repository.updateProvider("provider-1", ProviderUpdateParams(apiKey = "new"))
+        repository.updateProvider(ProviderId("provider-1"), ProviderUpdateParams(apiKey = "new"))
 
         assertEquals("new", repository.providers.first().first().apiKey)
     }

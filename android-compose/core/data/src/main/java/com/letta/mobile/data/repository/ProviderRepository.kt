@@ -4,6 +4,7 @@ import com.letta.mobile.data.api.ProviderApi
 import com.letta.mobile.data.model.Provider
 import com.letta.mobile.data.model.ProviderCheckParams
 import com.letta.mobile.data.model.ProviderCreateParams
+import com.letta.mobile.data.model.ProviderId
 import com.letta.mobile.data.model.ProviderUpdateParams
 import com.letta.mobile.data.repository.api.IProviderRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,8 +22,8 @@ class ProviderRepository(
         _providers.value = providerApi.listProviders(limit = 1000, name = name, providerType = providerType)
     }
 
-    override suspend fun getProvider(providerId: String): Provider {
-        return providerApi.retrieveProvider(providerId)
+    override suspend fun getProvider(providerId: ProviderId): Provider {
+        return providerApi.retrieveProvider(providerId.value)
     }
 
     override suspend fun createProvider(params: ProviderCreateParams): Provider {
@@ -31,8 +32,8 @@ class ProviderRepository(
         return provider
     }
 
-    override suspend fun updateProvider(providerId: String, params: ProviderUpdateParams): Provider {
-        val provider = providerApi.updateProvider(providerId, params)
+    override suspend fun updateProvider(providerId: ProviderId, params: ProviderUpdateParams): Provider {
+        val provider = providerApi.updateProvider(providerId.value, params)
         upsertProvider(provider)
         return provider
     }
@@ -41,12 +42,12 @@ class ProviderRepository(
         providerApi.checkProvider(params)
     }
 
-    override suspend fun checkExistingProvider(providerId: String) {
-        providerApi.checkExistingProvider(providerId)
+    override suspend fun checkExistingProvider(providerId: ProviderId) {
+        providerApi.checkExistingProvider(providerId.value)
     }
 
-    override suspend fun deleteProvider(providerId: String) {
-        providerApi.deleteProvider(providerId)
+    override suspend fun deleteProvider(providerId: ProviderId) {
+        providerApi.deleteProvider(providerId.value)
         _providers.update { current -> current.filterNot { it.id == providerId } }
     }
 

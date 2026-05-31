@@ -3,8 +3,10 @@ package com.letta.mobile.ui.screens.identities
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Identity
 import com.letta.mobile.data.model.IdentityCreateParams
+import com.letta.mobile.data.model.IdentityId
 import com.letta.mobile.data.model.IdentityUpdateParams
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IIdentityRepository
@@ -80,7 +82,7 @@ class IdentityListViewModel @Inject constructor(
         }
     }
 
-    fun inspectIdentity(identityId: String) {
+    fun inspectIdentity(identityId: IdentityId) {
         viewModelScope.launch {
             val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
             try {
@@ -114,7 +116,7 @@ class IdentityListViewModel @Inject constructor(
         }
     }
 
-    fun updateIdentity(identityId: String, params: IdentityUpdateParams, onSuccess: () -> Unit = {}) {
+    fun updateIdentity(identityId: IdentityId, params: IdentityUpdateParams, onSuccess: () -> Unit = {}) {
         viewModelScope.launch {
             try {
                 val updated = identityRepository.updateIdentity(identityId, params)
@@ -136,7 +138,7 @@ class IdentityListViewModel @Inject constructor(
         }
     }
 
-    fun deleteIdentity(identityId: String) {
+    fun deleteIdentity(identityId: IdentityId) {
         viewModelScope.launch {
             try {
                 identityRepository.deleteIdentity(identityId)
@@ -154,7 +156,7 @@ class IdentityListViewModel @Inject constructor(
         }
     }
 
-    fun attachIdentity(agentId: String, identityId: String, onSuccess: () -> Unit = {}) {
+    fun attachIdentity(agentId: AgentId, identityId: IdentityId, onSuccess: () -> Unit = {}) {
         viewModelScope.launch {
             try {
                 identityRepository.attachIdentity(agentId, identityId)
@@ -166,7 +168,7 @@ class IdentityListViewModel @Inject constructor(
         }
     }
 
-    fun detachIdentity(agentId: String, identityId: String) {
+    fun detachIdentity(agentId: AgentId, identityId: IdentityId) {
         viewModelScope.launch {
             try {
                 identityRepository.detachIdentity(agentId, identityId)
@@ -177,7 +179,7 @@ class IdentityListViewModel @Inject constructor(
         }
     }
 
-    private suspend fun refreshSelectedIdentity(identityId: String) {
+    private suspend fun refreshSelectedIdentity(identityId: IdentityId) {
         val current = (_uiState.value as? UiState.Success)?.data ?: return
         val identity = identityRepository.getIdentity(identityId)
         val knownAgents = try {

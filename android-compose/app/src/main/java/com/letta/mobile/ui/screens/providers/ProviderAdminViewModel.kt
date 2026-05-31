@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.Provider
 import com.letta.mobile.data.model.ProviderCreateParams
+import com.letta.mobile.data.model.ProviderId
 import com.letta.mobile.data.model.ProviderUpdateParams
 import com.letta.mobile.data.repository.api.IProviderRepository
 import com.letta.mobile.ui.common.UiState
@@ -79,7 +80,7 @@ class ProviderAdminViewModel @Inject constructor(
         }
     }
 
-    fun inspectProvider(providerId: String) {
+    fun inspectProvider(providerId: ProviderId) {
         viewModelScope.launch {
             val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
             try {
@@ -139,7 +140,7 @@ class ProviderAdminViewModel @Inject constructor(
     }
 
     fun updateProvider(
-        providerId: String,
+        providerId: ProviderId,
         apiKey: String,
         baseUrl: String,
         accessKey: String,
@@ -176,7 +177,7 @@ class ProviderAdminViewModel @Inject constructor(
         }
     }
 
-    fun deleteProvider(providerId: String) {
+    fun deleteProvider(providerId: ProviderId) {
         viewModelScope.launch {
             try {
                 providerRepository.deleteProvider(providerId)
@@ -196,7 +197,7 @@ class ProviderAdminViewModel @Inject constructor(
         }
     }
 
-    fun checkProvider(providerId: String) {
+    fun checkProvider(providerId: ProviderId) {
         viewModelScope.launch {
             try {
                 providerRepository.checkExistingProvider(providerId)

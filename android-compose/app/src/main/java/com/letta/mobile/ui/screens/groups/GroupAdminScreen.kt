@@ -200,9 +200,9 @@ fun GroupAdminScreen(
             title = stringResource(R.string.screen_groups_edit_title),
             confirmLabel = stringResource(R.string.action_save),
             initialDescription = group.description,
-            initialAgentIds = group.agentIds.joinToString(", "),
-            initialProjectId = group.projectId.orEmpty(),
-            initialSharedBlockIds = group.sharedBlockIds.joinToString(", "),
+            initialAgentIds = group.agentIds.joinToString(", ") { it.value },
+            initialProjectId = group.projectId?.value.orEmpty(),
+            initialSharedBlockIds = group.sharedBlockIds.joinToString(", ") { it.value },
             initialHidden = group.hidden == true,
             onDismiss = { editTarget = null },
             onConfirm = { description, agentIds, projectId, sharedBlockIds, hidden ->
@@ -217,7 +217,7 @@ fun GroupAdminScreen(
         ConfirmDialog(
             show = true,
             title = stringResource(R.string.screen_groups_delete_title),
-            message = stringResource(R.string.screen_groups_delete_confirm, group.id),
+            message = stringResource(R.string.screen_groups_delete_confirm, group.id.value),
             confirmText = stringResource(R.string.action_delete),
             dismissText = stringResource(R.string.action_cancel),
             onConfirm = {
@@ -247,7 +247,7 @@ fun GroupAdminScreen(
         ConfirmDialog(
             show = true,
             title = stringResource(R.string.screen_groups_reset_messages_title),
-            message = stringResource(R.string.screen_groups_reset_messages_confirm, group.id),
+            message = stringResource(R.string.screen_groups_reset_messages_confirm, group.id.value),
             confirmText = stringResource(R.string.action_reset_messages),
             dismissText = stringResource(R.string.action_cancel),
             onConfirm = {
@@ -306,13 +306,13 @@ private fun GroupCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = group.description.ifBlank { group.id },
+                        text = group.description.ifBlank { group.id.value },
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(group.id, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(group.id.value, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 IconButton(onClick = { showContextMenu = true }) {
                     Icon(LettaIcons.MoreVert, contentDescription = stringResource(R.string.action_more))
@@ -332,7 +332,7 @@ private fun GroupCard(
     ActionSheet(
         show = showContextMenu,
         onDismiss = { showContextMenu = false },
-        title = group.description.ifBlank { group.id },
+        title = group.description.ifBlank { group.id.value },
     ) {
         ActionSheetItem(
             text = stringResource(R.string.screen_groups_edit_title),
@@ -365,7 +365,7 @@ private fun GroupDetailDialog(
 ) {
     ConfirmDialog(
         show = true,
-        title = group.id,
+        title = group.id.value,
         confirmText = stringResource(R.string.action_close),
         dismissText = stringResource(R.string.action_close),
         onConfirm = onDismiss,
@@ -384,24 +384,24 @@ private fun GroupDetailDialog(
                     )
                     item(
                         headlineContent = { Text(stringResource(R.string.screen_groups_agents_label, "")) },
-                        supportingContent = { Text(group.agentIds.joinToString(), style = MaterialTheme.typography.listItemSupporting) },
+                        supportingContent = { Text(group.agentIds.joinToString { it.value }, style = MaterialTheme.typography.listItemSupporting) },
                     )
                     group.projectId?.let { projectId ->
                         item(
                             headlineContent = { Text(stringResource(R.string.screen_groups_project_label, "")) },
-                            supportingContent = { Text(projectId, style = MaterialTheme.typography.listItemSupporting) },
+                            supportingContent = { Text(projectId.value, style = MaterialTheme.typography.listItemSupporting) },
                         )
                     }
                     if (group.sharedBlockIds.isNotEmpty()) {
                         item(
                             headlineContent = { Text(stringResource(R.string.screen_groups_shared_blocks_label, "")) },
-                            supportingContent = { Text(group.sharedBlockIds.joinToString(), style = MaterialTheme.typography.listItemSupporting) },
+                            supportingContent = { Text(group.sharedBlockIds.joinToString { it.value }, style = MaterialTheme.typography.listItemSupporting) },
                         )
                     }
                     group.managerAgentId?.let { managerId ->
                         item(
                             headlineContent = { Text(stringResource(R.string.screen_groups_manager_agent_label, "")) },
-                            supportingContent = { Text(managerId, style = MaterialTheme.typography.listItemSupporting) },
+                            supportingContent = { Text(managerId.value, style = MaterialTheme.typography.listItemSupporting) },
                         )
                     }
                     group.templateId?.let { templateId ->

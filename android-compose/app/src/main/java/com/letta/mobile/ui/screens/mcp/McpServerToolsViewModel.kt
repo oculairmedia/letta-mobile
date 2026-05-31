@@ -4,10 +4,12 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.McpServer
+import com.letta.mobile.data.model.McpServerId
 import com.letta.mobile.data.model.McpServerResyncResult
 import com.letta.mobile.data.model.McpToolExecuteParams
 import com.letta.mobile.data.model.McpToolExecutionResult
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.repository.api.IMcpServerRepository
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.util.mapErrorToUserMessage
@@ -27,7 +29,7 @@ import kotlinx.serialization.json.jsonObject
 
 @androidx.compose.runtime.Immutable
 data class McpToolRunState(
-    val activeToolId: String? = null,
+    val activeToolId: ToolId? = null,
     val result: McpToolExecutionResult? = null,
     val errorMessage: String? = null,
 )
@@ -47,9 +49,9 @@ class McpServerToolsViewModel @Inject constructor(
     private val mcpServerRepository: IMcpServerRepository,
 ) : ViewModel() {
 
-    private val serverId: String = requireNotNull(savedStateHandle.get<String>("serverId")) {
+    private val serverId: McpServerId = McpServerId(requireNotNull(savedStateHandle.get<String>("serverId")) {
         "Missing serverId in McpServerToolsViewModel navigation arguments"
-    }
+    })
 
     private val _uiState = MutableStateFlow<UiState<McpServerToolsUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<McpServerToolsUiState>> = _uiState.asStateFlow()
@@ -99,7 +101,7 @@ class McpServerToolsViewModel @Inject constructor(
         }
     }
 
-    fun runTool(toolId: String, rawArgs: String) {
+    fun runTool(toolId: ToolId, rawArgs: String) {
         viewModelScope.launch {
             val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
             val parsedArgs = parseArgs(rawArgs)

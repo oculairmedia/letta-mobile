@@ -1,6 +1,9 @@
 package com.letta.mobile.ui.screens.groups
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Group
+import com.letta.mobile.data.model.GroupId
+import com.letta.mobile.data.model.ProjectId
 import com.letta.mobile.data.repository.GroupRepository
 import com.letta.mobile.testutil.FakeGroupApi
 import kotlinx.coroutines.Dispatchers
@@ -31,8 +34,8 @@ class GroupAdminViewModelTest {
         fakeApi = FakeGroupApi()
         fakeApi.groups.addAll(
             listOf(
-                Group(id = "group-1", managerType = "round_robin", agentIds = listOf("agent-1"), description = "Primary group", projectId = "proj-1"),
-                Group(id = "group-2", managerType = "supervisor", agentIds = listOf("agent-2"), description = "Secondary group"),
+                Group(id = GroupId("group-1"), managerType = "round_robin", agentIds = listOf(AgentId("agent-1")), description = "Primary group", projectId = ProjectId("proj-1")),
+                Group(id = GroupId("group-2"), managerType = "supervisor", agentIds = listOf(AgentId("agent-2")), description = "Secondary group"),
             )
         )
         repository = GroupRepository(fakeApi)
@@ -59,21 +62,21 @@ class GroupAdminViewModelTest {
 
         val filtered = viewModel.getFilteredGroups()
         assertEquals(1, filtered.size)
-        assertEquals("group-2", filtered.first().id)
+        assertEquals(GroupId("group-2"), filtered.first().id)
     }
 
     @Test
     fun `inspectGroup loads messages`() = runTest {
-        viewModel.inspectGroup("group-1")
+        viewModel.inspectGroup(GroupId("group-1"))
 
         val state = viewModel.uiState.value as com.letta.mobile.ui.common.UiState.Success
-        assertEquals("group-1", state.data.selectedGroup?.id)
+        assertEquals(GroupId("group-1"), state.data.selectedGroup?.id)
         assertEquals(1, state.data.selectedMessages.size)
     }
 
     @Test
     fun `sendMessage delegates to repository and updates notice`() = runTest {
-        viewModel.sendMessage("group-1", "hello")
+        viewModel.sendMessage(GroupId("group-1"), "hello")
 
         val state = viewModel.uiState.value as com.letta.mobile.ui.common.UiState.Success
         assertTrue(fakeApi.calls.contains("sendGroupMessage:group-1"))
@@ -82,7 +85,7 @@ class GroupAdminViewModelTest {
 
     @Test
     fun `deleteGroup removes group`() = runTest {
-        viewModel.deleteGroup("group-1")
+        viewModel.deleteGroup(GroupId("group-1"))
 
         val state = viewModel.uiState.value as com.letta.mobile.ui.common.UiState.Success
         assertEquals(1, state.data.groups.size)
