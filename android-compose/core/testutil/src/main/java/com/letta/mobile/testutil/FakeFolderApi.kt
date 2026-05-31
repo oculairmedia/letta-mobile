@@ -5,6 +5,7 @@ import com.letta.mobile.data.api.FolderApi
 import com.letta.mobile.data.model.FileMetadata
 import com.letta.mobile.data.model.Folder
 import com.letta.mobile.data.model.FolderCreateParams
+import com.letta.mobile.data.model.FolderId
 import com.letta.mobile.data.model.FolderUpdateParams
 import com.letta.mobile.data.model.OrganizationSourcesStats
 import com.letta.mobile.data.model.Passage
@@ -31,7 +32,7 @@ class FakeFolderApi : FolderApi(mockk(relaxed = true)) {
     override suspend fun retrieveFolder(folderId: String): Folder {
         calls.add("retrieveFolder:$folderId")
         if (shouldFail) throw ApiException(500, "Server error")
-        return folders.firstOrNull { it.id == folderId } ?: throw ApiException(404, "Not found")
+        return folders.firstOrNull { it.id.value == folderId } ?: throw ApiException(404, "Not found")
     }
 
     override suspend fun retrieveFolderMetadata(includeDetailedPerSourceMetadata: Boolean): OrganizationSourcesStats {
@@ -43,7 +44,7 @@ class FakeFolderApi : FolderApi(mockk(relaxed = true)) {
     override suspend fun createFolder(params: FolderCreateParams): Folder {
         calls.add("createFolder:${params.name}")
         if (shouldFail) throw ApiException(500, "Server error")
-        val folder = Folder(id = "source-${folders.size + 1}", name = params.name, description = params.description, instructions = params.instructions, embeddingConfig = params.embeddingConfig)
+        val folder = Folder(id = FolderId("source-${folders.size + 1}"), name = params.name, description = params.description, instructions = params.instructions, embeddingConfig = params.embeddingConfig)
         folders.add(folder)
         return folder
     }
@@ -51,7 +52,7 @@ class FakeFolderApi : FolderApi(mockk(relaxed = true)) {
     override suspend fun updateFolder(folderId: String, params: FolderUpdateParams): Folder {
         calls.add("updateFolder:$folderId")
         if (shouldFail) throw ApiException(500, "Server error")
-        val index = folders.indexOfFirst { it.id == folderId }
+        val index = folders.indexOfFirst { it.id.value == folderId }
         if (index < 0) throw ApiException(404, "Not found")
         val updated = folders[index].copy(
             name = params.name ?: folders[index].name,
@@ -65,7 +66,7 @@ class FakeFolderApi : FolderApi(mockk(relaxed = true)) {
     override suspend fun deleteFolder(folderId: String) {
         calls.add("deleteFolder:$folderId")
         if (shouldFail) throw ApiException(500, "Server error")
-        folders.removeAll { it.id == folderId }
+        folders.removeAll { it.id.value == folderId }
     }
 
     override suspend fun uploadFileToFolder(
@@ -78,7 +79,7 @@ class FakeFolderApi : FolderApi(mockk(relaxed = true)) {
     ): FileMetadata {
         calls.add("uploadFileToFolder:$folderId:$fileName")
         if (shouldFail) throw ApiException(500, "Server error")
-        return FileMetadata(id = "file-1", sourceId = folderId, fileName = customName ?: fileName)
+        return FileMetadata(id = "file-1", sourceId = FolderId(folderId), fileName = customName ?: fileName)
     }
 
     override suspend fun listAgentsForFolder(folderId: String, limit: Int?, before: String?, after: String?, order: String?): List<String> {
@@ -96,7 +97,7 @@ class FakeFolderApi : FolderApi(mockk(relaxed = true)) {
     override suspend fun listFolderFiles(folderId: String, limit: Int?, before: String?, after: String?, order: String?, includeContent: Boolean?): List<FileMetadata> {
         calls.add("listFolderFiles:$folderId")
         if (shouldFail) throw ApiException(500, "Server error")
-        return listOf(FileMetadata(id = "file-1", sourceId = folderId, fileName = "doc.txt"))
+        return listOf(FileMetadata(id = "file-1", sourceId = FolderId(folderId), fileName = "doc.txt"))
     }
 
     override suspend fun deleteFileFromFolder(folderId: String, fileId: String) {

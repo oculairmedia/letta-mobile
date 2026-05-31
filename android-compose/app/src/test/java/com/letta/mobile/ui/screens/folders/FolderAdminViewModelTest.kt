@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.screens.folders
 
 import com.letta.mobile.data.model.Folder
+import com.letta.mobile.data.model.FolderId
 import com.letta.mobile.data.repository.FolderRepository
 import com.letta.mobile.testutil.FakeFolderApi
 import kotlinx.coroutines.Dispatchers
@@ -30,8 +31,8 @@ class FolderAdminViewModelTest {
         fakeApi = FakeFolderApi()
         fakeApi.folders.addAll(
             listOf(
-                Folder(id = "folder-1", name = "Docs", description = "Primary docs", instructions = "Summarize"),
-                Folder(id = "folder-2", name = "Logs", description = "Run logs", instructions = "Index"),
+                Folder(id = FolderId("folder-1"), name = "Docs", description = "Primary docs", instructions = "Summarize"),
+                Folder(id = FolderId("folder-2"), name = "Logs", description = "Run logs", instructions = "Index"),
             )
         )
         repository = FolderRepository(fakeApi)
@@ -59,15 +60,15 @@ class FolderAdminViewModelTest {
 
         val filtered = viewModel.getFilteredFolders()
         assertEquals(1, filtered.size)
-        assertEquals("folder-2", filtered.first().id)
+        assertEquals(FolderId("folder-2"), filtered.first().id)
     }
 
     @Test
     fun `inspectFolder loads related data`() = runTest {
-        viewModel.inspectFolder("folder-1")
+        viewModel.inspectFolder(FolderId("folder-1"))
 
         val state = viewModel.uiState.value as com.letta.mobile.ui.common.UiState.Success
-        assertEquals("folder-1", state.data.selectedFolder?.id)
+        assertEquals(FolderId("folder-1"), state.data.selectedFolder?.id)
         assertEquals(1, state.data.selectedFolderAgents.size)
         assertEquals(1, state.data.selectedFolderFiles.size)
         assertEquals(1, state.data.selectedFolderPassages.size)
@@ -83,7 +84,7 @@ class FolderAdminViewModelTest {
 
     @Test
     fun `deleteFolder removes folder`() = runTest {
-        viewModel.deleteFolder("folder-1")
+        viewModel.deleteFolder(FolderId("folder-1"))
 
         val state = viewModel.uiState.value as com.letta.mobile.ui.common.UiState.Success
         assertEquals(1, state.data.folders.size)

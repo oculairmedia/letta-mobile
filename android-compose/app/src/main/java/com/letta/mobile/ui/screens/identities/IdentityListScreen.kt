@@ -46,6 +46,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.BlockId
 import com.letta.mobile.data.model.Identity
 import com.letta.mobile.data.model.IdentityCreateParams
 import com.letta.mobile.data.model.IdentityUpdateParams
@@ -355,7 +356,7 @@ private fun IdentityDetailDialog(
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
     onAttachAgent: () -> Unit,
-    onDetachAgent: (String) -> Unit,
+    onDetachAgent: (AgentId) -> Unit,
 ) {
     val attachedAgentsById = remember(identity.id, knownAgents) {
         knownAgents.associateBy { it.id }
@@ -423,7 +424,7 @@ private fun IdentityDetailDialog(
                         item(
                             headlineContent = { Text(agent.name, style = MaterialTheme.typography.listItemSupporting) },
                             trailingContent = {
-                                TextButton(onClick = { onDetachAgent(agent.id.value) }) {
+                                TextButton(onClick = { onDetachAgent(agent.id) }) {
                                     Text(stringResource(R.string.action_remove), color = MaterialTheme.colorScheme.error)
                                 }
                             },
@@ -433,7 +434,7 @@ private fun IdentityDetailDialog(
                         item(
                             headlineContent = { Text(agentId.value, style = MaterialTheme.typography.listItemMetadataMonospace) },
                             trailingContent = {
-                                TextButton(onClick = { onDetachAgent(agentId.value) }) {
+                                TextButton(onClick = { onDetachAgent(agentId) }) {
                                     Text(stringResource(R.string.action_remove), color = MaterialTheme.colorScheme.error)
                                 }
                             },
@@ -499,14 +500,14 @@ private fun IdentityEditorDialog(
     initialIdentifierKey: String = "",
     initialName: String = "",
     initialIdentityType: String = "user",
-    initialBlockIds: List<String> = emptyList(),
+    initialBlockIds: List<BlockId> = emptyList(),
     onDismiss: () -> Unit,
-    onConfirm: (identifierKey: String, name: String, identityType: String, blockIds: List<String>) -> Unit,
+    onConfirm: (identifierKey: String, name: String, identityType: String, blockIds: List<BlockId>) -> Unit,
 ) {
     var identifierKey by remember(initialIdentifierKey) { mutableStateOf(initialIdentifierKey) }
     var name by remember(initialName) { mutableStateOf(initialName) }
     var identityType by remember(initialIdentityType) { mutableStateOf(initialIdentityType) }
-    var blockIdsText by remember(initialBlockIds) { mutableStateOf(initialBlockIds.joinToString(", ")) }
+    var blockIdsText by remember(initialBlockIds) { mutableStateOf(initialBlockIds.joinToString(", ") { it.value }) }
 
     MultiFieldInputDialog(
         show = true,
@@ -520,7 +521,7 @@ private fun IdentityEditorDialog(
                 identifierKey.trim(),
                 name.trim(),
                 identityType.trim(),
-                blockIdsText.parseCommaSeparatedValues(),
+                blockIdsText.parseCommaSeparatedValues().map(::BlockId),
             )
         },
     ) {

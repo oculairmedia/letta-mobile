@@ -2,11 +2,15 @@ package com.letta.mobile.ui.screens.groups
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.BlockId
 import com.letta.mobile.data.model.Group
 import com.letta.mobile.data.model.GroupCreateParams
+import com.letta.mobile.data.model.GroupId
 import com.letta.mobile.data.model.GroupUpdateParams
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
+import com.letta.mobile.data.model.ProjectId
 import com.letta.mobile.data.repository.api.IGroupRepository
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.util.mapErrorToUserMessage
@@ -76,13 +80,13 @@ class GroupAdminViewModel @Inject constructor(
         val query = current.searchQuery.trim().lowercase()
         return current.groups.filter { group ->
             group.description.lowercase().contains(query) ||
-                group.id.lowercase().contains(query) ||
+                group.id.value.lowercase().contains(query) ||
                 group.managerType.lowercase().contains(query) ||
-                group.projectId.orEmpty().lowercase().contains(query)
+                group.projectId?.value.orEmpty().lowercase().contains(query)
         }
     }
 
-    fun inspectGroup(groupId: String) {
+    fun inspectGroup(groupId: GroupId) {
         viewModelScope.launch {
             val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
             try {
@@ -116,9 +120,9 @@ class GroupAdminViewModel @Inject constructor(
                 val group = groupRepository.createGroup(
                     GroupCreateParams(
                         description = description,
-                        agentIds = agentIdsText.toCsvList(),
-                        projectId = projectId?.takeIf { it.isNotBlank() },
-                        sharedBlockIds = sharedBlockIdsText.toCsvList().takeIf { it.isNotEmpty() },
+                        agentIds = agentIdsText.toAgentIdList(),
+                        projectId = projectId?.takeIf { it.isNotBlank() }?.let(::ProjectId),
+                        sharedBlockIds = sharedBlockIdsText.toBlockIdList().takeIf { it.isNotEmpty() },
                         hidden = hidden,
                     )
                 )
@@ -142,7 +146,7 @@ class GroupAdminViewModel @Inject constructor(
     }
 
     fun updateGroup(
-        groupId: String,
+        groupId: GroupId,
         description: String,
         agentIdsText: String,
         projectId: String?,
@@ -156,9 +160,9 @@ class GroupAdminViewModel @Inject constructor(
                     groupId = groupId,
                     params = GroupUpdateParams(
                         description = description,
-                        agentIds = agentIdsText.toCsvList(),
-                        projectId = projectId?.takeIf { it.isNotBlank() },
-                        sharedBlockIds = sharedBlockIdsText.toCsvList(),
+                        agentIds = agentIdsText.toAgentIdList(),
+                        projectId = projectId?.takeIf { it.isNotBlank() }?.let(::ProjectId),
+                        sharedBlockIds = sharedBlockIdsText.toBlockIdList(),
                         hidden = hidden,
                     )
                 )
@@ -181,7 +185,7 @@ class GroupAdminViewModel @Inject constructor(
         }
     }
 
-    fun deleteGroup(groupId: String) {
+    fun deleteGroup(groupId: GroupId) {
         viewModelScope.launch {
             try {
                 groupRepository.deleteGroup(groupId)
@@ -202,7 +206,7 @@ class GroupAdminViewModel @Inject constructor(
         }
     }
 
-    fun sendMessage(groupId: String, input: String, onSuccess: () -> Unit = {}) {
+    fun sendMessage(groupId: GroupId, input: String, onSuccess: () -> Unit = {}) {
         viewModelScope.launch {
             try {
                 groupRepository.sendGroupMessage(groupId, MessageCreateRequest(input = input))
@@ -221,7 +225,7 @@ class GroupAdminViewModel @Inject constructor(
         }
     }
 
-    fun resetMessages(groupId: String) {
+    fun resetMessages(groupId: GroupId) {
         viewModelScope.launch {
             try {
                 groupRepository.resetGroupMessages(groupId)
@@ -273,6 +277,12 @@ private fun List<Group>.replaceGroup(updated: Group): List<Group> {
         this + updated
     }
 }
+
+private fun String.toAgentIdList(): List<AgentId> =
+    toCsvList().map(::AgentId)
+
+private fun String.toBlockIdList(): List<BlockId> =
+    toCsvList().map(::BlockId)
 
 private fun String.toCsvList(): List<String> =
     split(',').mapNotNull { value -> value.trim().takeIf { it.isNotEmpty() } }

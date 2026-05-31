@@ -4,6 +4,7 @@ import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.api.GroupApi
 import com.letta.mobile.data.model.Group
 import com.letta.mobile.data.model.GroupCreateParams
+import com.letta.mobile.data.model.GroupId
 import com.letta.mobile.data.model.GroupUpdateParams
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LettaResponse
@@ -34,14 +35,14 @@ class FakeGroupApi : GroupApi(mockk(relaxed = true)) {
     override suspend fun retrieveGroup(groupId: String): Group {
         calls.add("retrieveGroup:$groupId")
         if (shouldFail) throw ApiException(500, "Server error")
-        return groups.firstOrNull { it.id == groupId } ?: throw ApiException(404, "Not found")
+        return groups.firstOrNull { it.id.value == groupId } ?: throw ApiException(404, "Not found")
     }
 
     override suspend fun createGroup(params: GroupCreateParams): Group {
         calls.add("createGroup:${params.description}")
         if (shouldFail) throw ApiException(500, "Server error")
         val group = Group(
-            id = "group-${groups.size + 1}",
+            id = GroupId("group-${groups.size + 1}"),
             managerType = "round_robin",
             agentIds = params.agentIds,
             description = params.description,
@@ -56,7 +57,7 @@ class FakeGroupApi : GroupApi(mockk(relaxed = true)) {
     override suspend fun updateGroup(groupId: String, params: GroupUpdateParams): Group {
         calls.add("updateGroup:$groupId")
         if (shouldFail) throw ApiException(500, "Server error")
-        val index = groups.indexOfFirst { it.id == groupId }
+        val index = groups.indexOfFirst { it.id.value == groupId }
         if (index < 0) throw ApiException(404, "Not found")
         val updated = groups[index].copy(
             description = params.description ?: groups[index].description,
@@ -72,7 +73,7 @@ class FakeGroupApi : GroupApi(mockk(relaxed = true)) {
     override suspend fun deleteGroup(groupId: String) {
         calls.add("deleteGroup:$groupId")
         if (shouldFail) throw ApiException(500, "Server error")
-        groups.removeAll { it.id == groupId }
+        groups.removeAll { it.id.value == groupId }
     }
 
     override suspend fun sendGroupMessage(groupId: String, request: MessageCreateRequest): LettaResponse {

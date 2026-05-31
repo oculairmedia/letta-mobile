@@ -2,8 +2,10 @@ package com.letta.mobile.testutil
 
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.api.IdentityApi
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Identity
 import com.letta.mobile.data.model.IdentityCreateParams
+import com.letta.mobile.data.model.IdentityId
 import com.letta.mobile.data.model.IdentityUpdateParams
 import com.letta.mobile.data.model.IdentityUpsertParams
 import io.mockk.mockk
@@ -22,14 +24,14 @@ class FakeIdentityApi : IdentityApi(mockk(relaxed = true)) {
     override suspend fun retrieveIdentity(identityId: String): Identity {
         calls.add("retrieveIdentity:$identityId")
         if (shouldFail) throw ApiException(500, "Server error")
-        return identities.firstOrNull { it.id == identityId } ?: throw ApiException(404, "Not found")
+        return identities.firstOrNull { it.id.value == identityId } ?: throw ApiException(404, "Not found")
     }
 
     override suspend fun createIdentity(params: IdentityCreateParams): Identity {
         calls.add("createIdentity:${params.identifierKey}")
         if (shouldFail) throw ApiException(500, "Server error")
         val identity = Identity(
-            id = "identity-${identities.size}",
+            id = IdentityId("identity-${identities.size}"),
             identifierKey = params.identifierKey,
             name = params.name,
             identityType = params.identityType,
@@ -47,7 +49,7 @@ class FakeIdentityApi : IdentityApi(mockk(relaxed = true)) {
         if (shouldFail) throw ApiException(500, "Server error")
         val existingIndex = identities.indexOfFirst { it.identifierKey == params.identifierKey }
         val identity = Identity(
-            id = if (existingIndex >= 0) identities[existingIndex].id else "identity-${identities.size}",
+            id = if (existingIndex >= 0) identities[existingIndex].id else IdentityId("identity-${identities.size}"),
             identifierKey = params.identifierKey,
             name = params.name,
             identityType = params.identityType,
@@ -63,7 +65,7 @@ class FakeIdentityApi : IdentityApi(mockk(relaxed = true)) {
     override suspend fun updateIdentity(identityId: String, params: IdentityUpdateParams): Identity {
         calls.add("updateIdentity:$identityId")
         if (shouldFail) throw ApiException(500, "Server error")
-        val index = identities.indexOfFirst { it.id == identityId }
+        val index = identities.indexOfFirst { it.id.value == identityId }
         if (index < 0) throw ApiException(404, "Not found")
         val current = identities[index]
         val updated = current.copy(
@@ -81,26 +83,27 @@ class FakeIdentityApi : IdentityApi(mockk(relaxed = true)) {
     override suspend fun deleteIdentity(identityId: String) {
         calls.add("deleteIdentity:$identityId")
         if (shouldFail) throw ApiException(500, "Server error")
-        identities.removeAll { it.id == identityId }
+        identities.removeAll { it.id.value == identityId }
     }
 
     override suspend fun attachIdentity(agentId: String, identityId: String) {
         calls.add("attachIdentity:$agentId:$identityId")
         if (shouldFail) throw ApiException(500, "Server error")
-        val index = identities.indexOfFirst { it.id == identityId }
+        val index = identities.indexOfFirst { it.id.value == identityId }
         if (index < 0) throw ApiException(404, "Not found")
         val current = identities[index]
-        if (agentId !in current.agentIds) {
-            identities[index] = current.copy(agentIds = current.agentIds + agentId)
+        val typedAgentId = AgentId(agentId)
+        if (typedAgentId !in current.agentIds) {
+            identities[index] = current.copy(agentIds = current.agentIds + typedAgentId)
         }
     }
 
     override suspend fun detachIdentity(agentId: String, identityId: String) {
         calls.add("detachIdentity:$agentId:$identityId")
         if (shouldFail) throw ApiException(500, "Server error")
-        val index = identities.indexOfFirst { it.id == identityId }
+        val index = identities.indexOfFirst { it.id.value == identityId }
         if (index < 0) throw ApiException(404, "Not found")
         val current = identities[index]
-        identities[index] = current.copy(agentIds = current.agentIds.filterNot { it == agentId })
+        identities[index] = current.copy(agentIds = current.agentIds.filterNot { it.value == agentId })
     }
 }
