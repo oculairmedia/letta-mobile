@@ -42,6 +42,8 @@ open class AgentRepository(
     override open val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
     private val _isRefreshing = MutableStateFlow(false)
     override open val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+    private val _refreshError = MutableStateFlow<Throwable?>(null)
+    override open val refreshError: StateFlow<Throwable?> = _refreshError.asStateFlow()
     private val refreshMutex = Mutex()
     private var lastRefreshAtMillis: Long = 0L
 
@@ -75,6 +77,10 @@ open class AgentRepository(
         _isRefreshing.value = true
         try {
             refreshAgentsLocked()
+            _refreshError.value = null
+        } catch (t: Throwable) {
+            _refreshError.value = t
+            throw t
         } finally {
             _isRefreshing.value = false
         }
@@ -84,6 +90,7 @@ open class AgentRepository(
         refreshMutex.withLock {
             _agents.value = emptyList()
             _isRefreshing.value = false
+            _refreshError.value = null
             lastRefreshAtMillis = 0L
             // Propagate DAO failure to the caller. Swallowing here would leave
             // stale agent rows from the previous backend visible after switch
@@ -163,6 +170,10 @@ open class AgentRepository(
         _isRefreshing.value = true
         try {
             refreshAgentsLocked()
+            _refreshError.value = null
+        } catch (t: Throwable) {
+            _refreshError.value = t
+            throw t
         } finally {
             _isRefreshing.value = false
         }

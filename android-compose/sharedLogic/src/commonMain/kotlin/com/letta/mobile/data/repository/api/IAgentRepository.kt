@@ -20,6 +20,12 @@ interface IAgentRepository {
      * agents to another.
      */
     val isRefreshing: StateFlow<Boolean>
+    /**
+     * Exposes the last encountered refresh/sync exception (e.g. connection timeout,
+     * invalid credentials, offline state) so that UI consumers can surface recoverable
+     * errors. Set to null when a refresh succeeds.
+     */
+    val refreshError: StateFlow<Throwable?>
     suspend fun countAgents(): Int
     suspend fun refreshAgents()
     suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean

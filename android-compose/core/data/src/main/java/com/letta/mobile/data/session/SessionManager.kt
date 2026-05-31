@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session
 
+import android.util.Log
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import java.util.concurrent.locks.ReentrantLock
 import javax.inject.Inject
@@ -35,11 +36,17 @@ class SessionManager internal constructor(
 
     private val _currentGraph = MutableStateFlow(sessionGraphFactory.create())
     val currentGraph: StateFlow<SessionGraph> = _currentGraph.asStateFlow()
+    private val _sessionError = MutableStateFlow<Throwable?>(null)
+    val sessionError: StateFlow<Throwable?> = _sessionError.asStateFlow()
 
     init {
         managerScope.launch {
             settingsRepository.activeConfigChanges.collect {
-                rebuild()
+                try {
+                    rebuild()
+                } catch (t: Throwable) {
+                    Log.e("SessionManager", "Failed to auto-rebuild session graph on config change", t)
+                }
             }
         }
     }
@@ -48,10 +55,16 @@ class SessionManager internal constructor(
 
     fun rebuild(): SessionGraph = rebuildLock.withLock {
         val previous = _currentGraph.value
-        val next = sessionGraphFactory.create()
-        _currentGraph.value = next
-        previous.scope.cancel()
-        next
+        try {
+            val next = sessionGraphFactory.create()
+            _currentGraph.value = next
+            previous.scope.cancel()
+            _sessionError.value = null
+            next
+        } catch (t: Throwable) {
+            _sessionError.value = t
+            throw t
+        }
     }
 
     val current: SessionGraph

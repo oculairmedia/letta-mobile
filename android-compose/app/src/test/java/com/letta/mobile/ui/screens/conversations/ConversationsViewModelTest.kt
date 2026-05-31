@@ -105,7 +105,7 @@ class ConversationsViewModelTest {
     @Test
     fun `loadConversations keeps conversations when agent refresh fails`() = runTest {
         fakeAllRepo.setConversations(listOf(TestData.conversation(id = "1", agentId = "a1")))
-        fakeAgentRepo.refreshError = IllegalStateException("Agents failed")
+        fakeAgentRepo.refreshFailure = IllegalStateException("Agents failed")
 
         viewModel.loadConversations()
 
@@ -253,13 +253,19 @@ class ConversationsViewModelTest {
     private class FakeAgentRepository : AgentRepository(FakeAgentApi(), mockk(relaxed = true)) {
         private val _agents = MutableStateFlow(listOf(Agent(id = AgentId("a1"), name = "Agent One")))
         override val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
+        private val _refreshError = MutableStateFlow<Throwable?>(null)
+        override val refreshError: StateFlow<Throwable?> = _refreshError.asStateFlow()
         var fresh: Boolean = false
         var didRefresh: Boolean = false
-        var refreshError: Throwable? = null
+        var refreshFailure: Throwable? = null
         override suspend fun refreshAgents() { didRefresh = true }
         override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean {
-            refreshError?.let { throw it }
+            refreshFailure?.let { error ->
+                _refreshError.value = error
+                throw error
+            }
             if (fresh) return false
+            _refreshError.value = null
             didRefresh = true
             return true
         }

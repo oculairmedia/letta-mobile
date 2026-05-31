@@ -40,6 +40,8 @@ class SessionScopedAgentRepository internal constructor(
     override val agents: StateFlow<List<Agent>> = _agents
     private val _isRefreshing = MutableStateFlow(sessionManager.current.agentRepository.isRefreshing.value)
     override val isRefreshing: StateFlow<Boolean> = _isRefreshing
+    private val _refreshError = MutableStateFlow(sessionManager.current.agentRepository.refreshError.value)
+    override val refreshError: StateFlow<Throwable?> = _refreshError
 
     init {
         sessionManager.currentGraph
@@ -49,6 +51,10 @@ class SessionScopedAgentRepository internal constructor(
         sessionManager.currentGraph
             .flatMapLatest { it.agentRepository.isRefreshing }
             .onEach { _isRefreshing.value = it }
+            .launchIn(proxyScope)
+        sessionManager.currentGraph
+            .flatMapLatest { it.agentRepository.refreshError }
+            .onEach { _refreshError.value = it }
             .launchIn(proxyScope)
     }
 
@@ -62,6 +68,7 @@ class SessionScopedAgentRepository internal constructor(
     override suspend fun clearForBackendSwitch() {
         _agents.value = emptyList()
         _isRefreshing.value = false
+        _refreshError.value = null
         sessionManager.current.agentRepository.clearForBackendSwitch()
     }
 
