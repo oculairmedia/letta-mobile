@@ -2,6 +2,7 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.Folder
 import com.letta.mobile.data.model.FolderCreateParams
+import com.letta.mobile.data.model.FolderId
 import com.letta.mobile.data.model.FolderUpdateParams
 import com.letta.mobile.testutil.FakeFolderApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -27,7 +28,7 @@ class FolderRepositoryTest {
 
     @Test
     fun `refreshFolders updates state flow`() = runTest {
-        fakeApi.folders.add(Folder(id = "source-1", name = "Knowledge"))
+        fakeApi.folders.add(Folder(id = FolderId("source-1"), name = "Knowledge"))
 
         repository.refreshFolders()
 
@@ -44,17 +45,17 @@ class FolderRepositoryTest {
 
     @Test
     fun `updateFolder updates cache`() = runTest {
-        fakeApi.folders.add(Folder(id = "source-1", name = "Knowledge"))
+        fakeApi.folders.add(Folder(id = FolderId("source-1"), name = "Knowledge"))
         repository.refreshFolders()
 
-        repository.updateFolder("source-1", FolderUpdateParams(description = "Docs"))
+        repository.updateFolder(FolderId("source-1"), FolderUpdateParams(description = "Docs"))
 
         assertEquals("Docs", repository.folders.first().first().description)
     }
 
     @Test
     fun `listFolderFiles delegates to api`() = runTest {
-        val files = repository.listFolderFiles("source-1")
+        val files = repository.listFolderFiles(FolderId("source-1"))
 
         assertEquals(1, files.size)
         assertTrue(fakeApi.calls.contains("listFolderFiles:source-1"))

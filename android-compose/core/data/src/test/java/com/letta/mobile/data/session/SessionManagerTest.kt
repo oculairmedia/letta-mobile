@@ -10,19 +10,24 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Archive
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.Folder
+import com.letta.mobile.data.model.FolderId
 import com.letta.mobile.data.model.Group
+import com.letta.mobile.data.model.GroupId
 import com.letta.mobile.data.model.Identity
+import com.letta.mobile.data.model.IdentityId
 import com.letta.mobile.data.model.Job
 import com.letta.mobile.data.model.JobListParams
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.McpServer
+import com.letta.mobile.data.model.McpServerId
 import com.letta.mobile.data.model.Passage
 import com.letta.mobile.data.model.ProjectIssueDetail
 import com.letta.mobile.data.model.ProjectIssueListParams
 import com.letta.mobile.data.model.ProjectIssueSummary
 import com.letta.mobile.data.model.ProjectSummary
 import com.letta.mobile.data.model.Provider
+import com.letta.mobile.data.model.ProviderId
 import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.model.RunListParams
 import com.letta.mobile.data.model.RunRequestConfig
@@ -545,7 +550,7 @@ class SessionManagerTest {
     fun `admin repository proxies switch caches to rebuilt graph`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val fakeFolderApi = FakeFolderApi().apply {
-            folders = mutableListOf(Folder(id = "folder-a", name = "Backend A Folder"))
+            folders = mutableListOf(Folder(id = FolderId("folder-a"), name = "Backend A Folder"))
         }
         val fakeGroupApi = FakeGroupApi().apply {
             groups = mutableListOf(sampleGroup("group-a", "Backend A Group"))
@@ -605,22 +610,22 @@ class SessionManagerTest {
         identityProxy.refreshIdentities()
         providerProxy.refreshProviders()
         advanceUntilIdle()
-        assertEquals(listOf("folder-a"), folderProxy.folders.value.map { it.id })
-        assertEquals(listOf("group-a"), groupProxy.groups.value.map { it.id })
-        assertEquals(listOf("identity-a"), identityProxy.identities.value.map { it.id })
-        assertEquals(listOf("provider-a"), providerProxy.providers.value.map { it.id })
+        assertEquals(listOf(FolderId("folder-a")), folderProxy.folders.value.map { it.id })
+        assertEquals(listOf(GroupId("group-a")), groupProxy.groups.value.map { it.id })
+        assertEquals(listOf(IdentityId("identity-a")), identityProxy.identities.value.map { it.id })
+        assertEquals(listOf(ProviderId("provider-a")), providerProxy.providers.value.map { it.id })
 
-        fakeFolderApi.folders = mutableListOf(Folder(id = "folder-b", name = "Backend B Folder"))
+        fakeFolderApi.folders = mutableListOf(Folder(id = FolderId("folder-b"), name = "Backend B Folder"))
         fakeGroupApi.groups = mutableListOf(sampleGroup("group-b", "Backend B Group"))
         fakeIdentityApi.identities = mutableListOf(sampleIdentity("identity-b", "Backend B Identity"))
         fakeProviderApi.providers = mutableListOf(sampleProvider("provider-b", "Backend B Provider"))
         settingsRepository.activeConfigState.value = config("backend-b")
         advanceUntilIdle()
 
-        assertEquals(emptyList<String>(), folderProxy.folders.value.map { it.id })
-        assertEquals(emptyList<String>(), groupProxy.groups.value.map { it.id })
-        assertEquals(emptyList<String>(), identityProxy.identities.value.map { it.id })
-        assertEquals(emptyList<String>(), providerProxy.providers.value.map { it.id })
+        assertEquals(emptyList<FolderId>(), folderProxy.folders.value.map { it.id })
+        assertEquals(emptyList<GroupId>(), groupProxy.groups.value.map { it.id })
+        assertEquals(emptyList<IdentityId>(), identityProxy.identities.value.map { it.id })
+        assertEquals(emptyList<ProviderId>(), providerProxy.providers.value.map { it.id })
 
         folderProxy.refreshFolders()
         groupProxy.refreshGroups()
@@ -628,10 +633,10 @@ class SessionManagerTest {
         providerProxy.refreshProviders()
         advanceUntilIdle()
 
-        assertEquals(listOf("folder-b"), folderProxy.folders.value.map { it.id })
-        assertEquals(listOf("group-b"), groupProxy.groups.value.map { it.id })
-        assertEquals(listOf("identity-b"), identityProxy.identities.value.map { it.id })
-        assertEquals(listOf("provider-b"), providerProxy.providers.value.map { it.id })
+        assertEquals(listOf(FolderId("folder-b")), folderProxy.folders.value.map { it.id })
+        assertEquals(listOf(GroupId("group-b")), groupProxy.groups.value.map { it.id })
+        assertEquals(listOf(IdentityId("identity-b")), identityProxy.identities.value.map { it.id })
+        assertEquals(listOf(ProviderId("provider-b")), providerProxy.providers.value.map { it.id })
     }
 
     @Test
@@ -772,16 +777,16 @@ class SessionManagerTest {
             proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
         val agentTools = toolProxy.getAgentTools("agent-1")
-        val serverTools = mcpProxy.getServerTools("server-a")
+        val serverTools = mcpProxy.getServerTools(McpServerId("server-a"))
 
         toolProxy.refreshTools()
         toolProxy.attachTool("agent-1", "tool-a")
         mcpProxy.refreshServers()
-        mcpProxy.refreshServerTools("server-a")
+        mcpProxy.refreshServerTools(McpServerId("server-a"))
         advanceUntilIdle()
         assertEquals(listOf("tool-a"), toolProxy.getTools().value.map { it.id.value })
         assertEquals(listOf("tool-a"), agentTools.first().map { it.id.value })
-        assertEquals(listOf("server-a"), mcpProxy.servers.value.map { it.id })
+        assertEquals(listOf(McpServerId("server-a")), mcpProxy.servers.value.map { it.id })
         assertEquals(listOf("mcp-tool-a"), serverTools.first().map { it.id.value })
 
         fakeToolApi.tools = mutableListOf(sampleTool("tool-b"))
@@ -792,20 +797,20 @@ class SessionManagerTest {
 
         assertEquals(emptyList<String>(), toolProxy.getTools().value.map { it.id.value })
         assertEquals(emptyList<String>(), agentTools.first().map { it.id.value })
-        assertEquals(emptyList<String>(), mcpProxy.servers.value.map { it.id })
+        assertEquals(emptyList<McpServerId>(), mcpProxy.servers.value.map { it.id })
         assertEquals(emptyList<String>(), serverTools.first().map { it.id.value })
 
         val rebuiltAgentTools = toolProxy.getAgentTools("agent-1")
-        val rebuiltServerTools = mcpProxy.getServerTools("server-a")
+        val rebuiltServerTools = mcpProxy.getServerTools(McpServerId("server-a"))
         toolProxy.refreshTools()
         toolProxy.attachTool("agent-1", "tool-b")
         mcpProxy.refreshServers()
-        mcpProxy.refreshServerTools("server-a")
+        mcpProxy.refreshServerTools(McpServerId("server-a"))
         advanceUntilIdle()
 
         assertEquals(listOf("tool-b"), toolProxy.getTools().value.map { it.id.value })
         assertEquals(listOf("tool-b"), rebuiltAgentTools.first().map { it.id.value })
-        assertEquals(listOf("server-b"), mcpProxy.servers.value.map { it.id })
+        assertEquals(listOf(McpServerId("server-b")), mcpProxy.servers.value.map { it.id })
         assertEquals(listOf("mcp-tool-b"), rebuiltServerTools.first().map { it.id.value })
     }
 
@@ -1170,21 +1175,21 @@ class SessionManagerTest {
     private fun sampleStep(id: String) = FakeStepApi().sampleStep(id)
 
     private fun sampleGroup(id: String, description: String) = Group(
-        id = id,
+        id = GroupId(id),
         managerType = "round_robin",
         description = description,
-        agentIds = listOf("agent-1"),
+        agentIds = listOf(AgentId("agent-1")),
     )
 
     private fun sampleIdentity(id: String, name: String) = Identity(
-        id = id,
+        id = IdentityId(id),
         identifierKey = id,
         name = name,
         identityType = "user",
     )
 
     private fun sampleProvider(id: String, name: String) = Provider(
-        id = id,
+        id = ProviderId(id),
         name = name,
         providerType = "openai",
     )
@@ -1216,7 +1221,7 @@ class SessionManagerTest {
     )
 
     private fun sampleMcpServer(id: String) = McpServer(
-        id = id,
+        id = McpServerId(id),
         serverName = id,
     )
 

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.api
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.GroupCreateParams
 import com.letta.mobile.data.model.GroupUpdateParams
 import com.letta.mobile.data.model.MessageCreateRequest
@@ -58,7 +59,7 @@ class GroupApiTest : com.letta.mobile.testutil.TrackedMockClientTestSupport() {
             respond("""{"id":"group-1","manager_type":"round_robin","agent_ids":["agent-1"],"description":"Test"}""", HttpStatusCode.OK, jsonHeaders)
         }
 
-        api.createGroup(GroupCreateParams(agentIds = listOf("agent-1"), description = "Test"))
+        api.createGroup(GroupCreateParams(agentIds = listOf(AgentId("agent-1")), description = "Test"))
 
         assertEquals(HttpMethod.Post, method)
     }
