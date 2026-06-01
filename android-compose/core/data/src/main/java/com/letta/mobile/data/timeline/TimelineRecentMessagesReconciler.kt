@@ -90,14 +90,19 @@ internal class TimelineRecentMessagesReconciler(
     suspend fun applyRecentMessagesSnapshot(
         event: TimelineGatewayEvent.RecentMessagesSnapshot,
     ) {
-        val appended = writeMutex.withLock {
-            applyRecentMessagesSnapshotLocked(
-                serverMessages = event.serverMessages,
-                telemetryName = event.telemetryName,
-                telemetryAttrs = event.telemetryAttrs.toTypedArray(),
-            )
+        try {
+            val appended = writeMutex.withLock {
+                applyRecentMessagesSnapshotLocked(
+                    serverMessages = event.serverMessages,
+                    telemetryName = event.telemetryName,
+                    telemetryAttrs = event.telemetryAttrs.toTypedArray(),
+                )
+            }
+            event.ack.complete(appended)
+        } catch (t: Throwable) {
+            event.ack.completeExceptionally(t)
+            throw t
         }
-        event.ack.complete(appended)
     }
 
     private fun applyRecentMessagesSnapshotLocked(

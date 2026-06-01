@@ -17,10 +17,14 @@ internal fun applyReturnsAndResponsesFromSnapshot(
 ) {
     val decidedIds = snapshot.filterIsInstance<ApprovalResponseMessage>()
         .mapNotNull { it.approvalRequestId }
+        .filter { it.isNotBlank() }
         .toSet()
     val returnsByCallId: Map<String, ToolReturnMessage> =
         snapshot.filterIsInstance<ToolReturnMessage>()
-            .mapNotNull { r -> r.toolCallId?.let { it to r } }
+            .mapNotNull { r ->
+                val callId = r.toolCallId
+                if (!callId.isNullOrBlank()) callId to r else null
+            }
             .toMap()
     if (decidedIds.isEmpty() && returnsByCallId.isEmpty()) return
     val returnedToolCallIds = returnsByCallId.keys

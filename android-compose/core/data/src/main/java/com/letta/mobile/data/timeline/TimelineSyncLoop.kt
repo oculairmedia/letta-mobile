@@ -4,6 +4,7 @@ import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.ToolReturnMessage
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CompletableDeferred
@@ -236,8 +237,8 @@ class TimelineSyncLoop(
     }
 
     internal suspend fun reconcileForExternalRun(runId: String) {
-        reconcileForExternalRun(runId) { name, attrs ->
-            recentMessagesReconciler.reconcileRecentMessagesFromServer(name, attrs)
+        reconcileForExternalRun(runId) { name, attrs, allowWhileActive ->
+            recentMessagesReconciler.reconcileRecentMessagesFromServer(name, attrs, allowWhileActive)
         }
     }
 

@@ -169,11 +169,12 @@ internal fun Timeline.positionForServerMessageDate(message: LettaMessage): Doubl
 
 internal suspend fun reconcileForExternalRun(
     runId: String,
-    reconcileRecentMessagesFromServer: suspend (String, Array<Pair<String, Any?>>) -> Unit,
+    reconcileRecentMessagesFromServer: suspend (String, Array<Pair<String, Any?>>, Boolean) -> Unit,
 ) {
     reconcileRecentMessagesFromServer(
         "externalRunReconcile",
-        arrayOf("runId" to runId)
+        arrayOf("runId" to runId),
+        true
     )
 }
 
