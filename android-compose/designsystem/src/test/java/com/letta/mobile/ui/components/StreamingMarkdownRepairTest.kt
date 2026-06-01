@@ -32,6 +32,34 @@ class StreamingMarkdownRepairTest {
     }
 
     @Test
+    fun `repairs incomplete inline code span across active block lines`() {
+        assertEquals(
+            "the renderer correctly detected the `\nthe a2ui-json tags before the renderer sees them`",
+            repairIncompleteMarkdownForStreaming(
+                "the renderer correctly detected the `\nthe a2ui-json tags before the renderer sees them",
+            ),
+        )
+    }
+
+    @Test
+    fun `repairs incomplete inline code span before later line punctuation`() {
+        assertEquals(
+            "stream parser strips the `\na2ui-json tags before the renderer sees them." +
+                "\nThis sentence should stay visible too.`",
+            repairIncompleteMarkdownForStreaming(
+                "stream parser strips the `\na2ui-json tags before the renderer sees them.\n" +
+                    "This sentence should stay visible too.",
+            ),
+        )
+    }
+
+    @Test
+    fun `leaves closed multiline inline code span unchanged`() {
+        val markdown = "Use `code\nthat already closed` after it"
+        assertEquals(markdown, repairIncompleteMarkdownForStreaming(markdown))
+    }
+
+    @Test
     fun `repairs incomplete strikethrough marker`() {
         assertEquals(
             "This is ~~removed~~",
