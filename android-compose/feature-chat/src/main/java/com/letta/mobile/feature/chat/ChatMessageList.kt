@@ -45,6 +45,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontFamily
+import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.DateSeparator
@@ -75,6 +76,7 @@ internal fun ChatMessageList(
     onSubmitApproval: (String, List<String>, Boolean, String?) -> Unit,
     onToggleRunCollapsed: (String) -> Unit,
     onToggleReasoningExpanded: (String) -> Unit,
+    onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -449,6 +451,7 @@ internal fun ChatMessageList(
                                             onSubmitApproval = onSubmitApproval,
                                             reasoningCollapsed = message.id !in state.expandedReasoningMessageIds,
                                             onToggleReasoning = { onToggleReasoningExpanded(message.id) },
+                                            onAttachmentImageTap = onAttachmentImageTap,
                                             modifier = rowModifier,
                                         )
                                     }
@@ -464,6 +467,7 @@ internal fun ChatMessageList(
                                         onSubmitApproval = onSubmitApproval,
                                         reasoningCollapsed = msg.id !in state.expandedReasoningMessageIds,
                                         onToggleReasoning = { onToggleReasoningExpanded(msg.id) },
+                                        onAttachmentImageTap = onAttachmentImageTap,
                                     )
                                 }
                             }
@@ -498,6 +502,7 @@ internal fun ChatMessageList(
                                         onSubmitApproval = onSubmitApproval,
                                         reasoningCollapsed = message.id !in state.expandedReasoningMessageIds,
                                         onToggleReasoning = { onToggleReasoningExpanded(message.id) },
+                                        onAttachmentImageTap = onAttachmentImageTap,
                                         modifier = rowModifier,
                                     )
                                 }
@@ -684,6 +689,7 @@ private fun RenderChatMessage(
     onSubmitApproval: (String, List<String>, Boolean, String?) -> Unit,
     reasoningCollapsed: Boolean = false,
     onToggleReasoning: (() -> Unit)? = null,
+    onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     // reverseLayout = true: top = space below (toward newer),
@@ -721,6 +727,7 @@ private fun RenderChatMessage(
                 onSubmitApproval(requestId, toolCallIds, approve, reason)
             },
             approvalInFlight = state.activeApprovalRequestId == message.approvalRequest?.requestId,
+            onAttachmentImageTap = onAttachmentImageTap,
             modifier = modifier.then(highlightModifier).padding(top = spacingBelow, bottom = spacingAbove),
         )
     }

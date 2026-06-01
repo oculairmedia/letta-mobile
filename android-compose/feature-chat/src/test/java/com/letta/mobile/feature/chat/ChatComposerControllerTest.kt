@@ -152,6 +152,28 @@ class ChatComposerControllerTest {
     }
 
     @Test
+    fun `composer action stays visible for attachments while keyboard is open`() {
+        assertTrue(
+            shouldShowChatComposerAction(
+                isStreaming = false,
+                keyboardOpen = true,
+                hasAttachments = true,
+            )
+        )
+    }
+
+    @Test
+    fun `composer action can hide for text-only send while keyboard is open`() {
+        assertFalse(
+            shouldShowChatComposerAction(
+                isStreaming = false,
+                keyboardOpen = true,
+                hasAttachments = false,
+            )
+        )
+    }
+
+    @Test
     fun `attachment count cap honours injected limits override (lcp-dlj)`() {
         val customLimits = com.letta.mobile.data.attachment.AttachmentLimits(
             maxAttachmentCount = 2,

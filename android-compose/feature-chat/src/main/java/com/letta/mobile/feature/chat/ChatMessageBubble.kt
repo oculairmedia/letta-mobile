@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.LatencyText
@@ -105,6 +106,7 @@ internal fun MessageBubbleSurface(
     onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)? = null,
     approvalInFlight: Boolean = false,
     onLongClick: (() -> Unit)? = null,
+    onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
 ) {
     val isUser = message.role == "user"
     val isLastAssistant = isStreaming && message.role == "assistant"
@@ -220,7 +222,12 @@ internal fun MessageBubbleSurface(
                 val stableAttachments = remember(message.attachments) {
                     message.attachments.toImmutableList()
                 }
-                MessageAttachmentsGrid(attachments = stableAttachments)
+                MessageAttachmentsGrid(
+                    attachments = stableAttachments,
+                    onImageClick = onAttachmentImageTap?.let { callback ->
+                        { index -> callback(stableAttachments, index) }
+                    },
+                )
             }
 
             val textColor = when {
