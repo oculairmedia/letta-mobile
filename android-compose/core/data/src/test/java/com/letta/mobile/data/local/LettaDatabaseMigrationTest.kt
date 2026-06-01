@@ -190,8 +190,8 @@ class LettaDatabaseMigrationTest {
             conversations = listOf(
                 ConversationEntity.fromConversation(
                     com.letta.mobile.data.model.Conversation(
-                        id = "conversation-1",
-                        agentId = "agent-1",
+                        id = com.letta.mobile.data.model.ConversationId("conversation-1"),
+                        agentId = com.letta.mobile.data.model.AgentId("agent-1"),
                         summary = "Cached title",
                     ),
                 ),

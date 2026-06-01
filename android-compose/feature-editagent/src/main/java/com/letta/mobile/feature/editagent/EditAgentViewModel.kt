@@ -3,6 +3,7 @@ package com.letta.mobile.feature.editagent
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -77,7 +78,7 @@ internal class EditAgentViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = UiState.Loading
             try {
-                val agent = agentRepository.getAgent(agentId).first()
+                val agent = agentRepository.getAgent(AgentId(agentId)).first()
                 val editableBlocks = agent.blocks.map { block ->
                     EditableBlock(
                         id = block.id.value,

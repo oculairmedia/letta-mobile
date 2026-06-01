@@ -17,6 +17,8 @@ import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.health.ShimBackendDetector
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.toBackendLabel
@@ -109,7 +111,7 @@ internal class AdminChatViewModel @Inject constructor(
         private const val TAG = "AdminChatViewModel"
     }
 
-    val agentId: String = routeArgs.agentId
+    val agentId: AgentId = AgentId(routeArgs.agentId)
     private val initialAgentName: String? = routeArgs.initialAgentName
     private val initialMessage: String? = routeArgs.initialMessage
     private val explicitConversationId: String?
@@ -130,8 +132,8 @@ internal class AdminChatViewModel @Inject constructor(
     private val isShimBackend: StateFlow<Boolean> = shimBackendDetector.activeIsShimBackend
         .stateIn(viewModelScope, SharingStarted.Eagerly, shimBackendDetector.cachedActiveIsShimBackend())
     private var followingDuplicateInitialMessageInFlight = false
-    val conversationId: String?
-        get() = chatConversationCoordinator.conversationId(false)
+    val conversationId: ConversationId?
+        get() = chatConversationCoordinator.conversationId(false)?.let { ConversationId(it) }
     val projectContext: ProjectChatContext? = routeArgs.projectContext
 
     private val chatSessionResolver = ChatSessionResolver(
@@ -221,7 +223,7 @@ internal class AdminChatViewModel @Inject constructor(
         }
     }
 
-    fun toggleCurrentAgentPinned() = toggleAgentPinned(agentId)
+    fun toggleCurrentAgentPinned() = toggleAgentPinned(agentId.value)
 
     fun updateChatSearchQuery(query: String) = chatSearchCoordinator.updateQuery(query)
 
@@ -254,8 +256,8 @@ internal class AdminChatViewModel @Inject constructor(
         scope = viewModelScope,
         messageRepository = messageRepository,
         uiState = _uiState,
-        agentId = agentId,
-        conversationId = { conversationId },
+        agentId = agentId.value,
+        conversationId = { conversationId?.value },
     )
     private val chatTimelineObserver = ChatTimelineObserver(
         scope = viewModelScope,
@@ -273,7 +275,7 @@ internal class AdminChatViewModel @Inject constructor(
     )
     private val chatConversationCoordinator = ChatConversationCoordinator(
         scope = viewModelScope,
-        agentId = agentId,
+        agentId = agentId.value,
         initialMessage = initialMessage,
         explicitConversationId = { explicitConversationId },
         setRouteConversationId = routeArgs::setRouteConversationId,
@@ -313,13 +315,13 @@ internal class AdminChatViewModel @Inject constructor(
         coordinator = chatApprovalCoordinator,
         uiState = _uiState,
         bannerController = chatBannerController,
-        agentId = agentId,
+        agentId = agentId.value,
         activeConversationId = { chatConversationCoordinator.activeConversationId },
     )
     private val timelineSendCoordinator: TimelineSendCoordinator by lazy {
         TimelineSendCoordinator(
             scope = viewModelScope,
-            agentId = agentId,
+            agentId = agentId.value,
             isFreshRoute = isFreshRoute,
             explicitConversationId = explicitConversationId,
             conversationRepository = conversationRepository,
@@ -337,7 +339,7 @@ internal class AdminChatViewModel @Inject constructor(
     private val wsChatSendCoordinator: WsChatSendCoordinator by lazy {
         WsChatSendCoordinator(
             scope = viewModelScope,
-            agentId = agentId,
+            agentId = agentId.value,
             activeConfig = { settingsRepository.activeConfig.value },
             wsChatBridge = wsChatBridge,
             timelineRepository = timelineRepository,
@@ -361,7 +363,7 @@ internal class AdminChatViewModel @Inject constructor(
     private val localRuntimeChatSendCoordinator: LocalRuntimeChatSendCoordinator by lazy {
         LocalRuntimeChatSendCoordinator(
             scope = viewModelScope,
-            agentId = agentId,
+            agentId = agentId.value,
             localBackend = { sessionManager.current.localRuntimeBackend },
             timelineRepository = timelineRepository,
             uiState = _uiState,
@@ -384,7 +386,7 @@ internal class AdminChatViewModel @Inject constructor(
     private val chatHistoryPager: ChatHistoryPager by lazy {
         ChatHistoryPager(
             scope = viewModelScope,
-            agentId = agentId,
+            agentId = agentId.value,
             messageRepository = messageRepository,
             chatTimelineObserver = chatTimelineObserver,
             uiState = _uiState,
@@ -393,13 +395,13 @@ internal class AdminChatViewModel @Inject constructor(
     }
     private val projectChatCoordinator = ProjectChatCoordinator(
         scope = viewModelScope,
-        agentId = agentId,
+        agentId = agentId.value,
         projectContext = projectContext,
         uiState = _uiState,
         agentRepository = agentRepository,
         blockRepository = blockRepository,
         bugReportRepository = bugReportRepository,
-        conversationId = { conversationId },
+        conversationId = { conversationId?.value },
         setComposerError = chatBannerController::showComposerError,
         sendMessage = ::sendMessage,
     )
@@ -407,7 +409,7 @@ internal class AdminChatViewModel @Inject constructor(
     private val chatSessionInitializer by lazy {
         ChatSessionInitializer(
             scope = viewModelScope,
-            agentId = agentId,
+            agentId = agentId.value,
             isFreshRoute = isFreshRoute,
             explicitNewChat = explicitNewChat,
             resumeCacheMaxAgeMs = RESUME_CACHE_MAX_AGE_MS,
@@ -432,7 +434,7 @@ internal class AdminChatViewModel @Inject constructor(
     }
 
     private fun seedAgentNameFromMemoryCache() {
-        val cachedName = chatSessionResolver.cachedAgentName(agentId) ?: return
+        val cachedName = chatSessionResolver.cachedAgentName(agentId.value) ?: return
         _uiState.update { current ->
             if (current.agentName.isBlank()) current.copy(agentName = cachedName) else current
         }
@@ -440,7 +442,7 @@ internal class AdminChatViewModel @Inject constructor(
 
     private fun observeAgentNameCache() {
         viewModelScope.launch {
-            chatSessionResolver.observeCachedAgentName(agentId)
+            chatSessionResolver.observeCachedAgentName(agentId.value)
                 .collect { cachedName ->
                     if (cachedName.isBlank()) return@collect
                     _uiState.update { current ->
@@ -452,9 +454,9 @@ internal class AdminChatViewModel @Inject constructor(
 
     private fun observeLastChatSelection() {
         settingsRepository.setLastChatSelection(
-            agentId = agentId,
+            agentId = agentId.value,
             agentName = initialAgentName,
-            conversationId = conversationId,
+            conversationId = conversationId?.value,
         )
         viewModelScope.launch {
             uiState
@@ -465,7 +467,7 @@ internal class AdminChatViewModel @Inject constructor(
                 .distinctUntilChanged()
                 .collect { (resolvedAgentName, resolvedConversationId) ->
                     settingsRepository.setLastChatSelection(
-                        agentId = agentId,
+                        agentId = agentId.value,
                         agentName = resolvedAgentName,
                         conversationId = resolvedConversationId,
                     )
@@ -720,7 +722,7 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun submitA2uiAction(action: A2uiAction) {
         val resolvedAction = if (action.conversationId.isNullOrBlank()) {
-            val currentConversationId = chatConversationCoordinator.activeConversationId ?: conversationId
+            val currentConversationId = chatConversationCoordinator.activeConversationId ?: conversationId?.value
             if (currentConversationId.isNullOrBlank()) {
                 chatBannerController.showComposerError("Couldn't send action. No active conversation is available.")
                 return
@@ -971,7 +973,7 @@ internal class AdminChatViewModel @Inject constructor(
         val now = android.os.SystemClock.elapsedRealtime()
         if (now - lastScreenResumedAtMs < 200) return
         lastScreenResumedAtMs = now
-        conversationId?.let { currentConversationTracker.setCurrent(it) }
+        conversationId?.value?.let { currentConversationTracker.setCurrent(it) }
     }
 
     override fun onCleared() {

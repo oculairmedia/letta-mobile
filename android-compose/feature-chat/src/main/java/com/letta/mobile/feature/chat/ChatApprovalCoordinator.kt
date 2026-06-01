@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.MessageRepository
 
 internal class ChatApprovalCoordinator(
@@ -18,7 +19,7 @@ internal class ChatApprovalCoordinator(
 
         return try {
             messageRepository.submitApproval(
-                agentId = agentId,
+                agentId = AgentId(agentId),
                 approvalRequestId = requestId,
                 toolCallIds = toolCallIds,
                 approve = approve,

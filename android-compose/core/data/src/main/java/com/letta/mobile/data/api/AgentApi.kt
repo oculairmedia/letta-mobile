@@ -31,27 +31,32 @@ open class AgentApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun getAgent(agentId: String): Agent {
+    open suspend fun getAgent(agentId: AgentId): Agent {
         val (client, baseUrl) = apiClient.session()
 
-        val response = client.get("$baseUrl/v1/agents/$agentId")
+        val response = client.get("$baseUrl/v1/agents/${agentId.value}")
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())
         }
         return response.body()
     }
 
-    open suspend fun getContextWindow(agentId: String, conversationId: String? = null): ContextWindowOverview {
+    open suspend fun getAgent(agentId: String): Agent = getAgent(AgentId(agentId))
+
+    open suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId? = null): ContextWindowOverview {
         val (client, baseUrl) = apiClient.session()
 
-        val response = client.get("$baseUrl/v1/agents/$agentId/context") {
-            parameter("conversation_id", conversationId)
+        val response = client.get("$baseUrl/v1/agents/${agentId.value}/context") {
+            parameter("conversation_id", conversationId?.value)
         }
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())
         }
         return response.body()
     }
+
+    open suspend fun getContextWindow(agentId: String, conversationId: String? = null): ContextWindowOverview =
+        getContextWindow(AgentId(agentId), conversationId?.let(::ConversationId))
 
     open suspend fun countAgents(): Int {
         val (client, baseUrl) = apiClient.session()
@@ -76,10 +81,10 @@ open class AgentApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun updateAgent(agentId: String, params: AgentUpdateParams): Agent {
+    open suspend fun updateAgent(agentId: AgentId, params: AgentUpdateParams): Agent {
         val (client, baseUrl) = apiClient.session()
 
-        val response = client.patch("$baseUrl/v1/agents/$agentId") {
+        val response = client.patch("$baseUrl/v1/agents/${agentId.value}") {
             contentType(ContentType.Application.Json)
             setBody(params)
         }
@@ -89,31 +94,37 @@ open class AgentApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun deleteAgent(agentId: String) {
+    open suspend fun updateAgent(agentId: String, params: AgentUpdateParams): Agent = updateAgent(AgentId(agentId), params)
+
+    open suspend fun deleteAgent(agentId: AgentId) {
         val (client, baseUrl) = apiClient.session()
 
-        val response = client.delete("$baseUrl/v1/agents/$agentId")
+        val response = client.delete("$baseUrl/v1/agents/${agentId.value}")
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())
         }
     }
 
-    open suspend fun exportAgent(agentId: String): String {
+    open suspend fun deleteAgent(agentId: String) = deleteAgent(AgentId(agentId))
+
+    open suspend fun exportAgent(agentId: AgentId): String {
         val (client, baseUrl) = apiClient.session()
 
-        val response = client.get("$baseUrl/v1/agents/$agentId/export")
+        val response = client.get("$baseUrl/v1/agents/${agentId.value}/export")
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())
         }
         return response.body()
     }
 
+    open suspend fun exportAgent(agentId: String): String = exportAgent(AgentId(agentId))
+
     open suspend fun importAgent(
         fileName: String,
         fileBytes: ByteArray,
         overrideName: String? = null,
         overrideExistingTools: Boolean? = null,
-        projectId: String? = null,
+        projectId: ProjectId? = null,
         stripMessages: Boolean? = null,
     ): ImportedAgentsResponse {
         val (client, baseUrl) = apiClient.session()
@@ -127,7 +138,7 @@ open class AgentApi @Inject constructor(
                 })
                 overrideName?.let { append("override_name", it) }
                 overrideExistingTools?.let { append("override_existing_tools", it.toString()) }
-                projectId?.let { append("project_id", it) }
+                projectId?.let { append("project_id", it.value) }
                 stripMessages?.let { append("strip_messages", it.toString()) }
             }
         )
@@ -137,21 +148,25 @@ open class AgentApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun attachArchive(agentId: String, archiveId: String) {
+    open suspend fun attachArchive(agentId: AgentId, archiveId: String) {
         val (client, baseUrl) = apiClient.session()
 
-        val response = client.patch("$baseUrl/v1/agents/$agentId/archives/attach/$archiveId")
+        val response = client.patch("$baseUrl/v1/agents/${agentId.value}/archives/attach/$archiveId")
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())
         }
     }
 
-    open suspend fun detachArchive(agentId: String, archiveId: String) {
+    open suspend fun attachArchive(agentId: String, archiveId: String) = attachArchive(AgentId(agentId), archiveId)
+
+    open suspend fun detachArchive(agentId: AgentId, archiveId: String) {
         val (client, baseUrl) = apiClient.session()
 
-        val response = client.patch("$baseUrl/v1/agents/$agentId/archives/detach/$archiveId")
+        val response = client.patch("$baseUrl/v1/agents/${agentId.value}/archives/detach/$archiveId")
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())
         }
     }
+
+    open suspend fun detachArchive(agentId: String, archiveId: String) = detachArchive(AgentId(agentId), archiveId)
 }

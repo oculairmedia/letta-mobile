@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.editagent
 
 import com.letta.mobile.data.model.AgentEnvironmentVariable
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.model.CompactionSettings
@@ -92,7 +93,7 @@ internal class EditAgentUseCases(
                 return
             }
             agentRepository.updateAgent(
-                agentId,
+                AgentId(agentId),
                 AgentUpdateParams(
                     name = state.name,
                     description = state.description,
@@ -302,7 +303,7 @@ internal class EditAgentUseCases(
 
     suspend fun exportAgent(onResult: (String) -> Unit) {
         try {
-            val data = agentRepository.exportAgent(agentId)
+            val data = agentRepository.exportAgent(AgentId(agentId))
             onResult(data)
         } catch (e: CancellationException) {
             throw e
@@ -320,7 +321,7 @@ internal class EditAgentUseCases(
         val state = (uiState.value as? UiState.Success)?.data ?: return
         uiState.value = UiState.Success(state.copy(isCloning = true))
         try {
-            val exportData = agentRepository.exportAgent(agentId)
+            val exportData = agentRepository.exportAgent(AgentId(agentId))
             val response = agentRepository.importAgent(
                 fileName = "${state.name.ifBlank { "agent" }}.json",
                 fileBytes = exportData.encodeToByteArray(),
@@ -339,7 +340,7 @@ internal class EditAgentUseCases(
 
     suspend fun resetMessages(onSuccess: () -> Unit = {}) {
         try {
-            messageRepository.resetMessages(agentId)
+            messageRepository.resetMessages(AgentId(agentId))
             onSuccess()
         } catch (e: CancellationException) {
             throw e
@@ -350,7 +351,7 @@ internal class EditAgentUseCases(
 
     suspend fun deleteAgent(onSuccess: () -> Unit) {
         try {
-            agentRepository.deleteAgent(agentId)
+            agentRepository.deleteAgent(AgentId(agentId))
             onSuccess()
         } catch (e: CancellationException) {
             throw e

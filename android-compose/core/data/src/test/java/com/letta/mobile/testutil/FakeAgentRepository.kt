@@ -4,8 +4,10 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.ImportedAgentsResponse
+import com.letta.mobile.data.model.ProjectId
 import com.letta.mobile.data.repository.api.IAgentRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,23 +49,23 @@ class FakeAgentRepository(
         return false
     }
 
-    override fun getCachedAgent(id: String): Agent? {
-        calls += "getCachedAgent:$id"
-        return agentsState.value.find { it.id == AgentId(id) }
+    override fun getCachedAgent(id: AgentId): Agent? {
+        calls += "getCachedAgent:${id.value}"
+        return agentsState.value.find { it.id == id }
     }
 
-    override fun getAgent(id: String): Flow<Agent> = flow {
-        calls += "getAgent:$id"
+    override fun getAgent(id: AgentId): Flow<Agent> = flow {
+        calls += "getAgent:${id.value}"
         emit(requireAgent(id))
     }
 
-    override suspend fun checkpointAndRestoreConfig(agentId: String, operation: suspend () -> Unit) {
-        calls += "checkpointAndRestoreConfig:$agentId"
+    override suspend fun checkpointAndRestoreConfig(agentId: AgentId, operation: suspend () -> Unit) {
+        calls += "checkpointAndRestoreConfig:${agentId.value}"
         operation()
     }
 
-    override suspend fun getContextWindow(agentId: String, conversationId: String?): ContextWindowOverview {
-        calls += "getContextWindow:$agentId:${conversationId ?: "<null>"}"
+    override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview {
+        calls += "getContextWindow:${agentId.value}:${conversationId?.value ?: "<null>"}"
         return ContextWindowOverview()
     }
 
@@ -80,8 +82,8 @@ class FakeAgentRepository(
         return agent
     }
 
-    override suspend fun updateAgent(id: String, params: AgentUpdateParams): Agent {
-        calls += "updateAgent:$id"
+    override suspend fun updateAgent(id: AgentId, params: AgentUpdateParams): Agent {
+        calls += "updateAgent:${id.value}"
         val current = requireAgent(id)
         val updated = current.copy(
             name = params.name ?: current.name,
@@ -89,18 +91,18 @@ class FakeAgentRepository(
             model = params.model ?: current.model,
             tags = params.tags ?: current.tags,
         )
-        agentsState.value = agentsState.value.map { agent -> if (agent.id == AgentId(id)) updated else agent }
+        agentsState.value = agentsState.value.map { agent -> if (agent.id == id) updated else agent }
         return updated
     }
 
-    override suspend fun deleteAgent(id: String) {
-        calls += "deleteAgent:$id"
-        agentsState.value = agentsState.value.filterNot { it.id == AgentId(id) }
+    override suspend fun deleteAgent(id: AgentId) {
+        calls += "deleteAgent:${id.value}"
+        agentsState.value = agentsState.value.filterNot { it.id == id }
     }
 
-    override suspend fun exportAgent(id: String): String {
-        calls += "exportAgent:$id"
-        return "{\"agents\":[{\"id\":\"$id\"}]}"
+    override suspend fun exportAgent(id: AgentId): String {
+        calls += "exportAgent:${id.value}"
+        return "{\"agents\":[{\"id\":\"${id.value}\"}]}"
     }
 
     override suspend fun importAgent(
@@ -108,7 +110,7 @@ class FakeAgentRepository(
         fileBytes: ByteArray,
         overrideName: String?,
         overrideExistingTools: Boolean?,
-        projectId: String?,
+        projectId: ProjectId?,
         stripMessages: Boolean?,
     ): ImportedAgentsResponse {
         calls += "importAgent:$fileName"
@@ -117,14 +119,14 @@ class FakeAgentRepository(
         return ImportedAgentsResponse(agentIds = listOf(importedId))
     }
 
-    override suspend fun attachArchive(agentId: String, archiveId: String) {
-        calls += "attachArchive:$agentId:$archiveId"
+    override suspend fun attachArchive(agentId: AgentId, archiveId: String) {
+        calls += "attachArchive:${agentId.value}:$archiveId"
     }
 
-    override suspend fun detachArchive(agentId: String, archiveId: String) {
-        calls += "detachArchive:$agentId:$archiveId"
+    override suspend fun detachArchive(agentId: AgentId, archiveId: String) {
+        calls += "detachArchive:${agentId.value}:$archiveId"
     }
 
-    private fun requireAgent(id: String): Agent =
-        getCachedAgent(id) ?: error("No fake agent queued for $id")
+    private fun requireAgent(id: AgentId): Agent =
+        getCachedAgent(id) ?: error("No fake agent queued for ${id.value}")
 }

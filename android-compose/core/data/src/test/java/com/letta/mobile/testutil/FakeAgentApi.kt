@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
+import com.letta.mobile.data.model.ProjectId
 import io.mockk.mockk
 import kotlinx.coroutines.delay
 
@@ -41,10 +42,10 @@ class FakeAgentApi : AgentApi(mockk(relaxed = true)) {
         return agents.size
     }
 
-    override suspend fun getAgent(agentId: String): Agent {
+    override suspend fun getAgent(agentId: AgentId): Agent {
         calls.add("getAgent:$agentId")
         if (shouldFail) throw ApiException(failCode, failMessage)
-        return agents.find { it.id == AgentId(agentId) } ?: throw ApiException(404, "Not found")
+        return agents.find { it.id == agentId } ?: throw ApiException(404, "Not found")
     }
 
     override suspend fun createAgent(params: AgentCreateParams): Agent {
@@ -55,27 +56,27 @@ class FakeAgentApi : AgentApi(mockk(relaxed = true)) {
         return agent
     }
 
-    override suspend fun updateAgent(agentId: String, params: AgentUpdateParams): Agent {
+    override suspend fun updateAgent(agentId: AgentId, params: AgentUpdateParams): Agent {
         calls.add("updateAgent:$agentId")
         if (shouldFail) throw ApiException(failCode, failMessage)
-        val index = agents.indexOfFirst { it.id == AgentId(agentId) }
+        val index = agents.indexOfFirst { it.id == agentId }
         if (index < 0) throw ApiException(404, "Not found")
         val updated = agents[index].copy(name = params.name ?: agents[index].name)
         agents[index] = updated
         return updated
     }
 
-    override suspend fun deleteAgent(agentId: String) {
+    override suspend fun deleteAgent(agentId: AgentId) {
         calls.add("deleteAgent:$agentId")
         if (shouldFail) throw ApiException(failCode, failMessage)
-        agents.removeAll { it.id == AgentId(agentId) }
+        agents.removeAll { it.id == agentId }
     }
 
-    override suspend fun exportAgent(agentId: String): String {
+    override suspend fun exportAgent(agentId: AgentId): String {
         calls.add("exportAgent:$agentId")
         if (shouldFail) throw ApiException(failCode, failMessage)
-        return exportPayloadByAgentId[agentId]
-            ?: "{\"agents\":[{\"id\":\"$agentId\",\"name\":\"${agents.find { it.id == AgentId(agentId) }?.name ?: "Agent"}\"}]}"
+        return exportPayloadByAgentId[agentId.value]
+            ?: "{\"agents\":[{\"id\":\"${agentId.value}\",\"name\":\"${agents.find { it.id == agentId }?.name ?: "Agent"}\"}]}"
     }
 
     override suspend fun importAgent(
@@ -83,7 +84,7 @@ class FakeAgentApi : AgentApi(mockk(relaxed = true)) {
         fileBytes: ByteArray,
         overrideName: String?,
         overrideExistingTools: Boolean?,
-        projectId: String?,
+        projectId: ProjectId?,
         stripMessages: Boolean?,
     ): ImportedAgentsResponse {
         calls.add(
@@ -105,12 +106,12 @@ class FakeAgentApi : AgentApi(mockk(relaxed = true)) {
         return ImportedAgentsResponse(agentIds = listOf(importedId))
     }
 
-    override suspend fun attachArchive(agentId: String, archiveId: String) {
+    override suspend fun attachArchive(agentId: AgentId, archiveId: String) {
         calls.add("attachArchive:$agentId:$archiveId")
         if (shouldFail) throw ApiException(failCode, failMessage)
     }
 
-    override suspend fun detachArchive(agentId: String, archiveId: String) {
+    override suspend fun detachArchive(agentId: AgentId, archiveId: String) {
         calls.add("detachArchive:$agentId:$archiveId")
         if (shouldFail) throw ApiException(failCode, failMessage)
     }

@@ -7,8 +7,10 @@ import androidx.paging.PagingData
 import com.letta.mobile.data.api.ConversationApi
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.local.ConversationEntity
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCountEstimate
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.paging.ConversationPagingSource
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.session.BackendScopedCache
@@ -65,7 +67,7 @@ open class AllConversationsRepository(
     }
 
     override open fun getConversationsPaged(
-        agentId: String?,
+        agentId: AgentId?,
         archiveStatus: String?,
         summarySearch: String?,
     ): Flow<PagingData<Conversation>> {
@@ -149,10 +151,10 @@ open class AllConversationsRepository(
         }
     }
 
-    override open fun handleOptimisticDelete(conversationId: String) {
+    override open fun handleOptimisticDelete(conversationId: ConversationId) {
         _conversations.update { current -> current.filter { it.id != conversationId } }
         repositoryScope.launch {
-            conversationDao?.delete(conversationId)
+            conversationDao?.delete(conversationId.value)
         }
     }
 
@@ -208,7 +210,7 @@ open class AllConversationsRepository(
                 current + deduped
             }
             cacheConversations(newConversations)
-            currentCursor = newConversations.last().id
+            currentCursor = newConversations.last().id.value
         }
     }
 

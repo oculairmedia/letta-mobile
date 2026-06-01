@@ -1,6 +1,7 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.api.MessageApi
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import io.ktor.utils.io.ByteReadChannel
 import io.mockk.mockk
@@ -57,6 +58,8 @@ class TimelineRepositoryTest {
         assertTrue("recently accessed loop should remain active", api.isActive("conv-a"))
         assertTrue("new loop should remain active", api.isActive("conv-c"))
         assertFalse("least recently used loop should be closed", api.isActive("conv-b"))
+
+        repository.clearAll()
     }
 
     @Test
@@ -79,6 +82,8 @@ class TimelineRepositoryTest {
         assertTrue("postHandlerCollapse access should keep conv-a active", api.isActive("conv-a"))
         assertTrue("new loop should remain active", api.isActive("conv-c"))
         assertFalse("least recently used loop should be closed", api.isActive("conv-b"))
+
+        repository.clearAll()
     }
 
     @Test
@@ -102,6 +107,8 @@ class TimelineRepositoryTest {
             "hydrate should not run on caller dispatcher, ran on $hydrateThread",
             hydrateThread.contains("caller-main-probe"),
         )
+
+        repository.clearAll()
     }
 }
 
@@ -110,23 +117,23 @@ private class CancellableStreamApi : MessageApi(mockk(relaxed = true)) {
     private val closedStreams = ConcurrentHashMap<String, AtomicInteger>()
     val listMessageThreads = ConcurrentHashMap<String, String>()
 
-    override suspend fun streamConversation(conversationId: String): ByteReadChannel {
-        activeStreams.counter(conversationId).incrementAndGet()
+    override suspend fun streamConversation(conversationId: ConversationId): ByteReadChannel {
+        activeStreams.counter(conversationId.value).incrementAndGet()
         try {
             awaitCancellation()
         } finally {
-            activeStreams.counter(conversationId).decrementAndGet()
-            closedStreams.counter(conversationId).incrementAndGet()
+            activeStreams.counter(conversationId.value).decrementAndGet()
+            closedStreams.counter(conversationId.value).incrementAndGet()
         }
     }
 
     override suspend fun listConversationMessages(
-        conversationId: String,
+        conversationId: ConversationId,
         limit: Int?,
         after: String?,
         order: String?,
     ): List<LettaMessage> {
-        listMessageThreads[conversationId] = Thread.currentThread().name
+        listMessageThreads[conversationId.value] = Thread.currentThread().name
         return emptyList()
     }
 

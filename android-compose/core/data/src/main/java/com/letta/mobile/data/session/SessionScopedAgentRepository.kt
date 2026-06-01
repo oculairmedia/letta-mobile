@@ -1,10 +1,13 @@
 package com.letta.mobile.data.session
 
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentUpdateParams
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.ImportedAgentsResponse
+import com.letta.mobile.data.model.ProjectId
 import com.letta.mobile.data.repository.api.IAgentRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -74,31 +77,31 @@ class SessionScopedAgentRepository internal constructor(
 
     override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = sessionManager.withCurrentSession { it.agentRepository.refreshAgentsIfStale(maxAgeMs) }
 
-    override fun getCachedAgent(id: String): Agent? = current.getCachedAgent(id)
+    override fun getCachedAgent(id: AgentId): Agent? = current.getCachedAgent(id)
 
-    override fun getAgent(id: String): Flow<Agent> =
+    override fun getAgent(id: AgentId): Flow<Agent> =
         sessionManager.currentGraph.flatMapLatest { it.agentRepository.getAgent(id) }
 
-    override suspend fun getContextWindow(agentId: String, conversationId: String?): ContextWindowOverview =
+    override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview =
         sessionManager.withCurrentSession { it.agentRepository.getContextWindow(agentId, conversationId) }
 
-    override suspend fun checkpointAndRestoreConfig(agentId: String, operation: suspend () -> Unit) =
+    override suspend fun checkpointAndRestoreConfig(agentId: AgentId, operation: suspend () -> Unit) =
         current.checkpointAndRestoreConfig(agentId, operation)
 
     override suspend fun createAgent(params: AgentCreateParams): Agent = sessionManager.withCurrentSession { it.agentRepository.createAgent(params) }
 
-    override suspend fun updateAgent(id: String, params: AgentUpdateParams): Agent = sessionManager.withCurrentSession { it.agentRepository.updateAgent(id, params) }
+    override suspend fun updateAgent(id: AgentId, params: AgentUpdateParams): Agent = sessionManager.withCurrentSession { it.agentRepository.updateAgent(id, params) }
 
-    override suspend fun deleteAgent(id: String) = sessionManager.withCurrentSession { it.agentRepository.deleteAgent(id) }
+    override suspend fun deleteAgent(id: AgentId) = sessionManager.withCurrentSession { it.agentRepository.deleteAgent(id) }
 
-    override suspend fun exportAgent(id: String): String = sessionManager.withCurrentSession { it.agentRepository.exportAgent(id) }
+    override suspend fun exportAgent(id: AgentId): String = sessionManager.withCurrentSession { it.agentRepository.exportAgent(id) }
 
     override suspend fun importAgent(
         fileName: String,
         fileBytes: ByteArray,
         overrideName: String?,
         overrideExistingTools: Boolean?,
-        projectId: String?,
+        projectId: ProjectId?,
         stripMessages: Boolean?,
     ): ImportedAgentsResponse = sessionManager.withCurrentSession { it.agentRepository.importAgent(
         fileName = fileName,
@@ -109,9 +112,9 @@ class SessionScopedAgentRepository internal constructor(
         stripMessages = stripMessages,
     ) }
 
-    override suspend fun attachArchive(agentId: String, archiveId: String) = sessionManager.withCurrentSession { it.agentRepository.attachArchive(agentId, archiveId) }
+    override suspend fun attachArchive(agentId: AgentId, archiveId: String) = sessionManager.withCurrentSession { it.agentRepository.attachArchive(agentId, archiveId) }
 
-    override suspend fun detachArchive(agentId: String, archiveId: String) = sessionManager.withCurrentSession { it.agentRepository.detachArchive(agentId, archiveId) }
+    override suspend fun detachArchive(agentId: AgentId, archiveId: String) = sessionManager.withCurrentSession { it.agentRepository.detachArchive(agentId, archiveId) }
 
     fun close() { proxyScope.cancel() }
 }

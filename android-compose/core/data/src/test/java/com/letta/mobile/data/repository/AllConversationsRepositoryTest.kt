@@ -38,7 +38,7 @@ class AllConversationsRepositoryTest {
         }.joinAll()
 
         assertEquals(1, fakeApi.calls.count { it == "listConversations" })
-        assertEquals(listOf("1"), repository.conversations.value.map { it.id })
+        assertEquals(listOf("1"), repository.conversations.value.map { it.id.value })
     }
 
     @Test
@@ -69,7 +69,7 @@ class AllConversationsRepositoryTest {
         val refreshed = repository.refreshIfStale(maxAgeMs = -1)
 
         assertEquals(true, refreshed)
-        assertEquals(listOf("new"), repository.conversations.value.map { it.id })
+        assertEquals(listOf("new"), repository.conversations.value.map { it.id.value })
         assertEquals(1, fakeApi.calls.count { it == "listConversations" })
     }
 
@@ -86,7 +86,7 @@ class AllConversationsRepositoryTest {
             // Expected.
         }
 
-        assertEquals(listOf("cached"), repository.conversations.value.map { it.id })
+        assertEquals(listOf("cached"), repository.conversations.value.map { it.id.value })
     }
 
     @Test
@@ -94,7 +94,7 @@ class AllConversationsRepositoryTest {
         val conv = TestData.conversation(id = "new-1")
         repository.handleOptimisticUpdate(conv)
         assertEquals(1, repository.conversations.value.size)
-        assertEquals("new-1", repository.conversations.value.first().id)
+        assertEquals("new-1", repository.conversations.value.first().id.value)
     }
 
     @Test
@@ -109,9 +109,9 @@ class AllConversationsRepositoryTest {
     fun `handleOptimisticDelete removes conversation`() {
         repository.handleOptimisticUpdate(TestData.conversation(id = "1"))
         repository.handleOptimisticUpdate(TestData.conversation(id = "2"))
-        repository.handleOptimisticDelete("1")
+        repository.handleOptimisticDelete(com.letta.mobile.data.model.ConversationId("1"))
         assertEquals(1, repository.conversations.value.size)
-        assertTrue(repository.conversations.value.none { it.id == "1" })
+        assertTrue(repository.conversations.value.none { it.id.value == "1" })
     }
 
     @Test

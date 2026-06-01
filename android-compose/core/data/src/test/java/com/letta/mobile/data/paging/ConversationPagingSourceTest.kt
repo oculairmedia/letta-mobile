@@ -2,6 +2,7 @@ package com.letta.mobile.data.paging
 
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.TestData
@@ -57,7 +58,7 @@ class ConversationPagingSourceTest {
         )
 
         result as PagingSource.LoadResult.Page
-        assertEquals((50 until 75).map { "conv-$it" }, result.data.map { it.id })
+        assertEquals((50 until 75).map { "conv-$it" }, result.data.map { it.id.value })
         assertNull(result.nextKey)
         assertEquals(listOf(50), conversationApi.listLimits)
     }
@@ -66,7 +67,7 @@ class ConversationPagingSourceTest {
     fun `passes filters to api`() = runTest {
         pagingSource = ConversationPagingSource(
             conversationApi = conversationApi,
-            agentId = "agent-1",
+            agentId = AgentId("agent-1"),
             archiveStatus = "unarchived",
             summarySearch = "important",
             order = "desc",
@@ -89,7 +90,7 @@ class ConversationPagingSourceTest {
         )
 
         result as PagingSource.LoadResult.Page
-        assertEquals(listOf("match"), result.data.map { it.id })
+        assertEquals(listOf("match"), result.data.map { it.id.value })
         assertEquals(listOf(20), conversationApi.listLimits)
     }
 

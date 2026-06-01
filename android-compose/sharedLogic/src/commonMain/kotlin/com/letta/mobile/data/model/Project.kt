@@ -85,7 +85,7 @@ data class BeadsRemoteProvisionResponse(
 
 @Serializable
 data class ProjectSyncTriggerRequest(
-    val projectId: String? = null,
+    val projectId: ProjectId? = null,
 )
 
 @Serializable
@@ -97,7 +97,7 @@ data class ProjectSyncTriggerResponse(
 
 @Serializable
 data class PmAgentMetadata(
-    @SerialName("agent_id") val agentId: String,
+    @SerialName("agent_id") val agentId: AgentId,
     val name: String? = null,
     val status: String? = null,
     val repo: String? = null,
@@ -131,7 +131,7 @@ data class VibesyncStatsResponse(
 
 @Serializable
 data class AgentsMdRefreshRequest(
-    val projectId: String? = null,
+    val projectId: ProjectId? = null,
     val dryRun: Boolean = true,
 )
 
@@ -159,14 +159,14 @@ data class ProjectRepoInfo(
 data class ProjectAgentsInfo(
     val total: Int? = null,
     val active: Int? = null,
-    @SerialName("default_agent_id") val defaultAgentId: String? = null,
+    @SerialName("default_agent_id") val defaultAgentId: AgentId? = null,
 )
 
 @Serializable
 data class ProjectConversationsInfo(
     @SerialName("total_known") val totalKnown: Int? = null,
     @SerialName("has_more") val hasMore: Boolean = false,
-    @SerialName("last_conversation_id") val lastConversationId: String? = null,
+    @SerialName("last_conversation_id") val lastConversationId: ConversationId? = null,
 )
 
 @Serializable

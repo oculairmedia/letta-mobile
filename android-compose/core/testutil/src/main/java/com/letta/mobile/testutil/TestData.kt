@@ -2,6 +2,7 @@ package com.letta.mobile.testutil
 
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockId
@@ -40,8 +41,8 @@ object TestData {
         agentId: String = "agent-1",
         summary: String? = "Test conversation",
     ) = Conversation(
-        id = id,
-        agentId = agentId,
+        id = ConversationId(id),
+        agentId = AgentId(agentId),
         summary = summary,
     )
 

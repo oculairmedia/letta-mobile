@@ -620,8 +620,8 @@ private fun ProjectActionSheetHeader(
             }
             pmAgent?.let { agent ->
                 AssistChip(
-                    onClick = { onPmAgentClick(agent.agentId) },
-                    label = { Text(stringResource(R.string.screen_projects_pm_agent_chip, agent.name ?: agent.agentId)) },
+                    onClick = { onPmAgentClick(agent.agentId.value) },
+                    label = { Text(stringResource(R.string.screen_projects_pm_agent_chip, agent.name ?: agent.agentId.value)) },
                 )
             }
             if (syncInFlight) {

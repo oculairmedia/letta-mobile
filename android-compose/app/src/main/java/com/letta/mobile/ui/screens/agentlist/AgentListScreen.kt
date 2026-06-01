@@ -76,6 +76,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Switch
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.LlmModel
@@ -166,7 +167,7 @@ fun AgentListScreen(
     }
 
     val favoriteAgent = uiState.favoriteAgentId?.let { favId ->
-        uiState.agents.find { it.id.value == favId }
+        uiState.agents.find { it.id == favId }
     }
     val displayAgents = remember(filteredAgents, favoriteAgent, uiState.pinnedAgentIds) {
         resolveAgentListDisplayAgents(
@@ -364,7 +365,7 @@ fun AgentListScreen(
                                             agent = visibleFavoriteAgent,
                                             onClick = { selectAgent(visibleFavoriteAgent.id.value, visibleFavoriteAgent.name) },
                                             onEdit = { onNavigateToEditAgent(visibleFavoriteAgent.id.value) },
-                                            onUnfavorite = { viewModel.toggleFavorite(visibleFavoriteAgent.id.value) },
+                                            onUnfavorite = { viewModel.toggleFavorite(visibleFavoriteAgent.id) },
                                             contextualActionsEnabled = !isShareMode,
                                         )
                                     }
@@ -373,13 +374,13 @@ fun AgentListScreen(
                                 items(gridAgents, key = { it.id.value }) { agent ->
                                     CompactAgentCard(
                                         agent = agent,
-                                        isFavorite = agent.id.value == uiState.favoriteAgentId,
-                                        isPinned = agent.id.value in uiState.pinnedAgentIds,
+                                        isFavorite = agent.id == uiState.favoriteAgentId,
+                                        isPinned = agent.id in uiState.pinnedAgentIds,
                                         onClick = { selectAgent(agent.id.value, agent.name) },
                                         onLongPress = { onNavigateToEditAgent(agent.id.value) },
-                                        onDelete = { viewModel.deleteAgent(agent.id.value) },
-                                        onToggleFavorite = { viewModel.toggleFavorite(agent.id.value) },
-                                        onTogglePinned = { viewModel.togglePinned(agent.id.value) },
+                                        onDelete = { viewModel.deleteAgent(agent.id) },
+                                        onToggleFavorite = { viewModel.toggleFavorite(agent.id) },
+                                        onTogglePinned = { viewModel.togglePinned(agent.id) },
                                         contextualActionsEnabled = !isShareMode,
                                     )
                                 }
@@ -402,7 +403,7 @@ fun AgentListScreen(
                                             agent = visibleFavoriteAgent,
                                             onClick = { selectAgent(visibleFavoriteAgent.id.value, visibleFavoriteAgent.name) },
                                             onEdit = { onNavigateToEditAgent(visibleFavoriteAgent.id.value) },
-                                            onUnfavorite = { viewModel.toggleFavorite(visibleFavoriteAgent.id.value) },
+                                            onUnfavorite = { viewModel.toggleFavorite(visibleFavoriteAgent.id) },
                                             contextualActionsEnabled = !isShareMode,
                                         )
                                     }
@@ -415,13 +416,13 @@ fun AgentListScreen(
                                     StaggeredListItem(index = index) {
                                         AgentCard(
                                             agent = agent,
-                                            isFavorite = agent.id.value == uiState.favoriteAgentId,
-                                            isPinned = agent.id.value in uiState.pinnedAgentIds,
+                                            isFavorite = agent.id == uiState.favoriteAgentId,
+                                            isPinned = agent.id in uiState.pinnedAgentIds,
                                             onClick = { selectAgent(agent.id.value, agent.name) },
                                             onLongPress = { onNavigateToEditAgent(agent.id.value) },
-                                            onDelete = { viewModel.deleteAgent(agent.id.value) },
-                                            onToggleFavorite = { viewModel.toggleFavorite(agent.id.value) },
-                                            onTogglePinned = { viewModel.togglePinned(agent.id.value) },
+                                            onDelete = { viewModel.deleteAgent(agent.id) },
+                                            onToggleFavorite = { viewModel.toggleFavorite(agent.id) },
+                                            onTogglePinned = { viewModel.togglePinned(agent.id) },
                                             contextualActionsEnabled = !isShareMode,
                                         )
                                     }
@@ -444,7 +445,7 @@ fun AgentListScreen(
             onCreate = { params ->
                 viewModel.createAgent(params) { agentId ->
                     viewModel.hideCreateDialog()
-                    onNavigateToAgent(agentId, params.name)
+                    onNavigateToAgent(agentId.value, params.name)
                 }
             },
         )
@@ -473,7 +474,7 @@ data class AgentListDisplayAgents(
 fun resolveAgentListDisplayAgents(
     filteredAgents: List<Agent>,
     favoriteAgent: Agent?,
-    pinnedAgentIds: Set<String> = emptySet(),
+    pinnedAgentIds: Set<AgentId> = emptySet(),
 ): AgentListDisplayAgents {
     val filteredAgentIds = filteredAgents.mapTo(mutableSetOf()) { it.id }
     val visibleFavoriteAgent = favoriteAgent?.takeIf { it.id in filteredAgentIds }
@@ -483,7 +484,7 @@ fun resolveAgentListDisplayAgents(
             .filter { it.id != visibleFavoriteAgent?.id }
             .mapIndexed { index, agent -> index to agent }
             .sortedWith(
-                compareByDescending<Pair<Int, Agent>> { it.second.id.value in pinnedAgentIds }
+                compareByDescending<Pair<Int, Agent>> { it.second.id in pinnedAgentIds }
                     .thenBy { it.first },
             )
             .map { it.second },

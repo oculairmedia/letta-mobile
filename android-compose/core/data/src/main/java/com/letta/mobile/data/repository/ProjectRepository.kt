@@ -147,7 +147,7 @@ open class ProjectRepository @Inject constructor(
     private fun ProjectSummary.sanitize(): ProjectSummary = copy(
         filesystemPath = filesystemPath ?: repo?.filesystemPath,
         gitUrl = (gitUrl ?: repo?.remoteUrl)?.let(::sanitizeGitUrl),
-        lettaAgentId = lettaAgentId ?: agents?.defaultAgentId?.let { AgentId(it) },
+        lettaAgentId = lettaAgentId ?: agents?.defaultAgentId,
         issueCount = issueCount ?: tracker?.summary?.totalKnown,
         beadsIssueCount = beadsIssueCount ?: tracker?.summary?.totalKnown,
         updatedAt = normalizeTimestamp(updatedAt),

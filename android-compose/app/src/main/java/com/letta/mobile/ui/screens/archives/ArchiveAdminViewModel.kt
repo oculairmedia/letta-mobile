@@ -3,6 +3,7 @@ package com.letta.mobile.ui.screens.archives
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Archive
 import com.letta.mobile.data.model.ArchiveCreateParams
 import com.letta.mobile.data.model.ArchiveUpdateParams
@@ -190,7 +191,7 @@ class ArchiveAdminViewModel @Inject constructor(
     fun attachArchiveToAgent(archiveId: String, agentId: String, onSuccess: () -> Unit = {}) {
         viewModelScope.launch {
             try {
-                agentRepository.attachArchive(agentId = agentId, archiveId = archiveId)
+                agentRepository.attachArchive(agentId = AgentId(agentId), archiveId = archiveId)
                 inspectArchive(archiveId)
                 onSuccess()
             } catch (e: Exception) {
@@ -202,7 +203,7 @@ class ArchiveAdminViewModel @Inject constructor(
     fun detachArchiveFromAgent(archiveId: String, agentId: String) {
         viewModelScope.launch {
             try {
-                agentRepository.detachArchive(agentId = agentId, archiveId = archiveId)
+                agentRepository.detachArchive(agentId = AgentId(agentId), archiveId = archiveId)
                 inspectArchive(archiveId)
             } catch (e: Exception) {
                 setOperationError(mapErrorToUserMessage(e, "Failed to detach archive"))

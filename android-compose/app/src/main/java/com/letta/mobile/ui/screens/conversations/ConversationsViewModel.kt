@@ -4,6 +4,8 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.ConversationInspectorMessage
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -67,18 +69,19 @@ class ConversationsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ConversationsUiState())
     val uiState: StateFlow<ConversationsUiState> = _uiState.asStateFlow()
 
-    private var agentNameCache = mutableMapOf<String, String>()
-    private var pinnedConversationIds: Set<String> = emptySet()
+    private var agentNameCache = mutableMapOf<AgentId, String>()
+    private var pinnedConversationIds: Set<ConversationId> = emptySet()
 
     init {
         viewModelScope.launch {
             settingsRepository.getPinnedConversationIds().collectLatest { pinnedIds ->
-                pinnedConversationIds = pinnedIds
+                val typedPinnedIds = pinnedIds.map { ConversationId(it) }.toSet()
+                pinnedConversationIds = typedPinnedIds
                 val selectedConversation = _uiState.value.selectedConversation
                 _uiState.value = _uiState.value.copy(
-                    conversations = applyPinnedState(_uiState.value.conversations).toImmutableList(),
+                    conversations = applyPinnedState(_uiState.value.conversations, typedPinnedIds).toImmutableList(),
                     selectedConversation = selectedConversation?.let {
-                        it.copy(isPinned = it.conversation.id in pinnedIds)
+                        it.copy(isPinned = it.conversation.id in typedPinnedIds)
                     },
                 )
             }
@@ -92,7 +95,7 @@ class ConversationsViewModel @Inject constructor(
         }
         val cachedAgents = agentRepository.agents.value
         if (cachedAgents.isNotEmpty()) {
-            agentNameCache = cachedAgents.associate { it.id.value to it.name }.toMutableMap()
+            agentNameCache = cachedAgents.associate { it.id to it.name }.toMutableMap()
         }
         val cachedConversations = allConversationsRepository.conversations.value
         if (cachedConversations.isNotEmpty()) {
@@ -128,7 +131,7 @@ class ConversationsViewModel @Inject constructor(
             }
 
             loadResult.agents.onSuccess { agents ->
-                agentNameCache = agents.associate { it.id.value to it.name }.toMutableMap()
+                agentNameCache = agents.associate { it.id to it.name }.toMutableMap()
             }.onFailure { error ->
                 Log.w("ConversationsVM", "Agent load failed", error)
             }
@@ -167,7 +170,7 @@ class ConversationsViewModel @Inject constructor(
         }
     }
 
-    fun deleteConversation(conversationId: String) {
+    fun deleteConversation(conversationId: ConversationId) {
         viewModelScope.launch {
             val display = _uiState.value.conversations.firstOrNull { it.conversation.id == conversationId } ?: return@launch
             try {
@@ -195,11 +198,11 @@ class ConversationsViewModel @Inject constructor(
         return state.conversations.filter { display ->
             (display.conversation.summary?.lowercase()?.contains(q) == true) ||
                 display.agentName.lowercase().contains(q) ||
-                display.conversation.id.lowercase().contains(q)
+                display.conversation.id.value.lowercase().contains(q)
         }
     }
 
-    fun renameConversation(conversationId: String, agentId: String, newName: String) {
+    fun renameConversation(conversationId: ConversationId, agentId: AgentId, newName: String) {
         viewModelScope.launch {
             try {
                 conversationRepository.updateConversation(conversationId, agentId, newName)
@@ -220,7 +223,7 @@ class ConversationsViewModel @Inject constructor(
         }
     }
 
-    fun forkConversation(conversationId: String, agentId: String, onSuccess: (String) -> Unit) {
+    fun forkConversation(conversationId: ConversationId, agentId: AgentId, onSuccess: (ConversationId) -> Unit) {
         viewModelScope.launch {
             try {
                 val forked = conversationRepository.forkConversation(conversationId, agentId)
@@ -315,7 +318,7 @@ class ConversationsViewModel @Inject constructor(
         }
     }
 
-    fun createConversation(agentId: String, onSuccess: (String) -> Unit) {
+    fun createConversation(agentId: AgentId, onSuccess: (ConversationId) -> Unit) {
         viewModelScope.launch {
             try {
                 val conversation = conversationRepository.createConversation(agentId)
@@ -333,7 +336,7 @@ class ConversationsViewModel @Inject constructor(
     fun toggleConversationPinned(display: ConversationDisplay) {
         viewModelScope.launch {
             val nextPinned = !display.isPinned
-            settingsRepository.setConversationPinned(display.conversation.id, nextPinned)
+            settingsRepository.setConversationPinned(display.conversation.id.value, nextPinned)
             val updatedPinnedIds = if (nextPinned) {
                 pinnedConversationIds + display.conversation.id
             } else {
@@ -351,13 +354,13 @@ class ConversationsViewModel @Inject constructor(
 
     private fun Conversation.toDisplay() = ConversationDisplay(
         conversation = this,
-        agentName = agentNameCache[agentId] ?: agentId.take(8),
+        agentName = agentNameCache[agentId] ?: agentId.value.take(8),
         isPinned = id in pinnedConversationIds,
     )
 
     private fun applyPinnedState(
         displays: List<ConversationDisplay>,
-        pinnedIds: Set<String> = pinnedConversationIds,
+        pinnedIds: Set<ConversationId> = pinnedConversationIds,
     ): List<ConversationDisplay> = displays
         .map { it.copy(isPinned = it.conversation.id in pinnedIds) }
         .sortedWith(

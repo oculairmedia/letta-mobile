@@ -58,6 +58,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.ConversationInspectorMessage
 import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
@@ -274,7 +275,7 @@ fun ConversationsScreen(
                     isRefreshing = uiState.isRefreshing,
                     isSearchActive = uiState.searchQuery.isNotBlank(),
                     onConversationClick = { display ->
-                        onNavigateToChat(display.conversation.agentId, display.conversation.id, display.routeAgentName())
+                        onNavigateToChat(display.conversation.agentId.value, display.conversation.id.value, display.routeAgentName())
                     },
                 onOpenAdmin = { display -> viewModel.openConversationAdmin(display) },
                 onDeleteConversation = { viewModel.deleteConversation(it.conversation.id) },
@@ -284,7 +285,7 @@ fun ConversationsScreen(
                 onTogglePinned = viewModel::toggleConversationPinned,
                 onForkConversation = { display ->
                     viewModel.forkConversation(display.conversation.id, display.conversation.agentId) { newConvId ->
-                        onNavigateToChat(display.conversation.agentId, newConvId, display.routeAgentName())
+                        onNavigateToChat(display.conversation.agentId.value, newConvId.value, display.routeAgentName())
                     }
                 },
                 onRefresh = { viewModel.refresh() },
@@ -301,9 +302,9 @@ fun ConversationsScreen(
             onDismiss = { showAgentPickerDialog = false },
             onAgentSelected = { agentId ->
                 val agentName = agents.firstOrNull { it.id.value == agentId }?.name?.takeIf { it.isNotBlank() }
-                viewModel.createConversation(agentId) { conversationId ->
+                viewModel.createConversation(AgentId(agentId)) { conversationId ->
                     showAgentPickerDialog = false
-                    onNavigateToChat(agentId, conversationId, agentName)
+                    onNavigateToChat(agentId, conversationId.value, agentName)
                 }
             }
         )
@@ -328,7 +329,7 @@ fun ConversationsScreen(
 }
 
 private fun ConversationDisplay.routeAgentName(): String? =
-    agentName.takeIf { it.isNotBlank() && it != conversation.agentId.take(8) }
+    agentName.takeIf { it.isNotBlank() && it != conversation.agentId.value.take(8) }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -640,7 +641,7 @@ private fun ConversationAdminDialog(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                conversation.id,
+                conversation.id.value,
                 style = MaterialTheme.typography.listItemMetadataMonospace,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -1,6 +1,8 @@
 package com.letta.mobile.feature.chat
 
 import com.letta.mobile.data.mapper.toUiMessages
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.util.Telemetry
@@ -112,8 +114,8 @@ internal class ChatHistoryPager(
             uiState.value = uiState.value.copy(isLoadingOlderMessages = true)
             try {
                 val olderMessages = messageRepository.fetchOlderMessages(
-                    agentId = agentId,
-                    conversationId = conversationId,
+                    agentId = AgentId(agentId),
+                    conversationId = ConversationId(conversationId),
                     beforeMessageId = oldestLoadedMessageId,
                 )
                 if (conversationId != activeConversationId()) {

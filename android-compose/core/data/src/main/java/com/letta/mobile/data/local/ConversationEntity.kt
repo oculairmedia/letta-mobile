@@ -3,7 +3,9 @@ package com.letta.mobile.data.local
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationId
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
@@ -31,8 +33,8 @@ data class ConversationEntity(
     val cachedAtEpochMs: Long = System.currentTimeMillis(),
 ) {
     fun toConversation() = Conversation(
-        id = id,
-        agentId = agentId,
+        id = ConversationId(id),
+        agentId = AgentId(agentId),
         summary = summary,
         createdAt = createdAt,
         updatedAt = updatedAt,
@@ -48,8 +50,8 @@ data class ConversationEntity(
         private val stringListSerializer = ListSerializer(String.serializer())
 
         fun fromConversation(conversation: Conversation, cachedAtEpochMs: Long = System.currentTimeMillis()) = ConversationEntity(
-            id = conversation.id,
-            agentId = conversation.agentId,
+            id = conversation.id.value,
+            agentId = conversation.agentId.value,
             summary = conversation.summary,
             createdAt = conversation.createdAt,
             updatedAt = conversation.updatedAt,

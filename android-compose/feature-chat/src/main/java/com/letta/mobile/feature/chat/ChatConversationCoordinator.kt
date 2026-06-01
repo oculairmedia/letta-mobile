@@ -2,6 +2,7 @@ package com.letta.mobile.feature.chat
 
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.mapper.toUiMessages
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -144,8 +145,9 @@ internal class ChatConversationCoordinator(
                 null
             }
         currentConversationTracker.setCurrent(clientConversationId)
-        val agent = agentRepository.getCachedAgent(agentId)
-            ?: runCatching { agentRepository.getAgent(agentId).first() }.getOrNull()
+        val typedAgentId = AgentId(agentId)
+        val agent = agentRepository.getCachedAgent(typedAgentId)
+            ?: runCatching { agentRepository.getAgent(typedAgentId).first() }.getOrNull()
         if (clientConversationId != null) {
             startTimelineObserver(clientConversationId)
             uiState.value = uiState.value.copy(
@@ -237,7 +239,7 @@ internal class ChatConversationCoordinator(
             loadTimer.stop("result" to "noConversation")
             return
         }
-        val cachedAgent = agentRepository.getCachedAgent(agentId)
+        val cachedAgent = agentRepository.getCachedAgent(AgentId(agentId))
         val cachedMessages = emptyList<AppMessage>()
         if (cachedAgent != null || cachedMessages.isNotEmpty()) {
             if (requestedConversationId == currentConversationId) {
@@ -254,7 +256,7 @@ internal class ChatConversationCoordinator(
             }
         }
         try {
-            val agent = agentRepository.getAgent(agentId).first()
+            val agent = agentRepository.getAgent(AgentId(agentId)).first()
             if (requestedConversationId != (activeConversationId ?: explicitConversationId())) {
                 loadTimer.stop("result" to "staleConversation")
                 return

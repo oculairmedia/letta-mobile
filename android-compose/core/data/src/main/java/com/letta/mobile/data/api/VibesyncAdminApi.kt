@@ -2,6 +2,7 @@ package com.letta.mobile.data.api
 
 import com.letta.mobile.data.model.AgentsMdRefreshRequest
 import com.letta.mobile.data.model.AgentsMdRefreshSummary
+import com.letta.mobile.data.model.ProjectId
 import io.ktor.client.call.body
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -19,7 +20,7 @@ open class VibesyncAdminApi @Inject constructor(
         val (client, baseUrl) = apiClient.session()
         val response = client.post("$baseUrl/api/admin/agents-md/refresh") {
             contentType(ContentType.Application.Json)
-            setBody(AgentsMdRefreshRequest(projectId = projectId, dryRun = dryRun))
+            setBody(AgentsMdRefreshRequest(projectId = projectId?.let(::ProjectId), dryRun = dryRun))
         }
         if (response.status.value !in 200..299) throw ApiException(response.status.value, response.bodyAsText())
         return response.body()

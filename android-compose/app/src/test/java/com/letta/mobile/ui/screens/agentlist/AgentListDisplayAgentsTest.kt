@@ -45,7 +45,7 @@ class AgentListDisplayAgentsTest {
         val display = resolveAgentListDisplayAgents(
             filteredAgents = listOf(regular, favorite, pinned),
             favoriteAgent = favorite,
-            pinnedAgentIds = setOf("pinned"),
+            pinnedAgentIds = setOf(AgentId("pinned")),
         )
 
         assertEquals(favorite, display.visibleFavoriteAgent)

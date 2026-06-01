@@ -11,7 +11,9 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentUpdateParams
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ImportedAgentsResponse
+import com.letta.mobile.data.model.ProjectId
 import com.letta.mobile.data.paging.AgentPagingSource
 import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -159,7 +161,7 @@ open class AgentRepository(
         return fullList
     }
 
-    override open fun getCachedAgent(id: String): Agent? = _agents.value.find { it.id == AgentId(id) }
+    override open fun getCachedAgent(id: AgentId): Agent? = _agents.value.find { it.id == id }
 
     fun hasFreshAgents(maxAgeMs: Long): Boolean {
         return _agents.value.isNotEmpty() && System.currentTimeMillis() - lastRefreshAtMillis <= maxAgeMs
@@ -180,8 +182,8 @@ open class AgentRepository(
         true
     }
 
-    override open fun getAgent(id: String): Flow<Agent> = flow {
-        val cached = _agents.value.find { it.id == AgentId(id) }
+    override open fun getAgent(id: AgentId): Flow<Agent> = flow {
+        val cached = _agents.value.find { it.id == id }
         if (cached != null) {
             emit(cached)
         }
@@ -190,10 +192,10 @@ open class AgentRepository(
         updateAgentInCache(fresh)
     }
 
-    override open suspend fun getContextWindow(agentId: String, conversationId: String?) =
+    override open suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?) =
         agentApi.getContextWindow(agentId, conversationId)
 
-    fun getAgentPolling(id: String): Flow<Agent> = flow {
+    fun getAgentPolling(id: AgentId): Flow<Agent> = flow {
         while (true) {
             val agent = agentApi.getAgent(id)
             emit(agent)
@@ -208,15 +210,15 @@ open class AgentRepository(
         return agent
     }
 
-    override open suspend fun updateAgent(id: String, params: AgentUpdateParams): Agent {
+    override open suspend fun updateAgent(id: AgentId, params: AgentUpdateParams): Agent {
         val agent = agentApi.updateAgent(id, params)
         refreshAgents()
         return agent
     }
 
-    override open suspend fun deleteAgent(id: String) {
+    override open suspend fun deleteAgent(id: AgentId) {
         agentApi.deleteAgent(id)
-        _agents.update { current -> current.filterNot { it.id == AgentId(id) } }
+        _agents.update { current -> current.filterNot { it.id == id } }
         try {
             agentDao.deleteExcept(_agents.value.map { it.id.value })
         } catch (e: Exception) {
@@ -224,7 +226,7 @@ open class AgentRepository(
         }
     }
 
-    override open suspend fun exportAgent(id: String): String {
+    override open suspend fun exportAgent(id: AgentId): String {
         return agentApi.exportAgent(id)
     }
 
@@ -233,7 +235,7 @@ open class AgentRepository(
         fileBytes: ByteArray,
         overrideName: String?,
         overrideExistingTools: Boolean?,
-        projectId: String?,
+        projectId: ProjectId?,
         stripMessages: Boolean?,
     ): ImportedAgentsResponse {
         val response = agentApi.importAgent(
@@ -248,12 +250,12 @@ open class AgentRepository(
         return response
     }
 
-    override open suspend fun attachArchive(agentId: String, archiveId: String) {
+    override open suspend fun attachArchive(agentId: AgentId, archiveId: String) {
         agentApi.attachArchive(agentId, archiveId)
         refreshAgents()
     }
 
-    override open suspend fun detachArchive(agentId: String, archiveId: String) {
+    override open suspend fun detachArchive(agentId: AgentId, archiveId: String) {
         agentApi.detachArchive(agentId, archiveId)
         refreshAgents()
     }
@@ -270,7 +272,7 @@ open class AgentRepository(
     }
 
     override open suspend fun checkpointAndRestoreConfig(
-        agentId: String,
+        agentId: AgentId,
         operation: suspend () -> Unit
     ) {
         val agent = agentApi.getAgent(agentId)

@@ -4,12 +4,14 @@ import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.data.mapper.toAppMessages
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppMessage
+import com.letta.mobile.data.model.ConversationId
 
 class MessagePagingSource(
     private val messageApi: MessageApi,
-    private val agentId: String?,
-    private val conversationId: String?
+    private val agentId: AgentId?,
+    private val conversationId: ConversationId?
 ) : PagingSource<String, AppMessage>() {
 
     companion object {

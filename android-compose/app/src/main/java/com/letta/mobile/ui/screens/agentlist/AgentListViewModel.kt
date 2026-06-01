@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.model.LlmModel
@@ -35,8 +36,8 @@ data class AgentListUiState(
     val availableTools: ImmutableList<Tool> = persistentListOf(),
     val llmModels: ImmutableList<LlmModel> = persistentListOf(),
     val embeddingModels: ImmutableList<EmbeddingModel> = persistentListOf(),
-    val favoriteAgentId: String? = null,
-    val pinnedAgentIds: Set<String> = emptySet(),
+    val favoriteAgentId: AgentId? = null,
+    val pinnedAgentIds: Set<AgentId> = emptySet(),
     val searchQuery: String = "",
     val selectedTags: Set<String> = emptySet(),
     val isImporting: Boolean = false,
@@ -115,8 +116,8 @@ class AgentListViewModel @Inject constructor(
             availableTools = tools.toImmutableList(),
             llmModels = overlay.llm.toImmutableList(),
             embeddingModels = overlay.emb.toImmutableList(),
-            favoriteAgentId = favId,
-            pinnedAgentIds = pinnedIds,
+            favoriteAgentId = favId?.let { AgentId(it) },
+            pinnedAgentIds = pinnedIds.map { AgentId(it) }.toSet(),
             searchQuery = overlay.transient.searchQuery,
             selectedTags = overlay.transient.selectedTags,
             isLoading = overlay.transient.isLoading && agents.isEmpty(),
@@ -270,7 +271,7 @@ class AgentListViewModel @Inject constructor(
         _transient.update { it.copy(selectedTags = emptySet()) }
     }
 
-    fun deleteAgent(agentId: String, onComplete: () -> Unit = {}) {
+    fun deleteAgent(agentId: AgentId, onComplete: () -> Unit = {}) {
         viewModelScope.launch {
             try {
                 agentRepository.deleteAgent(agentId)
@@ -284,16 +285,16 @@ class AgentListViewModel @Inject constructor(
         }
     }
 
-    fun toggleFavorite(agentId: String) {
+    fun toggleFavorite(agentId: AgentId) {
         val current = uiState.value.favoriteAgentId
-        val newFav = if (current == agentId) null else agentId
+        val newFav = if (current == agentId) null else agentId.value
         settingsRepository.setFavoriteAgentId(newFav)
     }
 
-    fun togglePinned(agentId: String) {
+    fun togglePinned(agentId: AgentId) {
         viewModelScope.launch {
             val isPinned = agentId in uiState.value.pinnedAgentIds
-            settingsRepository.setAgentPinned(agentId, !isPinned)
+            settingsRepository.setAgentPinned(agentId.value, !isPinned)
         }
     }
 
@@ -301,14 +302,14 @@ class AgentListViewModel @Inject constructor(
         _transient.update { it.copy(error = null) }
     }
 
-    fun createAgent(params: AgentCreateParams, onSuccess: (String) -> Unit) {
+    fun createAgent(params: AgentCreateParams, onSuccess: (AgentId) -> Unit) {
         viewModelScope.launch {
             _transient.update { it.copy(isCreating = true) }
             try {
                 val agent = agentRepository.createAgent(params)
                 _transient.update { it.copy(isCreating = false) }
                 agentRepository.refreshAgents()
-                onSuccess(agent.id.value)
+                onSuccess(agent.id)
             } catch (e: Exception) {
                 _transient.update {
                     it.copy(

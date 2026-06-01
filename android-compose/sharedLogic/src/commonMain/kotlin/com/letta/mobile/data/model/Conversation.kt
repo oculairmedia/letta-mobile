@@ -5,8 +5,8 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class Conversation(
-    val id: String,
-    @SerialName("agent_id") val agentId: String,
+    val id: ConversationId,
+    @SerialName("agent_id") val agentId: AgentId,
     val summary: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null,
@@ -19,7 +19,7 @@ data class Conversation(
 
 @Serializable
 data class ConversationCreateParams(
-    @SerialName("agent_id") val agentId: String,
+    @SerialName("agent_id") val agentId: AgentId,
     val summary: String? = null,
     @SerialName("isolated_block_labels") val isolatedBlockLabels: List<String>? = null,
     val model: String? = null,

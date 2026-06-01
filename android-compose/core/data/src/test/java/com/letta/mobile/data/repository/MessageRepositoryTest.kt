@@ -205,7 +205,7 @@ class MessageRepositoryTest {
             )
         )
 
-        val result = repository.fetchConversationInspectorMessages("conv-1")
+        val result = repository.fetchConversationInspectorMessages(com.letta.mobile.data.model.ConversationId("conv-1"))
 
         assertEquals(listOf("user-1", "assistant-1"), result.map { it.id })
         assertEquals("user_message", result.first().messageType)

@@ -42,7 +42,7 @@ class ChannelHeartbeatSync @Inject constructor(
         val agentNames = agentRepository.agents.value.associate { it.id.value to it.name }
 
         conversations.forEach { conversation ->
-            processConversation(conversation, agentNames[conversation.agentId].orEmpty())
+            processConversation(conversation, agentNames[conversation.agentId.value].orEmpty())
         }
 
         return ListenableWorker.Result.success()
@@ -53,7 +53,8 @@ class ChannelHeartbeatSync @Inject constructor(
         agentName: String,
     ) {
         val lastActivityAt = conversation.lastMessageAt ?: conversation.updatedAt ?: conversation.createdAt ?: return
-        val previousProcessedAt = syncStateStore.getProcessedLastActivityAt(conversation.id)
+        val conversationId = conversation.id.value
+        val previousProcessedAt = syncStateStore.getProcessedLastActivityAt(conversationId)
         if (previousProcessedAt == lastActivityAt) {
             return
         }
@@ -66,16 +67,16 @@ class ChannelHeartbeatSync @Inject constructor(
 
         val latestNotifiable = messages.lastOrNull { it.isNotifiable() }
         if (previousProcessedAt == null) {
-            syncStateStore.setProcessedLastActivityAt(conversation.id, lastActivityAt)
-            latestNotifiable?.id?.let { syncStateStore.setLastNotifiedMessageId(conversation.id, it) }
+            syncStateStore.setProcessedLastActivityAt(conversationId, lastActivityAt)
+            latestNotifiable?.id?.let { syncStateStore.setLastNotifiedMessageId(conversationId, it) }
             return
         }
 
         if (latestNotifiable != null) {
             notificationDeliveryCoordinator.submit(
                 NotificationDeliveryCandidate(
-                    conversationId = conversation.id,
-                    agentId = conversation.agentId,
+                    conversationId = conversationId,
+                    agentId = conversation.agentId.value,
                     agentName = agentName,
                     conversationSummary = conversation.summary,
                     messageId = latestNotifiable.id,
@@ -88,7 +89,7 @@ class ChannelHeartbeatSync @Inject constructor(
             )
         }
 
-        syncStateStore.setProcessedLastActivityAt(conversation.id, lastActivityAt)
+        syncStateStore.setProcessedLastActivityAt(conversationId, lastActivityAt)
     }
 
     private fun ConversationInspectorMessage.isNotifiable(): Boolean {

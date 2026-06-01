@@ -3,6 +3,7 @@ package com.letta.mobile.domain
 import android.util.Log
 import com.letta.mobile.data.api.AgentApi
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.paging.AgentPagingSource
@@ -42,7 +43,7 @@ class AdminAgentManager @Inject constructor(
         val existingId = settingsRepository.adminAgentId.value
         if (existingId != null) {
             try {
-                val agent = agentApi.getAgent(existingId)
+                val agent = agentApi.getAgent(AgentId(existingId))
                 Log.d(TAG, "Found admin agent by saved ID: ${agent.id}")
                 return agent
             } catch (e: Exception) {

@@ -1,7 +1,9 @@
 package com.letta.mobile.feature.chat
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockUpdateParams
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ProjectBugReport
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
@@ -33,7 +35,7 @@ internal class ProjectChatCoordinator(
                 it.copy(contextWindow = it.contextWindow.copy(isLoading = true, error = null))
             }
             try {
-                val overview = agentRepository.getContextWindow(agentId, conversationId())
+                val overview = agentRepository.getContextWindow(AgentId(agentId), conversationId()?.let(::ConversationId))
                 uiState.update {
                     it.copy(
                         contextWindow = ContextWindowUiState(

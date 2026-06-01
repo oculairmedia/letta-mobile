@@ -1,8 +1,10 @@
 package com.letta.mobile.data.session
 
 import androidx.paging.PagingData
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCountEstimate
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -57,7 +59,7 @@ class SessionScopedAllConversationsRepository internal constructor(
 
     @Suppress("UNCHECKED_CAST")
     override fun getConversationsPaged(
-        agentId: String?,
+        agentId: AgentId?,
         archiveStatus: String?,
         summarySearch: String?,
     ): Flow<PagingData<Conversation>> = sessionManager.currentGraph
@@ -74,7 +76,7 @@ class SessionScopedAllConversationsRepository internal constructor(
     override fun hasFreshConversations(maxAgeMs: Long): Boolean = current.hasFreshConversations(maxAgeMs)
     override suspend fun refreshIfStale(maxAgeMs: Long): Boolean = sessionManager.withCurrentSession { it.allConversationsRepository.refreshIfStale(maxAgeMs) }
     override fun handleOptimisticUpdate(conversation: Conversation) = current.handleOptimisticUpdate(conversation)
-    override fun handleOptimisticDelete(conversationId: String) = current.handleOptimisticDelete(conversationId)
+    override fun handleOptimisticDelete(conversationId: ConversationId) = current.handleOptimisticDelete(conversationId)
     override fun loadedCountEstimate(): ConversationCountEstimate? = current.loadedCountEstimate()
 
     @Deprecated("Use loadedCountEstimate() and render approximate/unknown states explicitly.")

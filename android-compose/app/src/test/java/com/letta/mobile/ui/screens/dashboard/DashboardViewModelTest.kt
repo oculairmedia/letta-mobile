@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.screens.dashboard
 
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCountEstimate
@@ -74,11 +75,13 @@ class DashboardViewModelTest {
         // which made this test flake as "expected 2, was 0" (o7ob.6).
         coEvery { agentRepository.countAgents() } returns 2
         coEvery { agentRepository.refreshAgents() } returns Unit
-        every { agentRepository.getCachedAgent(any()) } answers {
-            agentRepository.agents.value.firstOrNull { it.id == firstArg() }
+        every { agentRepository.getCachedAgent(any<AgentId>()) } answers {
+            val agentId = firstArg<AgentId>()
+            agentRepository.agents.value.firstOrNull { it.id == agentId }
         }
-        every { agentRepository.getAgent(any()) } answers {
-            flowOf(agentRepository.agents.value.first { it.id == firstArg() })
+        every { agentRepository.getAgent(any<AgentId>()) } answers {
+            val agentId = firstArg<AgentId>()
+            flowOf(agentRepository.agents.value.first { it.id == agentId })
         }
 
         conversationsRepository = mockk(relaxed = true)

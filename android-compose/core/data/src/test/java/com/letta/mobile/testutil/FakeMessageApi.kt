@@ -2,8 +2,10 @@ package com.letta.mobile.testutil
 
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.api.MessageApi
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.BatchMessage
 import com.letta.mobile.data.model.BatchMessagesResponse
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.CreateBatchMessagesRequest
 import com.letta.mobile.data.model.Job
 import com.letta.mobile.data.model.LettaMessage
@@ -45,39 +47,39 @@ class FakeMessageApi : MessageApi(mockk(relaxed = true)) {
     var lastResetAgentId: String? = null
 
     override suspend fun fetchRecentMessages(
-        conversationId: String,
+        conversationId: ConversationId,
         messageLimit: Int,
         beforeMessageId: String?,
     ): List<LettaMessage> {
         calls.add("fetchRecentMessages:$conversationId")
         if (shouldFail) throw ApiException(500, "Server error")
-        lastFetchConversationId = conversationId
+        lastFetchConversationId = conversationId.value
         lastFetchMessageLimit = messageLimit
         lastFetchBeforeMessageId = beforeMessageId
         return messages.take(messageLimit)
     }
 
     override suspend fun listMessages(
-        agentId: String,
+        agentId: AgentId,
         limit: Int?,
         before: String?,
         after: String?,
         order: String?,
-        conversationId: String?,
+        conversationId: ConversationId?,
     ): List<LettaMessage> {
         calls.add("listMessages:$agentId")
         if (shouldFail) throw ApiException(500, "Server error")
-        lastListAgentId = agentId
+        lastListAgentId = agentId.value
         lastListLimit = limit
         lastListBefore = before
         lastListAfter = after
         lastListOrder = order
-        lastListConversationId = conversationId
+        lastListConversationId = conversationId?.value
         return messages
     }
 
     override suspend fun listConversationMessages(
-        conversationId: String,
+        conversationId: ConversationId,
         limit: Int?,
         after: String?,
         order: String?,
@@ -94,23 +96,23 @@ class FakeMessageApi : MessageApi(mockk(relaxed = true)) {
     }
 
     override suspend fun sendConversationMessage(
-        conversationId: String,
+        conversationId: ConversationId,
         request: MessageCreateRequest,
     ): ByteReadChannel {
         calls.add("sendConversationMessage:$conversationId")
         if (shouldFail) throw ApiException(500, "Server error")
-        lastStreamConversationId = conversationId
+        lastStreamConversationId = conversationId.value
         lastStreamRequest = request
         return ByteReadChannel("data: [DONE]\n\n")
     }
 
     override suspend fun sendConversationMessageNoStream(
-        conversationId: String,
+        conversationId: ConversationId,
         request: MessageCreateRequest,
     ): LettaResponse {
         calls.add("sendConversationMessageNoStream:$conversationId")
         if (shouldFail) throw ApiException(500, "Server error")
-        lastNoStreamConversationId = conversationId
+        lastNoStreamConversationId = conversationId.value
         lastNoStreamRequest = request
         return LettaResponse(
             messages = emptyList(),
@@ -119,10 +121,10 @@ class FakeMessageApi : MessageApi(mockk(relaxed = true)) {
         )
     }
 
-    override suspend fun sendMessage(agentId: String, request: MessageCreateRequest): LettaResponse {
+    override suspend fun sendMessage(agentId: AgentId, request: MessageCreateRequest): LettaResponse {
         calls.add("sendMessage:$agentId")
         if (shouldFail) throw ApiException(500, "Server error")
-        lastSendAgentId = agentId
+        lastSendAgentId = agentId.value
         lastSendRequest = request
         return LettaResponse(
             messages = emptyList(),
@@ -131,10 +133,10 @@ class FakeMessageApi : MessageApi(mockk(relaxed = true)) {
         )
     }
 
-    override suspend fun cancelMessage(agentId: String, runIds: List<String>?): Map<String, String> {
+    override suspend fun cancelMessage(agentId: AgentId, runIds: List<String>?): Map<String, String> {
         calls.add("cancelMessage:$agentId")
         if (shouldFail) throw ApiException(500, "Server error")
-        lastCancelAgentId = agentId
+        lastCancelAgentId = agentId.value
         lastCancelRunIds = runIds
         return mapOf("status" to "cancelled")
     }
@@ -183,9 +185,9 @@ class FakeMessageApi : MessageApi(mockk(relaxed = true)) {
         batches[index] = batches[index].copy(status = "cancelled")
     }
 
-    override suspend fun resetMessages(agentId: String) {
+    override suspend fun resetMessages(agentId: AgentId) {
         calls.add("resetMessages:$agentId")
         if (shouldFail) throw ApiException(500, "Server error")
-        lastResetAgentId = agentId
+        lastResetAgentId = agentId.value
     }
 }

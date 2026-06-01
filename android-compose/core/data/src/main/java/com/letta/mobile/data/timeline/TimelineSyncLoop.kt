@@ -15,6 +15,8 @@ import com.letta.mobile.data.model.buildContentParts
 import com.letta.mobile.data.model.toJsonArray
 import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.ApprovalResponseMessage
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.EventMessage
 import com.letta.mobile.data.model.HiddenReasoningMessage
 import com.letta.mobile.data.model.PingMessage
@@ -296,7 +298,7 @@ class TimelineSyncLoop(
             val rawFetchLimit = hydrateRawFetchLimit(limit)
             val response = normalizeHydratedMessageOrder(
                 messageApi.listConversationMessages(
-                    conversationId = conversationId,
+                    conversationId = ConversationId(conversationId),
                     limit = rawFetchLimit,
                     order = "desc",
                 ).reversed()
@@ -640,7 +642,7 @@ class TimelineSyncLoop(
             Log.d(logTag, "send.requestBody otid=$otid preview=${previewRequest(request, previewJson)}")
         }
         val postTimer = Telemetry.startTimer("TimelineSync", "send.post")
-        val channel = messageApi.sendConversationMessage(conversationId, request)
+        val channel = messageApi.sendConversationMessage(ConversationId(conversationId), request)
         postTimer.stop("otid" to otid)
 
         val streamTimer = Telemetry.startTimer("TimelineSync", "send.stream")
@@ -829,7 +831,7 @@ class TimelineSyncLoop(
                 return
             }
             val serverMessages = messageApi.listConversationMessages(
-                conversationId = conversationId,
+                conversationId = ConversationId(conversationId),
                 limit = RECONCILE_LIMIT,
                 order = "desc",
             ).reversed()
@@ -890,7 +892,7 @@ class TimelineSyncLoop(
         for (attempt in 0 until RECONCILE_RETRY_ATTEMPTS) {
             try {
                 return messageApi.listConversationMessages(
-                    conversationId = conversationId,
+                    conversationId = ConversationId(conversationId),
                     limit = if (afterCursor != null) 50 else RECONCILE_LIMIT,
                     after = afterCursor,
                     order = if (afterCursor != null) "asc" else "desc",
@@ -922,10 +924,10 @@ class TimelineSyncLoop(
         for (attempt in 0 until RECONCILE_RETRY_ATTEMPTS) {
             try {
                 return messageApi.listMessages(
-                    agentId = agentId,
+                    agentId = AgentId(agentId),
                     limit = RECONCILE_LIMIT,
                     order = "desc",
-                    conversationId = externalConversationId,
+                    conversationId = ConversationId(externalConversationId),
                 )
             } catch (t: Throwable) {
                 if (!isRetryableReconcileError(t) || attempt == RECONCILE_RETRY_ATTEMPTS - 1) {

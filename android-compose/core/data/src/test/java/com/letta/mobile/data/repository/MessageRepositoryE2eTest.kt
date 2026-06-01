@@ -199,7 +199,7 @@ class MessageRepositoryE2eTest : com.letta.mobile.testutil.TrackedMockClientTest
             ssePayload = "data: [DONE]\n\n",
         )
 
-        val messages = repository.fetchConversationInspectorMessages("conv-1")
+        val messages = repository.fetchConversationInspectorMessages(com.letta.mobile.data.model.ConversationId("conv-1"))
 
         assertEquals(2, messages.size)
         assertEquals("tool_call_message", messages.first().messageType)

@@ -202,17 +202,18 @@ internal fun AgentScaffoldContent(
 
     val agentName = uiState.agentName
     val agentId = viewModel.agentId
-    val conversationId = viewModel.conversationId
+    val agentIdValue = agentId.value
+    val conversationId = viewModel.conversationId?.value
     val projectContext = viewModel.projectContext
     var isProjectInfoExpanded by rememberSaveable(projectContext?.identifier) { mutableStateOf(false) }
     val screenTitle = projectContext?.name ?: agentName.ifBlank { stringResource(R.string.screen_chat_title) }
-    val currentAgentIsFavorite = agentId == favoriteAgentId
-    val currentAgentIsPinned = agentId in pinnedAgentIds
+    val currentAgentIsFavorite = agentIdValue == favoriteAgentId
+    val currentAgentIsPinned = agentIdValue in pinnedAgentIds
     val switchableAgents = remember(availableAgents, agentId, agentName, favoriteAgentId, pinnedAgentIds) {
-        val agents = if (availableAgents.any { it.id.value == agentId }) {
+        val agents = if (availableAgents.any { it.id == agentId }) {
             availableAgents
         } else {
-            listOf(Agent(id = AgentId(agentId), name = agentName.ifBlank { "Agent" })) + availableAgents
+            listOf(Agent(id = agentId, name = agentName.ifBlank { "Agent" })) + availableAgents
         }
         sortAgentsForPicker(
             agents = agents,
@@ -266,7 +267,7 @@ internal fun AgentScaffoldContent(
             ModalDrawerSheet {
                 DrawerContent(
                     agentName = agentName,
-                    agentId = agentId,
+                    agentId = agentIdValue,
                     activeBackendLabel = activeBackendLabel,
                     contextWindow = uiState.contextWindow,
                     chatMode = chatMode,
@@ -275,15 +276,15 @@ internal fun AgentScaffoldContent(
                     currentConversationId = conversationId,
                     onNewConversation = {
                         scope.launch { drawerState.close() }
-                        onSwitchConversation?.invoke(agentId, null, agentName.takeIf { it.isNotBlank() })
+                        onSwitchConversation?.invoke(agentIdValue, null, agentName.takeIf { it.isNotBlank() })
                     },
                     onConversationSelected = { selectedConversationId ->
                         scope.launch { drawerState.close() }
-                        onSwitchConversation?.invoke(agentId, selectedConversationId, agentName.takeIf { it.isNotBlank() })
+                        onSwitchConversation?.invoke(agentIdValue, selectedConversationId, agentName.takeIf { it.isNotBlank() })
                     },
                     onEditAgent = {
                         scope.launch { drawerState.close() }
-                        onNavigateToSettings(agentId)
+                        onNavigateToSettings(agentIdValue)
                     },
                     onResetMessages = {
                         scope.launch { drawerState.close() }
@@ -451,7 +452,7 @@ internal fun AgentScaffoldContent(
                             isChatSearchExpanded = false
                             viewModel.clearChatSearch()
                             result.conversationId?.let { targetConversationId ->
-                                onSwitchConversation?.invoke(agentId, targetConversationId, agentName.takeIf { it.isNotBlank() })
+                                onSwitchConversation?.invoke(agentIdValue, targetConversationId, agentName.takeIf { it.isNotBlank() })
                             }
                         },
                         modifier = Modifier
@@ -475,14 +476,14 @@ internal fun AgentScaffoldContent(
     if (showAgentSwitcher) {
         AgentPickerSheet(
             agents = switchableAgents,
-            currentAgentId = agentId,
+            currentAgentId = agentIdValue,
             favoriteAgentId = favoriteAgentId,
             pinnedAgentIds = pinnedAgentIds,
             onDismiss = { showAgentSwitcher = false },
             onTogglePinned = { selectedAgent -> viewModel.toggleAgentPinned(selectedAgent.id.value) },
             onAgentSelected = { selectedAgent ->
                 showAgentSwitcher = false
-                if (selectedAgent.id.value != agentId) {
+                if (selectedAgent.id.value != agentIdValue) {
                     onSwitchConversation?.invoke(selectedAgent.id.value, null, selectedAgent.name.takeIf { it.isNotBlank() })
                 }
             },
@@ -512,7 +513,7 @@ private fun ChatSearchResultsContent(
     modifier: Modifier = Modifier,
 ) {
     val highlightColors = rememberSearchHighlightColors()
-    val conversationsById = remember(conversations) { conversations.associateBy { it.id } }
+    val conversationsById = remember(conversations) { conversations.associateBy { it.id.value } }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),

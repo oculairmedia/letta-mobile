@@ -61,7 +61,7 @@ class ConversationRepositoryTest {
         }.joinAll()
 
         assertEquals(1, fakeApi.calls.count { it == "listConversations" })
-        assertEquals(listOf("1"), repository.getConversations("a1").first().map { it.id })
+        assertEquals(listOf("1"), repository.getConversations("a1").first().map { it.id.value })
     }
 
     @Test
@@ -128,7 +128,7 @@ class ConversationRepositoryTest {
         val refreshed = repository.refreshConversationsIfStale("a1", maxAgeMs = -1)
 
         assertEquals(true, refreshed)
-        assertEquals(listOf("new"), repository.getConversations("a1").first().map { it.id })
+        assertEquals(listOf("new"), repository.getConversations("a1").first().map { it.id.value })
         assertEquals(1, fakeApi.calls.count { it == "listConversations" })
     }
 
@@ -145,14 +145,14 @@ class ConversationRepositoryTest {
             // Expected.
         }
 
-        assertEquals(listOf("cached"), repository.getConversations("a1").first().map { it.id })
+        assertEquals(listOf("cached"), repository.getConversations("a1").first().map { it.id.value })
     }
 
     @Test
     fun `createConversation adds to list and returns new conversation`() = runTest {
         val conv = repository.createConversation("a1", "Test summary")
 
-        assertEquals("a1", conv.agentId)
+        assertEquals("a1", conv.agentId.value)
         assertTrue(fakeApi.calls.any { it.startsWith("createConversation") })
         assertTrue(repository.getConversations("a1").first().any { it.id == conv.id })
     }
@@ -168,7 +168,7 @@ class ConversationRepositoryTest {
         repository.deleteConversation("1", "a1")
         val result = repository.getConversations("a1").first()
 
-        assertTrue(result.none { it.id == "1" })
+        assertTrue(result.none { it.id.value == "1" })
     }
 
     @Test
@@ -219,7 +219,7 @@ class ConversationRepositoryTest {
 
         val forked = repository.forkConversation("1", "a1")
 
-        assertTrue(forked.id.startsWith("fork-"))
+        assertTrue(forked.id.value.startsWith("fork-"))
         assertTrue(fakeApi.calls.any { it.startsWith("forkConversation") })
         assertTrue(repository.getConversations("a1").first().any { it.id == forked.id })
     }
@@ -230,7 +230,7 @@ class ConversationRepositoryTest {
 
         val conversation = repository.getConversation("1")
 
-        assertEquals("1", conversation.id)
+        assertEquals("1", conversation.id.value)
     }
 
     @Test

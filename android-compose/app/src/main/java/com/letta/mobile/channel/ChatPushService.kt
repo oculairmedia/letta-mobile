@@ -22,7 +22,7 @@ import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.channel.NotificationCandidatePhase
 import com.letta.mobile.data.channel.NotificationCandidateSource
 import com.letta.mobile.data.channel.NotificationDeliveryCandidate
-import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.timeline.IngestedMessageListener
 import com.letta.mobile.data.timeline.TimelineRepository
@@ -226,8 +226,8 @@ class ChatPushService : Service() {
                 )
                 val (agentId, agentName) = try {
                     // Best-effort: look up the conversation's agent for a nice title.
-                    val conv = conversationApi.getConversation(conversationId)
-                    conv.agentId to agentRepository.agents.value.firstOrNull { it.id == AgentId(conv.agentId) }?.name.orEmpty()
+                    val conv = conversationApi.getConversation(ConversationId(conversationId))
+                    conv.agentId.value to agentRepository.agents.value.firstOrNull { it.id == conv.agentId }?.name.orEmpty()
                 } catch (_: Exception) {
                     "" to ""
                 }
@@ -309,7 +309,7 @@ class ChatPushService : Service() {
                 val warmupConversationIds = buildList {
                     currentConversationId?.let { add(it) }
                     recentConversations.forEach { conversation ->
-                        if (conversation.id !in this) add(conversation.id)
+                        if (conversation.id.value !in this) add(conversation.id.value)
                     }
                 }.take(MAX_BACKGROUND_PERSISTENT_STREAMS)
                 Telemetry.event(

@@ -65,7 +65,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.ui.components.ConfirmDialog
@@ -99,7 +101,7 @@ internal fun ConversationPickerSheet(
     viewModel: ConversationPickerViewModel = hiltViewModel(),
 ) {
     val conversationRepo = viewModel.conversationRepository
-    val conversations by conversationRepo.getConversations(agentId).collectAsStateWithLifecycle(emptyList())
+    val conversations by conversationRepo.getConversations(AgentId(agentId)).collectAsStateWithLifecycle(emptyList())
     val selectedIds by viewModel.selectedIds.collectAsStateWithLifecycle()
     val isSelectionMode = selectedIds.isNotEmpty()
     var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -124,7 +126,7 @@ internal fun ConversationPickerSheet(
     }
 
     LaunchedEffect(agentId) {
-        conversationRepo.refreshConversations(agentId)
+        conversationRepo.refreshConversations(AgentId(agentId))
     }
 
     ModalBottomSheet(
@@ -191,9 +193,9 @@ internal fun ConversationPickerSheet(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.heightIn(max = 400.dp),
                 ) {
-                    items(conversations, key = { it.id }) { conversation ->
-                        val isActive = conversation.id == currentConversationId
-                        val isChecked = conversation.id in selectedIds
+                    items(conversations, key = { it.id.value }) { conversation ->
+                        val isActive = conversation.id.value == currentConversationId
+                        val isChecked = conversation.id.value in selectedIds
                         val containerColor = when {
                             isChecked -> selectionColors.selectionContainer
                             isActive -> MaterialTheme.colorScheme.primaryContainer
@@ -221,18 +223,18 @@ internal fun ConversationPickerSheet(
                             } else null,
                             onClick = {
                                 if (isSelectionMode) {
-                                    viewModel.toggleSelection(conversation.id)
+                                    viewModel.toggleSelection(conversation.id.value)
                                 } else {
                                     dismissThen {
                                         onConversationSelected(
-                                            ConversationSwitchAction.ExistingConversation(conversation.id)
+                                            ConversationSwitchAction.ExistingConversation(conversation.id.value)
                                         )
                                     }
                                 }
                             },
                             onLongClick = {
                                 HapticEffects.longPress(haptic)
-                                viewModel.toggleSelection(conversation.id)
+                                viewModel.toggleSelection(conversation.id.value)
                             },
                         )
                     }
@@ -557,7 +559,7 @@ internal class ConversationPickerViewModel @Inject constructor(
             var deletedActive = false
             for (id in ids) {
                 try {
-                    conversationRepository.deleteConversation(id, agentId)
+                    conversationRepository.deleteConversation(ConversationId(id), AgentId(agentId))
                     if (id == activeConversationId) deletedActive = true
                 } catch (_: Exception) { /* individual failures are handled by the repository's rollback */ }
             }
@@ -871,7 +873,7 @@ internal fun DrawerContent(
             // conversation picker. Keeps the drawer scannable on small
             // screens and stops it from running past the bottom system bar.
             conversations.take(4).forEach { conversation ->
-                val isActive = conversation.id == currentConversationId
+                val isActive = conversation.id.value == currentConversationId
                 ConversationMenuItem(
                     conversation = conversation,
                     containerColor = if (isActive) {
@@ -893,7 +895,7 @@ internal fun DrawerContent(
                     },
                     onClick = {
                         HapticEffects.segmentTick(haptic, view, enabled = !isActive)
-                        onConversationSelected(conversation.id)
+                        onConversationSelected(conversation.id.value)
                     },
                 )
             }

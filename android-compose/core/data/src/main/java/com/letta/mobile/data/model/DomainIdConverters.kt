@@ -19,6 +19,12 @@ class DomainIdConverters {
     fun stringToProjectId(value: String): ProjectId = ProjectId(value)
 
     @TypeConverter
+    fun conversationIdToString(id: ConversationId): String = id.value
+
+    @TypeConverter
+    fun stringToConversationId(value: String): ConversationId = ConversationId(value)
+
+    @TypeConverter
     fun toolIdToString(id: ToolId): String = id.value
 
     @TypeConverter

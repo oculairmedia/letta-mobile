@@ -2,6 +2,7 @@ package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.api.NoActiveRunException
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.stream.SseFrame
 import com.letta.mobile.data.stream.SseParser
@@ -49,7 +50,7 @@ internal suspend fun runStreamSubscriber(
     var runHeartbeatCount = 0
     while (currentCoroutineContext().isActive) {
         try {
-            val channel = messageApi.streamConversation(conversationId)
+            val channel = messageApi.streamConversation(ConversationId(conversationId))
             val activeStreamCountOnOpen = activeStreamCount.incrementAndGet()
             var activeStreamCountAfterClose = activeStreamCountOnOpen
             var streamTimedOut = false

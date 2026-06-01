@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import kotlinx.coroutines.CoroutineScope
@@ -14,7 +15,7 @@ internal class ChatSessionResolver(
     private val backgroundRefreshScope: CoroutineScope? = null,
 ) {
     fun cachedAgentName(agentId: String): String? {
-        return agentRepository.getCachedAgent(agentId)
+        return agentRepository.getCachedAgent(AgentId(agentId))
             ?.name
             ?.takeIf { it.isNotBlank() }
     }
@@ -30,21 +31,22 @@ internal class ChatSessionResolver(
         maxAgeMs: Long,
     ): String? {
         mostRecentCachedConversationId(agentId)?.let { cachedConversationId ->
-            if (!conversationRepository.hasFreshConversations(agentId, maxAgeMs)) {
+            if (!conversationRepository.hasFreshConversations(AgentId(agentId), maxAgeMs)) {
                 backgroundRefreshScope?.launch {
-                    runCatching { conversationRepository.refreshConversationsIfStale(agentId, maxAgeMs) }
-                } ?: runCatching { conversationRepository.refreshConversationsIfStale(agentId, maxAgeMs) }
+                    runCatching { conversationRepository.refreshConversationsIfStale(AgentId(agentId), maxAgeMs) }
+                } ?: runCatching { conversationRepository.refreshConversationsIfStale(AgentId(agentId), maxAgeMs) }
             }
             return cachedConversationId
         }
-        conversationRepository.refreshConversationsIfStale(agentId, maxAgeMs)
+        conversationRepository.refreshConversationsIfStale(AgentId(agentId), maxAgeMs)
         return mostRecentCachedConversationId(agentId)
     }
 
     private fun mostRecentCachedConversationId(agentId: String): String? {
-        return conversationRepository.getCachedConversations(agentId)
+        return conversationRepository.getCachedConversations(AgentId(agentId))
             .sortedByDescending { it.lastMessageAt ?: it.createdAt ?: "" }
             .firstOrNull()
             ?.id
+            ?.value
     }
 }

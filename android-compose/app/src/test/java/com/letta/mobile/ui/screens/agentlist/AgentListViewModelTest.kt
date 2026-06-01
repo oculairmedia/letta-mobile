@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.ProjectId
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.ModelRepository
@@ -100,7 +101,7 @@ class AgentListViewModelTest {
         val paramsSlot = slot<AgentCreateParams>()
         coEvery { agentRepository.createAgent(capture(paramsSlot)) } returns Agent(id = AgentId("a1"), name = "Agent")
 
-        var createdId: String? = null
+        var createdId: AgentId? = null
         viewModel.createAgent(
             AgentCreateParams(
                 name = "Agent",
@@ -113,7 +114,7 @@ class AgentListViewModelTest {
 
         assertEquals(listOf(ToolId("t1"), ToolId("t2")), paramsSlot.captured.toolIds)
         assertTrue(paramsSlot.captured.includeBaseTools == true)
-        assertEquals("a1", createdId)
+        assertEquals(AgentId("a1"), createdId)
         coVerify(exactly = 1) { agentRepository.createAgent(any()) }
     }
 
@@ -125,7 +126,7 @@ class AgentListViewModelTest {
                 fileBytes = any(),
                 overrideName = "Cloned Agent",
                 overrideExistingTools = false,
-                projectId = null,
+                projectId = null as ProjectId?,
                 stripMessages = true,
             )
         } returns ImportedAgentsResponse(agentIds = listOf("a2"))
@@ -146,7 +147,7 @@ class AgentListViewModelTest {
                 fileBytes = any(),
                 overrideName = "Cloned Agent",
                 overrideExistingTools = false,
-                projectId = null,
+                projectId = null as ProjectId?,
                 stripMessages = true,
             )
         }
@@ -300,16 +301,16 @@ class AgentListViewModelTest {
         every { agentRepository.agents } returns agentsFlow
         every { settingsRepository.favoriteAgentId } returns favFlow
         every { settingsRepository.setFavoriteAgentId(any()) } answers { favFlow.value = firstArg() }
-        coEvery { agentRepository.deleteAgent("a1") } answers {
-            agentsFlow.value = agentsFlow.value.filterNot { it.id.value == "a1" }
+        coEvery { agentRepository.deleteAgent(AgentId("a1")) } answers {
+            agentsFlow.value = agentsFlow.value.filterNot { it.id == AgentId("a1") }
         }
         viewModel = AgentListViewModel(agentRepository, settingsRepository, toolRepository, modelRepository)
 
-        viewModel.deleteAgent("a1")
+        viewModel.deleteAgent(AgentId("a1"))
 
         assertEquals(listOf("a2"), viewModel.uiState.value.agents.map { it.id.value })
         assertEquals(null, viewModel.uiState.value.favoriteAgentId)
-        coVerify(exactly = 1) { agentRepository.deleteAgent("a1") }
+        coVerify(exactly = 1) { agentRepository.deleteAgent(AgentId("a1")) }
         io.mockk.verify(exactly = 1) { settingsRepository.setFavoriteAgentId(null) }
     }
 }

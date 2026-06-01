@@ -2,7 +2,9 @@ package com.letta.mobile.data.paging
 
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppMessage
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.testutil.FakeMessageApi
 import kotlinx.coroutines.test.runTest
@@ -22,8 +24,8 @@ class MessagePagingSourceTest {
         messageApi = FakeMessageApi()
         pagingSource = MessagePagingSource(
             messageApi = messageApi,
-            agentId = "agent-123",
-            conversationId = "conv-456"
+            agentId = AgentId("agent-123"),
+            conversationId = ConversationId("conv-456")
         )
     }
 

@@ -3,7 +3,9 @@ package com.letta.mobile.channel
 import androidx.work.ListenableWorker
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.api.ConversationApi
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.ConversationInspectorMessage
 import com.letta.mobile.testutil.FakeAgentRepository
@@ -40,8 +42,8 @@ class ChannelHeartbeatSyncTest {
         fixture.conversations.clear()
         fixture.conversations += listOf(
             Conversation(
-                id = "conv-1",
-                agentId = "agent-1",
+                id = ConversationId("conv-1"),
+                agentId = AgentId("agent-1"),
                 summary = "Main thread",
                 lastMessageAt = "2026-04-10T10:05:00Z",
             )
@@ -67,8 +69,8 @@ class ChannelHeartbeatSyncTest {
         fixture.conversations.clear()
         fixture.conversations += listOf(
             Conversation(
-                id = "conv-1",
-                agentId = "agent-1",
+                id = ConversationId("conv-1"),
+                agentId = AgentId("agent-1"),
                 summary = "Main thread",
                 lastMessageAt = "2026-04-10T10:05:00Z",
             )
@@ -92,8 +94,8 @@ class ChannelHeartbeatSyncTest {
         fixture.conversations.clear()
         fixture.conversations += listOf(
             Conversation(
-                id = "conv-1",
-                agentId = "agent-1",
+                id = ConversationId("conv-1"),
+                agentId = AgentId("agent-1"),
                 summary = "Main thread",
                 lastMessageAt = "2026-04-10T10:06:00Z",
             )
@@ -128,8 +130,8 @@ class ChannelHeartbeatSyncTest {
 
         val conversations = mutableListOf(
             Conversation(
-                id = "conv-1",
-                agentId = "agent-1",
+                id = ConversationId("conv-1"),
+                agentId = AgentId("agent-1"),
                 summary = "Main thread",
                 lastMessageAt = "2026-04-10T10:00:00Z",
             )

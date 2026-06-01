@@ -2,8 +2,10 @@ package com.letta.mobile.testutil
 
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.api.MessageApi
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.BatchMessage
 import com.letta.mobile.data.model.BatchMessagesResponse
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.Job
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LettaResponse
@@ -18,12 +20,12 @@ class FakeMessageApi : MessageApi(mockk(relaxed = true)) {
     val calls = mutableListOf<String>()
 
     override suspend fun listMessages(
-        agentId: String,
+        agentId: AgentId,
         limit: Int?,
         before: String?,
         after: String?,
         order: String?,
-        conversationId: String?,
+        conversationId: ConversationId?,
     ): List<LettaMessage> {
         calls.add("listMessages:$agentId")
         if (shouldFail) throw ApiException(500, "Server error")
@@ -31,7 +33,7 @@ class FakeMessageApi : MessageApi(mockk(relaxed = true)) {
     }
 
     override suspend fun listConversationMessages(
-        conversationId: String,
+        conversationId: ConversationId,
         limit: Int?,
         after: String?,
         order: String?,

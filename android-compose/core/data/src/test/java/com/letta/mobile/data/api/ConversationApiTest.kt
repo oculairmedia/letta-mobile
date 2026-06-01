@@ -10,6 +10,7 @@ import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
+import com.letta.mobile.data.model.AgentId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -70,7 +71,7 @@ class ConversationApiTest : com.letta.mobile.testutil.TrackedMockClientTestSuppo
             method = req.method
             respond("""{"id":"c1","agent_id":"a1"}""", HttpStatusCode.OK, jsonHeaders)
         }
-        api.createConversation(com.letta.mobile.data.model.ConversationCreateParams(agentId = "a1"))
+        api.createConversation(com.letta.mobile.data.model.ConversationCreateParams(agentId = AgentId("a1")))
         assertEquals(HttpMethod.Post, method)
     }
 

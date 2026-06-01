@@ -27,6 +27,12 @@ value class ProjectId(val value: String) {
 
 @JvmInline
 @Serializable
+value class ConversationId(val value: String) {
+    override fun toString(): String = value
+}
+
+@JvmInline
+@Serializable
 value class ToolId(val value: String) {
     override fun toString(): String = value
 }

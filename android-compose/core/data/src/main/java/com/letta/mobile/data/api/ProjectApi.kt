@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.ProjectCatalog
 import com.letta.mobile.data.model.ProjectDetailResponse
 import com.letta.mobile.data.model.BeadsRemoteProvisionResponse
 import com.letta.mobile.data.model.BeadsRemoteStatus
+import com.letta.mobile.data.model.ProjectId
 import com.letta.mobile.data.model.ProjectSyncTriggerRequest
 import com.letta.mobile.data.model.ProjectSyncTriggerResponse
 import com.letta.mobile.data.model.ProjectSummary
@@ -122,7 +123,7 @@ open class ProjectApi @Inject constructor(
         val (client, baseUrl) = apiClient.session()
         val response = client.post("$baseUrl/api/sync/trigger") {
             contentType(ContentType.Application.Json)
-            setBody(ProjectSyncTriggerRequest(projectId = identifier))
+            setBody(ProjectSyncTriggerRequest(projectId = ProjectId(identifier)))
         }
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())

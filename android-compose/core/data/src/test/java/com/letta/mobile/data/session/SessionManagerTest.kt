@@ -398,7 +398,7 @@ class SessionManagerTest {
 
         proxy.refreshConversations("agent-1")
         advanceUntilIdle()
-        assertEquals(listOf("conv-a"), proxy.getCachedConversations("agent-1").map { it.id })
+        assertEquals(listOf("conv-a"), proxy.getCachedConversations("agent-1").map { it.id.value })
 
         fakeConversationApi.conversations = mutableListOf(
             TestData.conversation(id = "conv-b", agentId = "agent-1", summary = "Backend B"),
@@ -409,7 +409,7 @@ class SessionManagerTest {
         proxy.refreshConversations("agent-1")
         advanceUntilIdle()
 
-        assertEquals(listOf("conv-b"), proxy.getCachedConversations("agent-1").map { it.id })
+        assertEquals(listOf("conv-b"), proxy.getCachedConversations("agent-1").map { it.id.value })
     }
 
     @Test
@@ -911,7 +911,7 @@ class SessionManagerTest {
 
         conversationsProxy.refresh()
         advanceUntilIdle()
-        assertEquals(listOf("conv-a"), conversationsProxy.conversations.value.map { it.id })
+        assertEquals(listOf("conv-a"), conversationsProxy.conversations.value.map { it.id.value })
 
         fakeConversationApi.conversations = mutableListOf(TestData.conversation(id = "conv-b", summary = "Backend B"))
         settingsRepository.activeConfigState.value = config("backend-b")
@@ -920,7 +920,7 @@ class SessionManagerTest {
         conversationsProxy.refresh()
         advanceUntilIdle()
 
-        assertEquals(listOf("conv-b"), conversationsProxy.conversations.value.map { it.id })
+        assertEquals(listOf("conv-b"), conversationsProxy.conversations.value.map { it.id.value })
         assertTrue(conversationsProxy.hasFreshConversations(maxAgeMs = 60_000))
     }
 

@@ -5,11 +5,13 @@ import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.data.mapper.toAppMessages
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.ApprovalCreate
 import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.ApprovalSubmission
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.BatchMessagesResponse
@@ -79,7 +81,7 @@ open class MessageRepository @Inject constructor(
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    override fun getMessagesPaged(agentId: String?, conversationId: String?): Flow<PagingData<AppMessage>> {
+    override fun getMessagesPaged(agentId: AgentId?, conversationId: ConversationId?): Flow<PagingData<AppMessage>> {
         return Pager(
             config = PagingConfig(
                 pageSize = MessagePagingSource.PAGE_SIZE,
@@ -97,8 +99,8 @@ open class MessageRepository @Inject constructor(
      * use [com.letta.mobile.data.timeline.TimelineRepository] instead.
      */
     override suspend fun fetchMessages(
-        agentId: String,
-        conversationId: String,
+        agentId: AgentId,
+        conversationId: ConversationId,
         targetMessageId: String?,
     ): List<AppMessage> {
         return try {
@@ -122,8 +124,8 @@ open class MessageRepository @Inject constructor(
     }
 
     private suspend fun fetchMessagesUntilTarget(
-        agentId: String,
-        conversationId: String,
+        agentId: AgentId,
+        conversationId: ConversationId,
         targetMessageId: String,
     ): List<AppMessage> {
         var after: String? = null
@@ -157,8 +159,8 @@ open class MessageRepository @Inject constructor(
     }
 
     override suspend fun fetchOlderMessages(
-        agentId: String,
-        conversationId: String,
+        agentId: AgentId,
+        conversationId: ConversationId,
         beforeMessageId: String,
     ): List<AppMessage> {
         if (beforeMessageId.isBlank()) return emptyList()
@@ -170,7 +172,7 @@ open class MessageRepository @Inject constructor(
         ).toAppMessages()
     }
 
-    override suspend fun cancelMessage(agentId: String, runIds: List<String>?): Map<String, String> {
+    override suspend fun cancelMessage(agentId: AgentId, runIds: List<String>?): Map<String, String> {
         return messageApi.cancelMessage(agentId = agentId, runIds = runIds)
     }
 
@@ -190,15 +192,15 @@ open class MessageRepository @Inject constructor(
         return messageApi.listBatches(limit = 1000)
     }
 
-    override suspend fun listBatchMessages(batchId: String, agentId: String?): BatchMessagesResponse {
-        return messageApi.listBatchMessages(batchId = batchId, limit = 1000, agentId = agentId)
+    override suspend fun listBatchMessages(batchId: String, agentId: AgentId?): BatchMessagesResponse {
+        return messageApi.listBatchMessages(batchId = batchId, limit = 1000, agentId = agentId?.value)
     }
 
     override suspend fun cancelBatch(batchId: String) {
         messageApi.cancelBatch(batchId)
     }
 
-    override suspend fun fetchConversationInspectorMessages(conversationId: String): List<ConversationInspectorMessage> {
+    override suspend fun fetchConversationInspectorMessages(conversationId: ConversationId): List<ConversationInspectorMessage> {
         return messageApi.listConversationMessages(conversationId, limit = 200, order = "asc")
             .map { it.toInspectorMessage() }
     }
@@ -393,7 +395,6 @@ open class MessageRepository @Inject constructor(
                 )
             }
             is StopReason -> {
-                val stopReason = this as StopReason
                 ConversationInspectorMessage(
                     id = id,
                     messageType = messageType,
@@ -401,12 +402,11 @@ open class MessageRepository @Inject constructor(
                     runId = runId,
                     stepId = stepId,
                     otid = otid,
-                    summary = "Stop: ${stopReason.reason}",
-                    detailLines = baseDetails + listOf("Reason" to stopReason.reason),
+                    summary = "Stop: $reason",
+                    detailLines = baseDetails + listOf("Reason" to reason),
                 )
             }
             is UsageStatistics -> {
-                val usage = this as UsageStatistics
                 ConversationInspectorMessage(
                     id = id,
                     messageType = messageType,
@@ -414,12 +414,12 @@ open class MessageRepository @Inject constructor(
                     runId = runId,
                     stepId = stepId,
                     otid = otid,
-                    summary = "Usage: ${usage.totalTokens ?: 0} tokens",
+                    summary = "Usage: ${totalTokens ?: 0} tokens",
                     detailLines = baseDetails + buildList {
-                        usage.promptTokens?.let { add("Prompt Tokens" to it.toString()) }
-                        usage.completionTokens?.let { add("Completion Tokens" to it.toString()) }
-                        usage.totalTokens?.let { add("Total Tokens" to it.toString()) }
-                        usage.stepCount?.let { add("Step Count" to it.toString()) }
+                        promptTokens?.let { add("Prompt Tokens" to it.toString()) }
+                        completionTokens?.let { add("Completion Tokens" to it.toString()) }
+                        totalTokens?.let { add("Total Tokens" to it.toString()) }
+                        stepCount?.let { add("Step Count" to it.toString()) }
                     },
                 )
             }
@@ -427,7 +427,7 @@ open class MessageRepository @Inject constructor(
     }
 
     override suspend fun submitApproval(
-        agentId: String,
+        agentId: AgentId,
         approvalRequestId: String,
         toolCallIds: List<String>,
         approve: Boolean,
@@ -458,7 +458,7 @@ open class MessageRepository @Inject constructor(
         messageApi.sendMessage(agentId, request)
     }
 
-    override suspend fun resetMessages(agentId: String) {
+    override suspend fun resetMessages(agentId: AgentId) {
         messageApi.resetMessages(agentId)
     }
 }

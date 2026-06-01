@@ -5,8 +5,10 @@ import com.letta.mobile.data.api.ConversationApi
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.local.ConversationEntity
 import com.letta.mobile.data.local.ConversationRefreshEntity
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCreateParams
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ConversationUpdateParams
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
@@ -31,9 +33,9 @@ open class ConversationRepository(
     private val conversationDao: ConversationDao,
     private val repositoryScope: CoroutineScope = defaultConversationRepositoryScope(),
 ) : IConversationRepository, BackendScopedCache {
-    private val _conversationsByAgent = MutableStateFlow<Map<String, List<Conversation>>>(emptyMap())
+    private val _conversationsByAgent = MutableStateFlow<Map<AgentId, List<Conversation>>>(emptyMap())
     private val refreshMutex = Mutex()
-    private val lastRefreshAtMillisByAgent = mutableMapOf<String, Long>()
+    private val lastRefreshAtMillisByAgent = mutableMapOf<AgentId, Long>()
 
     init {
         repositoryScope.launch {
@@ -43,7 +45,7 @@ open class ConversationRepository(
                     _conversationsByAgent.value = cached.groupBy { it.agentId }
                 }
                 conversationDao.getAllRefreshStatesOnce().forEach { state ->
-                    lastRefreshAtMillisByAgent[state.agentId] = state.lastRefreshAtMillis
+                    lastRefreshAtMillisByAgent[AgentId(state.agentId)] = state.lastRefreshAtMillis
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to load cached conversations", e)
@@ -51,15 +53,15 @@ open class ConversationRepository(
         }
     }
 
-    override fun getConversations(agentId: String): Flow<List<Conversation>> {
-        return conversationDao.observeForAgent(agentId).map { rows ->
+    override fun getConversations(agentId: AgentId): Flow<List<Conversation>> {
+        return conversationDao.observeForAgent(agentId.value).map { rows ->
             rows.map { it.toConversation() }.also { conversations ->
                 updateMemoryCache(agentId, conversations)
             }
         }
     }
 
-    override suspend fun refreshConversations(agentId: String) = refreshMutex.withLock {
+    override suspend fun refreshConversations(agentId: AgentId) = refreshMutex.withLock {
         refreshConversationsLocked(agentId)
     }
 
@@ -74,43 +76,43 @@ open class ConversationRepository(
         }
     }
 
-    private suspend fun refreshConversationsLocked(agentId: String) {
+    private suspend fun refreshConversationsLocked(agentId: AgentId) {
         val conversations = conversationApi.listConversations(agentId = agentId)
         val refreshedAt = System.currentTimeMillis()
         writeAgentConversations(agentId, conversations, refreshedAt)
     }
 
-    override fun getCachedConversations(agentId: String): List<Conversation> = _conversationsByAgent.value[agentId] ?: emptyList()
+    override fun getCachedConversations(agentId: AgentId): List<Conversation> = _conversationsByAgent.value[agentId] ?: emptyList()
 
-    override fun hasFreshConversations(agentId: String, maxAgeMs: Long): Boolean {
+    override fun hasFreshConversations(agentId: AgentId, maxAgeMs: Long): Boolean {
         val lastRefreshAt = lastRefreshAtMillisByAgent[agentId] ?: return false
         return System.currentTimeMillis() - lastRefreshAt <= maxAgeMs
     }
 
-    override suspend fun refreshConversationsIfStale(agentId: String, maxAgeMs: Long): Boolean = refreshMutex.withLock {
+    override suspend fun refreshConversationsIfStale(agentId: AgentId, maxAgeMs: Long): Boolean = refreshMutex.withLock {
         if (hasFreshConversations(agentId, maxAgeMs)) return@withLock false
         refreshConversationsLocked(agentId)
         true
     }
 
-    override suspend fun getConversation(id: String): Conversation {
+    override suspend fun getConversation(id: ConversationId): Conversation {
         return try {
             conversationApi.getConversation(id).also { conversation ->
                 upsertCachedConversation(conversation)
             }
         } catch (e: Exception) {
-            conversationDao.getByIdOnce(id)?.toConversation() ?: throw e
+            conversationDao.getByIdOnce(id.value)?.toConversation() ?: throw e
         }
     }
 
-    override suspend fun createConversation(agentId: String, summary: String?): Conversation {
+    override suspend fun createConversation(agentId: AgentId, summary: String?): Conversation {
         val params = ConversationCreateParams(agentId = agentId, summary = summary)
         val conversation = conversationApi.createConversation(params)
         upsertCachedConversation(conversation, markAgentFresh = true)
         return conversation
     }
 
-    override suspend fun deleteConversation(id: String, agentId: String) {
+    override suspend fun deleteConversation(id: ConversationId, agentId: AgentId) {
         val snapshot = snapshotForAgent(agentId)
         val optimistic = snapshot.filter { it.id != id }
         writeAgentConversations(agentId, optimistic, System.currentTimeMillis())
@@ -123,7 +125,7 @@ open class ConversationRepository(
         }
     }
 
-    override suspend fun updateConversation(id: String, agentId: String, summary: String) {
+    override suspend fun updateConversation(id: ConversationId, agentId: AgentId, summary: String) {
         val snapshot = snapshotForAgent(agentId)
         val conversationIndex = snapshot.indexOfFirst { it.id == id }
         if (conversationIndex < 0) return
@@ -146,7 +148,7 @@ open class ConversationRepository(
         }
     }
 
-    override suspend fun setConversationArchived(id: String, agentId: String, archived: Boolean) {
+    override suspend fun setConversationArchived(id: ConversationId, agentId: AgentId, archived: Boolean) {
         val snapshot = snapshotForAgent(agentId)
         val conversationIndex = snapshot.indexOfFirst { it.id == id }
         if (conversationIndex < 0) return
@@ -169,11 +171,11 @@ open class ConversationRepository(
         }
     }
 
-    override suspend fun cancelConversation(id: String, agentId: String?) {
+    override suspend fun cancelConversation(id: ConversationId, agentId: AgentId?) {
         conversationApi.cancelConversation(id, agentId)
     }
 
-    override suspend fun recompileConversation(id: String, dryRun: Boolean, agentId: String?): String {
+    override suspend fun recompileConversation(id: ConversationId, dryRun: Boolean, agentId: AgentId?): String {
         return if (agentId != null && !dryRun) {
             var result = ""
             agentRepository.checkpointAndRestoreConfig(agentId) {
@@ -185,15 +187,15 @@ open class ConversationRepository(
         }
     }
 
-    override suspend fun forkConversation(id: String, agentId: String): Conversation {
+    override suspend fun forkConversation(id: ConversationId, agentId: AgentId): Conversation {
         val conversation = conversationApi.forkConversation(id, agentId)
         upsertCachedConversation(conversation, markAgentFresh = true)
         return conversation
     }
 
-    private suspend fun snapshotForAgent(agentId: String): List<Conversation> {
+    private suspend fun snapshotForAgent(agentId: AgentId): List<Conversation> {
         return getCachedConversations(agentId).ifEmpty {
-            conversationDao.getForAgentOnce(agentId).map { it.toConversation() }
+            conversationDao.getForAgentOnce(agentId.value).map { it.toConversation() }
         }
     }
 
@@ -206,18 +208,18 @@ open class ConversationRepository(
             val refreshedAt = System.currentTimeMillis()
             lastRefreshAtMillisByAgent[conversation.agentId] = refreshedAt
             conversationDao.upsertRefreshState(
-                ConversationRefreshEntity(agentId = conversation.agentId, lastRefreshAtMillis = refreshedAt),
+                ConversationRefreshEntity(agentId = conversation.agentId.value, lastRefreshAtMillis = refreshedAt),
             )
         }
     }
 
     private suspend fun writeAgentConversations(
-        agentId: String,
+        agentId: AgentId,
         conversations: List<Conversation>,
         refreshedAtMillis: Long,
     ) {
         conversationDao.replaceForAgent(
-            agentId = agentId,
+            agentId = agentId.value,
             conversations = conversations.map { ConversationEntity.fromConversation(it, cachedAtEpochMs = refreshedAtMillis) },
             refreshedAtMillis = refreshedAtMillis,
         )
@@ -225,7 +227,7 @@ open class ConversationRepository(
         lastRefreshAtMillisByAgent[agentId] = refreshedAtMillis
     }
 
-    private fun updateMemoryCache(agentId: String, conversations: List<Conversation>) {
+    private fun updateMemoryCache(agentId: AgentId, conversations: List<Conversation>) {
         _conversationsByAgent.update { current ->
             current.toMutableMap().apply { put(agentId, conversations) }
         }

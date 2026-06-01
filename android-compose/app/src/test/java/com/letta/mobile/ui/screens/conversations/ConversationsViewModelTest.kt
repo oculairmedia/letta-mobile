@@ -3,6 +3,7 @@ package com.letta.mobile.ui.screens.conversations
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.ConversationInspectorMessage
@@ -137,10 +138,10 @@ class ConversationsViewModelTest {
         fakeAllRepo.setConversations(listOf(TestData.conversation(id = "1", agentId = "a1")))
         viewModel.loadConversations()
 
-        viewModel.deleteConversation("1")
+        viewModel.deleteConversation(ConversationId("1"))
 
         assertTrue(fakeConvRepo.deletedConversationIds.contains("1"))
-        assertTrue(viewModel.uiState.value.conversations.none { it.conversation.id == "1" })
+        assertTrue(viewModel.uiState.value.conversations.none { it.conversation.id == ConversationId("1") })
     }
 
     @Test
@@ -149,7 +150,7 @@ class ConversationsViewModelTest {
 
         viewModel.openConversationAdmin(display)
 
-        assertEquals("1", viewModel.uiState.value.selectedConversation?.conversation?.id)
+        assertEquals(ConversationId("1"), viewModel.uiState.value.selectedConversation?.conversation?.id)
         assertEquals(1, viewModel.uiState.value.inspectorMessages.size)
     }
 
@@ -193,7 +194,7 @@ class ConversationsViewModelTest {
 
         viewModel.openConversationAdmin(display)
 
-        assertEquals("1", viewModel.uiState.value.selectedConversation?.conversation?.id)
+        assertEquals(ConversationId("1"), viewModel.uiState.value.selectedConversation?.conversation?.id)
         assertEquals(0, viewModel.uiState.value.inspectorMessages.size)
         assertEquals("Inspector failed", viewModel.uiState.value.inspectorError)
     }
@@ -213,7 +214,7 @@ class ConversationsViewModelTest {
             didRefresh = true
             return true
         }
-        override fun handleOptimisticDelete(conversationId: String) {
+        override fun handleOptimisticDelete(conversationId: ConversationId) {
             _conversations.value = _conversations.value.filter { it.id != conversationId }
         }
         override fun handleOptimisticUpdate(conversation: Conversation) {
@@ -227,27 +228,27 @@ class ConversationsViewModelTest {
         val deletedConversationIds = mutableListOf<String>()
         val archivedUpdates = mutableListOf<Pair<String, Boolean>>()
 
-        override suspend fun createConversation(agentId: String, summary: String?): Conversation {
-            return TestData.conversation(id = "new-conv", agentId = agentId)
+        override suspend fun createConversation(agentId: AgentId, summary: String?): Conversation {
+            return TestData.conversation(id = "new-conv", agentId = agentId.value)
         }
 
-        override suspend fun deleteConversation(id: String, agentId: String) {
-            deletedConversationIds.add(id)
+        override suspend fun deleteConversation(id: ConversationId, agentId: AgentId) {
+            deletedConversationIds.add(id.value)
         }
 
-        override suspend fun getConversation(id: String): Conversation {
-            return TestData.conversation(id = id, agentId = "a1")
+        override suspend fun getConversation(id: ConversationId): Conversation {
+            return TestData.conversation(id = id.value, agentId = "a1")
         }
 
-        override suspend fun setConversationArchived(id: String, agentId: String, archived: Boolean) {
-            archivedUpdates.add(id to archived)
+        override suspend fun setConversationArchived(id: ConversationId, agentId: AgentId, archived: Boolean) {
+            archivedUpdates.add(id.value to archived)
         }
 
-        override suspend fun recompileConversation(id: String, dryRun: Boolean, agentId: String?): String {
+        override suspend fun recompileConversation(id: ConversationId, dryRun: Boolean, agentId: AgentId?): String {
             return "recompiled-system-prompt"
         }
 
-        override suspend fun cancelConversation(id: String, agentId: String?) {}
+        override suspend fun cancelConversation(id: ConversationId, agentId: AgentId?) {}
     }
 
     private class FakeAgentRepository : AgentRepository(FakeAgentApi(), mockk(relaxed = true)) {
@@ -269,16 +270,16 @@ class ConversationsViewModelTest {
             didRefresh = true
             return true
         }
-        override fun getAgent(id: String) = flow { emit(_agents.value.first()) }
+        override fun getAgent(id: AgentId) = flow { emit(_agents.value.first()) }
         override suspend fun createAgent(params: com.letta.mobile.data.model.AgentCreateParams) = _agents.value.first()
-        override suspend fun updateAgent(id: String, params: com.letta.mobile.data.model.AgentUpdateParams) = _agents.value.first()
-        override suspend fun deleteAgent(id: String) {}
+        override suspend fun updateAgent(id: AgentId, params: com.letta.mobile.data.model.AgentUpdateParams) = _agents.value.first()
+        override suspend fun deleteAgent(id: AgentId) {}
     }
 
     private class FakeMessageRepository : MessageRepository(FakeMessageApi()) {
         var shouldFail: Boolean = false
 
-        override suspend fun fetchConversationInspectorMessages(conversationId: String): List<ConversationInspectorMessage> {
+        override suspend fun fetchConversationInspectorMessages(conversationId: ConversationId): List<ConversationInspectorMessage> {
             if (shouldFail) throw IllegalStateException("Inspector failed")
             return listOf(
                 ConversationInspectorMessage(

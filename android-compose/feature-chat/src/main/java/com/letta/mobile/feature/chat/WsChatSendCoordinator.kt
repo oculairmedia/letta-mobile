@@ -98,7 +98,7 @@ internal class WsChatSendCoordinator(
             currentConversationId != null -> currentConversationId
             startNewConversation -> NEW_CONVERSATION_PLACEHOLDER
             else -> runCatching {
-                conversationRepository.createConversation(agentId).id
+                conversationRepository.createConversation(AgentId(agentId)).id.value
             }.getOrElse { err ->
                 Telemetry.error("AdminChatVM", "ws.send.createConversationFailed", err)
                 failSend("Failed to create a new conversation: ${err.message ?: "unknown"}")

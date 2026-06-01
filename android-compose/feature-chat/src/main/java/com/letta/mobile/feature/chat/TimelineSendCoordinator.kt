@@ -1,6 +1,8 @@
 package com.letta.mobile.feature.chat
 
 import com.letta.mobile.data.api.ApiException
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.timeline.TimelineRepository
@@ -74,7 +76,7 @@ internal class TimelineSendCoordinator(
         }
         if (!hasSummary) {
             runCatching {
-                conversationRepository.updateConversation(existingConversationId, agentId, summary)
+                conversationRepository.updateConversation(ConversationId(existingConversationId), AgentId(agentId), summary)
                 hasSummary = true
             }
         }
@@ -85,7 +87,7 @@ internal class TimelineSendCoordinator(
         summary: String,
         staleConversationId: String?,
     ): String {
-        val replacementId = conversationRepository.createConversation(agentId, summary).id
+        val replacementId = conversationRepository.createConversation(AgentId(agentId), summary).id.value
         setActiveConversationId(replacementId)
         hasSummary = true
         uiState.value = uiState.value.copy(

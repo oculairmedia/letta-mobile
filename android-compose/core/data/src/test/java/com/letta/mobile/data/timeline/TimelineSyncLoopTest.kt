@@ -4,6 +4,7 @@ import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.data.api.NoActiveRunException
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.MessageCreateRequest
@@ -1788,12 +1789,12 @@ private class BlockingListApi : MessageApi(mockk(relaxed = true)) {
     val listStarted = CompletableDeferred<Unit>()
     val releaseList = CompletableDeferred<List<LettaMessage>>()
 
-    override suspend fun streamConversation(conversationId: String): ByteReadChannel {
+    override suspend fun streamConversation(conversationId: ConversationId): ByteReadChannel {
         kotlinx.coroutines.awaitCancellation()
     }
 
     override suspend fun listConversationMessages(
-        conversationId: String,
+        conversationId: ConversationId,
         limit: Int?,
         after: String?,
         order: String?,
@@ -1807,13 +1808,13 @@ private class OpenStreamApi : MessageApi(mockk(relaxed = true)) {
     val streamOpened = CompletableDeferred<Unit>()
     @Volatile var listMessagesCalls: Int = 0
 
-    override suspend fun streamConversation(conversationId: String): ByteReadChannel {
+    override suspend fun streamConversation(conversationId: ConversationId): ByteReadChannel {
         streamOpened.complete(Unit)
         return ByteChannel(autoFlush = true)
     }
 
     override suspend fun listConversationMessages(
-        conversationId: String,
+        conversationId: ConversationId,
         limit: Int?,
         after: String?,
         order: String?,
@@ -1826,7 +1827,7 @@ private class OpenStreamApi : MessageApi(mockk(relaxed = true)) {
 private class OneShotAssistantStreamApi : MessageApi(mockk(relaxed = true)) {
     private var opened = false
 
-    override suspend fun streamConversation(conversationId: String): ByteReadChannel {
+    override suspend fun streamConversation(conversationId: ConversationId): ByteReadChannel {
         if (opened) kotlinx.coroutines.awaitCancellation()
         opened = true
         val json = kotlinx.serialization.json.Json { encodeDefaults = true }
@@ -1844,7 +1845,7 @@ private class OneShotAssistantStreamApi : MessageApi(mockk(relaxed = true)) {
     }
 
     override suspend fun listConversationMessages(
-        conversationId: String,
+        conversationId: ConversationId,
         limit: Int?,
         after: String?,
         order: String?,
@@ -1854,7 +1855,7 @@ private class OneShotAssistantStreamApi : MessageApi(mockk(relaxed = true)) {
 private class SilentAfterHeartbeatApi : MessageApi(mockk(relaxed = true)) {
     @Volatile var streamCallCount: Int = 0
 
-    override suspend fun streamConversation(conversationId: String): ByteReadChannel {
+    override suspend fun streamConversation(conversationId: ConversationId): ByteReadChannel {
         streamCallCount++
         val channel = ByteChannel(autoFlush = true)
         channel.writeStringUtf8(": ping\n\n")
@@ -1862,7 +1863,7 @@ private class SilentAfterHeartbeatApi : MessageApi(mockk(relaxed = true)) {
     }
 
     override suspend fun listConversationMessages(
-        conversationId: String,
+        conversationId: ConversationId,
         limit: Int?,
         after: String?,
         order: String?,
@@ -1872,15 +1873,15 @@ private class SilentAfterHeartbeatApi : MessageApi(mockk(relaxed = true)) {
 private class AlwaysIdleApi : MessageApi(mockk(relaxed = true)) {
     @Volatile var streamCallCount: Int = 0
 
-    override suspend fun streamConversation(conversationId: String): ByteReadChannel {
+    override suspend fun streamConversation(conversationId: ConversationId): ByteReadChannel {
         streamCallCount++
         // letta-mobile-t8q7: real MessageApi classifies the "No active runs"
         // 400 body into NoActiveRunException before it reaches the subscriber.
-        throw NoActiveRunException(conversationId)
+        throw NoActiveRunException(conversationId.value)
     }
 
     override suspend fun listConversationMessages(
-        conversationId: String,
+        conversationId: ConversationId,
         limit: Int?,
         after: String?,
         order: String?,
@@ -1897,16 +1898,16 @@ private class AlwaysIdleApi : MessageApi(mockk(relaxed = true)) {
 private class ExpiredThenIdleApi : MessageApi(mockk(relaxed = true)) {
     @Volatile var streamCallCount: Int = 0
 
-    override suspend fun streamConversation(conversationId: String): ByteReadChannel {
+    override suspend fun streamConversation(conversationId: ConversationId): ByteReadChannel {
         streamCallCount++
         if (streamCallCount == 1) {
-            throw NoActiveRunException(conversationId)
+            throw NoActiveRunException(conversationId.value)
         }
         kotlinx.coroutines.awaitCancellation()
     }
 
     override suspend fun listConversationMessages(
-        conversationId: String,
+        conversationId: ConversationId,
         limit: Int?,
         after: String?,
         order: String?,
@@ -1951,7 +1952,7 @@ private class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
     // timers for the full duration of each test (observed: 91s for one test
     // that never exercises the subscriber). Idle here instead so the loop
     // suspends until the test's scope is cancelled. letta-mobile-o8pr.
-    override suspend fun streamConversation(conversationId: String): ByteReadChannel {
+    override suspend fun streamConversation(conversationId: ConversationId): ByteReadChannel {
         if (streamConversationReturnsOpenChannel) {
             return ByteChannel()
         }
@@ -1959,7 +1960,7 @@ private class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
     }
 
     override suspend fun listConversationMessages(
-        conversationId: String,
+        conversationId: ConversationId,
         limit: Int?,
         after: String?,
         order: String?,
@@ -1978,7 +1979,7 @@ private class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
     }
 
     override suspend fun sendConversationMessage(
-        conversationId: String,
+        conversationId: ConversationId,
         request: MessageCreateRequest,
     ): ByteReadChannel {
         sendCalls++

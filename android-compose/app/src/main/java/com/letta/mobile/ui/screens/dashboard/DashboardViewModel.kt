@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.MessageSearchRequest
 import com.letta.mobile.data.model.ParsedSearchMessage
@@ -170,7 +171,7 @@ class DashboardViewModel @Inject constructor(
             }
                 .collect { snapshot ->
                     val favId = snapshot.favId
-                    val favName = favId?.let { agentRepository.getCachedAgent(it)?.name }
+                    val favName = favId?.let { agentRepository.getCachedAgent(AgentId(it))?.name }
 
                     // Write-through: any pinned agent currently in the
                     // active backend's cache has its name persisted so
@@ -202,7 +203,7 @@ class DashboardViewModel @Inject constructor(
                     )
                     if (favId != null && favName == null) {
                         try {
-                            val fetched = agentRepository.getAgent(favId).first()
+                            val fetched = agentRepository.getAgent(AgentId(favId)).first()
                             _uiState.value = _uiState.value.copy(favoriteAgentName = fetched.name)
                         } catch (ce: kotlinx.coroutines.CancellationException) {
                             throw ce
@@ -240,7 +241,7 @@ class DashboardViewModel @Inject constructor(
         currentAgentIds: Set<String>,
         cacheIsAuthoritative: Boolean,
     ): PinnedItem.Agent? {
-        val cached = agentRepository.getCachedAgent(id)
+        val cached = agentRepository.getCachedAgent(AgentId(id))
         if (cached != null) {
             return PinnedItem.Agent(PinnedAgent(cached.id.value, cached.name))
         }
