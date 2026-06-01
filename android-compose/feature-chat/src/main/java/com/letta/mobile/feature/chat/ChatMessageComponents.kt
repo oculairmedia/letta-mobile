@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.data.model.ToolReturnStatus
 import com.letta.mobile.data.model.UiApprovalRequest
+import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.data.model.UiToolCall
@@ -120,6 +121,7 @@ internal fun ChatMessageItem(
     rerunEnabled: Boolean = true,
     onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)? = null,
     approvalInFlight: Boolean = false,
+    onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val isUser = message.role == "user"
@@ -233,6 +235,7 @@ internal fun ChatMessageItem(
                 onApprovalDecision = onApprovalDecision,
                 approvalInFlight = approvalInFlight,
                 onLongClick = onLongClick,
+                onAttachmentImageTap = onAttachmentImageTap,
             )
         }
     }

@@ -1,6 +1,8 @@
 package com.letta.mobile.feature.chat
 
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.EaseInOutCubic
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.foundation.background
@@ -38,7 +40,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,6 +56,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
+import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
@@ -66,9 +68,6 @@ import com.letta.mobile.ui.components.StarterPrompts
 import com.letta.mobile.ui.components.ThinkingShader
 import com.letta.mobile.ui.components.ThinkingTextToken
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
-import androidx.compose.animation.core.EaseInOutCubic
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.ui.draw.alpha
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
@@ -77,6 +76,8 @@ import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.isExpandedWidth
 import kotlinx.collections.immutable.ImmutableMap
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toImmutableList
 import kotlin.math.max
 
 /**
@@ -88,6 +89,11 @@ import kotlin.math.max
  * the row without any other change.
  */
 private const val TOOL_AFFORDANCE_ROW_ENABLED = false
+
+private data class ChatImageViewerState(
+    val attachments: ImmutableList<UiImageAttachment>,
+    val initialPage: Int,
+)
 
 @Composable
 internal fun ChatScreen(
@@ -127,6 +133,15 @@ internal fun ChatScreen(
         val bottomInsetDp = with(density) { max(imeBottomPx, navBottomPx + bottomBarPx).toDp() }
         var ambientAgentStatus by remember { mutableStateOf("Idle") }
         var hadActiveAmbientRun by remember { mutableStateOf(false) }
+        var imageViewerState by remember { mutableStateOf<ChatImageViewerState?>(null) }
+        val openImageViewer: (List<UiImageAttachment>, Int) -> Unit = { attachments, index ->
+            if (attachments.isNotEmpty()) {
+                imageViewerState = ChatImageViewerState(
+                    attachments = attachments.toImmutableList(),
+                    initialPage = index.coerceIn(0, attachments.lastIndex),
+                )
+            }
+        }
 
         LaunchedEffect(composerState.error) {
             val message = composerState.error ?: return@LaunchedEffect
@@ -285,6 +300,7 @@ internal fun ChatScreen(
                                 activeFontScale = activeFontScale,
                                 onActiveFontScaleChange = { activeFontScale = it },
                                 onFontScaleChange = { viewModel.setChatFontScale(it) },
+                                onAttachmentImageTap = openImageViewer,
                                 chatMode = chatMode,
                                 modifier = Modifier.fillMaxSize(),
                             )
@@ -306,6 +322,7 @@ internal fun ChatScreen(
                                 activeFontScale = activeFontScale,
                                 onActiveFontScaleChange = { activeFontScale = it },
                                 onFontScaleChange = { viewModel.setChatFontScale(it) },
+                                onAttachmentImageTap = openImageViewer,
                                 chatMode = chatMode,
                                 modifier = Modifier.fillMaxSize(),
                             )
@@ -397,6 +414,15 @@ internal fun ChatScreen(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
+
+            imageViewerState?.let { viewerState ->
+                ChatImageViewer(
+                    attachments = viewerState.attachments,
+                    initialPage = viewerState.initialPage,
+                    onDismiss = { imageViewerState = null },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
 
     }
@@ -458,6 +484,7 @@ internal fun NoConversationChatContent(
     activeFontScale: Float = 1f,
     onActiveFontScaleChange: (Float) -> Unit = {},
     onFontScaleChange: (Float) -> Unit = {},
+    onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
     chatMode: String = "interactive",
     modifier: Modifier = Modifier,
 ) {
@@ -487,6 +514,7 @@ internal fun NoConversationChatContent(
             activeFontScale = activeFontScale,
             onActiveFontScaleChange = onActiveFontScaleChange,
             onFontScaleChange = onFontScaleChange,
+            onAttachmentImageTap = onAttachmentImageTap,
             chatMode = chatMode,
             modifier = modifier,
         )
@@ -508,6 +536,7 @@ private fun ChatContent(
     activeFontScale: Float = 1f,
     onActiveFontScaleChange: (Float) -> Unit = {},
     onFontScaleChange: (Float) -> Unit = {},
+    onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
     chatMode: String = "interactive",
     modifier: Modifier = Modifier,
 ) {
@@ -544,6 +573,7 @@ private fun ChatContent(
                     onSubmitApproval = onSubmitApproval,
                     onToggleRunCollapsed = onToggleRunCollapsed,
                     onToggleReasoningExpanded = onToggleReasoningExpanded,
+                    onAttachmentImageTap = onAttachmentImageTap,
                     modifier = Modifier.weight(1f),
                 )
             }

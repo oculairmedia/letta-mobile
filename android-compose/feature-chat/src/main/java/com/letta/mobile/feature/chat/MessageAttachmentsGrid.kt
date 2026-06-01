@@ -2,6 +2,7 @@ package com.letta.mobile.feature.chat
 
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,41 +28,66 @@ import com.letta.mobile.data.model.UiImageAttachment
 @Composable
 internal fun MessageAttachmentsGrid(
     attachments: kotlinx.collections.immutable.ImmutableList<UiImageAttachment>,
+    onImageClick: ((Int) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     if (attachments.isEmpty()) return
 
     when (attachments.size) {
-        1 -> SingleImage(attachment = attachments.first(), modifier = modifier)
+        1 -> SingleImage(
+            attachment = attachments.first(),
+            onClick = onImageClick?.let { { it(0) } },
+            modifier = modifier,
+        )
         2 -> Row(
             modifier = modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            attachments.forEach { ImageCell(attachment = it, modifier = Modifier.weight(1f)) }
+            attachments.forEachIndexed { index, attachment ->
+                ImageCell(
+                    attachment = attachment,
+                    onClick = onImageClick?.let { { it(index) } },
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
         else -> Row(
             modifier = modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            attachments.take(3).forEach {
-                ImageCell(attachment = it, modifier = Modifier.weight(1f))
+            attachments.take(3).forEachIndexed { index, attachment ->
+                ImageCell(
+                    attachment = attachment,
+                    onClick = onImageClick?.let { { it(index) } },
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
     }
 }
 
 @Composable
-private fun SingleImage(attachment: UiImageAttachment, modifier: Modifier = Modifier) {
+private fun SingleImage(
+    attachment: UiImageAttachment,
+    onClick: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
     AttachmentImage(
         attachment = attachment,
+        onClick = onClick,
         modifier = modifier.fillMaxWidth().height(220.dp),
     )
 }
 
 @Composable
-private fun ImageCell(attachment: UiImageAttachment, modifier: Modifier = Modifier) {
+private fun ImageCell(
+    attachment: UiImageAttachment,
+    onClick: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
     AttachmentImage(
         attachment = attachment,
+        onClick = onClick,
         modifier = modifier.height(120.dp),
     )
 }
@@ -69,6 +95,7 @@ private fun ImageCell(attachment: UiImageAttachment, modifier: Modifier = Modifi
 @Composable
 private fun AttachmentImage(
     attachment: UiImageAttachment,
+    onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     // letta-mobile-v4f9: Coil 3.4's BitmapFetcher silently returns null
@@ -84,7 +111,7 @@ private fun AttachmentImage(
     }
 
     Surface(
-        modifier = modifier,
+        modifier = if (onClick != null) modifier.clickable(onClick = onClick) else modifier,
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(8.dp),
     ) {
