@@ -103,7 +103,11 @@ internal fun ChatComposer(
     // button visible while streaming so the morphed Stop affordance stays
     // reachable even with the keyboard up.
     val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-    val showAction = isStreaming || !keyboardOpen
+    val showAction = shouldShowChatComposerAction(
+        isStreaming = isStreaming,
+        keyboardOpen = keyboardOpen,
+        hasAttachments = pendingAttachments.isNotEmpty(),
+    )
 
     // letta-mobile-rl0d (audio): swap the Send/Stop button for a
     // HoldToDictateButton when the field is empty. Voice path stays
@@ -230,6 +234,12 @@ internal fun ChatComposer(
         )
     }
 }
+
+internal fun shouldShowChatComposerAction(
+    isStreaming: Boolean,
+    keyboardOpen: Boolean,
+    hasAttachments: Boolean,
+): Boolean = isStreaming || !keyboardOpen || hasAttachments
 
 @Composable
 private fun AttachmentStrip(
