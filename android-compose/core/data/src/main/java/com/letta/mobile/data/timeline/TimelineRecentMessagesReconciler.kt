@@ -1,0 +1,123 @@
+package com.letta.mobile.data.timeline
+
+import com.letta.mobile.data.api.MessageApi
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+/**
+ * Lifts recent-messages synchronization: periodic reconciles + snapshot applications.
+ */
+internal class TimelineRecentMessagesReconciler(
+    private val conversationId: String,
+    private val messageApi: MessageApi,
+    private val eventQueue: Channel<TimelineSyncLoop.TimelineGatewayEvent>,
+    private val state: MutableStateFlow<Timeline>,
+    private val streamSubscriberActive: StateFlow<Boolean>,
+    private val writeMutex: Mutex,
+    private val applyReturnsAndResponsesFromSnapshot: (List<LettaMessage>) -> Unit,
+) {
+    val seenRunIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    suspend fun reconcileRecentMessages(
+        reason: String,
+        forceRefresh: Boolean = false,
+    ) {
+        reconcileRecentMessagesFromServer(
+            telemetryName = "recentReconcile",
+            telemetryAttrs = arrayOf("reason" to reason),
+            allowWhileStreamActive = forceRefresh,
+        )
+    }
+
+    suspend fun reconcileRecentMessagesFromServer(
+        telemetryName: String,
+        telemetryAttrs: Array<Pair<String, Any?>>,
+        allowWhileStreamActive: Boolean = false,
+    ) {
+        val timer = Telemetry.startTimer("TimelineSync", telemetryName)
+        var appended = 0
+        try {
+            if (streamSubscriberActive.value && !allowWhileStreamActive) {
+                Telemetry.event(
+                    "TimelineSync", "$telemetryName.skipped",
+                    "conversationId" to conversationId,
+                    *telemetryAttrs,
+                    "reason" to "streamSubscriberActive",
+                )
+                timer.stop(
+                    *telemetryAttrs,
+                    "serverCount" to 0,
+                    "appended" to 0,
+                    "skipped" to true,
+                    "skipReason" to "streamSubscriberActive",
+                )
+                return
+            }
+            val serverMessages = messageApi.listConversationMessages(
+                conversationId = ConversationId(conversationId),
+                limit = RECONCILE_LIMIT,
+                order = "desc",
+            ).reversed()
+            val ack = CompletableDeferred<Int>()
+            eventQueue.send(
+                TimelineSyncLoop.TimelineGatewayEvent.RecentMessagesSnapshot(
+                    serverMessages = serverMessages,
+                    telemetryName = telemetryName,
+                    telemetryAttrs = telemetryAttrs.toList(),
+                    ack = ack,
+                )
+            )
+            appended = ack.await()
+            timer.stop(
+                *telemetryAttrs,
+                "serverCount" to serverMessages.size,
+                "appended" to appended,
+            )
+            dumpTimelineState("reconcile.$telemetryName", conversationId, state.value)
+        } catch (t: Throwable) {
+            timer.stopError(t, *telemetryAttrs)
+            throw t
+        }
+    }
+
+    suspend fun applyRecentMessagesSnapshot(
+        event: TimelineSyncLoop.TimelineGatewayEvent.RecentMessagesSnapshot,
+    ) {
+        val appended = writeMutex.withLock {
+            applyRecentMessagesSnapshotLocked(
+                serverMessages = event.serverMessages,
+                telemetryName = event.telemetryName,
+                telemetryAttrs = event.telemetryAttrs.toTypedArray(),
+            )
+        }
+        event.ack.complete(appended)
+    }
+
+    private fun applyRecentMessagesSnapshotLocked(
+        serverMessages: List<LettaMessage>,
+        telemetryName: String,
+        telemetryAttrs: Array<Pair<String, Any?>>,
+    ): Int {
+        val mergeResult = state.value.mergeServerMessages(serverMessages)
+        state.value = mergeResult.first
+        val appended = mergeResult.second
+        // After appending new events, apply return/response hints from
+        // the full snapshot so existing TOOL_CALL bubbles pick up their
+        // output + decided state. This is the key path for the UX
+        // symptom "approve/reject still visible after tool ran" when the
+        // server's SSE stream doesn't emit tool_return frames.
+        applyReturnsAndResponsesFromSnapshot(serverMessages)
+        return appended
+    }
+
+    companion object {
+        private const val RECONCILE_LIMIT = 250
+    }
+}

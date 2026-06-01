@@ -165,59 +165,15 @@ internal fun Timeline.positionForServerMessageDate(message: LettaMessage): Doubl
     }
 }
 
-/**
- * Walk a server message snapshot and apply any approval_response +
- * tool_return hints to existing TOOL_CALL events in the timeline. Flips
- * approvalDecided=true and attaches toolReturnContent as appropriate.
- * Must be invoked inside writeMutex.
- *
- * letta-mobile-mge5.21: the server's SSE /stream endpoint often omits
- * tool_return frames even though they're stored in REST. So we apply
- * these hints explicitly after any REST snapshot (hydrate, reconcile).
- */
-internal fun applyReturnsAndResponsesFromSnapshot(
-    snapshot: List<LettaMessage>,
-    state: MutableStateFlow<Timeline>,
+
+
+internal suspend fun reconcileForExternalRun(
+    runId: String,
+    reconcileRecentMessagesFromServer: suspend (String, Array<Pair<String, Any?>>) -> Unit,
 ) {
-    val decidedIds = snapshot.filterIsInstance<ApprovalResponseMessage>()
-        .mapNotNull { it.approvalRequestId }
-        .toSet()
-    val returnsByCallId: Map<String, ToolReturnMessage> =
-        snapshot.filterIsInstance<ToolReturnMessage>()
-            .mapNotNull { r -> r.toolCallId?.let { it to r } }
-            .toMap()
-    if (decidedIds.isEmpty() && returnsByCallId.isEmpty()) return
-    val returnedToolCallIds = returnsByCallId.keys
-    val newEvents = state.value.events.map { ev ->
-        if (ev !is TimelineEvent.Confirmed || ev.messageType != TimelineMessageType.TOOL_CALL) {
-            return@map ev
-        }
-        val matchingReturns = ev.toolCalls.mapNotNull { tc ->
-            val callId = tc.effectiveId.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-            val toolReturn = returnsByCallId[callId] ?: return@mapNotNull null
-            callId to toolReturn
-        }
-        val matchingReturn = matchingReturns.firstOrNull()?.second
-        val byResponse = ev.approvalRequestId != null && ev.approvalRequestId in decidedIds
-        val byReturn = ev.toolCalls.any { it.effectiveId in returnedToolCallIds }
-        if (matchingReturn == null && !byResponse && !byReturn) return@map ev
-        val returnContentByCallId = ev.toolReturnContentByCallId + matchingReturns.mapNotNull { (callId, toolReturn) ->
-            toolReturn.toolReturn.funcResponse?.let { callId to it }
-        }.toMap()
-        val returnIsErrorByCallId = ev.toolReturnIsErrorByCallId + matchingReturns.associate { (callId, toolReturn) ->
-            callId to (toolReturn.isErr == true || toolReturn.status == "error")
-        }
-        ev.copy(
-            approvalDecided = byResponse || byReturn || ev.approvalDecided,
-            toolReturnContent = matchingReturn?.toolReturn?.funcResponse
-                ?: ev.toolReturnContent,
-            toolReturnIsError = matchingReturn?.let { it.isErr == true || it.status == "error" }
-                ?: ev.toolReturnIsError,
-            toolReturnContentByCallId = returnContentByCallId,
-            toolReturnIsErrorByCallId = returnIsErrorByCallId,
-        )
-    }
-    if (newEvents !== state.value.events) {
-        state.value = state.value.copy(events = newEvents)
-    }
+    reconcileRecentMessagesFromServer(
+        "externalRunReconcile",
+        arrayOf("runId" to runId)
+    )
 }
+
