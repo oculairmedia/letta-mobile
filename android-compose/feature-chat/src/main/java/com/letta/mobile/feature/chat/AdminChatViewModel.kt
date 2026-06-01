@@ -1,7 +1,6 @@
 package com.letta.mobile.feature.chat
 
 import android.util.Log
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -10,9 +9,7 @@ import androidx.lifecycle.viewModelScope
 import app.cash.molecule.RecompositionMode.Immediate
 import app.cash.molecule.launchMolecule
 import com.letta.mobile.data.a2ui.A2uiAction
-import com.letta.mobile.data.a2ui.A2uiFrameEvent
 import com.letta.mobile.data.a2ui.A2uiMessage
-import com.letta.mobile.data.a2ui.A2uiSurfaceManager
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.health.ShimBackendDetector
@@ -39,10 +36,8 @@ import com.letta.mobile.feature.chat.send.WsChatSendStrategy
 import com.letta.mobile.feature.chat.route.ChatRouteArgs
 import com.letta.mobile.feature.chat.session.ChatSessionInitializer
 import com.letta.mobile.feature.chat.state.ChatBannerController
-import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsConnectionState
-import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.runtime.RuntimeEventOutbox
 import com.letta.mobile.util.Telemetry
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -66,10 +61,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.flow.update
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import javax.inject.Inject
 
 @HiltViewModel
@@ -90,24 +82,12 @@ internal class AdminChatViewModel @Inject constructor(
     private val shimBackendDetector: ShimBackendDetector,
     private val wsChatBridge: WsChatBridge,
     private val clientVersionProvider: ChatClientVersionProvider,
-    // Exposed (val, not private val) so ChatScreen can hand the same caps to
-    // the picker that the composer enforces (lcp-dlj). Default keeps test
-    // construction terse — Hilt always injects the bound value at runtime.
     val attachmentLimits: com.letta.mobile.data.attachment.AttachmentLimits =
         com.letta.mobile.data.attachment.AttachmentLimits.Default,
 ) : ViewModel() {
     companion object {
         private const val MESSAGE_SYNC_INTERVAL_MS = 5_000L
-        // letta-mobile-h2b8: max age the resume-most-recent flow tolerates
-        // before forcing a synchronous refresh of the conversation list.
-        // 60s is short enough to feel fresh when the user opens the app
-        // after a while, but long enough that warm-launches don't pay the
-        // round-trip on every chat open. Matches the cadence
-        // ChatSessionResolver uses in its own callers.
         private const val RESUME_CACHE_MAX_AGE_MS = 60_000L
-        private const val MAX_A2UI_DEBUG_FRAMES = 12
-        private const val A2UI_THINKING_TIMEOUT_MS = 60_000L
-        private const val A2UI_THINKING_DELAY_MESSAGE = "Response delayed — check your connection"
         private const val TAG = "AdminChatViewModel"
     }
 
@@ -120,13 +100,6 @@ internal class AdminChatViewModel @Inject constructor(
         get() = routeArgs.isFreshRoute
     val scrollToMessageId: String? = routeArgs.scrollToMessageId
 
-    /**
-     * letta-mobile-h2b8: distinguishes "user actively chose a new chat"
-     * (drawer / conversation-picker "New conversation" path, which always
-     * mints a fresh route key) from "screen opened cold without a specific
-     * conversation" (startDestination, notification deep-link with no convId,
-     * etc.). Only the latter triggers the resume-most-recent flow.
-     */
     private val explicitNewChat: Boolean
         get() = routeArgs.explicitNewChat
     private val isShimBackend: StateFlow<Boolean> = shimBackendDetector.activeIsShimBackend
@@ -136,24 +109,16 @@ internal class AdminChatViewModel @Inject constructor(
         get() = chatConversationCoordinator.conversationId(false)?.let { ConversationId(it) }
     val projectContext: ProjectChatContext? = routeArgs.projectContext
 
-    private val chatSessionResolver = ChatSessionResolver(
+    private val chatSessionResolver: ChatSessionResolver = ChatSessionResolver(
         agentRepository = agentRepository,
         conversationRepository = conversationRepository,
         backgroundRefreshScope = viewModelScope,
     )
-    private val chatApprovalCoordinator = ChatApprovalCoordinator(messageRepository)
-    private val _uiState = MutableStateFlow(
+    private val chatApprovalCoordinator: ChatApprovalCoordinator = ChatApprovalCoordinator(messageRepository)
+    private val _uiState: MutableStateFlow<ChatUiState> = MutableStateFlow(
         ChatUiState(agentName = initialAgentName.orEmpty())
     )
-    private val a2uiSurfaceManager = A2uiSurfaceManager()
-    private val pendingA2uiActions = mutableMapOf<String, PendingA2uiAction>()
-    private var a2uiConversationId: String? = null
-    private var a2uiHistorySignature: Int? = null
-    private var a2uiLiveEventSeen = false
-    private var a2uiThinkingTimeoutJob: Job? = null
-    private var a2uiThinkingStartMessageCount: Int? = null
-    private var nextA2uiDebugFrameId = 0L
-    private var nextA2uiSnackbarId = 0L
+
     val uiState: StateFlow<ChatUiState> by lazy(LazyThreadSafetyMode.NONE) {
         viewModelScope.launchMolecule(mode = Immediate) {
             present()
@@ -166,151 +131,10 @@ internal class AdminChatViewModel @Inject constructor(
         return state
     }
 
-    private val composerController = ChatComposerController(limits = attachmentLimits)
-    private val chatBannerController = ChatBannerController(_uiState, composerController)
-    val composerState: StateFlow<ChatComposerState> = composerController.state
-    val inputText: StateFlow<String> = composerState
-        .map { it.inputText }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    private val composerController: ChatComposerController = ChatComposerController(limits = attachmentLimits)
+    private val chatBannerController: ChatBannerController = ChatBannerController(_uiState, composerController)
 
-    val chatBackground: StateFlow<ChatBackground> = settingsRepository.getChatBackgroundKey()
-        .map { ChatBackground.fromKey(it) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ChatBackground.Default)
-
-    val chatFontScale: StateFlow<Float> = settingsRepository.getChatFontScale()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1f)
-
-    val availableAgents: StateFlow<List<Agent>> = agentRepository.agents
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    /**
-     * letta-mobile-ihuz: the active agent for this chat session, hydrated
-     * via [AgentRepository.getAgent]. Emits cached value (if any) then the
-     * refreshed payload. Stays `null` on transport failure so the
-     * tool-affordance row can simply hide itself instead of crashing.
-     */
-    val activeAgent: StateFlow<Agent?> = agentRepository.getAgent(agentId)
-        .map<Agent, Agent?> { it }
-        .catch { emit(null) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-
-    val favoriteAgentId: StateFlow<String?> = settingsRepository.favoriteAgentId
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), settingsRepository.favoriteAgentId.value)
-
-    /**
-     * letta-mobile-cdlk follow-up: surface the active backend label in the
-     * agent drawer so the user can tell at a glance which Letta server this
-     * agent is talking to. Mirrors the pill that the home / conversations
-     * surfaces show, computed via the same trim rules
-     * ([com.letta.mobile.data.model.toBackendLabel]).
-     */
-    val activeBackendLabel: StateFlow<String?> = settingsRepository.activeConfig
-        .map { it.toBackendLabel() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-
-    val pinnedAgentIds: StateFlow<Set<String>> = settingsRepository.getPinnedAgentIds()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
-
-    fun refreshAvailableAgents() {
-        viewModelScope.launch {
-            runCatching { agentRepository.refreshAgentsIfStale(maxAgeMs = 60_000) }
-        }
-    }
-
-    fun toggleAgentPinned(agentId: String) {
-        viewModelScope.launch {
-            settingsRepository.setAgentPinned(agentId, agentId !in pinnedAgentIds.value)
-        }
-    }
-
-    fun toggleCurrentAgentPinned() = toggleAgentPinned(agentId.value)
-
-    fun updateChatSearchQuery(query: String) = chatSearchCoordinator.updateQuery(query)
-
-    fun clearChatSearch() = chatSearchCoordinator.clear()
-
-    fun setChatBackground(background: ChatBackground) {
-        viewModelScope.launch {
-            settingsRepository.setChatBackgroundKey(background.key)
-        }
-    }
-
-    fun setChatFontScale(scale: Float) {
-        viewModelScope.launch {
-            settingsRepository.setChatFontScale(scale)
-        }
-    }
-
-    private val runExpansionState = ChatRunExpansionState(routeArgs.savedStateHandle(), _uiState)
-
-    fun toggleRunCollapsed(runId: String) = runExpansionState.toggleRunCollapsed(runId)
-
-    fun toggleReasoningExpanded(messageId: String) = runExpansionState.toggleReasoningExpanded(messageId)
-
-    private fun collapseCompletedRunsIfStreamingFinished(
-        previous: ChatUiState,
-        next: ChatUiState,
-    ): ChatUiState = runExpansionState.collapseCompletedRunsIfStreamingFinished(previous, next)
-
-    private val chatSearchCoordinator = ChatSearchCoordinator(
-        scope = viewModelScope,
-        messageRepository = messageRepository,
-        uiState = _uiState,
-        agentId = agentId.value,
-        conversationId = { conversationId?.value },
-    )
-    private val chatTimelineObserver = ChatTimelineObserver(
-        scope = viewModelScope,
-        timelineRepository = timelineRepository,
-        currentConversationTracker = currentConversationTracker,
-        activeReplyStreams = kotlinx.coroutines.flow.MutableStateFlow(emptySet()),
-        uiState = _uiState,
-        isClientModeStreamInFlight = { false },
-        a2uiThinkingStartMessageCount = { a2uiThinkingStartMessageCount },
-        clearA2uiThinkingOnResponse = ::clearA2uiThinkingOnResponse,
-        isFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight },
-        clearFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = false },
-        collapseCompletedRunsIfStreamingFinished = ::collapseCompletedRunsIfStreamingFinished,
-        syncA2uiHistorySnapshot = ::syncA2uiHistorySnapshot,
-    )
-    private val chatConversationCoordinator = ChatConversationCoordinator(
-        scope = viewModelScope,
-        agentId = agentId.value,
-        initialMessage = initialMessage,
-        explicitConversationId = { explicitConversationId },
-        setRouteConversationId = routeArgs::setRouteConversationId,
-        isFreshRoute = isFreshRoute,
-        chatSessionResolver = chatSessionResolver,
-        agentRepository = agentRepository,
-        currentConversationTracker = currentConversationTracker,
-        uiState = _uiState,
-        pendingClientModeBootstrapMessages = { persistentListOf() },
-        setPendingClientModeBootstrapUserMessage = { },
-        clearPendingClientModeBootstrapUserMessage = { },
-        currentClientModeConversationId = { null },
-        setClientModeConversationId = { },
-        startTimelineObserver = ::startTimelineObserver,
-        stopTimelineObserver = ::stopTimelineObserver,
-        reconcileRecentMessages = { convId, reason ->
-            timelineRepository.reconcileRecentMessages(convId, reason)
-        },
-        sendMessageViaClientMode = { message ->
-            timelineChatSendStrategy.send(
-                text = message,
-                attachments = emptyList(),
-                context = chatSendContext(),
-            )
-        },
-        sendMessageViaTimeline = { message ->
-            timelineChatSendStrategy.send(
-                text = message,
-                attachments = emptyList(),
-                context = chatSendContext(),
-            )
-        },
-        markFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = true },
-    )
-    private val chatApprovalController = ChatApprovalController(
+    private val chatApprovalController: ChatApprovalController = ChatApprovalController(
         scope = viewModelScope,
         coordinator = chatApprovalCoordinator,
         uiState = _uiState,
@@ -318,6 +142,18 @@ internal class AdminChatViewModel @Inject constructor(
         agentId = agentId.value,
         activeConversationId = { chatConversationCoordinator.activeConversationId },
     )
+
+    private val adminChatA2uiCoordinator: AdminChatA2uiCoordinator by lazy {
+        AdminChatA2uiCoordinator(
+            scope = viewModelScope,
+            wsChatBridge = wsChatBridge,
+            uiState = _uiState,
+            chatBannerController = chatBannerController,
+            activeConversationId = { chatConversationCoordinator.activeConversationId ?: conversationId?.value },
+            chatApprovalController = chatApprovalController,
+        )
+    }
+
     private val timelineSendCoordinator: TimelineSendCoordinator by lazy {
         TimelineSendCoordinator(
             scope = viewModelScope,
@@ -383,6 +219,158 @@ internal class AdminChatViewModel @Inject constructor(
             localStrategy = localRuntimeChatSendStrategy,
         )
     }
+
+    private val composerCoordinator: AdminChatComposerCoordinator by lazy {
+        AdminChatComposerCoordinator(
+            scope = viewModelScope,
+            composerController = composerController,
+            chatSendStrategySelector = chatSendStrategySelector,
+            chatBannerController = chatBannerController,
+            activeConversationId = { chatConversationCoordinator.activeConversationId },
+            uiState = _uiState,
+            agentId = agentId,
+            explicitConversationId = explicitConversationId,
+            isShimBackend = { isShimBackend.value },
+            sessionManager = sessionManager,
+            messageRepository = messageRepository,
+            timelineChatSendStrategy = timelineChatSendStrategy,
+            isStreaming = { _uiState.value.isStreaming },
+            projectContextAvailable = projectContext != null,
+        )
+    }
+
+    val composerState: StateFlow<ChatComposerState> by lazy { composerCoordinator.state }
+    val inputText: StateFlow<String> by lazy {
+        composerState
+            .map { it.inputText }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    }
+
+    val chatBackground: StateFlow<ChatBackground> = settingsRepository.getChatBackgroundKey()
+        .map { ChatBackground.fromKey(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ChatBackground.Default)
+
+    val chatFontScale: StateFlow<Float> = settingsRepository.getChatFontScale()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1f)
+
+    val availableAgents: StateFlow<List<Agent>> = agentRepository.agents
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val activeAgent: StateFlow<Agent?> = agentRepository.getAgent(agentId)
+        .map<Agent, Agent?> { it }
+        .catch { emit(null) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val favoriteAgentId: StateFlow<String?> = settingsRepository.favoriteAgentId
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), settingsRepository.favoriteAgentId.value)
+
+    val activeBackendLabel: StateFlow<String?> = settingsRepository.activeConfig
+        .map { it.toBackendLabel() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val pinnedAgentIds: StateFlow<Set<String>> = settingsRepository.getPinnedAgentIds()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
+    fun refreshAvailableAgents() {
+        viewModelScope.launch {
+            runCatching { agentRepository.refreshAgentsIfStale(maxAgeMs = 60_000) }
+        }
+    }
+
+    fun toggleAgentPinned(agentId: String) {
+        viewModelScope.launch {
+            settingsRepository.setAgentPinned(agentId, agentId !in pinnedAgentIds.value)
+        }
+    }
+
+    fun toggleCurrentAgentPinned() = toggleAgentPinned(agentId.value)
+
+    fun updateChatSearchQuery(query: String) = chatSearchCoordinator.updateQuery(query)
+
+    fun clearChatSearch() = chatSearchCoordinator.clear()
+
+    fun setChatBackground(background: ChatBackground) {
+        viewModelScope.launch {
+            settingsRepository.setChatBackgroundKey(background.key)
+        }
+    }
+
+    fun setChatFontScale(scale: Float) {
+        viewModelScope.launch {
+            settingsRepository.setChatFontScale(scale)
+        }
+    }
+
+    private val runExpansionState: ChatRunExpansionState = ChatRunExpansionState(routeArgs.savedStateHandle(), _uiState)
+
+    fun toggleRunCollapsed(runId: String) = runExpansionState.toggleRunCollapsed(runId)
+
+    fun toggleReasoningExpanded(messageId: String) = runExpansionState.toggleReasoningExpanded(messageId)
+
+    private fun collapseCompletedRunsIfStreamingFinished(
+        previous: ChatUiState,
+        next: ChatUiState,
+    ): ChatUiState = runExpansionState.collapseCompletedRunsIfStreamingFinished(previous, next)
+
+    private val chatSearchCoordinator: ChatSearchCoordinator = ChatSearchCoordinator(
+        scope = viewModelScope,
+        messageRepository = messageRepository,
+        uiState = _uiState,
+        agentId = agentId.value,
+        conversationId = { conversationId?.value },
+    )
+    private val chatTimelineObserver: ChatTimelineObserver = ChatTimelineObserver(
+        scope = viewModelScope,
+        timelineRepository = timelineRepository,
+        currentConversationTracker = currentConversationTracker,
+        activeReplyStreams = kotlinx.coroutines.flow.MutableStateFlow(emptySet()),
+        uiState = _uiState,
+        isClientModeStreamInFlight = { false },
+        a2uiThinkingStartMessageCount = { null },
+        clearA2uiThinkingOnResponse = { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() },
+        isFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight },
+        clearFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = false },
+        collapseCompletedRunsIfStreamingFinished = ::collapseCompletedRunsIfStreamingFinished,
+        syncA2uiHistorySnapshot = { convId, msgs -> adminChatA2uiCoordinator.syncA2uiHistorySnapshot(convId, msgs) },
+    )
+    private val chatConversationCoordinator: ChatConversationCoordinator = ChatConversationCoordinator(
+        scope = viewModelScope,
+        agentId = agentId.value,
+        initialMessage = initialMessage,
+        explicitConversationId = { explicitConversationId },
+        setRouteConversationId = routeArgs::setRouteConversationId,
+        isFreshRoute = isFreshRoute,
+        chatSessionResolver = chatSessionResolver,
+        agentRepository = agentRepository,
+        currentConversationTracker = currentConversationTracker,
+        uiState = _uiState,
+        pendingClientModeBootstrapMessages = { persistentListOf() },
+        setPendingClientModeBootstrapUserMessage = { },
+        clearPendingClientModeBootstrapUserMessage = { },
+        currentClientModeConversationId = { null },
+        setClientModeConversationId = { },
+        startTimelineObserver = ::startTimelineObserver,
+        stopTimelineObserver = ::stopTimelineObserver,
+        reconcileRecentMessages = { convId, reason ->
+            timelineRepository.reconcileRecentMessages(convId, reason)
+        },
+        sendMessageViaClientMode = { message ->
+            timelineChatSendStrategy.send(
+                text = message,
+                attachments = emptyList(),
+                context = composerCoordinator.chatSendContext(),
+            )
+        },
+        sendMessageViaTimeline = { message ->
+            timelineChatSendStrategy.send(
+                text = message,
+                attachments = emptyList(),
+                context = composerCoordinator.chatSendContext(),
+            )
+        },
+        markFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = true },
+    )
+
     private val chatHistoryPager: ChatHistoryPager by lazy {
         ChatHistoryPager(
             scope = viewModelScope,
@@ -393,7 +381,7 @@ internal class AdminChatViewModel @Inject constructor(
             activeConversationId = { chatConversationCoordinator.activeConversationId },
         )
     }
-    private val projectChatCoordinator = ProjectChatCoordinator(
+    private val projectChatCoordinator: ProjectChatCoordinator = ProjectChatCoordinator(
         scope = viewModelScope,
         agentId = agentId.value,
         projectContext = projectContext,
@@ -406,7 +394,7 @@ internal class AdminChatViewModel @Inject constructor(
         sendMessage = ::sendMessage,
     )
     val projectBindings: ChatProjectBindings = projectChatCoordinator
-    private val chatSessionInitializer by lazy {
+    private val chatSessionInitializer: ChatSessionInitializer by lazy {
         ChatSessionInitializer(
             scope = viewModelScope,
             agentId = agentId.value,
@@ -482,67 +470,13 @@ internal class AdminChatViewModel @Inject constructor(
                 shimBackendDetector.refresh(config)
             }
         }
-        observeA2uiSurfaceState()
-        observeA2uiEvents()
-        observeA2uiActionOutcomes()
         observeTransportState()
+        // Force eager initialization of lazy coordinators to start flow subscriptions
+        adminChatA2uiCoordinator
+        composerCoordinator
         chatSessionInitializer.run()
     }
 
-    private fun observeA2uiSurfaceState() {
-        viewModelScope.launch {
-            a2uiSurfaceManager.surfaces.collect { surfaces ->
-                publishA2uiSurfaces(surfaces)
-            }
-        }
-    }
-
-    private fun publishA2uiSurfaces(surfaces: Map<String, A2uiSurfaceState>) {
-        val next = surfaces.toPersistentMap()
-        _uiState.update { current ->
-            if (current.a2uiSurfaces == next) {
-                current
-            } else {
-                current.copy(a2uiSurfaces = next)
-            }
-        }
-    }
-
-    private fun observeA2uiEvents() {
-        viewModelScope.launch {
-            wsChatBridge.a2uiEvents.collect { event ->
-                event.conversationId?.let(::ensureA2uiConversation)
-                a2uiLiveEventSeen = true
-                a2uiSurfaceManager.apply(event)
-                val surfaces = a2uiSurfaceManager.surfaces.value.toPersistentMap()
-                val frames = event.toDebugFrames()
-                _uiState.update { current ->
-                    current.copy(
-                        a2uiSurfaces = surfaces,
-                        a2uiDebugFrames = if (frames.isEmpty()) {
-                            current.a2uiDebugFrames
-                        } else {
-                            (current.a2uiDebugFrames + frames)
-                                .takeLast(MAX_A2UI_DEBUG_FRAMES)
-                                .toImmutableList()
-                        },
-                        a2uiFrameCount = current.a2uiFrameCount + event.messages.size,
-                    )
-                }
-            }
-        }
-    }
-
-    /**
-     * Derives the [ChatTransport] surfaced in the top-bar chip from the
-     * shim-backend flag and the underlying ChannelTransport state.
-     *
-     * Non-shim backends stay on REST regardless of WS state. Shim
-     * backends report whichever phase the WS bridge is in; the
-     * Connected variant carries the A2UI negotiation directly off the
-     * hello-frame response so the chip can show whether A2UI was
-     * accepted (and which catalog) without a second probe.
-     */
     private fun observeTransportState() {
         viewModelScope.launch {
             combine(isShimBackend, wsChatBridge.connection) { isShim, wsState ->
@@ -565,277 +499,9 @@ internal class AdminChatViewModel @Inject constructor(
         }
     }
 
-    private fun A2uiFrameEvent.toDebugFrames(): List<A2uiDebugFrameUi> = messages.mapIndexed { index, message ->
-        A2uiDebugFrameUi(
-            id = listOf(
-                frameId.orEmpty().ifBlank { "frame" },
-                requestId.orEmpty().ifBlank { "request" },
-                message.surfaceId.ifBlank { "surface" },
-                message.messageType,
-                index.toString(),
-                (++nextA2uiDebugFrameId).toString(),
-            ).joinToString(":"),
-            transport = transport,
-            messageType = message.messageType,
-            surfaceId = message.surfaceId.takeIf { it.isNotBlank() },
-            conversationId = conversationId,
-            requestId = requestId,
-        )
-    }
-
-    private fun ensureA2uiConversation(conversationId: String) {
-        if (a2uiConversationId == conversationId) return
-        a2uiConversationId = conversationId
-        a2uiHistorySignature = null
-        a2uiLiveEventSeen = false
-        a2uiSurfaceManager.clear()
-        _uiState.update { it.copy(a2uiSurfaces = persistentMapOf()) }
-    }
-
-    private fun syncA2uiHistorySnapshot(
-        conversationId: String,
-        messages: List<A2uiMessage>,
-    ): Map<String, A2uiSurfaceState> {
-        ensureA2uiConversation(conversationId)
-        if (!a2uiLiveEventSeen) {
-            val signature = messages.hashCode()
-            if (signature != a2uiHistorySignature) {
-                a2uiSurfaceManager.replaceWith(messages)
-                a2uiHistorySignature = signature
-            }
-        }
-        return a2uiSurfaceManager.surfaces.value
-    }
-
-    private fun observeA2uiActionOutcomes() {
-        viewModelScope.launch {
-            wsChatBridge.events.collect { event ->
-                val outcome = event as? WsTimelineEvent.UserActionOutcome ?: return@collect
-                handleA2uiActionOutcome(outcome)
-            }
-        }
-    }
-
-    private fun handleA2uiActionOutcome(outcome: WsTimelineEvent.UserActionOutcome) {
-        val pending = pendingA2uiActions.remove(outcome.frameId)
-        if (pending == null) {
-            Log.w(TAG, "Dropping stale A2UI action outcome frameId=${outcome.frameId} outcome=${outcome.outcome}")
-            return
-        }
-        _uiState.update { current ->
-            val nextCount = (current.a2uiResolvedActionCounters[pending.action.surfaceId] ?: 0) + 1
-            current.copy(
-                a2uiResolvedActionCounters = current.a2uiResolvedActionCounters
-                    .toPersistentMap()
-                    .put(pending.action.surfaceId, nextCount),
-                a2uiActionSnackbar = outcome.toSnackbar(pending.action),
-            )
-        }
-        if (outcome.expectsFollowUpTurn()) {
-            startA2uiThinkingIndicator()
-        }
-    }
-
-    private fun WsTimelineEvent.UserActionOutcome.expectsFollowUpTurn(): Boolean = outcome.lowercase() in setOf(
-        "injected_as_input",
-        "matched_approval",
-    )
-
-    private fun startA2uiThinkingIndicator() {
-        a2uiThinkingTimeoutJob?.cancel()
-        a2uiThinkingStartMessageCount = _uiState.value.messages.size
-        _uiState.update {
-            it.copy(
-                isStreaming = true,
-                isAgentTyping = true,
-                a2uiThinkingDelayMessage = null,
-            )
-        }
-        a2uiThinkingTimeoutJob = viewModelScope.launch {
-            delay(A2UI_THINKING_TIMEOUT_MS)
-            if (a2uiThinkingStartMessageCount != null) {
-                a2uiThinkingStartMessageCount = null
-                _uiState.update {
-                    it.copy(
-                        isStreaming = false,
-                        isAgentTyping = false,
-                        a2uiThinkingDelayMessage = A2UI_THINKING_DELAY_MESSAGE,
-                    )
-                }
-            }
-        }
-    }
-
-    private fun clearA2uiThinkingOnResponse() {
-        a2uiThinkingStartMessageCount = null
-        a2uiThinkingTimeoutJob?.cancel()
-        a2uiThinkingTimeoutJob = null
-    }
-
-    fun markA2uiThinkingDelayMessageShown() {
-        _uiState.update { it.copy(a2uiThinkingDelayMessage = null) }
-    }
-
-    private data class PendingA2uiAction(
-        val action: A2uiAction,
-        val createdAtMillis: Long = System.currentTimeMillis(),
-    )
-
-    private fun WsTimelineEvent.UserActionOutcome.toSnackbar(action: A2uiAction): A2uiActionSnackbarUi {
-        val normalized = outcome.lowercase()
-        val decision = action.context["decision"]?.jsonPrimitive?.contentOrNull
-        val message = when (normalized) {
-            "matched_approval" -> when (decision) {
-                "deny", "rejected", "timeout" -> "Denied"
-                else -> "Approved"
-            }
-            "injected_as_input" -> "Sent"
-            "recorded_only" -> "Saved"
-            "rejected" -> reason?.takeIf { it.isNotBlank() }?.let { "Could not send: $it" } ?: "Could not send"
-            "error" -> reason?.takeIf { it.isNotBlank() }?.let { "Something went wrong: $it" } ?: "Something went wrong"
-            else -> "Action updated"
-        }
-        val retryable = normalized in setOf("rejected", "error") && idempotent
-        return A2uiActionSnackbarUi(
-            id = ++nextA2uiSnackbarId,
-            message = message,
-            actionLabel = if (retryable) "Retry" else null,
-            duration = if (retryable) SnackbarDuration.Indefinite else SnackbarDuration.Short,
-            retryAction = action.takeIf { retryable },
-        )
-    }
-
-    fun markA2uiActionSnackbarShown(id: Long) {
-        _uiState.update { current ->
-            if (current.a2uiActionSnackbar?.id == id) {
-                current.copy(a2uiActionSnackbar = null)
-            } else {
-                current
-            }
-        }
-    }
-
-    fun dismissA2uiSurface(surfaceId: String) {
-        a2uiSurfaceManager.dismissSurface(surfaceId)
-        publishA2uiSurfaces(a2uiSurfaceManager.surfaces.value)
-    }
-
-    fun submitA2uiAction(action: A2uiAction) {
-        val resolvedAction = if (action.conversationId.isNullOrBlank()) {
-            val currentConversationId = chatConversationCoordinator.activeConversationId ?: conversationId?.value
-            if (currentConversationId.isNullOrBlank()) {
-                chatBannerController.showComposerError("Couldn't send action. No active conversation is available.")
-                return
-            }
-            action.copy(conversationId = currentConversationId)
-        } else {
-            action
-        }
-        if (submitA2uiToolApprovalViaRest(resolvedAction)) return
-
-        val result = wsChatBridge.sendA2uiAction(resolvedAction)
-        // letta-mobile-ykkl: log the dispatch outcome so a missing
-        // user_action on the wire is diagnosable from adb logcat
-        // (which side dropped it: VM, bridge, transport).
-        android.util.Log.i(
-            "A2UI",
-            "submitA2uiAction surfaceId=${resolvedAction.surfaceId} event=${resolvedAction.name} " +
-                "conversationId=${resolvedAction.conversationId} result=$result",
-        )
-        when (result) {
-            is A2uiActionDispatchResult.Sent -> {
-                pendingA2uiActions[result.frameId] = PendingA2uiAction(action = resolvedAction)
-            }
-            is A2uiActionDispatchResult.Queued -> {
-                pendingA2uiActions[result.frameId] = PendingA2uiAction(action = resolvedAction)
-                chatBannerController.showComposerError("Action queued until the chat connection returns")
-            }
-            A2uiActionDispatchResult.Failed -> {
-                chatBannerController.showComposerError("Couldn't send action. Check the chat connection and try again.")
-            }
-        }
-    }
-
-    private fun submitA2uiToolApprovalViaRest(action: A2uiAction): Boolean {
-        val submission = action.toToolApprovalSubmission() ?: return false
-        chatApprovalController.submitApproval(
-            requestId = submission.approvalRequestId,
-            toolCallIds = listOf(submission.callId),
-            approve = submission.approve,
-            reason = submission.reason,
-            activeConversationIdOverride = action.conversationId,
-        )
-        return true
-    }
-
-    fun tryHandleSlashCommand(text: String): Boolean =
-        ChatSlashCommandParser.parse(
-            text = text,
-            projectContextAvailable = projectContext != null,
-        ) != null
-
-    fun handleComposerTextChanged(newText: String): ChatComposerEffect? {
-        val composer = composerState.value
-        return if (newText.endsWith("\n") && composer.hasSendableContent) {
-            submitComposer(composer.inputText)
-        } else {
-            updateInputText(newText)
-            null
-        }
-    }
-
-    fun submitComposer(text: String = composerState.value.inputText): ChatComposerEffect? {
-        return when (ChatSlashCommandParser.parse(text, projectContextAvailable = projectContext != null)) {
-            ChatSlashCommand.Bug -> {
-                composerController.clearText()
-                ChatComposerEffect.OpenBugReport
-            }
-            null -> {
-                if (_uiState.value.isStreaming) {
-                    composerController.setError(
-                        "Letta does not support free-form steering during an active run yet. Stop the run before sending another message."
-                    )
-                } else {
-                    sendMessage(text)
-                }
-                null
-            }
-        }
-    }
-
-    fun interruptRun() {
-        if (!_uiState.value.isStreaming) return
-        clearA2uiThinkingOnResponse()
-        val context = chatSendContext()
-        viewModelScope.launch {
-            if (context.isShimBackend || context.isLocalRuntime) {
-                chatBannerController.clearStreamingAfterInterrupt()
-                chatSendStrategySelector.cancel(context)
-                return@launch
-            }
-            val runIds = activeRunIds().takeIf { it.isNotEmpty() }
-            chatBannerController.clearStreamingAfterInterrupt()
-            runCatching {
-                messageRepository.cancelMessage(agentId = agentId, runIds = runIds)
-            }.onFailure { e ->
-                chatBannerController.showMappedError(e.asException(), "Failed to stop run")
-            }
-        }
-    }
-
-    private fun Throwable.asException(): Exception = this as? Exception ?: Exception(this)
-
-    private fun activeRunIds(): List<String> = _uiState.value.messages
-        .asReversed()
-        .mapNotNull { it.runId }
-        .distinct()
-        .take(1)
-
     private fun resolveConversationAndLoad(
         useClientModeForResolve: Boolean = false,
     ) = chatConversationCoordinator.resolveConversationAndLoad(useClientModeForResolve)
-
-    private suspend fun loadMessagesInternal() = chatConversationCoordinator.loadMessagesInternal()
 
     fun loadMessages() = chatConversationCoordinator.loadMessages(false)
 
@@ -845,86 +511,26 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun loadOlderMessages() = chatHistoryPager.loadOlderMessages(false)
 
-    fun sendMessage(text: String) {
-        when (_uiState.value.conversationState) {
-            ConversationState.Loading -> {
-                chatBannerController.showConversationStillLoading()
-                return
-            }
-            is ConversationState.Error -> {
-                chatBannerController.showRetryConversationLoadBeforeSend()
-                return
-            }
-            ConversationState.NoConversation,
-            is ConversationState.Ready,
-            -> Unit
-        }
+    fun reportComposerError(message: String) = composerCoordinator.reportComposerError(message)
 
-        val payload = composerController.payloadForSend(text) ?: return
-        sendMessagePayload(payload.text, payload.attachments)
-    }
-
-    fun rerunMessage(message: UiMessage) {
-        val text = message.content.trim()
-        if (message.role != "user" || text.isBlank()) return
-        sendMessagePayload(text, emptyList())
-    }
-
-    private fun sendMessagePayload(
-        text: String,
-        attachments: List<MessageContentPart.Image>,
-    ) {
-        val context = chatSendContext()
-        chatSendStrategySelector.send(text, attachments, context)
-    }
-
-    private fun chatSendContext() = ChatSendContext(
-        isClientModeEnabled = false,
-        explicitConversationId = explicitConversationId,
-        isShimBackend = isShimBackend.value,
-        isLocalRuntime = sessionManager.current.localRuntimeBackend != null,
-    )
-
-    private fun stopTimelineObserver() {
-        chatTimelineObserver.stop()
-    }
-
-    fun reportComposerError(message: String) {
-        chatBannerController.showComposerError(message)
-    }
-
-    fun clearComposerError() {
-        chatBannerController.clearComposerError()
-    }
+    fun clearComposerError() = composerCoordinator.clearComposerError()
 
     fun clearError() {
         chatBannerController.clearError()
     }
 
     fun addAttachment(image: MessageContentPart.Image): Boolean =
-        composerController.addAttachment(image)
+        composerCoordinator.addAttachment(image)
 
-    fun removeAttachment(index: Int) {
-        composerController.removeAttachment(index)
+    fun removeAttachment(index: Int) = composerCoordinator.removeAttachment(index)
+
+    private fun startTimelineObserver(conversationId: String) {
+        adminChatA2uiCoordinator.ensureA2uiConversation(conversationId)
+        chatTimelineObserver.start(conversationId)
     }
 
-    /**
-     * Subscribe to the [TimelineRepository]'s StateFlow for the given
-     * conversation and mirror its events into [_uiState.messages].
-     *
-     * Idempotent for the SAME conversation — calling repeatedly with the same
-     * id while a job is active is a no-op. When the id differs, the previous
-     * observer + hydrate-signal job are cancelled and fresh ones are spun up
-     * bound to the new conversation.
-     *
-     * This two-condition guard fixes `letta-mobile-nw2e`: the prior impl only
-     * checked `isActive == true` regardless of which conversation the job
-     * was bound to, which made switching conversations a silent no-op and
-     * left the UI locked onto the first-selected conversation's timeline.
-     */
-    private fun startTimelineObserver(conversationId: String) {
-        ensureA2uiConversation(conversationId)
-        chatTimelineObserver.start(conversationId)
+    private fun stopTimelineObserver() {
+        chatTimelineObserver.stop()
     }
 
     fun submitApproval(
@@ -945,9 +551,7 @@ internal class AdminChatViewModel @Inject constructor(
         }
     }
 
-    fun updateInputText(text: String) {
-        composerController.updateText(text)
-    }
+    fun updateInputText(text: String) = composerCoordinator.updateInputText(text)
 
     val canSendMessages: Boolean
         get() = when (_uiState.value.conversationState) {
@@ -962,11 +566,6 @@ internal class AdminChatViewModel @Inject constructor(
         currentConversationTracker.setCurrent(null)
     }
 
-    // letta-mobile-ik3u: debounce rapid duplicate onScreenResumed calls
-    // (observed 73ms apart) caused by DisposableEffect re-creation when
-    // the lifecycleOwner identity changes during composition.
-    // Sentinel ensures the very first onScreenResumed is never debounced,
-    // including in JVM unit tests where SystemClock.elapsedRealtime() returns 0.
     private var lastScreenResumedAtMs = Long.MIN_VALUE / 2
 
     fun onScreenResumed() {
@@ -977,9 +576,30 @@ internal class AdminChatViewModel @Inject constructor(
     }
 
     override fun onCleared() {
-        a2uiThinkingTimeoutJob?.cancel()
+        adminChatA2uiCoordinator.release()
         currentConversationTracker.setCurrent(null)
         super.onCleared()
     }
 
+    // --- Composer coordination delegates ---
+    fun handleComposerTextChanged(newText: String): ChatComposerEffect? =
+        composerCoordinator.handleComposerTextChanged(newText)
+
+    fun submitComposer(text: String = composerCoordinator.state.value.inputText): ChatComposerEffect? =
+        composerCoordinator.submitComposer(text)
+
+    fun sendMessage(text: String) = composerCoordinator.sendMessage(text)
+
+    fun rerunMessage(message: UiMessage) = composerCoordinator.rerunMessage(message)
+
+    fun interruptRun() = composerCoordinator.interruptRun { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() }
+
+    // --- A2UI coordination delegates ---
+    fun dismissA2uiSurface(surfaceId: String) = adminChatA2uiCoordinator.dismissA2uiSurface(surfaceId)
+
+    fun submitA2uiAction(action: A2uiAction) = adminChatA2uiCoordinator.submitA2uiAction(action)
+
+    fun markA2uiActionSnackbarShown(id: Long) = adminChatA2uiCoordinator.markA2uiActionSnackbarShown(id)
+
+    fun markA2uiThinkingDelayMessageShown() = adminChatA2uiCoordinator.markA2uiThinkingDelayMessageShown()
 }
