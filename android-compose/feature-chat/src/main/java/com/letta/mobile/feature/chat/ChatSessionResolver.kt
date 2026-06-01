@@ -44,9 +44,14 @@ internal class ChatSessionResolver(
 
     private fun mostRecentCachedConversationId(agentId: String): String? {
         return conversationRepository.getCachedConversations(AgentId(agentId))
+            .filterNot { it.id.value.startsWith(DEFAULT_SHIM_CONVERSATION_PREFIX) }
             .sortedByDescending { it.lastMessageAt ?: it.createdAt ?: "" }
             .firstOrNull()
             ?.id
             ?.value
+    }
+
+    private companion object {
+        const val DEFAULT_SHIM_CONVERSATION_PREFIX = "conv-default-"
     }
 }

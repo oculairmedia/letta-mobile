@@ -107,7 +107,7 @@ object TimelineHydrationReducer {
             .toSet()
         val toolReturnsByCallId: Map<String, ToolReturnMessage> =
             serverMessages.filterIsInstance<ToolReturnMessage>()
-                .mapNotNull { tr -> tr.toolCallId?.let { it to tr } }
+                .mapNotNull { tr -> tr.toolCallId?.takeIf { it.isNotBlank() }?.let { it to tr } }
                 .toMap()
         val returnedToolCallIds = toolReturnsByCallId.keys
         return rawConverted.mapNotNull { ev ->
@@ -133,7 +133,9 @@ object TimelineHydrationReducer {
         toolReturnsByCallId: Map<String, ToolReturnMessage>,
     ): TimelineEvent.Confirmed {
         val byResponse = approvalRequestId != null && approvalRequestId in decidedIds
-        val byReturn = toolCalls.any { it.effectiveId in returnedToolCallIds }
+        val byReturn = toolCalls.any { toolCall ->
+            toolCall.effectiveId.takeIf { it.isNotBlank() }?.let { it in returnedToolCallIds } == true
+        }
         val matchingReturns = toolCalls.mapNotNull { tc ->
             val callId = tc.effectiveId.takeIf { it.isNotBlank() } ?: return@mapNotNull null
             val toolReturn = toolReturnsByCallId[callId] ?: return@mapNotNull null

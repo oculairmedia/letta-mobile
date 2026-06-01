@@ -39,7 +39,9 @@ internal fun applyReturnsAndResponsesFromSnapshot(
         }
         val matchingReturn = matchingReturns.firstOrNull()?.second
         val byResponse = ev.approvalRequestId != null && ev.approvalRequestId in decidedIds
-        val byReturn = ev.toolCalls.any { it.effectiveId in returnedToolCallIds }
+        val byReturn = ev.toolCalls.any { toolCall ->
+            toolCall.effectiveId.takeIf { it.isNotBlank() }?.let { it in returnedToolCallIds } == true
+        }
         if (matchingReturn == null && !byResponse && !byReturn) return@map ev
         val returnContentByCallId = ev.toolReturnContentByCallId + matchingReturns.mapNotNull { (callId, toolReturn) ->
             toolReturn.toolReturn.funcResponse?.let { callId to it }

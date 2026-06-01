@@ -83,6 +83,48 @@ class TimelineHandlersIsolationTest {
     }
 
     @Test
+    fun `TimelineReturnsResponsesProcessor ignores blank tool return ids`() {
+        val initialTimeline = Timeline("conv1")
+            .append(
+                TimelineEvent.Confirmed(
+                    position = 1.0,
+                    otid = "otid-tc",
+                    content = "",
+                    serverId = "tc-blank",
+                    messageType = TimelineMessageType.TOOL_CALL,
+                    date = Instant.now(),
+                    runId = "run-1",
+                    stepId = "step-1",
+                    toolCalls = listOf(
+                        com.letta.mobile.data.model.ToolCall(
+                            name = "synthetic_tool",
+                            arguments = ""
+                        )
+                    ),
+                    approvalRequestId = "req-1"
+                )
+            )
+
+        val state = MutableStateFlow(initialTimeline)
+        val snapshot = listOf(
+            ToolReturnMessage(
+                id = "tr-blank",
+                toolCallId = "",
+                toolReturnRaw = JsonPrimitive("should_not_attach"),
+                isErr = true,
+                status = "error"
+            )
+        )
+
+        applyReturnsAndResponsesFromSnapshot(snapshot, state)
+
+        val unchanged = state.value.events.single() as TimelineEvent.Confirmed
+        assertFalse(unchanged.approvalDecided)
+        assertEquals(null, unchanged.toolReturnContent)
+        assertTrue(unchanged.toolReturnContentByCallId.isEmpty())
+    }
+
+    @Test
     fun `TimelineStateTransitionHandler transitions local event states`() = runTest {
         val state = MutableStateFlow(Timeline("conv1"))
         val events = MutableSharedFlow<TimelineSyncEvent>(extraBufferCapacity = 8)

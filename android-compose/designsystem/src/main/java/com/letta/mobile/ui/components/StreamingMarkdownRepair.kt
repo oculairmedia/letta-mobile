@@ -178,6 +178,7 @@ private fun inlineMarkdownClosersForLastLine(text: String): String {
     val lineStart = text.lastIndexOf('\n') + 1
     val line = text.substring(lineStart)
     if (line.isEmpty()) return ""
+    if (line.isCodeFenceMarkerLine()) return ""
 
     val stack = mutableListOf<String>()
     var i = 0
@@ -223,6 +224,11 @@ private fun inlineMarkdownClosersForLastLine(text: String): String {
     return buildString {
         for (i in stack.lastIndex downTo 0) append(stack[i])
     }
+}
+
+private fun String.isCodeFenceMarkerLine(): Boolean {
+    val trimmed = trimStart()
+    return trimmed.startsWith("```") || trimmed.startsWith("~~~")
 }
 
 private fun backtickRunLength(line: String, index: Int): Int {

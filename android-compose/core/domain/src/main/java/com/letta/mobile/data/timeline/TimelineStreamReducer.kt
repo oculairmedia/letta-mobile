@@ -64,10 +64,10 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
             "hasBody" to (message.toolReturn.funcResponse?.isNotEmpty() == true),
             "timelineSize" to timeline.events.size,
         )
-        if (tcid != null) {
+        if (!tcid.isNullOrBlank()) {
             val match = timeline.events.firstOrNull { ev ->
                 ev is TimelineEvent.Confirmed &&
-                    ev.toolCalls.any { it.effectiveId == tcid }
+                    ev.toolCalls.any { it.effectiveId.takeIf { id -> id.isNotBlank() } == tcid }
             } as? TimelineEvent.Confirmed
             if (match != null) {
                 val body = message.toolReturn.funcResponse ?: ""

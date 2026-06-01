@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -512,6 +513,7 @@ private fun MarkdownTextRaw(
             colors = markdownColor(
                 text = textColor,
                 codeBackground = MaterialTheme.colorScheme.surfaceVariant,
+                inlineCodeBackground = MaterialTheme.colorScheme.surfaceVariant,
                 dividerColor = MaterialTheme.colorScheme.outlineVariant,
             ),
             typography = markdownTypography(
@@ -535,16 +537,38 @@ private fun MarkdownTextRaw(
                     letterSpacing = 0.sp,
                     fontFeatureSettings = "liga 0, calt 0",
                 ),
-                h1 = MaterialTheme.typography.titleLarge.copy(color = textColor),
-                h2 = MaterialTheme.typography.titleMedium.copy(color = textColor),
-                h3 = MaterialTheme.typography.titleSmall.copy(color = textColor),
-                h4 = MaterialTheme.typography.bodyLarge.copy(color = textColor),
-                h5 = MaterialTheme.typography.bodyMedium.copy(color = textColor),
-                h6 = MaterialTheme.typography.bodySmall.copy(color = textColor),
+                h1 = MaterialTheme.typography.headlineSmall.copy(
+                    color = textColor,
+                    fontWeight = FontWeight.SemiBold,
+                ),
+                h2 = MaterialTheme.typography.titleLarge.copy(
+                    color = textColor,
+                    fontWeight = FontWeight.SemiBold,
+                ),
+                h3 = MaterialTheme.typography.titleMedium.copy(
+                    color = textColor,
+                    fontWeight = FontWeight.SemiBold,
+                ),
+                h4 = MaterialTheme.typography.titleSmall.copy(
+                    color = textColor,
+                    fontWeight = FontWeight.Medium,
+                ),
+                h5 = MaterialTheme.typography.bodyLarge.copy(
+                    color = textColor,
+                    fontWeight = FontWeight.Medium,
+                ),
+                h6 = MaterialTheme.typography.bodyMedium.copy(
+                    color = textColor,
+                    fontWeight = FontWeight.Medium,
+                ),
                 quote = MaterialTheme.typography.bodyMedium.copy(
                     color = textColor.copy(alpha = 0.7f),
+                    fontWeight = FontWeight.Medium,
                 ),
-                bullet = MaterialTheme.typography.bodyMedium.copy(color = textColor),
+                bullet = MaterialTheme.typography.bodyMedium.copy(
+                    color = textColor,
+                    fontWeight = FontWeight.Medium,
+                ),
                 list = MaterialTheme.typography.bodyMedium.copy(color = textColor),
                 ordered = MaterialTheme.typography.bodyMedium.copy(color = textColor),
             ),
