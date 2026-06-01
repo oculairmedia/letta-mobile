@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.ui.test.assertIsDisplayed
@@ -88,7 +89,7 @@ class AgentScaffoldHiltTest {
         every { viewModel.pinnedAgentIds } returns MutableStateFlow(emptySet())
         every { viewModel.activeBackendLabel } returns MutableStateFlow<String?>("letta.test")
         every { viewModel.projectBindings } returns projectBindings
-        every { viewModel.agentId } returns "agent-hilt-1"
+        every { viewModel.agentId } returns AgentId("agent-hilt-1")
         every { viewModel.conversationId } returns null
         every { viewModel.projectContext } returns null
         every { conversationRepository.getConversations(any()) } returns flowOf(emptyList())
@@ -181,7 +182,7 @@ class AgentScaffoldHiltTest {
 
     @Test
     fun searchResultsLabelPreviousConversationMatches() {
-        every { viewModel.conversationId } returns "conv-current"
+        every { viewModel.conversationId } returns ConversationId("conv-current")
         every { conversationRepository.getConversations(any()) } returns flowOf(
             listOf(
                 conversation("conv-current", "Current planning"),

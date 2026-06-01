@@ -1,5 +1,7 @@
 {
   "database": "jsonl",
-  "backend": "jsonl",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "beads",
   "project_id": "9d8d46c2-c475-4fff-b800-452d47841714"
 }
