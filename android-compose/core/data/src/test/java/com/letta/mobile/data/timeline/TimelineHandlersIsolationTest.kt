@@ -69,9 +69,7 @@ class TimelineHandlersIsolationTest {
             ToolReturnMessage(
                 id = "tr-1",
                 toolCallId = "call-id-1",
-                toolReturn = com.letta.mobile.data.model.ToolReturn(
-                    funcResponse = "success_response"
-                ),
+                toolReturnRaw = JsonPrimitive("success_response"),
                 isErr = false
             )
         )
