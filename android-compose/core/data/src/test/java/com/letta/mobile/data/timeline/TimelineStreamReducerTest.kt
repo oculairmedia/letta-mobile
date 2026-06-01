@@ -126,6 +126,32 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `blank tool return id does not attach to blank synthetic tool call`() {
+        val seeded = reduce(
+            frame = ToolCallMessage(
+                id = "tool-blank",
+                toolCall = ToolCall(name = "synthetic_tool", arguments = "{}"),
+            )
+        ).next
+        val toolReturn = ToolReturnMessage(
+            id = "return-blank",
+            toolCallId = "",
+            status = "error",
+            toolReturnRaw = JsonPrimitive("should_not_attach"),
+            isErr = true,
+        )
+
+        val output = reduce(prev = seeded, frame = toolReturn)
+
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.approvalDecided shouldBe false
+        event.toolReturnContentByCallId shouldBe emptyMap()
+        output.updatedPendingToolReturnsByCallId shouldBe emptyMap()
+        output.emittedEvents shouldBe emptyList()
+        output.notification shouldBe null
+    }
+
+    @Test
     fun `server id match merges stream deltas into existing confirmed event`() {
         val seeded = reduce(
             frame = AssistantMessage(id = "assistant-1", contentRaw = JsonPrimitive("Hel"))

@@ -49,6 +49,35 @@ class TimelineHydrationReducerTest {
     }
 
     @Test
+    fun `reduce ignores blank tool return ids for synthetic tool calls`() {
+        val result = TimelineHydrationReducer.reduce(
+            conversationId = "conversation-1",
+            serverMessagesChronological = listOf(
+                ToolCallMessage(
+                    id = "tool-call-blank",
+                    toolCall = ToolCall(name = "synthetic_tool", arguments = "{}"),
+                ),
+                ToolReturnMessage(
+                    id = "tool-return-blank",
+                    toolCallId = "",
+                    status = "error",
+                    toolReturnRaw = JsonPrimitive("should_not_attach"),
+                    isErr = true,
+                ),
+            ),
+            timelineBeforeFetch = Timeline("conversation-1"),
+            currentTimeline = Timeline("conversation-1"),
+            diskRecords = emptyList(),
+        )
+
+        assertEquals(1, result.visibleEventCount)
+        val toolEvent = result.timeline.events.single() as TimelineEvent.Confirmed
+        assertEquals(TimelineMessageType.TOOL_CALL, toolEvent.messageType)
+        assertEquals(false, toolEvent.approvalDecided)
+        assertTrue(toolEvent.toolReturnContentByCallId.isEmpty())
+    }
+
+    @Test
     fun `reduce preserves concurrent locals after server snapshot`() {
         val local = TimelineEvent.Local(
             position = 1.0,
