@@ -79,6 +79,21 @@ class TimelineSyncLoopTest {
     }
 
     @Test
+    fun `hydrate skips client-side default shim placeholder conversations`() = runBlocking {
+        val api = FakeSyncApi()
+        api.addStoredMessage(SystemMessage(id = "m1", contentRaw = JsonPrimitive("welcome")))
+
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        val sync = TimelineSyncLoop(api, "conv-default-agent-1", scope)
+
+        sync.hydrate()
+
+        assertEquals(0, api.listMessagesCalls)
+        assertEquals(0, sync.state.value.events.size)
+        scope.coroutineContext.job.cancel()
+    }
+
+    @Test
     fun `hydrate overfetches raw events so older visible turns survive tool-heavy latest run`() = runBlocking {
         val api = FakeSyncApi()
         api.addStoredMessage(

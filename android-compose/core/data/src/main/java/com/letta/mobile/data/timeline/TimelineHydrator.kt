@@ -27,6 +27,24 @@ internal class TimelineHydrator(
         fallbackCursorSeq: Long? = null,
     ) {
         val timer = Telemetry.startTimer("TimelineSync", "hydrate")
+        if (conversationId.startsWith(DEFAULT_SHIM_CONVERSATION_PREFIX)) {
+            Telemetry.event(
+                "TimelineSync", "hydrate.skipped",
+                "conversationId" to conversationId,
+                "reason" to "defaultShimConversation",
+                level = Telemetry.Level.WARN,
+            )
+            events.emit(TimelineSyncEvent.Hydrated(0))
+            timer.stop(
+                "conversationId" to conversationId,
+                "rawCount" to 0,
+                "eventCount" to 0,
+                "cursorSeq" to -1L,
+                "skipped" to true,
+                "skipReason" to "defaultShimConversation",
+            )
+            return
+        }
         val timelineBeforeFetch = writeMutex.withLock { state.value }
         try {
             val rawFetchLimit = hydrateRawFetchLimit(limit)
@@ -79,5 +97,9 @@ internal class TimelineHydrator(
             timer.stopError(t, "conversationId" to conversationId)
             throw t
         }
+    }
+
+    private companion object {
+        const val DEFAULT_SHIM_CONVERSATION_PREFIX = "conv-default-"
     }
 }
