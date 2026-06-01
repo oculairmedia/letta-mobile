@@ -22,7 +22,7 @@ import java.time.Instant
 internal class TimelineExternalTransportAppender(
     private val conversationId: String,
     private val messageApi: MessageApi,
-    private val eventQueue: Channel<TimelineSyncLoop.TimelineGatewayEvent>,
+    private val eventQueue: Channel<TimelineGatewayEvent>,
     private val state: MutableStateFlow<Timeline>,
     private val events: MutableSharedFlow<TimelineSyncEvent>,
     private val writeMutex: Mutex,
@@ -37,7 +37,7 @@ internal class TimelineExternalTransportAppender(
         val sentAt = Instant.now()
         val ack = CompletableDeferred<String>()
         eventQueue.send(
-            TimelineSyncLoop.TimelineGatewayEvent.ExternalTransportLocalAppend(
+            TimelineGatewayEvent.ExternalTransportLocalAppend(
                 content = content,
                 otid = otid,
                 attachments = attachments,
@@ -49,7 +49,7 @@ internal class TimelineExternalTransportAppender(
     }
 
     suspend fun applyExternalTransportLocalAppend(
-        event: TimelineSyncLoop.TimelineGatewayEvent.ExternalTransportLocalAppend,
+        event: TimelineGatewayEvent.ExternalTransportLocalAppend,
     ) {
         writeMutex.withLock {
             val local = TimelineEvent.Local(
@@ -76,13 +76,13 @@ internal class TimelineExternalTransportAppender(
 
     suspend fun markExternalTransportLocalSent(otid: String) {
         val ack = CompletableDeferred<Unit>()
-        eventQueue.send(TimelineSyncLoop.TimelineGatewayEvent.MarkSent(otid, ack))
+        eventQueue.send(TimelineGatewayEvent.MarkSent(otid, ack))
         ack.await()
     }
 
     suspend fun markExternalTransportLocalFailed(otid: String) {
         val ack = CompletableDeferred<Unit>()
-        eventQueue.send(TimelineSyncLoop.TimelineGatewayEvent.MarkFailed(otid, ack))
+        eventQueue.send(TimelineGatewayEvent.MarkFailed(otid, ack))
         ack.await()
     }
 

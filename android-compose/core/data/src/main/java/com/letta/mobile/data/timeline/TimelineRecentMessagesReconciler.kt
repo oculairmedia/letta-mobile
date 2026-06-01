@@ -17,7 +17,7 @@ import kotlinx.coroutines.sync.withLock
 internal class TimelineRecentMessagesReconciler(
     private val conversationId: String,
     private val messageApi: MessageApi,
-    private val eventQueue: Channel<TimelineSyncLoop.TimelineGatewayEvent>,
+    private val eventQueue: Channel<TimelineGatewayEvent>,
     private val state: MutableStateFlow<Timeline>,
     private val streamSubscriberActive: StateFlow<Boolean>,
     private val writeMutex: Mutex,
@@ -67,7 +67,7 @@ internal class TimelineRecentMessagesReconciler(
             ).reversed()
             val ack = CompletableDeferred<Int>()
             eventQueue.send(
-                TimelineSyncLoop.TimelineGatewayEvent.RecentMessagesSnapshot(
+                TimelineGatewayEvent.RecentMessagesSnapshot(
                     serverMessages = serverMessages,
                     telemetryName = telemetryName,
                     telemetryAttrs = telemetryAttrs.toList(),
@@ -88,7 +88,7 @@ internal class TimelineRecentMessagesReconciler(
     }
 
     suspend fun applyRecentMessagesSnapshot(
-        event: TimelineSyncLoop.TimelineGatewayEvent.RecentMessagesSnapshot,
+        event: TimelineGatewayEvent.RecentMessagesSnapshot,
     ) {
         val appended = writeMutex.withLock {
             applyRecentMessagesSnapshotLocked(
@@ -108,11 +108,6 @@ internal class TimelineRecentMessagesReconciler(
         val mergeResult = state.value.mergeServerMessages(serverMessages)
         state.value = mergeResult.first
         val appended = mergeResult.second
-        // After appending new events, apply return/response hints from
-        // the full snapshot so existing TOOL_CALL bubbles pick up their
-        // output + decided state. This is the key path for the UX
-        // symptom "approve/reject still visible after tool ran" when the
-        // server's SSE stream doesn't emit tool_return frames.
         applyReturnsAndResponsesFromSnapshot(serverMessages)
         return appended
     }
