@@ -15,6 +15,7 @@ internal fun repairIncompleteMarkdownForStreaming(text: String): String {
 
     repairOpenCodeFence(text)?.let { return it }
     repairOpenDisplayMath(text)?.let { return it }
+    repairOpenInlineCodeSpan(text)?.let { return it }
     repairOpenInlineMath(text)?.let { return it }
 
     val linkRepaired = repairDanglingLinkOrImage(text)
@@ -84,6 +85,44 @@ private fun hasOpenDisplayMathFence(text: String): Boolean {
         i++
     }
     return open
+}
+
+private fun repairOpenInlineCodeSpan(text: String): String? {
+    val opener = findUnclosedInlineCodeMarker(text) ?: return null
+    return text + opener
+}
+
+private fun findUnclosedInlineCodeMarker(text: String): String? {
+    var i = 0
+    while (i < text.length) {
+        if (text[i] == '\\') {
+            i += 2
+            continue
+        }
+
+        val backtickRun = backtickRunLength(text, i)
+        if (backtickRun > 0) {
+            val marker = "`".repeat(backtickRun)
+            val close = findNextUnescapedBacktickRun(text, marker, i + backtickRun)
+            if (close < 0) return marker
+            i = close + backtickRun
+            continue
+        }
+
+        i++
+    }
+    return null
+}
+
+private fun findNextUnescapedBacktickRun(text: String, marker: String, startIndex: Int): Int {
+    var searchFrom = startIndex
+    while (searchFrom < text.length) {
+        val index = text.indexOf(marker, startIndex = searchFrom)
+        if (index < 0) return -1
+        if (!text.isEscapedAt(index)) return index
+        searchFrom = index + marker.length
+    }
+    return -1
 }
 
 private fun repairOpenInlineMath(text: String): String? {
@@ -190,6 +229,10 @@ private fun inlineMarkdownClosersForLastLine(text: String): String {
 
         val backtickRun = backtickRunLength(line, i)
         if (backtickRun > 0) {
+            if (text.isInsideInlineCodeAt(lineStart + i)) {
+                i += backtickRun
+                continue
+            }
             val marker = "`".repeat(backtickRun)
             val close = line.indexOf(marker, startIndex = i + backtickRun)
             if (close < 0) {
