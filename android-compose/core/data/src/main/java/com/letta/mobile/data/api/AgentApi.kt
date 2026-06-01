@@ -148,22 +148,6 @@ open class AgentApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun importAgent(
-        fileName: String,
-        fileBytes: ByteArray,
-        overrideName: String? = null,
-        overrideExistingTools: Boolean? = null,
-        projectId: String?,
-        stripMessages: Boolean? = null,
-    ): ImportedAgentsResponse = importAgent(
-        fileName = fileName,
-        fileBytes = fileBytes,
-        overrideName = overrideName,
-        overrideExistingTools = overrideExistingTools,
-        projectId = projectId?.let(::ProjectId),
-        stripMessages = stripMessages,
-    )
-
     open suspend fun attachArchive(agentId: AgentId, archiveId: String) {
         val (client, baseUrl) = apiClient.session()
 

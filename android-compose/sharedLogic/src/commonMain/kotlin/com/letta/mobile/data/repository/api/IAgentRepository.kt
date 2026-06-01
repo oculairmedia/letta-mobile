@@ -57,14 +57,6 @@ interface IAgentRepository {
         projectId: ProjectId? = null,
         stripMessages: Boolean? = null,
     ): ImportedAgentsResponse
-    suspend fun importAgent(
-        fileName: String,
-        fileBytes: ByteArray,
-        overrideName: String? = null,
-        overrideExistingTools: Boolean? = null,
-        projectId: String?,
-        stripMessages: Boolean? = null,
-    ): ImportedAgentsResponse = importAgent(fileName, fileBytes, overrideName, overrideExistingTools, projectId?.let(::ProjectId), stripMessages)
     suspend fun attachArchive(agentId: AgentId, archiveId: String)
     suspend fun attachArchive(agentId: String, archiveId: String) = attachArchive(AgentId(agentId), archiveId)
     suspend fun detachArchive(agentId: AgentId, archiveId: String)
