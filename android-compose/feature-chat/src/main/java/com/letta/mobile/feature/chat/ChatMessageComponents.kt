@@ -79,6 +79,7 @@ import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LocalChatFontScale
 import com.letta.mobile.ui.theme.LocalChatIsPinching
+import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.chatBubbleSender
 import com.letta.mobile.ui.theme.chatColors
 import com.letta.mobile.ui.theme.chatDimens
@@ -191,7 +192,7 @@ internal fun ChatMessageItem(
         ) {
             if (showAvatar) {
                 MessageAvatar(role = "assistant")
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(LettaSpacing.xxs))
             }
             MessageReasoning(
                 message = message,
@@ -209,7 +210,7 @@ internal fun ChatMessageItem(
     ) {
         if (showAvatar) {
             MessageAvatar(role = message.role)
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(LettaSpacing.xxs))
         }
 
         // Assistant / tool bubbles take the full content-area width so code
@@ -254,7 +255,7 @@ internal fun MessageAvatar(
     // outline for the assistant (matches the leading AI-app convention of a
     // ringed sparkle/icon floating above the response) and a filled pill for
     // the user / tool roles (preserves the current visual weight for those).
-    val avatarSize = 24.dp
+    val avatarSize = LettaSpacing.avatarSize
 
     if (isUser || icon == null) {
         // Filled pill for user (and any unknown roles): preserves the current
@@ -293,7 +294,7 @@ internal fun MessageAvatar(
                 .clip(MaterialTheme.shapes.small)
                 .background(Color.Transparent)
                 .border(
-                    width = 1.dp,
+                    width = LettaSpacing.borderWidthThin,
                     color = ringColor,
                     shape = MaterialTheme.shapes.small,
                 ),
@@ -303,7 +304,7 @@ internal fun MessageAvatar(
                 imageVector = icon,
                 contentDescription = null,
                 tint = tint,
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(LettaSpacing.iconSizeSmall),
             )
         }
     }

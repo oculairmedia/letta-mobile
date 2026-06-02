@@ -41,19 +41,19 @@ data class ChatTypography(
 )
 
 data class ChatShapes(
-    val bubbleRadius: Dp = 12.dp,
-    val codeBlockRadius: Dp = 8.dp,
-    val bubble: Shape = RoundedCornerShape(12.dp),
+    val bubbleRadius: Dp = LettaSpacing.bubbleRadius,
+    val codeBlockRadius: Dp = LettaSpacing.codeBlockRadius,
+    val bubble: Shape = RoundedCornerShape(LettaSpacing.bubbleRadius),
 )
 
 data class ChatDimens(
-    val bubblePaddingHorizontal: Dp = 10.dp,
-    val bubblePaddingVertical: Dp = 7.dp,
+    val bubblePaddingHorizontal: Dp = LettaSpacing.bubblePaddingHorizontal,
+    val bubblePaddingVertical: Dp = LettaSpacing.bubblePaddingVertical,
     val bubbleMaxWidthFraction: Float = 0.88f,
-    val messageSpacing: Dp = 2.dp,
-    val groupedMessageSpacing: Dp = 2.dp,
-    val ungroupedMessageSpacing: Dp = 6.dp,
-    val contentPaddingHorizontal: Dp = 12.dp,
+    val messageSpacing: Dp = LettaSpacing.messageSpacing,
+    val groupedMessageSpacing: Dp = LettaSpacing.messageSpacing,
+    val ungroupedMessageSpacing: Dp = LettaSpacing.xs,
+    val contentPaddingHorizontal: Dp = LettaSpacing.screenHorizontal,
 )
 
 val LocalChatColors = staticCompositionLocalOf<ChatColors> { error("No ChatColors provided") }

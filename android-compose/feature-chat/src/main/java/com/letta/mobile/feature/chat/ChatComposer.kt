@@ -55,12 +55,14 @@ import com.letta.mobile.feature.chat.voice.VoiceInputUiState
 import com.letta.mobile.feature.chat.voice.VoiceInputViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
+import com.letta.mobile.ui.theme.LettaSpacing
 
-internal val ChatComposerAttachButtonSize = 36.dp
-private val ChatComposerAttachIconSize = 18.dp
-private val ChatComposerInputHorizontalPadding = 8.dp
-private val ChatComposerInputVerticalPadding = 6.dp
-private val ChatComposerInputItemSpacing = 6.dp
+// letta-mobile-awbf.1: composer sizing now references the design system tokens
+internal val ChatComposerAttachButtonSize = LettaSpacing.composerAttachButtonSize
+private val ChatComposerAttachIconSize = LettaSpacing.composerAttachIconSize
+private val ChatComposerInputHorizontalPadding = LettaSpacing.sm
+private val ChatComposerInputVerticalPadding = LettaSpacing.xs
+private val ChatComposerInputItemSpacing = LettaSpacing.xs
 
 internal object ChatComposerTestTags {
     const val AttachmentThumbnail = "chat-composer-attachment-thumbnail"

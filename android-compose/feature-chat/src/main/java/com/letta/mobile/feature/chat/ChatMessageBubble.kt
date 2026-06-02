@@ -27,6 +27,7 @@ import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.LatencyText
 import com.letta.mobile.ui.components.MessageBubbleShape
 import com.letta.mobile.ui.theme.LocalChatIsPinching
+import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.chatColors
 import com.letta.mobile.ui.theme.chatDimens
 import com.letta.mobile.ui.theme.chatTypography
@@ -252,7 +253,7 @@ internal fun MessageBubbleSurface(
                 message.latencyMs?.let { latencyMs ->
                     LatencyText(
                         latencyMs = latencyMs.toFloat(),
-                        modifier = Modifier.padding(top = 2.dp),
+                        modifier = Modifier.padding(top = LettaSpacing.xxxs),
                     )
                 }
             }
@@ -271,7 +272,7 @@ internal fun MessageBubbleSurface(
             contentColumn()
         }
     } else {
-        val bubbleShape = MessageBubbleShape(radius = 12.dp, isFromUser = isUser, groupPosition = groupPosition)
+        val bubbleShape = MessageBubbleShape(radius = LettaSpacing.bubbleRadius, isFromUser = isUser, groupPosition = groupPosition)
         Surface(
             shape = bubbleShape,
             color = style.containerColor,

@@ -74,6 +74,7 @@ import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.ui.theme.LettaChatTheme
+import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.isExpandedWidth
 import kotlinx.collections.immutable.ImmutableMap
@@ -362,7 +363,7 @@ internal fun ChatScreen(
                 text = floatingBannerMessage,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(16.dp),
+                    .padding(LettaSpacing.lg),
             )
 
             if (chatMode == "debug" && state.a2uiDebugFrames.isNotEmpty()) {
@@ -370,7 +371,7 @@ internal fun ChatScreen(
                     frames = state.a2uiDebugFrames,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(horizontal = LettaSpacing.lg, vertical = LettaSpacing.md),
                 )
             }
 
@@ -414,15 +415,15 @@ private fun A2uiDebugOverlay(
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
                 shape = MaterialTheme.shapes.small,
             )
-            .padding(8.dp),
+            .padding(LettaSpacing.sm),
     ) {
         Text(
             text = "A2UI frames",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.tertiary,
         )
-        HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
-        LazyColumn(modifier = Modifier.height(132.dp)) {
+        HorizontalDivider(modifier = Modifier.padding(vertical = LettaSpacing.xs))
+        LazyColumn(modifier = Modifier.height(LettaSpacing.xxxl.times(2))) {
             items(frames.takeLast(8).asReversed(), key = { it.id }) { frame ->
                 Text(
                     text = buildString {
@@ -554,7 +555,7 @@ private fun ChatContent(
                 onDismissSurface = onDismissA2uiSurface,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = LettaSpacing.lg, vertical = LettaSpacing.sm),
             )
         }
 
@@ -573,7 +574,7 @@ private fun A2uiSurfaceStack(
     val orderedSurfaces = surfaces.values.sortedBy(A2uiSurfaceState::surfaceId)
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(LettaSpacing.sm),
     ) {
         orderedSurfaces.forEach { surface ->
             key(surface.surfaceId) {
@@ -643,12 +644,12 @@ private fun ErrorContent(
         Icon(
             imageVector = LettaIcons.Error,
             contentDescription = "Error",
-            modifier = Modifier.size(64.dp),
+            modifier = Modifier.size(LettaSpacing.xxxl),
             tint = MaterialTheme.colorScheme.error
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(LettaSpacing.lg))
         Text(text = message, style = MaterialTheme.typography.bodyLarge)
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(LettaSpacing.lg))
         Button(onClick = onRetry) {
             Text(stringResource(R.string.action_retry))
         }
