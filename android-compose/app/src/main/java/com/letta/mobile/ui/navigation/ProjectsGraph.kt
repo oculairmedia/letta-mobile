@@ -8,7 +8,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
-import com.letta.mobile.feature.chat.AgentChatRoute
+import com.letta.mobile.feature.chat.route.AgentChatRoute
 import com.letta.mobile.ui.screens.projects.CreateProjectScreen
 import com.letta.mobile.ui.screens.projects.ProjectHomeScreen
 import com.letta.mobile.ui.screens.projects.ProjectIssueDetailScreen

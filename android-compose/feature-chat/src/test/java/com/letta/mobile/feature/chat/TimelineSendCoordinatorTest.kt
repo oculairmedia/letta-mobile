@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat
 
 import com.letta.mobile.data.api.ApiException
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.timeline.TimelineRepository
@@ -16,6 +17,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.feature.chat.coordination.TimelineSendCoordinator
+import com.letta.mobile.feature.chat.render.ChatUiState
+import com.letta.mobile.feature.chat.render.ConversationState
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TimelineSendCoordinatorTest {
@@ -120,8 +125,8 @@ class TimelineSendCoordinatorTest {
         init {
             coEvery { timelineRepository.sendMessage(any(), any()) } returns "otid"
             coEvery { timelineRepository.sendMessage(any(), any(), any()) } returns "otid"
-            coEvery { conversationRepository.updateConversation(any(), any(), any()) } returns Unit
-            coEvery { conversationRepository.createConversation(any(), any()) } returns
+            coEvery { conversationRepository.updateConversation(any<ConversationId>(), any<AgentId>(), any()) } returns Unit
+            coEvery { conversationRepository.createConversation(any<AgentId>(), any<String>()) } returns
                 TestData.conversation(id = "new-conv", agentId = "agent-1")
         }
     }

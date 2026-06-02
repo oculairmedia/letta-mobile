@@ -65,7 +65,7 @@ import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.DataStoreRunCursorStore
 import com.letta.mobile.data.transport.RunCursorStore
 import com.letta.mobile.data.transport.api.IChannelTransport
-import com.letta.mobile.feature.chat.ChatClientVersionProvider
+import com.letta.mobile.feature.chat.coordination.ChatClientVersionProvider
 import com.letta.mobile.platform.storage.AndroidAppPrivateStorageRootProvider
 import com.letta.mobile.platform.storage.AndroidSafStorageGrantStore
 import com.letta.mobile.platform.storage.AppPrivateStorageRootProvider

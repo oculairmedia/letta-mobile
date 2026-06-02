@@ -4,6 +4,7 @@ import com.letta.mobile.data.a2ui.A2uiMessage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.letta.mobile.feature.chat.a2ui.A2uiHistoryExtractor
 
 class A2uiHistoryExtractorTest {
     @Test

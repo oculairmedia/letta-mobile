@@ -17,9 +17,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
-import com.letta.mobile.feature.chat.AgentChatRoute
-import com.letta.mobile.feature.chat.AgentScaffold
-import com.letta.mobile.feature.chat.toViewModelKey
+import com.letta.mobile.feature.chat.route.AgentChatRoute
+import com.letta.mobile.feature.chat.screen.AgentScaffold
+import com.letta.mobile.feature.chat.route.toViewModelKey
 import com.letta.mobile.ui.navigation.ArchivalRoute
 import com.letta.mobile.feature.editagent.EditAgentRoute
 import com.letta.mobile.ui.navigation.AllToolsRoute

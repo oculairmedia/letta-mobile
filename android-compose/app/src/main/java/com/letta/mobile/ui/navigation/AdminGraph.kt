@@ -9,7 +9,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
-import com.letta.mobile.feature.chat.AgentChatRoute
+import com.letta.mobile.feature.chat.route.AgentChatRoute
 import com.letta.mobile.feature.editagent.EditAgentRoute
 import com.letta.mobile.ui.screens.dashboard.HomeScreen
 import com.letta.mobile.ui.screens.about.AboutScreen

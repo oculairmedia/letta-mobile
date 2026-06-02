@@ -36,6 +36,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.letta.mobile.feature.chat.coordination.ChatTimelineObserver
+import com.letta.mobile.feature.chat.render.ChatUiState
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatTimelineObserverTest {

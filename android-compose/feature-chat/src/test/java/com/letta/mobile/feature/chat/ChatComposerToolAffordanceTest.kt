@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolId
+import com.letta.mobile.feature.chat.screen.ChatComposer
 import com.letta.mobile.ui.components.ToolAffordanceRowTestTags
 import com.letta.mobile.ui.theme.LettaTheme
 import kotlinx.collections.immutable.persistentListOf

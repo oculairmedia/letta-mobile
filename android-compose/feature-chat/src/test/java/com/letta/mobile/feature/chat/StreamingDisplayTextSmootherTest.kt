@@ -3,6 +3,7 @@ package com.letta.mobile.feature.chat
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.letta.mobile.feature.chat.render.StreamingDisplayTextSmoother
 
 class StreamingDisplayTextSmootherTest {
 

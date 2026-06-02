@@ -8,6 +8,10 @@ import com.letta.mobile.ui.common.GroupPosition
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.letta.mobile.feature.chat.coordination.ChatRenderItem
+import com.letta.mobile.feature.chat.coordination.groupMessagesForRender
+import com.letta.mobile.feature.chat.screen.RunTimelineStep
+import com.letta.mobile.feature.chat.screen.compactRunToolCallSteps
 
 /**
  * Pure-JVM tests for [groupMessagesForRender] — verifies that contiguous

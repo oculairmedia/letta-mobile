@@ -1,11 +1,13 @@
 package com.letta.mobile.feature.chat
 
 import com.letta.mobile.data.channel.CurrentConversationTracker
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.data.repository.ConversationRepository
-import com.letta.mobile.data.repository.AgentRepository
+import com.letta.mobile.data.repository.api.IAgentRepository
+import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.testutil.FakeTimelineExternalTransportWriter
@@ -30,6 +32,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import com.letta.mobile.feature.chat.coordination.ChatClientVersionProvider
+import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinator
+import com.letta.mobile.feature.chat.coordination.ChatSessionResolver
+import com.letta.mobile.feature.chat.coordination.InitialRouteMessageDeliveryGuard
+import com.letta.mobile.feature.chat.coordination.WsChatSendCoordinator
+import com.letta.mobile.feature.chat.render.ChatUiState
+import com.letta.mobile.feature.chat.render.ConversationState
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatConversationCoordinatorTest {
@@ -149,7 +158,7 @@ class ChatConversationCoordinatorTest {
 
         wsSendCoordinator.send("ping").join()
 
-        coVerify(exactly = 0) { conversationRepository.createConversation(any(), any()) }
+        coVerify(exactly = 0) { conversationRepository.createConversation(any<AgentId>(), any()) }
         verify(exactly = 1) {
             bridge.send(
                 agentId = "agent-1",
@@ -188,13 +197,13 @@ class ChatConversationCoordinatorTest {
     @Test
     fun `duplicate fresh client initial message is mirrored without sending again`() = runTest {
         val first = Harness(scope = this, isFreshRoute = true, initialMessage = "shared prompt")
-        every { first.agentRepository.getCachedAgent("agent-1") } returns TestData.agent(id = "agent-1", name = "Ada")
+        every { first.agentRepository.getCachedAgent(AgentId("agent-1")) } returns TestData.agent(id = "agent-1", name = "Ada")
         first.coordinator.resolveConversationAndLoad(useClientModeForResolve = true)
         advanceUntilIdle()
         assertEquals(listOf("shared prompt"), first.sentClientModeMessages)
 
         val duplicate = Harness(scope = this, isFreshRoute = true, initialMessage = "shared prompt")
-        every { duplicate.agentRepository.getCachedAgent("agent-1") } returns TestData.agent(id = "agent-1", name = "Ada")
+        every { duplicate.agentRepository.getCachedAgent(AgentId("agent-1")) } returns TestData.agent(id = "agent-1", name = "Ada")
         duplicate.coordinator.resolveConversationAndLoad(useClientModeForResolve = true)
         advanceUntilIdle()
 
@@ -210,7 +219,7 @@ class ChatConversationCoordinatorTest {
         initialMessage: String? = null,
     ) {
         val chatSessionResolver: ChatSessionResolver = mockk(relaxed = true)
-        val agentRepository: AgentRepository = mockk(relaxed = true)
+        val agentRepository: IAgentRepository = mockk(relaxed = true)
         val currentConversationTracker = CurrentConversationTracker()
         val uiState = MutableStateFlow(ChatUiState())
         val startedObservers = mutableListOf<String>()
@@ -248,16 +257,16 @@ class ChatConversationCoordinatorTest {
         )
 
         init {
-            every { agentRepository.getCachedAgent("agent-1") } returns null
-            every { agentRepository.getAgent("agent-1") } returns flowOf(TestData.agent(id = "agent-1", name = "Ada"))
+            every { agentRepository.getCachedAgent(AgentId("agent-1")) } returns null
+            every { agentRepository.getAgent(AgentId("agent-1")) } returns flowOf(TestData.agent(id = "agent-1", name = "Ada"))
             coEvery { chatSessionResolver.resolveMostRecentConversation(any(), any()) } returns null
         }
     }
 
-    private fun stubConversationRepository(): ConversationRepository = mockk(relaxed = true) {
-        coEvery { createConversation(any(), any()) } returns Conversation(
-            id = "conv-created",
-            agentId = "agent-1",
+    private fun stubConversationRepository(): IConversationRepository = mockk(relaxed = true) {
+        coEvery { createConversation(any<AgentId>(), any()) } returns Conversation(
+            id = ConversationId("conv-created"),
+            agentId = AgentId("agent-1"),
             createdAt = "1970-01-01T00:00:00Z",
             updatedAt = "1970-01-01T00:00:00Z",
             lastMessageAt = "1970-01-01T00:00:00Z",

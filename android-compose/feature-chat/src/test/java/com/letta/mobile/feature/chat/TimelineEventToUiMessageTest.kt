@@ -14,6 +14,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 import org.junit.jupiter.api.Tag
+import com.letta.mobile.feature.chat.render.timelineEventToUiMessage
 
 /**
  * Programmatic test harness for the TimelineEvent → UiMessage contract that

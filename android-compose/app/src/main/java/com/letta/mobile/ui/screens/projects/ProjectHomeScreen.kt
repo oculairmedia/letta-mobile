@@ -77,7 +77,7 @@ import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.ShimmerBox
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.feature.chat.ProjectChatStartAction
+import com.letta.mobile.feature.chat.route.ProjectChatStartAction
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.customColors

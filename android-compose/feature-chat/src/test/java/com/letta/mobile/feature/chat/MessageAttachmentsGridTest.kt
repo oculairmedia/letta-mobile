@@ -4,6 +4,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.letta.mobile.feature.chat.screen.chatAttachmentImageDataUrl
+import com.letta.mobile.feature.chat.screen.chatAttachmentImageCacheKey
 
 class MessageAttachmentsGridTest {
 

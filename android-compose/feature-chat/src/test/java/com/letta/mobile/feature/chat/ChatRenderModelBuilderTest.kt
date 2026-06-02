@@ -7,6 +7,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.letta.mobile.feature.chat.coordination.ChatDisplayMode
+import com.letta.mobile.feature.chat.coordination.ChatRenderItem
+import com.letta.mobile.feature.chat.coordination.buildChatRenderModel
+import com.letta.mobile.feature.chat.coordination.dedupeReasoningAssistantEchoes
+import com.letta.mobile.feature.chat.coordination.dedupeGroupedMessagesForLazyKeys
+import com.letta.mobile.feature.chat.coordination.filterMessagesForMode
+import com.letta.mobile.feature.chat.coordination.toChatDisplayMode
 
 class ChatRenderModelBuilderTest {
 

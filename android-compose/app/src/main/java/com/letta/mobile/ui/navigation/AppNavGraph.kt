@@ -28,8 +28,8 @@ import com.letta.mobile.AppLaunchTarget
 import com.letta.mobile.channel.ChatPushAlarmScheduler
 import com.letta.mobile.data.model.toBackendLabel
 import com.letta.mobile.data.repository.api.ISettingsRepository
-import com.letta.mobile.feature.chat.AgentChatRoute
-import com.letta.mobile.feature.chat.chatGraph
+import com.letta.mobile.feature.chat.route.AgentChatRoute
+import com.letta.mobile.feature.chat.route.chatGraph
 import com.letta.mobile.feature.editagent.EditAgentRoute
 import com.letta.mobile.feature.editagent.editAgentGraph
 import com.letta.mobile.ui.screens.config.BackendSwitcherSheet
