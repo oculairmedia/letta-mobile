@@ -108,47 +108,86 @@ data class AssistantMessage(
 }
 
 private fun extractContent(raw: JsonElement?): String {
+    val parsed = raw.parseJsonStringPayload()
+    if (parsed != null) return extractContent(parsed)
+
     return when {
         raw == null -> ""
         raw is JsonPrimitive && raw.isString -> raw.content
         raw is JsonArray -> {
             raw.mapNotNull { element ->
                 if (element is JsonObject) {
-                    element["text"]?.jsonPrimitive?.contentOrNull
+                    extractObjectContent(element)
                 } else if (element is JsonPrimitive) {
-                    element.content
+                    element.parseJsonStringPayload()?.let { extractContent(it) } ?: element.content
                 } else null
             }.joinToString("\n")
         }
-        else -> raw.toString()
+        raw is JsonObject -> extractObjectContent(raw).orEmpty()
+        else -> ""
     }
 }
 
 private fun extractAttachments(raw: JsonElement?): List<MessageContentPart.Image> {
-    val elements = when (raw) {
-        is JsonArray -> raw
-        is JsonObject -> listOf(raw)
-        else -> return emptyList()
+    val parsed = raw.parseJsonStringPayload()
+    if (parsed != null) return extractAttachments(parsed)
+
+    return when (raw) {
+        is JsonArray -> raw.flatMap { extractAttachments(it) }
+        is JsonObject -> extractObjectAttachments(raw)
+        else -> emptyList()
     }
-    return elements.mapNotNull { element ->
-        val obj = element as? JsonObject ?: return@mapNotNull null
-        when (obj["type"]?.jsonPrimitive?.contentOrNull) {
+}
+
+private fun JsonElement?.parseJsonStringPayload(): JsonElement? {
+    val content = (this as? JsonPrimitive)
+        ?.takeIf { it.isString }
+        ?.content
+        ?.trim()
+        ?: return null
+    if (!content.startsWith("{") && !content.startsWith("[")) return null
+    return runCatching { Json.parseToJsonElement(content) }.getOrNull()
+}
+
+private fun extractObjectContent(obj: JsonObject): String? {
+    return when (obj["type"]?.jsonPrimitive?.contentOrNull) {
+        "text" -> obj["text"]?.jsonPrimitive?.contentOrNull
+        "tool_return" -> firstNestedContent(obj, "content", "tool_return", "func_response", "response", "result", "text")
+        else -> firstNestedContent(obj, "content", "tool_return", "func_response", "response", "result", "text")
+    }?.takeIf { it.isNotBlank() }
+}
+
+private fun firstNestedContent(obj: JsonObject, vararg keys: String): String? {
+    for (key in keys) {
+        val value = obj[key] ?: continue
+        val content = extractContent(value).takeIf { it.isNotBlank() }
+        if (content != null) return content
+    }
+    return null
+}
+
+private fun extractObjectAttachments(obj: JsonObject): List<MessageContentPart.Image> {
+    val current = when (obj["type"]?.jsonPrimitive?.contentOrNull) {
             // Letta's native shape: { type:"image", source:{ type:"base64", media_type, data } | { type:"url", url } }
             "image" -> parseLettaImagePart(obj)
             // Legacy / OpenAI-style shape kept for backward compatibility with
             // anything previously persisted or echoed by older server builds.
             "image_url" -> {
                 val url = obj["image_url"]
-                    ?.jsonObject
+                    ?.let { it as? JsonObject }
                     ?.get("url")
                     ?.jsonPrimitive
                     ?.contentOrNull
-                    ?: return@mapNotNull null
+                    ?: return emptyList()
                 parseImageDataUrl(url)
             }
             else -> null
-        }
     }
+    return listOfNotNull(current) + obj.values.flatMap { extractAttachments(it) }
+}
+
+private fun extractContentPartResponse(raw: JsonElement?): String? {
+    return extractContent(raw).takeIf { it.isNotBlank() }
 }
 
 private fun parseLettaImagePart(obj: JsonObject): MessageContentPart.Image? {
@@ -259,7 +298,7 @@ data class ToolReturnMessage(
     val toolReturn: ToolReturn
         get() {
             val rawFuncResponse = when {
-                toolReturnRaw is JsonPrimitive && toolReturnRaw.isString -> toolReturnRaw.content
+                toolReturnRaw is JsonPrimitive && toolReturnRaw.isString && toolReturnRaw.parseJsonStringPayload() == null -> toolReturnRaw.content
                 else -> null
             }
             val contentPartResponse = extractContentPartResponse(toolReturnRaw)
@@ -295,17 +334,6 @@ data class ToolReturnMessage(
 private fun JsonObject.looksLikeToolReturnEnvelope(): Boolean {
     return containsKey("tool_call_id") || containsKey("status") || containsKey("func_response") ||
         containsKey("stdout") || containsKey("stderr")
-}
-
-private fun extractContentPartResponse(raw: JsonElement?): String? {
-    return when (raw) {
-        is JsonArray -> extractContent(raw).takeIf { it.isNotBlank() }
-        is JsonObject -> {
-            if (raw["type"]?.jsonPrimitive?.contentOrNull != "text") return null
-            raw["text"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
-        }
-        else -> null
-    }
 }
 
 @Serializable

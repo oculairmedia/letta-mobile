@@ -9,6 +9,9 @@ import io.kotest.core.spec.style.WordSpec
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import org.junit.jupiter.api.Tag
 
 /**
@@ -80,7 +83,7 @@ class WsFrameMapperTest : WordSpec({
                 turnId = "T", runId = "R",
                 toolCallId = "tc-1",
                 status = "success",
-                toolReturn = "hello\n",
+                toolReturn = JsonPrimitive("hello\n"),
                 stdout = listOf("hello"),
                 stderr = null,
             )
@@ -91,6 +94,37 @@ class WsFrameMapperTest : WordSpec({
             mapped.stdout shouldBe listOf("hello")
             mapped.toolReturn.funcResponse shouldBe "hello\n"
             mapped.date shouldBe "t"
+        }
+
+        "preserve raw JSON tool_return image payloads from live frames" {
+            val imagePayload = buildJsonArray {
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("image"))
+                    put("source", buildJsonObject {
+                        put("type", JsonPrimitive("letta"))
+                        put("file_id", JsonPrimitive("file-live"))
+                        put("media_type", JsonPrimitive("image/png"))
+                        put("data", JsonPrimitive("LIVE_TOOL_IMAGE+/=="))
+                    })
+                })
+            }
+            val frame = ServerFrame.ToolReturnMessage(
+                id = "toolreturn-tc-live-image",
+                ts = "t",
+                agentId = "a", conversationId = "c",
+                turnId = "T", runId = "R",
+                toolCallId = "tc-live-image",
+                status = "success",
+                toolReturn = imagePayload,
+            )
+
+            val mapped = WsFrameMapper.toLettaMessage(frame)
+
+            mapped.shouldBeInstanceOf<ToolReturnMessage>()
+            mapped.toolReturn.funcResponse.shouldBeNull()
+            mapped.attachments.size shouldBe 1
+            mapped.attachments.single().mediaType shouldBe "image/png"
+            mapped.attachments.single().base64 shouldBe "LIVE_TOOL_IMAGE+/=="
         }
 
         "map reasoning_message and propagate signature when set" {

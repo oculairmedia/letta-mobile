@@ -292,6 +292,57 @@ class MessageContentPartTest {
     }
 
     @Test
+    fun `nested tool return content part image payload is decoded as attachment`() {
+        val content = buildJsonObject {
+            put("type", JsonPrimitive("tool_return"))
+            put("tool_return", buildJsonArray {
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("text"))
+                    put("text", JsonPrimitive("Read returned an image"))
+                })
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("image"))
+                    put("source", buildJsonObject {
+                        put("type", JsonPrimitive("letta"))
+                        put("file_id", JsonPrimitive("file-nested-tool"))
+                        put("media_type", JsonPrimitive("image/png"))
+                        put("data", JsonPrimitive("NESTED_TOOL_IMAGE+/=="))
+                    })
+                })
+            })
+        }
+
+        val message = ToolReturnMessage(
+            id = "tool-return-nested-image",
+            toolCallId = "call-image",
+            toolReturnRaw = content,
+        )
+
+        assertEquals("Read returned an image", message.toolReturn.funcResponse)
+        assertEquals(1, message.attachments.size)
+        assertEquals("image/png", message.attachments.first().mediaType)
+        assertEquals("NESTED_TOOL_IMAGE+/==", message.attachments.first().base64)
+    }
+
+    @Test
+    fun `json string tool return image payload is parsed without becoming response text`() {
+        val jsonPayload = """
+            [{"type":"image","source":{"type":"letta","file_id":"file-json","media_type":"image/jpeg","data":"JSON_TOOL_IMAGE+/=="}}]
+        """.trimIndent()
+
+        val message = ToolReturnMessage(
+            id = "tool-return-json-string-image",
+            toolCallId = "call-image",
+            toolReturnRaw = JsonPrimitive(jsonPayload),
+        )
+
+        assertNull(message.toolReturn.funcResponse)
+        assertEquals(1, message.attachments.size)
+        assertEquals("image/jpeg", message.attachments.first().mediaType)
+        assertEquals("JSON_TOOL_IMAGE+/==", message.attachments.first().base64)
+    }
+
+    @Test
     fun `letta image source without inline data is dropped`() {
         // A pure file-reference (no `data` field) can't be rendered inline —
         // the caller would need to fetch via /v1/files. Until that path
