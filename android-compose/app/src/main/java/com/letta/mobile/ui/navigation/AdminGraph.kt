@@ -33,7 +33,6 @@ import com.letta.mobile.ui.screens.tools.ToolDetailScreen
 import com.letta.mobile.ui.screens.systemaccess.SystemAccessDashboardScreen
 import com.letta.mobile.ui.screens.telemetry.TelemetryScreen
 import com.letta.mobile.ui.screens.usage.UsageScreen
-import com.letta.mobile.feature.chat.route.NavGraphBuilder
 
 fun NavGraphBuilder.adminGraph(
     navController: NavHostController,

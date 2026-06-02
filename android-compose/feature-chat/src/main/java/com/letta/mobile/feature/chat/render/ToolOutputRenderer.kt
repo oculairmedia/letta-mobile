@@ -1,7 +1,5 @@
 package com.letta.mobile.feature.chat.render
 
-import com.letta.mobile.ui.theme.LettaCodeFont
-
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.SizeTransform
@@ -45,14 +43,15 @@ import com.letta.mobile.feature.chat.R
 import com.letta.mobile.ui.text.ChatTextLayoutMode
 import com.letta.mobile.ui.text.ChatTextVisualClip
 import com.letta.mobile.ui.text.rememberChatTextGeometryMeasurer
+import com.letta.mobile.ui.theme.LettaCodeFont
 import com.letta.mobile.ui.theme.LocalChatFontScale
 import com.letta.mobile.ui.theme.LocalChatIsPinching
+import com.letta.mobile.ui.theme.LettaMotion
 import com.letta.mobile.ui.theme.chatTypography
 import com.letta.mobile.ui.theme.listItemSupporting
 import com.letta.mobile.ui.theme.scaledBy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import com.letta.mobile.feature.chat.screen.ChatMotion
 
 internal const val ToolOutputBackgroundParseThresholdChars = 12_000
 internal const val ToolOutputBackgroundHighlightThresholdChars = 4_000
@@ -103,12 +102,12 @@ internal fun ToolOutputRenderer(
             modifier = Modifier.fillMaxWidth(),
             transitionSpec = {
                 if (isPinching) {
-                    (ChatMotion.instantEnter() togetherWith ChatMotion.instantExit())
-                        .using(SizeTransform(clip = true) { _, _ -> ChatMotion.instantSizeSpec })
+                    (LettaMotion.instantEnter() togetherWith LettaMotion.instantExit())
+                        .using(SizeTransform(clip = true) { _, _ -> LettaMotion.instantSizeSpec })
                 } else {
                     // letta-mobile-vui8q: unfurl from leading edge instead of plain vertical expand.
-                    (ChatMotion.unfurlEnter() togetherWith ChatMotion.unfurlExit())
-                        .using(SizeTransform(clip = true) { _, _ -> ChatMotion.contentSizeSpec })
+                    (LettaMotion.unfurlEnter() togetherWith LettaMotion.unfurlExit())
+                        .using(SizeTransform(clip = true) { _, _ -> LettaMotion.contentSizeSpec })
                 }
             },
             contentAlignment = Alignment.TopStart,

@@ -6,7 +6,6 @@ import androidx.navigation.compose.composable
 import com.letta.mobile.ui.screens.config.ConfigListScreen
 import com.letta.mobile.ui.screens.config.ConfigScreen
 import com.letta.mobile.ui.screens.config.VibesyncDebugScreen
-import com.letta.mobile.feature.chat.route.NavGraphBuilder
 
 fun NavGraphBuilder.configGraph(
     navController: NavHostController,

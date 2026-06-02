@@ -17,7 +17,6 @@ import com.letta.mobile.ui.screens.conversations.ConversationsScreen
 import com.letta.mobile.ui.screens.conversations.TwoPaneConversationsLayout
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.isExpandedWidth
-import com.letta.mobile.feature.chat.route.NavGraphBuilder
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 fun NavGraphBuilder.conversationsGraph(
