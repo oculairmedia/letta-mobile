@@ -125,8 +125,12 @@ private fun extractContent(raw: JsonElement?): String {
 }
 
 private fun extractAttachments(raw: JsonElement?): List<MessageContentPart.Image> {
-    if (raw !is JsonArray) return emptyList()
-    return raw.mapNotNull { element ->
+    val elements = when (raw) {
+        is JsonArray -> raw
+        is JsonObject -> listOf(raw)
+        else -> return emptyList()
+    }
+    return elements.mapNotNull { element ->
         val obj = element as? JsonObject ?: return@mapNotNull null
         when (obj["type"]?.jsonPrimitive?.contentOrNull) {
             // Letta's native shape: { type:"image", source:{ type:"base64", media_type, data } | { type:"url", url } }
@@ -258,11 +262,14 @@ data class ToolReturnMessage(
                 toolReturnRaw is JsonPrimitive && toolReturnRaw.isString -> toolReturnRaw.content
                 else -> null
             }
+            val contentPartResponse = extractContentPartResponse(toolReturnRaw)
             val fromList = toolReturns?.firstOrNull()
             if (fromList != null) {
                 // Enrich with funcResponse from tool_return raw if missing
                 return if (fromList.funcResponse == null && rawFuncResponse != null) {
                     fromList.copy(funcResponse = rawFuncResponse, stdout = fromList.stdout ?: stdout, stderr = fromList.stderr ?: stderr)
+                } else if (fromList.funcResponse == null && contentPartResponse != null) {
+                    fromList.copy(funcResponse = contentPartResponse, stdout = fromList.stdout ?: stdout, stderr = fromList.stderr ?: stderr)
                 } else {
                     fromList
                 }
@@ -275,10 +282,30 @@ data class ToolReturnMessage(
                     stdout = stdout,
                     stderr = stderr,
                 )
-                toolReturnRaw is JsonObject -> Json.decodeFromJsonElement(ToolReturn.serializer(), toolReturnRaw)
-                else -> ToolReturn(toolCallId = toolCallId ?: "", status = status ?: "unknown", funcResponse = null, stdout = stdout, stderr = stderr)
+                toolReturnRaw is JsonObject && toolReturnRaw.looksLikeToolReturnEnvelope() ->
+                    Json.decodeFromJsonElement(ToolReturn.serializer(), toolReturnRaw)
+                else -> ToolReturn(toolCallId = toolCallId ?: "", status = status ?: "unknown", funcResponse = contentPartResponse, stdout = stdout, stderr = stderr)
             }
         }
+
+    val attachments: List<MessageContentPart.Image>
+        get() = extractAttachments(toolReturnRaw)
+}
+
+private fun JsonObject.looksLikeToolReturnEnvelope(): Boolean {
+    return containsKey("tool_call_id") || containsKey("status") || containsKey("func_response") ||
+        containsKey("stdout") || containsKey("stderr")
+}
+
+private fun extractContentPartResponse(raw: JsonElement?): String? {
+    return when (raw) {
+        is JsonArray -> extractContent(raw).takeIf { it.isNotBlank() }
+        is JsonObject -> {
+            if (raw["type"]?.jsonPrimitive?.contentOrNull != "text") return null
+            raw["text"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+        }
+        else -> null
+    }
 }
 
 @Serializable

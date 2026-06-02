@@ -154,6 +154,7 @@ fun LettaMessage.toAppMessage(state: MessageMappingState): AppMessage? {
                 toolName = context?.name ?: name,
                 toolCallId = toolCallId,
                 toolReturnStatus = toolReturn.status,
+                attachments = attachments,
             )
         }
         is ApprovalResponseMessage -> AppMessage(
@@ -363,6 +364,9 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                     runId = msg.runId,
                     stepId = msg.stepId,
                     toolCalls = listOf(toolCall),
+                    attachments = matchedReturn?.attachments.orEmpty().map {
+                        UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
+                    },
                 ))
             }
 
@@ -420,6 +424,9 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                     runId = msg.runId,
                     stepId = msg.stepId,
                     toolCalls = listOf(toolCall),
+                    attachments = msg.attachments.map {
+                        UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
+                    },
                 ))
             }
 
