@@ -588,7 +588,7 @@ sealed interface ServerFrame {
         @SerialName("run_id") val runId: String? = null,
         @SerialName("tool_call_id") val toolCallId: String,
         val status: String = "success",
-        @SerialName("tool_return") val toolReturn: String? = null,
+        @SerialName("tool_return") val toolReturn: JsonElement? = null,
         val stdout: List<String>? = null,
         val stderr: List<String>? = null,
         val seq: Long? = null,

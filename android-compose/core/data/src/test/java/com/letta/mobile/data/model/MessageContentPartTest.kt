@@ -213,6 +213,136 @@ class MessageContentPartTest {
     }
 
     @Test
+    fun `tool return image payload is decoded as attachment`() {
+        val content = buildJsonArray {
+            add(buildJsonObject {
+                put("type", JsonPrimitive("image"))
+                put("source", buildJsonObject {
+                    put("type", JsonPrimitive("letta"))
+                    put("file_id", JsonPrimitive("file-tool"))
+                    put("media_type", JsonPrimitive("image/png"))
+                    put("data", JsonPrimitive("TOOL_IMAGE+/=="))
+                })
+            })
+        }
+
+        val message = ToolReturnMessage(
+            id = "tool-return-image",
+            toolCallId = "call-image",
+            toolReturnRaw = content,
+        )
+
+        assertEquals(1, message.attachments.size)
+        assertEquals("image/png", message.attachments.first().mediaType)
+        assertEquals("TOOL_IMAGE+/==", message.attachments.first().base64)
+    }
+
+    @Test
+    fun `tool return mixed text and image payload preserves response text and attachment`() {
+        val content = buildJsonArray {
+            add(buildJsonObject {
+                put("type", JsonPrimitive("text"))
+                put("text", JsonPrimitive("Screenshot captured"))
+            })
+            add(buildJsonObject {
+                put("type", JsonPrimitive("image"))
+                put("source", buildJsonObject {
+                    put("type", JsonPrimitive("letta"))
+                    put("file_id", JsonPrimitive("file-tool"))
+                    put("media_type", JsonPrimitive("image/png"))
+                    put("data", JsonPrimitive("MIXED_TOOL_IMAGE+/=="))
+                })
+            })
+        }
+
+        val message = ToolReturnMessage(
+            id = "tool-return-mixed",
+            toolCallId = "call-image",
+            toolReturnRaw = content,
+        )
+
+        assertEquals("Screenshot captured", message.toolReturn.funcResponse)
+        assertEquals(1, message.attachments.size)
+        assertEquals("MIXED_TOOL_IMAGE+/==", message.attachments.first().base64)
+    }
+
+    @Test
+    fun `tool return single image object payload does not deserialize as tool return envelope`() {
+        val content = buildJsonObject {
+            put("type", JsonPrimitive("image"))
+            put("source", buildJsonObject {
+                put("type", JsonPrimitive("letta"))
+                put("file_id", JsonPrimitive("file-tool"))
+                put("media_type", JsonPrimitive("image/png"))
+                put("data", JsonPrimitive("SINGLE_TOOL_IMAGE+/=="))
+            })
+        }
+
+        val message = ToolReturnMessage(
+            id = "tool-return-single-image",
+            toolCallId = "call-image",
+            toolReturnRaw = content,
+        )
+
+        assertEquals("call-image", message.toolReturn.toolCallId)
+        assertEquals("unknown", message.toolReturn.status)
+        assertNull(message.toolReturn.funcResponse)
+        assertEquals(1, message.attachments.size)
+        assertEquals("SINGLE_TOOL_IMAGE+/==", message.attachments.first().base64)
+    }
+
+    @Test
+    fun `nested tool return content part image payload is decoded as attachment`() {
+        val content = buildJsonObject {
+            put("type", JsonPrimitive("tool_return"))
+            put("tool_return", buildJsonArray {
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("text"))
+                    put("text", JsonPrimitive("Read returned an image"))
+                })
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("image"))
+                    put("source", buildJsonObject {
+                        put("type", JsonPrimitive("letta"))
+                        put("file_id", JsonPrimitive("file-nested-tool"))
+                        put("media_type", JsonPrimitive("image/png"))
+                        put("data", JsonPrimitive("NESTED_TOOL_IMAGE+/=="))
+                    })
+                })
+            })
+        }
+
+        val message = ToolReturnMessage(
+            id = "tool-return-nested-image",
+            toolCallId = "call-image",
+            toolReturnRaw = content,
+        )
+
+        assertEquals("Read returned an image", message.toolReturn.funcResponse)
+        assertEquals(1, message.attachments.size)
+        assertEquals("image/png", message.attachments.first().mediaType)
+        assertEquals("NESTED_TOOL_IMAGE+/==", message.attachments.first().base64)
+    }
+
+    @Test
+    fun `json string tool return image payload is parsed without becoming response text`() {
+        val jsonPayload = """
+            [{"type":"image","source":{"type":"letta","file_id":"file-json","media_type":"image/jpeg","data":"JSON_TOOL_IMAGE+/=="}}]
+        """.trimIndent()
+
+        val message = ToolReturnMessage(
+            id = "tool-return-json-string-image",
+            toolCallId = "call-image",
+            toolReturnRaw = JsonPrimitive(jsonPayload),
+        )
+
+        assertNull(message.toolReturn.funcResponse)
+        assertEquals(1, message.attachments.size)
+        assertEquals("image/jpeg", message.attachments.first().mediaType)
+        assertEquals("JSON_TOOL_IMAGE+/==", message.attachments.first().base64)
+    }
+
+    @Test
     fun `letta image source without inline data is dropped`() {
         // A pure file-reference (no `data` field) can't be rendered inline —
         // the caller would need to fetch via /v1/files. Until that path
