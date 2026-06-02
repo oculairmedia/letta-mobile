@@ -14,6 +14,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.jupiter.api.Tag
+import com.letta.mobile.feature.chat.coordination.ChatSearchController
 
 @Tag("unit")
 class ChatSearchControllerTest {

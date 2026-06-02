@@ -2,7 +2,7 @@ package com.letta.mobile
 
 import android.content.Context
 import android.content.Intent
-import com.letta.mobile.feature.chat.AgentChatRoute
+import com.letta.mobile.feature.chat.route.AgentChatRoute
 
 data class NotificationNavigationTarget(
     val agentId: String,

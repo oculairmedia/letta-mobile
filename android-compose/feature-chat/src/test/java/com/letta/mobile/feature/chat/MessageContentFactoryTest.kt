@@ -2,6 +2,11 @@ package com.letta.mobile.feature.chat
 
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.feature.chat.render.shouldAnimateToolCallEntrance
+import com.letta.mobile.feature.chat.screen.clearToolCallEntranceAnimationHistoryForTest
+import com.letta.mobile.feature.chat.screen.shouldRunToolCallEntranceAnimation
+import com.letta.mobile.feature.chat.screen.shouldUseCompactToolCallGroup
+import com.letta.mobile.feature.chat.screen.buildMessageCopyText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

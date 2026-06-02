@@ -21,7 +21,8 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.ui.test.setLettaTestContent
-import com.letta.mobile.data.repository.ConversationRepository
+import com.letta.mobile.data.repository.api.IConversationRepository
+import com.letta.mobile.feature.chat.screen.AgentScaffoldContent
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -37,6 +38,13 @@ import org.junit.jupiter.api.Tag
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import com.letta.mobile.feature.chat.coordination.ChatComposerState
+import com.letta.mobile.feature.chat.coordination.ChatProjectBindings
+import com.letta.mobile.feature.chat.render.ChatUiState
+import com.letta.mobile.feature.chat.render.ContextWindowUiState
+import com.letta.mobile.feature.chat.render.ProjectChatContext
+import com.letta.mobile.feature.chat.screen.AdminChatViewModel
+import com.letta.mobile.feature.chat.screen.AgentScaffoldTestTags
 
 @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -64,11 +72,11 @@ class AgentScaffoldHiltTest {
 
     private lateinit var viewModel: AdminChatViewModel
     private lateinit var projectBindings: ChatProjectBindings
-    private lateinit var conversationRepository: ConversationRepository
+    private lateinit var conversationRepository: IConversationRepository
 
     private fun conversation(id: String, summary: String): Conversation = Conversation(
-        id = id,
-        agentId = "agent-hilt-1",
+        id = com.letta.mobile.data.model.ConversationId(id),
+        agentId = com.letta.mobile.data.model.AgentId("agent-hilt-1"),
         summary = summary,
         createdAt = "2026-05-01T12:00:00Z",
         lastMessageAt = "2026-05-01T12:00:00Z",
@@ -92,8 +100,8 @@ class AgentScaffoldHiltTest {
         every { viewModel.agentId } returns AgentId("agent-hilt-1")
         every { viewModel.conversationId } returns null
         every { viewModel.projectContext } returns null
-        every { conversationRepository.getConversations(any()) } returns flowOf(emptyList())
-        coEvery { conversationRepository.refreshConversations(any()) } returns Unit
+        every { conversationRepository.getConversations(any<AgentId>()) } returns flowOf(emptyList())
+        coEvery { conversationRepository.refreshConversations(any<AgentId>()) } returns Unit
     }
 
     @Test
@@ -183,7 +191,7 @@ class AgentScaffoldHiltTest {
     @Test
     fun searchResultsLabelPreviousConversationMatches() {
         every { viewModel.conversationId } returns ConversationId("conv-current")
-        every { conversationRepository.getConversations(any()) } returns flowOf(
+        every { conversationRepository.getConversations(any<AgentId>()) } returns flowOf(
             listOf(
                 conversation("conv-current", "Current planning"),
                 conversation("conv-previous", "Previous planning"),

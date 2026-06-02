@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.feature.chat.screen.DrawerContent
 import com.letta.mobile.ui.test.setLettaTestContent
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -18,6 +19,8 @@ import org.junit.jupiter.api.Tag
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import com.letta.mobile.feature.chat.render.ContextWindowUiState
+import com.letta.mobile.feature.chat.screen.AgentScaffoldTestTags
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -30,8 +33,8 @@ class AgentScaffoldTest {
     private fun emptyContextWindow() = ContextWindowUiState()
 
     private fun conversation(id: String, summary: String): Conversation = Conversation(
-        id = id,
-        agentId = "agent-drawer-42",
+        id = com.letta.mobile.data.model.ConversationId(id),
+        agentId = com.letta.mobile.data.model.AgentId("agent-drawer-42"),
         summary = summary,
         createdAt = "2026-05-01T12:00:00Z",
         lastMessageAt = "2026-05-01T12:00:00Z",

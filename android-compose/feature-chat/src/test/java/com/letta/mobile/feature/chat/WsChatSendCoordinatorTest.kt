@@ -1,4 +1,4 @@
-﻿package com.letta.mobile.feature.chat
+package com.letta.mobile.feature.chat
 
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.AgentId
@@ -38,6 +38,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.letta.mobile.feature.chat.coordination.ChatClientVersionProvider
+import com.letta.mobile.feature.chat.coordination.WsChatSendCoordinator
+import com.letta.mobile.feature.chat.render.ChatUiState
+import com.letta.mobile.feature.chat.render.ConversationState
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class WsChatSendCoordinatorTest {
@@ -116,7 +120,7 @@ class WsChatSendCoordinatorTest {
 
         coordinator.send("hello").join()
 
-        coVerify(exactly = 0) { conversationRepository.createConversation(any(), any()) }
+        coVerify(exactly = 0) { conversationRepository.createConversation(any<AgentId>(), any()) }
         assertTrue(cleared)
         assertTrue(timelineRepository.externalLocals.isEmpty())
         verify(exactly = 1) {
@@ -952,8 +956,8 @@ class WsChatSendCoordinatorTest {
         agentId: String = "agent-1",
     ): ConversationRepository = mockk(relaxed = true) {
         coEvery { createConversation(agentId, any()) } returns Conversation(
-            id = conversationId,
-            agentId = agentId,
+            id = com.letta.mobile.data.model.ConversationId(conversationId),
+            agentId = AgentId(agentId),
             createdAt = "1970-01-01T00:00:00Z",
             updatedAt = "1970-01-01T00:00:00Z",
             lastMessageAt = "1970-01-01T00:00:00Z",

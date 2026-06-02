@@ -6,6 +6,8 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import com.letta.mobile.feature.chat.render.StepDotIcon
+import com.letta.mobile.feature.chat.render.runStepDotIcon
 
 /**
  * Pure-JVM tests for [runStepDotIcon] — the classification used by

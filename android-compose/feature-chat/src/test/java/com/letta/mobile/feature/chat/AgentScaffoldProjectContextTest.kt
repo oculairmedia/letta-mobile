@@ -19,6 +19,18 @@ import org.junit.jupiter.api.Tag
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import com.letta.mobile.feature.chat.render.ProjectAgentActivity
+import com.letta.mobile.feature.chat.render.ProjectAgentStatusTone
+import com.letta.mobile.feature.chat.render.ProjectAgentsUiState
+import com.letta.mobile.feature.chat.render.ProjectBriefSection
+import com.letta.mobile.feature.chat.render.ProjectBriefSectionKey
+import com.letta.mobile.feature.chat.render.ProjectBriefUiState
+import com.letta.mobile.feature.chat.render.ProjectBugReportUiState
+import com.letta.mobile.feature.chat.render.ProjectChatContext
+import com.letta.mobile.feature.chat.screen.ProjectContextCard
+import com.letta.mobile.feature.chat.screen.ProjectAgentsCard
+import com.letta.mobile.feature.chat.screen.ProjectBriefCard
+import com.letta.mobile.feature.chat.screen.ProjectBugReportSummaryCard
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])

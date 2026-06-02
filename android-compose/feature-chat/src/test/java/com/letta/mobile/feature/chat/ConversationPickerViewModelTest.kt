@@ -1,5 +1,8 @@
 package com.letta.mobile.feature.chat
 
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.testutil.MainDispatcherRule
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -14,6 +17,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.jupiter.api.Tag
+import com.letta.mobile.feature.chat.screen.ConversationPickerViewModel
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @Tag("unit")
@@ -22,7 +26,7 @@ class ConversationPickerViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule(StandardTestDispatcher())
 
-    private val repository: com.letta.mobile.data.repository.ConversationRepository = mockk(relaxed = true)
+    private val repository: IConversationRepository = mockk(relaxed = true)
 
     @Test
     fun toggleSelection_addsId() = runTest(mainDispatcherRule.dispatcher) {
@@ -74,7 +78,7 @@ class ConversationPickerViewModelTest {
         vm.deleteSelected(agentId = "agent-1")
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { repository.deleteConversation(any(), any()) }
+        coVerify(exactly = 0) { repository.deleteConversation(any<ConversationId>(), any<AgentId>()) }
     }
 
     @Test
@@ -87,15 +91,15 @@ class ConversationPickerViewModelTest {
         vm.deleteSelected(agentId = "agent-abc")
         advanceUntilIdle()
 
-        coVerify(exactly = 1) { repository.deleteConversation("conv-1", "agent-abc") }
-        coVerify(exactly = 1) { repository.deleteConversation("conv-2", "agent-abc") }
-        coVerify(exactly = 1) { repository.deleteConversation("conv-3", "agent-abc") }
+        coVerify(exactly = 1) { repository.deleteConversation(ConversationId("conv-1"), AgentId("agent-abc")) }
+        coVerify(exactly = 1) { repository.deleteConversation(ConversationId("conv-2"), AgentId("agent-abc")) }
+        coVerify(exactly = 1) { repository.deleteConversation(ConversationId("conv-3"), AgentId("agent-abc")) }
         assertTrue(vm.selectedIds.first().isEmpty())
     }
 
     @Test
     fun deleteSelected_clearsSelectionBeforeDeleteCompletes() = runTest(mainDispatcherRule.dispatcher) {
-        coEvery { repository.deleteConversation(any(), any()) } throws RuntimeException("boom")
+        coEvery { repository.deleteConversation(any<ConversationId>(), any<AgentId>()) } throws RuntimeException("boom")
         val vm = ConversationPickerViewModel(repository)
         vm.toggleSelection("conv-1")
 
@@ -140,7 +144,7 @@ class ConversationPickerViewModelTest {
 
     @Test
     fun deleteSelected_continuesWhenSingleDeleteFails() = runTest(mainDispatcherRule.dispatcher) {
-        coEvery { repository.deleteConversation("conv-2", any()) } throws RuntimeException("delete failed")
+        coEvery { repository.deleteConversation(ConversationId("conv-2"), any<AgentId>()) } throws RuntimeException("delete failed")
         val vm = ConversationPickerViewModel(repository)
         vm.toggleSelection("conv-1")
         vm.toggleSelection("conv-2")
@@ -149,8 +153,8 @@ class ConversationPickerViewModelTest {
         vm.deleteSelected(agentId = "agent-1")
         advanceUntilIdle()
 
-        coVerify(exactly = 1) { repository.deleteConversation("conv-1", "agent-1") }
-        coVerify(exactly = 1) { repository.deleteConversation("conv-2", "agent-1") }
-        coVerify(exactly = 1) { repository.deleteConversation("conv-3", "agent-1") }
+        coVerify(exactly = 1) { repository.deleteConversation(ConversationId("conv-1"), AgentId("agent-1")) }
+        coVerify(exactly = 1) { repository.deleteConversation(ConversationId("conv-2"), AgentId("agent-1")) }
+        coVerify(exactly = 1) { repository.deleteConversation(ConversationId("conv-3"), AgentId("agent-1")) }
     }
 }

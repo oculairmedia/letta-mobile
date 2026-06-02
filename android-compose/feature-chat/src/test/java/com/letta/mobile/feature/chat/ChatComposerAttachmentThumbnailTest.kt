@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.feature.chat.screen.ChatComposer
 import com.letta.mobile.ui.theme.LettaTheme
 import kotlinx.collections.immutable.persistentListOf
 import org.junit.Rule
@@ -20,6 +21,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.ByteArrayOutputStream
+import com.letta.mobile.feature.chat.screen.ChatComposerTestTags
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)

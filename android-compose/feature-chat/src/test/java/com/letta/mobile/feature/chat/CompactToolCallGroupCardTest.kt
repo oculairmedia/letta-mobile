@@ -24,6 +24,9 @@ import org.junit.jupiter.api.Tag
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import com.letta.mobile.feature.chat.screen.ToolApprovalState
+import com.letta.mobile.feature.chat.screen.shouldShowCompactApprovalChip
+import com.letta.mobile.feature.chat.screen.CompactToolCallGroupCard
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)

@@ -6,6 +6,10 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.letta.mobile.feature.chat.coordination.ChatComposerController
+import com.letta.mobile.feature.chat.coordination.ChatComposerTelemetry
+import com.letta.mobile.feature.chat.coordination.MAX_COMPOSER_ATTACHMENTS
+import com.letta.mobile.feature.chat.coordination.MAX_COMPOSER_TOTAL_BYTES
 
 class ChatComposerControllerTest {
     private val noTelemetry = ChatComposerTelemetry { _, _ -> }

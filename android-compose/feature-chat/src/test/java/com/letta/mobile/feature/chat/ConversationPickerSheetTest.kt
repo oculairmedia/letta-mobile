@@ -10,6 +10,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.feature.chat.screen.ConversationPickerSheet
+import com.letta.mobile.feature.chat.screen.ConversationPickerViewModel
 import com.letta.mobile.testutil.FakeConversationRepository
 import com.letta.mobile.ui.test.setLettaTestContent
 import org.junit.Rule
@@ -28,8 +30,8 @@ class ConversationPickerSheetTest {
     val composeRule = createComposeRule()
 
     private fun conversation(id: String, summary: String): Conversation = Conversation(
-        id = id,
-        agentId = "agent-1",
+        id = com.letta.mobile.data.model.ConversationId(id),
+        agentId = com.letta.mobile.data.model.AgentId("agent-1"),
         summary = summary,
         createdAt = "2026-05-01T12:00:00Z",
         lastMessageAt = "2026-05-01T12:00:00Z",

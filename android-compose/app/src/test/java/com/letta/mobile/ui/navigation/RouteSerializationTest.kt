@@ -1,7 +1,7 @@
 package com.letta.mobile.ui.navigation
 
-import com.letta.mobile.feature.chat.AgentChatRoute
-import com.letta.mobile.feature.chat.ProjectChatStartAction
+import com.letta.mobile.feature.chat.route.AgentChatRoute
+import com.letta.mobile.feature.chat.route.ProjectChatStartAction
 import com.letta.mobile.feature.editagent.EditAgentRoute
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json

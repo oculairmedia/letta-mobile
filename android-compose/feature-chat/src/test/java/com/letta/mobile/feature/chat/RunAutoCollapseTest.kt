@@ -3,6 +3,7 @@ package com.letta.mobile.feature.chat
 import com.letta.mobile.data.model.UiMessage
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import com.letta.mobile.feature.chat.coordination.collapsedRunIdsAfterRunCompletion
 
 class RunAutoCollapseTest {
 

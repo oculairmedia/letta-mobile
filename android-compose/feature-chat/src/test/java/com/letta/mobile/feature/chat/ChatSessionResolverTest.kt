@@ -1,8 +1,10 @@
 package com.letta.mobile.feature.chat
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
-import com.letta.mobile.data.repository.AgentRepository
-import com.letta.mobile.data.repository.ConversationRepository
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.repository.api.IAgentRepository
+import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.testutil.TestData
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -18,16 +20,17 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.jupiter.api.Tag
+import com.letta.mobile.feature.chat.coordination.ChatSessionResolver
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @Tag("unit")
 class ChatSessionResolverTest {
-    private val agentRepository: AgentRepository = mockk(relaxed = true)
-    private val conversationRepository: ConversationRepository = mockk(relaxed = true)
+    private val agentRepository: IAgentRepository = mockk(relaxed = true)
+    private val conversationRepository: IConversationRepository = mockk(relaxed = true)
 
     @Test
     fun `cachedAgentName returns nonblank cached name`() {
-        every { agentRepository.getCachedAgent("agent-1") } returns TestData.agent(id = "agent-1", name = "Cached Agent")
+        every { agentRepository.getCachedAgent(AgentId("agent-1")) } returns TestData.agent(id = "agent-1", name = "Cached Agent")
         val resolver = resolver()
 
         assertEquals("Cached Agent", resolver.cachedAgentName("agent-1"))
@@ -35,7 +38,7 @@ class ChatSessionResolverTest {
 
     @Test
     fun `cachedAgentName ignores missing or blank names`() {
-        every { agentRepository.getCachedAgent("agent-1") } returns TestData.agent(id = "agent-1", name = "")
+        every { agentRepository.getCachedAgent(AgentId("agent-1")) } returns TestData.agent(id = "agent-1", name = "")
         val resolver = resolver()
 
         assertNull(resolver.cachedAgentName("agent-1"))
@@ -60,53 +63,53 @@ class ChatSessionResolverTest {
 
     @Test
     fun `resolveMostRecentConversation returns cached most recent and refreshes stale cache in background`() = runTest {
-        every { conversationRepository.getCachedConversations("agent-1") } returns listOf(
+        every { conversationRepository.getCachedConversations(AgentId("agent-1")) } returns listOf(
             conversation(id = "older", createdAt = "2026-01-01T00:00:00Z", lastMessageAt = "2026-01-01T00:00:00Z"),
             conversation(id = "newer", createdAt = "2026-01-02T00:00:00Z", lastMessageAt = "2026-01-03T00:00:00Z"),
         )
-        every { conversationRepository.hasFreshConversations("agent-1", 30_000L) } returns false
-        coEvery { conversationRepository.refreshConversationsIfStale("agent-1", 30_000L) } returns true
+        every { conversationRepository.hasFreshConversations(AgentId("agent-1"), 30_000L) } returns false
+        coEvery { conversationRepository.refreshConversationsIfStale(AgentId("agent-1"), 30_000L) } returns true
         val resolver = resolver()
 
         val resolved = resolver.resolveMostRecentConversation("agent-1", 30_000L)
         advanceUntilIdle()
 
         assertEquals("newer", resolved)
-        coVerify(exactly = 1) { conversationRepository.refreshConversationsIfStale("agent-1", 30_000L) }
+        coVerify(exactly = 1) { conversationRepository.refreshConversationsIfStale(AgentId("agent-1"), 30_000L) }
     }
 
     @Test
     fun `resolveMostRecentConversation handles one thousand cached conversations`() = runTest {
-        every { conversationRepository.getCachedConversations("agent-1") } returns List(1_000) { index ->
+        every { conversationRepository.getCachedConversations(AgentId("agent-1")) } returns List(1_000) { index ->
             conversation(
                 id = "conversation-$index",
                 createdAt = "2026-01-01T00:00:00Z",
                 lastMessageAt = "2026-01-01T00:${(index / 60).toString().padStart(2, '0')}:${(index % 60).toString().padStart(2, '0')}Z",
             )
         }
-        every { conversationRepository.hasFreshConversations("agent-1", 30_000L) } returns true
+        every { conversationRepository.hasFreshConversations(AgentId("agent-1"), 30_000L) } returns true
         val resolver = resolver()
 
         val resolved = resolver.resolveMostRecentConversation("agent-1", 30_000L)
 
         assertEquals("conversation-999", resolved)
-        coVerify(exactly = 0) { conversationRepository.refreshConversationsIfStale(any(), any()) }
+        coVerify(exactly = 0) { conversationRepository.refreshConversationsIfStale(any<AgentId>(), any<Long>()) }
     }
 
     @Test
     fun `resolveMostRecentConversation refreshes when cache is empty`() = runTest {
-        every { conversationRepository.getCachedConversations("agent-1") } returnsMany listOf(
+        every { conversationRepository.getCachedConversations(AgentId("agent-1")) } returnsMany listOf(
             emptyList(),
             listOf(conversation(id = "after-refresh", createdAt = "2026-01-02T00:00:00Z")),
         )
-        coEvery { conversationRepository.refreshConversationsIfStale("agent-1", 30_000L) } returns true
+        coEvery { conversationRepository.refreshConversationsIfStale(AgentId("agent-1"), 30_000L) } returns true
         val resolver = resolver()
 
         val resolved = resolver.resolveMostRecentConversation("agent-1", 30_000L)
 
         assertEquals("after-refresh", resolved)
-        coVerify(exactly = 1) { conversationRepository.refreshConversationsIfStale("agent-1", 30_000L) }
-        verify(exactly = 2) { conversationRepository.getCachedConversations("agent-1") }
+        coVerify(exactly = 1) { conversationRepository.refreshConversationsIfStale(AgentId("agent-1"), 30_000L) }
+        verify(exactly = 2) { conversationRepository.getCachedConversations(AgentId("agent-1")) }
     }
 
     private fun resolver(): ChatSessionResolver = ChatSessionResolver(
@@ -119,8 +122,8 @@ class ChatSessionResolverTest {
         createdAt: String,
         lastMessageAt: String? = null,
     ): Conversation = Conversation(
-        id = id,
-        agentId = "agent-1",
+        id = ConversationId(id),
+        agentId = AgentId("agent-1"),
         createdAt = createdAt,
         lastMessageAt = lastMessageAt,
     )

@@ -4,6 +4,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.letta.mobile.feature.chat.render.streamingDisplayText
+import com.letta.mobile.feature.chat.render.shouldShowStreamingCursor
 
 /**
  * Pure-JVM tests for [streamingDisplayText] and [shouldShowStreamingCursor]

@@ -1,7 +1,7 @@
 package com.letta.mobile.feature.chat.send
 
 import com.letta.mobile.data.model.MessageContentPart
-import com.letta.mobile.feature.chat.WsChatSendCoordinator
+import com.letta.mobile.feature.chat.coordination.WsChatSendCoordinator
 import kotlinx.coroutines.Job
 
 internal class WsChatSendStrategy(

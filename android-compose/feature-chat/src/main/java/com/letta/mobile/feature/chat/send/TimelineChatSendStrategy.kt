@@ -1,7 +1,7 @@
 package com.letta.mobile.feature.chat.send
 
 import com.letta.mobile.data.model.MessageContentPart
-import com.letta.mobile.feature.chat.TimelineSendCoordinator
+import com.letta.mobile.feature.chat.coordination.TimelineSendCoordinator
 import kotlinx.coroutines.Job
 
 internal class TimelineChatSendStrategy(

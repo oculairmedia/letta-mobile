@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.MessageRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -8,6 +9,8 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.jupiter.api.Tag
+import com.letta.mobile.feature.chat.coordination.ChatApprovalCoordinator
+import com.letta.mobile.feature.chat.coordination.ChatApprovalResult
 
 @Tag("unit")
 class ChatApprovalCoordinatorTest {
@@ -26,7 +29,7 @@ class ChatApprovalCoordinatorTest {
         )
 
         assertEquals(ChatApprovalResult.MissingActiveConversation, result)
-        coVerify(exactly = 0) { messageRepository.submitApproval(any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { messageRepository.submitApproval(any<AgentId>(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -41,7 +44,7 @@ class ChatApprovalCoordinatorTest {
         )
 
         assertEquals(ChatApprovalResult.MissingActiveAgent, result)
-        coVerify(exactly = 0) { messageRepository.submitApproval(any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { messageRepository.submitApproval(any<AgentId>(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -58,7 +61,7 @@ class ChatApprovalCoordinatorTest {
         assertEquals(ChatApprovalResult.Submitted, result)
         coVerify(exactly = 1) {
             messageRepository.submitApproval(
-                agentId = "agent-1",
+                agentId = AgentId("agent-1"),
                 approvalRequestId = "approval-1",
                 toolCallIds = listOf("tool-1", "tool-2"),
                 approve = false,
@@ -69,7 +72,7 @@ class ChatApprovalCoordinatorTest {
 
     @Test
     fun `submitApproval maps repository failure`() = runTest {
-        coEvery { messageRepository.submitApproval(any(), any(), any(), any(), any()) } throws IllegalStateException("boom")
+        coEvery { messageRepository.submitApproval(any<AgentId>(), any(), any(), any(), any()) } throws IllegalStateException("boom")
 
         val result = coordinator.submitApproval(
             agentId = "agent-1",

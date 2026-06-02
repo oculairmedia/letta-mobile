@@ -1,6 +1,8 @@
 package com.letta.mobile.feature.chat
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppMessage
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.MessageType
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.MessageRepository
@@ -17,6 +19,9 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
+import com.letta.mobile.feature.chat.coordination.ChatHistoryPager
+import com.letta.mobile.feature.chat.coordination.ChatTimelineObserver
+import com.letta.mobile.feature.chat.render.ChatUiState
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatHistoryPagerTest {
@@ -25,7 +30,7 @@ class ChatHistoryPagerTest {
     fun `load older messages merges page through timeline observer prefix`() = runTest {
         val harness = Harness(scope = this)
         val older = appMessage(id = "older-1", content = "old")
-        coEvery { harness.messageRepository.fetchOlderMessages("agent-1", "conv-1", "live-1") } returns listOf(older)
+        coEvery { harness.messageRepository.fetchOlderMessages(AgentId("agent-1"), ConversationId("conv-1"), "live-1") } returns listOf(older)
         every {
             harness.chatTimelineObserver.mergeOlderPage("conv-1", any(), any())
         } answers {
@@ -37,7 +42,7 @@ class ChatHistoryPagerTest {
 
         assertEquals(listOf("older-1", "live-1"), harness.uiState.value.messages.map { it.id })
         assertFalse(harness.uiState.value.isLoadingOlderMessages)
-        coVerify(exactly = 1) { harness.messageRepository.fetchOlderMessages("agent-1", "conv-1", "live-1") }
+        coVerify(exactly = 1) { harness.messageRepository.fetchOlderMessages(AgentId("agent-1"), ConversationId("conv-1"), "live-1") }
     }
 
     @Test
@@ -48,14 +53,14 @@ class ChatHistoryPagerTest {
         harness.pager.loadOlderMessages(clientModeEnabled = false)
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { harness.messageRepository.fetchOlderMessages(any(), any(), any()) }
+        coVerify(exactly = 0) { harness.messageRepository.fetchOlderMessages(any<AgentId>(), any<ConversationId>(), any()) }
     }
 
     @Test
     fun `stale older page result does not mutate messages`() = runTest {
         val harness = Harness(scope = this)
         harness.activeConversationId = "conv-1"
-        coEvery { harness.messageRepository.fetchOlderMessages(any(), any(), any()) } answers {
+        coEvery { harness.messageRepository.fetchOlderMessages(any<AgentId>(), any<ConversationId>(), any()) } answers {
             harness.activeConversationId = "conv-2"
             listOf(appMessage(id = "older-1", content = "old"))
         }
@@ -89,7 +94,7 @@ class ChatHistoryPagerTest {
         )
 
         init {
-            coEvery { messageRepository.fetchOlderMessages(any(), any(), any()) } returns emptyList()
+            coEvery { messageRepository.fetchOlderMessages(any<AgentId>(), any<ConversationId>(), any()) } returns emptyList()
             every { chatTimelineObserver.mergeOlderPage(any(), any(), any()) } answers {
                 secondArg<List<UiMessage>>() + thirdArg<List<UiMessage>>()
             }

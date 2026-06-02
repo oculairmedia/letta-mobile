@@ -10,13 +10,14 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
-import com.letta.mobile.feature.chat.AgentChatRoute
+import com.letta.mobile.feature.chat.route.AgentChatRoute
 import com.letta.mobile.feature.editagent.EditAgentRoute
 import com.letta.mobile.ui.screens.agentlist.AgentListScreen
 import com.letta.mobile.ui.screens.conversations.ConversationsScreen
 import com.letta.mobile.ui.screens.conversations.TwoPaneConversationsLayout
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.isExpandedWidth
+import com.letta.mobile.feature.chat.route.NavGraphBuilder
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 fun NavGraphBuilder.conversationsGraph(

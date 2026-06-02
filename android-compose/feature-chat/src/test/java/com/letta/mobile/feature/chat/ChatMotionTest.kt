@@ -3,6 +3,7 @@ package com.letta.mobile.feature.chat
 import java.io.File
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.letta.mobile.feature.chat.screen.ChatMotion
 
 class ChatMotionTest {
 
