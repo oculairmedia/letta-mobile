@@ -1,0 +1,140 @@
+package com.letta.mobile.ui.navigation
+
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavGraphBuilder
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.composable
+import androidx.navigation.toRoute
+import com.letta.mobile.feature.chat.AgentChatRoute
+import com.letta.mobile.feature.editagent.EditAgentRoute
+import com.letta.mobile.ui.screens.agentlist.AgentListScreen
+import com.letta.mobile.ui.screens.conversations.ConversationsScreen
+import com.letta.mobile.ui.screens.conversations.TwoPaneConversationsLayout
+import com.letta.mobile.ui.theme.LocalWindowSizeClass
+import com.letta.mobile.ui.theme.isExpandedWidth
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+fun NavGraphBuilder.conversationsGraph(
+    navController: NavHostController,
+    activeBackendLabel: String?,
+    openBackendSwitcher: () -> Unit,
+) {
+    composable<ConversationsRoute>(
+        enterTransition = drillInPopEnter,
+        exitTransition = drillInExit,
+        popEnterTransition = drillInPopEnter,
+        popExitTransition = drillInPopExit,
+    ) {
+        CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+            val windowSizeClass = LocalWindowSizeClass.current
+            if (windowSizeClass.isExpandedWidth) {
+                TwoPaneConversationsLayout(
+                    outerNavController = navController,
+                    onNavigateToSettings = { navController.navigate(ConfigRoute()) },
+                    onNavigateToAgentList = { navController.navigate(AgentListRoute) },
+                    onNavigateToTemplates = { navController.navigate(TemplatesRoute) },
+                    onNavigateToArchives = { navController.navigate(ArchivesRoute) },
+                    onNavigateToFolders = { navController.navigate(FoldersRoute) },
+                    onNavigateToGroups = { navController.navigate(GroupsRoute) },
+                    onNavigateToProviders = { navController.navigate(ProvidersRoute) },
+                    onNavigateToBlocks = { navController.navigate(BlocksRoute) },
+                    onNavigateToIdentities = { navController.navigate(IdentitiesRoute) },
+                    onNavigateToSchedules = { navController.navigate(SchedulesRoute) },
+                    onNavigateToRuns = { navController.navigate(RunsRoute) },
+                    onNavigateToJobs = { navController.navigate(JobsRoute) },
+                    onNavigateToMessageBatches = { navController.navigate(MessageBatchesRoute) },
+                    onNavigateToMcp = { navController.navigate(McpRoute) },
+                    onNavigateToAbout = { navController.navigate(AboutRoute) },
+                    onNavigateToBotSettings = { },
+                    onNavigateToProjects = { navController.navigate(HomeRoute) },
+                    activeBackendLabel = activeBackendLabel,
+                    onNavigateToBackendSwitcher = openBackendSwitcher,
+                )
+            } else {
+                ConversationsScreen(
+                    onNavigateToChat = { agentId, conversationId, agentName ->
+                        navController.navigate(
+                            AgentChatRoute(
+                                agentId = agentId,
+                                agentName = agentName,
+                                conversationId = conversationId,
+                            )
+                        )
+                    },
+                    onNavigateToSettings = { navController.navigate(ConfigRoute()) },
+                    onNavigateToAgentList = { navController.navigate(AgentListRoute) },
+                    onNavigateToTemplates = { navController.navigate(TemplatesRoute) },
+                    onNavigateToArchives = { navController.navigate(ArchivesRoute) },
+                    onNavigateToFolders = { navController.navigate(FoldersRoute) },
+                    onNavigateToGroups = { navController.navigate(GroupsRoute) },
+                    onNavigateToProviders = { navController.navigate(ProvidersRoute) },
+                    onNavigateToBlocks = { navController.navigate(BlocksRoute) },
+                    onNavigateToIdentities = { navController.navigate(IdentitiesRoute) },
+                    onNavigateToSchedules = { navController.navigate(SchedulesRoute) },
+                    onNavigateToRuns = { navController.navigate(RunsRoute) },
+                    onNavigateToJobs = { navController.navigate(JobsRoute) },
+                    onNavigateToMessageBatches = { navController.navigate(MessageBatchesRoute) },
+                    onNavigateToMcp = { navController.navigate(McpRoute) },
+                    onNavigateToAbout = { navController.navigate(AboutRoute) },
+                    onNavigateToBotSettings = { },
+                    onNavigateToProjects = { navController.navigate(HomeRoute) },
+                    activeBackendLabel = activeBackendLabel,
+                    onNavigateToBackendSwitcher = openBackendSwitcher,
+                )
+            }
+        }
+    }
+
+    composable<AgentListRoute>(
+        enterTransition = drillInEnter,
+        exitTransition = drillInExit,
+        popEnterTransition = drillInPopEnter,
+        popExitTransition = drillInPopExit,
+    ) {
+        CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+            AgentListScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToAgent = { agentId, agentName ->
+                    navController.navigate(AgentChatRoute(agentId = agentId, agentName = agentName))
+                },
+                onNavigateToEditAgent = { agentId ->
+                    navController.navigate(EditAgentRoute(agentId))
+                },
+            )
+        }
+    }
+
+    composable<ShareToAgentRoute>(
+        enterTransition = drillInEnter,
+        exitTransition = drillInExit,
+        popEnterTransition = drillInPopEnter,
+        popExitTransition = drillInPopExit,
+    ) { backStackEntry ->
+        val route = backStackEntry.toRoute<ShareToAgentRoute>()
+        CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+            AgentListScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToAgent = { agentId, agentName ->
+                    navController.navigate(
+                        AgentChatRoute(
+                            agentId = agentId,
+                            agentName = agentName,
+                            initialMessage = route.sharedText,
+                        ),
+                    ) {
+                        popUpTo<ShareToAgentRoute> { inclusive = true }
+                    }
+                },
+                onNavigateToEditAgent = { agentId ->
+                    navController.navigate(EditAgentRoute(agentId))
+                },
+                shareContentPreview = route.sharedText,
+            )
+        }
+    }
+}

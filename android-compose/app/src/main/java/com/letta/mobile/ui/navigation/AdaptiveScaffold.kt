@@ -43,6 +43,7 @@ import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.letta.mobile.feature.chat.AgentChatRoute
+import com.letta.mobile.feature.editagent.EditAgentRoute
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.isExpandedWidth

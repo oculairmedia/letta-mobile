@@ -21,7 +21,7 @@ import com.letta.mobile.feature.chat.AgentChatRoute
 import com.letta.mobile.feature.chat.AgentScaffold
 import com.letta.mobile.feature.chat.toViewModelKey
 import com.letta.mobile.ui.navigation.ArchivalRoute
-import com.letta.mobile.ui.navigation.EditAgentRoute
+import com.letta.mobile.feature.editagent.EditAgentRoute
 import com.letta.mobile.ui.navigation.AllToolsRoute
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.isWideWidth
