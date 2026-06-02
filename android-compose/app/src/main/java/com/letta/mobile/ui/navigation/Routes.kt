@@ -56,8 +56,7 @@ data class ProjectIssueDetailRoute(
 @Serializable
 data class McpServerToolsRoute(val serverId: String)
 
-@Serializable
-data class EditAgentRoute(val agentId: String)
+
 
 @Serializable
 data class ToolDetailRoute(val toolId: String)
