@@ -20,7 +20,7 @@ import androidx.compose.ui.Modifier
 import kotlinx.coroutines.delay
 
 /** Per-index stagger delay. Single source of truth for the entrance cadence. */
-const val StaggerDelayPerIndexMs: Long = 45L
+const val StaggerDelayPerIndexMs: Long = 30L
 
 /**
  * Items at indices >= this value render immediately (no stagger). Items

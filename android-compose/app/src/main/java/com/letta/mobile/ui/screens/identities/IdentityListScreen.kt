@@ -47,6 +47,9 @@ import com.letta.mobile.R
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.BlockId
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.itemsIndexed
 import com.letta.mobile.data.model.Identity
 import com.letta.mobile.data.model.IdentityCreateParams
 import com.letta.mobile.data.model.IdentityUpdateParams
@@ -55,9 +58,11 @@ import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.EmptyState
+import com.letta.mobile.ui.motion.StaggeredListItem
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
@@ -156,13 +161,15 @@ fun IdentityListScreen(
                             contentPadding = PaddingValues(16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            items(filteredIdentities, key = { it.id }) { identity ->
-                                IdentityCard(
-                                    identity = identity,
-                                    onInspect = { viewModel.inspectIdentity(identity.id) },
-                                    onEdit = { editTarget = identity },
-                                    onDelete = { deleteTarget = identity },
-                                )
+                            itemsIndexed(filteredIdentities, key = { _, it -> it.id }) { index, identity ->
+                                StaggeredListItem(index = index) {
+                                    IdentityCard(
+                                        identity = identity,
+                                        onInspect = { viewModel.inspectIdentity(identity.id) },
+                                        onEdit = { editTarget = identity },
+                                        onDelete = { deleteTarget = identity },
+                                    )
+                                }
                             }
                         }
                     }
@@ -525,38 +532,60 @@ private fun IdentityEditorDialog(
             )
         },
     ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = identifierKey,
-                    onValueChange = { identifierKey = it },
-                    label = { Text(stringResource(R.string.screen_identities_identifier_key_label)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                )
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text(stringResource(R.string.common_name)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                )
-                OutlinedTextField(
-                    value = identityType,
-                    onValueChange = { identityType = it },
-                    label = { Text(stringResource(R.string.screen_identities_type_input_label)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                )
-                OutlinedTextField(
-                    value = blockIdsText,
-                    onValueChange = { blockIdsText = it },
-                    label = { Text(stringResource(R.string.screen_identities_block_ids_label)) },
-                    supportingText = { Text(stringResource(R.string.screen_identities_block_ids_helper)) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
+        CardGroup {
+            item(
+                headlineContent = {
+                    FormItem(label = { Text(stringResource(R.string.screen_identities_identifier_key_label)) }) {
+                        OutlinedTextField(
+                            value = identifierKey,
+                            onValueChange = { identifierKey = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                        )
+                    }
+                }
+            )
+            item(
+                headlineContent = {
+                    FormItem(label = { Text(stringResource(R.string.common_name)) }) {
+                        OutlinedTextField(
+                            value = name,
+                            onValueChange = { name = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                        )
+                    }
+                }
+            )
+            item(
+                headlineContent = {
+                    FormItem(label = { Text(stringResource(R.string.screen_identities_type_input_label)) }) {
+                        OutlinedTextField(
+                            value = identityType,
+                            onValueChange = { identityType = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                        )
+                    }
+                }
+            )
+            item(
+                headlineContent = {
+                    FormItem(
+                        label = { Text(stringResource(R.string.screen_identities_block_ids_label)) },
+                        description = { Text(stringResource(R.string.screen_identities_block_ids_helper)) }
+                    ) {
+                        OutlinedTextField(
+                            value = blockIdsText,
+                            onValueChange = { blockIdsText = it },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            )
         }
     }
+}
 
 @Composable
 private fun AgentAttachDialog(
@@ -575,48 +604,42 @@ private fun AgentAttachDialog(
         confirmEnabled = selection != null,
         onConfirm = { selection?.let(onAttach) },
     ) {
-            if (agents.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.screen_identities_no_available_agents),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.height(240.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(agents, key = { it.id.value }) { agent ->
-                        TextButton(
+        if (agents.isEmpty()) {
+            Text(
+                text = stringResource(R.string.screen_identities_no_available_agents),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        } else {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 240.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                CardGroup {
+                    agents.forEach { agent ->
+                        val isSelected = selection == agent.id.value
+                        item(
                             onClick = {
-                                selection = if (selection == agent.id.value) null else agent.id.value
+                                selection = if (isSelected) null else agent.id.value
                             },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Column(
-                                    modifier = Modifier.weight(1f),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                                ) {
-                                    Text(agent.name, style = MaterialTheme.typography.bodyMedium)
-                                    Text(
-                                        text = agent.id.value,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontFamily = LettaCodeFont,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
+                            leadingContent = {
                                 androidx.compose.material3.Checkbox(
-                                    checked = selection == agent.id.value,
+                                    checked = isSelected,
                                     onCheckedChange = null,
                                 )
+                            },
+                            headlineContent = { Text(agent.name, style = MaterialTheme.typography.bodyMedium) },
+                            supportingContent = {
+                                Text(
+                                    text = agent.id.value,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontFamily = LettaCodeFont,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
                             }
-                        }
+                        )
                     }
                 }
             }

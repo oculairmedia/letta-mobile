@@ -55,11 +55,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.ui.navigation.optionalSharedElement
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.ShimmerCard
@@ -494,17 +497,35 @@ private fun AgentAttachDialog(
                     style = MaterialTheme.typography.bodyMedium,
                 )
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(agents, key = { it.id.value }) { agent ->
-                        TextButton(
-                            onClick = {
-                                selection = if (agent.id.value in selection) selection - agent.id.value else selection + agent.id.value
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(agent.name, modifier = Modifier.weight(1f))
-                            Text(
-                                if (agent.id.value in selection) stringResource(R.string.action_remove) else stringResource(R.string.action_attach)
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 240.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    CardGroup {
+                        agents.forEach { agent ->
+                            val isSelected = agent.id.value in selection
+                            item(
+                                onClick = {
+                                    selection = if (isSelected) selection - agent.id.value else selection + agent.id.value
+                                },
+                                leadingContent = {
+                                    androidx.compose.material3.Checkbox(
+                                        checked = isSelected,
+                                        onCheckedChange = null,
+                                    )
+                                },
+                                headlineContent = { Text(agent.name, style = MaterialTheme.typography.bodyMedium) },
+                                supportingContent = {
+                                    Text(
+                                        text = agent.id.value,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontFamily = LettaCodeFont,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
                             )
                         }
                     }
@@ -539,28 +560,45 @@ private fun EditToolDialog(
             )
         },
         content = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text(stringResource(R.string.common_description)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 2,
+            CardGroup {
+                item(
+                    headlineContent = {
+                        FormItem(label = { Text(stringResource(R.string.common_description)) }) {
+                            OutlinedTextField(
+                                value = description,
+                                onValueChange = { description = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                minLines = 2,
+                            )
+                        }
+                    }
                 )
-                OutlinedTextField(
-                    value = tagsText,
-                    onValueChange = { tagsText = it },
-                    label = { Text(stringResource(R.string.screen_tool_detail_tags_label)) },
-                    modifier = Modifier.fillMaxWidth(),
+                item(
+                    headlineContent = {
+                        FormItem(label = { Text(stringResource(R.string.screen_tool_detail_tags_label)) }) {
+                            OutlinedTextField(
+                                value = tagsText,
+                                onValueChange = { tagsText = it },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
                 )
-                OutlinedTextField(
-                    value = sourceCode,
-                    onValueChange = { sourceCode = it },
-                    label = { Text(stringResource(R.string.screen_tool_detail_source_code)) },
-                    supportingText = { Text(stringResource(R.string.screen_tool_detail_source_code_helper)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 8,
-                    textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = LettaCodeFont),
+                item(
+                    headlineContent = {
+                        FormItem(
+                            label = { Text(stringResource(R.string.screen_tool_detail_source_code)) },
+                            description = { Text(stringResource(R.string.screen_tool_detail_source_code_helper)) }
+                        ) {
+                            OutlinedTextField(
+                                value = sourceCode,
+                                onValueChange = { sourceCode = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                minLines = 8,
+                                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = LettaCodeFont),
+                            )
+                        }
+                    }
                 )
             }
         },
