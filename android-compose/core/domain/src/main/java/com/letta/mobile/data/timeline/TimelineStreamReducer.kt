@@ -79,6 +79,7 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
                     toolReturnIsError = isError,
                     toolReturnContentByCallId = contentByCallId,
                     toolReturnIsErrorByCallId = match.toolReturnIsErrorByCallId + (tcid to isError),
+                    attachments = (match.attachments + message.attachments).distinct(),
                 )
                 timeline = timeline.replaceByServerId(updated)
                 pendingEvents += TimelineSyncEvent.StreamEventIngested(match.serverId, message.messageType)
@@ -160,6 +161,7 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
                 toolReturnContentByCallId = existing.toolReturnContentByCallId + confirmed.toolReturnContentByCallId,
                 toolReturnIsErrorByCallId = existing.toolReturnIsErrorByCallId + confirmed.toolReturnIsErrorByCallId,
                 approvalRequestId = confirmed.approvalRequestId ?: existing.approvalRequestId,
+                attachments = (existing.attachments + confirmed.attachments).distinct(),
                 source = existing.source,
                 seqId = latestSeqId(existing.seqId, confirmed.seqId),
             ),
@@ -316,5 +318,6 @@ private fun applyPendingToolReturns(
         toolReturnIsError = firstReturn.isErr == true || firstReturn.status == "error" || ev.toolReturnIsError,
         toolReturnContentByCallId = returnContentByCallId,
         toolReturnIsErrorByCallId = returnIsErrorByCallId,
+        attachments = (ev.attachments + matchingReturns.flatMap { (_, toolReturn) -> toolReturn.attachments }).distinct(),
     )
 }
