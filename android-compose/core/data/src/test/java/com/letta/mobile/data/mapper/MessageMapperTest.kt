@@ -183,6 +183,45 @@ class MessageMapperTest : WordSpec({
             ui.attachments shouldHaveSize 1
             ui.attachments.first().base64 shouldBe "HYDRATED+/=="
         }
+
+        "hydrate ToolReturnMessage image parts through merged tool call ui" {
+            val contentRaw = kotlinx.serialization.json.buildJsonArray {
+                add(kotlinx.serialization.json.buildJsonObject {
+                    put("type", kotlinx.serialization.json.JsonPrimitive("image"))
+                    put("source", kotlinx.serialization.json.buildJsonObject {
+                        put("type", kotlinx.serialization.json.JsonPrimitive("letta"))
+                        put("file_id", kotlinx.serialization.json.JsonPrimitive("file-tool"))
+                        put("media_type", kotlinx.serialization.json.JsonPrimitive("image/png"))
+                        put("data", kotlinx.serialization.json.JsonPrimitive("TOOL_HYDRATED+/=="))
+                    })
+                })
+            }
+            val messages = listOf<com.letta.mobile.data.model.LettaMessage>(
+                com.letta.mobile.data.model.ToolCallMessage(
+                    id = "tool-call-image",
+                    toolCall = ToolCall(toolCallId = "call-image", name = "Read", arguments = "{}"),
+                ),
+                com.letta.mobile.data.model.ToolReturnMessage(
+                    id = "tool-return-image",
+                    toolCallId = "call-image",
+                    status = "success",
+                    toolReturnRaw = contentRaw,
+                ),
+            )
+
+            val appMessages = messages.toAppMessages()
+            appMessages shouldHaveSize 2
+            appMessages[1].messageType shouldBe MessageType.TOOL_RETURN
+            appMessages[1].attachments shouldHaveSize 1
+            appMessages[1].attachments.first().base64 shouldBe "TOOL_HYDRATED+/=="
+
+            val uiMessages = appMessages.toUiMessages()
+            uiMessages shouldHaveSize 1
+            uiMessages.first().role shouldBe "tool"
+            uiMessages.first().attachments shouldHaveSize 1
+            uiMessages.first().attachments.first().base64 shouldBe "TOOL_HYDRATED+/=="
+            uiMessages.first().attachments.first().mediaType shouldBe "image/png"
+        }
     }
 
     "List<AppMessage>.toUiMessages" should {

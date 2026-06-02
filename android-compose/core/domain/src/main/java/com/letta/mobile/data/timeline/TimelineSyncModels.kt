@@ -59,7 +59,8 @@ fun LettaMessage.toTimelineEvent(position: Double): TimelineEvent.Confirmed? {
         is UserMessage -> this.attachments
         is AssistantMessage -> this.attachments
         is SystemMessage -> this.attachments
-        is ReasoningMessage, is ToolCallMessage, is ToolReturnMessage, is ApprovalRequestMessage,
+        is ToolReturnMessage -> this.attachments
+        is ReasoningMessage, is ToolCallMessage, is ApprovalRequestMessage,
         is ApprovalResponseMessage, is HiddenReasoningMessage, is EventMessage,
         is PingMessage, is UnknownMessage, is StopReason, is UsageStatistics,
         is com.letta.mobile.data.model.ErrorMessage -> emptyList()

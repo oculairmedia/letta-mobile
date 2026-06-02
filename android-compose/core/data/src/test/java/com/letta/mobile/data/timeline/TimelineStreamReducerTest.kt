@@ -3,6 +3,7 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
@@ -14,6 +15,8 @@ import com.letta.mobile.util.Telemetry
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import org.junit.After
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -105,6 +108,39 @@ class TimelineStreamReducerTest {
             serverId = "tool-batch",
             messageType = "tool_return_message",
             contentPreview = "done",
+        )
+    }
+
+    @Test
+    fun `tool return image attaches to matching tool call attachments`() {
+        val seeded = reduce(
+            frame = ToolCallMessage(
+                id = "tool-batch",
+                toolCall = ToolCall(toolCallId = "call-image", name = "Read", arguments = "{}"),
+            )
+        ).next
+        val toolReturn = ToolReturnMessage(
+            id = "return-image",
+            toolCallId = "call-image",
+            status = "success",
+            toolReturnRaw = buildJsonArray {
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("image"))
+                    put("source", buildJsonObject {
+                        put("type", JsonPrimitive("letta"))
+                        put("file_id", JsonPrimitive("file-tool"))
+                        put("media_type", JsonPrimitive("image/png"))
+                        put("data", JsonPrimitive("STREAM_TOOL_IMAGE+/=="))
+                    })
+                })
+            },
+        )
+
+        val output = reduce(prev = seeded, frame = toolReturn)
+
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.attachments shouldBe listOf(
+            MessageContentPart.Image(base64 = "STREAM_TOOL_IMAGE+/==", mediaType = "image/png")
         )
     }
 
