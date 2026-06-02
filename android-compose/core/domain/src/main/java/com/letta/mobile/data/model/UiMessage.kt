@@ -59,6 +59,14 @@ data class UiToolCall(
     val name: String,
     val arguments: String,
     val result: String?,
+    /**
+     * letta-mobile-x34f2: image attachments returned by the tool (e.g. the
+     * Read tool returning an image file). Extracted from the tool-return's
+     * content image parts (`{type:"image", source:{base64}}`) so the tool
+     * card can render the actual image instead of only the `[Image: name]`
+     * text placeholder. Empty for text-only tool returns.
+     */
+    val resultImages: List<UiImageAttachment> = emptyList(),
     val status: String? = null,
     /**
      * Best-effort wall-clock execution duration for the tool call, measured

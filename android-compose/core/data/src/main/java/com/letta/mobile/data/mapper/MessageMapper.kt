@@ -351,6 +351,9 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                     name = name ?: "tool",
                     arguments = arguments,
                     result = returnContent,
+                    resultImages = matchedReturn?.attachments.orEmpty().map {
+                        UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
+                    },
                     status = returnStatus,
                     executionTimeMs = executionTimeMs,
                     toolCallId = msg.toolCallId,
@@ -412,6 +415,9 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                     name = name,
                     arguments = "",
                     result = msg.content.ifBlank { null },
+                    resultImages = msg.attachments.map {
+                        UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
+                    },
                     status = msg.toolReturnStatus,
                     toolCallId = msg.toolCallId,
                     approvalDecision = msg.toolCallId?.let { foldedApprovals[it]?.decision },

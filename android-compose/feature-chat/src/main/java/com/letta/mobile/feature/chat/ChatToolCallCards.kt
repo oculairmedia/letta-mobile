@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import kotlinx.collections.immutable.toImmutableList
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -340,6 +341,17 @@ private fun ToolCallExpandedBodyContent(
             isError = isError,
             fontScale = fontScale,
         )
+        // letta-mobile-x34f2: render image attachments returned by the tool
+        // (e.g. Read on an image file). Previously these were extracted into
+        // the tool-return AppMessage but never drawn — the card only showed
+        // the "[Image: name]" text placeholder. Reuse the attachment grid.
+        if (toolCall.resultImages.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(6.dp))
+            MessageAttachmentsGrid(
+                attachments = toolCall.resultImages.toImmutableList(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         Column(modifier = Modifier.padding(top = 4.dp)) {
             // Tool name and timing
             Text(
