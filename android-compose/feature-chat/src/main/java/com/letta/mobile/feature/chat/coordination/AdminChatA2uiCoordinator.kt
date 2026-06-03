@@ -38,7 +38,7 @@ internal class AdminChatA2uiCoordinator(
     companion object {
         private const val MAX_A2UI_DEBUG_FRAMES = 12
         private const val A2UI_THINKING_TIMEOUT_MS = 60_000L
-        private const val A2UI_THINKING_DELAY_MESSAGE = "Response delayed — check your connection"
+        private const val A2UI_THINKING_DELAY_MESSAGE = "Still working — long tool calls can take a few minutes"
         private const val TAG = "AdminChatA2uiCoordinator"
     }
 
@@ -180,8 +180,8 @@ internal class AdminChatA2uiCoordinator(
                 a2uiThinkingStartMessageCount = null
                 uiState.update {
                     it.copy(
-                        isStreaming = false,
-                        isAgentTyping = false,
+                        isStreaming = true,
+                        isAgentTyping = true,
                         a2uiThinkingDelayMessage = A2UI_THINKING_DELAY_MESSAGE,
                     )
                 }

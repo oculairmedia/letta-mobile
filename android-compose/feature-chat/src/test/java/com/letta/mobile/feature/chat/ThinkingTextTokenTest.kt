@@ -48,11 +48,11 @@ class ThinkingTextTokenTest {
         composeRule.setContent {
             ThemedToken(
                 visible = false,
-                delayMessage = "Response delayed — check your connection",
+                delayMessage = "Still working — long tool calls can take a few minutes",
             )
         }
         composeRule.onNodeWithTag(THINKING_TEXT_TOKEN_TEST_TAG).assertIsDisplayed()
-        composeRule.onNodeWithText("Response delayed — check your connection").assertIsDisplayed()
+        composeRule.onNodeWithText("Still working — long tool calls can take a few minutes").assertIsDisplayed()
     }
 
     @Test
@@ -60,10 +60,10 @@ class ThinkingTextTokenTest {
         composeRule.setContent {
             ThemedToken(
                 visible = true,
-                delayMessage = "Response delayed — check your connection",
+                delayMessage = "Still working — long tool calls can take a few minutes",
             )
         }
-        composeRule.onNodeWithText("Response delayed — check your connection").assertIsDisplayed()
+        composeRule.onNodeWithText("Still working — long tool calls can take a few minutes").assertIsDisplayed()
     }
 
     @Test
