@@ -29,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
@@ -65,7 +66,10 @@ import com.letta.mobile.util.Telemetry
 import java.util.LinkedHashMap
 import com.letta.mobile.feature.chat.render.ToolDisplayInfo
 import com.letta.mobile.feature.chat.render.ToolDisplayRegistry
+import com.letta.mobile.feature.chat.render.LocalToolCardBodyParentVisible
+import com.letta.mobile.feature.chat.render.LocalToolCardBodyRenderEligibility
 import com.letta.mobile.feature.chat.render.ToolOutputRenderer
+import com.letta.mobile.feature.chat.render.toolCardBodyRenderEligibility
 
 private const val TOOL_CALL_ENTRANCE_ANIMATION_HISTORY_SIZE = 512
 
@@ -352,7 +356,44 @@ private fun ToolCallExpandedBodyContent(
     executionTimeText: String?,
     displayResult: String?,
 ) {
-    if (!visible) return
+    val parentVisible = LocalToolCardBodyParentVisible.current
+    val renderEligibility = remember(visible, parentVisible) {
+        toolCardBodyRenderEligibility(
+            expanded = visible,
+            parentVisible = parentVisible,
+        )
+    }
+    if (!renderEligibility.shouldRenderBody) return
+
+    CompositionLocalProvider(
+        LocalToolCardBodyRenderEligibility provides renderEligibility,
+    ) {
+        ToolCallExpandedBodyContentInner(
+            toolCall = toolCall,
+            argumentSummary = argumentSummary,
+            resultPreview = resultPreview,
+            isError = isError,
+            fontScale = fontScale,
+            codeStyle = codeStyle,
+            display = display,
+            executionTimeText = executionTimeText,
+            displayResult = displayResult,
+        )
+    }
+}
+
+@Composable
+private fun ToolCallExpandedBodyContentInner(
+    toolCall: UiToolCall,
+    argumentSummary: ToolArgumentSummary?,
+    resultPreview: String?,
+    isError: Boolean,
+    fontScale: Float,
+    codeStyle: androidx.compose.ui.text.TextStyle,
+    display: ToolDisplayInfo,
+    executionTimeText: String?,
+    displayResult: String?,
+) {
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
     Column {
@@ -471,102 +512,115 @@ internal fun ToolCallExpandedBody(
     isError: Boolean,
     fontScale: Float,
 ) {
+    val parentVisible = LocalToolCardBodyParentVisible.current
+    val renderEligibility = remember(parentVisible) {
+        toolCardBodyRenderEligibility(
+            expanded = true,
+            parentVisible = parentVisible,
+        )
+    }
+    if (!renderEligibility.shouldRenderBody) return
+
     val codeStyle = MaterialTheme.chatTypography.codeBlock
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 4.dp),
+    CompositionLocalProvider(
+        LocalToolCardBodyRenderEligibility provides renderEligibility,
     ) {
-        Text(
-            text = "Tool: ${toolCall.name}",
-            style = MaterialTheme.typography.chatBubbleSender.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f),
-        )
-        executionTimeText?.let { time ->
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
+        ) {
             Text(
-                text = "Execution time: $time",
-                style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.76f),
+                text = "Tool: ${toolCall.name}",
+                style = MaterialTheme.typography.chatBubbleSender.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f),
             )
-        }
-        display.detailLine?.let { detail ->
-            Text(
-                text = detail,
-                style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.76f),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        if (toolCall.arguments.isNotBlank()) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Arguments",
-                style = MaterialTheme.typography.sectionTitle.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-            )
-            Text(
-                text = toolCall.arguments,
-                style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 6,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        displayResult?.takeIf { it.isNotBlank() }?.let { result ->
-            var resultExpanded by remember(toolCall.result) { mutableStateOf(false) }
-            val resultChevronRotation by animateFloatAsState(
-                targetValue = if (resultExpanded) 180f else 0f,
-                animationSpec = ChatMotion.chipCrossfadeSpec,
-                label = "ToolOutputChevronRotation",
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .semantics(mergeDescendants = true) { }
-                    .clickable {
-                        HapticEffects.segmentTick(haptic, view)
-                        resultExpanded = !resultExpanded
-                    },
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            executionTimeText?.let { time ->
                 Text(
-                    text = if (isError) "Error" else "Output",
-                    style = MaterialTheme.typography.sectionTitle.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                    color = if (isError) {
-                        MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
-                    },
-                    modifier = Modifier.weight(1f),
-                )
-                val lineCount = result.count { it == '\n' } + 1
-                if (lineCount > 1 || result.length > 80) {
-                    Text(
-                        text = if (resultExpanded) "collapse" else "${lineCount} line${if (lineCount == 1) "" else "s"}",
-                        style = MaterialTheme.typography.labelSmall.scaledBy(fontScale),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f),
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                }
-                Icon(
-                    imageVector = LettaIcons.ExpandMore,
-                    contentDescription = if (resultExpanded) "Collapse output" else "Expand output",
-                    modifier = Modifier
-                        .size(14.dp)
-                        .rotate(resultChevronRotation),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                    text = "Execution time: $time",
+                    style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.76f),
                 )
             }
-            ToolOutputRenderer(
-                raw = result,
-                expanded = resultExpanded,
-                isError = isError,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            display.detailLine?.let { detail ->
+                Text(
+                    text = detail,
+                    style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.76f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (toolCall.arguments.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Arguments",
+                    style = MaterialTheme.typography.sectionTitle.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                )
+                Text(
+                    text = toolCall.arguments,
+                    style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 6,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            displayResult?.takeIf { it.isNotBlank() }?.let { result ->
+                var resultExpanded by remember(toolCall.result) { mutableStateOf(false) }
+                val resultChevronRotation by animateFloatAsState(
+                    targetValue = if (resultExpanded) 180f else 0f,
+                    animationSpec = ChatMotion.chipCrossfadeSpec,
+                    label = "ToolOutputChevronRotation",
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics(mergeDescendants = true) { }
+                        .clickable {
+                            HapticEffects.segmentTick(haptic, view)
+                            resultExpanded = !resultExpanded
+                        },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = if (isError) "Error" else "Output",
+                        style = MaterialTheme.typography.sectionTitle.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                        color = if (isError) {
+                            MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                    val lineCount = result.count { it == '\n' } + 1
+                    if (lineCount > 1 || result.length > 80) {
+                        Text(
+                            text = if (resultExpanded) "collapse" else "${lineCount} line${if (lineCount == 1) "" else "s"}",
+                            style = MaterialTheme.typography.labelSmall.scaledBy(fontScale),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f),
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                    Icon(
+                        imageVector = LettaIcons.ExpandMore,
+                        contentDescription = if (resultExpanded) "Collapse output" else "Expand output",
+                        modifier = Modifier
+                            .size(14.dp)
+                            .rotate(resultChevronRotation),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                    )
+                }
+                ToolOutputRenderer(
+                    raw = result,
+                    expanded = resultExpanded,
+                    isError = isError,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
 }

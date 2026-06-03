@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -27,6 +28,8 @@ import org.robolectric.annotation.Config
 import com.letta.mobile.feature.chat.screen.ToolApprovalState
 import com.letta.mobile.feature.chat.screen.shouldShowCompactApprovalChip
 import com.letta.mobile.feature.chat.screen.CompactToolCallGroupCard
+import com.letta.mobile.feature.chat.render.LocalToolCardBodyParentVisible
+import com.letta.mobile.feature.chat.render.toolCardBodyRenderEligibility
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)
@@ -81,6 +84,48 @@ class CompactToolCallGroupCardTest {
 
         composeRule.onNodeWithText("Output").performClick()
         composeRule.onNodeWithText("collapse").assertIsDisplayed()
+    }
+
+    @Test
+    fun expandedToolCallBodyStaysHiddenWhenParentIsNotVisible() {
+        composeRule.setContent {
+            LettaTheme(
+                appTheme = AppTheme.LIGHT,
+                themePreset = ThemePreset.DEFAULT,
+                dynamicColor = false,
+            ) {
+                LettaChatTheme {
+                    CompositionLocalProvider(LocalToolCardBodyParentVisible provides false) {
+                        CompactToolCallGroupCard(
+                            toolCalls = listOf(
+                                UiToolCall(
+                                    name = "Bash",
+                                    arguments = """{"command":"pwd"}""",
+                                    result = "line one\nline two",
+                                    status = "success",
+                                    executionTimeMs = 1_250L,
+                                    toolCallId = "call-a",
+                                ),
+                                UiToolCall(
+                                    name = "Read",
+                                    arguments = """{"file_path":"/tmp/file.txt"}""",
+                                    result = null,
+                                    toolCallId = "call-b",
+                                ),
+                            ),
+                            pendingApprovalToolCallIds = emptySet(),
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Bash - Result: line one", substring = true).performClick()
+
+        composeRule.onNodeWithText("Bash - Result: line one", substring = true).assertIsDisplayed()
+        composeRule.onAllNodesWithText("Tool: Bash").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Arguments").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Output").assertCountEquals(0)
     }
 
     @Test
@@ -228,5 +273,21 @@ class CompactToolCallGroupCardTest {
         // null: never show.
         assertFalse(shouldShowCompactApprovalChip(null, hasResult = false))
         assertFalse(shouldShowCompactApprovalChip(null, hasResult = true))
+    }
+
+    @Test
+    fun toolCardBodyRenderEligibility_rules() {
+        assertTrue(
+            toolCardBodyRenderEligibility(expanded = true, parentVisible = true).shouldRenderBody,
+        )
+        assertFalse(
+            toolCardBodyRenderEligibility(expanded = false, parentVisible = true).shouldRenderBody,
+        )
+        assertFalse(
+            toolCardBodyRenderEligibility(expanded = true, parentVisible = false).shouldRenderBody,
+        )
+        assertFalse(
+            toolCardBodyRenderEligibility(expanded = false, parentVisible = false).shouldRenderBody,
+        )
     }
 }
