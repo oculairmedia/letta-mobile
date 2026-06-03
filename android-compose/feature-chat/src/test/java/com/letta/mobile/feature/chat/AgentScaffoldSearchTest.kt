@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat
 
 import com.letta.mobile.data.model.ParsedSearchMessage
+import com.letta.mobile.feature.chat.screen.chatSearchResultKey
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test

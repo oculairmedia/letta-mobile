@@ -8,6 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.jupiter.api.Tag
 import com.letta.mobile.feature.chat.a2ui.A2uiToolApprovalSubmission
+import com.letta.mobile.feature.chat.a2ui.toToolApprovalSubmission
 
 @Tag("unit")
 class A2uiToolApprovalSubmissionTest {
