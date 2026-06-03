@@ -12,7 +12,6 @@ import com.letta.mobile.data.timeline.Role
 import com.letta.mobile.data.timeline.TimelineEvent
 import com.letta.mobile.data.timeline.TimelineMessageType
 import com.letta.mobile.data.timeline.stripEnvelopeReminders
-import com.letta.mobile.util.Telemetry
 import java.time.Duration
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 
@@ -273,27 +272,6 @@ internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
             // here — see comment above. The chip on the tool card carries
             // the "Approved" indicator without hiding the tool body.
             val uiApprovalResponse: UiApprovalResponse? = null
-            // letta-mobile-spqb probe: pin down whether the approval card is
-            // being projected. If approvalRequestId is null OR
-            // approvalDecided is true here, the card can never render —
-            // the bug is upstream (toTimelineEvent / merge / reconcile).
-            // If both are correct (id non-null, decided=false) and the user
-            // still sees no card, the bug is downstream in Compose.
-            if (ev.messageType == TimelineMessageType.TOOL_CALL ||
-                ev.approvalRequestId != null ||
-                ev.toolCalls.isNotEmpty()
-            ) {
-                Telemetry.event(
-                    "TimelineSync", "uiProjection.approval",
-                    "serverId" to ev.serverId,
-                    "messageType" to ev.messageType.name,
-                    "approvalRequestId" to (ev.approvalRequestId ?: "<null>"),
-                    "approvalDecided" to ev.approvalDecided,
-                    "toolCalls" to ev.toolCalls.size,
-                    "uiApprovalEmitted" to (uiApproval != null),
-                    "uiToolCallsEmitted" to (uiToolCalls?.size ?: 0),
-                )
-            }
             // lettabot-y4j: defensive strip of leaked envelope blocks on
             // USER bubbles. Confirmed events come from `GET /v1/conversations/
             // :id/messages` which goes directly to the Letta server (the
