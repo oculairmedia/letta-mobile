@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -64,6 +66,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -122,6 +125,7 @@ fun AgentListScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbar = LocalSnackbarDispatcher.current
     val haptic = LocalHapticFeedback.current
+    val layoutDirection = LocalLayoutDirection.current
     val view = LocalView.current
     val isShareMode = shareContentPreview != null
     var shareNavigationConsumed by rememberSaveable(shareContentPreview) { mutableStateOf(false) }
@@ -318,13 +322,13 @@ fun AgentListScreen(
                 modifier = Modifier.padding(paddingValues),
             )
             else -> {
-                    PullToRefreshBox(
-                        isRefreshing = uiState.isRefreshing,
-                        onRefresh = {
-                            HapticEffects.confirm(haptic, view)
-                            viewModel.refresh()
-                        },
-                    modifier = Modifier.padding(paddingValues).fillMaxSize(),
+                PullToRefreshBox(
+                    isRefreshing = uiState.isRefreshing,
+                    onRefresh = {
+                        HapticEffects.confirm(haptic, view)
+                        viewModel.refresh()
+                    },
+                    modifier = Modifier.fillMaxSize(),
                 ) {
                     if (filteredAgents.isEmpty()) {
                         EmptyState(
@@ -335,7 +339,9 @@ fun AgentListScreen(
                                 uiState.searchQuery.isBlank() -> stringResource(R.string.screen_agents_empty)
                                 else -> "No agents matching \"${uiState.searchQuery}\""
                             },
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier
+                                .padding(paddingValues)
+                                .fillMaxSize(),
                         )
                     } else {
                         if (uiState.showGrid) {
@@ -343,7 +349,12 @@ fun AgentListScreen(
                             LazyVerticalGrid(
                                 state = gridState,
                                 columns = GridCells.Adaptive(minSize = minTileWidth),
-                                contentPadding = PaddingValues(LettaSpacing.screenHorizontal),
+                                contentPadding = PaddingValues(
+                                    start = paddingValues.calculateStartPadding(layoutDirection) + LettaSpacing.screenHorizontal,
+                                    top = paddingValues.calculateTopPadding() + LettaSpacing.screenHorizontal,
+                                    end = paddingValues.calculateEndPadding(layoutDirection) + LettaSpacing.screenHorizontal,
+                                    bottom = paddingValues.calculateBottomPadding() + LettaSpacing.screenHorizontal,
+                                ),
                                 verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
                                 horizontalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
                             ) {
@@ -388,7 +399,12 @@ fun AgentListScreen(
                         } else {
                             LazyColumn(
                                 state = listState,
-                                contentPadding = PaddingValues(LettaSpacing.screenHorizontal),
+                                contentPadding = PaddingValues(
+                                    start = paddingValues.calculateStartPadding(layoutDirection) + LettaSpacing.screenHorizontal,
+                                    top = paddingValues.calculateTopPadding() + LettaSpacing.screenHorizontal,
+                                    end = paddingValues.calculateEndPadding(layoutDirection) + LettaSpacing.screenHorizontal,
+                                    bottom = paddingValues.calculateBottomPadding() + LettaSpacing.screenHorizontal,
+                                ),
                                 verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
                             ) {
                                 if (uiState.isHydrating) {

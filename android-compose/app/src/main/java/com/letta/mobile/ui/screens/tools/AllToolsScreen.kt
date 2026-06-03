@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -45,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -73,6 +76,7 @@ fun AllToolsScreen(
     var showCreateDialog by remember { mutableStateOf(false) }
     var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
+    val layoutDirection = LocalLayoutDirection.current
     val view = LocalView.current
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -172,7 +176,7 @@ fun AllToolsScreen(
                         HapticEffects.confirm(haptic, view)
                         viewModel.loadTools()
                     },
-                    modifier = Modifier.padding(paddingValues).fillMaxSize(),
+                    modifier = Modifier.fillMaxSize(),
                 ) {
                     if (filteredTools.isEmpty()) {
                         EmptyState(
@@ -182,12 +186,19 @@ fun AllToolsScreen(
                             } else {
                                 stringResource(R.string.screen_tools_empty_search, state.data.searchQuery)
                             },
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier
+                                .padding(paddingValues)
+                                .fillMaxSize(),
                         )
                     } else {
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(3),
-                            contentPadding = PaddingValues(12.dp),
+                            contentPadding = PaddingValues(
+                                start = paddingValues.calculateStartPadding(layoutDirection) + 12.dp,
+                                top = paddingValues.calculateTopPadding() + 12.dp,
+                                end = paddingValues.calculateEndPadding(layoutDirection) + 12.dp,
+                                bottom = paddingValues.calculateBottomPadding() + 12.dp,
+                            ),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
