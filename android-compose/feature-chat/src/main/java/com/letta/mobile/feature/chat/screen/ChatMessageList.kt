@@ -66,17 +66,14 @@ import com.letta.mobile.feature.chat.coordination.ChatRenderItem
 import com.letta.mobile.feature.chat.render.ChatMessageGeometryState
 import com.letta.mobile.feature.chat.render.ChatRenderItemGeometrySignature
 import com.letta.mobile.feature.chat.render.ChatUiState
+import com.letta.mobile.feature.chat.render.LocalToolCardBodyParentVisible
 import com.letta.mobile.feature.chat.render.chatGeometrySignature
 
-private fun ChatRenderItem.containsExpensivePinchContent(): Boolean {
-    fun UiMessage.isExpensiveForLivePinch(): Boolean =
-        role == "tool" || !toolCalls.isNullOrEmpty() || generatedUi != null || approvalRequest != null || approvalResponse != null
-
-    return when (this) {
-        is ChatRenderItem.Single -> message.isExpensiveForLivePinch()
-        is ChatRenderItem.RunBlock -> messages.any { (message, _) -> message.isExpensiveForLivePinch() }
-    }
-}
+internal fun chatRenderItemSeesLiveScale(
+    isPinching: Boolean,
+    scaleWindowIndexRange: IntRange,
+    itemIndex: Int,
+): Boolean = !isPinching || scaleWindowIndexRange.isEmpty() || itemIndex in scaleWindowIndexRange
 
 private data class ChatPinchVisibleContentSummary(
     val userMessages: Int,
@@ -660,14 +657,15 @@ internal fun ChatMessageList(
                         // are injected into the LazyColumn between them, so
                         // visible indices don't map 1:1) — the margin already
                         // absorbs this drift.
-                        val itemSeesLiveScale = !pinchFontScaleController.isPinching ||
-                            (!renderItem.containsExpensivePinchContent() && (
-                                scaleWindowIndexRange.isEmpty() ||
-                                    index in scaleWindowIndexRange
-                            ))
+                        val itemSeesLiveScale = chatRenderItemSeesLiveScale(
+                            isPinching = pinchFontScaleController.isPinching,
+                            scaleWindowIndexRange = scaleWindowIndexRange,
+                            itemIndex = index,
+                        )
                         val perItemFontScale = if (itemSeesLiveScale) liveFontScale else activeFontScale
                         CompositionLocalProvider(
                             LocalChatFontScale provides perItemFontScale,
+                            LocalToolCardBodyParentVisible provides itemSeesLiveScale,
                         ) {
                         // letta-mobile-lbur follow-up: log render item keys for dedup analysis
                         MeasuredChatRenderItem(
