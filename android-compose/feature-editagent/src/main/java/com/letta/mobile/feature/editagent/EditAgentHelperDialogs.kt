@@ -26,7 +26,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.feature.editagent.R
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.icons.LettaIcons
 
@@ -142,38 +144,58 @@ internal fun AddBlockDialog(
         confirmEnabled = newLabel.isNotBlank(),
         onConfirm = { onAdd(newLabel, newValue, newDescription, newLimit.toIntOrNull()) },
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(
-                value = newLabel,
-                onValueChange = { newLabel = it },
-                label = { Text(stringResource(R.string.common_name)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = newValue,
-                onValueChange = { newValue = it },
-                label = { Text(stringResource(R.string.common_value)) },
-                minLines = 3,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = newDescription,
-                onValueChange = { newDescription = it },
-                label = { Text(stringResource(R.string.common_description)) },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 2,
-            )
-            OutlinedTextField(
-                value = newLimit,
-                onValueChange = { value ->
-                    if (value.isBlank() || (value.toIntOrNull()?.let { it >= 0 } == true)) {
-                        newLimit = value
+        CardGroup {
+            item(
+                headlineContent = {
+                    FormItem(label = { Text(stringResource(R.string.common_name)) }) {
+                        OutlinedTextField(
+                            value = newLabel,
+                            onValueChange = { newLabel = it },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
-                },
-                label = { Text(stringResource(R.string.screen_agent_edit_character_limit)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
+                }
+            )
+            item(
+                headlineContent = {
+                    FormItem(label = { Text(stringResource(R.string.common_value)) }) {
+                        OutlinedTextField(
+                            value = newValue,
+                            onValueChange = { newValue = it },
+                            minLines = 3,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+            )
+            item(
+                headlineContent = {
+                    FormItem(label = { Text(stringResource(R.string.common_description)) }) {
+                        OutlinedTextField(
+                            value = newDescription,
+                            onValueChange = { newDescription = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 2,
+                        )
+                    }
+                }
+            )
+            item(
+                headlineContent = {
+                    FormItem(label = { Text(stringResource(R.string.screen_agent_edit_character_limit)) }) {
+                        OutlinedTextField(
+                            value = newLimit,
+                            onValueChange = { value ->
+                                if (value.isBlank() || (value.toIntOrNull()?.let { it >= 0 } == true)) {
+                                    newLimit = value
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                        )
+                    }
+                }
             )
         }
     }
@@ -209,42 +231,47 @@ internal fun CloneAgentDialog(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            OutlinedTextField(
-                value = cloneName,
-                onValueChange = { cloneName = it },
-                label = { Text(stringResource(R.string.screen_settings_clone_name_label)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.screen_agents_import_override_tools_title), style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        stringResource(R.string.screen_agents_import_override_tools_helper),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(checked = overrideExistingTools, onCheckedChange = { overrideExistingTools = it })
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.screen_agents_import_strip_messages_title), style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        stringResource(R.string.screen_agents_import_strip_messages_helper),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(checked = stripMessages, onCheckedChange = { stripMessages = it })
+            CardGroup {
+                item(
+                    headlineContent = {
+                        FormItem(label = { Text(stringResource(R.string.screen_settings_clone_name_label)) }) {
+                            OutlinedTextField(
+                                value = cloneName,
+                                onValueChange = { cloneName = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                            )
+                        }
+                    }
+                )
+                item(
+                    headlineContent = {
+                        FormItem(
+                            label = { Text(stringResource(R.string.screen_agents_import_override_tools_title)) },
+                            description = { Text(stringResource(R.string.screen_agents_import_override_tools_helper)) },
+                            tail = {
+                                Switch(
+                                    checked = overrideExistingTools,
+                                    onCheckedChange = { overrideExistingTools = it }
+                                )
+                            }
+                        )
+                    }
+                )
+                item(
+                    headlineContent = {
+                        FormItem(
+                            label = { Text(stringResource(R.string.screen_agents_import_strip_messages_title)) },
+                            description = { Text(stringResource(R.string.screen_agents_import_strip_messages_helper)) },
+                            tail = {
+                                Switch(
+                                    checked = stripMessages,
+                                    onCheckedChange = { stripMessages = it }
+                                )
+                            }
+                        )
+                    }
+                )
             }
         }
     }

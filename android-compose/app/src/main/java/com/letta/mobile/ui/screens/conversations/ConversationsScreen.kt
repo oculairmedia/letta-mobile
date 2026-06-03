@@ -60,9 +60,13 @@ import com.letta.mobile.R
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.repository.ConversationInspectorMessage
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
+import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.DateSeparator
 import com.letta.mobile.ui.components.EmptyState
@@ -639,48 +643,92 @@ private fun ConversationAdminDialog(
         onConfirm = onDismiss,
         onDismiss = onDismiss,
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                conversation.id.value,
-                style = MaterialTheme.typography.listItemMetadataMonospace,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                display.agentName,
-                style = MaterialTheme.typography.listItemSupporting,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = if (conversation.archived == true) stringResource(R.string.screen_conversations_archived_label)
-                else stringResource(R.string.screen_conversations_active_label),
-                style = MaterialTheme.typography.listItemMetadata,
-            )
-            conversation.createdAt?.let {
-                Text(stringResource(R.string.screen_conversations_created_label, formatRelativeTime(it)))
-            }
-            OutlinedTextField(
-                value = renameText,
-                onValueChange = { renameText = it },
-                label = { Text(stringResource(R.string.common_name)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = { if (renameText.isNotBlank()) onRename(renameText) }) {
-                    Text(stringResource(R.string.action_save))
-                }
-                TextButton(onClick = { onToggleArchived(conversation.archived != true) }) {
-                    Text(
-                        if (conversation.archived == true) stringResource(R.string.screen_conversations_unarchive_action)
-                        else stringResource(R.string.screen_conversations_archive_action)
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            CardGroup(title = { Text(stringResource(R.string.common_details)) }) {
+                item(
+                    headlineContent = { Text(stringResource(R.string.common_id)) },
+                    supportingContent = { Text(conversation.id.value, style = MaterialTheme.typography.listItemMetadataMonospace) }
+                )
+                item(
+                    headlineContent = { Text(stringResource(R.string.common_agents)) },
+                    supportingContent = { Text(display.agentName, style = MaterialTheme.typography.listItemSupporting) }
+                )
+                item(
+                    headlineContent = { Text(stringResource(R.string.common_status)) },
+                    supportingContent = {
+                        Text(
+                            text = if (conversation.archived == true) stringResource(R.string.screen_conversations_archived_label)
+                            else stringResource(R.string.screen_conversations_active_label),
+                            style = MaterialTheme.typography.listItemMetadata
+                        )
+                    }
+                )
+                conversation.createdAt?.let {
+                    item(
+                        headlineContent = { Text(stringResource(R.string.common_created)) },
+                        supportingContent = { Text(formatRelativeTime(it), style = MaterialTheme.typography.listItemMetadata) }
                     )
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onFork) { Text(stringResource(R.string.action_fork)) }
-                TextButton(onClick = onCancelRuns) { Text(stringResource(R.string.screen_conversations_cancel_runs_action)) }
-                TextButton(onClick = onRecompile) { Text(stringResource(R.string.screen_conversations_recompile_action)) }
+
+            CardGroup(title = { Text("Rename") }) {
+                item(
+                    headlineContent = {
+                        FormItem(label = { Text(stringResource(R.string.common_name)) }) {
+                            OutlinedTextField(
+                                value = renameText,
+                                onValueChange = { renameText = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                            )
+                        }
+                    },
+                    trailingContent = {
+                        TextButton(onClick = { if (renameText.isNotBlank()) onRename(renameText) }) {
+                            Text(stringResource(R.string.action_save))
+                        }
+                    }
+                )
             }
+
+            CardGroup(title = { Text("Actions") }) {
+                item(
+                    onClick = { onToggleArchived(conversation.archived != true) },
+                    headlineContent = {
+                        Text(
+                            if (conversation.archived == true) stringResource(R.string.screen_conversations_unarchive_action)
+                            else stringResource(R.string.screen_conversations_archive_action)
+                        )
+                    },
+                    leadingContent = {
+                        Icon(
+                            imageVector = LettaIcons.Archive,
+                            contentDescription = null
+                        )
+                    }
+                )
+                item(
+                    onClick = onFork,
+                    headlineContent = { Text(stringResource(R.string.action_fork)) },
+                    leadingContent = { Icon(imageVector = LettaIcons.ForkRight, contentDescription = null) }
+                )
+                item(
+                    onClick = onCancelRuns,
+                    headlineContent = { Text(stringResource(R.string.screen_conversations_cancel_runs_action)) },
+                    leadingContent = { Icon(imageVector = LettaIcons.Close, contentDescription = null) }
+                )
+                item(
+                    onClick = onRecompile,
+                    headlineContent = { Text(stringResource(R.string.screen_conversations_recompile_action)) },
+                    leadingContent = { Icon(imageVector = LettaIcons.Refresh, contentDescription = null) }
+                )
+                item(
+                    onClick = onDelete,
+                    headlineContent = { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) },
+                    leadingContent = { Icon(imageVector = LettaIcons.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) }
+                )
+            }
+
             Text(
                 text = stringResource(R.string.screen_conversations_message_inspector_title),
                 style = MaterialTheme.typography.dialogSectionHeading,
@@ -723,9 +771,6 @@ private fun ConversationAdminDialog(
             if (!recompilePreview.isNullOrBlank()) {
                 Text(stringResource(R.string.screen_conversations_recompile_preview_title), style = MaterialTheme.typography.dialogSectionHeading)
                 Text(recompilePreview, style = MaterialTheme.typography.listItemSupporting)
-            }
-            TextButton(onClick = onDelete) {
-                Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
             }
         }
     }

@@ -46,7 +46,9 @@ import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleDefinition
 import com.letta.mobile.data.model.ScheduleMessage
 import com.letta.mobile.data.model.ScheduledMessage
+import androidx.compose.foundation.lazy.itemsIndexed
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.EmptyState
@@ -55,6 +57,7 @@ import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.motion.StaggeredListItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -176,11 +179,13 @@ private fun ScheduleListContent(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(state.schedules, key = { it.id }) { schedule ->
-                    ScheduleCard(
-                        schedule = schedule,
-                        onDelete = { onDeleteSchedule(schedule) },
-                    )
+                itemsIndexed(state.schedules, key = { _, it -> it.id }) { index, schedule ->
+                    StaggeredListItem(index = index) {
+                        ScheduleCard(
+                            schedule = schedule,
+                            onDelete = { onDeleteSchedule(schedule) },
+                        )
+                    }
                 }
             }
         }
@@ -313,43 +318,64 @@ private fun CreateScheduleDialog(
             )
         },
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            AgentSelector(
-                agents = agents,
-                selectedAgentId = selectedAgent,
-                onAgentSelected = { selectedAgent = it },
+        CardGroup {
+            item(
+                headlineContent = {
+                    FormItem(label = { Text(stringResource(R.string.common_agents)) }) {
+                        AgentSelector(
+                            agents = agents,
+                            selectedAgentId = selectedAgent,
+                            onAgentSelected = { selectedAgent = it },
+                        )
+                    }
+                }
             )
-            OutlinedTextField(
-                value = content,
-                onValueChange = { content = it },
-                label = { Text(stringResource(R.string.screen_schedules_message_label)) },
-                minLines = 3,
-                modifier = Modifier.fillMaxWidth(),
+            item(
+                headlineContent = {
+                    FormItem(label = { Text(stringResource(R.string.screen_schedules_message_label)) }) {
+                        OutlinedTextField(
+                            value = content,
+                            onValueChange = { content = it },
+                            minLines = 3,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
             )
-            FormItem(
-                label = { Text(stringResource(R.string.screen_schedules_recurring_toggle)) },
-                tail = {
-                    androidx.compose.material3.Switch(checked = isRecurring, onCheckedChange = { isRecurring = it })
-                },
+            item(
+                headlineContent = {
+                    FormItem(
+                        label = { Text(stringResource(R.string.screen_schedules_recurring_toggle)) },
+                        tail = {
+                            androidx.compose.material3.Switch(checked = isRecurring, onCheckedChange = { isRecurring = it })
+                        }
+                    )
+                }
             )
-            if (isRecurring) {
-                OutlinedTextField(
-                    value = cronExpression,
-                    onValueChange = { cronExpression = it },
-                    label = { Text(stringResource(R.string.screen_schedules_cron_label)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                )
-            } else {
-                OutlinedTextField(
-                    value = scheduledAt,
-                    onValueChange = { scheduledAt = it },
-                    label = { Text(stringResource(R.string.screen_schedules_scheduled_at_label)) },
-                    placeholder = { Text(stringResource(R.string.screen_schedules_scheduled_at_placeholder)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                )
-            }
+            item(
+                headlineContent = {
+                    if (isRecurring) {
+                        FormItem(label = { Text(stringResource(R.string.screen_schedules_cron_label)) }) {
+                            OutlinedTextField(
+                                value = cronExpression,
+                                onValueChange = { cronExpression = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                            )
+                        }
+                    } else {
+                        FormItem(label = { Text(stringResource(R.string.screen_schedules_scheduled_at_label)) }) {
+                            OutlinedTextField(
+                                value = scheduledAt,
+                                onValueChange = { scheduledAt = it },
+                                placeholder = { Text(stringResource(R.string.screen_schedules_scheduled_at_placeholder)) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                            )
+                        }
+                    }
+                }
+            )
         }
     }
 }
