@@ -158,23 +158,28 @@ internal fun groupMessagesForRender(
                 break
             }
         }
-        if (acc.size == 1) {
+        val compactedAcc = compactRunBlockEchoes(
+            accumulator = acc,
+            reversed = reversed,
+            olderStartIndex = j,
+        )
+        if (compactedAcc.size == 1) {
             // Adopt the future RunBlock key when this runId is unique in the
             // snapshot (count == 1 means: just this one Single, no other
             // Single or RunBlock will use `run-$runId`). This keeps the
             // LazyColumn slot stable when a sibling message later arrives and
             // promotes this Single into a RunBlock mid-stream.
             val stableKey = if ((runIdCounts[runId] ?: 0) == 1) "run-$runId" else null
-            out.add(ChatRenderItem.Single(acc[0].first, acc[0].second, stableRunKey = stableKey))
+            out.add(ChatRenderItem.Single(compactedAcc[0].first, compactedAcc[0].second, stableRunKey = stableKey))
         } else {
             out.add(
                 ChatRenderItem.RunBlock(
                     runId = runId,
-                    messages = acc.asReversed(),
+                    messages = compactedAcc.asReversed(),
                     stableKey = runBlockKey(
                         runId = runId,
                         runIdCounts = runIdCounts,
-                        accumulator = acc,
+                        accumulator = compactedAcc,
                     ),
                 )
             )
@@ -182,6 +187,42 @@ internal fun groupMessagesForRender(
         i = j
     }
     return out
+}
+
+private const val MinRunPanelEchoLength = 24
+private val RunPanelWhitespaceRegex = Regex("\\s+")
+
+private fun compactRunBlockEchoes(
+    accumulator: List<Pair<UiMessage, GroupPosition>>,
+    reversed: List<Pair<UiMessage, GroupPosition>>,
+    olderStartIndex: Int,
+): List<Pair<UiMessage, GroupPosition>> {
+    if (accumulator.size < 2) return accumulator
+
+    val olderPlainAssistantText = buildSet {
+        for (index in olderStartIndex until reversed.size) {
+            reversed[index].first.runPanelEchoKey()?.let(::add)
+        }
+    }
+    val seenInBlock = HashSet<String>()
+    return accumulator.filter { (message, _) ->
+        val key = message.runPanelEchoKey() ?: return@filter true
+        seenInBlock.add(key) && key !in olderPlainAssistantText
+    }.ifEmpty {
+        // Never erase an entire run. If the server sent only duplicate text
+        // frames, keep the newest one so the conversation still has an anchor.
+        listOf(accumulator.first())
+    }
+}
+
+private fun UiMessage.runPanelEchoKey(): String? {
+    if (role != "assistant") return null
+    if (isReasoning || isError) return null
+    if (!toolCalls.isNullOrEmpty()) return null
+    if (generatedUi != null || approvalRequest != null || approvalResponse != null) return null
+    if (attachments.isNotEmpty()) return null
+    val normalized = content.trim().replace(RunPanelWhitespaceRegex, " ")
+    return normalized.takeIf { it.length >= MinRunPanelEchoLength }
 }
 
 private fun runBlockKey(

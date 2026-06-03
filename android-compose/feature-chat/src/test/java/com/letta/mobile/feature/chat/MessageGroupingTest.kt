@@ -334,6 +334,53 @@ class MessageGroupingTest {
     }
 
     @Test
+    fun `run block drops plain assistant echoes already present as older chat messages`() {
+        val duplicateText = "Good — predictable nights are the best kind."
+        val items = groupMessagesForRender(
+            listOf(
+                assistant("run-tool", runId = "current", content = "about to inspect") to GroupPosition.First,
+                assistant("run-echo", runId = "current", content = duplicateText) to GroupPosition.Middle,
+                assistant("run-final", runId = "current", content = "Fresh final answer") to GroupPosition.Last,
+                assistant("history", runId = "older", content = duplicateText) to GroupPosition.None,
+            ),
+        )
+
+        assertEquals(2, items.size)
+        val currentRun = items[0] as ChatRenderItem.RunBlock
+        assertEquals(listOf("run-final", "run-tool"), currentRun.messages.map { it.first.id })
+        assertEquals("history", (items[1] as ChatRenderItem.Single).message.id)
+    }
+
+    @Test
+    fun `run block removes duplicate plain assistant text within the same block`() {
+        val repeated = "Morning, Emmanuel. How'd you sleep?"
+        val items = groupMessagesForRender(
+            listOf(
+                assistant("run-new", runId = "current", content = "Fresh final answer") to GroupPosition.First,
+                assistant("run-dup-2", runId = "current", content = repeated) to GroupPosition.Middle,
+                assistant("run-dup-1", runId = "current", content = repeated) to GroupPosition.Last,
+            ),
+        )
+
+        val currentRun = items.single() as ChatRenderItem.RunBlock
+        assertEquals(listOf("run-dup-2", "run-new"), currentRun.messages.map { it.first.id })
+    }
+
+    @Test
+    fun `run block keeps short repeated assistant messages as intentional content`() {
+        val items = groupMessagesForRender(
+            listOf(
+                assistant("run-repeat", runId = "current", content = "OK") to GroupPosition.First,
+                assistant("run-final", runId = "current", content = "Fresh final answer") to GroupPosition.Last,
+                assistant("history", runId = "older", content = "OK") to GroupPosition.None,
+            ),
+        )
+
+        val currentRun = items[0] as ChatRenderItem.RunBlock
+        assertEquals(listOf("run-final", "run-repeat"), currentRun.messages.map { it.first.id })
+    }
+
+    @Test
     fun `consecutive tool-call messages compact into one run timeline step`() {
         val steps = compactRunToolCallSteps(
             listOf(
@@ -452,11 +499,12 @@ class MessageGroupingTest {
     private fun assistant(
         id: String,
         runId: String?,
+        content: String = "a-$id",
         ts: String = "2026-04-19T12:00:00Z",
     ) = UiMessage(
         id = id,
         role = "assistant",
-        content = "a-$id",
+        content = content,
         timestamp = ts,
         runId = runId,
     )
