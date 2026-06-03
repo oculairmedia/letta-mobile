@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
@@ -61,6 +62,27 @@ internal const val ToolOutputPreviewMaxRenderedChars = 1_200
 internal const val ToolOutputMaxHighlightSpans = 800
 internal const val ToolOutputDocumentMaxCacheableRawChars = ToolOutputParser.MaxAnalyzedChars
 
+internal data class ToolCardBodyRenderEligibility(
+    val expanded: Boolean,
+    val parentVisible: Boolean,
+) {
+    val shouldRenderBody: Boolean = expanded && parentVisible
+}
+
+internal val LocalToolCardBodyParentVisible = compositionLocalOf { true }
+
+internal val LocalToolCardBodyRenderEligibility = compositionLocalOf {
+    toolCardBodyRenderEligibility(expanded = false, parentVisible = true)
+}
+
+internal fun toolCardBodyRenderEligibility(
+    expanded: Boolean,
+    parentVisible: Boolean,
+): ToolCardBodyRenderEligibility = ToolCardBodyRenderEligibility(
+    expanded = expanded,
+    parentVisible = parentVisible,
+)
+
 @Composable
 @OptIn(ExperimentalAnimationApi::class)
 internal fun ToolOutputRenderer(
@@ -88,6 +110,7 @@ internal fun ToolOutputRenderer(
     // to instant transitions. That avoids both height interpolation cascades
     // during multi-touch and content remounts on finger-up.
     val isPinching = LocalChatIsPinching.current
+    val bodyEligibility = LocalToolCardBodyRenderEligibility.current
     val clipboard = LocalClipboardManager.current
     Column(
         modifier = modifier
@@ -117,6 +140,7 @@ internal fun ToolOutputRenderer(
                 document = document,
                 expanded = isExpanded,
                 isError = isError,
+                bodyEligibility = bodyEligibility,
             )
         }
     }
@@ -127,7 +151,10 @@ private fun ToolOutputBody(
     document: ToolOutputDocument,
     expanded: Boolean,
     isError: Boolean,
+    bodyEligibility: ToolCardBodyRenderEligibility,
 ) {
+    if (!bodyEligibility.parentVisible) return
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(6.dp),
