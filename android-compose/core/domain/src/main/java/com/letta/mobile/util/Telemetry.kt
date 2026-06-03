@@ -129,12 +129,24 @@ object Telemetry {
     val timelineDumpEnabled = AtomicBoolean(false)
 
     /**
+     * Chat reducer/render hot-path diagnostics. OFF by default because these
+     * probes can emit once per streamed frame or composed tool card. Enable only
+     * while investigating chat projection/reducer/render behavior.
+     */
+    @Suppress("MemberVisibilityCanBePrivate")
+    val chatHotPathDebugEnabled = AtomicBoolean(false)
+
+    /**
      * Tag used for the adb setprop override.
      */
     private const val TIMELINE_DUMP_TAG = "LettaTimelineDump"
+    private const val CHAT_HOT_PATH_DEBUG_TAG = "LettaChatHotPath"
 
     fun isTimelineDumpEnabled(): Boolean =
         timelineDumpEnabled.get() || (delegate?.isLoggable(TIMELINE_DUMP_TAG, 2 /* VERBOSE */) ?: false)
+
+    fun isChatHotPathDebugEnabled(): Boolean =
+        chatHotPathDebugEnabled.get() || (delegate?.isLoggable(CHAT_HOT_PATH_DEBUG_TAG, 2 /* VERBOSE */) ?: false)
 
     private const val TAG_PREFIX = "Telemetry"
     private const val MAX_RING_SIZE = 1000
