@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.screen
 
+import android.view.Choreographer
 import com.letta.mobile.ui.theme.LettaCodeFont
 
 import androidx.compose.foundation.background
@@ -26,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
@@ -55,6 +57,7 @@ import com.letta.mobile.ui.theme.LocalChatIsPinching
 import com.letta.mobile.ui.theme.chatDimens
 import com.letta.mobile.ui.theme.chatShapes
 import com.letta.mobile.ui.zoom.PinchScalePreviewController
+import com.letta.mobile.util.Telemetry
 import java.time.LocalDate
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -64,6 +67,178 @@ import com.letta.mobile.feature.chat.render.ChatMessageGeometryState
 import com.letta.mobile.feature.chat.render.ChatRenderItemGeometrySignature
 import com.letta.mobile.feature.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.render.chatGeometrySignature
+
+private fun ChatRenderItem.containsExpensivePinchContent(): Boolean {
+    fun UiMessage.isExpensiveForLivePinch(): Boolean =
+        role == "tool" || !toolCalls.isNullOrEmpty() || generatedUi != null || approvalRequest != null || approvalResponse != null
+
+    return when (this) {
+        is ChatRenderItem.Single -> message.isExpensiveForLivePinch()
+        is ChatRenderItem.RunBlock -> messages.any { (message, _) -> message.isExpensiveForLivePinch() }
+    }
+}
+
+private data class ChatPinchVisibleContentSummary(
+    val userMessages: Int,
+    val assistantMessages: Int,
+    val toolCards: Int,
+    val runBlocks: Int,
+)
+
+private fun Collection<ChatRenderItem>.pinchVisibleContentSummary(): ChatPinchVisibleContentSummary {
+    var userMessages = 0
+    var assistantMessages = 0
+    var toolCards = 0
+    var runBlocks = 0
+
+    fun countMessage(message: UiMessage) {
+        when {
+            message.role == "user" -> userMessages++
+            message.role == "assistant" -> assistantMessages++
+        }
+        if (message.role == "tool" || !message.toolCalls.isNullOrEmpty() || message.generatedUi != null) {
+            toolCards++
+        }
+    }
+
+    for (item in this) {
+        when (item) {
+            is ChatRenderItem.Single -> countMessage(item.message)
+            is ChatRenderItem.RunBlock -> {
+                runBlocks++
+                item.messages.forEach { (message, _) -> countMessage(message) }
+            }
+        }
+    }
+
+    return ChatPinchVisibleContentSummary(
+        userMessages = userMessages,
+        assistantMessages = assistantMessages,
+        toolCards = toolCards,
+        runBlocks = runBlocks,
+    )
+}
+
+private class ChatPinchFrameBudgetSampler {
+    private val frameDurationsMs = ArrayList<Long>(240)
+    private var choreographer: Choreographer? = null
+    private var startedAtMs = 0L
+    private var lastFrameTimeNanos = 0L
+    private var visibleItems = 0
+    private var totalItems = 0
+    private var visibleUserMessages = 0
+    private var visibleAssistantMessages = 0
+    private var visibleToolCards = 0
+    private var visibleRunBlocks = 0
+    private var committedScale = 1f
+    private var running = false
+
+    private val callback: Choreographer.FrameCallback = object : Choreographer.FrameCallback {
+        override fun doFrame(frameTimeNanos: Long) {
+            if (!running) return
+            val previous = lastFrameTimeNanos
+            lastFrameTimeNanos = frameTimeNanos
+            if (previous != 0L) {
+                frameDurationsMs += ((frameTimeNanos - previous) / 1_000_000L).coerceAtLeast(0L)
+            }
+            choreographer?.postFrameCallback(this)
+        }
+    }
+
+    fun start(
+        visibleItems: Int,
+        totalItems: Int,
+        visibleUserMessages: Int,
+        visibleAssistantMessages: Int,
+        visibleToolCards: Int,
+        visibleRunBlocks: Int,
+        committedScale: Float,
+    ) {
+        cancel()
+        this.visibleItems = visibleItems
+        this.totalItems = totalItems
+        this.visibleUserMessages = visibleUserMessages
+        this.visibleAssistantMessages = visibleAssistantMessages
+        this.visibleToolCards = visibleToolCards
+        this.visibleRunBlocks = visibleRunBlocks
+        this.committedScale = committedScale
+        frameDurationsMs.clear()
+        startedAtMs = System.currentTimeMillis()
+        lastFrameTimeNanos = 0L
+        running = true
+        choreographer = Choreographer.getInstance().also { it.postFrameCallback(callback) }
+        Telemetry.event(
+            "ChatPinch",
+            "frameBudget.started",
+            "visibleItems" to visibleItems,
+            "totalItems" to totalItems,
+            "visibleUserMessages" to visibleUserMessages,
+            "visibleAssistantMessages" to visibleAssistantMessages,
+            "visibleToolCards" to visibleToolCards,
+            "visibleRunBlocks" to visibleRunBlocks,
+            "committedScale" to committedScale,
+        )
+    }
+
+    fun stop(committedScale: Float, targetScale: Float) {
+        if (!running) return
+        val elapsedMs = System.currentTimeMillis() - startedAtMs
+        val frames = frameDurationsMs.toList()
+        cancel()
+        if (frames.isEmpty()) {
+            Telemetry.event(
+                "ChatPinch",
+                "frameBudget.finished",
+                "frames" to 0,
+                "elapsedMs" to elapsedMs,
+                "committedScale" to committedScale,
+                "targetScale" to targetScale,
+                "visibleItems" to visibleItems,
+                "totalItems" to totalItems,
+                "visibleUserMessages" to visibleUserMessages,
+                "visibleAssistantMessages" to visibleAssistantMessages,
+                "visibleToolCards" to visibleToolCards,
+                "visibleRunBlocks" to visibleRunBlocks,
+            )
+            return
+        }
+        val sorted = frames.sorted()
+        val frameBudgetMs = 16L
+        val jankFrames = frames.count { it > frameBudgetMs }
+        val maxMs = frames.maxOrNull() ?: 0L
+        val avgMs = frames.average()
+        val p95Index = ((sorted.size - 1) * 95 / 100).coerceIn(0, sorted.lastIndex)
+        Telemetry.event(
+            "ChatPinch",
+            "frameBudget.finished",
+            "frames" to frames.size,
+            "jankFrames" to jankFrames,
+            "jankPercent" to ((jankFrames * 100.0) / frames.size),
+            "avgMs" to avgMs,
+            "p95Ms" to sorted[p95Index],
+            "maxMs" to maxMs,
+            "overBudgetTotalMs" to frames.sumOf { (it - frameBudgetMs).coerceAtLeast(0L) },
+            "elapsedMs" to elapsedMs,
+            "committedScale" to committedScale,
+            "targetScale" to targetScale,
+            "visibleItems" to visibleItems,
+            "totalItems" to totalItems,
+            "visibleUserMessages" to visibleUserMessages,
+            "visibleAssistantMessages" to visibleAssistantMessages,
+            "visibleToolCards" to visibleToolCards,
+            "visibleRunBlocks" to visibleRunBlocks,
+        )
+    }
+
+    fun cancel() {
+        if (running) {
+            choreographer?.removeFrameCallback(callback)
+        }
+        running = false
+        choreographer = null
+        lastFrameTimeNanos = 0L
+    }
+}
 
 @Composable
 internal fun ChatMessageList(
@@ -88,6 +263,7 @@ internal fun ChatMessageList(
     val chatShapes = MaterialTheme.chatShapes
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
+    val renderItemsByKey = remember(renderItems) { renderItems.associateBy { it.key } }
     val itemGeometryState = remember { ChatMessageGeometryState() }
     var highlightedMessageId by remember { mutableStateOf<String?>(null) }
     var hasScrolledToTarget by remember { mutableStateOf(false) }
@@ -97,6 +273,10 @@ internal fun ChatMessageList(
     var suppressPinchLayoutAnimations by remember { mutableStateOf(false) }
     val pinchFontScaleController = remember {
         PinchScalePreviewController(minScale = 0.7f, maxScale = 1.6f, step = 0.02f)
+    }
+    val pinchFrameBudgetSampler = remember { ChatPinchFrameBudgetSampler() }
+    DisposableEffect(Unit) {
+        onDispose { pinchFrameBudgetSampler.cancel() }
     }
     // letta-mobile-6261e: drive real text re-layout during pinch instead of a
     // graphicsLayer bitmap scale. During a gesture the controller's
@@ -253,6 +433,19 @@ internal fun ChatMessageList(
                                 suppressPinchLayoutAnimations = true
                                 pinchAnimationSuppressionTick = 0L
                                 pinchFontScaleController.begin(activeFontScale)
+                                val visibleRenderItems = listState.layoutInfo.visibleItemsInfo.mapNotNull { itemInfo ->
+                                    renderItemsByKey[itemInfo.key]
+                                }
+                                val visibleContent = visibleRenderItems.pinchVisibleContentSummary()
+                                pinchFrameBudgetSampler.start(
+                                    visibleItems = listState.layoutInfo.visibleItemsInfo.size,
+                                    totalItems = listState.layoutInfo.totalItemsCount,
+                                    visibleUserMessages = visibleContent.userMessages,
+                                    visibleAssistantMessages = visibleContent.assistantMessages,
+                                    visibleToolCards = visibleContent.toolCards,
+                                    visibleRunBlocks = visibleContent.runBlocks,
+                                    committedScale = activeFontScale,
+                                )
                                 pinchTick = System.nanoTime()
                             }
                             val zoom = event.calculateZoom()
@@ -266,10 +459,12 @@ internal fun ChatMessageList(
                         val snapped = pinchFontScaleController.finishPreview()
                         onActiveFontScaleChange(snapped)
                         onFontScaleChange(snapped)
+                        pinchFrameBudgetSampler.stop(committedScale = activeFontScale, targetScale = snapped)
                         pinchTick = System.nanoTime()
                         pinchAnimationSuppressionTick = pinchTick
                     } else {
                         pinchFontScaleController.cancel()
+                        pinchFrameBudgetSampler.cancel()
                         suppressPinchLayoutAnimations = false
                     }
                 }
@@ -397,8 +592,10 @@ internal fun ChatMessageList(
                         // visible indices don't map 1:1) — the margin already
                         // absorbs this drift.
                         val itemSeesLiveScale = !pinchFontScaleController.isPinching ||
-                            scaleWindowIndexRange.isEmpty() ||
-                            index in scaleWindowIndexRange
+                            (!renderItem.containsExpensivePinchContent() && (
+                                scaleWindowIndexRange.isEmpty() ||
+                                    index in scaleWindowIndexRange
+                            ))
                         val perItemFontScale = if (itemSeesLiveScale) liveFontScale else activeFontScale
                         CompositionLocalProvider(
                             LocalChatFontScale provides perItemFontScale,

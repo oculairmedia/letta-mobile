@@ -20,7 +20,9 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.components.MarkdownText
 import com.letta.mobile.ui.components.StreamingMarkdownText
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
+import com.letta.mobile.ui.theme.LocalChatFontScale
 import com.letta.mobile.ui.theme.chatTypography
+import com.letta.mobile.ui.theme.scaledBy
 import com.letta.mobile.feature.chat.screen.MessageToolCalls
 import kotlinx.collections.immutable.toImmutableList
 
@@ -555,7 +557,7 @@ internal object TextMessageRenderer : MessageContentRenderer {
         if (message.role == "user") {
             Text(
                 text = message.content,
-                style = MaterialTheme.chatTypography.messageBody,
+                style = MaterialTheme.chatTypography.messageBody.scaledBy(LocalChatFontScale.current),
                 color = textColor,
                 modifier = modifier,
             )
