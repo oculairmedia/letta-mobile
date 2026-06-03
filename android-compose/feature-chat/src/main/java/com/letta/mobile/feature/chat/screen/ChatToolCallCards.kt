@@ -30,6 +30,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -60,6 +61,7 @@ import com.letta.mobile.ui.theme.chatTypography
 import com.letta.mobile.ui.theme.listItemSupporting
 import com.letta.mobile.ui.theme.scaledBy
 import com.letta.mobile.ui.theme.sectionTitle
+import com.letta.mobile.util.Telemetry
 import java.util.LinkedHashMap
 import com.letta.mobile.feature.chat.render.ToolDisplayInfo
 import com.letta.mobile.feature.chat.render.ToolDisplayRegistry
@@ -69,6 +71,8 @@ private const val TOOL_CALL_ENTRANCE_ANIMATION_HISTORY_SIZE = 512
 
 private val toolCallEntranceAnimationHistory =
     RecentStringSet(TOOL_CALL_ENTRANCE_ANIMATION_HISTORY_SIZE)
+
+internal val LocalChatShouldDeferHeavyToolCards = compositionLocalOf { false }
 
 @Composable
 internal fun MessageToolCalls(
@@ -153,12 +157,17 @@ internal fun ToolCallCard(
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
     var expanded by remember { mutableStateOf(false) }
+    val showDetails = keepExpanded || expanded
+    val deferHeavyOutput = LocalChatShouldDeferHeavyToolCards.current && !showDetails && toolCall.result != null
+    val renderStartedAtMs = System.currentTimeMillis()
     val display = remember(toolCall.name, toolCall.arguments) {
         ToolDisplayRegistry.resolve(toolCall.name, toolCall.arguments)
     }
     val argumentSummary = remember(toolCall.arguments) { summarizeToolArguments(toolCall.arguments) }
     val executionTimeText = remember(toolCall.executionTimeMs) { toolCall.executionTimeMs?.let(::formatToolExecutionTime) }
-    val displayResult = remember(toolCall.result) { toolCall.result?.displayToolResult() }
+    val displayResult = remember(toolCall.result, deferHeavyOutput) {
+        if (deferHeavyOutput) toolCall.result?.deferredToolResultPreview() else toolCall.result?.displayToolResult()
+    }
     val resultPreview = remember(displayResult) { displayResult?.takeIf { it.isNotBlank() } }
     // Explicit-error-whitelist: only paint the Error icon / red color when
     // the server actually said "error". Treating `null`, "completed", or any
@@ -167,7 +176,6 @@ internal fun ToolCallCard(
     // empirical justification.
     val isError = ToolReturnStatus.isError(toolCall.status)
     val codeStyle = MaterialTheme.chatTypography.codeBlock
-    val showDetails = keepExpanded || expanded
     val approvalState = approvalStateOverride ?: toolCall.approvalDecision?.toToolApprovalState()
     val compactDetail = remember(
         display.label,
@@ -188,6 +196,18 @@ internal fun ToolCallCard(
     }
     val compactTitle = remember(toolCall.name, compactDetail) {
         compactDetail?.let { "${toolCall.name} - $it" } ?: toolCall.name
+    }
+    LaunchedEffect(toolCall.toolCallMotionKey(), showDetails, deferHeavyOutput, toolCall.result?.length) {
+        Telemetry.event(
+            "ChatToolCard",
+            "render.composed",
+            "toolName" to toolCall.name,
+            "hasResult" to (toolCall.result != null),
+            "isExpanded" to showDetails,
+            "deferredHeavyOutput" to deferHeavyOutput,
+            "resultChars" to (toolCall.result?.length ?: 0),
+            "effectDispatchDelayMs" to (System.currentTimeMillis() - renderStartedAtMs),
+        )
     }
 
     // letta-mobile-23h5 (polish 2026-04-19): give the tool card a touch
@@ -672,12 +692,16 @@ internal fun CompactToolCallRow(
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
     var expanded by remember(toolCall.toolCallMotionKey()) { mutableStateOf(false) }
+    val deferHeavyOutput = LocalChatShouldDeferHeavyToolCards.current && !expanded && toolCall.result != null
+    val renderStartedAtMs = System.currentTimeMillis()
     val display = remember(toolCall.name, toolCall.arguments) {
         ToolDisplayRegistry.resolve(toolCall.name, toolCall.arguments)
     }
     val argumentSummary = remember(toolCall.arguments) { summarizeToolArguments(toolCall.arguments) }
     val executionTimeText = remember(toolCall.executionTimeMs) { toolCall.executionTimeMs?.let(::formatToolExecutionTime) }
-    val displayResult = remember(toolCall.result) { toolCall.result?.displayToolResult() }
+    val displayResult = remember(toolCall.result, deferHeavyOutput) {
+        if (deferHeavyOutput) toolCall.result?.deferredToolResultPreview() else toolCall.result?.displayToolResult()
+    }
     val resultPreview = remember(displayResult) { displayResult?.takeIf { it.isNotBlank() } }
     val summary = remember(toolCall.name, toolCall.arguments, displayResult, toolCall.status, display.detailLine) {
         compactToolCallSummary(toolCall, display.detailLine, displayResult)
@@ -686,6 +710,18 @@ internal fun CompactToolCallRow(
         "${toolCall.name} - $summary"
     }
     val isError = ToolReturnStatus.isError(toolCall.status)
+    LaunchedEffect(toolCall.toolCallMotionKey(), expanded, deferHeavyOutput, toolCall.result?.length) {
+        Telemetry.event(
+            "ChatToolCard",
+            "compactRow.composed",
+            "toolName" to toolCall.name,
+            "hasResult" to (toolCall.result != null),
+            "isExpanded" to expanded,
+            "deferredHeavyOutput" to deferHeavyOutput,
+            "resultChars" to (toolCall.result?.length ?: 0),
+            "effectDispatchDelayMs" to (System.currentTimeMillis() - renderStartedAtMs),
+        )
+    }
     val chevronRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
         animationSpec = ChatMotion.chipCrossfadeSpec,
@@ -812,6 +848,11 @@ internal fun compactToolCallSummary(
 }
 
 internal fun String.displayToolResult(): String = ToolOutputParser.sanitizeResultFieldText(this)
+
+internal fun String.deferredToolResultPreview(): String {
+    val preview = take(240).substringBefore('\n').trim()
+    return if (length > preview.length) "$preview…" else preview
+}
 
 internal fun shouldUseCompactToolCallGroup(toolCalls: List<UiToolCall>): Boolean =
     toolCalls.size > 1

@@ -85,6 +85,18 @@ private data class ChatPinchVisibleContentSummary(
     val runBlocks: Int,
 )
 
+private data class ChatLoadPressureSummary(
+    val messageCount: Int,
+    val renderItemCount: Int,
+    val isStreaming: Boolean,
+    val isLoadingMessages: Boolean,
+    val isLoadingOlderMessages: Boolean,
+    val toolCardCount: Int,
+) {
+    val isHydrating: Boolean = isLoadingMessages
+    val isReconciling: Boolean = false
+}
+
 private fun Collection<ChatRenderItem>.pinchVisibleContentSummary(): ChatPinchVisibleContentSummary {
     var userMessages = 0
     var assistantMessages = 0
@@ -130,6 +142,14 @@ private class ChatPinchFrameBudgetSampler {
     private var visibleAssistantMessages = 0
     private var visibleToolCards = 0
     private var visibleRunBlocks = 0
+    private var loadPressure = ChatLoadPressureSummary(
+        messageCount = 0,
+        renderItemCount = 0,
+        isStreaming = false,
+        isLoadingMessages = false,
+        isLoadingOlderMessages = false,
+        toolCardCount = 0,
+    )
     private var committedScale = 1f
     private var running = false
 
@@ -152,6 +172,7 @@ private class ChatPinchFrameBudgetSampler {
         visibleAssistantMessages: Int,
         visibleToolCards: Int,
         visibleRunBlocks: Int,
+        loadPressure: ChatLoadPressureSummary,
         committedScale: Float,
     ) {
         cancel()
@@ -161,6 +182,7 @@ private class ChatPinchFrameBudgetSampler {
         this.visibleAssistantMessages = visibleAssistantMessages
         this.visibleToolCards = visibleToolCards
         this.visibleRunBlocks = visibleRunBlocks
+        this.loadPressure = loadPressure
         this.committedScale = committedScale
         frameDurationsMs.clear()
         startedAtMs = System.currentTimeMillis()
@@ -176,6 +198,14 @@ private class ChatPinchFrameBudgetSampler {
             "visibleAssistantMessages" to visibleAssistantMessages,
             "visibleToolCards" to visibleToolCards,
             "visibleRunBlocks" to visibleRunBlocks,
+            "messageCount" to loadPressure.messageCount,
+            "renderItemCount" to loadPressure.renderItemCount,
+            "isStreaming" to loadPressure.isStreaming,
+            "isLoadingMessages" to loadPressure.isLoadingMessages,
+            "isLoadingOlderMessages" to loadPressure.isLoadingOlderMessages,
+            "isHydrating" to loadPressure.isHydrating,
+            "isReconciling" to loadPressure.isReconciling,
+            "toolCardCount" to loadPressure.toolCardCount,
             "committedScale" to committedScale,
         )
     }
@@ -199,6 +229,14 @@ private class ChatPinchFrameBudgetSampler {
                 "visibleAssistantMessages" to visibleAssistantMessages,
                 "visibleToolCards" to visibleToolCards,
                 "visibleRunBlocks" to visibleRunBlocks,
+                "messageCount" to loadPressure.messageCount,
+                "renderItemCount" to loadPressure.renderItemCount,
+                "isStreaming" to loadPressure.isStreaming,
+                "isLoadingMessages" to loadPressure.isLoadingMessages,
+                "isLoadingOlderMessages" to loadPressure.isLoadingOlderMessages,
+                "isHydrating" to loadPressure.isHydrating,
+                "isReconciling" to loadPressure.isReconciling,
+                "toolCardCount" to loadPressure.toolCardCount,
             )
             return
         }
@@ -227,6 +265,14 @@ private class ChatPinchFrameBudgetSampler {
             "visibleAssistantMessages" to visibleAssistantMessages,
             "visibleToolCards" to visibleToolCards,
             "visibleRunBlocks" to visibleRunBlocks,
+            "messageCount" to loadPressure.messageCount,
+            "renderItemCount" to loadPressure.renderItemCount,
+            "isStreaming" to loadPressure.isStreaming,
+            "isLoadingMessages" to loadPressure.isLoadingMessages,
+            "isLoadingOlderMessages" to loadPressure.isLoadingOlderMessages,
+            "isHydrating" to loadPressure.isHydrating,
+            "isReconciling" to loadPressure.isReconciling,
+            "toolCardCount" to loadPressure.toolCardCount,
         )
     }
 
@@ -350,6 +396,23 @@ internal fun ChatMessageList(
     }
 
     val autoScrollSignature by rememberUpdatedState(newestMessageAutoScrollSignature(state.messages))
+    val loadPressureSummary = remember(
+        state.messages,
+        state.isStreaming,
+        state.isLoadingMessages,
+        state.isLoadingOlderMessages,
+        renderItems,
+    ) {
+        ChatLoadPressureSummary(
+            messageCount = state.messages.size,
+            renderItemCount = renderItems.size,
+            isStreaming = state.isStreaming,
+            isLoadingMessages = state.isLoadingMessages,
+            isLoadingOlderMessages = state.isLoadingOlderMessages,
+            toolCardCount = renderItems.pinchVisibleContentSummary().toolCards,
+        )
+    }
+    val currentLoadPressureSummary by rememberUpdatedState(loadPressureSummary)
 
     val isNearBottom by remember {
         derivedStateOf {
@@ -444,6 +507,7 @@ internal fun ChatMessageList(
                                     visibleAssistantMessages = visibleContent.assistantMessages,
                                     visibleToolCards = visibleContent.toolCards,
                                     visibleRunBlocks = visibleContent.runBlocks,
+                                    loadPressure = currentLoadPressureSummary,
                                     committedScale = activeFontScale,
                                 )
                                 pinchTick = System.nanoTime()
@@ -530,6 +594,11 @@ internal fun ChatMessageList(
         CompositionLocalProvider(
             LocalChatIsPinching provides suppressPinchLayoutAnimations,
             LocalChatFontScale provides liveFontScale,
+            LocalChatShouldDeferHeavyToolCards provides (
+                state.isLoadingMessages ||
+                    state.isLoadingOlderMessages ||
+                    suppressPinchLayoutAnimations
+                ),
         ) {
             LazyColumn(
                 state = listState,
