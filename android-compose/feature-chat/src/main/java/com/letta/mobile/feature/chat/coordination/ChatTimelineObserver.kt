@@ -11,6 +11,7 @@ import com.letta.mobile.data.timeline.TimelineEvent
 import com.letta.mobile.data.timeline.TimelineMessageType
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.timeline.TimelineSyncEvent
+import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toPersistentMap
@@ -52,6 +53,7 @@ internal class ChatTimelineObserver(
 ) {
     private var observerJob: Job? = null
     private var hydrateSignalJob: Job? = null
+    private var projectionCache: Map<TimelineProjectionKey, CachedTimelineProjectionEvent> = emptyMap()
 
     /**
      * Older messages fetched via pagination need to survive the next timeline
@@ -69,6 +71,7 @@ internal class ChatTimelineObserver(
         hydrateSignalJob?.cancel()
         hydrateSignalJob = null
         observerConversationId = null
+        projectionCache = emptyMap()
     }
 
     fun start(conversationId: String) {
@@ -79,6 +82,7 @@ internal class ChatTimelineObserver(
         observerJob?.cancel()
         hydrateSignalJob?.cancel()
         olderMessagesPrefix = "" to emptyList()
+        projectionCache = emptyMap()
         observerConversationId = conversationId
         observerJob = scope.launch {
             val flow = try {
@@ -126,10 +130,12 @@ internal class ChatTimelineObserver(
             try {
                 flow.collect { timeline ->
                     val prefix = olderPrefixFor(conversationId)
+                    val previousState = uiState.value
                     val projection = withContext(projectionDispatcher) {
                         projectTimelineSnapshot(
                             timeline = timeline,
                             prefix = prefix,
+                            previousState = previousState,
                         )
                     }
                     val ui = projection.ui
@@ -221,13 +227,36 @@ internal class ChatTimelineObserver(
     private fun projectTimelineSnapshot(
         timeline: Timeline,
         prefix: List<UiMessage>,
+        previousState: ChatUiState,
     ): TimelineProjection {
+        val startedAtMs = System.currentTimeMillis()
         val a2uiMessages = mutableListOf<A2uiMessage>()
-        val live = timeline.events.mapNotNull { event ->
-            val uiMessage = timelineEventToUiMessage(event) ?: return@mapNotNull null
-            val normalized = uiMessage.extractA2uiHistoryInto(a2uiMessages)
-            normalized.takeUnless { it.isEmptyAfterA2uiExtraction() }
+        var eventsReused = 0
+        var eventsProjected = 0
+        val nextCache = HashMap<TimelineProjectionKey, CachedTimelineProjectionEvent>(timeline.events.size)
+        val live = ArrayList<UiMessage>(timeline.events.size)
+
+        timeline.events.forEach { event ->
+            val key = event.projectionKey()
+            val cached = projectionCache[key]?.takeIf { it.event == event }
+            val projected = if (cached != null) {
+                eventsReused++
+                cached
+            } else {
+                eventsProjected++
+                val projection = event.projectForCache()
+                CachedTimelineProjectionEvent(
+                    event = event,
+                    uiMessage = projection.uiMessage,
+                    a2uiMessages = projection.a2uiMessages,
+                )
+            }
+            nextCache[key] = projected
+            a2uiMessages += projected.a2uiMessages
+            projected.uiMessage?.let(live::add)
         }
+        projectionCache = nextCache
+
         val combined = combineOlderPrefix(prefix, live)
         val ui = combined.toImmutableList()
         val tailIsAssistant = timeline.events.lastOrNull().let {
@@ -237,14 +266,51 @@ internal class ChatTimelineObserver(
             it is TimelineEvent.Local &&
                 it.deliveryState == DeliveryState.SENDING
         }
-        return TimelineProjection(
+        val result = TimelineProjection(
             ui = ui,
             tailIsAssistant = tailIsAssistant,
             anyLettaServerLocalPending = anyLettaServerLocalPending,
             anyConfirmed = ui.any { !it.isPending },
             a2uiMessages = a2uiMessages,
         )
+        Telemetry.event(
+            "TimelineSync",
+            "uiProjection.snapshot",
+            "conversationId" to timeline.conversationId,
+            "eventsTotal" to timeline.events.size,
+            "eventsReused" to eventsReused,
+            "eventsProjected" to eventsProjected,
+            "messageCount" to ui.size,
+            "prefixCount" to prefix.size,
+            "toolCardCount" to ui.sumOf { it.toolCardCount() },
+            "isStreaming" to previousState.isStreaming,
+            "isLoadingMessages" to previousState.isLoadingMessages,
+            "isLoadingOlderMessages" to previousState.isLoadingOlderMessages,
+            "isHydrating" to previousState.isLoadingMessages,
+            "isReconciling" to false,
+            durationMs = System.currentTimeMillis() - startedAtMs,
+        )
+        return result
     }
+
+    private fun TimelineEvent.projectForCache(): CachedTimelineProjection {
+        val extractedA2uiMessages = mutableListOf<A2uiMessage>()
+        val uiMessage = timelineEventToUiMessage(this)
+            ?.extractA2uiHistoryInto(extractedA2uiMessages)
+            ?.takeUnless { it.isEmptyAfterA2uiExtraction() }
+        return CachedTimelineProjection(
+            uiMessage = uiMessage,
+            a2uiMessages = extractedA2uiMessages.toList(),
+        )
+    }
+
+    private fun TimelineEvent.projectionKey(): TimelineProjectionKey = when (this) {
+        is TimelineEvent.Confirmed -> TimelineProjectionKey("confirmed", serverId, messageType.name)
+        is TimelineEvent.Local -> TimelineProjectionKey("local", otid, messageType.name)
+    }
+
+    private fun UiMessage.toolCardCount(): Int =
+        toolCalls?.size ?: if (role == "tool" || generatedUi != null || approvalRequest != null || approvalResponse != null) 1 else 0
 
     private fun UiMessage.extractA2uiHistoryInto(out: MutableList<A2uiMessage>): UiMessage {
         if (role != "assistant" || content.isBlank()) return this
@@ -267,6 +333,23 @@ internal class ChatTimelineObserver(
         val tailIsAssistant: Boolean,
         val anyLettaServerLocalPending: Boolean,
         val anyConfirmed: Boolean,
+        val a2uiMessages: List<A2uiMessage>,
+    )
+
+    private data class TimelineProjectionKey(
+        val source: String,
+        val id: String,
+        val type: String,
+    )
+
+    private data class CachedTimelineProjection(
+        val uiMessage: UiMessage?,
+        val a2uiMessages: List<A2uiMessage>,
+    )
+
+    private data class CachedTimelineProjectionEvent(
+        val event: TimelineEvent,
+        val uiMessage: UiMessage?,
         val a2uiMessages: List<A2uiMessage>,
     )
 }

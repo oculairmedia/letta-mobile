@@ -15,6 +15,7 @@ import com.letta.mobile.data.timeline.TimelineMessageType
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.timeline.TimelineSyncEvent
 import com.letta.mobile.data.timeline.TimelineSyncLoop
+import com.letta.mobile.util.Telemetry
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -34,6 +35,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.coroutines.ContinuationInterceptor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import com.letta.mobile.feature.chat.coordination.ChatTimelineObserver
@@ -229,6 +231,64 @@ class ChatTimelineObserverTest {
             "Final",
             A2uiBindingResolver.resolvePath(live.dataModel, "/message")!!.jsonPrimitive.content,
         )
+    }
+
+    @Test
+    fun `unchanged timeline events reuse cached ui projection and report reuse counts`() = runTest {
+        Telemetry.clear()
+        val harness = Harness(backgroundScope)
+        val first = confirmed("assistant-1", "hello", TimelineMessageType.ASSISTANT)
+        val flow = harness.seedTimeline("conv-1", listOf(first))
+
+        harness.observer.start("conv-1")
+        runCurrent()
+        val firstProjectedMessage = harness.uiState.value.messages.single()
+
+        flow.value = Timeline(
+            "conv-1",
+            events = listOf(
+                first,
+                confirmed("assistant-2", "next", TimelineMessageType.ASSISTANT),
+            ),
+        )
+        runCurrent()
+
+        assertSame(firstProjectedMessage, harness.uiState.value.messages.first())
+        val projectionEvent = Telemetry.snapshot().first {
+            it.tag == "TimelineSync" && it.name == "uiProjection.snapshot" && it.attrs["eventsTotal"] == 2
+        }
+        assertEquals(1, projectionEvent.attrs["eventsReused"])
+        assertEquals(1, projectionEvent.attrs["eventsProjected"])
+        assertEquals(2, projectionEvent.attrs["messageCount"])
+    }
+
+    @Test
+    fun `changed timeline event with same identity invalidates cached ui projection`() = runTest {
+        Telemetry.clear()
+        val harness = Harness(backgroundScope)
+        val flow = harness.seedTimeline(
+            "conv-1",
+            listOf(confirmed("assistant-1", "first", TimelineMessageType.ASSISTANT)),
+        )
+
+        harness.observer.start("conv-1")
+        runCurrent()
+        val firstProjectedMessage = harness.uiState.value.messages.single()
+
+        flow.value = Timeline(
+            "conv-1",
+            events = listOf(confirmed("assistant-1", "edited", TimelineMessageType.ASSISTANT)),
+        )
+        runCurrent()
+
+        val updatedMessage = harness.uiState.value.messages.single()
+        assertEquals("edited", updatedMessage.content)
+        assertFalse(firstProjectedMessage === updatedMessage)
+        val projectionEvent = Telemetry.snapshot().first {
+            it.tag == "TimelineSync" && it.name == "uiProjection.snapshot" && it.attrs["eventsTotal"] == 1
+        }
+        assertEquals(0, projectionEvent.attrs["eventsReused"])
+        assertEquals(1, projectionEvent.attrs["eventsProjected"])
     }
 
     private class Harness(
