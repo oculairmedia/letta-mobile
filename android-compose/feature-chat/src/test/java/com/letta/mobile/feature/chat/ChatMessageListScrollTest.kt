@@ -14,6 +14,7 @@ import com.letta.mobile.feature.chat.render.ChatMessageGeometryState
 import com.letta.mobile.feature.chat.render.ChatRenderItemGeometrySignature
 import com.letta.mobile.feature.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.render.chatGeometrySignature
+import com.letta.mobile.feature.chat.screen.chatRenderItemSeesLiveScale
 import com.letta.mobile.feature.chat.screen.calculateLazyIndexForRenderItem
 import com.letta.mobile.feature.chat.screen.newestMessageAutoScrollSignature
 
@@ -216,6 +217,52 @@ class ChatMessageListScrollTest {
         )
 
         assertNotEquals(collapsed, expanded)
+    }
+
+    @Test
+    fun `pinch live scale follows visible window regardless of expensive content`() {
+        val visibleWindow = 2..4
+
+        assertEquals(
+            true,
+            chatRenderItemSeesLiveScale(
+                isPinching = true,
+                scaleWindowIndexRange = visibleWindow,
+                itemIndex = 3,
+            ),
+        )
+        assertEquals(
+            false,
+            chatRenderItemSeesLiveScale(
+                isPinching = true,
+                scaleWindowIndexRange = visibleWindow,
+                itemIndex = 7,
+            ),
+        )
+    }
+
+    @Test
+    fun `pinch live scale includes all items before visibility window is known`() {
+        assertEquals(
+            true,
+            chatRenderItemSeesLiveScale(
+                isPinching = true,
+                scaleWindowIndexRange = IntRange.EMPTY,
+                itemIndex = 7,
+            ),
+        )
+    }
+
+    @Test
+    fun `non-pinching items always see committed live scale path`() {
+        assertEquals(
+            true,
+            chatRenderItemSeesLiveScale(
+                isPinching = false,
+                scaleWindowIndexRange = 2..4,
+                itemIndex = 7,
+            ),
+        )
     }
 
     private fun single(
