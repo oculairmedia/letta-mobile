@@ -206,7 +206,7 @@ internal fun ToolCallCard(
             "isExpanded" to showDetails,
             "deferredHeavyOutput" to deferHeavyOutput,
             "resultChars" to (toolCall.result?.length ?: 0),
-            durationMs = System.currentTimeMillis() - renderStartedAtMs,
+            "effectDispatchDelayMs" to (System.currentTimeMillis() - renderStartedAtMs),
         )
     }
 
@@ -719,7 +719,7 @@ internal fun CompactToolCallRow(
             "isExpanded" to expanded,
             "deferredHeavyOutput" to deferHeavyOutput,
             "resultChars" to (toolCall.result?.length ?: 0),
-            durationMs = System.currentTimeMillis() - renderStartedAtMs,
+            "effectDispatchDelayMs" to (System.currentTimeMillis() - renderStartedAtMs),
         )
     }
     val chevronRotation by animateFloatAsState(

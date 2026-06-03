@@ -287,6 +287,9 @@ internal class ChatTimelineObserver(
             "isLoadingMessages" to previousState.isLoadingMessages,
             "isLoadingOlderMessages" to previousState.isLoadingOlderMessages,
             "isHydrating" to previousState.isLoadingMessages,
+            // The timeline observer is downstream of reconcile emissions today;
+            // no in-flight reconcile flag is exposed here yet. Keep the field
+            // present so load-pressure telemetry has a stable schema.
             "isReconciling" to false,
             durationMs = System.currentTimeMillis() - startedAtMs,
         )

@@ -35,6 +35,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.coroutines.ContinuationInterceptor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -283,7 +284,7 @@ class ChatTimelineObserverTest {
 
         val updatedMessage = harness.uiState.value.messages.single()
         assertEquals("edited", updatedMessage.content)
-        assertFalse(firstProjectedMessage === updatedMessage)
+        assertNotSame(firstProjectedMessage, updatedMessage)
         val projectionEvent = Telemetry.snapshot().first {
             it.tag == "TimelineSync" && it.name == "uiProjection.snapshot" && it.attrs["eventsTotal"] == 1
         }
