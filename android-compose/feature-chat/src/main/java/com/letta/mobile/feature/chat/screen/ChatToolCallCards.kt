@@ -162,7 +162,9 @@ internal fun ToolCallCard(
     val view = LocalView.current
     var expanded by remember { mutableStateOf(false) }
     val showDetails = keepExpanded || expanded
-    val deferHeavyOutput = LocalChatShouldDeferHeavyToolCards.current && !showDetails && toolCall.result != null
+    val parentVisible = LocalToolCardBodyParentVisible.current
+    val canRenderFullOutput = showDetails && parentVisible
+    val deferHeavyOutput = toolCall.result != null && !canRenderFullOutput
     val renderStartedAtMs = System.currentTimeMillis()
     val display = remember(toolCall.name, toolCall.arguments) {
         ToolDisplayRegistry.resolve(toolCall.name, toolCall.arguments)
@@ -746,7 +748,9 @@ internal fun CompactToolCallRow(
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
     var expanded by remember(toolCall.toolCallMotionKey()) { mutableStateOf(false) }
-    val deferHeavyOutput = LocalChatShouldDeferHeavyToolCards.current && !expanded && toolCall.result != null
+    val parentVisible = LocalToolCardBodyParentVisible.current
+    val canRenderFullOutput = expanded && parentVisible
+    val deferHeavyOutput = toolCall.result != null && !canRenderFullOutput
     val renderStartedAtMs = System.currentTimeMillis()
     val display = remember(toolCall.name, toolCall.arguments) {
         ToolDisplayRegistry.resolve(toolCall.name, toolCall.arguments)

@@ -129,6 +129,49 @@ class CompactToolCallGroupCardTest {
     }
 
     @Test
+    fun collapsedToolCallRowUsesLightweightOutputPreviewUntilExpanded() {
+        val fullOutput = "first line\nsecond line with details"
+
+        composeRule.setContent {
+            LettaTheme(
+                appTheme = AppTheme.LIGHT,
+                themePreset = ThemePreset.DEFAULT,
+                dynamicColor = false,
+            ) {
+                LettaChatTheme {
+                    CompactToolCallGroupCard(
+                        toolCalls = listOf(
+                            UiToolCall(
+                                name = "Bash",
+                                arguments = """{"command":"pwd"}""",
+                                result = fullOutput,
+                                status = "success",
+                                toolCallId = "call-a",
+                            ),
+                            UiToolCall(
+                                name = "Read",
+                                arguments = """{"file_path":"/tmp/file.txt"}""",
+                                result = null,
+                                toolCallId = "call-b",
+                            ),
+                        ),
+                        pendingApprovalToolCallIds = emptySet(),
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Bash - Result: first line…", substring = true).assertIsDisplayed()
+        composeRule.onAllNodesWithText("second line with details", substring = true).assertCountEquals(0)
+
+        composeRule.onNodeWithText("Bash - Result: first line…", substring = true).performClick()
+
+        composeRule.onNodeWithText("Tool: Bash").assertIsDisplayed()
+        composeRule.onNodeWithText("Arguments").assertIsDisplayed()
+        composeRule.onNodeWithText("2 lines").assertIsDisplayed()
+    }
+
+    @Test
     fun groupedToolCallCardShowsApprovalActionsWhenApprovalIsPending() {
         composeRule.setContent {
             LettaTheme(
