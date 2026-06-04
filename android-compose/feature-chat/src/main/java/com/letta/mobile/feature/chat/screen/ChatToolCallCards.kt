@@ -434,12 +434,8 @@ private fun ToolCallExpandedBodyContentInner(
             fontScale = fontScale,
         )
         Column(modifier = Modifier.padding(top = 4.dp)) {
-            // Tool name and timing
-            Text(
-                text = "Tool: ${toolCall.name}",
-                style = MaterialTheme.typography.chatBubbleSender.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f),
-            )
+            // letta-mobile (toolcard-dedup): removed the "Tool: <name>" line
+            // (the header already names the tool). Timing/detail kept below.
             executionTimeText?.let { time ->
                 Text(
                     text = "Execution time: $time",
@@ -457,22 +453,10 @@ private fun ToolCallExpandedBodyContentInner(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            // Arguments
-            if (toolCall.arguments.isNotBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Arguments",
-                    style = MaterialTheme.typography.sectionTitle.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-                )
-                Text(
-                    text = toolCall.arguments,
-                    style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 6,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            // letta-mobile (toolcard-dedup): the raw-JSON "Arguments" block
+            // was removed — it duplicated the concise header summary above
+            // (e.g. the Bash command / file path). Header summary + Output
+            // only; no repetition.
             // Result — inner collapsible (letta-mobile-mge5.19).
             // Default collapsed: show the result-label row with a
             // chevron + first-line preview. Tap expands to full.
@@ -525,7 +509,12 @@ private fun ToolCallExpandedBodyContentInner(
                     raw = result,
                     expanded = resultExpanded,
                     isError = isError,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            HapticEffects.segmentTick(haptic, view)
+                            resultExpanded = !resultExpanded
+                        },
                 )
             }
         }
@@ -561,11 +550,8 @@ internal fun ToolCallExpandedBody(
                 .fillMaxWidth()
                 .padding(top = 4.dp),
         ) {
-            Text(
-                text = "Tool: ${toolCall.name}",
-                style = MaterialTheme.typography.chatBubbleSender.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f),
-            )
+            // letta-mobile (toolcard-dedup): removed the "Tool: <name>" line
+            // (header already names the tool). Timing/detail kept below.
             executionTimeText?.let { time ->
                 Text(
                     text = "Execution time: $time",
@@ -582,21 +568,8 @@ internal fun ToolCallExpandedBody(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            if (toolCall.arguments.isNotBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Arguments",
-                    style = MaterialTheme.typography.sectionTitle.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-                )
-                Text(
-                    text = toolCall.arguments,
-                    style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 6,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            // letta-mobile (toolcard-dedup): removed the duplicate raw-JSON
+            // "Arguments" block (same content as the header summary above).
             displayResult?.takeIf { it.isNotBlank() }?.let { result ->
                 var resultExpanded by remember(toolCall.result) { mutableStateOf(false) }
                 val resultChevronRotation by animateFloatAsState(
@@ -647,7 +620,12 @@ internal fun ToolCallExpandedBody(
                     raw = result,
                     expanded = resultExpanded,
                     isError = isError,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            HapticEffects.segmentTick(haptic, view)
+                            resultExpanded = !resultExpanded
+                        },
                 )
             }
         }
@@ -671,16 +649,10 @@ internal fun ToolCallExpandedSummary(
             maxLines = 2,
         )
     }
-    if (resultPreview != null) {
-        Spacer(modifier = Modifier.height(4.dp))
-        ToolSummaryLine(
-            label = if (isError) "Error" else "Result",
-            value = resultPreview,
-            fontScale = fontScale,
-            isError = isError,
-            maxLines = 2,
-        )
-    } else if (toolCall.result == null) {
+    // letta-mobile (toolcard-dedup): the "Result:" preview line was removed
+    // — it duplicated the Output section below. Keep only the running-status
+    // hint for in-flight calls that have no Output yet.
+    if (resultPreview == null && toolCall.result == null) {
         Spacer(modifier = Modifier.height(4.dp))
         ToolSummaryLine(
             label = "Status",
