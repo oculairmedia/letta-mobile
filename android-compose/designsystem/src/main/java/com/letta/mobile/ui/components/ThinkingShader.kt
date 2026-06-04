@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 import kotlin.math.PI
 import kotlin.math.sin
@@ -55,14 +56,16 @@ private const val SHADER =
 uniform float2 iResolution;
 uniform float iTime;
 uniform vec4 tint;
+uniform vec4 tint2;
+uniform vec4 tint3;
 uniform vec4 bgColor;
 
-// vcky.b4: organic-noise variant. The brightness baseline still
-// anchors at uv.y=0.92 (just inside the strip bottom — composer
-// hides it) but is now perturbed by a slow horizontal sine AND a
-// low-amplitude 1D perlin layer for texture. Audio-shader-style
-// perlin, scaled WAY down so it grains the glow without becoming a
-// visualizer.
+// p2auf: themed, slowly-evolving variant. Three theme accents
+// (tint/tint2/tint3) are blended along a very slow time phase so the
+// glow drifts across the app palette (~60-90s cycle), and the perlin
+// texture is now a two-octave field with a slow 2D crawl so the grain
+// visibly evolves instead of merely scrolling. All draw-phase; no
+// composition cost.
 float hash(float i) {
   float h = i * 127.1;
   return -1.0 + 2.0 * fract(sin(h) * 43758.1453123);
@@ -79,6 +82,36 @@ float perlin_noise_1d(float d) {
   return r * 0.5 + 0.5;
 }
 
+// p2auf: theme-controlled chaser. The three theme accents are deepened
+// (luminance-capped + saturated) so they read as COLOR on a dark
+// surface regardless of how pale the theme palette is, then arranged
+// as a repeating 3-stop ring that SCROLLS along the band over time —
+// a chaser, not a whole-strip cross-fade. Each x position shows a
+// different point in the tint -> tint2 -> tint3 cycle.
+vec3 saturate(vec3 c, float amount) {
+  float lum = dot(c, vec3(0.299, 0.587, 0.114));
+  return clamp(mix(vec3(lum), c, amount), 0.0, 1.0);
+}
+// Deepen a (possibly pale) theme color so it survives as hue on dark.
+vec3 deepen(vec3 c) {
+  vec3 s = saturate(c, 1.5);
+  // Cap luminance so bright theme accents don't wash to white; keep a
+  // floor so very dark accents still glow.
+  float lum = dot(s, vec3(0.299, 0.587, 0.114));
+  float target = clamp(lum, 0.25, 0.55);
+  return s * (target / max(lum, 0.001));
+}
+// Position within a 0..1 ring -> blended themed color across 3 stops.
+vec3 ringColor(float phase) {
+  vec3 a = deepen(tint.rgb);
+  vec3 b = deepen(tint2.rgb);
+  vec3 c = deepen(tint3.rgb);
+  float p = fract(phase) * 3.0; // 0..3 across the three stops
+  if (p < 1.0) return mix(a, b, p);
+  if (p < 2.0) return mix(b, c, p - 1.0);
+  return mix(c, a, p - 2.0);
+}
+
 half4 main(float2 fragCoord) {
   float2 uv = fragCoord / iResolution.xy;
 
@@ -88,28 +121,33 @@ half4 main(float2 fragCoord) {
   float wave_frequency = 3.2;
   float wave = sin(uv.x * wave_frequency + iTime * wave_speed) * 0.06;
 
-  // vcky.b4: perlin texture layer. Sampled along uv.x (spatial) and
-  // shifted by iTime (temporal). Amplitude 0.025 ≈ ~5.4dp on a 216dp
-  // strip — visible as grain on the glow's upper tail but small
-  // enough to never dominate the macro sine motion.
-  float noise = perlin_noise_1d(uv.x * 2.8 + iTime * 0.45);
+  // p2auf: two-octave perlin with a slow 2D crawl. Octave A is the
+  // original coarse grain (now also drifting on uv.y over time);
+  // octave B is finer and slower, summed at reduced amplitude so the
+  // field churns organically rather than sliding in one direction.
+  float nA = perlin_noise_1d(uv.x * 2.8 + iTime * 0.45 + uv.y * 1.5);
+  float nB = perlin_noise_1d(uv.x * 5.3 - iTime * 0.21 + 11.0);
+  float noise = nA * 0.7 + nB * 0.3;
   float noise_offset = (noise - 0.5) * 0.025;
 
-  float baseline = 0.92 + wave + noise_offset;
+  // p2auf: glow body hugs the bottom of the strip; the composer covers
+  // the brightest part and a soft tinted halo rises above.
+  float baseline = 0.90 + wave + noise_offset;
   float dist = clamp(baseline - uv.y, 0.0, 1.0);
-  float glow = pow(1.0 - clamp(dist / 0.90, 0.0, 1.0), 1.6);
+  float glow = pow(1.0 - clamp(dist / 0.75, 0.0, 1.0), 1.6);
 
   // Top alpha fade over the outermost 30% so the glow dissolves into
   // bgColor with zero hard line at the upper edge.
   float top_fade = smoothstep(0.0, 0.30, uv.y);
 
-  // vcky.b5: at 50% alpha against a light surface, srcOver
-  // (result = src·a + dst·(1-a)) produced too much white from the
-  // surface contribution, washing the tint. Drop to 10% — keeps the
-  // texture/motion visible but the tint reads through cleanly.
-  float a = top_fade * glow * 0.10 * tint.a;
+  float a = top_fade * glow * 0.20 * tint.a;
 
-  return vec4(tint.rgb, a);
+  // p2auf: chaser — color cycles ACROSS the band (uv.x) and the whole
+  // ring scrolls over time, so the themed accents chase along the strip
+  // rather than the whole band cross-fading as one block. 1.0 spatial
+  // cycle across the width; iTime*0.10 scrolls it leftward slowly.
+  vec3 col = ringColor(uv.x * 1.0 + iTime * 0.10);
+  return vec4(col, a);
 }
 """
 
@@ -120,6 +158,11 @@ fun ThinkingShader(
     modifier: Modifier = Modifier,
     heightDp: Int = 216,
     animate: Boolean = true,
+    // p2auf: secondary/tertiary themed accents the glow slowly drifts
+    // toward. Default to [tint] so existing single-color callers are
+    // unchanged; pass distinct theme colors for the multi-color drift.
+    tint2: Color = tint,
+    tint3: Color = tint,
 ) {
     // letta-mobile-vcky.b: API ≥ 33 gets the AGSL path; older devices fall
     // back to the Compose-native gradient so we don't ship a dead rectangle.
@@ -151,6 +194,20 @@ fun ThinkingShader(
                 tint.alpha,
             )
             shader.setFloatUniform(
+                "tint2",
+                tint2.red,
+                tint2.green,
+                tint2.blue,
+                tint2.alpha,
+            )
+            shader.setFloatUniform(
+                "tint3",
+                tint3.red,
+                tint3.green,
+                tint3.blue,
+                tint3.alpha,
+            )
+            shader.setFloatUniform(
                 "bgColor",
                 bgColor.red,
                 bgColor.green,
@@ -166,6 +223,8 @@ fun ThinkingShader(
             modifier = modifier,
             heightDp = heightDp,
             animate = animate,
+            tint2 = tint2,
+            tint3 = tint3,
         )
     }
 }
@@ -177,6 +236,8 @@ private fun ThinkingShaderFallback(
     modifier: Modifier = Modifier,
     heightDp: Int = 216,
     animate: Boolean = true,
+    tint2: Color = tint,
+    tint3: Color = tint,
 ) {
     val phase = if (animate) {
         val transition = rememberInfiniteTransition(label = "thinkingShaderFallback")
@@ -194,13 +255,36 @@ private fun ThinkingShaderFallback(
         0f
     }
 
+    // p2auf: slow themed color drift, parity with the AGSL driftColor.
+    // A separate, much slower cycle so old devices still see the palette
+    // evolve rather than sitting on one accent.
+    val driftPhase = if (animate) {
+        val driftTransition = rememberInfiniteTransition(label = "thinkingShaderColorDrift")
+        val animatedDrift by driftTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = (2 * PI).toFloat(),
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 78000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "drift",
+        )
+        animatedDrift
+    } else {
+        0f
+    }
+    val w1 = 0.5f + 0.5f * sin(driftPhase)
+    val w2 = 0.5f + 0.5f * sin(driftPhase * 0.61803f + 2.094f)
+    val drifted = lerp(lerp(tint, tint2, w1), tint3, w2 * 0.5f)
+
     // vcky.b2 fallback: glow anchored at the bottom of the strip (matches
     // the AGSL path's intent — the composer covers this and the visible
     // tail fades upward into the chat list). Horizontal phase shift gives
     // the "slightly moving" sensation without a runtime shader.
     val center = 0.5f + 0.30f * sin(phase)
-    // vcky.b5: matches the AGSL path's 10% opacity drop.
-    val mixed = tint.copy(alpha = 0.10f)
+    // p2auf: match the AGSL path's stronger 45% glow so the themed
+    // color actually reads instead of washing to white.
+    val mixed = drifted.copy(alpha = 0.45f)
 
     Canvas(
         modifier = modifier

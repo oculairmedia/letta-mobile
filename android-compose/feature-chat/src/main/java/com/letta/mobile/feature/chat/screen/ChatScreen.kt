@@ -44,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
@@ -228,12 +229,14 @@ internal fun ChatScreen(
             )
             if (thinkingAlpha > 0.001f) {
                 ThinkingShader(
-                    // vcky.b4: tertiary is the most vibrant accent in
-                    // the theme (default Color(0xFF0091EA) blue light,
-                    // CyanAccent dark, per-theme variants). Picks up the
-                    // user's currently-active theme color rather than
-                    // the muted role-label tone.
-                    tint = MaterialTheme.colorScheme.tertiary,
+                    // p2auf: theme-controlled chaser. Pass the active
+                    // theme's accent triad; the shader deepens each color
+                    // (saturates + caps luminance) so even pale theme
+                    // accents read as hue on the dark surface, then chases
+                    // them across the band over time.
+                    tint = MaterialTheme.colorScheme.primary,
+                    tint2 = MaterialTheme.colorScheme.tertiary,
+                    tint3 = MaterialTheme.colorScheme.secondary,
                     bgColor = MaterialTheme.colorScheme.surface,
                     animate = !reducedMotion,
                     modifier = Modifier
