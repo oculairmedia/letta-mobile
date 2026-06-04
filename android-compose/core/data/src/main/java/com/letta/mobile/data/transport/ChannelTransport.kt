@@ -398,6 +398,34 @@ class ChannelTransport internal constructor(
         return awaitCronResponse(requestId, frame, timeoutMs) as ServerFrame.CronDeleteAllResponse
     }
 
+    override suspend fun sendSubagentList(
+        all: Boolean,
+        timeoutMs: Long,
+    ): ServerFrame.SubagentListResponse {
+        val requestId = cronCorrelator.newCronRequestId()
+        val frame = SubagentListFrame(
+            id = UUID.randomUUID().toString(),
+            ts = nowIso(),
+            requestId = requestId,
+            all = all,
+        )
+        return awaitCronResponse(requestId, frame, timeoutMs) as ServerFrame.SubagentListResponse
+    }
+
+    override suspend fun sendSubagentTodos(
+        toolCallId: String,
+        timeoutMs: Long,
+    ): ServerFrame.SubagentTodosResponse {
+        val requestId = cronCorrelator.newCronRequestId()
+        val frame = SubagentTodosFrame(
+            id = UUID.randomUUID().toString(),
+            ts = nowIso(),
+            requestId = requestId,
+            toolCallId = toolCallId,
+        )
+        return awaitCronResponse(requestId, frame, timeoutMs) as ServerFrame.SubagentTodosResponse
+    }
+
     private suspend fun awaitCronResponse(
         requestId: String,
         frame: ClientFrame,
@@ -509,7 +537,9 @@ class ChannelTransport internal constructor(
             is ServerFrame.CronAddResponse,
             is ServerFrame.CronGetResponse,
             is ServerFrame.CronDeleteResponse,
-            is ServerFrame.CronDeleteAllResponse -> {
+            is ServerFrame.CronDeleteAllResponse,
+            is ServerFrame.SubagentListResponse,
+            is ServerFrame.SubagentTodosResponse -> {
                 frame.cronRequestIdOrNull()?.let { rid ->
                     cronCorrelator.completeRequest(rid, frame)
                 }
@@ -724,6 +754,9 @@ class ChannelTransport internal constructor(
             "cron_delete_response",
             "cron_delete_all_response",
             "crons_updated",
+            "subagent_list_response",
+            "subagent_todos_response",
+            "subagents_updated",
             "subscribe_frame",
             "subscribe_done",
         )
@@ -789,6 +822,8 @@ class ChannelTransport internal constructor(
             is ServerFrame.CronGetResponse -> requestId
             is ServerFrame.CronDeleteResponse -> requestId
             is ServerFrame.CronDeleteAllResponse -> requestId
+            is ServerFrame.SubagentListResponse -> requestId
+            is ServerFrame.SubagentTodosResponse -> requestId
             else -> null
         }
 

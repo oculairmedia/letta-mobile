@@ -88,4 +88,24 @@ interface IChannelTransport {
         agentId: String,
         timeoutMs: Long = ChannelTransport.DEFAULT_CRON_TIMEOUT_MS,
     ): ServerFrame.CronDeleteAllResponse
+
+    /**
+     * letta-mobile-73o2h.3 — §13.2: enumerate registered subagents.
+     * Active-only unless [all] is true. Mirrors [sendCronList]:
+     * resolves on the matching `subagent_list_response` frame via
+     * `request_id` correlation, throwing on timeout / send failure.
+     */
+    suspend fun sendSubagentList(
+        all: Boolean = false,
+        timeoutMs: Long = ChannelTransport.DEFAULT_CRON_TIMEOUT_MS,
+    ): ServerFrame.SubagentListResponse
+
+    /**
+     * letta-mobile-73o2h.3 — §13.3: fetch one subagent's latest
+     * TodoWrite snapshot, keyed by the parent Agent [toolCallId].
+     */
+    suspend fun sendSubagentTodos(
+        toolCallId: String,
+        timeoutMs: Long = ChannelTransport.DEFAULT_CRON_TIMEOUT_MS,
+    ): ServerFrame.SubagentTodosResponse
 }

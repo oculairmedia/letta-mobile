@@ -34,8 +34,11 @@ class FakeChannelTransport(
     val cronGetCalls = mutableListOf<String>()
     val cronDeleteCalls = mutableListOf<String>()
     val cronDeleteAllCalls = mutableListOf<String>()
+    val subagentListCalls = mutableListOf<Boolean>()
+    val subagentTodosCalls = mutableListOf<String>()
 
     var cronListDelayMs: Long = 0L
+    var subagentListDelayMs: Long = 0L
     var sendResult: Boolean = true
     var cancelResult: Boolean = true
     var byeResult: Boolean = true
@@ -50,6 +53,8 @@ class FakeChannelTransport(
     private val cronGetResponses = mutableMapOf<String, ArrayDeque<ServerFrame.CronGetResponse>>()
     private val cronDeleteResponses = mutableMapOf<String, ArrayDeque<ServerFrame.CronDeleteResponse>>()
     private val cronDeleteAllResponses = mutableMapOf<String, ArrayDeque<ServerFrame.CronDeleteAllResponse>>()
+    private val subagentListResponses = ArrayDeque<ServerFrame.SubagentListResponse>()
+    private val subagentTodosResponses = mutableMapOf<String, ArrayDeque<ServerFrame.SubagentTodosResponse>>()
 
     fun enqueueCronList(
         agentId: String?,
@@ -74,6 +79,14 @@ class FakeChannelTransport(
 
     fun enqueueCronDeleteAll(agentId: String, vararg responses: ServerFrame.CronDeleteAllResponse) {
         cronDeleteAllResponses.getOrPut(agentId) { ArrayDeque() }.addResponses(responses)
+    }
+
+    fun enqueueSubagentList(vararg responses: ServerFrame.SubagentListResponse) {
+        subagentListResponses.addResponses(responses)
+    }
+
+    fun enqueueSubagentTodos(toolCallId: String, vararg responses: ServerFrame.SubagentTodosResponse) {
+        subagentTodosResponses.getOrPut(toolCallId) { ArrayDeque() }.addResponses(responses)
     }
 
     override suspend fun connect(
@@ -176,6 +189,25 @@ class FakeChannelTransport(
         cronDeleteAllCalls += agentId
         return cronDeleteAllResponses[agentId]?.removeFirstOrNull()
             ?: error("No fake cron_delete_all response queued for $agentId")
+    }
+
+    override suspend fun sendSubagentList(
+        all: Boolean,
+        timeoutMs: Long,
+    ): ServerFrame.SubagentListResponse {
+        if (subagentListDelayMs > 0) delay(subagentListDelayMs)
+        subagentListCalls += all
+        return subagentListResponses.removeFirstOrNull()
+            ?: error("No fake subagent_list response queued")
+    }
+
+    override suspend fun sendSubagentTodos(
+        toolCallId: String,
+        timeoutMs: Long,
+    ): ServerFrame.SubagentTodosResponse {
+        subagentTodosCalls += toolCallId
+        return subagentTodosResponses[toolCallId]?.removeFirstOrNull()
+            ?: error("No fake subagent_todos response queued for $toolCallId")
     }
 
     data class SubscribeCall(

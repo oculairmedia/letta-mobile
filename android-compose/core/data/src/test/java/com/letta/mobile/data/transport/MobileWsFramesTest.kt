@@ -608,4 +608,131 @@ class MobileWsFramesTest : WordSpec({
             parsed.tasksActive shouldBe 2L
         }
     }
+
+    "Subagent frame serialization (letta-mobile-73o2h.3, §13)" should {
+        "subagent_list — encodes request_id and all flag (§13.2)" {
+            val frame = SubagentListFrame(
+                id = "f-sa-list",
+                ts = "2026-06-01T00:00:00Z",
+                requestId = "r1",
+                all = false,
+            )
+            val out = frame.encodeJson(json)
+            out shouldContain "\"type\":\"subagent_list\""
+            out shouldContain "\"request_id\":\"r1\""
+            out shouldContain "\"all\":false"
+        }
+
+        "subagent_list — all=true includes terminal entries" {
+            val out = SubagentListFrame(
+                id = "f-sa-list-2",
+                ts = "2026-06-01T00:00:00Z",
+                requestId = "r2",
+                all = true,
+            ).encodeJson(json)
+            out shouldContain "\"all\":true"
+        }
+
+        "subagent_todos — carries tool_call_id keyed by parent Agent call (§13.3)" {
+            val out = SubagentTodosFrame(
+                id = "f-sa-todos",
+                ts = "2026-06-01T00:00:00Z",
+                requestId = "r3",
+                toolCallId = "toolu_abc",
+            ).encodeJson(json)
+            out shouldContain "\"type\":\"subagent_todos\""
+            out shouldContain "\"request_id\":\"r3\""
+            out shouldContain "\"tool_call_id\":\"toolu_abc\""
+        }
+
+        "subagent_list_response — parses subagents array and correlation id (§13.2)" {
+            val payload = """
+                {"v":1,"type":"subagent_list_response","id":"r-1","ts":"t","request_id":"r1",
+                 "success":true,
+                 "subagents":[
+                   {"toolCallId":"toolu_1","description":"do the thing",
+                    "subagentType":"general-purpose","status":"running",
+                    "taskId":"task_2","subagentAgentId":"agent-local-x",
+                    "parentRunId":"run-9","startedAt":"2026-06-01T00:00:00Z"}
+                 ]}
+            """.trimIndent()
+            val parsed = json.decodeFromString(ServerFrameSerializer, payload)
+            parsed.shouldBeInstanceOf<ServerFrame.SubagentListResponse>()
+            parsed.requestId shouldBe "r1"
+            parsed.success shouldBe true
+            parsed.subagents.size shouldBe 1
+            val first = parsed.subagents.first()
+            first.toolCallId shouldBe "toolu_1"
+            first.subagentType shouldBe "general-purpose"
+            first.status shouldBe "running"
+            first.taskId shouldBe "task_2"
+            first.subagentAgentId shouldBe "agent-local-x"
+            first.parentRunId shouldBe "run-9"
+        }
+
+        "subagent_list_response — surfaces error on failure" {
+            val payload = """
+                {"v":1,"type":"subagent_list_response","id":"r","ts":"t","request_id":"r1",
+                 "success":false,"error":"registry unavailable"}
+            """.trimIndent()
+            val parsed = json.decodeFromString(ServerFrameSerializer, payload)
+            parsed.shouldBeInstanceOf<ServerFrame.SubagentListResponse>()
+            parsed.success shouldBe false
+            parsed.error shouldBe "registry unavailable"
+            parsed.subagents shouldBe emptyList()
+        }
+
+        "subagent_todos_response — parses todos snapshot + lifecycle (§13.3)" {
+            val payload = """
+                {"v":1,"type":"subagent_todos_response","id":"r","ts":"t","request_id":"r2",
+                 "success":true,"found":true,"todos_found":true,
+                 "subagent":{"toolCallId":"toolu_1","description":"d","subagentType":"general-purpose","status":"running"},
+                 "todos":[
+                   {"content":"step one","status":"completed","activeForm":"Doing step one"},
+                   {"content":"step two","status":"in_progress","activeForm":"Doing step two"}
+                 ]}
+            """.trimIndent()
+            val parsed = json.decodeFromString(ServerFrameSerializer, payload)
+            parsed.shouldBeInstanceOf<ServerFrame.SubagentTodosResponse>()
+            parsed.success shouldBe true
+            parsed.found shouldBe true
+            parsed.todosFound shouldBe true
+            parsed.subagent?.toolCallId shouldBe "toolu_1"
+            parsed.todos.size shouldBe 2
+            parsed.todos.first().content shouldBe "step one"
+            parsed.todos.first().status shouldBe "completed"
+            parsed.todos[1].status shouldBe "in_progress"
+        }
+
+        "subagent_todos_response — degrades gracefully when not found" {
+            val payload = """
+                {"v":1,"type":"subagent_todos_response","id":"r","ts":"t","request_id":"r2",
+                 "success":true,"found":false,"todos_found":false}
+            """.trimIndent()
+            val parsed = json.decodeFromString(ServerFrameSerializer, payload)
+            parsed.shouldBeInstanceOf<ServerFrame.SubagentTodosResponse>()
+            parsed.found shouldBe false
+            parsed.todosFound shouldBe false
+            parsed.subagent shouldBe null
+            parsed.todos shouldBe emptyList()
+        }
+
+        "subagents_updated — parses push with reason + fresh active snapshot (§13.4)" {
+            val payload = """
+                {"v":1,"type":"subagents_updated","id":"u-1","ts":"2026-06-01T00:00:00Z",
+                 "reason":"started",
+                 "subagent":{"toolCallId":"toolu_1","description":"d","subagentType":"general-purpose","status":"running"},
+                 "subagents_active":[
+                   {"toolCallId":"toolu_1","description":"d","subagentType":"general-purpose","status":"running"}
+                 ],
+                 "at":"2026-06-01T00:00:00Z"}
+            """.trimIndent()
+            val parsed = json.decodeFromString(ServerFrameSerializer, payload)
+            parsed.shouldBeInstanceOf<ServerFrame.SubagentsUpdated>()
+            parsed.reason shouldBe "started"
+            parsed.subagent?.toolCallId shouldBe "toolu_1"
+            parsed.subagentsActive.size shouldBe 1
+            parsed.subagentsActive.first().status shouldBe "running"
+        }
+    }
 })

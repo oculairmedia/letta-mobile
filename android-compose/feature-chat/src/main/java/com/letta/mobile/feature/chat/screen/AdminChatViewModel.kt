@@ -26,6 +26,7 @@ import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.IFolderRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.feature.chat.send.ChatSendContext
@@ -36,6 +37,8 @@ import com.letta.mobile.feature.chat.send.WsChatSendStrategy
 import com.letta.mobile.feature.chat.route.ChatRouteArgs
 import com.letta.mobile.feature.chat.session.ChatSessionInitializer
 import com.letta.mobile.feature.chat.state.ChatBannerController
+import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
+import com.letta.mobile.feature.chat.subagent.WsActiveSubagentSource
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsConnectionState
 import com.letta.mobile.runtime.RuntimeEventOutbox
@@ -106,6 +109,7 @@ internal class AdminChatViewModel @Inject constructor(
     private val notificationDeliveryCoordinator: NotificationDelivery,
     private val shimBackendDetector: ShimBackendDetector,
     private val wsChatBridge: WsChatBridge,
+    private val subagentRepository: ISubagentRepository,
     private val clientVersionProvider: ChatClientVersionProvider,
     val attachmentLimits: com.letta.mobile.data.attachment.AttachmentLimits =
         com.letta.mobile.data.attachment.AttachmentLimits.Default,
@@ -117,6 +121,17 @@ internal class AdminChatViewModel @Inject constructor(
     }
 
     val agentId: AgentId = AgentId(routeArgs.agentId)
+
+    /**
+     * letta-mobile-73o2h.3: WS-backed feed for the active-subagent status
+     * bar. Bound here (rather than at the [ChatScreen] call site) so the
+     * screen's `activeSubagentSource` parameter stays a single seam that
+     * defaults to the fake for previews/tests but gets the real per-socket
+     * registry in production. Hot-shared off [viewModelScope].
+     */
+    val activeSubagentSource: ActiveSubagentSource =
+        WsActiveSubagentSource(subagentRepository, viewModelScope)
+
     private val initialAgentName: String? = routeArgs.initialAgentName
     private val initialMessage: String? = routeArgs.initialMessage
     private val explicitConversationId: String?

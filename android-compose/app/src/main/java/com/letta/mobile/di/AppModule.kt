@@ -22,6 +22,7 @@ import com.letta.mobile.data.repository.api.IBugReportRepository
 import com.letta.mobile.data.repository.api.IConversationInspectorMessageRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.ICronRepository
+import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.repository.api.IFolderRepository
 import com.letta.mobile.data.repository.api.IGroupRepository
 import com.letta.mobile.data.repository.api.IIdentityRepository
@@ -58,6 +59,7 @@ import com.letta.mobile.data.session.SessionScopedProjectWorkRepository
 import com.letta.mobile.data.session.SessionScopedRunRepository
 import com.letta.mobile.data.session.SessionScopedScheduleRepository
 import com.letta.mobile.data.session.SessionScopedStepRepository
+import com.letta.mobile.data.session.SessionScopedSubagentRepository
 import com.letta.mobile.data.session.SessionScopedToolRepository
 import com.letta.mobile.data.session.SessionScopedVibesyncEventStreamRepository
 import com.letta.mobile.data.timeline.TimelineRepository
@@ -111,6 +113,10 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindCronRepository(impl: SessionScopedCronRepository): ICronRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSubagentRepository(impl: SessionScopedSubagentRepository): ISubagentRepository
 
     @Binds
     @Singleton

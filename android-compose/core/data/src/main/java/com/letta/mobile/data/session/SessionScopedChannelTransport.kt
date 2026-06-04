@@ -102,5 +102,11 @@ class SessionScopedChannelTransport internal constructor(
     override suspend fun sendCronDeleteAll(agentId: String, timeoutMs: Long): ServerFrame.CronDeleteAllResponse =
         sessionManager.withCurrentSession { it.channelTransport.sendCronDeleteAll(agentId, timeoutMs) }
 
+    override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long): ServerFrame.SubagentListResponse =
+        sessionManager.withCurrentSession { it.channelTransport.sendSubagentList(all, timeoutMs) }
+
+    override suspend fun sendSubagentTodos(toolCallId: String, timeoutMs: Long): ServerFrame.SubagentTodosResponse =
+        sessionManager.withCurrentSession { it.channelTransport.sendSubagentTodos(toolCallId, timeoutMs) }
+
     fun close() { proxyScope.cancel() }
 }
