@@ -236,9 +236,9 @@ internal fun ChatScreen(
                     // cyan -> teal -> indigo set reads as clear color on
                     // a dark surface even at low opacity, and the slow
                     // drift moves gently between them.
-                    tint = Color(0xFF22D3EE),  // cyan
-                    tint2 = Color(0xFF2DD4BF), // teal
-                    tint3 = Color(0xFF6366F1), // indigo
+                    tint = Color(0xFF1E40AF),  // deep blue (low luminance, reads as BLUE not white)
+                    tint2 = Color(0xFF4338CA), // deep indigo
+                    tint3 = Color(0xFF0E7490), // deep teal
                     bgColor = MaterialTheme.colorScheme.surface,
                     animate = !reducedMotion,
                     modifier = Modifier

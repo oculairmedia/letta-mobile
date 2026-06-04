@@ -95,9 +95,9 @@ vec3 driftColor(float t) {
   float p = t * 0.08; // ~78s for a full 2*pi cycle
   float w1 = 0.5 + 0.5 * sin(p);
   float w2 = 0.5 + 0.5 * sin(p * 0.61803 + 2.094);
-  vec3 a = saturate(tint.rgb, 1.8);
-  vec3 b = saturate(tint2.rgb, 1.8);
-  vec3 c = saturate(tint3.rgb, 1.8);
+  vec3 a = saturate(tint.rgb, 1.3);
+  vec3 b = saturate(tint2.rgb, 1.3);
+  vec3 c = saturate(tint3.rgb, 1.3);
   vec3 ab = mix(a, b, w1);
   return mix(ab, c, w2 * 0.5);
 }
@@ -120,9 +120,8 @@ half4 main(float2 fragCoord) {
   float noise = nA * 0.7 + nB * 0.3;
   float noise_offset = (noise - 0.5) * 0.025;
 
-  // p2auf: keep the colored body low — an ambient hint hugging the
-  // bottom, not a wall. Baseline near the strip bottom; the composer
-  // covers the brightest part and only a soft tinted halo rises above.
+  // p2auf: glow body hugs the bottom of the strip; the composer covers
+  // the brightest part and a soft tinted halo rises above.
   float baseline = 0.90 + wave + noise_offset;
   float dist = clamp(baseline - uv.y, 0.0, 1.0);
   float glow = pow(1.0 - clamp(dist / 0.75, 0.0, 1.0), 1.6);
@@ -131,11 +130,11 @@ half4 main(float2 fragCoord) {
   // bgColor with zero hard line at the upper edge.
   float top_fade = smoothstep(0.0, 0.30, uv.y);
 
-  // p2auf: moderate alpha. The color is pre-saturated in driftColor, so
-  // a thin veil still reads as color on a dark surface — alpha controls
-  // presence, saturation controls hue. 0.32 is the ambient-but-visible
-  // sweet spot.
-  float a = top_fade * glow * 0.32 * tint.a;
+  // p2auf: halved per request (0.40 -> 0.20). The deeper, lower-luminance
+  // source colors are what make it read as BLUE rather than white — high
+  // alpha on a bright color was the cause of the white wash, not lack of
+  // intensity.
+  float a = top_fade * glow * 0.20 * tint.a;
 
   vec3 col = driftColor(iTime);
   return vec4(col, a);
