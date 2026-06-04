@@ -19,6 +19,9 @@ import com.letta.mobile.feature.chat.screen.chatRenderItemSeesLiveScale
 import com.letta.mobile.feature.chat.screen.calculateLazyIndexForRenderItem
 import com.letta.mobile.feature.chat.screen.autoScrollAction
 import com.letta.mobile.feature.chat.screen.newestMessageAutoScrollSignature
+import com.letta.mobile.feature.chat.screen.shouldForceScrollOnUserSend
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 
 class ChatMessageListScrollTest {
 
@@ -209,6 +212,54 @@ class ChatMessageListScrollTest {
     }
 
     @Test
+    fun `force scroll on user send brings new user bubble into view from any position`() {
+        val signature = newestMessageAutoScrollSignature(
+            listOf(message(id = "u-new", role = "user", content = "hello there")),
+        )!!
+
+        // A brand-new user message (different id from the last handled newest)
+        // must force a scroll regardless of current scroll position.
+        assertTrue(
+            shouldForceScrollOnUserSend(
+                signature = signature,
+                previousNewestMessageId = "assistant-prev",
+            ),
+        )
+    }
+
+    @Test
+    fun `force scroll on user send does not retrigger for same user message`() {
+        val signature = newestMessageAutoScrollSignature(
+            listOf(message(id = "u-new", role = "user", content = "hello there")),
+        )!!
+
+        // Subsequent signature emissions for the SAME user message (e.g. an
+        // edit) must not re-fire the force scroll and fight manual scrolling.
+        assertFalse(
+            shouldForceScrollOnUserSend(
+                signature = signature,
+                previousNewestMessageId = "u-new",
+            ),
+        )
+    }
+
+    @Test
+    fun `force scroll on user send ignores assistant streaming updates`() {
+        val signature = newestMessageAutoScrollSignature(
+            listOf(message(id = "assistant-new", role = "assistant", content = "streaming")),
+        )!!
+
+        // Assistant updates must flow through the existing pinned/throttled
+        // path (rmzmo streaming-jank + pinned snap), not the force-scroll path.
+        assertFalse(
+            shouldForceScrollOnUserSend(
+                signature = signature,
+                previousNewestMessageId = "user-prev",
+            ),
+        )
+    }
+
+    @Test
     fun `streaming geometry floor follows render bucket across content growth`() {
         val state = ChatMessageGeometryState(maxEntries = 8)
         val short = geometrySignature(content = "Hello")
@@ -357,9 +408,10 @@ class ChatMessageListScrollTest {
         ts: String = "2026-04-20T12:00:00Z",
         content: String = id,
         isReasoning: Boolean = false,
+        role: String = "assistant",
     ) = UiMessage(
         id = id,
-        role = "assistant",
+        role = role,
         content = content,
         timestamp = ts,
         isReasoning = isReasoning,

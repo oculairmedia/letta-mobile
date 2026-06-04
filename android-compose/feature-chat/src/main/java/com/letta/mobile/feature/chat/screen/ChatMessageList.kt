@@ -439,6 +439,11 @@ internal fun ChatMessageList(
     }
 
     var lastStreamingSnapMs by remember { mutableStateOf(0L) }
+    // letta-mobile-4bgm3: track the newest message id we've already handled so
+    // we can detect when a brand-new user message lands (i.e. the user just
+    // hit send). Seeded null so the very first signature emission can be
+    // classified, but the force-scroll only fires for role == "user".
+    var lastHandledNewestMessageId by remember { mutableStateOf<String?>(null) }
 
     // Keep the bottom anchored while new messages arrive or the newest assistant
     // bubble grows during streaming. With reverseLayout=true, item 0 is the
@@ -447,7 +452,30 @@ internal fun ChatMessageList(
         snapshotFlow { autoScrollSignature }
             .distinctUntilChanged()
             .collect { signature ->
-                if (signature != null && isNearBottom && scrollToMessageId == null) {
+                if (signature == null || scrollToMessageId != null) {
+                    lastHandledNewestMessageId = signature?.messageId
+                    return@collect
+                }
+
+                // letta-mobile-4bgm3: when the user SENDS a message, the
+                // optimistic user bubble becomes the newest item. Force the
+                // viewport to that bubble regardless of current scroll
+                // position — distinct from the streaming auto-scroll throttle,
+                // which only snaps when already pinned near the bottom. Without
+                // this, sending from a scrolled-up position in a long
+                // conversation leaves the new prompt off the top edge.
+                val previousNewestId = lastHandledNewestMessageId
+                lastHandledNewestMessageId = signature.messageId
+                if (shouldForceScrollOnUserSend(
+                        signature = signature,
+                        previousNewestMessageId = previousNewestId,
+                    )
+                ) {
+                    listState.animateScrollToItem(0)
+                    return@collect
+                }
+
+                if (isNearBottom) {
                     val nowMs = System.currentTimeMillis()
                     when (autoScrollAction(
                         signature = signature,
@@ -951,6 +979,26 @@ internal fun autoScrollAction(
     if (abs(firstVisibleItemScrollOffset) > 12) return ChatAutoScrollAction.Animate
     if (nowMs - lastStreamingSnapMs < StreamingAutoScrollSnapThrottleMs) return ChatAutoScrollAction.Skip
     return ChatAutoScrollAction.Snap
+}
+
+// letta-mobile-4bgm3: a brand-new user message becoming the newest item means
+// the user just sent something (optimistic insertion). In that case we force a
+// scroll to the newest edge (item 0 with reverseLayout) so the just-sent bubble
+// is always brought into view — independent of the streaming snap throttle in
+// [autoScrollAction] and independent of whether the viewport was near the bottom.
+//
+// We require the message id to differ from the previously-handled newest id so
+// that subsequent edits/streaming updates to the same user message (or assistant
+// growth) don't re-trigger the force scroll and fight intentional manual
+// scrolling. Only role == "user" qualifies; assistant updates flow through the
+// existing pinned/throttled path so the rmzmo streaming-jank and pinned-snap
+// behaviour is untouched.
+internal fun shouldForceScrollOnUserSend(
+    signature: ChatAutoScrollSignature,
+    previousNewestMessageId: String?,
+): Boolean {
+    if (signature.role != "user") return false
+    return signature.messageId != previousNewestMessageId
 }
 
 internal fun newestMessageAutoScrollSignature(messages: List<UiMessage>): ChatAutoScrollSignature? {
