@@ -10,6 +10,7 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import com.letta.mobile.feature.chat.render.ChatMessageListChange
 import com.letta.mobile.feature.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 
@@ -147,6 +148,7 @@ internal class ChatHistoryPager(
                     olderMessages.size >= MessageRepository.OLDER_MESSAGES_PAGE_SIZE
                 uiState.value = uiState.value.copy(
                     messages = mergedMessages.toImmutableList(),
+                    messageListChange = ChatMessageListChange.Full,
                     isLoadingOlderMessages = false,
                     hasMoreOlderMessages = newHasMore,
                 )

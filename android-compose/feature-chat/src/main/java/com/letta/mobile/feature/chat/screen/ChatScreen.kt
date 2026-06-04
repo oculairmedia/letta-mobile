@@ -69,7 +69,7 @@ import com.letta.mobile.ui.components.ThinkingShader
 import com.letta.mobile.ui.components.ThinkingTextToken
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.feature.chat.coordination.ChatComposerEffect
-import com.letta.mobile.feature.chat.coordination.buildChatRenderModel
+import com.letta.mobile.feature.chat.coordination.IncrementalChatRenderItemsCache
 import com.letta.mobile.feature.chat.coordination.toChatDisplayMode
 import com.letta.mobile.feature.chat.render.A2uiDebugFrameUi
 import com.letta.mobile.feature.chat.render.ChatUiState
@@ -517,10 +517,13 @@ private fun ChatContent(
     chatMode: String = "interactive",
     modifier: Modifier = Modifier,
 ) {
-    val renderModel = remember(state.messages, chatMode) {
-        buildChatRenderModel(
+    val renderItemsCache = remember { IncrementalChatRenderItemsCache() }
+    val chatDisplayMode = chatMode.toChatDisplayMode()
+    val renderItems = remember(state.messages, chatMode, state.messageListChange) {
+        renderItemsCache.renderItems(
             messages = state.messages,
-            mode = chatMode.toChatDisplayMode(),
+            mode = chatDisplayMode,
+            change = state.messageListChange,
         )
     }
 
@@ -531,8 +534,6 @@ private fun ChatContent(
                 modifier = Modifier.weight(1f),
             )
         } else {
-            val renderItems = renderModel.renderItems
-
             if (state.messages.isEmpty() && !state.isStreaming) {
                 Spacer(modifier = Modifier.weight(1f))
             } else {

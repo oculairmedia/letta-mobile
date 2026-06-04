@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 import com.letta.mobile.feature.chat.render.ChatUiState
+import com.letta.mobile.feature.chat.render.ChatMessageListChange
 import com.letta.mobile.feature.chat.render.ConversationState
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 
@@ -109,6 +110,7 @@ internal class ChatConversationCoordinator(
                         message = e.message ?: "Failed to load conversation",
                     ),
                     messages = persistentListOf(),
+                    messageListChange = ChatMessageListChange.Full,
                     isLoadingMessages = false,
                     isLoadingOlderMessages = false,
                     hasMoreOlderMessages = false,
@@ -168,6 +170,7 @@ internal class ChatConversationCoordinator(
                 agentName = agent?.name ?: uiState.value.agentName,
                 conversationState = ConversationState.NoConversation,
                 messages = pendingClientModeBootstrapMessages(),
+                messageListChange = ChatMessageListChange.Full,
                 isLoadingMessages = false,
                 isLoadingOlderMessages = false,
                 hasMoreOlderMessages = false,
@@ -201,6 +204,7 @@ internal class ChatConversationCoordinator(
             uiState.value = uiState.value.copy(
                 conversationState = ConversationState.NoConversation,
                 messages = persistentListOf(),
+                messageListChange = ChatMessageListChange.Full,
                 isLoadingMessages = false,
                 isLoadingOlderMessages = false,
                 hasMoreOlderMessages = false,
@@ -233,6 +237,7 @@ internal class ChatConversationCoordinator(
                 uiState.value = uiState.value.copy(
                     conversationState = ConversationState.NoConversation,
                     messages = persistentListOf(),
+                    messageListChange = ChatMessageListChange.Full,
                     isLoadingMessages = false,
                     isLoadingOlderMessages = false,
                     hasMoreOlderMessages = false,
@@ -249,6 +254,7 @@ internal class ChatConversationCoordinator(
                 uiState.value = uiState.value.copy(
                     agentName = cachedAgent?.name ?: uiState.value.agentName,
                     messages = if (cachedMessages.isNotEmpty()) cachedMessages.toUiMessages().toImmutableList() else uiState.value.messages,
+                    messageListChange = ChatMessageListChange.Full,
                     isLoadingMessages = cachedMessages.isEmpty(),
                     error = null,
                 )
@@ -347,6 +353,7 @@ internal class ChatConversationCoordinator(
                 uiState.value = uiState.value.copy(
                     conversationState = ConversationState.NoConversation,
                     messages = pendingClientModeBootstrapMessages(),
+                    messageListChange = ChatMessageListChange.Full,
                     isLoadingMessages = false,
                     isStreaming = true,
                     isAgentTyping = true,
@@ -384,6 +391,7 @@ internal class ChatConversationCoordinator(
         uiState.value = uiState.value.copy(
             conversationState = ConversationState.NoConversation,
             messages = persistentListOf(),
+            messageListChange = ChatMessageListChange.Full,
             isLoadingMessages = false,
             isLoadingOlderMessages = false,
             hasMoreOlderMessages = false,

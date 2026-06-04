@@ -40,6 +40,7 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import com.letta.mobile.feature.chat.coordination.ChatTimelineObserver
+import com.letta.mobile.feature.chat.render.ChatMessageListChange
 import com.letta.mobile.feature.chat.render.ChatUiState
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -284,6 +285,7 @@ class ChatTimelineObserverTest {
             assertSame(message, harness.uiState.value.messages[index])
         }
         assertEquals("assistant-201", harness.uiState.value.messages.last().id)
+        assertEquals(ChatMessageListChange.AppendTail, harness.uiState.value.messageListChange)
     }
 
     @Test
@@ -308,6 +310,7 @@ class ChatTimelineObserverTest {
         runCurrent()
 
         assertEquals("hello", harness.uiState.value.messages.last().content)
+        assertEquals(ChatMessageListChange.ReplaceTail, harness.uiState.value.messageListChange)
         projectedHistory.forEachIndexed { index, message ->
             assertSame(message, harness.uiState.value.messages[index])
         }
@@ -381,6 +384,7 @@ class ChatTimelineObserverTest {
         assertEquals(0, fastPathEvent.attrs["prefixEventsChecked"])
         assertEquals(513, harness.uiState.value.messages.size)
         assertEquals("token 16", harness.uiState.value.messages.last().content)
+        assertEquals(ChatMessageListChange.ReplaceTail, harness.uiState.value.messageListChange)
     }
 
     private class Harness(

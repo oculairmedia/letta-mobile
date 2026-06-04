@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.feature.chat.render.ChatMessageListChange
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.common.groupMessages
 import java.time.Duration
@@ -89,6 +90,110 @@ internal fun buildChatRenderModel(
         groupedMessages = groupedMessages,
         renderItems = renderItems,
     )
+}
+
+internal class IncrementalChatRenderItemsCache {
+    var fullBuildCount: Int = 0
+        private set
+    var incrementalBuildCount: Int = 0
+        private set
+
+    private var cachedMode: ChatDisplayMode? = null
+    private var previousMessages: List<UiMessage> = emptyList()
+    private var previousTailStartIndex: Int = -1
+    private var committedRenderItems: List<ChatRenderItem> = emptyList()
+
+    fun renderItems(
+        messages: List<UiMessage>,
+        mode: ChatDisplayMode,
+        change: ChatMessageListChange,
+    ): List<ChatRenderItem> {
+        if (messages.isEmpty()) {
+            cachedMode = mode
+            previousMessages = messages
+            previousTailStartIndex = 0
+            committedRenderItems = emptyList()
+            return emptyList()
+        }
+
+        val tailStartIndex = activeTailStartIndex(messages)
+        if (canReuseCommittedHistory(messages, mode, change, tailStartIndex)) {
+            val tailRenderItems = buildChatRenderModel(
+                messages = messages.subList(tailStartIndex, messages.size),
+                mode = mode,
+            ).renderItems
+            val next = tailRenderItems + committedRenderItems
+            cachedMode = mode
+            previousMessages = messages
+            previousTailStartIndex = tailStartIndex
+            incrementalBuildCount++
+            return next
+        }
+
+        return rebuildFull(messages, mode, tailStartIndex)
+    }
+
+    private fun canReuseCommittedHistory(
+        messages: List<UiMessage>,
+        mode: ChatDisplayMode,
+        change: ChatMessageListChange,
+        tailStartIndex: Int,
+    ): Boolean {
+        val previous = previousMessages
+        if (cachedMode != mode || change == ChatMessageListChange.Full) return false
+        if (tailStartIndex != previousTailStartIndex || previous.isEmpty()) return false
+        if (tailStartIndex !in previous.indices) return false
+        if (messages[tailStartIndex].id != previous[tailStartIndex].id) return false
+
+        return when (change) {
+            ChatMessageListChange.AppendTail ->
+                messages.size == previous.size + 1 &&
+                    messages[messages.size - 2].id == previous.last().id
+            ChatMessageListChange.ReplaceTail ->
+                messages.size == previous.size &&
+                    (messages.size == 1 || messages[messages.size - 2].id == previous[messages.size - 2].id)
+            ChatMessageListChange.Full -> false
+        }
+    }
+
+    private fun rebuildFull(
+        messages: List<UiMessage>,
+        mode: ChatDisplayMode,
+        tailStartIndex: Int,
+    ): List<ChatRenderItem> {
+        val full = buildChatRenderModel(messages, mode).renderItems
+        committedRenderItems = if (tailStartIndex > 0) {
+            buildChatRenderModel(
+                messages = messages.subList(0, tailStartIndex),
+                mode = mode,
+            ).renderItems
+        } else {
+            emptyList()
+        }
+        cachedMode = mode
+        previousMessages = messages
+        previousTailStartIndex = tailStartIndex
+        fullBuildCount++
+        return full
+    }
+
+    private fun activeTailStartIndex(messages: List<UiMessage>): Int {
+        val lastUserIndex = messages.indexOfLast { it.role == "user" }
+        var start = if (lastUserIndex <= 0) 0 else lastUserIndex - 1
+        val contextRunId = messages[start].runId.takeIf {
+            messages[start].role == "assistant" && !it.isNullOrBlank()
+        }
+        if (contextRunId != null) {
+            while (
+                start > 0 &&
+                messages[start - 1].role == "assistant" &&
+                messages[start - 1].runId == contextRunId
+            ) {
+                start--
+            }
+        }
+        return start
+    }
 }
 
 private fun attachLatencyMetadata(messages: List<UiMessage>): List<UiMessage> {

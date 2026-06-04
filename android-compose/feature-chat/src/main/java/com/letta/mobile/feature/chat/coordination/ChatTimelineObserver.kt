@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.letta.mobile.feature.chat.a2ui.A2uiHistoryExtractor
+import com.letta.mobile.feature.chat.render.ChatMessageListChange
 import com.letta.mobile.feature.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.render.timelineEventToUiMessage
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
@@ -181,6 +182,7 @@ internal class ChatTimelineObserver(
                         prev,
                         prev.copy(
                             messages = ui,
+                            messageListChange = projection.messageListChange,
                             a2uiSurfaces = a2uiSurfaces.toPersistentMap(),
                             isLoadingMessages = if (clearLoading) false else prev.isLoadingMessages,
                             isStreaming = nextIsStreaming,
@@ -279,28 +281,31 @@ internal class ChatTimelineObserver(
         val anyLettaServerLocalPending = nextRecords.any(CachedTimelineProjectionEvent::isLettaServerLocalPending)
         val anyConfirmed = nextRecords.any(CachedTimelineProjectionEvent::isConfirmedVisible)
         val liveToolCardCount = nextRecords.sumOf { it.toolCardCount }
-        val toolCardCount = prefix.sumOf { it.toolCardCount() } + liveToolCardCount
+        val prefixToolCardCount = prefix.sumOf { it.toolCardCount() }
         val result = TimelineProjection(
             ui = ui,
             tailIsAssistant = tailIsAssistant,
             anyLettaServerLocalPending = anyLettaServerLocalPending,
             anyConfirmed = anyConfirmed,
             a2uiMessages = a2uiMessages,
-            toolCardCount = toolCardCount,
+            toolCardCount = prefixToolCardCount + liveToolCardCount,
             eventsReused = eventsReused,
             eventsProjected = eventsProjected,
             prefixEventsChecked = 0,
             fastPath = false,
+            messageListChange = ChatMessageListChange.Full,
         )
         lastProjectionSnapshot = CachedTimelineProjectionSnapshot(
             conversationId = timeline.conversationId,
             stablePrefixVersion = timeline.stablePrefixVersion,
             records = nextRecords,
             liveMessages = live,
+            prefix = prefix,
             a2uiMessages = a2uiMessages.toList(),
             anyLettaServerLocalPending = anyLettaServerLocalPending,
             anyConfirmed = anyConfirmed,
             toolCardCount = liveToolCardCount,
+            prefixToolCardCount = prefixToolCardCount,
         )
         emitProjectionTelemetry(
             timeline = timeline,
@@ -318,6 +323,7 @@ internal class ChatTimelineObserver(
     ): TimelineProjection? {
         val previous = lastProjectionSnapshot ?: return null
         if (previous.conversationId != timeline.conversationId || timeline.events.isEmpty()) return null
+        if (previous.prefix !== prefix) return null
 
         val replaceTail = timeline.events.size == previous.records.size &&
             timeline.stablePrefixVersion == previous.stablePrefixVersion
@@ -376,22 +382,30 @@ internal class ChatTimelineObserver(
             stablePrefixVersion = timeline.stablePrefixVersion,
             records = records,
             liveMessages = live,
+            prefix = prefix,
             a2uiMessages = a2uiMessages,
             anyLettaServerLocalPending = anyLettaServerLocalPending,
             anyConfirmed = anyConfirmed,
             toolCardCount = toolCardCount,
+            prefixToolCardCount = previous.prefixToolCardCount,
         )
+        val messageListChange = if (appendTail) {
+            ChatMessageListChange.AppendTail
+        } else {
+            ChatMessageListChange.ReplaceTail
+        }
         return TimelineProjection(
             ui = ui,
             tailIsAssistant = tailIsAssistant,
             anyLettaServerLocalPending = anyLettaServerLocalPending,
             anyConfirmed = anyConfirmed,
             a2uiMessages = a2uiMessages,
-            toolCardCount = prefix.sumOf { it.toolCardCount() } + records.sumOf { it.toolCardCount },
+            toolCardCount = previous.prefixToolCardCount + toolCardCount,
             eventsReused = records.size - (if (tailCached == null) 1 else 0),
             eventsProjected = if (tailCached == null) 1 else 0,
             prefixEventsChecked = 0,
             fastPath = true,
+            messageListChange = messageListChange,
         )
     }
 
@@ -483,6 +497,7 @@ internal class ChatTimelineObserver(
         val eventsProjected: Int,
         val prefixEventsChecked: Int,
         val fastPath: Boolean,
+        val messageListChange: ChatMessageListChange,
     )
 
     private data class CachedTimelineProjectionSnapshot(
@@ -490,10 +505,12 @@ internal class ChatTimelineObserver(
         val stablePrefixVersion: Long,
         val records: List<CachedTimelineProjectionEvent>,
         val liveMessages: List<UiMessage>,
+        val prefix: List<UiMessage>,
         val a2uiMessages: List<A2uiMessage>,
         val anyLettaServerLocalPending: Boolean,
         val anyConfirmed: Boolean,
         val toolCardCount: Int,
+        val prefixToolCardCount: Int,
     )
 
     private data class TimelineProjectionKey(

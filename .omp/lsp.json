@@ -1,0 +1,10 @@
+{
+  "servers": {
+    "kotlin-lsp": {
+      "command": "kotlin-lsp",
+      "args": ["--stdio"],
+      "fileTypes": [".kt", ".kts"],
+      "rootMarkers": ["android-compose/settings.gradle.kts", "android-compose/build.gradle.kts"]
+    }
+  }
+}
