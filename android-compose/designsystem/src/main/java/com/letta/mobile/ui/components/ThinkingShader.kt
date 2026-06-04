@@ -135,9 +135,11 @@ half4 main(float2 fragCoord) {
   // brightest part and a soft halo rises above. (geometry unchanged)
   float baseline = 0.90 + wave + noise_offset;
   float dist = clamp(baseline - uv.y, 0.0, 1.0);
-  // Taller band hugging the bottom; dissolves upward (larger divisor =
-  // the colored body rises higher up the strip).
-  float glow = pow(1.0 - clamp(dist / 0.70, 0.0, 1.0), 2.0);
+  // Band hugging the bottom; dissolves upward. Divisor controls height
+  // (too large = the colour washes up over the messages); pow keeps the
+  // top edge soft. 0.55 = a touch taller than the slim version but still
+  // an accent at the composer, NOT a screen-wide wash.
+  float glow = pow(1.0 - clamp(dist / 0.55, 0.0, 1.0), 2.6);
 
   // Vivid drifting multi-color body, then SOFTENED by pre-mixing the
   // background colour into it. BG_MIX pulls the vivid palette toward the
