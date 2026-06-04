@@ -135,13 +135,16 @@ half4 main(float2 fragCoord) {
   // brightest part and a soft halo rises above. (geometry unchanged)
   float baseline = 0.90 + wave + noise_offset;
   float dist = clamp(baseline - uv.y, 0.0, 1.0);
-  // Subtler effect = THINNER colored band (not lower alpha). Smaller
-  // divisor + steeper pow concentrates vivid color into a slim strip
-  // hugging the bottom; the rest dissolves to bg in color space.
-  float glow = pow(1.0 - clamp(dist / 0.35, 0.0, 1.0), 3.0);
+  // Full-height band hugging the bottom; dissolves upward.
+  float glow = pow(1.0 - clamp(dist / 0.45, 0.0, 1.0), 2.4);
 
-  // Vivid drifting multi-color body.
-  vec3 col = mix4(uv);
+  // Vivid drifting multi-color body, then SOFTENED by pre-mixing the
+  // background colour into it. BG_MIX pulls the vivid palette toward the
+  // chat surface tone so the glow reads as a muted/soft colour rather
+  // than a bright wash — keeps the full band height and the drift, just
+  // less saturated. Color-space (toward the real bg), so never grey.
+  float BG_MIX = 0.55; // 0=fully vivid, 1=invisible (== bg)
+  vec3 col = mix(mix4(uv), bgColor.rgb, BG_MIX);
 
   // COLOR-SPACE dissolve (TTS technique): render col at FULL opacity and
   // mix toward the ACTUAL bgColor as we approach the top of the strip,
@@ -150,14 +153,9 @@ half4 main(float2 fragCoord) {
   // as before (top ~30% blends out) and additionally damped by the glow
   // body so the diffuse tail above the composer fades cleanly.
   float top_fade = smoothstep(0.0, 0.30, uv.y);
-  // PRESENCE_CAP: the color never becomes fully solid — even at peak glow
-  // it stays partly dissolved toward bg, so the effect reads as a SOFT
-  // tint rather than a bright wash. This is the real "opacity" control:
-  // it reduces presence in COLOR SPACE (mixing toward bgColor), so it
-  // softens WITHOUT the grey-wash that a low output alpha causes on dark.
-  float PRESENCE_CAP = 0.45; // 0=invisible, 1=fully solid color
-  float presence = top_fade * glow * PRESENCE_CAP;
-  float fade = 1.0 - presence;
+  // Dissolve to bg toward the top edge (softening is handled by BG_MIX
+  // above, so the body stays full-height; this just blends the edges).
+  float fade = 1.0 - top_fade * glow;
   vec4 final_color = mix(vec4(col, 1.0), bgColor, fade);
 
   // tint.a is the caller-supplied overall glow strength multiplier.
