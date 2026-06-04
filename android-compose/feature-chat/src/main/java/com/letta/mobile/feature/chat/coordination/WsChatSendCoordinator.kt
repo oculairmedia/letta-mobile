@@ -88,17 +88,13 @@ internal class WsChatSendCoordinator(
         // still trips its cap we surface protocol_violation as a one-
         // shot toast via the standard Error path.
 
-        // letta-mobile-wdrc: when a fresh route already has a live WS,
-        // ask the shim to mint the conversation inside send_message. If
-        // the socket is not live yet, keep vcky's REST pre-create path as
-        // the compatibility fallback before connecting and sending.
-        val currentConversationId = activeConversationId()
-        val startNewConversation = isFreshRoute &&
-            currentConversationId == null &&
-            wsChatBridge.isConnected()
+        // The live shim requires every send_message to carry a concrete
+        // conversation_id. Pre-create fresh conversations through REST instead
+        // of sending a blank placeholder and relying on shim-side minting.
+        val currentConversationId = activeConversationId()?.takeIf { it.isNotBlank() }
+        val startNewConversation = false
         val conversationId = when {
             currentConversationId != null -> currentConversationId
-            startNewConversation -> NEW_CONVERSATION_PLACEHOLDER
             else -> runCatching {
                 conversationRepository.createConversation(AgentId(agentId)).id.value
             }.getOrElse { err ->
@@ -640,7 +636,6 @@ internal class WsChatSendCoordinator(
         private const val CONNECT_WAIT_MS = 1_500L
         private const val MAX_PENDING_SENDS = 10
         private const val DEQUEUE_RETRY_DELAY_MS = 50L
-        private const val NEW_CONVERSATION_PLACEHOLDER = ""
         private const val BARE_STOP_REASON_ERROR_MESSAGE =
             "Agent run failed after your message was sent. No error details were provided by the shim."
         private const val CURSOR_EXPIRED_ERROR_CODE = "cursor_expired"

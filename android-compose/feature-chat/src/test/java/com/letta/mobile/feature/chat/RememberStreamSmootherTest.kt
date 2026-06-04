@@ -1,12 +1,18 @@
 package com.letta.mobile.feature.chat
 
+import com.letta.mobile.feature.chat.render.STREAMING_TEXT_PAINT_INTERVAL_MS
+import com.letta.mobile.feature.chat.render.StreamingDisplayTextSmoother
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import com.letta.mobile.feature.chat.render.StreamingDisplayTextSmoother
 
 class RememberStreamSmootherTest {
+
+    @Test
+    fun `visible smoother cadence matches streaming markdown paint window`() {
+        assertEquals(50L, STREAMING_TEXT_PAINT_INTERVAL_MS)
+    }
 
     @Test
     fun `updates and reveals text progressively`() {

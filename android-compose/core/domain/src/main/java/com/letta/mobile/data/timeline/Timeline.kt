@@ -173,6 +173,12 @@ data class Timeline(
         }
     }
 
+    private val identityKeySet: Set<String> by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        HashSet<String>(events.size * 3).also { keys ->
+            events.forEach { event -> keys += event.identityKeys() }
+        }
+    }
+
     init {
         val positionViolation = events.zipWithNext().any { (a, b) -> a.position >= b.position }
         val otidDupes = events.size != events.distinctBy { it.otid }.size
@@ -203,6 +209,12 @@ data class Timeline(
     }
 
     fun findByOtid(otid: String): TimelineEvent? = otidToIndex[otid]?.let { events[it] }
+
+    fun containsIdentityFor(event: TimelineEvent): Boolean {
+        val tail = events.lastOrNull()
+        if (tail != null && tail.identityKeys().any { it in event.identityKeys() }) return true
+        return event.identityKeys().any { it in identityKeySet }
+    }
 
     /**
      * Find an event by its server message id. Used by the resume-stream

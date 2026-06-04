@@ -159,7 +159,7 @@ internal class SendCommand : AdminShimCommand(
         val rest = CliRestClient(baseUrl, token)
         try {
             val resolvedAgentId = requireAgentId(agentId)
-            val conversationId = conversation ?: defaultConversationId() ?: rest.createConversation(resolvedAgentId).id
+            val conversationId = conversation ?: defaultConversationId() ?: rest.createConversation(resolvedAgentId).id.value
             val attachments = readImageAttachments(images)
             val messageText = text.orEmpty()
             if (messageText.isBlank() && attachments.isEmpty()) {
@@ -217,7 +217,7 @@ internal class CaptureCommand : AdminShimCommand(
         }
         val captureBaseUrl = shimUrl ?: baseUrl
         val conversationId = requireConversationId(conversation)
-        val resolvedAgentId = if (message != null) requireAgentId(agentId) else agentId ?: defaultAgentId()
+        val resolvedAgentId: String? = if (message != null) requireAgentId(agentId) else agentId ?: defaultAgentId()
         val restMessages = if (skipRestSnapshot) {
             null
         } else {
@@ -452,7 +452,7 @@ internal class RecordCommand : AdminShimCommand(
     override fun run() = runBlocking {
         val attachments = readImageAttachments(images)
         val shouldSendMessage = message != null || attachments.isNotEmpty()
-        val resolvedAgentId = if (shouldSendMessage) requireAgentId(agentId) else agentId ?: defaultAgentId()
+        val resolvedAgentId: String? = if (shouldSendMessage) requireAgentId(agentId) else agentId ?: defaultAgentId()
         val resolvedConversationId = if (shouldSendMessage) {
             requireConversationId(conversation)
         } else {

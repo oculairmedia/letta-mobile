@@ -94,7 +94,7 @@ class WsChatSendCoordinatorTest {
     }
 
     @Test
-    fun `fresh route on connected ws asks shim to create conversation and adopts turn started id`() = runTest {
+    fun `fresh route pre-creates conversation before ws send`() = runTest {
         val wsChatBridge = mockBridge(sendAccepted = true)
         val timelineRepository = FakeTimelineExternalTransportWriter()
         val conversationRepository = stubConversationRepository(conversationId = "conv-rest-fallback")
@@ -120,17 +120,19 @@ class WsChatSendCoordinatorTest {
 
         coordinator.send("hello").join()
 
-        coVerify(exactly = 0) { conversationRepository.createConversation(any<AgentId>(), any()) }
+        coVerify(exactly = 1) { conversationRepository.createConversation(AgentId("agent-1"), any()) }
         assertTrue(cleared)
-        assertTrue(timelineRepository.externalLocals.isEmpty())
+        assertEquals("conv-rest-fallback", activeConversation)
+        assertEquals("conv-rest-fallback", observedConversation)
+        assertEquals("conv-rest-fallback", timelineRepository.externalLocals.single().conversationId)
         verify(exactly = 1) {
             wsChatBridge.send(
                 agentId = "agent-1",
-                conversationId = "",
+                conversationId = "conv-rest-fallback",
                 text = "hello",
                 otid = any(),
                 attachments = emptyList(),
-                startNewConversation = true,
+                startNewConversation = false,
             )
         }
 
@@ -146,7 +148,7 @@ class WsChatSendCoordinatorTest {
 
         assertEquals("conv-shim-created", activeConversation)
         assertEquals("conv-shim-created", observedConversation)
-        assertEquals("conv-shim-created", timelineRepository.externalLocals.single().conversationId)
+        assertEquals("conv-rest-fallback", timelineRepository.externalLocals.first().conversationId)
         assertEquals(ConversationState.Ready("conv-shim-created"), uiState.value.conversationState)
     }
 
@@ -955,7 +957,7 @@ class WsChatSendCoordinatorTest {
         conversationId: String = "conv-default-agent-1",
         agentId: String = "agent-1",
     ): ConversationRepository = mockk(relaxed = true) {
-        coEvery { createConversation(agentId, any()) } returns Conversation(
+        coEvery { createConversation(AgentId(agentId), any()) } returns Conversation(
             id = com.letta.mobile.data.model.ConversationId(conversationId),
             agentId = AgentId(agentId),
             createdAt = "1970-01-01T00:00:00Z",
