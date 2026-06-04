@@ -457,22 +457,10 @@ private fun ToolCallExpandedBodyContentInner(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            // Arguments
-            if (toolCall.arguments.isNotBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Arguments",
-                    style = MaterialTheme.typography.sectionTitle.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-                )
-                Text(
-                    text = toolCall.arguments,
-                    style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 6,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            // letta-mobile (toolcard-dedup): the raw-JSON "Arguments" block
+            // was removed — it duplicated the concise header summary above
+            // (e.g. the Bash command / file path). Header summary + Output
+            // only; no repetition.
             // Result — inner collapsible (letta-mobile-mge5.19).
             // Default collapsed: show the result-label row with a
             // chevron + first-line preview. Tap expands to full.
@@ -582,21 +570,8 @@ internal fun ToolCallExpandedBody(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            if (toolCall.arguments.isNotBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Arguments",
-                    style = MaterialTheme.typography.sectionTitle.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-                )
-                Text(
-                    text = toolCall.arguments,
-                    style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 6,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            // letta-mobile (toolcard-dedup): removed the duplicate raw-JSON
+            // "Arguments" block (same content as the header summary above).
             displayResult?.takeIf { it.isNotBlank() }?.let { result ->
                 var resultExpanded by remember(toolCall.result) { mutableStateOf(false) }
                 val resultChevronRotation by animateFloatAsState(
