@@ -97,7 +97,7 @@ internal fun SubagentTodo.toItem(): SubagentTodoItem {
     val label = when (normalized) {
         SubagentTodoStatus.IN_PROGRESS -> activeForm.ifBlank { content }
         else -> content.ifBlank { activeForm }
-    }
+    }.ifBlank { "Untitled todo" }
     return SubagentTodoItem(label = label, status = normalized)
 }
 

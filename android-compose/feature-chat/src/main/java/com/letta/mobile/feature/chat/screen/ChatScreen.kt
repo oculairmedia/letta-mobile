@@ -366,7 +366,7 @@ internal fun ChatScreen(
                     var todoState by remember(subagent.id) {
                         mutableStateOf<SubagentTodoSheetState>(SubagentTodoSheetState.Loading)
                     }
-                    LaunchedEffect(subagent.id) {
+                    LaunchedEffect(resolvedSubagentSource, subagent.id) {
                         todoState = subagentTodoSheetStateFrom(
                             resolvedSubagentSource.todos(subagent.id),
                         )
