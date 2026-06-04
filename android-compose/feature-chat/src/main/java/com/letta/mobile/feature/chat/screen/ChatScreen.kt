@@ -269,9 +269,14 @@ internal fun ChatScreen(
                     // sits on the scaffold/window background (colorScheme.
                     // background), NOT surface; use the explicit chat-bg
                     // color when one is set.
+                    // The chat actually sits on the Scaffold container color
+                    // (LettaTopBarDefaults.scaffoldContainerColor() ==
+                    // colorScheme.surfaceContainer), NOT surface/background.
+                    // Dissolving toward the wrong one is what produced the
+                    // hard line. Use the explicit chat-bg color when set.
                     bgColor = when (val cb = chatBackground) {
                         is ChatBackground.SolidColor -> cb.color
-                        else -> MaterialTheme.colorScheme.background
+                        else -> MaterialTheme.colorScheme.surfaceContainer
                     },
                     animate = !reducedMotion,
                     modifier = Modifier
