@@ -72,6 +72,27 @@ EOF
 export JAVA_HOME="/c/Program Files/Eclipse Adoptium/jdk-26"
 ```
 
+### Optional Kotlin LSP setup
+
+The OpenCode/OMP LSP config in `.omp/lsp.json` expects the official JetBrains
+Kotlin language server executable to be available as `kotlin-lsp` on `PATH` and
+started with `--stdio`. Use the `Kotlin/kotlin-lsp` release binary rather than
+the deprecated `fwcd/kotlin-language-server` project.
+
+Install/update by downloading the latest `kotlin-lsp` archive for your platform
+from `https://github.com/Kotlin/kotlin-lsp/releases`, extracting it outside the
+repo, and adding the extracted `bin/` directory to `PATH`. Verify the executable
+is discoverable before opening the workspace:
+
+```bash
+kotlin-lsp --version
+```
+
+The configured root markers are `android-compose/settings.gradle.kts` and
+`android-compose/build.gradle.kts` because the Kotlin/Gradle workspace lives in
+the `android-compose/` subproject; the repository root intentionally does not
+contain Gradle marker files.
+
 ## Recommended build checks
 
 Run these from `android-compose/` before pushing (the pre-push hook covers the first one automatically):
