@@ -98,6 +98,13 @@ class UrlAutolinkTest {
     }
 
     @Test
+    fun `autolinkBareUrls preserves dashed path segments in GitHub PR URLs`() {
+        val input = "PR: https://github.com/oculairmedia/letta-mobile/pull/341"
+        val expected = "PR: [https://github.com/oculairmedia/letta-mobile/pull/341](https://github.com/oculairmedia/letta-mobile/pull/341)"
+        assertEquals(expected, autolinkBareUrls(input))
+    }
+
+    @Test
     fun `autolinkBareUrls handles mixed content with inline code and bare URLs`() {
         val input = "Use `curl https://api.example.com` but visit https://example.com directly"
         val expected = "Use `curl https://api.example.com` but visit [https://example.com](https://example.com) directly"

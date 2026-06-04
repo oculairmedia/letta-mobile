@@ -75,15 +75,6 @@ private fun AssistantResponseText(
     // stable across the flicker.
     val useStreamingRenderer = (isStreaming && textHasGrown) || hasStreamed
 
-    if (!useStreamingRenderer && !hasTable) {
-        MarkdownText(
-            text = text,
-            textColor = textColor,
-            modifier = modifier,
-        )
-        return
-    }
-
     val smoothedText = if (useStreamingRenderer) {
         // letta-mobile-uoiu6: seed the smoother with the text that was already
         // painted via the plain MarkdownText path on the first composition
