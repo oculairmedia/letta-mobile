@@ -114,6 +114,7 @@ dependencies {
     ksp("com.google.dagger:hilt-compiler:2.59.2")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:6.1.0")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation("io.ktor:ktor-client-core:3.5.0")
     testImplementation("io.mockk:mockk:1.14.9")
@@ -130,6 +131,7 @@ dependencies {
     testImplementation("androidx.test.ext:junit-ktx:1.3.0")
     testImplementation("com.google.dagger:hilt-android-testing:2.59.2")
     kspTest("com.google.dagger:hilt-compiler:2.59.2")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.1.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.0")
     testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.1.0")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
