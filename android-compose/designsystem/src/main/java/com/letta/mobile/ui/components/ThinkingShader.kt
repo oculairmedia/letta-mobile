@@ -135,15 +135,16 @@ half4 main(float2 fragCoord) {
   // brightest part and a soft halo rises above. (geometry unchanged)
   float baseline = 0.90 + wave + noise_offset;
   float dist = clamp(baseline - uv.y, 0.0, 1.0);
-  // Full-height band hugging the bottom; dissolves upward.
-  float glow = pow(1.0 - clamp(dist / 0.45, 0.0, 1.0), 2.4);
+  // Taller band hugging the bottom; dissolves upward (larger divisor =
+  // the colored body rises higher up the strip).
+  float glow = pow(1.0 - clamp(dist / 0.70, 0.0, 1.0), 2.0);
 
   // Vivid drifting multi-color body, then SOFTENED by pre-mixing the
   // background colour into it. BG_MIX pulls the vivid palette toward the
   // chat surface tone so the glow reads as a muted/soft colour rather
   // than a bright wash — keeps the full band height and the drift, just
   // less saturated. Color-space (toward the real bg), so never grey.
-  float BG_MIX = 0.55; // 0=fully vivid, 1=invisible (== bg)
+  float BG_MIX = 0.70; // 0=fully vivid, 1=invisible (== bg)
   vec3 col = mix(mix4(uv), bgColor.rgb, BG_MIX);
 
   // COLOR-SPACE dissolve (TTS technique): render col at FULL opacity and
