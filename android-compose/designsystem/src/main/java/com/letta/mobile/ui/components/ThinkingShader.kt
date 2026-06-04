@@ -152,7 +152,8 @@ half4 main(float2 fragCoord) {
   vec4 final_color = mix(vec4(col, 1.0), bgColor, fade);
 
   // tint.a is the caller-supplied overall glow strength multiplier.
-  return vec4(final_color.xyz, final_color.a * tint.a);
+  // GLOW_OPACITY halves the overall effect (per-request 50% of prior strength).
+  return vec4(final_color.xyz, final_color.a * tint.a * 0.5);
 }
 """
 

@@ -3,11 +3,11 @@ package com.letta.mobile.feature.chat.subagent
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource.Companion.activeOnly
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
 import org.junit.jupiter.api.Tag
-import org.junit.jupiter.api.Test
 
 /**
  * letta-mobile-73o2h.2: unit coverage for the active-subagent state model
