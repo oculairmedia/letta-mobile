@@ -34,9 +34,11 @@ import kotlinx.coroutines.flow.stateIn
  *    surfaces in the active bar rather than silently vanishing.
  */
 class WsActiveSubagentSource(
-    repository: ISubagentRepository,
+    private val repository: ISubagentRepository,
     scope: CoroutineScope,
 ) : ActiveSubagentSource {
+
+    override suspend fun todos(toolCallId: String) = repository.todos(toolCallId)
 
     override val activeSubagents: StateFlow<ImmutableList<ActiveSubagent>> =
         repository.activeSubagentsFlow()

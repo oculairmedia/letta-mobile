@@ -8,6 +8,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -119,6 +120,7 @@ private fun SubagentChip(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(LettaSpacing.bubbleRadius))
+            .clickable(onClick = onClick)
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(horizontal = LettaSpacing.md, vertical = LettaSpacing.xs)
             .semantics {
