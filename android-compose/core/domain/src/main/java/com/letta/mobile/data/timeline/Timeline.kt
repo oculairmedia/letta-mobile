@@ -211,6 +211,12 @@ data class Timeline(
         serverId: String,
         messageType: TimelineMessageType? = null,
     ): TimelineEvent.Confirmed? {
+        val tail = events.lastOrNull()
+        if (tail is TimelineEvent.Confirmed && tail.serverId == serverId) {
+            if (messageType != null && tail.messageType != messageType) return null
+            return tail
+        }
+
         val idx = serverIdToIndex[serverId] ?: return null
         val event = events[idx] as? TimelineEvent.Confirmed ?: return null
         if (messageType != null && event.messageType != messageType) return null
@@ -307,6 +313,17 @@ data class Timeline(
      * Added for letta-mobile-mge5.
      */
     fun replaceByServerId(confirmed: TimelineEvent.Confirmed): Timeline {
+        val tailIdx = events.lastIndex
+        val tail = events.lastOrNull()
+        if (tail is TimelineEvent.Confirmed && tail.serverId == confirmed.serverId) {
+            if (tail.messageType != confirmed.messageType) return this
+            val stabilized = confirmed.copy(
+                position = tail.position,
+                otid = tail.otid
+            )
+            return copy(events = events.toMutableList().also { it[tailIdx] = stabilized })
+        }
+
         val idx = serverIdToIndex[confirmed.serverId] ?: return this
         val existing = events[idx]
         if (existing !is TimelineEvent.Confirmed || existing.messageType != confirmed.messageType) return this
@@ -315,19 +332,28 @@ data class Timeline(
             otid = existing.otid
         )
         val replaced = events.toMutableList().also { it[idx] = stabilized }
+        if (!events.hasDuplicateOtidOutside(index = idx, otid = stabilized.otid)) {
+            return copy(events = replaced)
+        }
+
         val deduped = replaced.filterIndexed { eventIndex, event ->
             eventIndex == idx || event.otid != stabilized.otid
         }
-        if (deduped.size != replaced.size) {
-            Telemetry.event(
-                "Timeline", "replaceByServerId.duplicateOtidDropped",
-                "conversationId" to conversationId,
-                "serverId" to confirmed.serverId,
-                "otid" to stabilized.otid,
-                level = Telemetry.Level.WARN,
-            )
-        }
+        Telemetry.event(
+            "Timeline", "replaceByServerId.duplicateOtidDropped",
+            "conversationId" to conversationId,
+            "serverId" to confirmed.serverId,
+            "otid" to stabilized.otid,
+            level = Telemetry.Level.WARN,
+        )
         return copy(events = deduped)
+    }
+
+    private fun List<TimelineEvent>.hasDuplicateOtidOutside(index: Int, otid: String): Boolean {
+        for (i in indices) {
+            if (i != index && this[i].otid == otid) return true
+        }
+        return false
     }
 
     /** Mark a Local event as [DeliveryState.SENT]. No-op for Confirmed events. */

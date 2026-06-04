@@ -111,6 +111,45 @@ class TimelineTest {
     }
 
     @Test
+    fun `findByServerId returns streaming tail without forcing full index path`() {
+        val tail = confirmed("tail", 3.0, serverId = "srv-tail", content = "streaming")
+        val t = Timeline("c1")
+            .append(confirmed("older", 1.0, serverId = "srv-older"))
+            .append(tail)
+
+        assertEquals(tail, t.findByServerId("srv-tail", TimelineMessageType.ASSISTANT))
+        assertNull(t.findByServerId("srv-tail", TimelineMessageType.USER))
+    }
+
+    @Test
+    fun `replaceByServerId updates streaming tail without duplicate telemetry`() {
+        Telemetry.clear()
+        val t = Timeline(
+            "c1",
+            events = listOf(
+                confirmed("tail", 1.0, serverId = "srv-old-duplicate"),
+                confirmed("older", 2.0, serverId = "srv-older"),
+                confirmed("tail", 3.0, serverId = "srv-tail", content = "hel"),
+            ),
+        )
+        Telemetry.clear()
+
+        val updated = t.replaceByServerId(
+            confirmed("ignored", 99.0, serverId = "srv-tail", content = "hello"),
+        )
+
+        assertEquals(listOf("tail", "older", "tail"), updated.events.map { it.otid })
+        assertEquals(3.0, updated.events.last().position, 0.0)
+        assertEquals("hello", updated.events.last().content)
+        assertTrue(
+            "Tail replacement should not log duplicate drop telemetry",
+            Telemetry.snapshot().none {
+                it.tag == "Timeline" && it.name == "replaceByServerId.duplicateOtidDropped"
+            },
+        )
+    }
+
+    @Test
     fun `replaceByServerId drops pre existing duplicate otid outside replacement slot`() {
         Telemetry.clear()
         val existing = confirmed("stable", 1.0, TimelineMessageType.ASSISTANT).copy(serverId = "srv-1")
