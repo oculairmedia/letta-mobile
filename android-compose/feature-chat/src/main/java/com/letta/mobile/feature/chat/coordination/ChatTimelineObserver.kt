@@ -53,7 +53,9 @@ internal class ChatTimelineObserver(
 ) {
     private var observerJob: Job? = null
     private var hydrateSignalJob: Job? = null
-    private var projectionCache: Map<TimelineProjectionKey, CachedTimelineProjectionEvent> = emptyMap()
+    private var projectionCache: MutableMap<TimelineProjectionKey, CachedTimelineProjectionEvent> = mutableMapOf()
+    private var lastProjectionSnapshot: CachedTimelineProjectionSnapshot? = null
+    private var projectionTelemetryTick: Int = 0
 
     /**
      * Older messages fetched via pagination need to survive the next timeline
@@ -71,7 +73,9 @@ internal class ChatTimelineObserver(
         hydrateSignalJob?.cancel()
         hydrateSignalJob = null
         observerConversationId = null
-        projectionCache = emptyMap()
+        projectionCache = mutableMapOf()
+        lastProjectionSnapshot = null
+        projectionTelemetryTick = 0
     }
 
     fun start(conversationId: String) {
@@ -82,7 +86,9 @@ internal class ChatTimelineObserver(
         observerJob?.cancel()
         hydrateSignalJob?.cancel()
         olderMessagesPrefix = "" to emptyList()
-        projectionCache = emptyMap()
+        projectionCache = mutableMapOf()
+        lastProjectionSnapshot = null
+        projectionTelemetryTick = 0
         observerConversationId = conversationId
         observerJob = scope.launch {
             val flow = try {
@@ -230,10 +236,22 @@ internal class ChatTimelineObserver(
         previousState: ChatUiState,
     ): TimelineProjection {
         val startedAtMs = System.currentTimeMillis()
+        tailProjectionFastPath(timeline = timeline, prefix = prefix)?.let { fastProjection ->
+            emitProjectionTelemetry(
+                timeline = timeline,
+                projection = fastProjection,
+                prefix = prefix,
+                previousState = previousState,
+                startedAtMs = startedAtMs,
+            )
+            return fastProjection
+        }
+
         val a2uiMessages = mutableListOf<A2uiMessage>()
         var eventsReused = 0
         var eventsProjected = 0
         val nextCache = HashMap<TimelineProjectionKey, CachedTimelineProjectionEvent>(timeline.events.size)
+        val nextRecords = ArrayList<CachedTimelineProjectionEvent>(timeline.events.size)
         val live = ArrayList<UiMessage>(timeline.events.size)
 
         timeline.events.forEach { event ->
@@ -244,14 +262,10 @@ internal class ChatTimelineObserver(
                 cached
             } else {
                 eventsProjected++
-                val projection = event.projectForCache()
-                CachedTimelineProjectionEvent(
-                    event = event,
-                    uiMessage = projection.uiMessage,
-                    a2uiMessages = projection.a2uiMessages,
-                )
+                event.projectForCacheRecord(key)
             }
             nextCache[key] = projected
+            nextRecords += projected
             a2uiMessages += projected.a2uiMessages
             projected.uiMessage?.let(live::add)
         }
@@ -262,27 +276,147 @@ internal class ChatTimelineObserver(
         val tailIsAssistant = timeline.events.lastOrNull().let {
             it is TimelineEvent.Confirmed && it.messageType == TimelineMessageType.ASSISTANT
         }
-        val anyLettaServerLocalPending = timeline.events.any {
-            it is TimelineEvent.Local &&
-                it.deliveryState == DeliveryState.SENDING
-        }
+        val anyLettaServerLocalPending = nextRecords.any(CachedTimelineProjectionEvent::isLettaServerLocalPending)
+        val anyConfirmed = nextRecords.any(CachedTimelineProjectionEvent::isConfirmedVisible)
+        val liveToolCardCount = nextRecords.sumOf { it.toolCardCount }
+        val toolCardCount = prefix.sumOf { it.toolCardCount() } + liveToolCardCount
         val result = TimelineProjection(
             ui = ui,
             tailIsAssistant = tailIsAssistant,
             anyLettaServerLocalPending = anyLettaServerLocalPending,
-            anyConfirmed = ui.any { !it.isPending },
+            anyConfirmed = anyConfirmed,
             a2uiMessages = a2uiMessages,
+            toolCardCount = toolCardCount,
+            eventsReused = eventsReused,
+            eventsProjected = eventsProjected,
+            prefixEventsChecked = 0,
+            fastPath = false,
         )
+        lastProjectionSnapshot = CachedTimelineProjectionSnapshot(
+            conversationId = timeline.conversationId,
+            stablePrefixVersion = timeline.stablePrefixVersion,
+            records = nextRecords,
+            liveMessages = live,
+            a2uiMessages = a2uiMessages.toList(),
+            anyLettaServerLocalPending = anyLettaServerLocalPending,
+            anyConfirmed = anyConfirmed,
+            toolCardCount = liveToolCardCount,
+        )
+        emitProjectionTelemetry(
+            timeline = timeline,
+            projection = result,
+            prefix = prefix,
+            previousState = previousState,
+            startedAtMs = startedAtMs,
+        )
+        return result
+    }
+
+    private fun tailProjectionFastPath(
+        timeline: Timeline,
+        prefix: List<UiMessage>,
+    ): TimelineProjection? {
+        val previous = lastProjectionSnapshot ?: return null
+        if (previous.conversationId != timeline.conversationId || timeline.events.isEmpty()) return null
+
+        val replaceTail = timeline.events.size == previous.records.size &&
+            timeline.stablePrefixVersion == previous.stablePrefixVersion
+        val appendTail = timeline.events.size == previous.records.size + 1 &&
+            timeline.stablePrefixVersion == previous.stablePrefixVersion + 1
+        if (!replaceTail && !appendTail) return null
+
+        val tailEvent = timeline.events.last()
+        val tailKey = tailEvent.projectionKey()
+        val tailCached = projectionCache[tailKey]?.takeIf { it.event == tailEvent }
+        val tailRecord = tailCached ?: tailEvent.projectForCacheRecord(tailKey)
+
+        val records = if (appendTail) {
+            previous.records + tailRecord
+        } else {
+            previous.records.dropLast(1) + tailRecord
+        }
+        val live = if (appendTail) {
+            if (tailRecord.uiMessage == null) previous.liveMessages else previous.liveMessages + tailRecord.uiMessage
+        } else {
+            val previousTailHadUi = previous.records.last().uiMessage != null
+            when {
+                previousTailHadUi && tailRecord.uiMessage != null -> previous.liveMessages.dropLast(1) + tailRecord.uiMessage
+                previousTailHadUi -> previous.liveMessages.dropLast(1)
+                tailRecord.uiMessage != null -> previous.liveMessages + tailRecord.uiMessage
+                else -> previous.liveMessages
+            }
+        }
+        val a2uiMessages = if (appendTail) {
+            previous.a2uiMessages + tailRecord.a2uiMessages
+        } else {
+            previous.records.dropLast(1).flatMap { it.a2uiMessages } + tailRecord.a2uiMessages
+        }
+        val anyLettaServerLocalPending = if (appendTail) {
+            previous.anyLettaServerLocalPending || tailRecord.isLettaServerLocalPending
+        } else {
+            records.any(CachedTimelineProjectionEvent::isLettaServerLocalPending)
+        }
+        val anyConfirmed = if (appendTail) {
+            previous.anyConfirmed || tailRecord.isConfirmedVisible
+        } else {
+            records.any(CachedTimelineProjectionEvent::isConfirmedVisible)
+        }
+        val toolCardCount = if (appendTail) {
+            previous.toolCardCount + tailRecord.toolCardCount
+        } else {
+            previous.toolCardCount - previous.records.last().toolCardCount + tailRecord.toolCardCount
+        }
+        val tailIsAssistant = tailEvent is TimelineEvent.Confirmed && tailEvent.messageType == TimelineMessageType.ASSISTANT
+        val combined = combineOlderPrefix(prefix, live)
+        val ui = combined.toImmutableList()
+
+        projectionCache[tailKey] = tailRecord
+        lastProjectionSnapshot = CachedTimelineProjectionSnapshot(
+            conversationId = timeline.conversationId,
+            stablePrefixVersion = timeline.stablePrefixVersion,
+            records = records,
+            liveMessages = live,
+            a2uiMessages = a2uiMessages,
+            anyLettaServerLocalPending = anyLettaServerLocalPending,
+            anyConfirmed = anyConfirmed,
+            toolCardCount = toolCardCount,
+        )
+        return TimelineProjection(
+            ui = ui,
+            tailIsAssistant = tailIsAssistant,
+            anyLettaServerLocalPending = anyLettaServerLocalPending,
+            anyConfirmed = anyConfirmed,
+            a2uiMessages = a2uiMessages,
+            toolCardCount = prefix.sumOf { it.toolCardCount() } + records.sumOf { it.toolCardCount },
+            eventsReused = records.size - (if (tailCached == null) 1 else 0),
+            eventsProjected = if (tailCached == null) 1 else 0,
+            prefixEventsChecked = 0,
+            fastPath = true,
+        )
+    }
+
+    private fun emitProjectionTelemetry(
+        timeline: Timeline,
+        projection: TimelineProjection,
+        prefix: List<UiMessage>,
+        previousState: ChatUiState,
+        startedAtMs: Long,
+    ) {
+        projectionTelemetryTick++
+        if (projection.fastPath && timeline.events.size > 128 && projectionTelemetryTick % 16 != 1) return
+
         Telemetry.event(
             "TimelineSync",
             "uiProjection.snapshot",
             "conversationId" to timeline.conversationId,
             "eventsTotal" to timeline.events.size,
-            "eventsReused" to eventsReused,
-            "eventsProjected" to eventsProjected,
-            "messageCount" to ui.size,
+            "eventsReused" to projection.eventsReused,
+            "eventsProjected" to projection.eventsProjected,
+            "prefixEventsChecked" to projection.prefixEventsChecked,
+            "messageCount" to projection.ui.size,
             "prefixCount" to prefix.size,
-            "toolCardCount" to ui.sumOf { it.toolCardCount() },
+            "toolCardCount" to projection.toolCardCount,
+            "fastPath" to projection.fastPath,
             "isStreaming" to previousState.isStreaming,
             "isLoadingMessages" to previousState.isLoadingMessages,
             "isLoadingOlderMessages" to previousState.isLoadingOlderMessages,
@@ -293,17 +427,21 @@ internal class ChatTimelineObserver(
             "isReconciling" to false,
             durationMs = System.currentTimeMillis() - startedAtMs,
         )
-        return result
     }
 
-    private fun TimelineEvent.projectForCache(): CachedTimelineProjection {
+    private fun TimelineEvent.projectForCacheRecord(key: TimelineProjectionKey): CachedTimelineProjectionEvent {
         val extractedA2uiMessages = mutableListOf<A2uiMessage>()
         val uiMessage = timelineEventToUiMessage(this)
             ?.extractA2uiHistoryInto(extractedA2uiMessages)
             ?.takeUnless { it.isEmptyAfterA2uiExtraction() }
-        return CachedTimelineProjection(
+        return CachedTimelineProjectionEvent(
+            key = key,
+            event = this,
             uiMessage = uiMessage,
             a2uiMessages = extractedA2uiMessages.toList(),
+            toolCardCount = uiMessage?.toolCardCount() ?: 0,
+            isLettaServerLocalPending = isLettaServerLocalPending(),
+            isConfirmedVisible = this is TimelineEvent.Confirmed && uiMessage != null,
         )
     }
 
@@ -314,6 +452,9 @@ internal class ChatTimelineObserver(
 
     private fun UiMessage.toolCardCount(): Int =
         toolCalls?.size ?: if (role == "tool" || generatedUi != null || approvalRequest != null || approvalResponse != null) 1 else 0
+
+    private fun TimelineEvent.isLettaServerLocalPending(): Boolean =
+        this is TimelineEvent.Local && deliveryState == DeliveryState.SENDING
 
     private fun UiMessage.extractA2uiHistoryInto(out: MutableList<A2uiMessage>): UiMessage {
         if (role != "assistant" || content.isBlank()) return this
@@ -337,6 +478,22 @@ internal class ChatTimelineObserver(
         val anyLettaServerLocalPending: Boolean,
         val anyConfirmed: Boolean,
         val a2uiMessages: List<A2uiMessage>,
+        val toolCardCount: Int,
+        val eventsReused: Int,
+        val eventsProjected: Int,
+        val prefixEventsChecked: Int,
+        val fastPath: Boolean,
+    )
+
+    private data class CachedTimelineProjectionSnapshot(
+        val conversationId: String,
+        val stablePrefixVersion: Long,
+        val records: List<CachedTimelineProjectionEvent>,
+        val liveMessages: List<UiMessage>,
+        val a2uiMessages: List<A2uiMessage>,
+        val anyLettaServerLocalPending: Boolean,
+        val anyConfirmed: Boolean,
+        val toolCardCount: Int,
     )
 
     private data class TimelineProjectionKey(
@@ -345,14 +502,13 @@ internal class ChatTimelineObserver(
         val type: String,
     )
 
-    private data class CachedTimelineProjection(
-        val uiMessage: UiMessage?,
-        val a2uiMessages: List<A2uiMessage>,
-    )
-
     private data class CachedTimelineProjectionEvent(
+        val key: TimelineProjectionKey,
         val event: TimelineEvent,
         val uiMessage: UiMessage?,
         val a2uiMessages: List<A2uiMessage>,
+        val toolCardCount: Int,
+        val isLettaServerLocalPending: Boolean,
+        val isConfirmedVisible: Boolean,
     )
 }

@@ -111,6 +111,36 @@ class TimelineTest {
     }
 
     @Test
+    fun `tail stream replacement preserves stable prefix version`() {
+        val t = Timeline("c1")
+            .append(confirmed("older", 1.0, serverId = "srv-older"))
+            .append(confirmed("tail", 2.0, serverId = "srv-tail", content = "hel"))
+        val beforeVersion = t.stablePrefixVersion
+
+        val updated = t.replaceByServerId(
+            confirmed("ignored", 99.0, serverId = "srv-tail", content = "hello"),
+        )
+
+        assertEquals(beforeVersion, updated.stablePrefixVersion)
+        assertEquals("hello", updated.events.last().content)
+    }
+
+    @Test
+    fun `non tail server replacement advances stable prefix version`() {
+        val t = Timeline("c1")
+            .append(confirmed("older", 1.0, serverId = "srv-older", content = "old"))
+            .append(confirmed("tail", 2.0, serverId = "srv-tail"))
+        val beforeVersion = t.stablePrefixVersion
+
+        val updated = t.replaceByServerId(
+            confirmed("ignored", 99.0, serverId = "srv-older", content = "edited"),
+        )
+
+        assertEquals(beforeVersion + 1, updated.stablePrefixVersion)
+        assertEquals("edited", updated.events.first().content)
+    }
+
+    @Test
     fun `findByServerId returns streaming tail without forcing full index path`() {
         val tail = confirmed("tail", 3.0, serverId = "srv-tail", content = "streaming")
         val t = Timeline("c1")

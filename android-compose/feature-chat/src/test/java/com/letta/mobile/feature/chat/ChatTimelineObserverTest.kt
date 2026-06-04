@@ -264,6 +264,62 @@ class ChatTimelineObserverTest {
     }
 
     @Test
+    fun `tail-only append reuses prior projected message instances`() = runTest {
+        Telemetry.clear()
+        val harness = Harness(backgroundScope)
+        val history = (1..200).map { index ->
+            confirmed("user-$index", "prompt $index")
+        }
+        val flow = harness.seedTimeline("conv-1", history)
+
+        harness.observer.start("conv-1")
+        runCurrent()
+        val projectedPrefix = harness.uiState.value.messages.take(199)
+
+        flow.value = flow.value.append(confirmed("assistant-201", "streaming", TimelineMessageType.ASSISTANT))
+        runCurrent()
+
+        assertEquals(projectedPrefix.map { it.id }, harness.uiState.value.messages.take(199).map { it.id })
+        projectedPrefix.forEachIndexed { index, message ->
+            assertSame(message, harness.uiState.value.messages[index])
+        }
+        assertEquals("assistant-201", harness.uiState.value.messages.last().id)
+    }
+
+    @Test
+    fun `streaming tail replacement reuses unchanged history without full projection`() = runTest {
+        Telemetry.clear()
+        val harness = Harness(backgroundScope)
+        var timeline = Timeline("conv-1")
+        repeat(64) { index ->
+            timeline = timeline.append(confirmed("user-$index", "history-$index"))
+        }
+        timeline = timeline.append(confirmed("assistant-tail", "hel", TimelineMessageType.ASSISTANT))
+        val flow = harness.seedTimeline(timeline)
+
+        harness.observer.start("conv-1")
+        runCurrent()
+        val projectedHistory = harness.uiState.value.messages.dropLast(1)
+        Telemetry.clear()
+
+        flow.value = timeline.replaceByServerId(
+            confirmed("assistant-tail", "hello", TimelineMessageType.ASSISTANT),
+        )
+        runCurrent()
+
+        assertEquals("hello", harness.uiState.value.messages.last().content)
+        projectedHistory.forEachIndexed { index, message ->
+            assertSame(message, harness.uiState.value.messages[index])
+        }
+        val projectionEvent = Telemetry.snapshot().first {
+            it.tag == "TimelineSync" && it.name == "uiProjection.snapshot"
+        }
+        assertEquals(true, projectionEvent.attrs["fastPath"])
+        assertEquals(64, projectionEvent.attrs["eventsReused"])
+        assertEquals(1, projectionEvent.attrs["eventsProjected"])
+    }
+
+    @Test
     fun `changed timeline event with same identity invalidates cached ui projection`() = runTest {
         Telemetry.clear()
         val harness = Harness(backgroundScope)
@@ -290,6 +346,41 @@ class ChatTimelineObserverTest {
         }
         assertEquals(0, projectionEvent.attrs["eventsReused"])
         assertEquals(1, projectionEvent.attrs["eventsProjected"])
+    }
+
+    @Test
+    fun `long history streaming tail projection does not scan full history per frame`() = runTest {
+        Telemetry.clear()
+        val harness = Harness(backgroundScope)
+        val tailId = "assistant-513"
+        var timeline = Timeline("conv-1")
+        repeat(512) { index ->
+            timeline = timeline.append(confirmed("user-${index + 1}", "history ${index + 1}"))
+        }
+        timeline = timeline.append(confirmed(tailId, "token 0", TimelineMessageType.ASSISTANT))
+        val flow = harness.seedTimeline(timeline)
+
+        harness.observer.start("conv-1")
+        runCurrent()
+
+        repeat(16) { frame ->
+            timeline = timeline.replaceByServerId(
+                confirmed(tailId, "token ${frame + 1}", TimelineMessageType.ASSISTANT),
+            )
+            flow.value = timeline
+            runCurrent()
+        }
+
+        val fastPathEvent = Telemetry.snapshot().last {
+            it.tag == "TimelineSync" &&
+                it.name == "uiProjection.snapshot" &&
+                it.attrs["eventsTotal"] == 513 &&
+                it.attrs["fastPath"] == true
+        }
+        assertEquals(1, fastPathEvent.attrs["eventsProjected"])
+        assertEquals(0, fastPathEvent.attrs["prefixEventsChecked"])
+        assertEquals(513, harness.uiState.value.messages.size)
+        assertEquals("token 16", harness.uiState.value.messages.last().content)
     }
 
     private class Harness(
@@ -338,9 +429,11 @@ class ChatTimelineObserverTest {
         fun seedTimeline(
             conversationId: String,
             events: List<TimelineEvent> = emptyList(),
-        ): MutableStateFlow<Timeline> {
-            val flow = MutableStateFlow(Timeline(conversationId = conversationId, events = events))
-            timelineFlows[conversationId] = flow
+        ): MutableStateFlow<Timeline> = seedTimeline(Timeline(conversationId = conversationId, events = events))
+
+        fun seedTimeline(timeline: Timeline): MutableStateFlow<Timeline> {
+            val flow = MutableStateFlow(timeline)
+            timelineFlows[timeline.conversationId] = flow
             return flow
         }
     }
