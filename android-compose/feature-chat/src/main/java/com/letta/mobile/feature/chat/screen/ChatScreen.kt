@@ -44,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
@@ -228,17 +229,16 @@ internal fun ChatScreen(
             )
             if (thinkingAlpha > 0.001f) {
                 ThinkingShader(
-                    // vcky.b4: tertiary is the most vibrant accent in
-                    // the theme (default Color(0xFF0091EA) blue light,
-                    // CyanAccent dark, per-theme variants). Picks up the
-                    // user's currently-active theme color rather than
-                    // the muted role-label tone.
-                    // p2auf: pass the full themed accent triad so the
-                    // glow slowly drifts across the active theme palette
-                    // instead of sitting on one accent.
-                    tint = MaterialTheme.colorScheme.tertiary,
-                    tint2 = MaterialTheme.colorScheme.primary,
-                    tint3 = MaterialTheme.colorScheme.secondary,
+                    // p2auf: dedicated vivid "thinking" accent triad,
+                    // decoupled from the theme's palette (which can be
+                    // pink/magenta and made the glow read as a pink wall
+                    // or, at low alpha, a grey wash). A hand-picked calm
+                    // cyan -> teal -> indigo set reads as clear color on
+                    // a dark surface even at low opacity, and the slow
+                    // drift moves gently between them.
+                    tint = Color(0xFF22D3EE),  // cyan
+                    tint2 = Color(0xFF2DD4BF), // teal
+                    tint3 = Color(0xFF6366F1), // indigo
                     bgColor = MaterialTheme.colorScheme.surface,
                     animate = !reducedMotion,
                     modifier = Modifier

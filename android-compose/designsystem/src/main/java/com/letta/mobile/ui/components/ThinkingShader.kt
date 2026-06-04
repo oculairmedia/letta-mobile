@@ -82,15 +82,24 @@ float perlin_noise_1d(float d) {
   return r * 0.5 + 0.5;
 }
 
-// p2auf: slow palette drift across the three themed accents. Two
-// out-of-phase slow sines pick a position in a tint -> tint2 -> tint3
-// loop so no single accent dominates and the transition never snaps.
+// p2auf: slow palette drift. The incoming tints are saturation-lifted
+// first so that even at low alpha on a dark surface the glow reads as
+// COLOR rather than greying out. Two out-of-phase slow sines walk a
+// tint -> tint2 -> tint3 loop so no single accent dominates and the
+// transition never snaps.
+vec3 saturate(vec3 c, float amount) {
+  float lum = dot(c, vec3(0.299, 0.587, 0.114));
+  return clamp(mix(vec3(lum), c, amount), 0.0, 1.0);
+}
 vec3 driftColor(float t) {
   float p = t * 0.08; // ~78s for a full 2*pi cycle
   float w1 = 0.5 + 0.5 * sin(p);
   float w2 = 0.5 + 0.5 * sin(p * 0.61803 + 2.094);
-  vec3 ab = mix(tint.rgb, tint2.rgb, w1);
-  return mix(ab, tint3.rgb, w2 * 0.5);
+  vec3 a = saturate(tint.rgb, 1.8);
+  vec3 b = saturate(tint2.rgb, 1.8);
+  vec3 c = saturate(tint3.rgb, 1.8);
+  vec3 ab = mix(a, b, w1);
+  return mix(ab, c, w2 * 0.5);
 }
 
 half4 main(float2 fragCoord) {
@@ -111,26 +120,24 @@ half4 main(float2 fragCoord) {
   float noise = nA * 0.7 + nB * 0.3;
   float noise_offset = (noise - 0.5) * 0.025;
 
-  float baseline = 0.92 + wave + noise_offset;
+  // p2auf: keep the colored body low — an ambient hint hugging the
+  // bottom, not a wall. Baseline near the strip bottom; the composer
+  // covers the brightest part and only a soft tinted halo rises above.
+  float baseline = 0.90 + wave + noise_offset;
   float dist = clamp(baseline - uv.y, 0.0, 1.0);
-  float glow = pow(1.0 - clamp(dist / 0.90, 0.0, 1.0), 1.6);
+  float glow = pow(1.0 - clamp(dist / 0.75, 0.0, 1.0), 1.6);
 
   // Top alpha fade over the outermost 30% so the glow dissolves into
   // bgColor with zero hard line at the upper edge.
   float top_fade = smoothstep(0.0, 0.30, uv.y);
 
-  // p2auf: the previous 0.10 alpha read as a faint white wash on
-  // light surfaces — the color never asserted itself. Raise the glow
-  // alpha substantially (0.45) so the themed accent is actually
-  // visible, and boost saturation by pushing the drifted color away
-  // from its own luminance (a cheap saturate) so it reads as COLOR,
-  // not a grey/white veil. Edge fades still guarantee zero hard lines.
-  float a = top_fade * glow * 0.45 * tint.a;
+  // p2auf: moderate alpha. The color is pre-saturated in driftColor, so
+  // a thin veil still reads as color on a dark surface — alpha controls
+  // presence, saturation controls hue. 0.32 is the ambient-but-visible
+  // sweet spot.
+  float a = top_fade * glow * 0.32 * tint.a;
 
-  // p2auf: the visible color is the slowly-drifting themed blend.
   vec3 col = driftColor(iTime);
-  float lum = dot(col, vec3(0.299, 0.587, 0.114));
-  col = clamp(mix(vec3(lum), col, 1.6), 0.0, 1.0); // saturate ~1.6x
   return vec4(col, a);
 }
 """
