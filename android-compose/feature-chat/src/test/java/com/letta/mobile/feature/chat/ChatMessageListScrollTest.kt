@@ -14,8 +14,10 @@ import com.letta.mobile.feature.chat.render.ChatMessageGeometryState
 import com.letta.mobile.feature.chat.render.ChatRenderItemGeometrySignature
 import com.letta.mobile.feature.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.render.chatGeometrySignature
+import com.letta.mobile.feature.chat.screen.ChatAutoScrollAction
 import com.letta.mobile.feature.chat.screen.chatRenderItemSeesLiveScale
 import com.letta.mobile.feature.chat.screen.calculateLazyIndexForRenderItem
+import com.letta.mobile.feature.chat.screen.autoScrollAction
 import com.letta.mobile.feature.chat.screen.newestMessageAutoScrollSignature
 
 class ChatMessageListScrollTest {
@@ -136,6 +138,74 @@ class ChatMessageListScrollTest {
         )
 
         assertEquals(before, after)
+    }
+
+    @Test
+    fun `streaming assistant auto-scroll snaps when already pinned`() {
+        val signature = newestMessageAutoScrollSignature(
+            listOf(message(id = "assistant", content = "streaming")),
+        )!!
+
+        assertEquals(
+            ChatAutoScrollAction.Snap,
+            autoScrollAction(
+                signature = signature,
+                isStreaming = true,
+                firstVisibleItemIndex = 0,
+                firstVisibleItemScrollOffset = 0,
+                lastStreamingSnapMs = 0L,
+                nowMs = 120L,
+            ),
+        )
+    }
+
+    @Test
+    fun `streaming assistant auto-scroll throttles repeated pinned snaps`() {
+        val signature = newestMessageAutoScrollSignature(
+            listOf(message(id = "assistant", content = "streaming")),
+        )!!
+
+        assertEquals(
+            ChatAutoScrollAction.Skip,
+            autoScrollAction(
+                signature = signature,
+                isStreaming = true,
+                firstVisibleItemIndex = 0,
+                firstVisibleItemScrollOffset = 0,
+                lastStreamingSnapMs = 100L,
+                nowMs = 150L,
+            ),
+        )
+    }
+
+    @Test
+    fun `auto-scroll keeps animation for unpinned or non-streaming updates`() {
+        val signature = newestMessageAutoScrollSignature(
+            listOf(message(id = "assistant", content = "streaming")),
+        )!!
+
+        assertEquals(
+            ChatAutoScrollAction.Animate,
+            autoScrollAction(
+                signature = signature,
+                isStreaming = true,
+                firstVisibleItemIndex = 1,
+                firstVisibleItemScrollOffset = 0,
+                lastStreamingSnapMs = 100L,
+                nowMs = 150L,
+            ),
+        )
+        assertEquals(
+            ChatAutoScrollAction.Animate,
+            autoScrollAction(
+                signature = signature,
+                isStreaming = false,
+                firstVisibleItemIndex = 0,
+                firstVisibleItemScrollOffset = 0,
+                lastStreamingSnapMs = 100L,
+                nowMs = 150L,
+            ),
+        )
     }
 
     @Test

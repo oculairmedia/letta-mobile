@@ -59,6 +59,7 @@ import com.letta.mobile.ui.theme.chatShapes
 import com.letta.mobile.ui.zoom.PinchScalePreviewController
 import com.letta.mobile.util.Telemetry
 import java.time.LocalDate
+import kotlin.math.abs
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -393,6 +394,7 @@ internal fun ChatMessageList(
     }
 
     val autoScrollSignature by rememberUpdatedState(newestMessageAutoScrollSignature(state.messages))
+    val isStreamingForAutoScroll by rememberUpdatedState(state.isStreaming)
     val loadPressureSummary = remember(
         state.messages,
         state.isStreaming,
@@ -436,6 +438,8 @@ internal fun ChatMessageList(
         }
     }
 
+    var lastStreamingSnapMs by remember { mutableStateOf(0L) }
+
     // Keep the bottom anchored while new messages arrive or the newest assistant
     // bubble grows during streaming. With reverseLayout=true, item 0 is the
     // newest edge (the typing slot), so scrolling to 0 means "bottom".
@@ -444,7 +448,22 @@ internal fun ChatMessageList(
             .distinctUntilChanged()
             .collect { signature ->
                 if (signature != null && isNearBottom && scrollToMessageId == null) {
-                    listState.animateScrollToItem(0)
+                    val nowMs = System.currentTimeMillis()
+                    when (autoScrollAction(
+                        signature = signature,
+                        isStreaming = isStreamingForAutoScroll,
+                        firstVisibleItemIndex = listState.firstVisibleItemIndex,
+                        firstVisibleItemScrollOffset = listState.firstVisibleItemScrollOffset,
+                        lastStreamingSnapMs = lastStreamingSnapMs,
+                        nowMs = nowMs,
+                    )) {
+                        ChatAutoScrollAction.Animate -> listState.animateScrollToItem(0)
+                        ChatAutoScrollAction.Snap -> {
+                            lastStreamingSnapMs = nowMs
+                            listState.scrollToItem(0)
+                        }
+                        ChatAutoScrollAction.Skip -> Unit
+                    }
                 }
             }
     }
@@ -910,6 +929,29 @@ internal data class ChatAutoScrollSignature(
     val approvalHash: Int,
     val attachmentCount: Int,
 )
+
+internal enum class ChatAutoScrollAction {
+    Animate,
+    Snap,
+    Skip,
+}
+
+private const val StreamingAutoScrollSnapThrottleMs = 96L
+
+internal fun autoScrollAction(
+    signature: ChatAutoScrollSignature,
+    isStreaming: Boolean,
+    firstVisibleItemIndex: Int,
+    firstVisibleItemScrollOffset: Int,
+    lastStreamingSnapMs: Long,
+    nowMs: Long,
+): ChatAutoScrollAction {
+    if (!isStreaming || signature.role != "assistant") return ChatAutoScrollAction.Animate
+    if (firstVisibleItemIndex != 0) return ChatAutoScrollAction.Animate
+    if (abs(firstVisibleItemScrollOffset) > 12) return ChatAutoScrollAction.Animate
+    if (nowMs - lastStreamingSnapMs < StreamingAutoScrollSnapThrottleMs) return ChatAutoScrollAction.Skip
+    return ChatAutoScrollAction.Snap
+}
 
 internal fun newestMessageAutoScrollSignature(messages: List<UiMessage>): ChatAutoScrollSignature? {
     val newest = messages.lastOrNull() ?: return null
