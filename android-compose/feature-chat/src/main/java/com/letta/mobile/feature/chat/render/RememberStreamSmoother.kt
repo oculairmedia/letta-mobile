@@ -34,9 +34,22 @@ import kotlinx.coroutines.isActive
 internal fun rememberSmoothedStreamingText(
     rawText: String,
     isStreaming: Boolean,
+    seedText: String = "",
 ): String {
     val smoother = remember { StreamingDisplayTextSmoother() }
-    var displayedText by remember { mutableStateOf("") }
+
+    // letta-mobile-uoiu6: seed the smoother (and the initial displayed value)
+    // with the prefix that was already painted before streaming engaged.
+    // Without this, the smoother starts at revealedCount=0 and re-reveals the
+    // already-visible first word from an empty string, producing the visible
+    // "first word flash". The seed only takes effect on the very first
+    // composition / before the smoother has begun revealing.
+    val initialDisplayed = remember { seedText }
+    var displayedText by remember { mutableStateOf(initialDisplayed) }
+    remember {
+        smoother.seed(seedText, isStreaming, System.nanoTime() / 1_000_000L)
+        true
+    }
 
     // Push every rawText / isStreaming change into the smoother.
     val nowMs = { System.nanoTime() / 1_000_000L }
