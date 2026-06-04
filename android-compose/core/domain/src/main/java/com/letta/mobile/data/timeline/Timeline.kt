@@ -156,6 +156,8 @@ data class Timeline(
     val liveCursor: String? = null,
     /** Cursor for backfill pagination (oldest known message id). */
     val backfillCursor: String? = null,
+    /** Monotonic fingerprint for all non-tail events so UI projections can trust unchanged history. */
+    val stablePrefixVersion: Long = events.stablePrefixFingerprint(),
 ) {
     private val otidToIndex: Map<String, Int> by lazy(LazyThreadSafetyMode.PUBLICATION) {
         HashMap<String, Int>(events.size).also { map ->
@@ -261,7 +263,7 @@ data class Timeline(
         } else {
             event
         }
-        return copy(events = events + safeEvent)
+        return copy(events = events + safeEvent, stablePrefixVersion = stablePrefixVersion + 1)
     }
 
     /**
@@ -279,7 +281,7 @@ data class Timeline(
             otid = local.otid,
         )
         val newEvents = events.toMutableList().also { it[idx] = stabilized }
-        return copy(events = newEvents)
+        return copy(events = newEvents, stablePrefixVersion = stablePrefixVersion + 1)
     }
 
     /**
@@ -295,7 +297,7 @@ data class Timeline(
         val insertIdx = events.indexOfFirst { it.position > event.position }
         val newEvents = if (insertIdx == -1) events + event
                        else events.toMutableList().also { it.add(insertIdx, event) }
-        return copy(events = newEvents)
+        return copy(events = newEvents, stablePrefixVersion = stablePrefixVersion + 1)
     }
 
     /**
@@ -333,7 +335,7 @@ data class Timeline(
         )
         val replaced = events.toMutableList().also { it[idx] = stabilized }
         if (!events.hasDuplicateOtidOutside(index = idx, otid = stabilized.otid)) {
-            return copy(events = replaced)
+            return copy(events = replaced, stablePrefixVersion = stablePrefixVersion + 1)
         }
 
         val deduped = replaced.filterIndexed { eventIndex, event ->
@@ -346,7 +348,7 @@ data class Timeline(
             "otid" to stabilized.otid,
             level = Telemetry.Level.WARN,
         )
-        return copy(events = deduped)
+        return copy(events = deduped, stablePrefixVersion = stablePrefixVersion + 1)
     }
 
     private fun List<TimelineEvent>.hasDuplicateOtidOutside(index: Int, otid: String): Boolean {
@@ -365,8 +367,16 @@ data class Timeline(
     private inline fun updateLocal(otid: String, transform: (TimelineEvent.Local) -> TimelineEvent.Local): Timeline {
         val idx = otidToIndex[otid]?.takeIf { events[it] is TimelineEvent.Local } ?: return this
         val local = events[idx] as TimelineEvent.Local
-        return copy(events = events.toMutableList().also { it[idx] = transform(local) })
+        return copy(events = events.toMutableList().also { it[idx] = transform(local) }, stablePrefixVersion = stablePrefixVersion + 1)
     }
+}
+
+private fun List<TimelineEvent>.stablePrefixFingerprint(): Long {
+    var fingerprint = 1125899906842597L
+    for (index in 0 until lastIndex) {
+        fingerprint = fingerprint * 31 + this[index].hashCode()
+    }
+    return fingerprint
 }
 
 /** Generate a new client-side otid for outgoing messages. */
