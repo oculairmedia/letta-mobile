@@ -59,10 +59,7 @@ object WsFrameMapper {
             status = frame.status,
             stdout = frame.stdout,
             stderr = frame.stderr,
-            // Wrap the bare tool_return string in a JsonPrimitive so
-            // the model's lazy `toolReturn` getter (which checks
-            // `is JsonPrimitive && isString`) finds it.
-            toolReturnRaw = frame.toolReturn?.let { JsonPrimitive(it) },
+            toolReturnRaw = frame.toolReturn,
             date = frame.ts,
             runId = frame.runId,
             seqId = frame.seq.toSeqId(),

@@ -154,6 +154,7 @@ object TimelineHydrationReducer {
             toolReturnIsError = matchingReturn?.let { it.isErr == true || it.status == "error" } ?: toolReturnIsError,
             toolReturnContentByCallId = returnContentByCallId,
             toolReturnIsErrorByCallId = returnIsErrorByCallId,
+            attachments = (attachments + matchingReturns.flatMap { (_, toolReturn) -> toolReturn.attachments }).distinct(),
         )
     }
 }

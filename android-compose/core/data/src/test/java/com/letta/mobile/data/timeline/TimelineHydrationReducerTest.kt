@@ -1,6 +1,7 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
@@ -9,6 +10,8 @@ import com.letta.mobile.util.Telemetry
 import java.time.Instant
 import org.junit.After
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -46,6 +49,44 @@ class TimelineHydrationReducerTest {
         assertEquals(TimelineMessageType.TOOL_CALL, toolEvent.messageType)
         assertEquals("ok", toolEvent.toolReturnContentByCallId["call-1"])
         assertTrue(toolEvent.approvalDecided)
+    }
+
+    @Test
+    fun `reduce attaches tool return image attachments to tool call event`() {
+        val result = TimelineHydrationReducer.reduce(
+            conversationId = "conversation-1",
+            serverMessagesChronological = listOf(
+                ToolCallMessage(
+                    id = "tool-call-image",
+                    toolCall = ToolCall(toolCallId = "call-image", name = "Read", arguments = "{}"),
+                ),
+                ToolReturnMessage(
+                    id = "tool-return-image",
+                    toolCallId = "call-image",
+                    status = "success",
+                    toolReturnRaw = buildJsonArray {
+                        add(buildJsonObject {
+                            put("type", JsonPrimitive("image"))
+                            put("source", buildJsonObject {
+                                put("type", JsonPrimitive("letta"))
+                                put("file_id", JsonPrimitive("file-tool"))
+                                put("media_type", JsonPrimitive("image/png"))
+                                put("data", JsonPrimitive("HYDRATED_TOOL_IMAGE+/=="))
+                            })
+                        })
+                    },
+                ),
+            ),
+            timelineBeforeFetch = Timeline("conversation-1"),
+            currentTimeline = Timeline("conversation-1"),
+            diskRecords = emptyList(),
+        )
+
+        val toolEvent = result.timeline.events.single() as TimelineEvent.Confirmed
+        assertEquals(
+            listOf(MessageContentPart.Image(base64 = "HYDRATED_TOOL_IMAGE+/==", mediaType = "image/png")),
+            toolEvent.attachments,
+        )
     }
 
     @Test

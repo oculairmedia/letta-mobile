@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat
 
 import com.letta.mobile.data.model.ToolCall
+import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.DeliveryState
 import com.letta.mobile.data.timeline.MessageSource
 import com.letta.mobile.data.timeline.Role
@@ -39,6 +40,7 @@ class TimelineEventToUiMessageTest {
         toolReturnIsError: Boolean = false,
         toolReturnContentByCallId: Map<String, String> = emptyMap(),
         toolReturnIsErrorByCallId: Map<String, Boolean> = emptyMap(),
+        attachments: List<MessageContentPart.Image> = emptyList(),
         source: MessageSource = MessageSource.LETTA_SERVER,
     ) = TimelineEvent.Confirmed(
         position = 1.0,
@@ -56,6 +58,7 @@ class TimelineEventToUiMessageTest {
         toolReturnIsError = toolReturnIsError,
         toolReturnContentByCallId = toolReturnContentByCallId,
         toolReturnIsErrorByCallId = toolReturnIsErrorByCallId,
+        attachments = attachments,
         source = source,
     )
 
@@ -114,6 +117,22 @@ class TimelineEventToUiMessageTest {
         val calls = ui.toolCalls!!
         assertEquals("hi\n", calls[0].result)
         assertEquals("success", calls[0].status)
+    }
+
+    @Test
+    fun `TOOL_CALL with attached tool return image surfaces image attachment`() {
+        val tc = ToolCall(id = "toolu_1", name = "Read", arguments = "{}")
+        val ev = confirmed(
+            TimelineMessageType.TOOL_CALL,
+            toolCalls = listOf(tc),
+            attachments = listOf(MessageContentPart.Image(base64 = "IMG+/==", mediaType = "image/png")),
+        )
+
+        val ui = timelineEventToUiMessage(ev)!!
+
+        assertEquals(1, ui.attachments.size)
+        assertEquals("IMG+/==", ui.attachments.first().base64)
+        assertEquals("image/png", ui.attachments.first().mediaType)
     }
 
     @Test
