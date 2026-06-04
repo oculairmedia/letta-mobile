@@ -509,7 +509,12 @@ private fun ToolCallExpandedBodyContentInner(
                     raw = result,
                     expanded = resultExpanded,
                     isError = isError,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            HapticEffects.segmentTick(haptic, view)
+                            resultExpanded = !resultExpanded
+                        },
                 )
             }
         }
@@ -615,7 +620,12 @@ internal fun ToolCallExpandedBody(
                     raw = result,
                     expanded = resultExpanded,
                     isError = isError,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            HapticEffects.segmentTick(haptic, view)
+                            resultExpanded = !resultExpanded
+                        },
                 )
             }
         }
