@@ -139,14 +139,14 @@ half4 main(float2 fragCoord) {
   // (too large = the colour washes up over the messages); pow keeps the
   // top edge soft. 0.55 = a touch taller than the slim version but still
   // an accent at the composer, NOT a screen-wide wash.
-  float glow = pow(1.0 - clamp(dist / 0.55, 0.0, 1.0), 2.6);
+  float glow = pow(1.0 - clamp(dist / 0.45, 0.0, 1.0), 2.4);
 
   // Vivid drifting multi-color body, then SOFTENED by pre-mixing the
   // background colour into it. BG_MIX pulls the vivid palette toward the
   // chat surface tone so the glow reads as a muted/soft colour rather
   // than a bright wash — keeps the full band height and the drift, just
   // less saturated. Color-space (toward the real bg), so never grey.
-  float BG_MIX = 0.70; // 0=fully vivid, 1=invisible (== bg)
+  float BG_MIX = 0.55; // 0=fully vivid, 1=invisible (== bg)
   vec3 col = mix(mix4(uv), bgColor.rgb, BG_MIX);
 
   // COLOR-SPACE dissolve (TTS technique): render col at FULL opacity and

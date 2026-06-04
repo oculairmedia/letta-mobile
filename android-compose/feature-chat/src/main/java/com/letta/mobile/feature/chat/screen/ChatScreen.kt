@@ -263,7 +263,16 @@ internal fun ChatScreen(
                     tint = MaterialTheme.colorScheme.primary,
                     tint2 = MaterialTheme.colorScheme.tertiary,
                     tint3 = MaterialTheme.colorScheme.secondary,
-                    bgColor = MaterialTheme.colorScheme.surface,
+                    // Dissolve toward the ACTUAL color the chat draws on, so
+                    // the glow grades seamlessly into it instead of producing
+                    // a hard line. With ChatBackground.Default the content
+                    // sits on the scaffold/window background (colorScheme.
+                    // background), NOT surface; use the explicit chat-bg
+                    // color when one is set.
+                    bgColor = when (val cb = chatBackground) {
+                        is ChatBackground.SolidColor -> cb.color
+                        else -> MaterialTheme.colorScheme.background
+                    },
                     animate = !reducedMotion,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
