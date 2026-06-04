@@ -4,7 +4,8 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -41,6 +42,7 @@ import com.letta.mobile.data.tooloutput.ToolOutputBlock
 import com.letta.mobile.data.tooloutput.ToolOutputDocument
 import com.letta.mobile.data.tooloutput.ToolOutputParser
 import com.letta.mobile.feature.chat.R
+import com.letta.mobile.feature.chat.screen.chatLongPressTimeoutMillis
 import com.letta.mobile.ui.text.ChatTextLayoutMode
 import com.letta.mobile.ui.text.ChatTextVisualClip
 import com.letta.mobile.ui.text.rememberChatTextGeometryMeasurer
@@ -53,6 +55,7 @@ import com.letta.mobile.ui.theme.listItemSupporting
 import com.letta.mobile.ui.theme.scaledBy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 internal const val ToolOutputBackgroundParseThresholdChars = 12_000
 internal const val ToolOutputBackgroundHighlightThresholdChars = 4_000
@@ -115,9 +118,22 @@ internal fun ToolOutputRenderer(
     Column(
         modifier = modifier
             .pointerInput(raw) {
-                detectTapGestures(
-                    onLongPress = { clipboard.setText(AnnotatedString(raw)) },
-                )
+                // letta-mobile-y1ogc: use a doubled long-press hold threshold so
+                // incidental touches during scroll don't trigger copy-to-clipboard.
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    val upBeforeTimeout = withTimeoutOrNull(
+                        chatLongPressTimeoutMillis(viewConfiguration.longPressTimeoutMillis),
+                    ) {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            if (event.changes.any { !it.pressed }) break
+                        }
+                    }
+                    if (upBeforeTimeout == null) {
+                        clipboard.setText(AnnotatedString(raw))
+                    }
+                }
             },
     ) {
         AnimatedContent(

@@ -66,6 +66,26 @@ internal fun UiMessage.shouldRenderBubbleLess(): Boolean {
 }
 
 /**
+ * Multiplier applied to the platform long-press timeout for chat-timeline
+ * long-press handlers (message bubbles, tool cards).
+ *
+ * letta-mobile-y1ogc: the default Compose long-press timeout (~400-500ms) fired
+ * far too easily on the chat timeline, triggering on incidental touches and
+ * scroll-intent. Doubling it requires a deliberate hold without affecting normal
+ * taps or scrolling (scroll movement still cancels the gesture via child scroll
+ * consumption / pointer lift).
+ */
+internal const val CHAT_LONG_PRESS_TIMEOUT_MULTIPLIER: Long = 2L
+
+/**
+ * The long-press hold duration (ms) used by chat-timeline long-press handlers,
+ * derived from the platform [viewConfiguration]'s long-press timeout scaled by
+ * [CHAT_LONG_PRESS_TIMEOUT_MULTIPLIER].
+ */
+internal fun chatLongPressTimeoutMillis(platformLongPressTimeoutMillis: Long): Long =
+    platformLongPressTimeoutMillis * CHAT_LONG_PRESS_TIMEOUT_MULTIPLIER
+
+/**
  * A modifier that detects long-press gestures without consuming short taps.
  *
  * Unlike [Modifier.combinedClickable] or [detectTapGestures], this handler uses
@@ -73,6 +93,10 @@ internal fun UiMessage.shouldRenderBubbleLess(): Boolean {
  * event for short taps. This allows child composables (e.g., mermaid diagram's
  * tap-to-fullscreen) to receive their own tap events, while the parent still
  * gets long-press-to-copy behavior.
+ *
+ * The hold threshold is doubled relative to the platform default (see
+ * [chatLongPressTimeoutMillis]) so incidental touches during scrolling don't
+ * trigger the long-press.
  */
 internal fun Modifier.longPressPassthrough(
     onLongPress: (() -> Unit)?,
@@ -82,7 +106,7 @@ internal fun Modifier.longPressPassthrough(
         awaitEachGesture {
             awaitFirstDown(requireUnconsumed = false)
             val upBeforeTimeout = withTimeoutOrNull(
-                viewConfiguration.longPressTimeoutMillis,
+                chatLongPressTimeoutMillis(viewConfiguration.longPressTimeoutMillis),
             ) {
                 // Spin until the pointer lifts (short tap) — do not consume.
                 while (true) {
