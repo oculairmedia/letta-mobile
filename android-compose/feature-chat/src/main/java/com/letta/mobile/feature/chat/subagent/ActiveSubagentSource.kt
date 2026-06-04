@@ -32,6 +32,15 @@ import kotlinx.coroutines.flow.map
 interface ActiveSubagentSource {
     val activeSubagents: StateFlow<ImmutableList<ActiveSubagent>>
 
+    /**
+     * letta-mobile-73o2h.3: fetch one subagent's latest TodoWrite snapshot
+     * for the tap-to-todolist sheet. Keyed by the chip id (the parent Agent
+     * tool_call_id). Default returns empty so previews/fakes need no wiring;
+     * the WS-backed source delegates to the repository.
+     */
+    suspend fun todos(toolCallId: String): Result<List<com.letta.mobile.data.model.SubagentTodo>> =
+        Result.success(emptyList())
+
     companion object {
         /**
          * The active-only visibility rule, applied as a flow operator. Keeps
