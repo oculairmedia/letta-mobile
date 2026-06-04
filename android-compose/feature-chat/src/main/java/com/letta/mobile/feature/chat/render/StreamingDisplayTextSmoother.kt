@@ -35,6 +35,41 @@ internal class StreamingDisplayTextSmoother(
     private var streaming: Boolean = false
 
     /**
+     * Seed the reveal cursor so the smoother starts with [prefix] already
+     * visible instead of rewinding to an empty string.
+     *
+     * letta-mobile-uoiu6: when an assistant message is first created with a
+     * first token, that token is painted once via the plain (non-smoothed)
+     * markdown path. The moment a subsequent delta makes the text grow, the
+     * UI switches to the smoothed streaming renderer. Without seeding, the
+     * smoother would start at `revealedCount = 0` and re-reveal from the
+     * beginning, visibly wiping and re-growing the first word — the "first
+     * word flash". Seeding with the already-painted prefix makes the reveal
+     * continue from there, so the opening render is continuous.
+     *
+     * No-op once the smoother already has a non-empty target (i.e. it has
+     * begun revealing), so this only takes effect on the initial engage.
+     *
+     * @param prefix the text already visible on screen when streaming engages.
+     * @param isStreaming whether the stream is still open.
+     * @param nowMs current monotonic time.
+     */
+    fun seed(prefix: String, isStreaming: Boolean, nowMs: Long) {
+        if (target.isNotEmpty() || prefix.isEmpty()) {
+            // Already started revealing (or nothing to seed). Fall through to
+            // a normal target update so callers can use seed() unconditionally.
+            updateTarget(prefix, isStreaming, nowMs)
+            return
+        }
+        target = prefix
+        revealedCount = prefix.length
+        revealedFloat = prefix.length.toFloat()
+        lastStepMs = nowMs
+        lastTargetUpdateMs = nowMs
+        streaming = isStreaming
+    }
+
+    /**
      * Push the latest accumulated text from the ViewModel.
      *
      * @param text full accumulated assistant text so far.

@@ -67,6 +67,63 @@ class RememberStreamSmootherTest {
     }
 
     @Test
+    fun `seed reveals prefix immediately without rewinding to empty`() {
+        // letta-mobile-uoiu6: the first token painted via the non-smoothed
+        // path must NOT be re-revealed from an empty string when streaming
+        // engages, or the opening word visibly flashes/redraws.
+        val smoother = StreamingDisplayTextSmoother()
+
+        // First word was already on screen when the smoother engages.
+        smoother.seed("Hello", isStreaming = true, nowMs = 0L)
+
+        // The very first paint must already show the full seeded prefix —
+        // no growth from "", "H", "He"... that would be the flash.
+        val firstPaint = smoother.step(16L)
+        assertTrue(
+            "Seeded prefix must be fully visible on first paint, was '$firstPaint'",
+            firstPaint.startsWith("Hello"),
+        )
+    }
+
+    @Test
+    fun `seed then growth continues from prefix without re-revealing it`() {
+        val smoother = StreamingDisplayTextSmoother()
+
+        smoother.seed("Hello", isStreaming = true, nowMs = 0L)
+        // First delta grows the message past the seeded prefix.
+        smoother.updateTarget("Hello world", isStreaming = true, nowMs = 16L)
+
+        // The reveal continues forward from the seeded prefix; it must never
+        // drop below the already-visible prefix length.
+        var text = smoother.step(32L)
+        assertTrue(
+            "Reveal must not rewind below seeded prefix, was '$text'",
+            text.length >= "Hello".length,
+        )
+        assertTrue(text.startsWith("Hello"))
+
+        // Eventually catches the full grown target.
+        var loops = 0
+        while (!smoother.isFullyRevealed && loops < 50) {
+            text = smoother.step(48L + loops * 16L)
+            loops++
+        }
+        assertEquals("Hello world", text)
+    }
+
+    @Test
+    fun `seed with empty prefix behaves like a normal reveal`() {
+        val smoother = StreamingDisplayTextSmoother()
+
+        // Empty seed => nothing was painted yet; normal char-by-char reveal.
+        smoother.seed("", isStreaming = true, nowMs = 0L)
+        smoother.updateTarget("Hi", isStreaming = true, nowMs = 0L)
+
+        val step1 = smoother.step(16L)
+        assertEquals("H", step1)
+    }
+
+    @Test
     fun `handles abrupt target changes`() {
         val smoother = StreamingDisplayTextSmoother()
 

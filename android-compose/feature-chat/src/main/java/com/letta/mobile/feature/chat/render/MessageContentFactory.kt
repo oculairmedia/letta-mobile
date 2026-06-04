@@ -85,9 +85,18 @@ private fun AssistantResponseText(
     }
 
     val smoothedText = if (useStreamingRenderer) {
+        // letta-mobile-uoiu6: seed the smoother with the text that was already
+        // painted via the plain MarkdownText path on the first composition
+        // (`initialText`). When the first delta makes the message grow and we
+        // switch into the streaming renderer, seeding makes the reveal continue
+        // from the already-visible prefix instead of rewinding to an empty
+        // string and re-growing the first word — which is the visible
+        // "first word flash". The seed is captured once and only applies on the
+        // smoother's first engage.
         rememberSmoothedStreamingText(
             rawText = text,
             isStreaming = isStreaming && textHasGrown,
+            seedText = initialText,
         )
     } else {
         text
