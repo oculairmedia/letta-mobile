@@ -233,7 +233,12 @@ internal fun ChatScreen(
                     // CyanAccent dark, per-theme variants). Picks up the
                     // user's currently-active theme color rather than
                     // the muted role-label tone.
+                    // p2auf: pass the full themed accent triad so the
+                    // glow slowly drifts across the active theme palette
+                    // instead of sitting on one accent.
                     tint = MaterialTheme.colorScheme.tertiary,
+                    tint2 = MaterialTheme.colorScheme.primary,
+                    tint3 = MaterialTheme.colorScheme.secondary,
                     bgColor = MaterialTheme.colorScheme.surface,
                     animate = !reducedMotion,
                     modifier = Modifier
