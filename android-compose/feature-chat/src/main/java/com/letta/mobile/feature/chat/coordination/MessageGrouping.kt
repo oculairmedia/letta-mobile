@@ -53,6 +53,14 @@ internal sealed interface ChatRenderItem {
         val message: UiMessage,
         val groupPosition: GroupPosition,
         val stableRunKey: String? = null,
+        /**
+         * The raw server run id behind [stableRunKey], carried verbatim so
+         * collapse-state lookups (`runId in collapsedRunIds`) match the
+         * [RunBlock] path exactly. We can't recover this from [stableRunKey]
+         * via `removePrefix("run-")` because the server id may *itself* start
+         * with `run-` (letta-mobile-lkj4r), which normalisation would strip.
+         */
+        val stableRunId: String? = null,
     ) : ChatRenderItem {
         override val key: String = stableRunKey ?: "msg-${message.id}"
         override val boundaryTimestamp: String = message.timestamp
@@ -76,7 +84,7 @@ internal sealed interface ChatRenderItem {
             require(messages.isNotEmpty()) { "RunBlock must contain at least one message" }
         }
 
-        override val key: String = stableKey ?: "run-$runId"
+        override val key: String = stableKey ?: runKey(runId)
 
         /**
          * Newest message timestamp in the run. The reversed input to
@@ -169,8 +177,16 @@ internal fun groupMessagesForRender(
             // Single or RunBlock will use `run-$runId`). This keeps the
             // LazyColumn slot stable when a sibling message later arrives and
             // promotes this Single into a RunBlock mid-stream.
-            val stableKey = if ((runIdCounts[runId] ?: 0) == 1) "run-$runId" else null
-            out.add(ChatRenderItem.Single(compactedAcc[0].first, compactedAcc[0].second, stableRunKey = stableKey))
+            val isUniqueRun = (runIdCounts[runId] ?: 0) == 1
+            val stableKey = if (isUniqueRun) runKey(runId) else null
+            out.add(
+                ChatRenderItem.Single(
+                    compactedAcc[0].first,
+                    compactedAcc[0].second,
+                    stableRunKey = stableKey,
+                    stableRunId = if (isUniqueRun) runId else null,
+                )
+            )
         } else {
             out.add(
                 ChatRenderItem.RunBlock(
@@ -235,8 +251,26 @@ private fun runBlockKey(
     }
     val allMatchingMessagesAreInThisBlock = runIdCounts[runId] == matchingMessagesInThisBlock
     return if (allMatchingMessagesAreInThisBlock) {
-        "run-$runId"
+        runKey(runId)
     } else {
-        "run-$runId-${accumulator.first().first.id}"
+        "${runKey(runId)}-${accumulator.first().first.id}"
     }
 }
+
+/**
+ * Build the canonical LazyColumn key for a server run id.
+ *
+ * Server run ids frequently already carry a `run-` prefix (e.g.
+ * `run-80aa0047-…`). Naively doing `"run-$runId"` then produces a
+ * **double**-prefixed `run-run-80aa0047-…` key. That doubled key collides
+ * with a sibling that derived the single-prefixed `run-80aa0047-…` form
+ * (e.g. a unique-runId Single's stable key vs. a RunBlock for the same run),
+ * which LazyColumn treats as a fatal duplicate-key crash:
+ *
+ *   IllegalArgumentException: Key "run-run-<id>" was already used.
+ *
+ * Normalising here guarantees a single, stable `run-<id>` prefix regardless
+ * of whether the server id already had one (letta-mobile-lkj4r).
+ */
+internal fun runKey(runId: String): String =
+    if (runId.startsWith("run-")) runId else "run-$runId"

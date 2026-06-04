@@ -284,6 +284,9 @@ class MessageGroupingTest {
         assertEquals(3, items.size)
         val currentRun = items[0] as ChatRenderItem.RunBlock
         assertEquals("run-c", currentRun.runId)
+        // letta-mobile-lkj4r: server id already starts with `run-`, so the key
+        // must be `run-c`, never the double-prefixed `run-run-c`.
+        assertEquals("run-c", currentRun.key)
         assertEquals(listOf("c-1", "c-2"), currentRun.messages.map { it.first.id })
         assertTrue(!currentRun.containsMessageId("a"))
         assertTrue(!currentRun.containsMessageId("b"))
@@ -378,6 +381,105 @@ class MessageGroupingTest {
 
         val currentRun = items[0] as ChatRenderItem.RunBlock
         assertEquals(listOf("run-final", "run-repeat"), currentRun.messages.map { it.first.id })
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // letta-mobile-lkj4r — server run ids that already carry a `run-` prefix
+    // must NOT be double-prefixed into `run-run-<id>` keys. A doubled key both
+    // (a) looks wrong and (b) collides with a sibling that derived the
+    // single-prefixed `run-<id>` form, crashing the LazyColumn with
+    // "Key 'run-run-<id>' was already used."
+    // ──────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `RunBlock with already-prefixed runId is not double-prefixed`() {
+        val items = groupMessagesForRender(
+            listOf(
+                assistant("a2", runId = "run-80aa0047") to GroupPosition.First,
+                assistant("a1", runId = "run-80aa0047") to GroupPosition.Last,
+            ),
+        )
+        val block = items.single() as ChatRenderItem.RunBlock
+        // Key must be the run id verbatim — NOT `run-run-80aa0047`.
+        assertEquals("run-80aa0047", block.key)
+        assertTrue("key must not be double-run-prefixed", !block.key.startsWith("run-run-"))
+    }
+
+    @Test
+    fun `unique Single with already-prefixed runId adopts non-doubled run key`() {
+        val items = groupMessagesForRender(
+            listOf(
+                assistant("a1", runId = "run-80aa0047") to GroupPosition.None,
+                user("u1") to GroupPosition.None,
+            ),
+        )
+        val single = items[0] as ChatRenderItem.Single
+        assertEquals("run-80aa0047", single.key)
+        assertEquals("run-80aa0047", single.stableRunId)
+        assertTrue("key must not be double-run-prefixed", !single.key.startsWith("run-run-"))
+    }
+
+    @Test
+    fun `no render-item key is double-run-prefixed across a mixed streaming model`() {
+        // A realistic mid-stream snapshot mixing: a multi-message run whose id
+        // already starts with `run-`, a unique single-run (also `run-`-prefixed),
+        // a plain run id (no prefix), a user message, and a streaming tail.
+        val items = groupMessagesForRender(
+            listOf(
+                // streaming tail: current run, two assistant frames sharing id
+                assistant("s2", runId = "run-80aa0047-a612") to GroupPosition.First,
+                assistant("s1", runId = "run-80aa0047-a612") to GroupPosition.Last,
+                user("u3") to GroupPosition.None,
+                // unique single whose run id already carries the prefix
+                assistant("a-solo", runId = "run-deadbeef") to GroupPosition.None,
+                user("u2") to GroupPosition.None,
+                // a run id WITHOUT the server prefix — must gain exactly one
+                assistant("b2", runId = "plainrun") to GroupPosition.First,
+                assistant("b1", runId = "plainrun") to GroupPosition.Last,
+                user("u1") to GroupPosition.None,
+            ),
+        )
+
+        val keys = items.map { it.key }
+
+        // (1) All keys are unique — the actual LazyColumn crash condition.
+        assertEquals("render keys must be unique: $keys", keys.size, keys.toSet().size)
+
+        // (2) No key is double-`run-`-prefixed.
+        keys.forEach { key ->
+            assertTrue("key must not be double-run-prefixed: $key", !key.startsWith("run-run-"))
+        }
+
+        // (3) Specific keys are normalized as expected.
+        assertEquals("run-80aa0047-a612", items[0].key)
+        assertEquals("msg-u3", items[1].key)
+        assertEquals("run-deadbeef", items[2].key)
+        assertEquals("msg-u2", items[3].key)
+        assertEquals("run-plainrun", items[4].key)
+        assertEquals("msg-u1", items[5].key)
+    }
+
+    @Test
+    fun `single-prefixed Single transitions to single-prefixed RunBlock with stable key`() {
+        // The exact streaming scenario from the crash: an assistant frame in a
+        // run whose server id already starts with `run-` lands first (unique →
+        // Single), then a sibling arrives and promotes it to a RunBlock. The
+        // key MUST stay identical AND must never be `run-run-<id>`, or the
+        // LazyColumn unmounts the slot (flash) or crashes on the doubled key.
+        val before = groupMessagesForRender(
+            listOf(assistant("a1", runId = "run-80aa0047-a612") to GroupPosition.None),
+        )
+        val after = groupMessagesForRender(
+            listOf(
+                assistant("a2", runId = "run-80aa0047-a612") to GroupPosition.First,
+                assistant("a1", runId = "run-80aa0047-a612") to GroupPosition.Last,
+            ),
+        )
+        assertEquals("run-80aa0047-a612", before.single().key)
+        assertEquals("run-80aa0047-a612", after.single().key)
+        assertEquals(before.single().key, after.single().key)
+        assertTrue(!before.single().key.startsWith("run-run-"))
+        assertTrue(!after.single().key.startsWith("run-run-"))
     }
 
     @Test

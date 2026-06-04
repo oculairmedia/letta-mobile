@@ -138,7 +138,7 @@ private fun ChatRenderItem.geometryContentFingerprint(state: ChatUiState): ChatR
             includeMessage(message)
             include(groupPosition.hashCode())
             include(stableRunKey.hashCode())
-            stableRunKey?.removePrefix("run-")?.let { runId ->
+            stableRunId?.let { runId ->
                 include((runId in state.collapsedRunIds).hashCode())
             }
         }
@@ -165,7 +165,7 @@ private fun ChatRenderItem.geometryExpansionHash(state: ChatUiState): Int {
             include(groupPosition.hashCode())
             include(stableRunKey.hashCode())
             include((message.id !in state.expandedReasoningMessageIds).hashCode())
-            stableRunKey?.removePrefix("run-")?.let { runId ->
+            stableRunId?.let { runId ->
                 include((runId in state.collapsedRunIds).hashCode())
             }
         }

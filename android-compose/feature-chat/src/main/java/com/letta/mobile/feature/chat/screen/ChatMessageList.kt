@@ -744,7 +744,11 @@ internal fun ChatMessageList(
                                 // there's no visible change for true singletons.
                                 val stableKey = renderItem.stableRunKey
                                 if (stableKey != null) {
-                                    val runId = stableKey.removePrefix("run-")
+                                    // Use the raw run id (not stableKey.removePrefix)
+                                    // so collapse-state matches the RunBlock path even
+                                    // when the server id already starts with "run-"
+                                    // (letta-mobile-lkj4r).
+                                    val runId = renderItem.stableRunId ?: stableKey.removePrefix("run-")
                                     RunBlock(
                                         messages = listOf(msg),
                                         collapsed = runId in state.collapsedRunIds,
