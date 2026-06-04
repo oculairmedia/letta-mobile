@@ -263,7 +263,21 @@ internal fun ChatScreen(
                     tint = MaterialTheme.colorScheme.primary,
                     tint2 = MaterialTheme.colorScheme.tertiary,
                     tint3 = MaterialTheme.colorScheme.secondary,
-                    bgColor = MaterialTheme.colorScheme.surface,
+                    // Dissolve toward the ACTUAL color the chat draws on, so
+                    // the glow grades seamlessly into it instead of producing
+                    // a hard line. With ChatBackground.Default the content
+                    // sits on the scaffold/window background (colorScheme.
+                    // background), NOT surface; use the explicit chat-bg
+                    // color when one is set.
+                    // The chat actually sits on the Scaffold container color
+                    // (LettaTopBarDefaults.scaffoldContainerColor() ==
+                    // colorScheme.surfaceContainer), NOT surface/background.
+                    // Dissolving toward the wrong one is what produced the
+                    // hard line. Use the explicit chat-bg color when set.
+                    bgColor = when (val cb = chatBackground) {
+                        is ChatBackground.SolidColor -> cb.color
+                        else -> MaterialTheme.colorScheme.surfaceContainer
+                    },
                     animate = !reducedMotion,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
