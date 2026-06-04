@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.Density
 import com.letta.mobile.ui.text.ChatTextLayoutMode
 import com.letta.mobile.ui.text.rememberChatTextGeometryMeasurer
 import com.letta.mobile.ui.theme.LocalChatFontScale
+import com.letta.mobile.ui.theme.scaledBy
 import com.letta.mobile.ui.theme.LocalChatIsPinching
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -358,6 +359,15 @@ private fun StreamingMarkdownDocumentBlocks(
                     table = parsedTable,
                     textColor = textColor,
                     useContentColumnWidths = !(isStreaming && isActiveBlock),
+                )
+            }
+        } else if (isActiveBlock && block.supportsPlainTextHeightPrediction(renderSource)) {
+            key(block.key) {
+                Text(
+                    text = repairedMarkdown,
+                    color = textColor,
+                    style = MaterialTheme.typography.bodyMedium.scaledBy(LocalChatFontScale.current),
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         } else {

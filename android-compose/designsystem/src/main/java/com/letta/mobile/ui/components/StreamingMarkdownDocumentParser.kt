@@ -17,13 +17,14 @@ internal object StreamingMarkdownDocumentParser {
         """^\s{0,3}(?:-(?:[ \t]*-){2,}|\*(?:[ \t]*\*){2,}|_(?:[ \t]*_){2,})\s*$""",
     )
 
-    fun parse(text: String): List<ParsedStreamingMarkdownBlock> {
+    fun parse(text: String): List<ParsedStreamingMarkdownBlock> = parse(text, startOffset = 0)
+
+    fun parse(text: String, startOffset: Int): List<ParsedStreamingMarkdownBlock> {
         if (text.isEmpty()) return emptyList()
 
         val normalized = text.replace("\r\n", "\n").replace('\r', '\n')
         val blocks = mutableListOf<ParsedStreamingMarkdownBlock>()
-        var cursor = 0
-
+        var cursor = startOffset.coerceIn(0, normalized.length)
         while (cursor < normalized.length) {
             val line = readLine(normalized, cursor)
             if (line.isBlank) {

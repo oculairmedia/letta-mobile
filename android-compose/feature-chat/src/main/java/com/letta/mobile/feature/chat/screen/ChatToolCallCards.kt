@@ -40,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
@@ -293,7 +294,9 @@ internal fun ToolCallCard(
                     Icon(
                         imageVector = LettaIcons.Refresh,
                         contentDescription = "Running",
-                        modifier = Modifier.size(LettaIconSizing.Inline).rotate(angle),
+                        modifier = Modifier
+                            .size(LettaIconSizing.Inline)
+                            .graphicsLayer { rotationZ = angle },
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -859,7 +862,9 @@ internal fun CompactToolCallRow(
                     Icon(
                         imageVector = LettaIcons.Refresh,
                         contentDescription = "Running",
-                        modifier = Modifier.size(LettaIconSizing.Inline).rotate(a),
+                        modifier = Modifier
+                            .size(LettaIconSizing.Inline)
+                            .graphicsLayer { rotationZ = a },
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }

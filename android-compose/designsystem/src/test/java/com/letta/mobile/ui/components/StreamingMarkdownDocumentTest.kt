@@ -53,6 +53,34 @@ class StreamingMarkdownDocumentTest {
     }
 
     @Test
+    fun `append reparses active tail only when a paragraph becomes a table`() {
+        val state = StreamingMarkdownDocumentState()
+        val before = state.write("Intro paragraph.\n\n| A | B |\n")
+        val intro = before.blocks.first()
+
+        val after = state.write("| - | - |\n| 1 | 2 |")
+
+        assertSame(intro, after.blocks.first())
+        assertEquals(StreamingMarkdownBlockKind.Table, after.blocks[1].kind)
+        assertEquals("| A | B |\n| - | - |\n| 1 | 2 |", after.blocks[1].source)
+    }
+
+    @Test
+    fun `append after a closed block keeps completed tail identity`() {
+        val state = StreamingMarkdownDocumentState()
+        val before = state.write("First.\n\nSecond.\n\n")
+        val first = before.blocks[0]
+        val second = before.blocks[1]
+
+        val after = state.write("Third.")
+
+        assertSame(first, after.blocks[0])
+        assertSame(second, after.blocks[1])
+        assertEquals(StreamingMarkdownBlockKind.Paragraph, after.blocks[2].kind)
+        assertEquals("Third.", after.blocks[2].source)
+    }
+
+    @Test
     fun `open code fence becomes a code block immediately`() {
         val doc = StreamingMarkdownDocumentState().write("```kot")
 

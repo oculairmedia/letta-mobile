@@ -103,14 +103,33 @@ internal class StreamingMarkdownDocumentState {
     }
 
     fun update(text: String): StreamingMarkdownDocument {
-        if (!text.startsWith(previousRawText)) {
-            previousBlocks = emptyList()
+        if (text == previousRawText) {
+            return StreamingMarkdownDocument(previousBlocks)
         }
 
-        val parsed = StreamingMarkdownDocumentParser.parse(text)
-        val reconciled = parsed.mapIndexed { index, block ->
-            reconcile(index, block)
+        // Streaming updates are append-only in the hot path. Reparse only the active tail plus
+        // its immediate predecessor: the predecessor can still merge with the new tail for
+        // constructs like list continuations and table headers, while older blocks are already
+        // structurally sealed by a later block start.
+        val isAppend = text.startsWith(previousRawText)
+        val reparseBlockCount = if (isAppend) minOf(previousBlocks.size, 2) else 0
+        val parseStart = when {
+            reparseBlockCount > 0 -> previousBlocks[previousBlocks.size - reparseBlockCount].startOffset
+            else -> {
+                if (!isAppend) previousBlocks = emptyList()
+                0
+            }
         }
+        val stablePrefix = if (reparseBlockCount > 0) {
+            previousBlocks.dropLast(reparseBlockCount)
+        } else {
+            emptyList()
+        }
+        val parsed = StreamingMarkdownDocumentParser.parse(text, startOffset = parseStart)
+        val reconciledTail = parsed.mapIndexed { tailIndex, block ->
+            reconcile(stablePrefix.size + tailIndex, block)
+        }
+        val reconciled = stablePrefix + reconciledTail
 
         previousRawText = text
         previousBlocks = reconciled
