@@ -80,6 +80,9 @@ import com.letta.mobile.feature.chat.subagent.ActiveSubagent
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentBar
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource.Companion.activeOnly
+import com.letta.mobile.feature.chat.subagent.SubagentTodoSheet
+import com.letta.mobile.feature.chat.subagent.SubagentTodoSheetState
+import com.letta.mobile.feature.chat.subagent.subagentTodoSheetStateFrom
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatBackground
@@ -154,6 +157,9 @@ internal fun ChatScreen(
         val bottomInsetDp = with(density) { max(imeBottomPx, navBottomPx + bottomBarPx).toDp() }
         var ambientAgentStatus by remember { mutableStateOf("Idle") }
         var hadActiveAmbientRun by remember { mutableStateOf(false) }
+        // letta-mobile-73o2h.3: tap-to-todolist sheet. Holds the tapped
+        // subagent; the sheet fetches its TodoWrite via the repository.
+        var tappedSubagent by remember { mutableStateOf<ActiveSubagent?>(null) }
 
         LaunchedEffect(composerState.error) {
             val message = composerState.error ?: return@LaunchedEffect
@@ -349,7 +355,28 @@ internal fun ChatScreen(
                 // snapshot is empty (AnimatedVisibility), so this call site
                 // is unconditional and does not perturb ChatMessageList /
                 // streaming.
-                ActiveSubagentBar(subagents = activeSubagents)
+                ActiveSubagentBar(
+                    subagents = activeSubagents,
+                    onChipClick = { subagent -> tappedSubagent = subagent },
+                )
+
+                // letta-mobile-73o2h.3: tap-to-todolist bottom sheet. One-shot
+                // fetch of the tapped subagent's TodoWrite via the source.
+                tappedSubagent?.let { subagent ->
+                    var todoState by remember(subagent.id) {
+                        mutableStateOf<SubagentTodoSheetState>(SubagentTodoSheetState.Loading)
+                    }
+                    LaunchedEffect(subagent.id) {
+                        todoState = subagentTodoSheetStateFrom(
+                            resolvedSubagentSource.todos(subagent.id),
+                        )
+                    }
+                    SubagentTodoSheet(
+                        description = subagent.description,
+                        state = todoState,
+                        onDismiss = { tappedSubagent = null },
+                    )
+                }
 
                 // letta-mobile-ndtc.3: gradient "thinking" text token —
                 // ephemeral subtitle that appears between the message list /
