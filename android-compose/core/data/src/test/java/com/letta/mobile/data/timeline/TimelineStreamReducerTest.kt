@@ -26,6 +26,7 @@ class TimelineStreamReducerTest {
     @After
     fun tearDown() {
         Telemetry.clear()
+        Telemetry.chatHotPathDebugEnabled.set(false)
     }
 
     @Test
@@ -278,6 +279,8 @@ class TimelineStreamReducerTest {
 
     @Test
     fun `defensive stream merge branches emit named telemetry`() {
+        Telemetry.chatHotPathDebugEnabled.set(true)
+
         telemetryNamesForMerge("Stand", "Standing by.")
             .contains("streamSubscriber.cumulativeSnapshotReplaced") shouldBe true
         telemetryNamesForMerge("Standing by.", "Stand")
@@ -370,6 +373,7 @@ class TimelineStreamReducerTest {
             diskRecords = emptyList(),
         ).timeline
         Telemetry.clear()
+        Telemetry.chatHotPathDebugEnabled.set(true)
 
         val output = reduce(
             prev = hydrated,
@@ -388,6 +392,32 @@ class TimelineStreamReducerTest {
             it.tag == "TimelineSync" &&
                 it.name == "streamSubscriber.eventDeduped" &&
                 it.attrs["reason"] == "semanticIdentitySeen"
+        } shouldBe true
+    }
+
+    @Test
+    fun `stream reducer hot path telemetry is disabled by default`() {
+        Telemetry.chatHotPathDebugEnabled.set(false)
+        Telemetry.clear()
+
+        reduce(frame = AssistantMessage(id = "assistant-default", contentRaw = JsonPrimitive("hello")))
+
+        Telemetry.snapshot().none {
+            it.tag == "TimelineSync" && it.name.startsWith("streamSubscriber")
+        } shouldBe true
+    }
+
+    @Test
+    fun `stream reducer hot path telemetry can be enabled deliberately`() {
+        Telemetry.chatHotPathDebugEnabled.set(true)
+        Telemetry.clear()
+
+        reduce(frame = AssistantMessage(id = "assistant-debug", contentRaw = JsonPrimitive("hello")))
+
+        Telemetry.snapshot().any {
+            it.tag == "TimelineSync" &&
+                it.name == "streamSubscriber.ingested" &&
+                it.level == Telemetry.Level.DEBUG
         } shouldBe true
     }
 

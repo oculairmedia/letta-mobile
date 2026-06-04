@@ -204,16 +204,19 @@ internal fun ToolCallCard(
         compactDetail?.let { "${toolCall.name} - $it" } ?: toolCall.name
     }
     LaunchedEffect(toolCall.toolCallMotionKey(), showDetails, deferHeavyOutput, toolCall.result?.length) {
-        Telemetry.event(
-            "ChatToolCard",
-            "render.composed",
-            "toolName" to toolCall.name,
-            "hasResult" to (toolCall.result != null),
-            "isExpanded" to showDetails,
-            "deferredHeavyOutput" to deferHeavyOutput,
-            "resultChars" to (toolCall.result?.length ?: 0),
-            "effectDispatchDelayMs" to (System.currentTimeMillis() - renderStartedAtMs),
-        )
+        if (Telemetry.isChatHotPathDebugEnabled()) {
+            Telemetry.event(
+                "ChatToolCard",
+                "render.composed",
+                "toolName" to toolCall.name,
+                "hasResult" to (toolCall.result != null),
+                "isExpanded" to showDetails,
+                "deferredHeavyOutput" to deferHeavyOutput,
+                "resultChars" to (toolCall.result?.length ?: 0),
+                "effectDispatchDelayMs" to (System.currentTimeMillis() - renderStartedAtMs),
+                level = Telemetry.Level.DEBUG,
+            )
+        }
     }
 
     // letta-mobile-23h5 (polish 2026-04-19): give the tool card a touch
@@ -769,16 +772,19 @@ internal fun CompactToolCallRow(
     }
     val isError = ToolReturnStatus.isError(toolCall.status)
     LaunchedEffect(toolCall.toolCallMotionKey(), expanded, deferHeavyOutput, toolCall.result?.length) {
-        Telemetry.event(
-            "ChatToolCard",
-            "compactRow.composed",
-            "toolName" to toolCall.name,
-            "hasResult" to (toolCall.result != null),
-            "isExpanded" to expanded,
-            "deferredHeavyOutput" to deferHeavyOutput,
-            "resultChars" to (toolCall.result?.length ?: 0),
-            "effectDispatchDelayMs" to (System.currentTimeMillis() - renderStartedAtMs),
-        )
+        if (Telemetry.isChatHotPathDebugEnabled()) {
+            Telemetry.event(
+                "ChatToolCard",
+                "compactRow.composed",
+                "toolName" to toolCall.name,
+                "hasResult" to (toolCall.result != null),
+                "isExpanded" to expanded,
+                "deferredHeavyOutput" to deferHeavyOutput,
+                "resultChars" to (toolCall.result?.length ?: 0),
+                "effectDispatchDelayMs" to (System.currentTimeMillis() - renderStartedAtMs),
+                level = Telemetry.Level.DEBUG,
+            )
+        }
     }
     val chevronRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,

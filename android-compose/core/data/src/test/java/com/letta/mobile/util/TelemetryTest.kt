@@ -36,6 +36,11 @@ class TelemetryTest : WordSpec({
             }
         }
 
+        "keep chat hot path diagnostics disabled by default" {
+            Telemetry.chatHotPathDebugEnabled.get() shouldBe false
+            Telemetry.isChatHotPathDebugEnabled() shouldBe false
+        }
+
         "tolerate concurrent emitters and clear operations" {
             val wasEnabled = Telemetry.enabled.get()
             val wasLogcatEnabled = Telemetry.logcatEnabled.get()
