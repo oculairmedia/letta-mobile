@@ -135,7 +135,10 @@ half4 main(float2 fragCoord) {
   // brightest part and a soft halo rises above. (geometry unchanged)
   float baseline = 0.90 + wave + noise_offset;
   float dist = clamp(baseline - uv.y, 0.0, 1.0);
-  float glow = pow(1.0 - clamp(dist / 0.75, 0.0, 1.0), 1.6);
+  // Subtler effect = THINNER colored band (not lower alpha). Smaller
+  // divisor + steeper pow concentrates vivid color into a slim strip
+  // hugging the bottom; the rest dissolves to bg in color space.
+  float glow = pow(1.0 - clamp(dist / 0.45, 0.0, 1.0), 2.4);
 
   // Vivid drifting multi-color body.
   vec3 col = mix4(uv);
@@ -152,8 +155,12 @@ half4 main(float2 fragCoord) {
   vec4 final_color = mix(vec4(col, 1.0), bgColor, fade);
 
   // tint.a is the caller-supplied overall glow strength multiplier.
-  // GLOW_OPACITY halves the overall effect (per-request 50% of prior strength).
-  return vec4(final_color.xyz, final_color.a * tint.a * 0.5);
+  // NOTE: do NOT scale this alpha down to make the effect subtler — low
+  // alpha over the dark surface composites the color toward grey (the
+  // exact bug we fixed). To make it subtler, shrink the glow BAND
+  // (dist divisor / pow above) so less of the strip is colored while the
+  // color that IS shown stays full-opacity and vivid.
+  return vec4(final_color.xyz, final_color.a * tint.a);
 }
 """
 
