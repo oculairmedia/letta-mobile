@@ -81,6 +81,12 @@ object WsFrameMapper {
         is ServerFrame.CronDeleteResponse,
         is ServerFrame.CronDeleteAllResponse,
         is ServerFrame.CronsUpdated,
+        // letta-mobile-73o2h: active-subagent registry frames are
+        // routing-only — they drive the SubagentRepository state machine
+        // (active-bar), not the chat timeline. Same treatment as crons.
+        is ServerFrame.SubagentListResponse,
+        is ServerFrame.SubagentTodosResponse,
+        is ServerFrame.SubagentsUpdated,
         // letta-mobile-2rkdj: subscribe envelopes are routing-only —
         // SubscribeFrameMessage's inner BridgeFrame is re-routed
         // through the live handler in ChannelTransport, and

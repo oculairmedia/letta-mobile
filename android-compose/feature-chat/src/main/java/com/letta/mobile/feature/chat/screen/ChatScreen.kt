@@ -80,7 +80,6 @@ import com.letta.mobile.feature.chat.subagent.ActiveSubagent
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentBar
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource.Companion.activeOnly
-import com.letta.mobile.feature.chat.subagent.FakeActiveSubagentSource
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatBackground
@@ -108,14 +107,16 @@ internal fun ChatScreen(
     chatBackground: ChatBackground = ChatBackground.Default,
     chatMode: String = "interactive",
     onBugCommand: (() -> Unit)? = null,
-    // letta-mobile-73o2h.2: the WS SEAM for the active-subagent status bar.
-    // Defaults to an empty in-memory fake so production behaves as today
-    // (bar stays hidden) until the shim-side registry (letta-mobile-73o2h.1)
-    // lands. When .1 is merged, bind a WS-backed ActiveSubagentSource here —
-    // no other change in this file is required.
-    activeSubagentSource: ActiveSubagentSource = remember { FakeActiveSubagentSource() },
+    // letta-mobile-73o2h.2/.3: the WS SEAM for the active-subagent status
+    // bar. In production this is left null so the screen binds the real
+    // WS-backed source from the view model (the per-socket subagent registry
+    // shipped in letta-mobile-73o2h.1). Previews/tests pass an explicit
+    // FakeActiveSubagentSource. The bar itself is unchanged — only the feed
+    // is swapped at this single seam.
+    activeSubagentSource: ActiveSubagentSource? = null,
     viewModel: AdminChatViewModel = hiltViewModel()
 ) {
+    val resolvedSubagentSource = activeSubagentSource ?: viewModel.activeSubagentSource
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val composerState by viewModel.composerState.collectAsStateWithLifecycle()
     val fontScale by viewModel.chatFontScale.collectAsStateWithLifecycle()
@@ -143,7 +144,7 @@ internal fun ChatScreen(
         // the bottom status bar. `activeOnly()` re-asserts the visibility rule
         // defensively; the StateFlow emits full snapshots so the bar reduces
         // by replacement (no per-frame rebuilds — preserves rmzmo perf work).
-        val activeSubagents by activeSubagentSource.activeSubagents
+        val activeSubagents by resolvedSubagentSource.activeSubagents
             .activeOnly()
             .collectAsStateWithLifecycle(initialValue = persistentListOf<ActiveSubagent>())
         val windowSizeClass = LocalWindowSizeClass.current

@@ -8,6 +8,8 @@ import com.letta.mobile.data.a2ui.A2uiMessage
 import com.letta.mobile.data.a2ui.A2uiThemeHints
 import com.letta.mobile.data.a2ui.decodeA2uiMessages
 import com.letta.mobile.data.model.CronTask
+import com.letta.mobile.data.model.SubagentEntry
+import com.letta.mobile.data.model.SubagentTodo
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -72,6 +74,8 @@ fun ClientFrame.encodeJson(json: Json): String = when (this) {
     is CronGetFrame -> json.encodeToString(CronGetFrame.serializer(), this)
     is CronDeleteFrame -> json.encodeToString(CronDeleteFrame.serializer(), this)
     is CronDeleteAllFrame -> json.encodeToString(CronDeleteAllFrame.serializer(), this)
+    is SubagentListFrame -> json.encodeToString(SubagentListFrame.serializer(), this)
+    is SubagentTodosFrame -> json.encodeToString(SubagentTodosFrame.serializer(), this)
 }
 
 /**
@@ -292,6 +296,43 @@ data class CronDeleteAllFrame(
     override val ts: String,
     @SerialName("request_id") val requestId: String,
     @SerialName("agent_id") val agentId: String,
+) : ClientFrame
+
+// ─── Subagent client frames (letta-mobile-73o2h.3, sister to cron) ───
+//
+// The active-subagent registry mirrors the cron request/response +
+// server-push shape (MOBILE_WS_PROTOCOL.md §13). Each request frame
+// carries a `request_id` independent of the envelope `id`; the shim
+// echoes it on the matching response so the repo layer routes the
+// awaited continuation to its caller instead of broadcasting.
+
+/**
+ * Enumerate registered subagents (§13.2). Active-only by default; pass
+ * `all = true` to include terminal (completed/failed) entries. The
+ * registry is per-socket, so there is no agent/conversation filter.
+ */
+@Serializable
+data class SubagentListFrame(
+    override val v: Int = 1,
+    override val type: String = "subagent_list",
+    override val id: String,
+    override val ts: String,
+    @SerialName("request_id") val requestId: String,
+    val all: Boolean = false,
+) : ClientFrame
+
+/**
+ * Fetch one subagent's latest TodoWrite snapshot + lifecycle (§13.3),
+ * keyed by the parent Agent `tool_call_id`.
+ */
+@Serializable
+data class SubagentTodosFrame(
+    override val v: Int = 1,
+    override val type: String = "subagent_todos",
+    override val id: String,
+    override val ts: String,
+    @SerialName("request_id") val requestId: String,
+    @SerialName("tool_call_id") val toolCallId: String,
 ) : ClientFrame
 
 // ─── Server → client ───────────────────────────────────────────────
@@ -722,6 +763,69 @@ sealed interface ServerFrame {
         val at: String,
     ) : ServerFrame
 
+    // ─── Subagent server frames (letta-mobile-73o2h.3) ──────────────
+    //
+    // `request_id` echoes the client's outbound request so the repo
+    // layer can route the response to the awaiting continuation. The
+    // shim returns `null` when the inbound frame didn't carry one;
+    // SubagentRepository treats that as broadcast-only.
+
+    /**
+     * Response to [SubagentListFrame] (§13.2). `subagents` carries the
+     * full enumeration (active-only unless the request set `all`).
+     */
+    @Serializable
+    data class SubagentListResponse(
+        override val v: Int = 1,
+        val type: String = "subagent_list_response",
+        override val id: String,
+        override val ts: String,
+        @SerialName("request_id") val requestId: String? = null,
+        val success: Boolean,
+        val subagents: List<SubagentEntry> = emptyList(),
+        val error: String? = null,
+    ) : ServerFrame
+
+    /**
+     * Response to [SubagentTodosFrame] (§13.3). `subagent` is the matched
+     * registry entry; `todos` is the latest TodoWrite snapshot. `found`
+     * / `todosFound` degrade gracefully when the subagent or its todos
+     * could not be resolved.
+     */
+    @Serializable
+    data class SubagentTodosResponse(
+        override val v: Int = 1,
+        val type: String = "subagent_todos_response",
+        override val id: String,
+        override val ts: String,
+        @SerialName("request_id") val requestId: String? = null,
+        val success: Boolean,
+        val found: Boolean = false,
+        val subagent: SubagentEntry? = null,
+        val todos: List<SubagentTodo> = emptyList(),
+        @SerialName("todos_found") val todosFound: Boolean = false,
+        val error: String? = null,
+    ) : ServerFrame
+
+    /**
+     * Push notification emitted per-socket (after `hello`, mirroring
+     * [CronsUpdated]) whenever a subagent starts or reaches a terminal
+     * state (§13.4). Carries the changed [subagent], a fresh
+     * [subagentsActive] snapshot so the bar reduces by replacement, and
+     * an informational [reason] (e.g. `started`, `completed`, `failed`).
+     */
+    @Serializable
+    data class SubagentsUpdated(
+        override val v: Int = 1,
+        val type: String = "subagents_updated",
+        override val id: String,
+        override val ts: String,
+        val reason: String = "",
+        val subagent: SubagentEntry? = null,
+        @SerialName("subagents_active") val subagentsActive: List<SubagentEntry> = emptyList(),
+        val at: String = "",
+    ) : ServerFrame
+
     /**
      * Forward-compat sink for unknown `type` values. Spec §2 mandates
      * silent-ignore; surfacing as a typed value (rather than throwing)
@@ -785,6 +889,9 @@ object ServerFrameSerializer : JsonContentPolymorphicSerializer<ServerFrame>(Ser
             "cron_delete_response" -> ServerFrame.CronDeleteResponse.serializer()
             "cron_delete_all_response" -> ServerFrame.CronDeleteAllResponse.serializer()
             "crons_updated" -> ServerFrame.CronsUpdated.serializer()
+            "subagent_list_response" -> ServerFrame.SubagentListResponse.serializer()
+            "subagent_todos_response" -> ServerFrame.SubagentTodosResponse.serializer()
+            "subagents_updated" -> ServerFrame.SubagentsUpdated.serializer()
             else -> UnknownFrameDeserializer
         }
     }

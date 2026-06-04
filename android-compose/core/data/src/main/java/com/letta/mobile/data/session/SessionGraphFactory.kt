@@ -39,6 +39,7 @@ import com.letta.mobile.data.repository.ProviderRepository
 import com.letta.mobile.data.repository.RunRepository
 import com.letta.mobile.data.repository.ScheduleRepository
 import com.letta.mobile.data.repository.StepRepository
+import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.data.repository.VibesyncEventStreamRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
@@ -202,6 +203,10 @@ class SessionGraphFactory internal constructor(
             providerRepository = ProviderRepository(providerApi),
             scheduleRepository = ScheduleRepository(scheduleApi),
             stepRepository = StepRepository(stepApi),
+            subagentRepository = SubagentRepository(
+                transport = channelTransport,
+                scope = scope,
+            ),
             toolRepository = ToolRepository(toolApi),
             vibesyncEventStreamRepository = VibesyncEventStreamRepository(
                 apiClient = lettaApiClient,

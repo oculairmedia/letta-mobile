@@ -18,6 +18,7 @@ import com.letta.mobile.data.repository.ProviderRepository
 import com.letta.mobile.data.repository.RunRepository
 import com.letta.mobile.data.repository.ScheduleRepository
 import com.letta.mobile.data.repository.StepRepository
+import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.data.repository.VibesyncEventStreamRepository
 import com.letta.mobile.data.transport.ChannelTransport
@@ -49,6 +50,7 @@ class SessionGraph internal constructor(
     val providerRepository: ProviderRepository,
     val scheduleRepository: ScheduleRepository,
     val stepRepository: StepRepository,
+    val subagentRepository: SubagentRepository,
     val toolRepository: ToolRepository,
     val vibesyncEventStreamRepository: VibesyncEventStreamRepository,
 )

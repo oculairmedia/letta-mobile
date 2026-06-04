@@ -304,6 +304,11 @@ private fun ServerFrame.toTimelineEvent(): WsTimelineEvent? = when (this) {
     is ServerFrame.CronDeleteResponse,
     is ServerFrame.CronDeleteAllResponse,
     is ServerFrame.CronsUpdated,
+    // letta-mobile-73o2h: active-subagent frames route to the
+    // SubagentRepository (active-bar), not chat content.
+    is ServerFrame.SubagentListResponse,
+    is ServerFrame.SubagentTodosResponse,
+    is ServerFrame.SubagentsUpdated,
     // letta-mobile-2rkdj: subscribe wrappers don't surface to chat
     // directly — the inner BridgeFrame is unwrapped and re-routed
     // through the normal handler upstream of this mapper, so by the
