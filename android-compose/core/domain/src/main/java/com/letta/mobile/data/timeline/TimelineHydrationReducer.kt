@@ -168,13 +168,6 @@ internal fun TimelineEvent.identityKeys(): Set<String> {
     return keys
 }
 
-fun Timeline.containsIdentityFor(event: TimelineEvent): Boolean {
-    val incomingKeys = event.identityKeys()
-    return events.any { existing ->
-        existing.identityKeys().any { it in incomingKeys }
-    }
-}
-
 private fun TimelineEvent.Confirmed.semanticIdentityKeyOrNull(): String? {
     val stableRunId = runId?.takeIf { it.isNotBlank() } ?: return null
     return when (messageType) {

@@ -528,6 +528,37 @@ class TimelineStreamReducerTest {
         )
     }
 
+    @Test
+    fun `semantic duplicate detection stays bounded on long histories`() {
+        val longHistory = Timeline(
+            conversationId = "conv-test",
+            events = (1..5_000).map { index ->
+                TimelineEvent.Confirmed(
+                    position = index.toDouble(),
+                    otid = "otid-$index",
+                    content = "historical message $index",
+                    serverId = "server-$index",
+                    messageType = TimelineMessageType.ASSISTANT,
+                    date = java.time.Instant.EPOCH,
+                    runId = "run-$index",
+                    stepId = null,
+                )
+            },
+        )
+
+        val output = reduce(
+            prev = longHistory,
+            frame = AssistantMessage(
+                id = "assistant-duplicate",
+                contentRaw = JsonPrimitive("historical message 4999"),
+                runId = "run-4999",
+            ),
+        )
+
+        output.next.events shouldHaveSize 5_000
+        output.emittedEvents shouldBe emptyList()
+    }
+
     private fun reduce(
         prev: Timeline = timeline(),
         frame: com.letta.mobile.data.model.LettaMessage,

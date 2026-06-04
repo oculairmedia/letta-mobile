@@ -2,6 +2,7 @@ package com.letta.mobile.cli.runtime
 
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCreateParams
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaMessage
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -54,7 +55,7 @@ internal class CliRestClient(
             bearerAuth(token)
             contentType(ContentType.Application.Json)
             parameter("agent_id", agentId)
-            setBody(ConversationCreateParams(agentId = agentId))
+            setBody(ConversationCreateParams(agentId = AgentId(agentId)))
         }
         if (response.status.value !in 200..299) {
             throw IllegalStateException("create conversation failed: HTTP ${response.status.value}: ${response.bodyAsText()}")

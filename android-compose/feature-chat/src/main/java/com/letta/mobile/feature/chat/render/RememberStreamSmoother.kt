@@ -42,15 +42,16 @@ internal fun rememberSmoothedStreamingText(
     val nowMs = { System.nanoTime() / 1_000_000L }
     smoother.updateTarget(rawText, isStreaming, nowMs())
 
-    // Frame loop: runs while the smoother hasn't fully caught up.
-    // Uses a ~16 ms tick (≈ 60 fps) to call step(). The loop
-    // naturally suspends once isFullyRevealed && !isStreaming,
-    // because the LaunchedEffect's key (rawText, isStreaming)
-    // won't change until the next user send.
+    // Paint loop: runs while the smoother hasn't fully caught up.
+    // Use the same cadence as StreamingMarkdownText's markdown coalescer so
+    // one raw chunk produces at most one visible text tree/layout update per
+    // paint window instead of a 60fps stream of mostly redundant substring
+    // writes. This keeps long-history streaming focused on chunk/paint cadence
+    // while the pure smoother still estimates velocity from monotonic time.
     LaunchedEffect(rawText, isStreaming) {
         while (isActive && !(smoother.isFullyRevealed && !isStreaming)) {
             displayedText = smoother.step(nowMs())
-            delay(FRAME_INTERVAL_MS)
+            delay(STREAMING_TEXT_PAINT_INTERVAL_MS)
         }
         // Final step to ensure we don't leave a partial reveal.
         displayedText = smoother.step(nowMs())
@@ -59,5 +60,5 @@ internal fun rememberSmoothedStreamingText(
     return displayedText
 }
 
-/** Target frame interval — 16 ms ≈ 60 fps. */
-private const val FRAME_INTERVAL_MS = 16L
+/** Shared visible streaming-text cadence, aligned with StreamingMarkdownText. */
+internal const val STREAMING_TEXT_PAINT_INTERVAL_MS = 50L
