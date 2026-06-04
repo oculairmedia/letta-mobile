@@ -82,6 +82,7 @@ import com.letta.mobile.feature.chat.coordination.LocalRuntimeChatSendCoordinato
 import com.letta.mobile.feature.chat.coordination.ProjectChatCoordinator
 import com.letta.mobile.feature.chat.coordination.TimelineSendCoordinator
 import com.letta.mobile.feature.chat.coordination.WsChatSendCoordinator
+import com.letta.mobile.feature.chat.render.ChatMessageListChange
 import com.letta.mobile.feature.chat.render.ChatTransport
 import com.letta.mobile.feature.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.render.ConversationState
@@ -568,7 +569,10 @@ internal class AdminChatViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 messageRepository.resetMessages(agentId)
-                _uiState.value = _uiState.value.copy(messages = persistentListOf())
+                _uiState.value = _uiState.value.copy(
+                    messages = persistentListOf(),
+                    messageListChange = ChatMessageListChange.Full,
+                )
             } catch (e: Exception) {
                 android.util.Log.w("AdminChatViewModel", "Failed to reset messages", e)
             }

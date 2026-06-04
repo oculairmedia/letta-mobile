@@ -5,15 +5,18 @@ import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import com.letta.mobile.feature.chat.coordination.ChatDisplayMode
 import com.letta.mobile.feature.chat.coordination.ChatRenderItem
+import com.letta.mobile.feature.chat.coordination.IncrementalChatRenderItemsCache
 import com.letta.mobile.feature.chat.coordination.buildChatRenderModel
 import com.letta.mobile.feature.chat.coordination.dedupeReasoningAssistantEchoes
 import com.letta.mobile.feature.chat.coordination.dedupeGroupedMessagesForLazyKeys
 import com.letta.mobile.feature.chat.coordination.filterMessagesForMode
 import com.letta.mobile.feature.chat.coordination.toChatDisplayMode
+import com.letta.mobile.feature.chat.render.ChatMessageListChange
 
 class ChatRenderModelBuilderTest {
 
@@ -240,6 +243,72 @@ class ChatRenderModelBuilderTest {
         )
 
         assertEquals("run-r1", model.renderItems.first().key)
+    }
+
+    @Test
+    fun `incremental render item cache reuses committed history for tail appends and replacements`() {
+        val cache = IncrementalChatRenderItemsCache()
+        val base = streamingHistory(turnCount = 1_000)
+        cache.renderItems(base, ChatDisplayMode.Interactive, ChatMessageListChange.Full)
+
+        val appended = base + assistant("tail-append", content = "stream chunk", runId = "run-999")
+        val afterAppend = cache.renderItems(appended, ChatDisplayMode.Interactive, ChatMessageListChange.AppendTail)
+        val oldestCommittedItem = afterAppend.last()
+
+        val replaced = base + assistant("tail-append", content = "stream chunk plus more", runId = "run-999")
+        val afterReplace = cache.renderItems(replaced, ChatDisplayMode.Interactive, ChatMessageListChange.ReplaceTail)
+
+        assertEquals(1, cache.fullBuildCount)
+        assertEquals(2, cache.incrementalBuildCount)
+        assertSame(oldestCommittedItem, afterReplace.last())
+        assertEquals(
+            buildChatRenderModel(replaced, ChatDisplayMode.Interactive).renderItems.map { it.key },
+            afterReplace.map { it.key },
+        )
+    }
+
+    @Test
+    fun `incremental render item cache falls back when update is not an active tail change`() {
+        val cache = IncrementalChatRenderItemsCache()
+        val base = streamingHistory(turnCount = 200)
+        cache.renderItems(base, ChatDisplayMode.Interactive, ChatMessageListChange.Full)
+
+        val prepended = listOf(user("older-page")) + base
+        cache.renderItems(prepended, ChatDisplayMode.Interactive, ChatMessageListChange.AppendTail)
+
+        assertEquals(2, cache.fullBuildCount)
+        assertEquals(0, cache.incrementalBuildCount)
+    }
+
+    @Test
+    fun `long history active-tail render frame budget avoids full rebuilds`() {
+        val cache = IncrementalChatRenderItemsCache()
+        val prefix = streamingHistory(turnCount = 1_000)
+        var frameMessages = prefix + assistant("stream-tail", content = "token 0", runId = "run-999")
+        cache.renderItems(frameMessages, ChatDisplayMode.Interactive, ChatMessageListChange.Full)
+
+        val samplesMicros = buildList {
+            repeat(60) { frame ->
+                frameMessages = prefix + assistant(
+                    id = "stream-tail",
+                    content = "token $frame ${"x".repeat(frame + 1)}",
+                    runId = "run-999",
+                )
+                val started = System.nanoTime()
+                cache.renderItems(frameMessages, ChatDisplayMode.Interactive, ChatMessageListChange.ReplaceTail)
+                add((System.nanoTime() - started) / 1_000L)
+            }
+        }
+
+        assertEquals(1, cache.fullBuildCount)
+        assertEquals(60, cache.incrementalBuildCount)
+        val maxMicros = samplesMicros.maxOrNull() ?: 0L
+        assertTrue(maxMicros > 0)
+        println(
+            "incremental active-tail render frame budget: " +
+                "frames=${samplesMicros.size} max=${maxMicros}us " +
+                "p95=${samplesMicros.sorted().percentile(0.95)}us"
+        )
     }
 
     @Test

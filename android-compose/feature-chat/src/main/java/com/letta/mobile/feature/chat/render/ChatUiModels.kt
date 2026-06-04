@@ -187,10 +187,17 @@ internal sealed interface ConversationState {
     data class Error(val message: String) : ConversationState
 }
 
+internal enum class ChatMessageListChange {
+    Full,
+    AppendTail,
+    ReplaceTail,
+}
+
 @androidx.compose.runtime.Immutable
 internal data class ChatUiState(
     val conversationState: ConversationState = ConversationState.Loading,
     val messages: ImmutableList<UiMessage> = persistentListOf(),
+    val messageListChange: ChatMessageListChange = ChatMessageListChange.Full,
     val isLoadingMessages: Boolean = true,
     val isLoadingOlderMessages: Boolean = false,
     val hasMoreOlderMessages: Boolean = false,
