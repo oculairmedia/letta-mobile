@@ -53,6 +53,7 @@ import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.tooloutput.ToolOutputParser
+import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.haptics.HapticEffects
@@ -92,60 +93,75 @@ internal fun MessageToolCalls(
             ?.mapTo(mutableSetOf()) { it.toolCallId }
             .orEmpty()
     }
-    if (shouldUseCompactToolCallGroup(toolCalls)) {
-        val entranceKey = remember(messageId, toolCalls.firstOrNull()?.toolCallMotionKey()) {
-            "tool-group|${messageId.orEmpty()}|${toolCalls.firstOrNull()?.toolCallMotionKey().orEmpty()}"
-        }
-        val shouldAnimateEntrance = remember(animateEntrance, entranceKey) {
-            shouldRunToolCallEntranceAnimation(animateEntrance, entranceKey)
-        }
-        if (shouldAnimateEntrance) {
-            ToolCallEntrance {
+    val reducedMotion = rememberReducedMotionEnabled()
+    // letta-mobile-7kpxn: a streaming message can flip from a single
+    // ToolCallCard to the multi-tool CompactToolCallGroupCard as additional
+    // tool calls land. Previously this was a bare `if/else` swap that popped
+    // the new layout in with no transition. Wrap the single<->group decision
+    // in an AnimatedContent keyed *only* on the grouped flag so that:
+    //  - flipping single -> group (or back) crossfades + size-morphs through
+    //    the canonical ChatMotion content ramp instead of snapping, and
+    //  - streaming token / result updates that flow through the *same* branch
+    //    do NOT re-trigger the transition (the targetState is unchanged), so
+    //    we keep the rmzmo streaming-jank guarantees (cheap, draw-phase, no
+    //    per-frame full rebuild).
+    // Reduced-motion users get an instant swap (no animation) per the design
+    // system's reduced-motion contract.
+    val useCompactGroup = shouldUseCompactToolCallGroup(toolCalls)
+    AnimatedContent(
+        targetState = useCompactGroup,
+        modifier = modifier,
+        transitionSpec = {
+            if (reducedMotion) {
+                (ChatMotion.instantEnter() togetherWith ChatMotion.instantExit())
+                    .using(SizeTransform(clip = true) { _, _ -> ChatMotion.instantSizeSpec })
+            } else {
+                // Soft crossfade + height morph so the single card visually
+                // "becomes" the grouped card rather than being replaced.
+                (ChatMotion.expandEnter() togetherWith ChatMotion.expandExit())
+                    .using(SizeTransform(clip = true) { _, _ -> ChatMotion.contentSizeSpec })
+            }
+        },
+        contentAlignment = Alignment.TopStart,
+        label = "ToolCallsSingleVsGroup",
+    ) { grouped ->
+        if (grouped) {
+            val entranceKey = remember(messageId, toolCalls.firstOrNull()?.toolCallMotionKey()) {
+                "tool-group|${messageId.orEmpty()}|${toolCalls.firstOrNull()?.toolCallMotionKey().orEmpty()}"
+            }
+            val shouldAnimateEntrance = remember(animateEntrance, entranceKey) {
+                shouldRunToolCallEntranceAnimation(animateEntrance, entranceKey)
+            }
+            ToolCallEntrance(animate = shouldAnimateEntrance && !reducedMotion) {
                 CompactToolCallGroupCard(
                     toolCalls = toolCalls,
                     pendingApprovalToolCallIds = pendingApprovalToolCallIds,
-                    modifier = modifier,
+                    modifier = Modifier,
                     animateRows = animateEntrance,
                     rowAnimationKeyPrefix = "message|${messageId.orEmpty()}",
                 )
             }
         } else {
-            CompactToolCallGroupCard(
-                toolCalls = toolCalls,
-                pendingApprovalToolCallIds = pendingApprovalToolCallIds,
-                modifier = modifier,
-                animateRows = animateEntrance,
-                rowAnimationKeyPrefix = "message|${messageId.orEmpty()}",
-            )
-        }
-        return
-    }
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        toolCalls.forEachIndexed { index, toolCall ->
-            val motionKey = toolCall.toolCallMotionKey()
-            key(index, motionKey) {
-                val entranceKey = remember(messageId, motionKey) {
-                    "tool|${messageId.orEmpty()}|$motionKey"
-                }
-                val shouldAnimateEntrance = remember(animateEntrance, entranceKey) {
-                    shouldRunToolCallEntranceAnimation(animateEntrance, entranceKey)
-                }
-                val approvalState = toolCall.approvalState(pendingApprovalToolCallIds)
-                if (shouldAnimateEntrance) {
-                    ToolCallEntrance {
-                        ToolCallCard(
-                            toolCall = toolCall,
-                            approvalStateOverride = approvalState,
-                        )
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                toolCalls.forEachIndexed { index, toolCall ->
+                    val motionKey = toolCall.toolCallMotionKey()
+                    key(index, motionKey) {
+                        val entranceKey = remember(messageId, motionKey) {
+                            "tool|${messageId.orEmpty()}|$motionKey"
+                        }
+                        val shouldAnimateEntrance = remember(animateEntrance, entranceKey) {
+                            shouldRunToolCallEntranceAnimation(animateEntrance, entranceKey)
+                        }
+                        val approvalState = toolCall.approvalState(pendingApprovalToolCallIds)
+                        ToolCallEntrance(animate = shouldAnimateEntrance && !reducedMotion) {
+                            ToolCallCard(
+                                toolCall = toolCall,
+                                approvalStateOverride = approvalState,
+                            )
+                        }
                     }
-                } else {
-                    ToolCallCard(
-                        toolCall = toolCall,
-                        approvalStateOverride = approvalState,
-                    )
                 }
             }
         }
@@ -161,6 +177,7 @@ internal fun ToolCallCard(
     val fontScale = LocalChatFontScale.current
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
+    val reducedMotion = rememberReducedMotionEnabled()
     var expanded by remember { mutableStateOf(false) }
     val showDetails = keepExpanded || expanded
     val parentVisible = LocalToolCardBodyParentVisible.current
@@ -313,7 +330,11 @@ internal fun ToolCallCard(
             // gestures keep the AnimatedContent wrapper mounted but switch to
             // instant transitions so the content tree does not disappear and
             // remount on finger-up.
-            val suppressLayoutAnimation = LocalChatIsPinching.current
+            // letta-mobile-7kpxn (polish audit): reduced-motion users also get
+            // the instant path so disclosure never animates when the OS
+            // animation scale is 0 — matching the contract honoured elsewhere
+            // in the tool-card lifecycle (enter / single<->group).
+            val suppressLayoutAnimation = LocalChatIsPinching.current || reducedMotion
             AnimatedContent(
                 targetState = showDetails,
                 modifier = Modifier.fillMaxWidth(),
@@ -681,6 +702,7 @@ internal fun CompactToolCallGroupCard(
     animateRows: Boolean = false,
     rowAnimationKeyPrefix: String = "",
 ) {
+    val reducedMotion = rememberReducedMotionEnabled()
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -719,14 +741,7 @@ internal fun CompactToolCallGroupCard(
                     val shouldAnimateEntrance = remember(animateRows, entranceKey) {
                         shouldRunToolCallEntranceAnimation(animateRows, entranceKey)
                     }
-                    if (shouldAnimateEntrance) {
-                        ToolCallEntrance {
-                            CompactToolCallRow(
-                                toolCall = toolCall,
-                                approvalState = toolCall.approvalState(pendingApprovalToolCallIds),
-                            )
-                        }
-                    } else {
+                    ToolCallEntrance(animate = shouldAnimateEntrance && !reducedMotion) {
                         CompactToolCallRow(
                             toolCall = toolCall,
                             approvalState = toolCall.approvalState(pendingApprovalToolCallIds),
@@ -753,6 +768,7 @@ internal fun CompactToolCallRow(
     val fontScale = LocalChatFontScale.current
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
+    val reducedMotion = rememberReducedMotionEnabled()
     var expanded by remember(toolCall.toolCallMotionKey()) { mutableStateOf(false) }
     val parentVisible = LocalToolCardBodyParentVisible.current
     val canRenderFullOutput = expanded && parentVisible
@@ -878,27 +894,50 @@ internal fun CompactToolCallRow(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
             )
         }
-        if (expanded) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 2.dp, bottom = 4.dp),
-            ) {
-                ToolCallExpandedSummary(
-                    toolCall = toolCall,
-                    argumentSummary = argumentSummary,
-                    resultPreview = resultPreview,
-                    isError = isError,
-                    fontScale = fontScale,
-                )
-                ToolCallExpandedBody(
-                    toolCall = toolCall,
-                    display = display,
-                    executionTimeText = executionTimeText,
-                    displayResult = displayResult,
-                    isError = isError,
-                    fontScale = fontScale,
-                )
+        // letta-mobile-7kpxn (polish audit): the compact row's disclosure
+        // previously used a bare `if (expanded)` cut, which popped the body in
+        // with no transition while the single ToolCallCard unfurled smoothly —
+        // an inconsistency in the lifecycle. Route the row through the SAME
+        // unfurl AnimatedContent (with the instant path for pinch / reduced
+        // motion) so single-card and grouped-row disclosure feel identical.
+        val suppressLayoutAnimation = LocalChatIsPinching.current || reducedMotion
+        AnimatedContent(
+            targetState = expanded,
+            modifier = Modifier.fillMaxWidth(),
+            transitionSpec = {
+                if (suppressLayoutAnimation) {
+                    (ChatMotion.instantEnter() togetherWith ChatMotion.instantExit())
+                        .using(SizeTransform(clip = true) { _, _ -> ChatMotion.instantSizeSpec })
+                } else {
+                    (ChatMotion.unfurlEnter() togetherWith ChatMotion.unfurlExit())
+                        .using(SizeTransform(clip = true) { _, _ -> ChatMotion.contentSizeSpec })
+                }
+            },
+            contentAlignment = Alignment.TopStart,
+            label = "CompactToolCallRowExpanded",
+        ) { expandedNow ->
+            if (expandedNow) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 2.dp, bottom = 4.dp),
+                ) {
+                    ToolCallExpandedSummary(
+                        toolCall = toolCall,
+                        argumentSummary = argumentSummary,
+                        resultPreview = resultPreview,
+                        isError = isError,
+                        fontScale = fontScale,
+                    )
+                    ToolCallExpandedBody(
+                        toolCall = toolCall,
+                        display = display,
+                        executionTimeText = executionTimeText,
+                        displayResult = displayResult,
+                        isError = isError,
+                        fontScale = fontScale,
+                    )
+                }
             }
         }
     }
@@ -946,8 +985,28 @@ internal fun UiToolCall.toolCallMotionKey(): String = buildString {
     append(arguments.hashCode())
 }
 
+/**
+ * Plays a one-shot ENTER transition the first time a tool card appears in the
+ * timeline (letta-mobile-7kpxn). The card fades + slides + expands from the top
+ * edge via the canonical [ChatMotion.verticalEnter] ramp so a freshly-streamed
+ * tool call eases into place instead of popping in.
+ *
+ * When [animate] is false (reduced-motion enabled, or the entrance has already
+ * played for this card's stable key) the content renders immediately with no
+ * transition — Compose's `AnimatedVisibility` with `visible = true` from the
+ * first frame is skipped entirely so we never pay for an off-screen animation
+ * pass. This keeps the reduced-motion contract and avoids replaying entrance
+ * motion on lazy-list recycling.
+ */
 @Composable
-internal fun ToolCallEntrance(content: @Composable () -> Unit) {
+internal fun ToolCallEntrance(
+    animate: Boolean = true,
+    content: @Composable () -> Unit,
+) {
+    if (!animate) {
+        content()
+        return
+    }
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { visible = true }
 

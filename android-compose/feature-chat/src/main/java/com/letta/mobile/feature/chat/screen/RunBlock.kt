@@ -35,6 +35,7 @@ import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
+import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.feature.chat.render.StepDotIcon
 import com.letta.mobile.feature.chat.render.runStepDotColor
@@ -122,6 +123,11 @@ internal fun RunBlock(
 ) {
     if (messages.isEmpty()) return
 
+    // letta-mobile-7kpxn (polish audit): honour the reduced-motion contract on
+    // the run expand/collapse the same way the tool-card lifecycle does — when
+    // the OS animation scale is 0, swap instantly instead of playing the ramp.
+    val reducedMotion = rememberReducedMotionEnabled()
+
     // Defensive: the grouping layer already guarantees ≥2 messages for a
     // RunBlock, but if we ever get a single-message run (e.g. via a future
     // caller), short-circuit to a plain row so we don't paint a degenerate
@@ -179,8 +185,13 @@ internal fun RunBlock(
                 AnimatedContent(
                     targetState = collapsed,
                     transitionSpec = {
-                        (ChatMotion.expandEnter() togetherWith ChatMotion.expandExit())
-                            .using(SizeTransform(clip = true) { _, _ -> ChatMotion.contentSizeSpec })
+                        if (reducedMotion) {
+                            (ChatMotion.instantEnter() togetherWith ChatMotion.instantExit())
+                                .using(SizeTransform(clip = true) { _, _ -> ChatMotion.instantSizeSpec })
+                        } else {
+                            (ChatMotion.expandEnter() togetherWith ChatMotion.expandExit())
+                                .using(SizeTransform(clip = true) { _, _ -> ChatMotion.contentSizeSpec })
+                        }
                     },
                     label = "RunBlockExpandCollapse",
                 ) { isCollapsed ->
