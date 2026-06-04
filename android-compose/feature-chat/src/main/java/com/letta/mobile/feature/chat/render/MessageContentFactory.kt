@@ -24,6 +24,7 @@ import com.letta.mobile.ui.theme.LocalChatFontScale
 import com.letta.mobile.ui.theme.chatTypography
 import com.letta.mobile.ui.theme.scaledBy
 import com.letta.mobile.feature.chat.screen.MessageToolCalls
+import com.letta.mobile.feature.chat.screen.SubagentNotificationCard
 import kotlinx.collections.immutable.toImmutableList
 
 internal interface MessageContentRenderer {
@@ -574,6 +575,25 @@ internal object TextMessageRenderer : MessageContentRenderer {
     }
 }
 
+internal object SubagentNotificationRenderer : MessageContentRenderer {
+    override fun canRender(message: UiMessage): Boolean =
+        message.subagentNotification != null
+
+    @Composable
+    override fun Render(
+        message: UiMessage,
+        textColor: Color,
+        modifier: Modifier,
+        onGeneratedUiMessage: ((String) -> Unit)?,
+        isStreaming: Boolean,
+    ) {
+        SubagentNotificationCard(
+            notification = message.subagentNotification ?: return,
+            modifier = modifier,
+        )
+    }
+}
+
 internal object ToolCallRenderer : MessageContentRenderer {
     override fun canRender(message: UiMessage) =
         !message.toolCalls.isNullOrEmpty()
@@ -619,8 +639,7 @@ internal object ToolCallRenderer : MessageContentRenderer {
 
 internal fun shouldAnimateToolCallEntrance(isStreaming: Boolean): Boolean = isStreaming
 
-internal val defaultRenderers = listOf(ToolCallRenderer, TextMessageRenderer)
-
+internal val defaultRenderers = listOf(ToolCallRenderer, SubagentNotificationRenderer, TextMessageRenderer)
 internal fun resolveRenderer(message: UiMessage): MessageContentRenderer {
     return defaultRenderers.firstOrNull { it.canRender(message) } ?: TextMessageRenderer
 }

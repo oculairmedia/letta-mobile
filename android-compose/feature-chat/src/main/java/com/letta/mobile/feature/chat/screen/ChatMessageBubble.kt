@@ -60,6 +60,7 @@ internal fun UiMessage.shouldRenderBubbleLess(): Boolean {
     if (!toolCalls.isNullOrEmpty()) return false
     if (generatedUi != null) return false
     if (approvalRequest != null) return false
+    if (subagentNotification != null) return false
     if (approvalResponse != null) return false
     if (attachments.isNotEmpty()) return false
     return true
@@ -140,7 +141,7 @@ internal fun MessageBubbleSurface(
     val colors = MaterialTheme.chatColors
     val dimens = MaterialTheme.chatDimens
     val typo = MaterialTheme.chatTypography
-    val renderer = remember(message.role, message.toolCalls, message.generatedUi) { resolveRenderer(message) }
+    val renderer = remember(message.role, message.toolCalls, message.generatedUi, message.subagentNotification) { resolveRenderer(message) }
     val bubbleLess = message.shouldRenderBubbleLess()
 
     // letta-mobile-d2z6.s1 (Emmanuel 2026-04-26 01:28 EDT): ease bubble

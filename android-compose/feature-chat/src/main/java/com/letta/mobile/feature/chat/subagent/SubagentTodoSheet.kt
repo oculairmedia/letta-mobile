@@ -21,7 +21,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -37,6 +39,16 @@ import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LettaSpacing
+
+@Immutable
+data class SubagentTodoSheetTarget(
+    val toolCallId: String,
+    val description: String,
+)
+
+val LocalSubagentTodoSheetOpener = staticCompositionLocalOf<(SubagentTodoSheetTarget) -> Unit> {
+    {}
+}
 
 /**
  * letta-mobile-73o2h.3: pure, UI-agnostic state model for the tap-to-todolist
