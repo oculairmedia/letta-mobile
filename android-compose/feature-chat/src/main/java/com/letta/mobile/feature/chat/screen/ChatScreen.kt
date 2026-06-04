@@ -76,6 +76,11 @@ import com.letta.mobile.feature.chat.render.A2uiDebugFrameUi
 import com.letta.mobile.feature.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.render.ConversationState
 import com.letta.mobile.feature.chat.render.buildToolCallTemplate
+import com.letta.mobile.feature.chat.subagent.ActiveSubagent
+import com.letta.mobile.feature.chat.subagent.ActiveSubagentBar
+import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
+import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource.Companion.activeOnly
+import com.letta.mobile.feature.chat.subagent.FakeActiveSubagentSource
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatBackground
@@ -84,6 +89,7 @@ import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.isExpandedWidth
 import kotlinx.collections.immutable.ImmutableMap
+import kotlinx.collections.immutable.persistentListOf
 import kotlin.math.max
 
 /**
@@ -102,6 +108,12 @@ internal fun ChatScreen(
     chatBackground: ChatBackground = ChatBackground.Default,
     chatMode: String = "interactive",
     onBugCommand: (() -> Unit)? = null,
+    // letta-mobile-73o2h.2: the WS SEAM for the active-subagent status bar.
+    // Defaults to an empty in-memory fake so production behaves as today
+    // (bar stays hidden) until the shim-side registry (letta-mobile-73o2h.1)
+    // lands. When .1 is merged, bind a WS-backed ActiveSubagentSource here —
+    // no other change in this file is required.
+    activeSubagentSource: ActiveSubagentSource = remember { FakeActiveSubagentSource() },
     viewModel: AdminChatViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -127,6 +139,13 @@ internal fun ChatScreen(
         val haptic = LocalHapticFeedback.current
         val view = LocalView.current
         val reducedMotion = rememberReducedMotionEnabled()
+        // letta-mobile-73o2h.2: collect the active-only subagent snapshot for
+        // the bottom status bar. `activeOnly()` re-asserts the visibility rule
+        // defensively; the StateFlow emits full snapshots so the bar reduces
+        // by replacement (no per-frame rebuilds — preserves rmzmo perf work).
+        val activeSubagents by activeSubagentSource.activeSubagents
+            .activeOnly()
+            .collectAsStateWithLifecycle(initialValue = persistentListOf<ActiveSubagent>())
         val windowSizeClass = LocalWindowSizeClass.current
         val imeBottomPx = WindowInsets.ime.getBottom(density)
         val navBottomPx = WindowInsets.navigationBars.getBottom(density)
@@ -321,6 +340,15 @@ internal fun ChatScreen(
                         }
                     }
                 }
+
+                // letta-mobile-73o2h.2: persistent active-subagent status
+                // bar. Sits between the chat content and the composer. The
+                // active-only visibility rule is enforced by `activeOnly()`
+                // on the source flow; the bar hides itself entirely when the
+                // snapshot is empty (AnimatedVisibility), so this call site
+                // is unconditional and does not perturb ChatMessageList /
+                // streaming.
+                ActiveSubagentBar(subagents = activeSubagents)
 
                 // letta-mobile-ndtc.3: gradient "thinking" text token —
                 // ephemeral subtitle that appears between the message list /
