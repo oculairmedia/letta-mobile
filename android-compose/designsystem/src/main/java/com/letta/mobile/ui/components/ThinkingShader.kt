@@ -147,7 +147,7 @@ half4 main(float2 fragCoord) {
   // than a bright wash — keeps the full band height and the drift, just
   // less saturated. Color-space (toward the real bg), so never grey.
   // Base softness, ~20% more vivid than before (0.55 -> 0.44).
-  float BG_MIX_BASE = 0.44; // 0=fully vivid, 1=invisible (== bg)
+  float BG_MIX_BASE = 0.35; // 0=fully vivid, 1=invisible (== bg)
   // Vertical opacity graduation: MORE vivid toward the TOP of the band,
   // MORE muted toward the bottom. uv.y rises upward; map the band's
   // vertical position (where glow is non-zero) to an extra mix amount so
