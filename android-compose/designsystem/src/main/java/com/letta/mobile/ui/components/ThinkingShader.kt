@@ -138,7 +138,7 @@ half4 main(float2 fragCoord) {
   // Subtler effect = THINNER colored band (not lower alpha). Smaller
   // divisor + steeper pow concentrates vivid color into a slim strip
   // hugging the bottom; the rest dissolves to bg in color space.
-  float glow = pow(1.0 - clamp(dist / 0.45, 0.0, 1.0), 2.4);
+  float glow = pow(1.0 - clamp(dist / 0.35, 0.0, 1.0), 3.0);
 
   // Vivid drifting multi-color body.
   vec3 col = mix4(uv);
@@ -150,8 +150,14 @@ half4 main(float2 fragCoord) {
   // as before (top ~30% blends out) and additionally damped by the glow
   // body so the diffuse tail above the composer fades cleanly.
   float top_fade = smoothstep(0.0, 0.30, uv.y);
-  // Combine: where glow is weak OR we're near the top, dissolve to bg.
-  float fade = 1.0 - top_fade * glow;
+  // PRESENCE_CAP: the color never becomes fully solid — even at peak glow
+  // it stays partly dissolved toward bg, so the effect reads as a SOFT
+  // tint rather than a bright wash. This is the real "opacity" control:
+  // it reduces presence in COLOR SPACE (mixing toward bgColor), so it
+  // softens WITHOUT the grey-wash that a low output alpha causes on dark.
+  float PRESENCE_CAP = 0.45; // 0=invisible, 1=fully solid color
+  float presence = top_fade * glow * PRESENCE_CAP;
+  float fade = 1.0 - presence;
   vec4 final_color = mix(vec4(col, 1.0), bgColor, fade);
 
   // tint.a is the caller-supplied overall glow strength multiplier.
