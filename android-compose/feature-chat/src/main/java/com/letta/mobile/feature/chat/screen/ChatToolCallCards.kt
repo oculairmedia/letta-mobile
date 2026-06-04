@@ -434,12 +434,8 @@ private fun ToolCallExpandedBodyContentInner(
             fontScale = fontScale,
         )
         Column(modifier = Modifier.padding(top = 4.dp)) {
-            // Tool name and timing
-            Text(
-                text = "Tool: ${toolCall.name}",
-                style = MaterialTheme.typography.chatBubbleSender.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f),
-            )
+            // letta-mobile (toolcard-dedup): removed the "Tool: <name>" line
+            // (the header already names the tool). Timing/detail kept below.
             executionTimeText?.let { time ->
                 Text(
                     text = "Execution time: $time",
@@ -549,11 +545,8 @@ internal fun ToolCallExpandedBody(
                 .fillMaxWidth()
                 .padding(top = 4.dp),
         ) {
-            Text(
-                text = "Tool: ${toolCall.name}",
-                style = MaterialTheme.typography.chatBubbleSender.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f),
-            )
+            // letta-mobile (toolcard-dedup): removed the "Tool: <name>" line
+            // (header already names the tool). Timing/detail kept below.
             executionTimeText?.let { time ->
                 Text(
                     text = "Execution time: $time",
@@ -646,16 +639,10 @@ internal fun ToolCallExpandedSummary(
             maxLines = 2,
         )
     }
-    if (resultPreview != null) {
-        Spacer(modifier = Modifier.height(4.dp))
-        ToolSummaryLine(
-            label = if (isError) "Error" else "Result",
-            value = resultPreview,
-            fontScale = fontScale,
-            isError = isError,
-            maxLines = 2,
-        )
-    } else if (toolCall.result == null) {
+    // letta-mobile (toolcard-dedup): the "Result:" preview line was removed
+    // — it duplicated the Output section below. Keep only the running-status
+    // hint for in-flight calls that have no Output yet.
+    if (resultPreview == null && toolCall.result == null) {
         Spacer(modifier = Modifier.height(4.dp))
         ToolSummaryLine(
             label = "Status",
