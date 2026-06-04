@@ -146,7 +146,14 @@ half4 main(float2 fragCoord) {
   // chat surface tone so the glow reads as a muted/soft colour rather
   // than a bright wash — keeps the full band height and the drift, just
   // less saturated. Color-space (toward the real bg), so never grey.
-  float BG_MIX = 0.55; // 0=fully vivid, 1=invisible (== bg)
+  // Base softness, ~20% more vivid than before (0.55 -> 0.44).
+  float BG_MIX_BASE = 0.44; // 0=fully vivid, 1=invisible (== bg)
+  // Vertical opacity graduation: MORE vivid toward the TOP of the band,
+  // MORE muted toward the bottom. uv.y rises upward; map the band's
+  // vertical position (where glow is non-zero) to an extra mix amount so
+  // the bottom edge gets pulled further toward bg than the top.
+  float vgrad = clamp((baseline - uv.y) / 0.45, 0.0, 1.0); // 0 at top of band, 1 at bottom
+  float BG_MIX = clamp(BG_MIX_BASE + vgrad * 0.30, 0.0, 1.0);
   vec3 col = mix(mix4(uv), bgColor.rgb, BG_MIX);
 
   // COLOR-SPACE dissolve (TTS technique): render col at FULL opacity and
