@@ -229,16 +229,14 @@ internal fun ChatScreen(
             )
             if (thinkingAlpha > 0.001f) {
                 ThinkingShader(
-                    // p2auf: dedicated vivid "thinking" accent triad,
-                    // decoupled from the theme's palette (which can be
-                    // pink/magenta and made the glow read as a pink wall
-                    // or, at low alpha, a grey wash). A hand-picked calm
-                    // cyan -> teal -> indigo set reads as clear color on
-                    // a dark surface even at low opacity, and the slow
-                    // drift moves gently between them.
-                    tint = Color(0xFF1E40AF),  // deep blue (low luminance, reads as BLUE not white)
-                    tint2 = Color(0xFF4338CA), // deep indigo
-                    tint3 = Color(0xFF0E7490), // deep teal
+                    // p2auf: theme-controlled chaser. Pass the active
+                    // theme's accent triad; the shader deepens each color
+                    // (saturates + caps luminance) so even pale theme
+                    // accents read as hue on the dark surface, then chases
+                    // them across the band over time.
+                    tint = MaterialTheme.colorScheme.primary,
+                    tint2 = MaterialTheme.colorScheme.tertiary,
+                    tint3 = MaterialTheme.colorScheme.secondary,
                     bgColor = MaterialTheme.colorScheme.surface,
                     animate = !reducedMotion,
                     modifier = Modifier

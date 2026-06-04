@@ -82,24 +82,34 @@ float perlin_noise_1d(float d) {
   return r * 0.5 + 0.5;
 }
 
-// p2auf: slow palette drift. The incoming tints are saturation-lifted
-// first so that even at low alpha on a dark surface the glow reads as
-// COLOR rather than greying out. Two out-of-phase slow sines walk a
-// tint -> tint2 -> tint3 loop so no single accent dominates and the
-// transition never snaps.
+// p2auf: theme-controlled chaser. The three theme accents are deepened
+// (luminance-capped + saturated) so they read as COLOR on a dark
+// surface regardless of how pale the theme palette is, then arranged
+// as a repeating 3-stop ring that SCROLLS along the band over time —
+// a chaser, not a whole-strip cross-fade. Each x position shows a
+// different point in the tint -> tint2 -> tint3 cycle.
 vec3 saturate(vec3 c, float amount) {
   float lum = dot(c, vec3(0.299, 0.587, 0.114));
   return clamp(mix(vec3(lum), c, amount), 0.0, 1.0);
 }
-vec3 driftColor(float t) {
-  float p = t * 0.08; // ~78s for a full 2*pi cycle
-  float w1 = 0.5 + 0.5 * sin(p);
-  float w2 = 0.5 + 0.5 * sin(p * 0.61803 + 2.094);
-  vec3 a = saturate(tint.rgb, 1.3);
-  vec3 b = saturate(tint2.rgb, 1.3);
-  vec3 c = saturate(tint3.rgb, 1.3);
-  vec3 ab = mix(a, b, w1);
-  return mix(ab, c, w2 * 0.5);
+// Deepen a (possibly pale) theme color so it survives as hue on dark.
+vec3 deepen(vec3 c) {
+  vec3 s = saturate(c, 1.5);
+  // Cap luminance so bright theme accents don't wash to white; keep a
+  // floor so very dark accents still glow.
+  float lum = dot(s, vec3(0.299, 0.587, 0.114));
+  float target = clamp(lum, 0.25, 0.55);
+  return s * (target / max(lum, 0.001));
+}
+// Position within a 0..1 ring -> blended themed color across 3 stops.
+vec3 ringColor(float phase) {
+  vec3 a = deepen(tint.rgb);
+  vec3 b = deepen(tint2.rgb);
+  vec3 c = deepen(tint3.rgb);
+  float p = fract(phase) * 3.0; // 0..3 across the three stops
+  if (p < 1.0) return mix(a, b, p);
+  if (p < 2.0) return mix(b, c, p - 1.0);
+  return mix(c, a, p - 2.0);
 }
 
 half4 main(float2 fragCoord) {
@@ -130,13 +140,13 @@ half4 main(float2 fragCoord) {
   // bgColor with zero hard line at the upper edge.
   float top_fade = smoothstep(0.0, 0.30, uv.y);
 
-  // p2auf: halved per request (0.40 -> 0.20). The deeper, lower-luminance
-  // source colors are what make it read as BLUE rather than white — high
-  // alpha on a bright color was the cause of the white wash, not lack of
-  // intensity.
   float a = top_fade * glow * 0.20 * tint.a;
 
-  vec3 col = driftColor(iTime);
+  // p2auf: chaser — color cycles ACROSS the band (uv.x) and the whole
+  // ring scrolls over time, so the themed accents chase along the strip
+  // rather than the whole band cross-fading as one block. 1.0 spatial
+  // cycle across the width; iTime*0.10 scrolls it leftward slowly.
+  vec3 col = ringColor(uv.x * 1.0 + iTime * 0.10);
   return vec4(col, a);
 }
 """
