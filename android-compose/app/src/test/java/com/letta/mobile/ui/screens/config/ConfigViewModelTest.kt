@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.config
 
+import android.net.Uri
 import app.cash.turbine.test
 import androidx.lifecycle.SavedStateHandle
 import com.letta.mobile.data.api.CloudConnectionValidationResult
@@ -9,8 +10,11 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
+import com.letta.mobile.runtime.local.ImportedOnDeviceModel
+import com.letta.mobile.runtime.local.OnDeviceModelImporter
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.ui.common.UiState
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -31,6 +35,7 @@ class ConfigViewModelTest {
 
     private lateinit var fakeRepository: FakeSettingsRepository
     private lateinit var fakeValidator: FakeCloudConnectionValidator
+    private lateinit var fakeModelImporter: FakeOnDeviceModelImporter
     private lateinit var viewModel: ConfigViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
 
@@ -39,6 +44,7 @@ class ConfigViewModelTest {
         Dispatchers.setMain(testDispatcher)
         fakeRepository = FakeSettingsRepository()
         fakeValidator = FakeCloudConnectionValidator()
+        fakeModelImporter = FakeOnDeviceModelImporter()
         // letta-mobile-cdlk: ConfigViewModel now reads ConfigRoute(createNew)
         // from SavedStateHandle. Empty handle is fine for the existing edit-
         // active-config test cases (createNew defaults to false when the
@@ -48,6 +54,7 @@ class ConfigViewModelTest {
             fakeRepository,
             fakeValidator,
             FakeEmbeddedLettaCodeRuntimeStatusProvider(),
+            fakeModelImporter,
         )
     }
 
@@ -277,6 +284,37 @@ class ConfigViewModelTest {
         assertEquals("cpu", savedConfig?.localModelAccelerator)
         assertEquals(8192, savedConfig?.localModelMaxTokens)
         assertTrue(onSuccessCalled)
+    }
+
+    @Test
+    fun importLocalModel_updatesLocalModelPathAndHandle() = runTest {
+        fakeRepository.activeConfigState.value = null
+        viewModel.loadConfig()
+        fakeModelImporter.nextModel = ImportedOnDeviceModel(
+            displayName = "Gemma 3n.litertlm",
+            fileName = "Gemma_3n.litertlm",
+            path = "/data/user/0/com.letta.mobile/files/embedded-lettacode/models/Gemma_3n.litertlm",
+            handle = "local/gemma-3n",
+        )
+
+        var importedFileName: String? = null
+        viewModel.importLocalModel(
+            uri = mockk(relaxed = true),
+            onSuccess = { importedFileName = it },
+        )
+
+        val state = viewModel.uiState.first()
+        assertTrue(state is UiState.Success)
+        val successState = (state as UiState.Success).data
+        assertEquals(ServerMode.LOCAL, successState.mode)
+        assertEquals(ConfigViewModel.LOCAL_RUNTIME_URL, successState.serverUrl)
+        assertEquals(
+            "/data/user/0/com.letta.mobile/files/embedded-lettacode/models/Gemma_3n.litertlm",
+            successState.localModelPath,
+        )
+        assertEquals("local/gemma-3n", successState.localModelHandle)
+        assertEquals(false, successState.isImportingLocalModel)
+        assertEquals("Gemma_3n.litertlm", importedFileName)
     }
 
     @Test
@@ -593,5 +631,16 @@ class ConfigViewModelTest {
             version = "test",
             integrity = "sha512-test",
         )
+    }
+
+    private class FakeOnDeviceModelImporter : OnDeviceModelImporter {
+        var nextModel: ImportedOnDeviceModel = ImportedOnDeviceModel(
+            displayName = "model.litertlm",
+            fileName = "model.litertlm",
+            path = "/data/model.litertlm",
+            handle = "local/model",
+        )
+
+        override suspend fun importModel(uri: Uri): ImportedOnDeviceModel = nextModel
     }
 }

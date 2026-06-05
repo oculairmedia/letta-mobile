@@ -702,6 +702,9 @@
     <string name="screen_config_on_device_model_title">On-device model</string>
     <string name="screen_config_local_model_path">Model file path</string>
     <string name="screen_config_local_model_path_placeholder">/storage/emulated/0/Android/data/com.letta.mobile/files/models/gemma.litertlm</string>
+    <string name="screen_config_local_model_import">Import model file</string>
+    <string name="screen_config_local_model_importing">Importing model</string>
+    <string name="screen_config_local_model_import_success">Imported %1$s</string>
     <string name="screen_config_local_model_handle">Model handle</string>
     <string name="screen_config_local_model_handle_placeholder">local/default</string>
     <string name="screen_config_local_model_accelerator">Accelerator</string>

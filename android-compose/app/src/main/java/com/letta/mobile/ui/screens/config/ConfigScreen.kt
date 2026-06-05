@@ -83,6 +83,19 @@ fun ConfigScreen(
         )
     }
 
+    val localModelImportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        viewModel.importLocalModel(
+            uri = uri,
+            onSuccess = { fileName ->
+                snackbar.dispatch(context.getString(R.string.screen_config_local_model_import_success, fileName))
+            },
+            onError = { snackbar.dispatch(it) },
+        )
+    }
+
     DisposableEffect(context, lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -133,6 +146,9 @@ fun ConfigScreen(
                 onLocalModelHandleChange = { viewModel.updateLocalModelHandle(it) },
                 onLocalModelAcceleratorChange = { viewModel.updateLocalModelAccelerator(it) },
                 onLocalModelMaxTokensChange = { viewModel.updateLocalModelMaxTokens(it) },
+                onImportLocalModel = {
+                    localModelImportLauncher.launch(arrayOf("*/*"))
+                },
                 batteryOptimizationExempt = batteryOptimizationExempt,
                 onRequestBatteryOptimizationExemption = {
                     Telemetry.event(
@@ -186,6 +202,7 @@ private fun ConfigContent(
     onLocalModelHandleChange: (String) -> Unit,
     onLocalModelAcceleratorChange: (String) -> Unit,
     onLocalModelMaxTokensChange: (String) -> Unit,
+    onImportLocalModel: () -> Unit,
     batteryOptimizationExempt: Boolean,
     onRequestBatteryOptimizationExemption: () -> Unit,
     onNavigateToSystemAccess: () -> Unit,
@@ -272,6 +289,7 @@ private fun ConfigContent(
                             onLocalModelHandleChange = onLocalModelHandleChange,
                             onLocalModelAcceleratorChange = onLocalModelAcceleratorChange,
                             onLocalModelMaxTokensChange = onLocalModelMaxTokensChange,
+                            onImportLocalModel = onImportLocalModel,
                         )
                     },
                 )
@@ -557,6 +575,7 @@ private fun LocalModelSettingsItem(
     onLocalModelHandleChange: (String) -> Unit,
     onLocalModelAcceleratorChange: (String) -> Unit,
     onLocalModelMaxTokensChange: (String) -> Unit,
+    onImportLocalModel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
@@ -578,6 +597,31 @@ private fun LocalModelSettingsItem(
             leadingIcon = { Icon(LettaIcons.Database, null) },
             singleLine = true,
         )
+        OutlinedButton(
+            onClick = onImportLocalModel,
+            enabled = !state.isImportingLocalModel,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            if (state.isImportingLocalModel) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            } else {
+                Icon(LettaIcons.FileOpen, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            Text(
+                stringResource(
+                    if (state.isImportingLocalModel) {
+                        R.string.screen_config_local_model_importing
+                    } else {
+                        R.string.screen_config_local_model_import
+                    }
+                )
+            )
+        }
         OutlinedTextField(
             value = state.localModelHandle,
             onValueChange = onLocalModelHandleChange,

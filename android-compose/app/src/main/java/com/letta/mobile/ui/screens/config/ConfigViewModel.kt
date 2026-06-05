@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.config
 
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -13,6 +14,7 @@ import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeModelSelection
+import com.letta.mobile.runtime.local.OnDeviceModelImporter
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.navigation.ConfigRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -43,6 +45,7 @@ data class ConfigUiState(
     val localModelHandle: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_HANDLE,
     val localModelAccelerator: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_ACCELERATOR,
     val localModelMaxTokens: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_MAX_TOKENS,
+    val isImportingLocalModel: Boolean = false,
     val embeddedRuntimeStatus: EmbeddedLettaCodeRuntimeStatus = EmbeddedLettaCodeRuntimeStatus(
         nativeEnabled = false,
         assetsEnabled = false,
@@ -58,6 +61,7 @@ class ConfigViewModel @Inject constructor(
     private val settingsRepository: ISettingsRepository,
     private val cloudConnectionValidator: CloudConnectionValidator,
     private val embeddedRuntimeStatusProvider: EmbeddedLettaCodeRuntimeStatusProvider,
+    private val onDeviceModelImporter: OnDeviceModelImporter,
 ) : ViewModel() {
 
     companion object {
@@ -226,6 +230,36 @@ class ConfigViewModel @Inject constructor(
     fun updateLocalModelMaxTokens(maxTokens: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
         _uiState.value = UiState.Success(currentState.copy(localModelMaxTokens = maxTokens))
+    }
+
+    fun importLocalModel(
+        uri: Uri,
+        onSuccess: ((String) -> Unit)? = null,
+        onError: ((String) -> Unit)? = null,
+    ) {
+        viewModelScope.launch {
+            val state = (_uiState.value as? UiState.Success)?.data ?: return@launch
+            if (state.isImportingLocalModel) return@launch
+            _uiState.value = UiState.Success(state.copy(isImportingLocalModel = true))
+            try {
+                val imported = onDeviceModelImporter.importModel(uri)
+                val latest = (_uiState.value as? UiState.Success)?.data ?: state
+                _uiState.value = UiState.Success(
+                    latest.copy(
+                        mode = ServerMode.LOCAL,
+                        serverUrl = LOCAL_RUNTIME_URL,
+                        localModelPath = imported.path,
+                        localModelHandle = imported.handle,
+                        isImportingLocalModel = false,
+                    )
+                )
+                onSuccess?.invoke(imported.fileName)
+            } catch (e: Exception) {
+                val latest = (_uiState.value as? UiState.Success)?.data ?: state
+                _uiState.value = UiState.Success(latest.copy(isImportingLocalModel = false))
+                onError?.invoke(e.message ?: "Failed to import local model.")
+            }
+        }
     }
 
     fun saveConfig(onSuccess: () -> Unit, onError: ((String) -> Unit)? = null) {
