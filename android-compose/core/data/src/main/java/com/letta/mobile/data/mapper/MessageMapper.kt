@@ -249,7 +249,12 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
             returnContent = returnsByCallId[callId]?.content,
         ) ?: continue
         dispatch.taskId?.takeIf { it.isNotBlank() }?.let { taskId ->
-            subagentToolCallByTaskId[taskId] = callId
+            // Deterministic on taskId collision: keep the FIRST dispatch in
+            // conversation order as the owner of that taskId, rather than
+            // last-write-wins (which could mis-correlate a later notification
+            // to the wrong tool call). Server taskIds are normally unique per
+            // conversation; this only guards the collision edge case.
+            subagentToolCallByTaskId.putIfAbsent(taskId, callId)
         }
     }
 

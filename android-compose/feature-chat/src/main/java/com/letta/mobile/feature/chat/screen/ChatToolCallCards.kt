@@ -371,6 +371,17 @@ private fun SubagentMetaChip(text: String) {
     }
 }
 
+/**
+ * Parses a `<task-notification>` payload that arrives as a TOOL_RETURN result on
+ * the Agent tool call itself (the in-card path), vs.
+ * `MessageMapper.extractSubagentNotification` which parses the same format when
+ * it arrives as a separate ASSISTANT message (the message-level path). Both
+ * paths exist because the notification can surface either way depending on the
+ * backend; `feature-chat` cannot depend on `core:data` mapper internals, so the
+ * UI keeps a local parser. The `<task-notification>` schema is the shared source
+ * of truth — if it changes, update BOTH this function and
+ * `MessageMapper.extractSubagentNotification`. (CodeRabbit #343.)
+ */
 private fun parseTaskNotificationForToolCard(raw: String): UiSubagentNotification? {
     if (raw.indexOf("<task-notification", ignoreCase = true) < 0) return null
     fun tag(name: String): String? {
