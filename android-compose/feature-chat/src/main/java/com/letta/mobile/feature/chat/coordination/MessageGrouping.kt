@@ -24,6 +24,16 @@ internal sealed interface ChatRenderItem {
     val key: String
 
     /**
+     * A per-item discriminator that is stable across re-renders and never
+     * collides with another render item. Used by [deduplicateRenderKeys] as
+     * a suffix when two items would otherwise resolve to the same [key], so
+     * a future duplicate run id degrades gracefully (a slightly less-stable
+     * slot identity) instead of hard-crashing the LazyColumn with a
+     * duplicate-key IllegalArgumentException (letta-mobile-y70m0).
+     */
+    val stableItemDiscriminator: String
+
+    /**
      * The newest timestamp inside this item. Used by `ChatScreen` to decide
      * whether a date separator should be inserted between adjacent items.
      */
@@ -61,9 +71,16 @@ internal sealed interface ChatRenderItem {
          * with `run-` (letta-mobile-lkj4r), which normalisation would strip.
          */
         val stableRunId: String? = null,
+        /**
+         * Set by [deduplicateRenderKeys] only when this item's natural key
+         * would collide with another render item. Null in the common case,
+         * so normal slot identity is unchanged (letta-mobile-y70m0).
+         */
+        val keyOverride: String? = null,
     ) : ChatRenderItem {
-        override val key: String = stableRunKey ?: "msg-${message.id}"
+        override val key: String = keyOverride ?: (stableRunKey ?: "msg-${message.id}")
         override val boundaryTimestamp: String = message.timestamp
+        override val stableItemDiscriminator: String = message.id
         override fun containsMessageId(messageId: String): Boolean =
             message.id == messageId
     }
@@ -79,12 +96,25 @@ internal sealed interface ChatRenderItem {
         val runId: String,
         val messages: List<Pair<UiMessage, GroupPosition>>,
         private val stableKey: String? = null,
+        /**
+         * Set by [deduplicateRenderKeys] only when this item's natural key
+         * would collide with another render item. Null in the common case,
+         * so normal slot identity is unchanged (letta-mobile-y70m0).
+         */
+        val keyOverride: String? = null,
     ) : ChatRenderItem {
         init {
             require(messages.isNotEmpty()) { "RunBlock must contain at least one message" }
         }
 
-        override val key: String = stableKey ?: runKey(runId)
+        override val key: String = keyOverride ?: (stableKey ?: runKey(runId))
+
+        /**
+         * Stable per-item discriminator: the id of the run's first (oldest)
+         * message. Distinct render items never share their first message id,
+         * so this is a safe global tiebreaker for [deduplicateRenderKeys].
+         */
+        override val stableItemDiscriminator: String = messages.first().first.id
 
         /**
          * Newest message timestamp in the run. The reversed input to
@@ -202,7 +232,53 @@ internal fun groupMessagesForRender(
         }
         i = j
     }
-    return out
+    return deduplicateRenderKeys(out)
+}
+
+/**
+ * letta-mobile-y70m0 (defensive hardening): guarantee that every render
+ * item's LazyColumn [ChatRenderItem.key] is globally unique, even if two
+ * distinct items legitimately (or buggily) resolve to the same run id.
+ *
+ * The #337 [runKey] normaliser prevents the `run-run-<id>` double-prefix
+ * collision, but it does NOT guarantee uniqueness when two distinct render
+ * items map to the same single-prefixed `run-<id>` key. Before this pass a
+ * repeated run id crashed the LazyColumn with
+ * `IllegalArgumentException: Key "run-<id>" was already used`.
+ *
+ * We keep the FIRST occurrence's key verbatim (preserving the stable slot
+ * identity / #337 behaviour for the common, already-unique case) and only
+ * suffix subsequent collisions with their stable per-item discriminator —
+ * so a duplicate degrades into a distinct-but-stable slot instead of a hard
+ * crash. In a correct snapshot no item is rewritten, so this is a no-op.
+ */
+internal fun deduplicateRenderKeys(items: List<ChatRenderItem>): List<ChatRenderItem> {
+    if (items.size < 2) return items
+    val seen = HashSet<String>(items.size)
+    var rewroteAny = false
+    val out = ArrayList<ChatRenderItem>(items.size)
+    for (item in items) {
+        if (seen.add(item.key)) {
+            out.add(item)
+            continue
+        }
+        // Collision: derive a unique key from the stable per-item id, and
+        // keep probing in the (astronomically unlikely) event that even the
+        // discriminated key was already used.
+        var candidate = "${item.key}#${item.stableItemDiscriminator}"
+        var n = 1
+        while (!seen.add(candidate)) {
+            candidate = "${item.key}#${item.stableItemDiscriminator}#${n++}"
+        }
+        rewroteAny = true
+        out.add(
+            when (item) {
+                is ChatRenderItem.Single -> item.copy(keyOverride = candidate)
+                is ChatRenderItem.RunBlock -> item.copy(keyOverride = candidate)
+            }
+        )
+    }
+    return if (rewroteAny) out else items
 }
 
 private const val MinRunPanelEchoLength = 24
