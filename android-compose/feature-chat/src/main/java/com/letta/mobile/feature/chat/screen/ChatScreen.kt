@@ -80,6 +80,7 @@ import com.letta.mobile.feature.chat.render.ConversationState
 import com.letta.mobile.feature.chat.render.buildToolCallTemplate
 import com.letta.mobile.feature.chat.subagent.ActiveSubagent
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentBar
+import kotlinx.collections.immutable.toImmutableList
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
 import com.letta.mobile.feature.chat.subagent.withLingeringTerminals
 import com.letta.mobile.feature.chat.subagent.LocalSubagentTodoSheetOpener
@@ -126,9 +127,13 @@ internal fun ChatScreen(
     // FakeActiveSubagentSource. The bar itself is unchanged — only the feed
     // is swapped at this single seam.
     activeSubagentSource: ActiveSubagentSource? = null,
+    // letta-mobile-lgm98: optional self-todo source seam (previews/tests pass a
+    // fake). Defaults to the viewModel's WS-backed source in production.
+    selfTodoSource: com.letta.mobile.feature.chat.subagent.SelfTodoSource? = null,
     viewModel: AdminChatViewModel = hiltViewModel()
 ) {
     val resolvedSubagentSource = activeSubagentSource ?: viewModel.activeSubagentSource
+    val resolvedSelfTodoSource = selfTodoSource ?: viewModel.selfTodoSource
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val composerState by viewModel.composerState.collectAsStateWithLifecycle()
     val fontScale by viewModel.chatFontScale.collectAsStateWithLifecycle()
@@ -173,8 +178,26 @@ internal fun ChatScreen(
             }
             lingerTick = System.currentTimeMillis()
         }
-        val activeSubagents = remember(subagentSnapshot, lingerTick) {
-            subagentSnapshot.withLingeringTerminals(lingerTick)
+        // letta-mobile-lgm98: the MAIN agent's OWN TodoWrite plan ("self"
+        // entry). The shim broadcasts it (jb4gu) and SelfTodoRepository keys it
+        // by conversation id; we observe it for the CURRENT conversation and
+        // merge it into the bar list so ActiveSubagentBar's isSelf branch can
+        // render the SelfChip. The self entry is always-present-while-a-plan-
+        // exists (not terminal-lingered), so it is prepended AFTER the linger
+        // transform runs over the subagent entries only.
+        val currentConversationId = viewModel.conversationId?.value
+        val selfEntry by remember(resolvedSelfTodoSource, currentConversationId) {
+            if (currentConversationId.isNullOrBlank()) {
+                kotlinx.coroutines.flow.flowOf<ActiveSubagent?>(null)
+            } else {
+                resolvedSelfTodoSource.selfEntry(currentConversationId)
+            }
+        }.collectAsStateWithLifecycle(initialValue = null)
+        val activeSubagents = remember(subagentSnapshot, lingerTick, selfEntry) {
+            val subagents = subagentSnapshot.withLingeringTerminals(lingerTick)
+            val self = selfEntry
+            if (self == null) subagents
+            else (listOf(self) + subagents).toImmutableList()
         }
         val windowSizeClass = LocalWindowSizeClass.current
         val imeBottomPx = WindowInsets.ime.getBottom(density)
@@ -426,10 +449,18 @@ internal fun ChatScreen(
                     var todoState by remember(target.toolCallId) {
                         mutableStateOf<SubagentTodoSheetState>(SubagentTodoSheetState.Loading)
                     }
-                    LaunchedEffect(resolvedSubagentSource, target.toolCallId) {
-                        todoState = subagentTodoSheetStateFrom(
-                            resolvedSubagentSource.todos(target.toolCallId),
-                        )
+                    LaunchedEffect(resolvedSubagentSource, resolvedSelfTodoSource, target.toolCallId, currentConversationId) {
+                        // letta-mobile-lgm98: the self chip's target carries the
+                        // reserved SELF_ID; resolve its checklist from the
+                        // self-todo source (keyed by conversation), not the
+                        // subagent source (keyed by tool-call id).
+                        val todos = if (target.toolCallId == ActiveSubagent.SELF_ID) {
+                            // self source returns a plain list (no async fetch)
+                            Result.success(resolvedSelfTodoSource.todos(currentConversationId.orEmpty()))
+                        } else {
+                            resolvedSubagentSource.todos(target.toolCallId)
+                        }
+                        todoState = subagentTodoSheetStateFrom(todos)
                     }
                     SubagentTodoSheet(
                         description = target.description,
