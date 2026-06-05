@@ -378,6 +378,9 @@ internal class AdminChatViewModel @Inject constructor(
         agentId = agentId.value,
         initialMessage = initialMessage,
         explicitConversationId = { explicitConversationId },
+        // letta-mobile-9cb37: snapshot of the route's explicit conversation id so
+        // an agent switch can't lose it to a restored/stale CONVERSATION_ID_KEY.
+        pinnedExplicitConversationId = routeArgs.pinnedExplicitConversationId,
         setRouteConversationId = routeArgs::setRouteConversationId,
         isFreshRoute = isFreshRoute,
         chatSessionResolver = chatSessionResolver,

@@ -41,6 +41,53 @@ class ChatRouteArgsTest {
     }
 
     @Test
+    fun `pins explicit conversation id at construction and survives later route writes`() {
+        // letta-mobile-9cb37: the explicit route arg must be snapshotted so a
+        // later setRouteConversationId (resolved/last conversation) can't erase
+        // the "open exactly this conversation" intent the route carried.
+        val args = ChatRouteArgs(
+            SavedStateHandle(
+                mapOf(
+                    "agentId" to "agent-1",
+                    "conversationId" to "default",
+                )
+            )
+        )
+
+        assertEquals("default", args.pinnedExplicitConversationId)
+
+        args.setRouteConversationId("conv-other")
+
+        assertEquals("conv-other", args.explicitConversationId)
+        // The pinned snapshot is immutable and still reflects the route's request.
+        assertEquals("default", args.pinnedExplicitConversationId)
+    }
+
+    @Test
+    fun `pinned explicit conversation id is null for fresh and blank routes`() {
+        val freshArgs = ChatRouteArgs(
+            SavedStateHandle(
+                mapOf(
+                    "agentId" to "agent-1",
+                    "conversationId" to "default",
+                    "freshRouteKey" to 123L,
+                )
+            )
+        )
+        assertNull(freshArgs.pinnedExplicitConversationId)
+
+        val blankArgs = ChatRouteArgs(
+            SavedStateHandle(
+                mapOf(
+                    "agentId" to "agent-1",
+                    "conversationId" to "",
+                )
+            )
+        )
+        assertNull(blankArgs.pinnedExplicitConversationId)
+    }
+
+    @Test
     fun `blank conversation id is fresh but not explicit new chat without fresh key`() {
         val args = ChatRouteArgs(
             SavedStateHandle(

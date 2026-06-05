@@ -26,6 +26,28 @@ internal class ChatRouteArgs @Inject constructor(
     private val freshRouteKeyAtConstruction: Long? = savedStateHandle.get<Long>(FRESH_ROUTE_KEY)
     private val requestedConversationArgAtConstruction: String? = requestedConversationArg
 
+    /**
+     * letta-mobile-9cb37: the conversation id carried by the *route* at the
+     * moment this destination was (re)entered, captured ONCE at construction.
+     *
+     * [explicitConversationId] is a live read of [CONVERSATION_ID_KEY], which
+     * [setRouteConversationId] mutates as conversations resolve. When the user
+     * switches to a DIFFERENT agent, Compose Navigation can restore that agent's
+     * previously-saved SavedStateHandle, whose [CONVERSATION_ID_KEY] still holds
+     * the resolved/last conversation from the prior visit. That restored value
+     * then shadows the explicit `conversationId` the new route asked for (e.g.
+     * the subagent transcript's `default`), so the chat opens the agent's
+     * active/last conversation instead of the one the route demanded.
+     *
+     * This snapshot is the authoritative "the route explicitly asked for THIS
+     * conversation" signal. It is null for fresh/blank routes (no explicit
+     * request) so it never suppresses the resume-recent / picker flows.
+     */
+    val pinnedExplicitConversationId: String? =
+        requestedConversationArgAtConstruction
+            ?.takeIf { it.isNotBlank() }
+            ?.takeIf { freshRouteKeyAtConstruction == null }
+
     val scrollToMessageId: String? = savedStateHandle.get<String>(SCROLL_TO_MESSAGE_ID_KEY)
 
     // Freshness is a route-entry property, not mutable conversation state. The
