@@ -38,6 +38,7 @@ import com.letta.mobile.data.repository.ProjectWorkRepository
 import com.letta.mobile.data.repository.ProviderRepository
 import com.letta.mobile.data.repository.RunRepository
 import com.letta.mobile.data.repository.ScheduleRepository
+import com.letta.mobile.data.repository.SelfTodoRepository
 import com.letta.mobile.data.repository.StepRepository
 import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.ToolRepository
@@ -204,6 +205,10 @@ class SessionGraphFactory internal constructor(
             scheduleRepository = ScheduleRepository(scheduleApi),
             stepRepository = StepRepository(stepApi),
             subagentRepository = SubagentRepository(
+                transport = channelTransport,
+                scope = scope,
+            ),
+            selfTodoRepository = SelfTodoRepository(
                 transport = channelTransport,
                 scope = scope,
             ),

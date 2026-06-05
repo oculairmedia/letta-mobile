@@ -33,6 +33,16 @@ data class ActiveSubagent(
     val subagentType: String,
     /** Current lifecycle status. The bar only renders [Status.RUNNING]. */
     val status: Status,
+    /**
+     * letta-mobile-gnyf7: marks the synthetic "self"/"you" entry — the
+     * MAIN/foreground agent's OWN TodoWrite plan for the active conversation,
+     * as opposed to a DISPATCHED subagent. Rendered with a distinct
+     * icon/label and pinned at the head of the bar while a plan is active.
+     * Its [id] is the reserved [SELF_ID] sentinel; the tap-to-todolist sheet
+     * resolves its checklist from the self-todo source, not the subagent
+     * registry.
+     */
+    val isSelf: Boolean = false,
 ) {
     enum class Status {
         /** Dispatched and still working — the only state shown in the bar. */
@@ -49,4 +59,13 @@ data class ActiveSubagent(
     }
 
     val isActive: Boolean get() = status == Status.RUNNING
+
+    companion object {
+        /**
+         * letta-mobile-gnyf7: reserved stable id for the synthetic self
+         * entry. A real subagent's id is a `tool_call_id` / `task_id`, never
+         * this sentinel, so there is no collision risk.
+         */
+        const val SELF_ID = "__self__"
+    }
 }
