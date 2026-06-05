@@ -653,12 +653,22 @@ class SettingsRepository internal constructor(
         val mode: String,
         val serverUrl: String,
         val accessToken: String? = null,
+        val localModelPath: String? = null,
+        val localModelHandle: String? = null,
+        val localModelRuntime: String? = null,
+        val localModelAccelerator: String? = null,
+        val localModelMaxTokens: Int? = null,
     ) {
         fun toLettaConfig() = LettaConfig(
             id = id,
             mode = LettaConfig.Mode.valueOf(mode),
             serverUrl = serverUrl,
-            accessToken = accessToken
+            accessToken = accessToken,
+            localModelPath = localModelPath,
+            localModelHandle = localModelHandle,
+            localModelRuntime = localModelRuntime,
+            localModelAccelerator = localModelAccelerator,
+            localModelMaxTokens = localModelMaxTokens,
         )
 
         companion object {
@@ -666,7 +676,12 @@ class SettingsRepository internal constructor(
                 id = config.id,
                 mode = config.mode.name,
                 serverUrl = config.serverUrl,
-                accessToken = config.accessToken
+                accessToken = config.accessToken,
+                localModelPath = config.localModelPath,
+                localModelHandle = config.localModelHandle,
+                localModelRuntime = config.localModelRuntime,
+                localModelAccelerator = config.localModelAccelerator,
+                localModelMaxTokens = config.localModelMaxTokens,
             )
         }
     }

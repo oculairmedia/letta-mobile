@@ -77,6 +77,38 @@ class SettingsRepositoryTest {
     }
 
     @Test
+    fun `saveConfig persists local on-device model metadata`() = runTest {
+        val secureStore = InMemorySecureSettingsStore()
+        val scopedRepository = SettingsRepository(
+            dataStore = createTestPreferencesDataStore(),
+            secureSettingsStore = secureStore,
+        )
+        val config = LettaConfig(
+            id = "local",
+            mode = LettaConfig.Mode.LOCAL,
+            serverUrl = "local-lettacode://device",
+            localModelPath = "/sdcard/models/gemma.litertlm",
+            localModelHandle = "google/gemma-3n",
+            localModelRuntime = "litert-lm",
+            localModelAccelerator = "gpu",
+            localModelMaxTokens = 32768,
+        )
+
+        scopedRepository.saveConfig(config)
+
+        val restoredRepository = SettingsRepository(
+            dataStore = createTestPreferencesDataStore(),
+            secureSettingsStore = secureStore,
+        )
+        val restored = restoredRepository.configs.value.single()
+        assertEquals("/sdcard/models/gemma.litertlm", restored.localModelPath)
+        assertEquals("google/gemma-3n", restored.localModelHandle)
+        assertEquals("litert-lm", restored.localModelRuntime)
+        assertEquals("gpu", restored.localModelAccelerator)
+        assertEquals(32768, restored.localModelMaxTokens)
+    }
+
+    @Test
     fun `setActiveConfigId changes active config`() = runTest {
         val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://one.com")
         val c2 = LettaConfig(id = "c2", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "http://two.com")

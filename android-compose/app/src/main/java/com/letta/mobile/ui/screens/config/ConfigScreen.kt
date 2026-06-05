@@ -3,6 +3,7 @@ package com.letta.mobile.ui.screens.config
 import android.content.ActivityNotFoundException
 import android.os.Build
 import com.letta.mobile.BuildConfig
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -19,6 +20,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -127,6 +129,10 @@ fun ConfigScreen(
                 onThemePresetChange = { viewModel.updateThemePreset(it) },
                 onDynamicColorChange = { viewModel.updateDynamicColor(it) },
                 onEnableProjectsChange = { viewModel.updateEnableProjects(it) },
+                onLocalModelPathChange = { viewModel.updateLocalModelPath(it) },
+                onLocalModelHandleChange = { viewModel.updateLocalModelHandle(it) },
+                onLocalModelAcceleratorChange = { viewModel.updateLocalModelAccelerator(it) },
+                onLocalModelMaxTokensChange = { viewModel.updateLocalModelMaxTokens(it) },
                 batteryOptimizationExempt = batteryOptimizationExempt,
                 onRequestBatteryOptimizationExemption = {
                     Telemetry.event(
@@ -176,6 +182,10 @@ private fun ConfigContent(
     onThemePresetChange: (ThemePreset) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
     onEnableProjectsChange: (Boolean) -> Unit,
+    onLocalModelPathChange: (String) -> Unit,
+    onLocalModelHandleChange: (String) -> Unit,
+    onLocalModelAcceleratorChange: (String) -> Unit,
+    onLocalModelMaxTokensChange: (String) -> Unit,
     batteryOptimizationExempt: Boolean,
     onRequestBatteryOptimizationExemption: () -> Unit,
     onNavigateToSystemAccess: () -> Unit,
@@ -252,6 +262,17 @@ private fun ConfigContent(
                 item(
                     headlineContent = {
                         EmbeddedRuntimeStatusItem(status = state.embeddedRuntimeStatus)
+                    },
+                )
+                item(
+                    headlineContent = {
+                        LocalModelSettingsItem(
+                            state = state,
+                            onLocalModelPathChange = onLocalModelPathChange,
+                            onLocalModelHandleChange = onLocalModelHandleChange,
+                            onLocalModelAcceleratorChange = onLocalModelAcceleratorChange,
+                            onLocalModelMaxTokensChange = onLocalModelMaxTokensChange,
+                        )
                     },
                 )
             }
@@ -530,6 +551,81 @@ private fun EmbeddedRuntimeStatusItem(
 }
 
 @Composable
+private fun LocalModelSettingsItem(
+    state: ConfigUiState,
+    onLocalModelPathChange: (String) -> Unit,
+    onLocalModelHandleChange: (String) -> Unit,
+    onLocalModelAcceleratorChange: (String) -> Unit,
+    onLocalModelMaxTokensChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.screen_config_on_device_model_title),
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        OutlinedTextField(
+            value = state.localModelPath,
+            onValueChange = onLocalModelPathChange,
+            label = { Text(stringResource(R.string.screen_config_local_model_path)) },
+            placeholder = { Text(stringResource(R.string.screen_config_local_model_path_placeholder)) },
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = { Icon(LettaIcons.Database, null) },
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = state.localModelHandle,
+            onValueChange = onLocalModelHandleChange,
+            label = { Text(stringResource(R.string.screen_config_local_model_handle)) },
+            placeholder = { Text(stringResource(R.string.screen_config_local_model_handle_placeholder)) },
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = { Icon(LettaIcons.Psychology, null) },
+            singleLine = true,
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = stringResource(R.string.screen_config_local_model_accelerator),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                LocalModelAcceleratorOption.entries.forEachIndexed { index, option ->
+                    SegmentedButton(
+                        selected = state.localModelAccelerator == option.value,
+                        onClick = {
+                            HapticEffects.segmentTick(
+                                haptic,
+                                view,
+                                enabled = state.localModelAccelerator != option.value,
+                            )
+                            onLocalModelAcceleratorChange(option.value)
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(
+                            index = index,
+                            count = LocalModelAcceleratorOption.entries.size,
+                        ),
+                        label = { Text(stringResource(option.labelRes)) },
+                    )
+                }
+            }
+        }
+        OutlinedTextField(
+            value = state.localModelMaxTokens,
+            onValueChange = onLocalModelMaxTokensChange,
+            label = { Text(stringResource(R.string.screen_config_local_model_max_tokens)) },
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            leadingIcon = { Icon(LettaIcons.Settings, null) },
+            singleLine = true,
+        )
+    }
+}
+
+@Composable
 private fun HapticSwitch(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
@@ -551,6 +647,15 @@ private fun HapticSwitch(
             onCheckedChange(isChecked)
         },
     )
+}
+
+private enum class LocalModelAcceleratorOption(
+    val value: String,
+    val labelRes: Int,
+) {
+    CPU("cpu", R.string.screen_config_local_model_accelerator_cpu),
+    GPU("gpu", R.string.screen_config_local_model_accelerator_gpu),
+    NPU("npu", R.string.screen_config_local_model_accelerator_npu),
 }
 
 @Composable

@@ -142,6 +142,33 @@ class ConfigViewModelTest {
     }
 
     @Test
+    fun loadConfig_withExistingLocalConfig_mapsOnDeviceModelFields() = runTest {
+        val config = LettaConfig(
+            id = "config-local",
+            mode = LettaConfig.Mode.LOCAL,
+            serverUrl = ConfigViewModel.LOCAL_RUNTIME_URL,
+            localModelPath = "/sdcard/models/gemma.litertlm",
+            localModelHandle = "google/gemma-3n",
+            localModelRuntime = "litert-lm",
+            localModelAccelerator = "cpu",
+            localModelMaxTokens = 8192,
+        )
+        fakeRepository.activeConfigState.value = config
+
+        viewModel.loadConfig()
+
+        viewModel.uiState.test {
+            val state = awaitItem()
+            assertTrue(state is UiState.Success)
+            val successState = (state as UiState.Success).data
+            assertEquals("/sdcard/models/gemma.litertlm", successState.localModelPath)
+            assertEquals("google/gemma-3n", successState.localModelHandle)
+            assertEquals("cpu", successState.localModelAccelerator)
+            assertEquals("8192", successState.localModelMaxTokens)
+        }
+    }
+
+    @Test
     fun loadConfig_withConfigWithoutToken_mapsToEmptyString() = runTest {
         val config = LettaConfig(
             id = "config-3",
@@ -226,6 +253,45 @@ class ConfigViewModelTest {
         assertEquals(0, fakeValidator.calls)
         assertEquals(null, errorMessage)
         assertTrue(onSuccessCalled)
+    }
+
+    @Test
+    fun saveConfig_buildsLettaConfigWithOnDeviceModelFields_withLocalMode() = runTest {
+        fakeRepository.activeConfigState.value = null
+        viewModel.loadConfig()
+
+        viewModel.updateMode(ServerMode.LOCAL)
+        viewModel.updateLocalModelPath("  /sdcard/models/gemma.litertlm  ")
+        viewModel.updateLocalModelHandle("  google/gemma-3n  ")
+        viewModel.updateLocalModelAccelerator("cpu")
+        viewModel.updateLocalModelMaxTokens("8192")
+
+        var onSuccessCalled = false
+        viewModel.saveConfig(onSuccess = { onSuccessCalled = true })
+
+        val savedConfig = fakeRepository.activeConfig.value
+        assertEquals(LettaConfig.Mode.LOCAL, savedConfig?.mode)
+        assertEquals("/sdcard/models/gemma.litertlm", savedConfig?.localModelPath)
+        assertEquals("google/gemma-3n", savedConfig?.localModelHandle)
+        assertEquals(ConfigViewModel.DEFAULT_LOCAL_MODEL_RUNTIME, savedConfig?.localModelRuntime)
+        assertEquals("cpu", savedConfig?.localModelAccelerator)
+        assertEquals(8192, savedConfig?.localModelMaxTokens)
+        assertTrue(onSuccessCalled)
+    }
+
+    @Test
+    fun saveConfig_withInvalidLocalMaxTokens_reportsErrorAndDoesNotSave() = runTest {
+        fakeRepository.activeConfigState.value = null
+        viewModel.loadConfig()
+
+        viewModel.updateMode(ServerMode.LOCAL)
+        viewModel.updateLocalModelMaxTokens("not-a-number")
+
+        var errorMessage: String? = null
+        viewModel.saveConfig(onSuccess = {}, onError = { errorMessage = it })
+
+        assertEquals(null, fakeRepository.activeConfig.value)
+        assertEquals("Local model max tokens must be a positive number.", errorMessage)
     }
 
     @Test

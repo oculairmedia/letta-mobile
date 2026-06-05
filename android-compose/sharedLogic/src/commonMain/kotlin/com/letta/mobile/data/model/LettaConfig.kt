@@ -12,6 +12,11 @@ data class LettaConfig(
     val mode: Mode,
     val serverUrl: String,
     val accessToken: String? = null,
+    val localModelPath: String? = null,
+    val localModelHandle: String? = null,
+    val localModelRuntime: String? = null,
+    val localModelAccelerator: String? = null,
+    val localModelMaxTokens: Int? = null,
 ) {
     enum class Mode {
         CLOUD,

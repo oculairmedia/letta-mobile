@@ -699,6 +699,16 @@
     <string name="screen_config_embedded_runtime_native_disabled">Native bridge missing</string>
     <string name="screen_config_embedded_runtime_assets_enabled">Assets packaged</string>
     <string name="screen_config_embedded_runtime_assets_disabled">Assets missing</string>
+    <string name="screen_config_on_device_model_title">On-device model</string>
+    <string name="screen_config_local_model_path">Model file path</string>
+    <string name="screen_config_local_model_path_placeholder">/storage/emulated/0/Android/data/com.letta.mobile/files/models/gemma.litertlm</string>
+    <string name="screen_config_local_model_handle">Model handle</string>
+    <string name="screen_config_local_model_handle_placeholder">local/default</string>
+    <string name="screen_config_local_model_accelerator">Accelerator</string>
+    <string name="screen_config_local_model_accelerator_cpu">CPU</string>
+    <string name="screen_config_local_model_accelerator_gpu">GPU</string>
+    <string name="screen_config_local_model_accelerator_npu">NPU</string>
+    <string name="screen_config_local_model_max_tokens">Max tokens</string>
     <string name="action_loading">Loading…</string>
     <string name="screen_drawer_backend_unknown">No backend configured</string>
     <string name="common_active">ACTIVE</string>
