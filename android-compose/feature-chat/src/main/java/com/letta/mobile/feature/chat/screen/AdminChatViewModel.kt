@@ -111,6 +111,7 @@ internal class AdminChatViewModel @Inject constructor(
     private val wsChatBridge: WsChatBridge,
     private val subagentRepository: ISubagentRepository,
     private val clientVersionProvider: ChatClientVersionProvider,
+    private val selfTodoRepository: com.letta.mobile.data.repository.api.ISelfTodoRepository,
     val attachmentLimits: com.letta.mobile.data.attachment.AttachmentLimits =
         com.letta.mobile.data.attachment.AttachmentLimits.Default,
 ) : ViewModel() {
@@ -131,6 +132,16 @@ internal class AdminChatViewModel @Inject constructor(
      */
     val activeSubagentSource: ActiveSubagentSource =
         WsActiveSubagentSource(subagentRepository, viewModelScope)
+
+    /**
+     * letta-mobile-lgm98: WS-backed feed for the MAIN agent's OWN TodoWrite
+     * plan (the "self" chip). Backed by [selfTodoRepository], which the shim
+     * feeds via the self-todo broadcast (letta-mobile-jb4gu). Exposed here as
+     * a seam so [ChatScreen] can merge the self entry into the active-subagent
+     * bar alongside dispatched subagents.
+     */
+    val selfTodoSource: com.letta.mobile.feature.chat.subagent.SelfTodoSource =
+        com.letta.mobile.feature.chat.subagent.WsSelfTodoSource(selfTodoRepository)
 
     private val initialAgentName: String? = routeArgs.initialAgentName
     private val initialMessage: String? = routeArgs.initialMessage
