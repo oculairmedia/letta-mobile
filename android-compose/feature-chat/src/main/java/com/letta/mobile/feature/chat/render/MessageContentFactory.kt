@@ -134,6 +134,7 @@ private fun AssistantResponseText(
         deferUnstableMarkdown = showCursor,
         stabilizeTables = hasStreamed || hasTable,
         isStreaming = effectivelyStreaming,
+        animateSettledSize = effectivelyStreaming,
         modifier = modifier,
     )
 }

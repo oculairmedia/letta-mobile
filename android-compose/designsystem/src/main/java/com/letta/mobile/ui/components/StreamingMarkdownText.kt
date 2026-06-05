@@ -88,6 +88,7 @@ fun StreamingMarkdownText(
     deferUnstableMarkdown: Boolean = true,
     stabilizeTables: Boolean = false,
     isStreaming: Boolean = true,
+    animateSettledSize: Boolean = true,
 ) {
     if (text.isEmpty()) return
 
@@ -268,7 +269,7 @@ fun StreamingMarkdownText(
     // top of the compositor scale and reproduce the choppy "phase-2"
     // judder we ship-blocked on in d9zy.5.
     val isPinching = LocalChatIsPinching.current
-    val heightAnimation = if (isStreaming || isPinching) {
+    val heightAnimation = if (isStreaming || isPinching || !animateSettledSize) {
         Modifier
     } else {
         Modifier.animateContentSize(
