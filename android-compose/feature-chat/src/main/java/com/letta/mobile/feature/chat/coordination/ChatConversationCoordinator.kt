@@ -37,6 +37,13 @@ internal class ChatConversationCoordinator(
     private val agentId: String,
     private val initialMessage: String?,
     private val explicitConversationId: () -> String?,
+    // letta-mobile-9cb37: the conversation id the *route* explicitly asked for,
+    // snapshotted once at construction (see ChatRouteArgs.pinnedExplicitConversationId).
+    // Unlike explicitConversationId() — a live read of the shared CONVERSATION_ID_KEY
+    // that setRouteConversationId mutates and that Compose can restore stale across an
+    // agent switch — this is the authoritative "open exactly THIS conversation" signal.
+    // Null for fresh/blank routes so resume-recent / picker fallbacks are untouched.
+    private val pinnedExplicitConversationId: String? = null,
     private val setRouteConversationId: (String?) -> Unit,
     private val isFreshRoute: Boolean,
     private val chatSessionResolver: ChatSessionResolver,
@@ -123,10 +130,21 @@ internal class ChatConversationCoordinator(
     }
 
     private suspend fun resolveClientModeConversation(isFirstResolve: Boolean) {
+        // letta-mobile-9cb37: honor the route's explicit conversation request on
+        // the first resolve before any cached/most-recent fallback (mirrors the
+        // timeline path) so an agent switch with an explicit conversationId opens
+        // exactly that conversation rather than the target agent's last one.
+        val pinnedExplicit = pinnedExplicitConversationId?.takeIf { isFirstResolve }
+        if (pinnedExplicit != null && explicitConversationId() != pinnedExplicit) {
+            setRouteConversationId(pinnedExplicit)
+            clientModeBootstrapState = ClientModeBootstrapState.Ready(pinnedExplicit)
+        }
+
         val suppressFreshRouteFallbackClient =
             clientModeBootstrapState == ClientModeBootstrapState.NewConversationPending ||
                 (isFreshRoute && isFirstResolve)
-        val clientConversationId = explicitConversationId()
+        val clientConversationId = pinnedExplicit
+            ?: explicitConversationId()
             ?: currentClientModeConversationId()?.also { cached ->
                 // letta-mobile-go8el follow-up: PR #177 wired setRouteConversationId on the
                 // resolveMostRecent fallback below but missed this branch — the legacy
@@ -185,8 +203,21 @@ internal class ChatConversationCoordinator(
     }
 
     private suspend fun resolveTimelineConversation(isFirstResolve: Boolean) {
+        // letta-mobile-9cb37: when the route explicitly asked for a conversation
+        // (e.g. the subagent "view conversation" shortcut targeting `default`),
+        // that request must win on the first resolve — even across an agent
+        // switch, where the live explicitConversationId() may have been restored
+        // stale to the target agent's prior active/last conversation. Pin it into
+        // the route key so downstream loads/sends agree, and skip the
+        // resolve-most-recent fallback that would otherwise override it.
+        val pinnedExplicit = pinnedExplicitConversationId?.takeIf { isFirstResolve }
+        if (pinnedExplicit != null && explicitConversationId() != pinnedExplicit) {
+            setRouteConversationId(pinnedExplicit)
+        }
+
         val suppressFreshRouteFallback = isFreshRoute && isFirstResolve
         if (
+            pinnedExplicit == null &&
             !suppressFreshRouteFallback &&
             activeConversationId == null &&
             explicitConversationId() == null
@@ -194,11 +225,12 @@ internal class ChatConversationCoordinator(
             resolveMostRecentConversation(CONVERSATION_CACHE_TTL_MS)
         }
 
-        val conversationId = if (suppressFreshRouteFallback) {
-            explicitConversationId()
-        } else {
-            activeConversationId ?: explicitConversationId()
-        }
+        val conversationId = pinnedExplicit
+            ?: if (suppressFreshRouteFallback) {
+                explicitConversationId()
+            } else {
+                activeConversationId ?: explicitConversationId()
+            }
 
         if (conversationId == null) {
             uiState.value = uiState.value.copy(

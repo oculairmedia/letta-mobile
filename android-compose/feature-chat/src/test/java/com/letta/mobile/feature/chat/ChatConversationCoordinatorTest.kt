@@ -184,6 +184,40 @@ class ChatConversationCoordinatorTest {
         assertEquals("Ada", harness.uiState.value.agentName)
     }
 
+    /**
+     * letta-mobile-9cb37: the subagent "view conversation" shortcut navigates to
+     * a DIFFERENT agent with an explicit conversationId ("default"). When that
+     * target agent was visited before, its NavBackStackEntry's CONVERSATION_ID_KEY
+     * still holds the resolved/last conversation from the prior visit, and Compose
+     * can restore it — shadowing the route arg so `explicitConversationId()` (a live
+     * read of that key) returns the stale conversation. The pinned route snapshot
+     * must win on the first resolve so the EXACT requested conversation opens, and
+     * resolve-most-recent must NOT be consulted.
+     */
+    @Test
+    fun `explicit conversation id is honored across agent switch despite stale route key`() = runTest {
+        // Simulate the restored/stale SavedStateHandle: the live explicitConversationId
+        // already reports the target agent's prior last conversation...
+        val harness = Harness(
+            scope = this,
+            explicitConversationId = "conv-stale-last",
+            pinnedExplicitConversationId = "default",
+        )
+        // ...and most-recent would also resolve to that wrong conversation if consulted.
+        coEvery { harness.chatSessionResolver.resolveMostRecentConversation(any(), any()) } returns "conv-stale-last"
+
+        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        advanceUntilIdle()
+
+        // The route's explicit "default" wins, not the stale last conversation.
+        assertEquals(ConversationState.Ready("default"), harness.uiState.value.conversationState)
+        assertEquals("default", harness.coordinator.activeConversationId)
+        assertEquals("default", harness.routeConversationId)
+        assertEquals(listOf("default"), harness.startedObservers)
+        // Never fall back to the target agent's active/last conversation.
+        coVerify(exactly = 0) { harness.chatSessionResolver.resolveMostRecentConversation(any(), any()) }
+    }
+
     @Test
     fun `loadMessages reconciles recent messages on conversation open (letta-mobile-ork1)`() = runTest {
         val harness = Harness(scope = this, explicitConversationId = "conv-explicit")
@@ -217,6 +251,7 @@ class ChatConversationCoordinatorTest {
         explicitConversationId: String? = null,
         isFreshRoute: Boolean = false,
         initialMessage: String? = null,
+        pinnedExplicitConversationId: String? = null,
     ) {
         val chatSessionResolver: ChatSessionResolver = mockk(relaxed = true)
         val agentRepository: IAgentRepository = mockk(relaxed = true)
@@ -237,6 +272,7 @@ class ChatConversationCoordinatorTest {
             agentId = "agent-1",
             initialMessage = initialMessage,
             explicitConversationId = { routeConversationId },
+            pinnedExplicitConversationId = pinnedExplicitConversationId,
             setRouteConversationId = { routeConversationId = it?.takeIf { value -> value.isNotBlank() } },
             isFreshRoute = isFreshRoute,
             chatSessionResolver = chatSessionResolver,
