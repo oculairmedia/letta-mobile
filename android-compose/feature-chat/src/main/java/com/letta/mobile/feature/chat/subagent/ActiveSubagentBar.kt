@@ -81,23 +81,33 @@ fun ActiveSubagentBar(
         // duration of the exit transition, so we render straight off the
         // current snapshot — no need to cache a "last non-empty" copy.
         val rendered = subagents
-        if (rendered.size > CONDENSE_THRESHOLD) {
-            CondensedSubagentChip(
-                count = rendered.size,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = LettaSpacing.screenHorizontal, vertical = LettaSpacing.xs),
-            )
-        } else {
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(LettaSpacing.chipGap),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    horizontal = LettaSpacing.screenHorizontal,
-                    vertical = LettaSpacing.xs,
-                ),
-            ) {
-                items(items = rendered, key = { it.id }) { subagent ->
+        // letta-mobile-gnyf7: the self entry (the MAIN agent's OWN plan) is
+        // ALWAYS pinned at the head and never folded into the condensed
+        // summary; only the dispatched-subagent count condenses behind it.
+        val selfEntry = rendered.firstOrNull { it.isSelf }
+        val subagentEntries = rendered.filterNot { it.isSelf }
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(LettaSpacing.chipGap),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                horizontal = LettaSpacing.screenHorizontal,
+                vertical = LettaSpacing.xs,
+            ),
+        ) {
+            if (selfEntry != null) {
+                item(key = selfEntry.id) {
+                    SelfChip(
+                        subagent = selfEntry,
+                        onClick = { onChipClick(selfEntry) },
+                    )
+                }
+            }
+            if (subagentEntries.size > CONDENSE_THRESHOLD) {
+                item(key = "__condensed__") {
+                    CondensedSubagentChip(count = subagentEntries.size)
+                }
+            } else {
+                items(items = subagentEntries, key = { it.id }) { subagent ->
                     SubagentChip(
                         subagent = subagent,
                         onClick = { onChipClick(subagent) },
@@ -134,6 +144,47 @@ private fun SubagentChip(
             text = subagent.description,
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/**
+ * letta-mobile-gnyf7: the synthetic "self" chip — the MAIN/foreground agent's
+ * OWN TodoWrite plan. Visually differentiated from subagent chips (tertiary
+ * tint + agent icon + "You" label) so it reads as the user's own agent, not a
+ * dispatched worker. Taps open the same todo sheet, resolved from the
+ * self-todo source.
+ */
+@Composable
+private fun SelfChip(
+    subagent: ActiveSubagent,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {},
+) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(LettaSpacing.bubbleRadius))
+            .clickable(onClick = onClick)
+            .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.72f))
+            .padding(horizontal = LettaSpacing.md, vertical = LettaSpacing.xs)
+            .semantics {
+                contentDescription = "Your agent's current plan: ${subagent.description}"
+            },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LettaSpacing.sm),
+    ) {
+        Icon(
+            imageVector = LettaIcons.Agent,
+            contentDescription = null,
+            modifier = Modifier.size(LettaIconSizing.Inline),
+            tint = MaterialTheme.colorScheme.onTertiaryContainer,
+        )
+        Text(
+            text = subagent.description.ifBlank { "Your plan" },
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onTertiaryContainer,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
