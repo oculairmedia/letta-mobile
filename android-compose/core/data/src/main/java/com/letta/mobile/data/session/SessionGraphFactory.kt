@@ -203,12 +203,12 @@ class SessionGraphFactory internal constructor(
             jobRepository = JobRepository(jobApi),
             providerRepository = ProviderRepository(providerApi),
             scheduleRepository = ScheduleRepository(scheduleApi),
-            stepRepository = StepRepository(stepApi),
-            subagentRepository = SubagentRepository(
+            selfTodoRepository = SelfTodoRepository(
                 transport = channelTransport,
                 scope = scope,
             ),
-            selfTodoRepository = SelfTodoRepository(
+            stepRepository = StepRepository(stepApi),
+            subagentRepository = SubagentRepository(
                 transport = channelTransport,
                 scope = scope,
             ),

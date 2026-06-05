@@ -50,9 +50,9 @@ class SessionGraph internal constructor(
     val jobRepository: JobRepository,
     val providerRepository: ProviderRepository,
     val scheduleRepository: ScheduleRepository,
+    val selfTodoRepository: SelfTodoRepository,
     val stepRepository: StepRepository,
     val subagentRepository: SubagentRepository,
-    val selfTodoRepository: SelfTodoRepository,
     val toolRepository: ToolRepository,
     val vibesyncEventStreamRepository: VibesyncEventStreamRepository,
 )
