@@ -261,6 +261,109 @@ class MessageMapperTest : WordSpec({
             ui[2].role shouldBe "assistant"
         }
 
+        "map Agent dispatch into first-class subagent payload without dumping prompt" {
+            val messages = listOf(
+                TestData.appMessage(
+                    id = "agent-call",
+                    messageType = MessageType.TOOL_CALL,
+                    content = """{"subagent_type":"researcher","description":"Investigate qd5gq","run_in_background":true,"prompt":"Huge private prompt body"}""",
+                    toolName = "Agent",
+                    toolCallId = "toolu-agent-1",
+                    date = Instant.parse("2024-03-15T10:00:01Z"),
+                ),
+                TestData.appMessage(
+                    id = "agent-return",
+                    messageType = MessageType.TOOL_RETURN,
+                    content = """{"task_id":"task-123","agent_id":"agent-local-123"}""",
+                    toolName = "Agent",
+                    toolCallId = "toolu-agent-1",
+                    date = Instant.parse("2024-03-15T10:00:04Z"),
+                ),
+            )
+
+            val ui = messages.toUiMessages()
+
+            ui shouldHaveSize 1
+            val call = ui.single().toolCalls.shouldNotBeNull().single()
+            call.name shouldBe "Agent"
+            call.subagentDispatch.shouldNotBeNull()
+            call.subagentDispatch!!.toolCallId shouldBe "toolu-agent-1"
+            call.subagentDispatch!!.description shouldBe "Investigate qd5gq"
+            call.subagentDispatch!!.subagentType shouldBe "researcher"
+            call.subagentDispatch!!.runInBackground shouldBe true
+            call.subagentDispatch!!.prompt shouldBe "Huge private prompt body"
+            call.subagentDispatch!!.taskId shouldBe "task-123"
+            call.subagentDispatch!!.subagentAgentId shouldBe "agent-local-123"
+        }
+
+        "parse task-notification assistant XML into structured subagent notification" {
+            val messages = listOf(
+                TestData.appMessage(
+                    id = "task-note",
+                    messageType = MessageType.ASSISTANT,
+                    content = """
+                        <task-notification>
+                          <status>success</status>
+                          <summary>Subagent finished the review.</summary>
+                          <result>Found one actionable issue.</result>
+                          <usage>tokens=123 tools=2 duration=4s</usage>
+                          <task_id>task-123</task_id>
+                          Full transcript at: task://task-123
+                        </task-notification>
+                    """.trimIndent(),
+                ),
+            )
+
+            val ui = messages.toUiMessages()
+
+            ui shouldHaveSize 1
+            ui.single().content shouldBe ""
+            ui.single().subagentNotification.shouldNotBeNull()
+            ui.single().subagentNotification!!.status shouldBe "success"
+            ui.single().subagentNotification!!.summary shouldBe "Subagent finished the review."
+            ui.single().subagentNotification!!.result shouldBe "Found one actionable issue."
+            ui.single().subagentNotification!!.usage shouldBe "tokens=123 tools=2 duration=4s"
+            ui.single().subagentNotification!!.transcriptUri shouldBe "task://task-123"
+            ui.single().subagentNotification!!.taskId shouldBe "task-123"
+            ui.single().subagentNotification!!.toolCallId.shouldBeNull()
+        }
+
+        "correlate task-notification task id back to Agent tool call id" {
+            val messages = listOf(
+                TestData.appMessage(
+                    id = "agent-call",
+                    messageType = MessageType.TOOL_CALL,
+                    content = """{"subagent_type":"general","description":"Review implementation","run_in_background":true,"prompt":"Do the review"}""",
+                    toolName = "Agent",
+                    toolCallId = "toolu-agent-2",
+                ),
+                TestData.appMessage(
+                    id = "agent-return",
+                    messageType = MessageType.TOOL_RETURN,
+                    content = """{"task_id":"task-456","agent_id":"agent-local-456"}""",
+                    toolName = "Agent",
+                    toolCallId = "toolu-agent-2",
+                ),
+                TestData.appMessage(
+                    id = "task-note",
+                    messageType = MessageType.ASSISTANT,
+                    content = """
+                        <task-notification>
+                          <status>success</status>
+                          <summary>Review finished.</summary>
+                          <task_id>task-456</task_id>
+                        </task-notification>
+                    """.trimIndent(),
+                ),
+            )
+
+            val ui = messages.toUiMessages()
+
+            ui shouldHaveSize 2
+            ui[1].subagentNotification.shouldNotBeNull()
+            ui[1].subagentNotification!!.toolCallId shouldBe "toolu-agent-2"
+        }
+
         "promote send_message tool to assistant bubble" {
             val messages = listOf(
                 TestData.appMessage(id = "m1", messageType = MessageType.USER, content = "Hello"),

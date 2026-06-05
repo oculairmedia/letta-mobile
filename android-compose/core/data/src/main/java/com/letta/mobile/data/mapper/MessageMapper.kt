@@ -24,12 +24,14 @@ import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolApprovalDecision
+import com.letta.mobile.data.model.UiSubagentDispatch
+import com.letta.mobile.data.model.UiSubagentNotification
 import com.letta.mobile.data.model.UiToolCall
 import java.time.Duration
 import java.time.Instant
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -237,6 +239,24 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
             returnsByCallId[callId] = msg
         }
     }
+    val subagentToolCallByTaskId = mutableMapOf<String, String>()
+    for (msg in this) {
+        if (msg.messageType != MessageType.TOOL_CALL || msg.toolName != "Agent") continue
+        val callId = msg.toolCallId?.takeIf { it.isNotBlank() } ?: continue
+        val dispatch = extractSubagentDispatch(
+            toolCallId = callId,
+            arguments = msg.content,
+            returnContent = returnsByCallId[callId]?.content,
+        ) ?: continue
+        dispatch.taskId?.takeIf { it.isNotBlank() }?.let { taskId ->
+            // Deterministic on taskId collision: keep the FIRST dispatch in
+            // conversation order as the owner of that taskId, rather than
+            // last-write-wins (which could mis-correlate a later notification
+            // to the wrong tool call). Server taskIds are normally unique per
+            // conversation; this only guards the collision edge case.
+            subagentToolCallByTaskId.putIfAbsent(taskId, callId)
+        }
+    }
 
     // The set of tool-call ids that will actually produce a visible bubble in
     // this render. A folded approval decision can only silently replace its
@@ -347,6 +367,15 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                     }
                 }
 
+                val subagentDispatch = if (name == "Agent") {
+                    extractSubagentDispatch(
+                        toolCallId = msg.toolCallId,
+                        arguments = arguments,
+                        returnContent = returnContent,
+                    )
+                } else {
+                    null
+                }
                 val toolCall = UiToolCall(
                     name = name ?: "tool",
                     arguments = arguments,
@@ -355,6 +384,7 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                     executionTimeMs = executionTimeMs,
                     toolCallId = msg.toolCallId,
                     approvalDecision = msg.toolCallId?.let { foldedApprovals[it]?.decision },
+                    subagentDispatch = subagentDispatch,
                 )
                 result.add(UiMessage(
                     id = msg.id,
@@ -408,6 +438,15 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                     continue
                 }
 
+                val subagentDispatch = if (name == "Agent") {
+                    extractSubagentDispatch(
+                        toolCallId = msg.toolCallId,
+                        arguments = "",
+                        returnContent = msg.content,
+                    )
+                } else {
+                    null
+                }
                 val toolCall = UiToolCall(
                     name = name,
                     arguments = "",
@@ -415,6 +454,7 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                     status = msg.toolReturnStatus,
                     toolCallId = msg.toolCallId,
                     approvalDecision = msg.toolCallId?.let { foldedApprovals[it]?.decision },
+                    subagentDispatch = subagentDispatch,
                 )
                 result.add(UiMessage(
                     id = msg.id,
@@ -431,7 +471,26 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
             }
 
             MessageType.USER -> result.add(msg.toUiMessage())
-            MessageType.ASSISTANT -> result.add(msg.toUiMessage())
+            MessageType.ASSISTANT -> {
+                val uiMessage = msg.toUiMessage()
+                val notification = uiMessage.subagentNotification
+                val taskId = notification?.taskId
+                val correlatedToolCallId = when {
+                    notification == null -> null
+                    !notification.toolCallId.isNullOrBlank() -> notification.toolCallId
+                    !taskId.isNullOrBlank() -> subagentToolCallByTaskId[taskId]
+                    else -> null
+                }
+                result.add(
+                    if (notification != null && correlatedToolCallId != notification.toolCallId) {
+                        uiMessage.copy(
+                            subagentNotification = notification.copy(toolCallId = correlatedToolCallId),
+                        )
+                    } else {
+                        uiMessage
+                    }
+                )
+            }
             MessageType.REASONING -> result.add(msg.toUiMessage())
             MessageType.APPROVAL_REQUEST -> result.add(msg.toUiMessage())
             MessageType.APPROVAL_RESPONSE -> {
@@ -517,16 +576,56 @@ fun AppMessage.toUiMessage(): UiMessage {
     }
     val toolCalls = when {
         messageType == MessageType.TOOL_CALL -> {
-            listOf(UiToolCall(name = toolName ?: "tool", arguments = content, result = null, toolCallId = toolCallId))
+            val subagentDispatch = if (toolName == "Agent") {
+                extractSubagentDispatch(
+                    toolCallId = toolCallId,
+                    arguments = content,
+                    returnContent = null,
+                )
+            } else {
+                null
+            }
+            listOf(
+                UiToolCall(
+                    name = toolName ?: "tool",
+                    arguments = content,
+                    result = null,
+                    toolCallId = toolCallId,
+                    subagentDispatch = subagentDispatch,
+                )
+            )
         }
         messageType == MessageType.TOOL_RETURN -> {
-            listOf(UiToolCall(name = toolName ?: "tool", arguments = "", result = content.ifBlank { null }, toolCallId = toolCallId))
+            val subagentDispatch = if (toolName == "Agent") {
+                extractSubagentDispatch(
+                    toolCallId = toolCallId,
+                    arguments = "",
+                    returnContent = content,
+                )
+            } else {
+                null
+            }
+            listOf(
+                UiToolCall(
+                    name = toolName ?: "tool",
+                    arguments = "",
+                    result = content.ifBlank { null },
+                    toolCallId = toolCallId,
+                    subagentDispatch = subagentDispatch,
+                )
+            )
         }
         else -> null
+    }
+    val subagentNotification = if (messageType == MessageType.ASSISTANT) {
+        extractSubagentNotification(content)
+    } else {
+        null
     }
     val displayContent = when {
         messageType == MessageType.TOOL_CALL -> ""
         messageType == MessageType.TOOL_RETURN -> ""
+        subagentNotification != null -> ""
         else -> content
     }
 
@@ -574,6 +673,7 @@ fun AppMessage.toUiMessage(): UiMessage {
                 },
             )
         },
+        subagentNotification = subagentNotification,
         // letta-mobile-mge5.24: surface inline image parts extracted during
         // AppMessage mapping. USER/ASSISTANT bubbles will render a
         // MessageAttachmentsGrid alongside the text content.
@@ -582,6 +682,103 @@ fun AppMessage.toUiMessage(): UiMessage {
         },
     )
 }
+
+private fun extractSubagentDispatch(
+    toolCallId: String?,
+    arguments: String,
+    returnContent: String?,
+): UiSubagentDispatch? {
+    val args = parseJsonObject(arguments) ?: return null
+    val description = args.stringField("description")
+        ?: args.stringField("prompt")?.lineSequence()?.firstOrNull()?.take(96)
+        ?: "Subagent"
+    val subagentType = args.stringField("subagent_type")
+        ?: args.stringField("subagentType")
+        ?: "agent"
+    val prompt = args.stringField("prompt").orEmpty()
+    val runInBackground = args["run_in_background"]?.jsonPrimitive?.booleanOrNull
+        ?: args["runInBackground"]?.jsonPrimitive?.booleanOrNull
+        ?: false
+    val result = returnContent?.let(::parseJsonObject)
+    return UiSubagentDispatch(
+        toolCallId = toolCallId,
+        description = description,
+        subagentType = subagentType,
+        runInBackground = runInBackground,
+        prompt = prompt,
+        taskId = result?.stringField("task_id") ?: result?.stringField("taskId"),
+        subagentAgentId = result?.stringField("subagent_agent_id")
+            ?: result?.stringField("subagentAgentId")
+            ?: result?.stringField("agent_id")
+            ?: result?.stringField("agentId"),
+    )
+}
+
+private fun extractSubagentNotification(raw: String): UiSubagentNotification? {
+    if (raw.indexOf("<task-notification", ignoreCase = true) < 0) return null
+    val blockStart = raw.indexOf("<task-notification", ignoreCase = true)
+    val blockEnd = raw.indexOf("</task-notification>", startIndex = blockStart, ignoreCase = true)
+    val block = if (blockEnd >= 0) {
+        raw.substring(blockStart, blockEnd + "</task-notification>".length)
+    } else {
+        raw.substring(blockStart)
+    }
+    val status = block.xmlTag("status")
+        ?: block.xmlTag("state")
+        ?: "completed"
+    return UiSubagentNotification(
+        toolCallId = block.xmlTag("tool_call_id") ?: block.xmlTag("toolCallId"),
+        status = status,
+        summary = block.xmlTag("summary"),
+        result = block.xmlTag("result"),
+        usage = block.xmlTag("usage"),
+        transcriptUri = block.xmlTag("transcript")
+            ?: block.lineAfter("Full transcript at")
+            ?: block.lineAfter("Full transcript:"),
+        taskId = block.xmlTag("task_id") ?: block.xmlTag("taskId"),
+        subagentAgentId = block.xmlTag("agent_id") ?: block.xmlTag("agentId"),
+    )
+}
+
+private fun parseJsonObject(raw: String): JsonObject? =
+    runCatching { Json.parseToJsonElement(raw).jsonObject }.getOrNull()
+
+private fun JsonObject.stringField(name: String): String? =
+    this[name]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+
+private fun String.xmlTag(name: String): String? {
+    val open = Regex("<$name(?:\\s[^>]*)?>([\\s\\S]*?)</$name>", RegexOption.IGNORE_CASE)
+        .find(this)
+        ?.groupValues
+        ?.getOrNull(1)
+        ?: return null
+    return open
+        .removePrefix("<![CDATA[")
+        .removeSuffix("]]>")
+        .decodeXmlEntities()
+        .trim()
+        .takeIf { it.isNotBlank() }
+}
+
+private fun String.lineAfter(marker: String): String? {
+    val index = indexOf(marker, ignoreCase = true)
+    if (index < 0) return null
+    val start = index + marker.length
+    val end = indexOf('\n', start).let { if (it < 0) length else it }
+    return substring(start, end)
+        .trim()
+        .trimStart(':')
+        .trim()
+        .decodeXmlEntities()
+        .takeIf { it.isNotBlank() }
+}
+
+private fun String.decodeXmlEntities(): String =
+    replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&amp;", "&")
 
 private fun extractGeneratedUi(raw: kotlinx.serialization.json.JsonElement?): GeneratedUiPayload? {
     val obj = raw as? JsonObject ?: return null

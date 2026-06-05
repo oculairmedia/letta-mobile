@@ -52,6 +52,8 @@ import com.letta.mobile.data.model.ToolReturnStatus
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.data.model.UiSubagentDispatch
+import com.letta.mobile.data.model.UiSubagentNotification
 import com.letta.mobile.data.tooloutput.ToolOutputParser
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.icons.LettaIconSizing
@@ -72,6 +74,8 @@ import com.letta.mobile.feature.chat.render.LocalToolCardBodyParentVisible
 import com.letta.mobile.feature.chat.render.LocalToolCardBodyRenderEligibility
 import com.letta.mobile.feature.chat.render.ToolOutputRenderer
 import com.letta.mobile.feature.chat.render.toolCardBodyRenderEligibility
+import com.letta.mobile.feature.chat.subagent.LocalSubagentTodoSheetOpener
+import com.letta.mobile.feature.chat.subagent.SubagentTodoSheetTarget
 
 private const val TOOL_CALL_ENTRANCE_ANIMATION_HISTORY_SIZE = 512
 
@@ -164,9 +168,249 @@ internal fun MessageToolCalls(
                     }
                 }
             }
+            }
+        }
+    }
+@Composable
+internal fun SubagentNotificationCard(
+    notification: UiSubagentNotification,
+    toolCallId: String? = null,
+    fallbackDescription: String = "Subagent",
+    modifier: Modifier = Modifier,
+) {
+    val opener = LocalSubagentTodoSheetOpener.current
+    val effectiveToolCallId = toolCallId ?: notification.toolCallId
+    val openTodosModifier = if (!effectiveToolCallId.isNullOrBlank()) {
+        Modifier.clickable {
+            opener(
+                SubagentTodoSheetTarget(
+                    toolCallId = effectiveToolCallId,
+                    description = notification.summary ?: fallbackDescription,
+                )
+            )
+        }
+    } else {
+        Modifier
+    }
+    val isFailure = notification.status.equals("failed", ignoreCase = true) ||
+        notification.status.equals("error", ignoreCase = true)
+    Card(
+        modifier = modifier.then(openTodosModifier),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.70f),
+        ),
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f),
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = if (isFailure) LettaIcons.Error else LettaIcons.CheckCircle,
+                    contentDescription = null,
+                    modifier = Modifier.size(LettaIconSizing.Inline),
+                    tint = if (isFailure) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary,
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Subagent ${if (isFailure) "failed" else "completed"}",
+                    style = MaterialTheme.typography.chatBubbleSender,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                SubagentMetaChip(text = notification.status)
+            }
+            notification.summary?.let { summary ->
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.listItemSupporting,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            notification.result?.let { result ->
+                Text(
+                    text = result,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 6,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                notification.usage?.let { SubagentMetaChip(text = it) }
+                notification.taskId?.let { SubagentMetaChip(text = it) }
+            }
+            notification.transcriptUri?.let { transcript ->
+                Text(
+                    text = "View transcript: $transcript",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
+
+@Composable
+private fun SubagentDispatchCard(
+    dispatch: UiSubagentDispatch,
+    status: String?,
+    executionTimeMs: Long?,
+    modifier: Modifier = Modifier,
+) {
+    val opener = LocalSubagentTodoSheetOpener.current
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+    var expanded by remember(dispatch.toolCallId, dispatch.prompt) { mutableStateOf(false) }
+    val openTodosModifier = dispatch.toolCallId?.takeIf { it.isNotBlank() }?.let { callId ->
+        Modifier.clickable {
+            HapticEffects.segmentTick(haptic, view)
+            opener(SubagentTodoSheetTarget(toolCallId = callId, description = dispatch.description))
+        }
+    } ?: Modifier
+    Card(
+        modifier = modifier.then(openTodosModifier),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.70f),
+        ),
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f),
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = LettaIcons.Agent,
+                    contentDescription = null,
+                    modifier = Modifier.size(LettaIconSizing.Inline),
+                    tint = MaterialTheme.colorScheme.tertiary,
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Dispatched: ${dispatch.description}",
+                    style = MaterialTheme.typography.chatBubbleSender,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (dispatch.runInBackground) {
+                    SubagentMetaChip(text = "background")
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+                SubagentMetaChip(text = dispatch.subagentType)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                status?.let { SubagentMetaChip(text = it) }
+                executionTimeMs?.let(::formatToolExecutionTime)?.let { SubagentMetaChip(text = it) }
+                dispatch.taskId?.let { SubagentMetaChip(text = it) }
+            }
+            if (dispatch.prompt.isNotBlank()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            HapticEffects.segmentTick(haptic, view)
+                            expanded = !expanded
+                        },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = if (expanded) "Hide prompt" else "Show prompt",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Icon(
+                        imageVector = LettaIcons.ExpandMore,
+                        contentDescription = if (expanded) "Hide prompt" else "Show prompt",
+                        modifier = Modifier
+                            .size(14.dp)
+                            .rotate(if (expanded) 180f else 0f),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                AnimatedVisibility(visible = expanded) {
+                    Text(
+                        text = dispatch.prompt,
+                        style = MaterialTheme.typography.listItemSupporting,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 12,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubagentMetaChip(text: String) {
+    Surface(
+        shape = MaterialTheme.shapes.extraSmall,
+        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.72f),
+        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+        )
+    }
+}
+
+/**
+ * Parses a `<task-notification>` payload that arrives as a TOOL_RETURN result on
+ * the Agent tool call itself (the in-card path), vs.
+ * `MessageMapper.extractSubagentNotification` which parses the same format when
+ * it arrives as a separate ASSISTANT message (the message-level path). Both
+ * paths exist because the notification can surface either way depending on the
+ * backend; `feature-chat` cannot depend on `core:data` mapper internals, so the
+ * UI keeps a local parser. The `<task-notification>` schema is the shared source
+ * of truth — if it changes, update BOTH this function and
+ * `MessageMapper.extractSubagentNotification`. (CodeRabbit #343.)
+ */
+private fun parseTaskNotificationForToolCard(raw: String): UiSubagentNotification? {
+    if (raw.indexOf("<task-notification", ignoreCase = true) < 0) return null
+    fun tag(name: String): String? {
+        return Regex("<$name(?:\\s[^>]*)?>([\\s\\S]*?)</$name>", RegexOption.IGNORE_CASE)
+            .find(raw)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+    }
+    fun lineAfter(marker: String): String? {
+        val index = raw.indexOf(marker, ignoreCase = true)
+        if (index < 0) return null
+        val start = index + marker.length
+        val end = raw.indexOf('\n', start).let { if (it < 0) raw.length else it }
+        return raw.substring(start, end).trim().trimStart(':').trim().takeIf { it.isNotBlank() }
+    }
+    return UiSubagentNotification(
+        status = tag("status") ?: "completed",
+        summary = tag("summary"),
+        result = tag("result"),
+        usage = tag("usage"),
+        transcriptUri = tag("transcript") ?: lineAfter("Full transcript at"),
+        toolCallId = tag("tool_call_id") ?: tag("toolCallId"),
+        taskId = tag("task_id") ?: tag("taskId"),
+        subagentAgentId = tag("agent_id") ?: tag("agentId"),
+    )
+}
+
 
 @Composable
 internal fun ToolCallCard(
@@ -174,6 +418,26 @@ internal fun ToolCallCard(
     approvalStateOverride: ToolApprovalState? = null,
     keepExpanded: Boolean = false,
 ) {
+    val subagentDispatch = toolCall.subagentDispatch
+    if (subagentDispatch != null) {
+        SubagentDispatchCard(
+            dispatch = subagentDispatch,
+            status = toolCall.status,
+            executionTimeMs = toolCall.executionTimeMs,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        return
+    }
+    val subagentNotification = toolCall.result?.let(::parseTaskNotificationForToolCard)
+    if (subagentNotification != null) {
+        SubagentNotificationCard(
+            notification = subagentNotification,
+            toolCallId = toolCall.toolCallId,
+            fallbackDescription = toolCall.name,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        return
+    }
     val fontScale = LocalChatFontScale.current
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current

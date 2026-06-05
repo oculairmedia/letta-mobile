@@ -38,6 +38,7 @@ data class UiMessage(
     val generatedUi: UiGeneratedComponent? = null,
     val approvalRequest: UiApprovalRequest? = null,
     val approvalResponse: UiApprovalResponse? = null,
+    val subagentNotification: UiSubagentNotification? = null,
     /**
      * Image attachments rendered as thumbnails in the bubble. Populated for
      * outgoing user messages that carried attachments through the Timeline
@@ -79,6 +80,30 @@ data class UiToolCall(
      * decision hasn't arrived yet.
      */
     val approvalDecision: UiToolApprovalDecision? = null,
+    val subagentDispatch: UiSubagentDispatch? = null,
+)
+
+@Immutable
+data class UiSubagentDispatch(
+    val toolCallId: String?,
+    val description: String,
+    val subagentType: String,
+    val runInBackground: Boolean,
+    val prompt: String,
+    val taskId: String? = null,
+    val subagentAgentId: String? = null,
+)
+
+@Immutable
+data class UiSubagentNotification(
+    val status: String,
+    val summary: String?,
+    val result: String?,
+    val usage: String?,
+    val transcriptUri: String?,
+    val taskId: String? = null,
+    val subagentAgentId: String? = null,
+    val toolCallId: String? = null,
 )
 
 /**

@@ -34,6 +34,7 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -80,9 +81,11 @@ import com.letta.mobile.feature.chat.subagent.ActiveSubagent
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentBar
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource.Companion.activeOnly
+import com.letta.mobile.feature.chat.subagent.LocalSubagentTodoSheetOpener
 import com.letta.mobile.feature.chat.subagent.SubagentTodoSheet
 import com.letta.mobile.feature.chat.subagent.SubagentTodoSheetState
 import com.letta.mobile.feature.chat.subagent.subagentTodoSheetStateFrom
+import com.letta.mobile.feature.chat.subagent.SubagentTodoSheetTarget
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatBackground
@@ -157,9 +160,10 @@ internal fun ChatScreen(
         val bottomInsetDp = with(density) { max(imeBottomPx, navBottomPx + bottomBarPx).toDp() }
         var ambientAgentStatus by remember { mutableStateOf("Idle") }
         var hadActiveAmbientRun by remember { mutableStateOf(false) }
-        // letta-mobile-73o2h.3: tap-to-todolist sheet. Holds the tapped
-        // subagent; the sheet fetches its TodoWrite via the repository.
-        var tappedSubagent by remember { mutableStateOf<ActiveSubagent?>(null) }
+        // letta-mobile-73o2h.3 / pbnxa: tap-to-todolist sheet. Chips and
+        // first-class subagent timeline cards both set the same target so
+        // active bar + dispatch/result chrome open one coherent todo surface.
+        var tappedSubagentTarget by remember { mutableStateOf<SubagentTodoSheetTarget?>(null) }
 
         LaunchedEffect(composerState.error) {
             val message = composerState.error ?: return@LaunchedEffect
@@ -293,6 +297,11 @@ internal fun ChatScreen(
                     state.error != null && state.messages.isEmpty() -> "error"
                     else -> "ready"
                 }
+                CompositionLocalProvider(
+                    LocalSubagentTodoSheetOpener provides { target ->
+                        tappedSubagentTarget = target
+                    },
+                ) {
                 Crossfade(
                     targetState = contentPhase,
                     animationSpec = tween(durationMillis = 200),
@@ -371,24 +380,30 @@ internal fun ChatScreen(
                 // streaming.
                 ActiveSubagentBar(
                     subagents = activeSubagents,
-                    onChipClick = { subagent -> tappedSubagent = subagent },
+                    onChipClick = { subagent ->
+                        tappedSubagentTarget = SubagentTodoSheetTarget(
+                            toolCallId = subagent.id,
+                            description = subagent.description,
+                        )
+                    },
                 )
+                }
 
                 // letta-mobile-73o2h.3: tap-to-todolist bottom sheet. One-shot
                 // fetch of the tapped subagent's TodoWrite via the source.
-                tappedSubagent?.let { subagent ->
-                    var todoState by remember(subagent.id) {
+                tappedSubagentTarget?.let { target ->
+                    var todoState by remember(target.toolCallId) {
                         mutableStateOf<SubagentTodoSheetState>(SubagentTodoSheetState.Loading)
                     }
-                    LaunchedEffect(resolvedSubagentSource, subagent.id) {
+                    LaunchedEffect(resolvedSubagentSource, target.toolCallId) {
                         todoState = subagentTodoSheetStateFrom(
-                            resolvedSubagentSource.todos(subagent.id),
+                            resolvedSubagentSource.todos(target.toolCallId),
                         )
                     }
                     SubagentTodoSheet(
-                        description = subagent.description,
+                        description = target.description,
                         state = todoState,
-                        onDismiss = { tappedSubagent = null },
+                        onDismiss = { tappedSubagentTarget = null },
                     )
                 }
 
