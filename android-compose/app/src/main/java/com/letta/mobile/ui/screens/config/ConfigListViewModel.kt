@@ -13,6 +13,8 @@ import com.letta.mobile.data.health.IServerHealthRepository
 import com.letta.mobile.data.health.ServerHealthState
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
+import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
 import com.letta.mobile.ui.common.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -22,6 +24,7 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.util.UUID
 import javax.inject.Inject
 
 @androidx.compose.runtime.Immutable
@@ -35,7 +38,14 @@ data class ServerConfig(
 
 @androidx.compose.runtime.Immutable
 data class ConfigListUiState(
-    val configs: ImmutableList<ServerConfig> = persistentListOf()
+    val configs: ImmutableList<ServerConfig> = persistentListOf(),
+    val embeddedRuntimeStatus: EmbeddedLettaCodeRuntimeStatus = EmbeddedLettaCodeRuntimeStatus(
+        nativeEnabled = false,
+        assetsEnabled = false,
+        version = "",
+        integrity = "",
+    ),
+    val hasEmbeddedLettaCodeConfig: Boolean = false,
 )
 
 /**
@@ -58,6 +68,7 @@ data class ConfigListUiState(
 class ConfigListViewModel @Inject constructor(
     private val settingsRepository: ISettingsRepository,
     private val healthRepository: IServerHealthRepository,
+    private val embeddedRuntimeStatusProvider: EmbeddedLettaCodeRuntimeStatusProvider,
     @param:ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -87,6 +98,7 @@ class ConfigListViewModel @Inject constructor(
         val active by settingsRepository.activeConfig.collectAsState()
         val healthStates by healthRepository.states.collectAsState()
         val error by _actionError.collectAsState()
+        val embeddedRuntimeStatus = embeddedRuntimeStatusProvider.status
 
         if (error != null) {
             return UiState.Error(error!!)
@@ -102,7 +114,13 @@ class ConfigListViewModel @Inject constructor(
                 health = healthStates[c.id] ?: ServerHealthState.UNKNOWN,
             )
         }
-        return UiState.Success(ConfigListUiState(configs = rows.toImmutableList()))
+        return UiState.Success(
+            ConfigListUiState(
+                configs = rows.toImmutableList(),
+                embeddedRuntimeStatus = embeddedRuntimeStatus,
+                hasEmbeddedLettaCodeConfig = configs.any { it.isEmbeddedLettaCodeConfig() },
+            )
+        )
     }
 
     /**
@@ -150,10 +168,42 @@ class ConfigListViewModel @Inject constructor(
             }
         }
     }
+
+    fun connectEmbeddedLettaCodeRuntime() {
+        viewModelScope.launch {
+            try {
+                val existing = settingsRepository.configs.value.firstOrNull { it.isEmbeddedLettaCodeConfig() }
+                if (existing != null) {
+                    settingsRepository.setActiveConfigId(existing.id)
+                } else {
+                    val configId = UUID.randomUUID().toString()
+                    settingsRepository.saveConfig(
+                        LettaConfig(
+                            id = configId,
+                            mode = LettaConfig.Mode.LOCAL,
+                            serverUrl = ConfigViewModel.LOCAL_RUNTIME_URL,
+                            accessToken = null,
+                        )
+                    )
+                    settingsRepository.setActiveConfigId(configId)
+                }
+                _actionError.value = null
+            } catch (e: Exception) {
+                _actionError.value = e.message ?: "Failed to connect embedded runtime"
+            }
+        }
+    }
 }
 
 private fun LettaConfig.Mode.toServerMode(): ServerMode = when (this) {
     LettaConfig.Mode.CLOUD -> ServerMode.CLOUD
     LettaConfig.Mode.SELF_HOSTED -> ServerMode.SELF_HOSTED
     LettaConfig.Mode.LOCAL -> ServerMode.LOCAL
+}
+
+private fun LettaConfig.isEmbeddedLettaCodeConfig(): Boolean {
+    if (mode != LettaConfig.Mode.LOCAL) return false
+    val trimmed = serverUrl.trim()
+    val scheme = trimmed.substringBefore("://", missingDelimiterValue = trimmed).lowercase()
+    return scheme in setOf("local", "local-lettacode", "local-letta-code")
 }

@@ -690,6 +690,15 @@
     <string name="common_error">Error</string>
     <string name="screen_config_list_empty">No saved configurations</string>
     <string name="screen_config_list_add_server">Add server</string>
+    <string name="screen_config_embedded_runtime_title">Embedded LettaCode runtime</string>
+    <string name="screen_config_embedded_runtime_ready">Packaged in this build</string>
+    <string name="screen_config_embedded_runtime_unavailable">Not packaged in this build</string>
+    <string name="screen_config_embedded_runtime_connect">Connect embedded runtime</string>
+    <string name="screen_config_embedded_runtime_version">LettaCode %1$s</string>
+    <string name="screen_config_embedded_runtime_native_enabled">Native bridge packaged</string>
+    <string name="screen_config_embedded_runtime_native_disabled">Native bridge missing</string>
+    <string name="screen_config_embedded_runtime_assets_enabled">Assets packaged</string>
+    <string name="screen_config_embedded_runtime_assets_disabled">Assets missing</string>
     <string name="action_loading">Loading…</string>
     <string name="screen_drawer_backend_unknown">No backend configured</string>
     <string name="common_active">ACTIVE</string>

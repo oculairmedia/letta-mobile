@@ -10,6 +10,8 @@ import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
+import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.navigation.ConfigRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -36,6 +38,12 @@ data class ConfigUiState(
     val themePreset: ThemePreset = ThemePreset.DEFAULT,
     val dynamicColor: Boolean = false,
     val enableProjects: Boolean = false,
+    val embeddedRuntimeStatus: EmbeddedLettaCodeRuntimeStatus = EmbeddedLettaCodeRuntimeStatus(
+        nativeEnabled = false,
+        assetsEnabled = false,
+        version = "",
+        integrity = "",
+    ),
     val isSaving: Boolean = false,
 )
 
@@ -44,6 +52,7 @@ class ConfigViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val settingsRepository: ISettingsRepository,
     private val cloudConnectionValidator: CloudConnectionValidator,
+    private val embeddedRuntimeStatusProvider: EmbeddedLettaCodeRuntimeStatusProvider,
 ) : ViewModel() {
 
     companion object {
@@ -84,6 +93,7 @@ class ConfigViewModel @Inject constructor(
                         themePreset = themePreset,
                         dynamicColor = dynamicColor,
                         enableProjects = enableProjects,
+                        embeddedRuntimeStatus = embeddedRuntimeStatusProvider.status,
                     )
                 } else {
                     // createNew = true: empty form, fresh UUID at save time.
@@ -96,6 +106,7 @@ class ConfigViewModel @Inject constructor(
                         themePreset = themePreset,
                         dynamicColor = dynamicColor,
                         enableProjects = enableProjects,
+                        embeddedRuntimeStatus = embeddedRuntimeStatusProvider.status,
                     )
                 }
                 _uiState.value = UiState.Success(configUiState)

@@ -46,7 +46,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                     try {
                         nodeBridge.outputLines.collect { line ->
                             send(line)
-                            if (line.isTerminalResult()) {
+                            if (line.isTerminalFrame()) {
                                 throw TerminalResultSeen()
                             }
                         }
@@ -84,7 +84,9 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 )
             }
 
-            LocalLettaCodeService.start(context)
+            check(LocalLettaCodeService.start(context)) {
+                "Embedded LettaCode foreground service could not start."
+            }
             val project = assetExtractor.prepare()
             nodeBridge.start(project.startRequest(requestedSession)).getOrThrow()
             activeSession = requestedSession
@@ -141,7 +143,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                     "response",
                     buildJsonObject {
                         put("subtype", "success")
-                        put("request_id", "perm-${input.decision.callId.value}")
+                        put("request_id", input.decision.approvalId.value)
                         put(
                             "response",
                             buildJsonObject {
@@ -155,9 +157,18 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         }
     }
 
-    private fun String.isTerminalResult(): Boolean {
+    private fun String.isTerminalFrame(): Boolean {
         val root = runCatching { json.parseToJsonElement(this).jsonObject }.getOrNull() ?: return false
-        return root["type"]?.toString()?.trim('"') == "result"
+        return when (root["type"]?.toString()?.trim('"')) {
+            "result",
+            "error",
+            -> true
+            "stream_event" -> {
+                val event = root["event"] as? JsonObject
+                event?.get("type")?.toString()?.trim('"') in setOf("result", "error")
+            }
+            else -> false
+        }
     }
 
     private data class SessionKey(

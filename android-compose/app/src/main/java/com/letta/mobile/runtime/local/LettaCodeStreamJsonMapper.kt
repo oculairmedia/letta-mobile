@@ -80,6 +80,9 @@ class LettaCodeStreamJsonMapper @Inject constructor() {
         if (request.string("subtype") != "can_use_tool") return null
         val toolCallId = request.string("tool_call_id")?.takeIf { it.isNotBlank() } ?: return null
         val toolName = request.string("tool_name")?.takeIf { it.isNotBlank() } ?: return null
+        val requestId = string("request_id")
+            ?: request.string("request_id")
+            ?: "perm-$toolCallId"
         val inputPreview = request["input"]?.toString()
         return RuntimeEventDraft(
             backendId = command.backendId,
@@ -90,7 +93,7 @@ class LettaCodeStreamJsonMapper @Inject constructor() {
             source = RuntimeEventSource.LocalRuntime,
             payload = RuntimeEventPayload.ApprovalRequested(
                 ToolApprovalRequest(
-                    approvalId = ToolApprovalId("letta-code:$toolCallId"),
+                    approvalId = ToolApprovalId(requestId),
                     callId = ToolCallId(toolCallId),
                     toolName = ToolName(toolName),
                     prompt = "Allow LettaCode to run $toolName?",

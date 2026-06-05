@@ -41,6 +41,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.health.ServerHealthState
+import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.icons.LettaIconSizing
@@ -141,6 +142,16 @@ fun BackendSwitcherSheet(
                             )
                         }
                     }
+                    if (!state.data.hasEmbeddedLettaCodeConfig) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        EmbeddedRuntimeConnectAction(
+                            status = state.data.embeddedRuntimeStatus,
+                            onConnect = {
+                                viewModel.connectEmbeddedLettaCodeRuntime()
+                                dismissAndThen {}
+                            },
+                        )
+                    }
                 }
             }
 
@@ -176,6 +187,38 @@ fun BackendSwitcherSheet(
         onDismiss = { pendingDeleteId = null },
         destructive = true,
     )
+}
+
+@Composable
+private fun EmbeddedRuntimeConnectAction(
+    status: EmbeddedLettaCodeRuntimeStatus,
+    onConnect: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        FilledTonalButton(
+            onClick = onConnect,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Icon(
+                imageVector = LettaIcons.Psychology,
+                contentDescription = null,
+                modifier = Modifier.size(LettaIconSizing.Inline),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(stringResource(R.string.screen_config_embedded_runtime_connect))
+        }
+        Text(
+            text = stringResource(
+                if (status.runnable) {
+                    R.string.screen_config_embedded_runtime_ready
+                } else {
+                    R.string.screen_config_embedded_runtime_unavailable
+                }
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)

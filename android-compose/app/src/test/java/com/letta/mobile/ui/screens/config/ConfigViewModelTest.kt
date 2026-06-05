@@ -7,6 +7,8 @@ import com.letta.mobile.data.api.CloudConnectionValidator
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
+import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
+import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.ui.common.UiState
 import kotlinx.coroutines.Dispatchers
@@ -41,7 +43,12 @@ class ConfigViewModelTest {
         // from SavedStateHandle. Empty handle is fine for the existing edit-
         // active-config test cases (createNew defaults to false when the
         // route arg is absent).
-        viewModel = ConfigViewModel(SavedStateHandle(), fakeRepository, fakeValidator)
+        viewModel = ConfigViewModel(
+            SavedStateHandle(),
+            fakeRepository,
+            fakeValidator,
+            FakeEmbeddedLettaCodeRuntimeStatusProvider(),
+        )
     }
 
     @After
@@ -511,5 +518,14 @@ class ConfigViewModelTest {
             calls++
             return result
         }
+    }
+
+    private class FakeEmbeddedLettaCodeRuntimeStatusProvider : EmbeddedLettaCodeRuntimeStatusProvider {
+        override val status: EmbeddedLettaCodeRuntimeStatus = EmbeddedLettaCodeRuntimeStatus(
+            nativeEnabled = true,
+            assetsEnabled = true,
+            version = "test",
+            integrity = "sha512-test",
+        )
     }
 }

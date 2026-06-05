@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -30,6 +31,7 @@ import com.letta.mobile.R
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.platform.BatteryOptimizationHelper
+import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.CardGroup
@@ -246,6 +248,13 @@ private fun ConfigContent(
                     )
                 },
             )
+            if (state.mode == ServerMode.LOCAL) {
+                item(
+                    headlineContent = {
+                        EmbeddedRuntimeStatusItem(status = state.embeddedRuntimeStatus)
+                    },
+                )
+            }
             if (state.mode != ServerMode.LOCAL) {
                 item(
                     headlineContent = {
@@ -433,6 +442,87 @@ private fun ConfigContent(
                     if (state.isSaving) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp))
                     }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmbeddedRuntimeStatusItem(
+    status: EmbeddedLettaCodeRuntimeStatus,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = LettaIcons.Psychology,
+                contentDescription = null,
+                modifier = Modifier.padding(end = 8.dp),
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = stringResource(R.string.screen_config_embedded_runtime_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = stringResource(
+                        if (status.runnable) {
+                            R.string.screen_config_embedded_runtime_ready
+                        } else {
+                            R.string.screen_config_embedded_runtime_unavailable
+                        }
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        @OptIn(ExperimentalLayoutApi::class)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            AssistChip(
+                onClick = {},
+                label = {
+                    Text(
+                        stringResource(
+                            R.string.screen_config_embedded_runtime_version,
+                            status.version.ifBlank { "unknown" },
+                        )
+                    )
+                },
+            )
+            AssistChip(
+                onClick = {},
+                label = {
+                    Text(
+                        stringResource(
+                            if (status.nativeEnabled) {
+                                R.string.screen_config_embedded_runtime_native_enabled
+                            } else {
+                                R.string.screen_config_embedded_runtime_native_disabled
+                            }
+                        )
+                    )
+                },
+            )
+            AssistChip(
+                onClick = {},
+                label = {
+                    Text(
+                        stringResource(
+                            if (status.assetsEnabled) {
+                                R.string.screen_config_embedded_runtime_assets_enabled
+                            } else {
+                                R.string.screen_config_embedded_runtime_assets_disabled
+                            }
+                        )
+                    )
                 },
             )
         }

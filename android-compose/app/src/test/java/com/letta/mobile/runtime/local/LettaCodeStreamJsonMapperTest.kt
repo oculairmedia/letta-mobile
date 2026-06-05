@@ -74,10 +74,22 @@ class LettaCodeStreamJsonMapperTest {
         )
 
         val payload = drafts.single().payload as RuntimeEventPayload.ApprovalRequested
-        assertEquals("letta-code:call-1", payload.request.approvalId.value)
+        assertEquals("perm-call-1", payload.request.approvalId.value)
         assertEquals("call-1", payload.request.callId.value)
         assertEquals("Write", payload.request.toolName.value)
         assertTrue(payload.request.argumentsPreview?.contains("README.md") == true)
+    }
+
+    @Test
+    fun `maps tool approval request id independently from tool call id`() {
+        val drafts = mapper.mapLine(
+            """{"type":"control_request","request_id":"approval-random-123","request":{"subtype":"can_use_tool","tool_name":"Write","tool_call_id":"call-1","input":{"file_path":"README.md"}}}""",
+            command(),
+        )
+
+        val payload = drafts.single().payload as RuntimeEventPayload.ApprovalRequested
+        assertEquals("approval-random-123", payload.request.approvalId.value)
+        assertEquals("call-1", payload.request.callId.value)
     }
 
     @Test
