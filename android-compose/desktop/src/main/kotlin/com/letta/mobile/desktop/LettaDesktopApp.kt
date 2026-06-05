@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,7 +20,6 @@ import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SmartToy
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
@@ -273,17 +273,20 @@ private fun BackendCard(config: LettaConfig) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                AssistChip(
-                    onClick = {},
-                    label = { Text(config.mode.label) },
+                StatusPill(
+                    text = config.mode.label,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    borderColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.24f),
                 )
-                AssistChip(
-                    onClick = {},
-                    label = { Text("Shared model layer") },
+                StatusPill(
+                    text = "Shared model layer",
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    borderColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.24f),
                 )
-                AssistChip(
-                    onClick = {},
-                    label = { Text("Windows JVM") },
+                StatusPill(
+                    text = "Windows JVM",
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    borderColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.24f),
                 )
             }
         }
@@ -348,9 +351,11 @@ private fun ReadinessRow(feature: DesktopFeatureReadiness) {
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                 )
-                AssistChip(
-                    onClick = {},
-                    label = { Text(feature.state.label) },
+                StatusPill(
+                    text = feature.state.label,
+                    containerColor = feature.state.color().copy(alpha = 0.12f),
+                    contentColor = feature.state.color(),
+                    borderColor = Color.Transparent,
                 )
             }
             Text(
@@ -392,9 +397,11 @@ private fun PortabilityCard(
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            AssistChip(
-                onClick = {},
-                label = { Text(state.label) },
+            StatusPill(
+                text = state.label,
+                containerColor = state.color().copy(alpha = 0.12f),
+                contentColor = state.color(),
+                borderColor = Color.Transparent,
             )
             Text(
                 text = title,
@@ -407,5 +414,28 @@ private fun PortabilityCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+@Composable
+private fun StatusPill(
+    text: String,
+    modifier: Modifier = Modifier,
+    containerColor: Color = Color.Transparent,
+    contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    borderColor: Color = MaterialTheme.colorScheme.outlineVariant,
+) {
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.small,
+        color = containerColor,
+        contentColor = contentColor,
+        border = BorderStroke(1.dp, borderColor),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
     }
 }

@@ -1,6 +1,12 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+// This repo does not yet use a Gradle version catalog. Keep desktop-only
+// versions named here until dependency versions are centralized project-wide.
+val composeDesktopMaterial3Version = "1.9.0"
+val composeDesktopMaterialIconsVersion = "1.7.3"
+val coroutinesVersion = "1.11.0"
+
 plugins {
     id("org.jetbrains.kotlin.jvm")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -48,9 +54,9 @@ dependencies {
     implementation(project(":sharedLogic"))
 
     implementation(compose.desktop.currentOs)
-    implementation("org.jetbrains.compose.material3:material3:1.9.0")
-    implementation("org.jetbrains.compose.material:material-icons-extended:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0")
+    implementation("org.jetbrains.compose.material3:material3:$composeDesktopMaterial3Version")
+    implementation("org.jetbrains.compose.material:material-icons-extended:$composeDesktopMaterialIconsVersion")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:$coroutinesVersion")
 
     testImplementation(kotlin("test"))
 }
