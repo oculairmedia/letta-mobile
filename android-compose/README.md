@@ -71,6 +71,28 @@ Run Gradle commands from this directory.
 ./gradlew detekt
 ```
 
+## Windows desktop preview
+
+The first Windows desktop variant lives in `:desktop` and uses Compose
+Multiplatform for Desktop on the JVM. It starts as a desktop shell that depends
+on `:sharedLogic`, so the app boots on Windows while Android-only navigation,
+Hilt wiring, DataStore, notifications, and foreground-service behavior are
+extracted behind portable boundaries.
+
+Run it locally from Windows:
+
+```powershell
+$env:JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-26"
+$env:ANDROID_HOME="$env:USERPROFILE\AppData\Local\Android\Sdk"
+.\gradlew.bat :desktop:run
+```
+
+Build Windows packages:
+
+```powershell
+.\gradlew.bat :desktop:packageMsi :desktop:packageExe
+```
+
 ## Distribution flavors
 
 The app is split by a `distribution` product-flavor dimension so Android
