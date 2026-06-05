@@ -395,12 +395,24 @@ internal fun ChatMessageList(
 
     val autoScrollSignature by rememberUpdatedState(newestMessageAutoScrollSignature(state.messages))
     val isStreamingForAutoScroll by rememberUpdatedState(state.isStreaming)
+    // letta-mobile-gsvgt (F1): keep this per-tick summary O(1). The previous
+    // implementation keyed the remember on state.messages AND renderItems —
+    // both of which get a fresh identity on every streamed token — and its
+    // body called renderItems.pinchVisibleContentSummary(), an O(total
+    // conversation) walk over every render item and every message inside
+    // every RunBlock. That ran PER TOKEN during streaming purely to keep a
+    // telemetry value warm, which is exactly the rmzmo O(history)-per-token
+    // class. The only consumer is the pinch-begin handler below, so the
+    // expensive toolCardCount is now computed lazily there (over the already
+    // O(visible) render-item set) instead of eagerly every tick. Keeping
+    // toolCardCount = 0 here makes the steady-state summary allocation-light
+    // and history-independent.
     val loadPressureSummary = remember(
-        state.messages,
+        state.messages.size,
         state.isStreaming,
         state.isLoadingMessages,
         state.isLoadingOlderMessages,
-        renderItems,
+        renderItems.size,
     ) {
         ChatLoadPressureSummary(
             messageCount = state.messages.size,
@@ -408,7 +420,7 @@ internal fun ChatMessageList(
             isStreaming = state.isStreaming,
             isLoadingMessages = state.isLoadingMessages,
             isLoadingOlderMessages = state.isLoadingOlderMessages,
-            toolCardCount = renderItems.pinchVisibleContentSummary().toolCards,
+            toolCardCount = 0,
         )
     }
     val currentLoadPressureSummary by rememberUpdatedState(loadPressureSummary)
@@ -544,6 +556,16 @@ internal fun ChatMessageList(
                                     renderItemsByKey[itemInfo.key]
                                 }
                                 val visibleContent = visibleRenderItems.pinchVisibleContentSummary()
+                                // letta-mobile-gsvgt (F1): compute the
+                                // full-list tool-card count ONCE here, at
+                                // pinch-begin, rather than eagerly every
+                                // streamed token. This is a rare, one-shot
+                                // gesture event so the O(total render items)
+                                // walk is acceptable; the steady-state
+                                // per-tick path stays O(1).
+                                val loadPressureForSample = currentLoadPressureSummary.copy(
+                                    toolCardCount = renderItems.pinchVisibleContentSummary().toolCards,
+                                )
                                 pinchFrameBudgetSampler.start(
                                     visibleItems = listState.layoutInfo.visibleItemsInfo.size,
                                     totalItems = listState.layoutInfo.totalItemsCount,
@@ -551,7 +573,7 @@ internal fun ChatMessageList(
                                     visibleAssistantMessages = visibleContent.assistantMessages,
                                     visibleToolCards = visibleContent.toolCards,
                                     visibleRunBlocks = visibleContent.runBlocks,
-                                    loadPressure = currentLoadPressureSummary,
+                                    loadPressure = loadPressureForSample,
                                     committedScale = activeFontScale,
                                 )
                                 pinchTick = System.nanoTime()
