@@ -43,6 +43,25 @@ data class ActiveSubagent(
      * registry.
      */
     val isSelf: Boolean = false,
+    /**
+     * letta-mobile-vo9y1: the subagent's own agent id (`agent-local-*`) as
+     * correlated by the shim registry's parent-dispatch -> subagent-run seam
+     * ([SubagentEntry.subagentAgentId]). Present once the background dispatch
+     * has returned identity; absent for synchronous dispatches that have not
+     * yet reported it. When known it enables the "view conversation"
+     * affordance ([canViewConversation]) which jumps to that agent's
+     * transcript (conversation `default`).
+     */
+    val subagentAgentId: String? = null,
+    /**
+     * letta-mobile-29h9u: wall-clock epoch-ms at which this entry FIRST
+     * became terminal (completed/failed), stamped by the source as the chip
+     * transitions out of [Status.RUNNING]. Null while still running. Drives
+     * the lingering window in [withLingeringTerminals]: a terminal chip stays
+     * reviewable until `terminalAt + TERMINAL_LINGER_MS` before it is
+     * dismissed. Not part of identity — it never changes the chip's slot.
+     */
+    val terminalAt: Long? = null,
 ) {
     enum class Status {
         /** Dispatched and still working — the only state shown in the bar. */
@@ -55,10 +74,37 @@ data class ActiveSubagent(
          * Terminal: failed, including the 600s stream-timeout failure mode
          * surfaced by the .1 registry. Filtered out of the active bar.
          */
-        FAILED,
+        FAILED;
+
+        /**
+         * letta-mobile-29h9u: whether this status is terminal — a finished
+         * outcome (success or failure), as opposed to still-[RUNNING]. Used
+         * by the lingering transform to decide which chips earn a review
+         * dwell, and by the bar to pick the success/failed visual style.
+         */
+        val isTerminal: Boolean get() = this == COMPLETED || this == FAILED
     }
 
     val isActive: Boolean get() = status == Status.RUNNING
+
+    /**
+     * letta-mobile-29h9u: true once this entry has reached a terminal
+     * lifecycle state (completed or failed). The active-only rule
+     * ([ActiveSubagentSource.activeOnly]) filters these out instantly; the
+     * lingering rule ([withLingeringTerminals]) keeps them briefly visible in
+     * a success/failed style so the user can review the outcome.
+     */
+    val isTerminal: Boolean get() = status.isTerminal
+
+    /**
+     * letta-mobile-vo9y1: whether the "view conversation" affordance should
+     * be offered for this chip. True only when the shim has correlated a
+     * concrete subagent agent id; without it there is no transcript to open.
+     * The synthetic self entry is excluded — its conversation is already the
+     * one on screen.
+     */
+    val canViewConversation: Boolean
+        get() = !isSelf && !subagentAgentId.isNullOrBlank()
 
     companion object {
         /**
@@ -67,5 +113,14 @@ data class ActiveSubagent(
          * this sentinel, so there is no collision risk.
          */
         const val SELF_ID = "__self__"
+
+        /**
+         * letta-mobile-29h9u: how long a terminal (completed/failed) chip
+         * LINGERS in its success/failed style before being dismissed, so the
+         * user can review the outcome instead of the chip vanishing instantly
+         * under the active-only rule. Chosen at 8s — inside the bead's
+         * requested 6-10s window.
+         */
+        const val TERMINAL_LINGER_MS: Long = 8_000L
     }
 }

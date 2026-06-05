@@ -39,6 +39,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -80,7 +81,7 @@ import com.letta.mobile.feature.chat.render.buildToolCallTemplate
 import com.letta.mobile.feature.chat.subagent.ActiveSubagent
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentBar
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
-import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource.Companion.activeOnly
+import com.letta.mobile.feature.chat.subagent.withLingeringTerminals
 import com.letta.mobile.feature.chat.subagent.LocalSubagentTodoSheetOpener
 import com.letta.mobile.feature.chat.subagent.SubagentTodoSheet
 import com.letta.mobile.feature.chat.subagent.SubagentTodoSheetState
@@ -113,6 +114,11 @@ internal fun ChatScreen(
     chatBackground: ChatBackground = ChatBackground.Default,
     chatMode: String = "interactive",
     onBugCommand: (() -> Unit)? = null,
+    // letta-mobile-vo9y1: jump from a subagent chip / its todo sheet to that
+    // subagent's own conversation. Receives the subagent agent id
+    // (`agent-local-*`); the host (AgentScaffold) maps it to a conversation
+    // switch. Null when navigation is not available (e.g. previews).
+    onViewSubagentConversation: ((String) -> Unit)? = null,
     // letta-mobile-73o2h.2/.3: the WS SEAM for the active-subagent status
     // bar. In production this is left null so the screen binds the real
     // WS-backed source from the view model (the per-socket subagent registry
@@ -146,13 +152,30 @@ internal fun ChatScreen(
         val haptic = LocalHapticFeedback.current
         val view = LocalView.current
         val reducedMotion = rememberReducedMotionEnabled()
-        // letta-mobile-73o2h.2: collect the active-only subagent snapshot for
-        // the bottom status bar. `activeOnly()` re-asserts the visibility rule
-        // defensively; the StateFlow emits full snapshots so the bar reduces
-        // by replacement (no per-frame rebuilds — preserves rmzmo perf work).
-        val activeSubagents by resolvedSubagentSource.activeSubagents
-            .activeOnly()
+        // letta-mobile-73o2h.2 / 29h9u: collect the subagent snapshot for the
+        // bottom status bar. The source already emits running chips plus
+        // briefly-lingering terminal chips (the WS source stamps terminals
+        // with `terminalAt`). Here we apply `withLingeringTerminals(now)` so a
+        // completed/failed chip stays visible for its dwell, then auto-drops.
+        // A coarse 1s tick re-evaluates the window so an expired terminal
+        // dismisses on its own without any new WS frame. Snapshots still
+        // reduce by replacement (no per-frame rebuild — preserves rmzmo).
+        val subagentSnapshot by resolvedSubagentSource.activeSubagents
             .collectAsStateWithLifecycle(initialValue = persistentListOf<ActiveSubagent>())
+        var lingerTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
+        LaunchedEffect(subagentSnapshot) {
+            // Only tick while a terminal chip is lingering — when nothing is
+            // terminal there is no window to expire, so we idle (no wakeups on
+            // the hot streaming path).
+            while (subagentSnapshot.any { it.isTerminal }) {
+                lingerTick = System.currentTimeMillis()
+                kotlinx.coroutines.delay(1_000)
+            }
+            lingerTick = System.currentTimeMillis()
+        }
+        val activeSubagents = remember(subagentSnapshot, lingerTick) {
+            subagentSnapshot.withLingeringTerminals(lingerTick)
+        }
         val windowSizeClass = LocalWindowSizeClass.current
         val imeBottomPx = WindowInsets.ime.getBottom(density)
         val navBottomPx = WindowInsets.navigationBars.getBottom(density)
@@ -384,7 +407,15 @@ internal fun ChatScreen(
                         tappedSubagentTarget = SubagentTodoSheetTarget(
                             toolCallId = subagent.id,
                             description = subagent.description,
+                            subagentAgentId = subagent.subagentAgentId,
                         )
+                    },
+                    // letta-mobile-vo9y1: jump straight to the subagent's
+                    // conversation from the chip's view-conversation action.
+                    onViewConversation = { subagent ->
+                        subagent.subagentAgentId
+                            ?.takeIf { it.isNotBlank() }
+                            ?.let { agentId -> onViewSubagentConversation?.invoke(agentId) }
                     },
                 )
                 }
@@ -404,6 +435,17 @@ internal fun ChatScreen(
                         description = target.description,
                         state = todoState,
                         onDismiss = { tappedSubagentTarget = null },
+                        // letta-mobile-vo9y1: offer "view chat" in the sheet
+                        // when the subagent run is correlated and the host can
+                        // navigate. Tapping dismisses the sheet then jumps.
+                        onViewConversation = target.subagentAgentId
+                            ?.takeIf { it.isNotBlank() && onViewSubagentConversation != null }
+                            ?.let { agentId ->
+                                {
+                                    tappedSubagentTarget = null
+                                    onViewSubagentConversation?.invoke(agentId)
+                                }
+                            },
                     )
                 }
 

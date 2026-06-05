@@ -2,6 +2,9 @@ package com.letta.mobile.feature.chat.subagent
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,7 +47,17 @@ import com.letta.mobile.ui.theme.LettaSpacing
 data class SubagentTodoSheetTarget(
     val toolCallId: String,
     val description: String,
-)
+    /**
+     * letta-mobile-vo9y1: the correlated subagent agent id (`agent-local-*`)
+     * for the "view conversation" affordance in the sheet. Null when the shim
+     * has not yet correlated the dispatch to a concrete run — the affordance
+     * is then hidden ([canViewConversation] is false).
+     */
+    val subagentAgentId: String? = null,
+) {
+    /** Whether the sheet should offer the "view conversation" affordance. */
+    val canViewConversation: Boolean get() = !subagentAgentId.isNullOrBlank()
+}
 
 val LocalSubagentTodoSheetOpener = staticCompositionLocalOf<(SubagentTodoSheetTarget) -> Unit> {
     {}
@@ -165,6 +178,10 @@ fun SubagentTodoSheet(
     state: SubagentTodoSheetState,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    // letta-mobile-vo9y1: when non-null, the sheet shows a "view conversation"
+    // action in the header that jumps to the subagent's transcript. Null hides
+    // the affordance (no correlated agent id).
+    onViewConversation: (() -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState()
     val reducedMotion = rememberReducedMotionEnabled()
@@ -184,13 +201,26 @@ fun SubagentTodoSheet(
                 ),
             verticalArrangement = Arrangement.spacedBy(LettaSpacing.md),
         ) {
-            Text(
-                text = description.ifBlank { "Subagent" },
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(LettaSpacing.sm),
+            ) {
+                Text(
+                    text = description.ifBlank { "Subagent" },
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                if (onViewConversation != null) {
+                    ViewConversationButton(
+                        description = description,
+                        onClick = onViewConversation,
+                    )
+                }
+            }
 
             Crossfade(
                 targetState = state,
@@ -211,6 +241,41 @@ fun SubagentTodoSheet(
                 }
             }
         }
+    }
+}
+
+/**
+ * letta-mobile-vo9y1: header action that jumps from the todo sheet to the
+ * subagent's full conversation/transcript. Uses the external-link glyph +
+ * label so the affordance reads clearly as "leave this sheet, open that
+ * agent's chat".
+ */
+@Composable
+private fun ViewConversationButton(
+    description: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(LettaSpacing.bubbleRadius))
+            .clickable(onClick = onClick)
+            .padding(horizontal = LettaSpacing.sm, vertical = LettaSpacing.xs)
+            .semantics { contentDescription = "View conversation: $description" },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LettaSpacing.xs),
+    ) {
+        Icon(
+            imageVector = LettaIcons.ExternalLink,
+            contentDescription = null,
+            modifier = Modifier.size(LettaIconSizing.Inline),
+            tint = MaterialTheme.colorScheme.primary,
+        )
+        Text(
+            text = "View chat",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            maxLines = 1,
+        )
     }
 }
 

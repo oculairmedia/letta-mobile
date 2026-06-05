@@ -53,6 +53,41 @@ interface ActiveSubagentSource {
 }
 
 /**
+ * letta-mobile-29h9u: the LINGERING-terminal visibility rule.
+ *
+ * Pure, testable transform over a snapshot of subagents (which may carry both
+ * running and recently-terminal entries, each terminal one stamped with
+ * [ActiveSubagent.terminalAt]). It relaxes the strict active-only rule so a
+ * just-completed/failed chip stays reviewable for a short dwell instead of
+ * vanishing instantly:
+ *
+ *  - Still-running chips ([ActiveSubagent.isActive]) always pass — the
+ *    unchanged active-only behaviour.
+ *  - Terminal chips pass only while inside their linger window, i.e. until
+ *    `terminalAt + `[ActiveSubagent.TERMINAL_LINGER_MS]` <= now`. After that
+ *    they are dropped (dismissed).
+ *  - A terminal chip with no [ActiveSubagent.terminalAt] stamp is treated as
+ *    expired and dropped — a defensive fallback so an unstamped terminal can
+ *    never linger forever.
+ *
+ * Snapshot-by-replacement and stable ordering are preserved: the input order
+ * is kept and only filtering happens, so the bar still reduces by simple
+ * replacement (no per-frame rebuild — rmzmo perf constraints hold). [now] is
+ * injected (wall-clock epoch-ms) so the rule is deterministic under test.
+ */
+fun ImmutableList<ActiveSubagent>.withLingeringTerminals(now: Long): ImmutableList<ActiveSubagent> =
+    filter { entry ->
+        when {
+            entry.isActive -> true
+            entry.isTerminal -> {
+                val stampedAt = entry.terminalAt ?: return@filter false
+                now - stampedAt < ActiveSubagent.TERMINAL_LINGER_MS
+            }
+            else -> true
+        }
+    }.toImmutableList()
+
+/**
  * In-memory, fully-controllable [ActiveSubagentSource] for previews and
  * tests. Lets the bar be exercised end-to-end NOW — empty -> hidden,
  * single chip, multiple -> condensed — without the shim.
