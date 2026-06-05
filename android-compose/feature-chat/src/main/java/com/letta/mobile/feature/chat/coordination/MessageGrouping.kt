@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.coordination
 
+import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
 
@@ -18,7 +19,16 @@ import com.letta.mobile.ui.common.GroupPosition
  * preserves that order in the output, so callers don't need to re-reverse.
  *
  * letta-mobile-m772.2
+ *
+ * letta-mobile-fqxo2 (F2): marked @Immutable so the Compose compiler can
+ * skip the per-item composables (MeasuredChatRenderItem / RunBlock /
+ * RenderChatMessage) when a render item is unchanged across a recompose.
+ * Render items are built once per render-model build and never mutated;
+ * their fields are value types (UiMessage is @Immutable, GroupPosition is
+ * an enum), so the @Immutable promise holds even though RunBlock.messages
+ * is a raw List (migrating that to ImmutableList is tracked separately).
  */
+@Immutable
 internal sealed interface ChatRenderItem {
     /** Stable LazyColumn `key` — must be unique across the whole list. */
     val key: String
@@ -59,6 +69,7 @@ internal sealed interface ChatRenderItem {
      * snapshot, where adopting `run-$runId` would cause duplicate keys and
      * crash the LazyColumn. In case (b) we keep `msg-${id}` for safety.
      */
+    @Immutable
     data class Single(
         val message: UiMessage,
         val groupPosition: GroupPosition,
@@ -92,6 +103,7 @@ internal sealed interface ChatRenderItem {
      * within the run) so the gutter renders top→bottom correctly even when
      * the outer list is reversed.
      */
+    @Immutable
     data class RunBlock(
         val runId: String,
         val messages: List<Pair<UiMessage, GroupPosition>>,
