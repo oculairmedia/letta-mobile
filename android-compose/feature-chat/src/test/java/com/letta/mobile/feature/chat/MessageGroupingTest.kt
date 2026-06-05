@@ -9,7 +9,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import com.letta.mobile.feature.chat.coordination.ChatRenderItem
+import com.letta.mobile.feature.chat.coordination.deduplicateRenderKeys
 import com.letta.mobile.feature.chat.coordination.groupMessagesForRender
+import com.letta.mobile.feature.chat.coordination.runKey
 import com.letta.mobile.feature.chat.screen.RunTimelineStep
 import com.letta.mobile.feature.chat.screen.compactRunToolCallSteps
 
@@ -589,6 +591,72 @@ class MessageGroupingTest {
         assertEquals(listOf("tc1", "tc2", "tc3"), group.messages.map { it.id })
         assertEquals(listOf("call-tc1", "call-tc2", "call-tc3"), group.toolCalls.map { it.toolCallId })
         assertEquals("a1", (steps[2] as RunTimelineStep.Message).message.id)
+    }
+
+    // letta-mobile-y70m0 (defensive hardening): even if two distinct render
+    // items resolve to the SAME run id (a future regression, or the
+    // self-todo constant-id frame slipping through), the LazyColumn keys
+    // must still be globally unique so we degrade gracefully instead of
+    // hard-crashing with `Key "run-<id>" was already used`.
+
+    @Test
+    fun `deduplicateRenderKeys keeps unique keys untouched`() {
+        val a = ChatRenderItem.Single(assistant("a1", runId = "r1"), GroupPosition.None)
+        val b = ChatRenderItem.Single(user("u1"), GroupPosition.None)
+        val deduped = deduplicateRenderKeys(listOf(a, b))
+        // No collision -> same instances returned, keys unchanged.
+        assertEquals(listOf(a.key, b.key), deduped.map { it.key })
+        assertEquals(2, deduped.map { it.key }.toSet().size)
+    }
+
+    @Test
+    fun `deduplicateRenderKeys yields unique keys when two RunBlocks share a run id`() {
+        val sharedRunId = "d1a81dfa-7575-455a-be37-9141619194fd"
+        fun runBlock(idA: String, idB: String) = ChatRenderItem.RunBlock(
+            runId = sharedRunId,
+            messages = listOf(
+                assistant(idA, runId = sharedRunId) to GroupPosition.None,
+                assistant(idB, runId = sharedRunId) to GroupPosition.None,
+            ),
+        )
+        val first = runBlock("m1", "m2")
+        val second = runBlock("m3", "m4")
+        // Both naturally resolve to the identical `run-<id>` key.
+        assertEquals(first.key, second.key)
+
+        val deduped = deduplicateRenderKeys(listOf(first, second))
+        val keys = deduped.map { it.key }
+        assertEquals("all render keys must be globally unique", keys.size, keys.toSet().size)
+        // First occurrence keeps the canonical (single-prefixed) key — no
+        // #337 regression — and the collision is disambiguated by item id.
+        assertEquals(runKey(sharedRunId), keys[0])
+        assertTrue(keys[1].startsWith(runKey(sharedRunId)))
+        assertTrue(keys[1] != keys[0])
+    }
+
+    @Test
+    fun `deduplicateRenderKeys disambiguates a Single colliding with a RunBlock on the same run id`() {
+        val sharedRunId = "run-already-prefixed-collide"
+        val single = ChatRenderItem.Single(
+            assistant("s1", runId = sharedRunId),
+            GroupPosition.None,
+            stableRunKey = runKey(sharedRunId),
+            stableRunId = sharedRunId,
+        )
+        val block = ChatRenderItem.RunBlock(
+            runId = sharedRunId,
+            messages = listOf(
+                assistant("b1", runId = sharedRunId) to GroupPosition.None,
+                assistant("b2", runId = sharedRunId) to GroupPosition.None,
+            ),
+        )
+        assertEquals(single.key, block.key)
+
+        val deduped = deduplicateRenderKeys(listOf(single, block))
+        val keys = deduped.map { it.key }
+        assertEquals(keys.size, keys.toSet().size)
+        // #337: already-`run-`-prefixed ids must NOT get double-prefixed.
+        assertTrue(keys.none { it.startsWith("run-run-") })
     }
 
     private fun user(id: String, ts: String = "2026-04-19T12:00:00Z") = UiMessage(
