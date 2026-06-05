@@ -141,6 +141,14 @@ internal object AgentScaffoldTestTags {
     fun drawerChatMode(mode: String) = "agent_scaffold_drawer_chat_mode_$mode"
 }
 
+/**
+ * letta-mobile-vo9y1: the conversation a subagent run writes its transcript
+ * to. The shim correlates a parent dispatch to a subagent `agent-local-*`
+ * agent whose run lives on conversation `default`, so opening a subagent's
+ * transcript means switching to that agent id at this conversation.
+ */
+private const val SUBAGENT_DEFAULT_CONVERSATION_ID = "default"
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun AgentScaffold(
@@ -466,6 +474,18 @@ internal fun AgentScaffoldContent(
                         chatBackground = chatBackground,
                         chatMode = chatMode,
                         onBugCommand = { showBugReportSheet = true },
+                        // letta-mobile-vo9y1: open a subagent's own
+                        // conversation by switching to its `agent-local-*`
+                        // agent at conversation `default` (the subagent run's
+                        // canonical thread). Reuses the same conversation-switch
+                        // primitive the agent picker / search results use, so
+                        // navigation to an arbitrary agent-local conversation
+                        // works through the existing nav graph.
+                        onViewSubagentConversation = onSwitchConversation?.let { switch ->
+                            { subagentAgentId ->
+                                switch(subagentAgentId, SUBAGENT_DEFAULT_CONVERSATION_ID, null)
+                            }
+                        },
                         viewModel = viewModel,
                     )
                 }

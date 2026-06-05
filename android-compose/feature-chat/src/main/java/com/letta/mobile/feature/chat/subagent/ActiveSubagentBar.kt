@@ -60,12 +60,24 @@ import kotlinx.collections.immutable.ImmutableList
  * Condensed form: when more than [CONDENSE_THRESHOLD] subagents are active,
  * a single summary chip ("N subagents running") is shown instead of N chips,
  * keeping the bar compact.
+ *
+ * letta-mobile-29h9u — lingering terminals: the list may contain
+ * recently-terminal entries (the host applies [withLingeringTerminals]); such
+ * chips render in a success (green check) / failed (red error) style instead
+ * of the running spinner, so a completed/failed outcome is reviewable before
+ * it dismisses. Terminal chips are never folded into the condensed summary
+ * (only the running count condenses).
+ *
+ * letta-mobile-vo9y1 — view conversation: when [onViewConversation] is
+ * provided and a chip [ActiveSubagent.canViewConversation], the chip exposes
+ * a "view conversation" affordance that jumps to that subagent's transcript.
  */
 @Composable
 fun ActiveSubagentBar(
     subagents: ImmutableList<ActiveSubagent>,
     modifier: Modifier = Modifier,
     onChipClick: (ActiveSubagent) -> Unit = {},
+    onViewConversation: (ActiveSubagent) -> Unit = {},
 ) {
     // Defensive active-only filter happens in the host; here we trust the
     // snapshot. Visibility is driven purely by emptiness.
@@ -86,6 +98,11 @@ fun ActiveSubagentBar(
         // summary; only the dispatched-subagent count condenses behind it.
         val selfEntry = rendered.firstOrNull { it.isSelf }
         val subagentEntries = rendered.filterNot { it.isSelf }
+        // letta-mobile-29h9u: terminal (lingering) chips always render
+        // individually in their success/failed style — only the RUNNING set
+        // condenses behind the count summary.
+        val runningEntries = subagentEntries.filter { it.isActive }
+        val terminalEntries = subagentEntries.filter { it.isTerminal }
         LazyRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(LettaSpacing.chipGap),
@@ -102,17 +119,27 @@ fun ActiveSubagentBar(
                     )
                 }
             }
-            if (subagentEntries.size > CONDENSE_THRESHOLD) {
+            if (runningEntries.size > CONDENSE_THRESHOLD) {
                 item(key = "__condensed__") {
-                    CondensedSubagentChip(count = subagentEntries.size)
+                    CondensedSubagentChip(count = runningEntries.size)
                 }
             } else {
-                items(items = subagentEntries, key = { it.id }) { subagent ->
+                items(items = runningEntries, key = { it.id }) { subagent ->
                     SubagentChip(
                         subagent = subagent,
                         onClick = { onChipClick(subagent) },
+                        onViewConversation = { onViewConversation(subagent) },
                     )
                 }
+            }
+            // Lingering terminal chips trail the running set so the eye lands
+            // on still-working agents first, then on freshly-finished ones.
+            items(items = terminalEntries, key = { it.id }) { subagent ->
+                TerminalSubagentChip(
+                    subagent = subagent,
+                    onClick = { onChipClick(subagent) },
+                    onViewConversation = { onViewConversation(subagent) },
+                )
             }
         }
     }
@@ -126,6 +153,7 @@ private fun SubagentChip(
     subagent: ActiveSubagent,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {},
+    onViewConversation: () -> Unit = {},
 ) {
     Row(
         modifier = modifier
@@ -147,7 +175,102 @@ private fun SubagentChip(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        if (subagent.canViewConversation) {
+            ViewConversationAction(
+                description = subagent.description,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                onClick = onViewConversation,
+            )
+        }
     }
+}
+
+/**
+ * letta-mobile-29h9u: a recently-terminal subagent chip. Renders the OUTCOME
+ * — a green check for [ActiveSubagent.Status.COMPLETED], a red error for
+ * [ActiveSubagent.Status.FAILED] — using design-system tokens so the user can
+ * review success/failure before the chip dismisses (it lingers per
+ * [ActiveSubagent.TERMINAL_LINGER_MS]). No spinner, so reduced-motion is a
+ * no-op here. Still tappable (opens the todo sheet) and offers the
+ * view-conversation affordance when correlated.
+ */
+@Composable
+private fun TerminalSubagentChip(
+    subagent: ActiveSubagent,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {},
+    onViewConversation: () -> Unit = {},
+) {
+    val failed = subagent.status == ActiveSubagent.Status.FAILED
+    val container = if (failed) {
+        MaterialTheme.colorScheme.errorContainer
+    } else {
+        MaterialTheme.colorScheme.secondaryContainer
+    }
+    val onContainer = if (failed) {
+        MaterialTheme.colorScheme.onErrorContainer
+    } else {
+        MaterialTheme.colorScheme.onSecondaryContainer
+    }
+    val icon = if (failed) LettaIcons.Error else LettaIcons.CheckCircle
+    val outcomeLabel = if (failed) "Failed subagent" else "Completed subagent"
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(LettaSpacing.bubbleRadius))
+            .clickable(onClick = onClick)
+            .background(container)
+            .padding(horizontal = LettaSpacing.md, vertical = LettaSpacing.xs)
+            .semantics {
+                contentDescription = "$outcomeLabel: ${subagent.description}"
+            },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LettaSpacing.sm),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(LettaIconSizing.Inline),
+            tint = onContainer,
+        )
+        Text(
+            text = subagent.description,
+            style = MaterialTheme.typography.labelLarge,
+            color = onContainer,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (subagent.canViewConversation) {
+            ViewConversationAction(
+                description = subagent.description,
+                tint = onContainer,
+                onClick = onViewConversation,
+            )
+        }
+    }
+}
+
+/**
+ * letta-mobile-vo9y1: trailing "view conversation" affordance on a chip. An
+ * external-link glyph that, when tapped, jumps to the subagent's transcript.
+ * Has its own click target + semantics so it is reachable independently of
+ * the chip's tap-to-todolist action.
+ */
+@Composable
+private fun ViewConversationAction(
+    description: String,
+    tint: androidx.compose.ui.graphics.Color,
+    onClick: () -> Unit,
+) {
+    Icon(
+        imageVector = LettaIcons.ExternalLink,
+        contentDescription = "View conversation: $description",
+        modifier = Modifier
+            .clip(RoundedCornerShape(LettaSpacing.sm))
+            .clickable(onClick = onClick)
+            .padding(LettaSpacing.xxxs)
+            .size(LettaIconSizing.Inline),
+        tint = tint,
+    )
 }
 
 /**
@@ -289,6 +412,41 @@ private fun ActiveSubagentBarCondensedPreview() {
         Box(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
             ActiveSubagentBar(
                 subagents = FakeActiveSubagentSource.sample(4).activeSubagents.value,
+            )
+        }
+    }
+}
+
+@Preview(name = "Lingering terminals + view conversation")
+@Composable
+private fun ActiveSubagentBarTerminalPreview() {
+    LettaChatTheme {
+        Box(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
+            ActiveSubagentBar(
+                subagents = kotlinx.collections.immutable.persistentListOf(
+                    ActiveSubagent(
+                        id = "running_1",
+                        description = "Refactoring the chat reducer",
+                        subagentType = "general",
+                        status = ActiveSubagent.Status.RUNNING,
+                        subagentAgentId = "agent-local-running",
+                    ),
+                    ActiveSubagent(
+                        id = "done_1",
+                        description = "Audited accessibility semantics",
+                        subagentType = "reviewer",
+                        status = ActiveSubagent.Status.COMPLETED,
+                        subagentAgentId = "agent-local-done",
+                        terminalAt = 0L,
+                    ),
+                    ActiveSubagent(
+                        id = "failed_1",
+                        description = "Drafting the PR description",
+                        subagentType = "writer",
+                        status = ActiveSubagent.Status.FAILED,
+                        terminalAt = 0L,
+                    ),
+                ),
             )
         }
     }
