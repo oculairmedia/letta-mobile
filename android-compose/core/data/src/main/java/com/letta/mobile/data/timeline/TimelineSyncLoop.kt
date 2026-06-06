@@ -6,7 +6,6 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolReturnMessage
 import java.time.Instant
-import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -300,7 +299,7 @@ class TimelineSyncLoop(
     companion object {
         private const val STREAM_HEARTBEAT_EXPECTED_MS = 30_000L
         private const val STREAM_SILENCE_TIMEOUT_MS = STREAM_HEARTBEAT_EXPECTED_MS * 12
-        private val activeStreamCount = AtomicInteger(0)
+        private val activeStreamCount = TimelineAtomicCounter(0)
         internal val DEFAULT_INCLUDE_TYPES = listOf("assistant_message", "reasoning_message", "tool_call_message", "tool_return_message")
     }
 }

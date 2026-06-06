@@ -23,7 +23,7 @@ internal class TimelineRecentMessagesReconciler(
     private val writeMutex: Mutex,
     private val applyReturnsAndResponsesFromSnapshot: (List<LettaMessage>) -> Unit,
 ) {
-    val seenRunIds = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    val seenRunIds = TimelineSeenRunTracker()
 
     suspend fun reconcileRecentMessages(
         reason: String,

@@ -52,19 +52,31 @@ subprojects {
 
 subprojects {
     plugins.withId("com.google.devtools.ksp") {
-        tasks.matching { task -> task.name.startsWith("ksp") && task.name.endsWith("Kotlin") }.configureEach {
-            val kspVariant = name
-                .removePrefix("ksp")
-                .removeSuffix("Kotlin")
-                .replaceFirstChar { it.lowercase() }
-            val kotlinOutputDir = layout.buildDirectory.dir("generated/ksp/$kspVariant/kotlin").get().asFile
-            val classOutputDir = layout.buildDirectory.dir("generated/ksp/$kspVariant/classes").get().asFile
-            doFirst {
-                classOutputDir.mkdirs()
-            }
-            doLast {
-                kotlinOutputDir.mkdirs()
-                classOutputDir.mkdirs()
+        afterEvaluate {
+            tasks.matching { task -> task.name.startsWith("ksp") && task.name.endsWith("Kotlin") }.forEach { kspTask ->
+                val kspVariant = kspTask.name
+                    .removePrefix("ksp")
+                    .removeSuffix("Kotlin")
+                    .replaceFirstChar { it.lowercase() }
+                val kotlinOutputDir = layout.buildDirectory.dir("generated/ksp/$kspVariant/kotlin").get().asFile
+                val classOutputDir = layout.buildDirectory.dir("generated/ksp/$kspVariant/classes").get().asFile
+                val prepareOutputDirs = tasks.register("prepare${kspTask.name.replaceFirstChar { it.uppercase() }}OutputDirs") {
+                    outputs.dir(kotlinOutputDir)
+                    outputs.dir(classOutputDir)
+                    doLast {
+                        kotlinOutputDir.mkdirs()
+                        classOutputDir.mkdirs()
+                    }
+                }
+                kspTask.dependsOn(prepareOutputDirs)
+                kspTask.doFirst {
+                    kotlinOutputDir.mkdirs()
+                    classOutputDir.mkdirs()
+                }
+                kspTask.doLast {
+                    kotlinOutputDir.mkdirs()
+                    classOutputDir.mkdirs()
+                }
             }
         }
     }
