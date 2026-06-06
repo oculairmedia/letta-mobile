@@ -381,6 +381,13 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                     arguments = arguments,
                     result = returnContent,
                     status = returnStatus,
+                    generatedImageAttachments = if (name == "generate_image") {
+                        matchedReturn?.attachments.orEmpty().map {
+                            UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
+                        }
+                    } else {
+                        emptyList()
+                    },
                     executionTimeMs = executionTimeMs,
                     toolCallId = msg.toolCallId,
                     approvalDecision = msg.toolCallId?.let { foldedApprovals[it]?.decision },
@@ -394,8 +401,12 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                     runId = msg.runId,
                     stepId = msg.stepId,
                     toolCalls = listOf(toolCall),
-                    attachments = matchedReturn?.attachments.orEmpty().map {
-                        UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
+                    attachments = if (name == "generate_image") {
+                        emptyList()
+                    } else {
+                        matchedReturn?.attachments.orEmpty().map {
+                            UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
+                        }
                     },
                 ))
             }
@@ -452,6 +463,13 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                     arguments = "",
                     result = msg.content.ifBlank { null },
                     status = msg.toolReturnStatus,
+                    generatedImageAttachments = if (name == "generate_image") {
+                        msg.attachments.map {
+                            UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
+                        }
+                    } else {
+                        emptyList()
+                    },
                     toolCallId = msg.toolCallId,
                     approvalDecision = msg.toolCallId?.let { foldedApprovals[it]?.decision },
                     subagentDispatch = subagentDispatch,
@@ -464,8 +482,12 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                     runId = msg.runId,
                     stepId = msg.stepId,
                     toolCalls = listOf(toolCall),
-                    attachments = msg.attachments.map {
-                        UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
+                    attachments = if (name == "generate_image") {
+                        emptyList()
+                    } else {
+                        msg.attachments.map {
+                            UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
+                        }
                     },
                 ))
             }
