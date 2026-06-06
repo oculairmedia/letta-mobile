@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
@@ -26,7 +27,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -37,6 +42,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.LettaMotion
+import com.letta.mobile.ui.theme.customColors
 import kotlinx.collections.immutable.ImmutableList
 
 /**
@@ -78,6 +84,12 @@ fun ActiveSubagentBar(
     modifier: Modifier = Modifier,
     onChipClick: (ActiveSubagent) -> Unit = {},
     onViewConversation: (ActiveSubagent) -> Unit = {},
+    // letta-mobile-dvobc: wall-clock epoch-ms used to evaluate the "stuck"
+    // ring heuristic (running but no todo-state change for ~30-45s). The host
+    // re-evaluates it off the same coarse 1s linger tick, so the ring flips to
+    // yellow without any new WS frame. Defaults to the system clock for
+    // previews/tests that don't drive a tick.
+    now: Long = System.currentTimeMillis(),
 ) {
     // Defensive active-only filter happens in the host; here we trust the
     // snapshot. Visibility is driven purely by emptiness.
@@ -98,10 +110,17 @@ fun ActiveSubagentBar(
         // summary; only the dispatched-subagent count condenses behind it.
         val selfEntry = rendered.firstOrNull { it.isSelf }
         val subagentEntries = rendered.filterNot { it.isSelf }
-        // letta-mobile-29h9u: terminal (lingering) chips always render
-        // individually in their success/failed style — only the RUNNING set
-        // condenses behind the count summary.
-        val runningEntries = subagentEntries.filter { it.isActive }
+        // letta-mobile-29h9u / pvrrm: terminal (lingering) chips, AND running
+        // background-task chips, always render individually — only the running
+        // *subagent* set condenses behind the count summary. Background tasks
+        // are long-running glances the user explicitly wants to see, so they
+        // never fold away.
+        val runningSubagents = subagentEntries.filter {
+            it.isActive && it.kind == ActiveSubagent.Kind.SUBAGENT
+        }
+        val runningBackgroundTasks = subagentEntries.filter {
+            it.isActive && it.kind == ActiveSubagent.Kind.BACKGROUND_TASK
+        }
         val terminalEntries = subagentEntries.filter { it.isTerminal }
         LazyRow(
             modifier = Modifier.fillMaxWidth(),
@@ -113,30 +132,46 @@ fun ActiveSubagentBar(
         ) {
             if (selfEntry != null) {
                 item(key = selfEntry.id) {
-                    SelfChip(
+                    ActiveBarChip(
                         subagent = selfEntry,
+                        now = now,
                         onClick = { onChipClick(selfEntry) },
                     )
                 }
             }
-            if (runningEntries.size > CONDENSE_THRESHOLD) {
+            if (runningSubagents.size > CONDENSE_THRESHOLD) {
                 item(key = "__condensed__") {
-                    CondensedSubagentChip(count = runningEntries.size)
+                    CondensedSubagentChip(count = runningSubagents.size)
                 }
             } else {
-                items(items = runningEntries, key = { it.id }) { subagent ->
-                    SubagentChip(
+                items(items = runningSubagents, key = { it.id }) { subagent ->
+                    ActiveBarChip(
                         subagent = subagent,
+                        now = now,
                         onClick = { onChipClick(subagent) },
                         onViewConversation = { onViewConversation(subagent) },
                     )
                 }
             }
+            // letta-mobile-pvrrm: long-running background-task chips always
+            // render individually, between the subagents and the terminals.
+            items(items = runningBackgroundTasks, key = { it.id }) { task ->
+                ActiveBarChip(
+                    subagent = task,
+                    now = now,
+                    onClick = { onChipClick(task) },
+                    onViewConversation = { onViewConversation(task) },
+                )
+            }
             // Lingering terminal chips trail the running set so the eye lands
             // on still-working agents first, then on freshly-finished ones.
+            // letta-mobile-xrth2: trailing them keeps a freshly-finished chip
+            // visually SEPARATE from a NEW running chip above, so the running
+            // one never looks "done".
             items(items = terminalEntries, key = { it.id }) { subagent ->
-                TerminalSubagentChip(
+                ActiveBarChip(
                     subagent = subagent,
+                    now = now,
                     onClick = { onChipClick(subagent) },
                     onViewConversation = { onViewConversation(subagent) },
                 )
@@ -147,107 +182,121 @@ fun ActiveSubagentBar(
 
 private const val CONDENSE_THRESHOLD = 2
 
-/** A single running-subagent chip: spinner + description + type. */
+/**
+ * letta-mobile-dvobc / xrth2 / pvrrm: the UNIFIED active-bar chip. One chip
+ * type renders subagents, the self plan, AND background tool tasks — running
+ * OR terminal — differentiated only by glyph + label per [ActiveSubagent.Kind]
+ * and lifecycle. Replaces the former separate Subagent/Terminal/Self chips so
+ * sizing, padding, icon size and baseline are HOMOGENEOUS across the bar
+ * (xrth2 layout fix).
+ *
+ * - Leading visual: a determinate [ProgressRing] around the kind glyph. The
+ *   ring fill = TodoWrite completion fraction; the ring color encodes state
+ *   (green running, yellow stuck, red failed, green/check on success) —
+ *   [ActiveSubagent.ringState]/[ActiveSubagent.ringFraction] (dvobc).
+ * - Label: [ActiveSubagent.statusLabel] · description, so a running/dispatched
+ *   entry NEVER reads as "completed" (xrth2 copy fix).
+ * - Container: success/failed terminals get the secondary/error container so
+ *   the outcome is reviewable while it lingers; running chips use the neutral
+ *   surface-variant (self uses the tertiary tint).
+ */
 @Composable
-private fun SubagentChip(
+private fun ActiveBarChip(
     subagent: ActiveSubagent,
+    now: Long,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {},
     onViewConversation: () -> Unit = {},
 ) {
+    val palette = subagent.chipPalette()
+    val ringState = subagent.ringState(now)
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(LettaSpacing.bubbleRadius))
             .clickable(onClick = onClick)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(horizontal = LettaSpacing.md, vertical = LettaSpacing.xs)
+            .background(palette.container)
+            // letta-mobile-xrth2: homogeneous min-height + SYMMETRIC vertical
+            // padding so the chip is not bottom-heavy and matches other tool
+            // chips.
+            .heightIn(min = LettaSpacing.chipMinHeight)
+            .padding(
+                horizontal = LettaSpacing.chipPaddingHorizontal,
+                vertical = LettaSpacing.chipPaddingVertical,
+            )
             .semantics {
-                contentDescription = "Running subagent: ${subagent.description}"
+                contentDescription = subagent.chipSemanticLabel()
             },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaSpacing.sm),
     ) {
-        RunningSpinner()
+        ProgressRing(
+            fraction = subagent.ringFraction,
+            determinate = subagent.hasDeterminateProgress,
+            ringState = ringState,
+            glyph = subagent.kindGlyph(),
+            tint = palette.onContainer,
+        )
         Text(
-            text = subagent.description,
+            text = subagent.chipText(),
             style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = palette.onContainer,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         if (subagent.canViewConversation) {
             ViewConversationAction(
                 description = subagent.description,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = palette.onContainer,
                 onClick = onViewConversation,
             )
         }
     }
 }
 
-/**
- * letta-mobile-29h9u: a recently-terminal subagent chip. Renders the OUTCOME
- * — a green check for [ActiveSubagent.Status.COMPLETED], a red error for
- * [ActiveSubagent.Status.FAILED] — using design-system tokens so the user can
- * review success/failure before the chip dismisses (it lingers per
- * [ActiveSubagent.TERMINAL_LINGER_MS]). No spinner, so reduced-motion is a
- * no-op here. Still tappable (opens the todo sheet) and offers the
- * view-conversation affordance when correlated.
- */
+/** Container + on-container tint pair for a chip, by kind + lifecycle. */
+private data class ChipPalette(val container: Color, val onContainer: Color)
+
 @Composable
-private fun TerminalSubagentChip(
-    subagent: ActiveSubagent,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit = {},
-    onViewConversation: () -> Unit = {},
-) {
-    val failed = subagent.status == ActiveSubagent.Status.FAILED
-    val container = if (failed) {
-        MaterialTheme.colorScheme.errorContainer
-    } else {
-        MaterialTheme.colorScheme.secondaryContainer
-    }
-    val onContainer = if (failed) {
-        MaterialTheme.colorScheme.onErrorContainer
-    } else {
-        MaterialTheme.colorScheme.onSecondaryContainer
-    }
-    val icon = if (failed) LettaIcons.Error else LettaIcons.CheckCircle
-    val outcomeLabel = if (failed) "Failed subagent" else "Completed subagent"
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(LettaSpacing.bubbleRadius))
-            .clickable(onClick = onClick)
-            .background(container)
-            .padding(horizontal = LettaSpacing.md, vertical = LettaSpacing.xs)
-            .semantics {
-                contentDescription = "$outcomeLabel: ${subagent.description}"
-            },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaSpacing.sm),
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(LettaIconSizing.Inline),
-            tint = onContainer,
-        )
-        Text(
-            text = subagent.description,
-            style = MaterialTheme.typography.labelLarge,
-            color = onContainer,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (subagent.canViewConversation) {
-            ViewConversationAction(
-                description = subagent.description,
-                tint = onContainer,
-                onClick = onViewConversation,
-            )
-        }
-    }
+private fun ActiveSubagent.chipPalette(): ChipPalette = when {
+    status == ActiveSubagent.Status.FAILED -> ChipPalette(
+        MaterialTheme.colorScheme.errorContainer,
+        MaterialTheme.colorScheme.onErrorContainer,
+    )
+    status == ActiveSubagent.Status.COMPLETED -> ChipPalette(
+        MaterialTheme.colorScheme.secondaryContainer,
+        MaterialTheme.colorScheme.onSecondaryContainer,
+    )
+    kind == ActiveSubagent.Kind.SELF -> ChipPalette(
+        MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.72f),
+        MaterialTheme.colorScheme.onTertiaryContainer,
+    )
+    else -> ChipPalette(
+        MaterialTheme.colorScheme.surfaceVariant,
+        MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
+
+/** letta-mobile-pvrrm: the glyph that differentiates the chip kind. */
+private fun ActiveSubagent.kindGlyph(): ImageVector = when (kind) {
+    // A tool task is NOT an agent — distinct glyph (a wrench) + label.
+    ActiveSubagent.Kind.BACKGROUND_TASK -> LettaIcons.Tool
+    ActiveSubagent.Kind.SELF -> LettaIcons.Agent
+    ActiveSubagent.Kind.SUBAGENT -> LettaIcons.Agent
+}
+
+/** letta-mobile-xrth2: the visible chip text — "<state> · <description>". */
+private fun ActiveSubagent.chipText(): String {
+    val desc = description.ifBlank {
+        if (kind == ActiveSubagent.Kind.SELF) "Your plan" else statusLabel
+    }
+    // Self chip already carries its progress in the description; avoid a
+    // redundant "Your plan · Your plan · …".
+    return if (kind == ActiveSubagent.Kind.SELF) desc else desc
+}
+
+/** Unambiguous accessibility label — never "completed" for a running entry. */
+private fun ActiveSubagent.chipSemanticLabel(): String =
+    "${statusLabel}: ${description.ifBlank { "(no description)" }}"
 
 /**
  * letta-mobile-vo9y1: trailing "view conversation" affordance on a chip. An
@@ -273,47 +322,6 @@ private fun ViewConversationAction(
     )
 }
 
-/**
- * letta-mobile-gnyf7: the synthetic "self" chip — the MAIN/foreground agent's
- * OWN TodoWrite plan. Visually differentiated from subagent chips (tertiary
- * tint + agent icon + "You" label) so it reads as the user's own agent, not a
- * dispatched worker. Taps open the same todo sheet, resolved from the
- * self-todo source.
- */
-@Composable
-private fun SelfChip(
-    subagent: ActiveSubagent,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit = {},
-) {
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(LettaSpacing.bubbleRadius))
-            .clickable(onClick = onClick)
-            .background(MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.72f))
-            .padding(horizontal = LettaSpacing.md, vertical = LettaSpacing.xs)
-            .semantics {
-                contentDescription = "Your agent's current plan: ${subagent.description}"
-            },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaSpacing.sm),
-    ) {
-        Icon(
-            imageVector = LettaIcons.Agent,
-            contentDescription = null,
-            modifier = Modifier.size(LettaIconSizing.Inline),
-            tint = MaterialTheme.colorScheme.onTertiaryContainer,
-        )
-        Text(
-            text = subagent.description.ifBlank { "Your plan" },
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onTertiaryContainer,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
 /** Condensed summary chip shown when many subagents are active. */
 @Composable
 private fun CondensedSubagentChip(
@@ -324,14 +332,26 @@ private fun CondensedSubagentChip(
         modifier = modifier
             .clip(RoundedCornerShape(LettaSpacing.bubbleRadius))
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(horizontal = LettaSpacing.md, vertical = LettaSpacing.xs)
+            .heightIn(min = LettaSpacing.chipMinHeight)
+            .padding(
+                horizontal = LettaSpacing.chipPaddingHorizontal,
+                vertical = LettaSpacing.chipPaddingVertical,
+            )
             .semantics {
                 contentDescription = "$count subagents running"
             },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(LettaSpacing.sm),
     ) {
-        RunningSpinner()
+        // Condensed summary has no single fraction — render an indeterminate
+        // ring around the agent glyph (still reduced-motion aware).
+        ProgressRing(
+            fraction = 0f,
+            determinate = false,
+            ringState = RingState.RUNNING,
+            glyph = LettaIcons.Agent,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Text(
             text = "$count subagents running",
             style = MaterialTheme.typography.labelLarge,
@@ -343,42 +363,120 @@ private fun CondensedSubagentChip(
 }
 
 /**
- * Running spinner. Rotation is applied in the DRAW phase via
- * `graphicsLayer { rotationZ = ... }` (matching the tool-card spinner fix),
- * NOT via a composition-phase modifier update — so the animation does not
- * invalidate layout/composition every frame. Respects reduced-motion by
- * rendering a static icon.
+ * letta-mobile-dvobc: DETERMINATE progress ring drawn around a chip glyph.
+ * REPLACES the former indeterminate spinner.
+ *
+ *  - When [determinate], a clockwise arc fills to [fraction] (0..1) — the
+ *    TodoWrite completion fraction. The arc starts at 12 o'clock and sweeps
+ *    clockwise. The icon stays CENTERED inside the ring.
+ *  - The ring COLOR encodes [ringState]: green running, yellow stuck, red
+ *    failed, green on success (see [ringColor]).
+ *  - Reduced-motion: the ring is determinate (a static arc), so there is no
+ *    spin to suppress. When NOT determinate (no todos yet) and motion is
+ *    allowed, the ring sweeps slowly as an indeterminate activity cue; under
+ *    reduced-motion it falls back to a STATIC faint track ring (no animation).
+ *    Rotation, when used, is applied in the DRAW phase via `graphicsLayer`
+ *    (no composition/layout churn — preserves the rmzmo perf work).
  */
 @Composable
-private fun RunningSpinner(modifier: Modifier = Modifier) {
+private fun ProgressRing(
+    fraction: Float,
+    determinate: Boolean,
+    ringState: RingState,
+    glyph: ImageVector,
+    tint: Color,
+    modifier: Modifier = Modifier,
+) {
     val reducedMotion = rememberReducedMotionEnabled()
-    if (reducedMotion) {
-        Icon(
-            imageVector = LettaIcons.Refresh,
-            contentDescription = null,
-            modifier = modifier.size(LettaIconSizing.Inline),
-            tint = MaterialTheme.colorScheme.primary,
-        )
-        return
+    val color = ringColor(ringState)
+    val track = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+    val stroke = with(androidx.compose.ui.platform.LocalDensity.current) {
+        LettaSpacing.chipRingStroke.toPx()
     }
-    val transition = rememberInfiniteTransition(label = "subagentSpin")
-    val angle by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "subagentSpinAngle",
-    )
-    Icon(
-        imageVector = LettaIcons.Refresh,
-        contentDescription = null,
-        modifier = modifier
-            .size(LettaIconSizing.Inline)
-            .graphicsLayer { rotationZ = angle },
-        tint = MaterialTheme.colorScheme.primary,
-    )
+    val safeFraction = fraction.coerceIn(0f, 1f)
+
+    // Indeterminate sweep angle (only used when !determinate && !reducedMotion).
+    val sweepRotation = if (!determinate && !reducedMotion) {
+        val transition = rememberInfiniteTransition(label = "ringSweep")
+        val angle by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1200, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+            label = "ringSweepAngle",
+        )
+        angle
+    } else {
+        0f
+    }
+
+    Box(
+        modifier = modifier.size(LettaSpacing.chipRingSize),
+        contentAlignment = Alignment.Center,
+    ) {
+        androidx.compose.foundation.Canvas(
+            modifier = Modifier
+                .size(LettaSpacing.chipRingSize)
+                .graphicsLayer { rotationZ = sweepRotation },
+        ) {
+            val inset = stroke / 2f
+            val arcSize = androidx.compose.ui.geometry.Size(
+                size.width - stroke,
+                size.height - stroke,
+            )
+            val topLeft = androidx.compose.ui.geometry.Offset(inset, inset)
+            // Full faint track underneath.
+            drawArc(
+                color = track,
+                startAngle = 0f,
+                sweepAngle = 360f,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = stroke, cap = StrokeCap.Round),
+            )
+            // Foreground arc: determinate fill (clockwise from 12 o'clock) or
+            // a fixed 90° "comet" for the indeterminate (rotated) case.
+            val sweep = if (determinate) 360f * safeFraction else 90f
+            if (sweep > 0f) {
+                drawArc(
+                    color = color,
+                    startAngle = -90f, // 12 o'clock
+                    sweepAngle = sweep,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = stroke, cap = StrokeCap.Round),
+                )
+            }
+        }
+        Icon(
+            imageVector = glyph,
+            contentDescription = null,
+            modifier = Modifier.size(LettaIconSizing.Inline),
+            tint = tint,
+        )
+    }
+}
+
+/**
+ * letta-mobile-dvobc: map a [RingState] to its design-system tint.
+ *  - RUNNING / SUCCESS -> success green
+ *  - STUCK -> warning yellow
+ *  - ERROR -> error red
+ */
+@Composable
+private fun ringColor(state: RingState): Color = when (state) {
+    RingState.RUNNING -> MaterialTheme.customColors.successColor
+        .takeIf { it != Color.Unspecified } ?: MaterialTheme.colorScheme.primary
+    RingState.SUCCESS -> MaterialTheme.customColors.successColor
+        .takeIf { it != Color.Unspecified } ?: MaterialTheme.colorScheme.primary
+    RingState.STUCK -> MaterialTheme.customColors.warningTextColor
+        .takeIf { it != Color.Unspecified } ?: MaterialTheme.colorScheme.tertiary
+    RingState.ERROR -> MaterialTheme.customColors.errorTextColor
+        .takeIf { it != Color.Unspecified } ?: MaterialTheme.colorScheme.error
 }
 
 @Preview(name = "Single active")
@@ -445,6 +543,47 @@ private fun ActiveSubagentBarTerminalPreview() {
                         subagentType = "writer",
                         status = ActiveSubagent.Status.FAILED,
                         terminalAt = 0L,
+                    ),
+                ),
+            )
+        }
+    }
+}
+
+@Preview(name = "Rings: running / stuck / background-task")
+@Composable
+private fun ActiveSubagentBarRingsPreview() {
+    LettaChatTheme {
+        Box(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
+            ActiveSubagentBar(
+                now = 100_000L,
+                subagents = kotlinx.collections.immutable.persistentListOf(
+                    // Running + progressing (green ring, 2/4 filled).
+                    ActiveSubagent(
+                        id = "run_1",
+                        description = "Refactoring the reducer",
+                        subagentType = "general",
+                        status = ActiveSubagent.Status.RUNNING,
+                        progress = SubagentTodoProgress(completed = 2, total = 4),
+                        lastUpdateAt = 100_000L,
+                    ),
+                    // Running but STUCK (yellow ring) — last update long ago.
+                    ActiveSubagent(
+                        id = "stuck_1",
+                        description = "Waiting on a slow fetch",
+                        subagentType = "general",
+                        status = ActiveSubagent.Status.RUNNING,
+                        progress = SubagentTodoProgress(completed = 1, total = 5),
+                        lastUpdateAt = 0L,
+                    ),
+                    // letta-mobile-pvrrm: a long-running BACKGROUND TOOL task.
+                    ActiveSubagent(
+                        id = "bg_1",
+                        description = "Building APK…",
+                        subagentType = "tool",
+                        status = ActiveSubagent.Status.RUNNING,
+                        kind = ActiveSubagent.Kind.BACKGROUND_TASK,
+                        lastUpdateAt = 100_000L,
                     ),
                 ),
             )

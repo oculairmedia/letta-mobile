@@ -65,7 +65,7 @@ class ActiveSubagentBarTest {
         }
 
         // No chip semantics at all.
-        composeRule.onAllNodesWithContentDescription("Running subagent:", substring = true)
+        composeRule.onAllNodesWithContentDescription("Subagent running:", substring = true)
             .assertCountEquals(0)
     }
 
@@ -78,8 +78,12 @@ class ActiveSubagentBarTest {
         }
 
         composeRule.onNodeWithText("sentinel-single-desc").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Running subagent: sentinel-single-desc")
+        // letta-mobile-xrth2: unambiguous copy — a running chip reads
+        // "Subagent running", never "completed".
+        composeRule.onNodeWithContentDescription("Subagent running: sentinel-single-desc")
             .assertIsDisplayed()
+        composeRule.onAllNodesWithContentDescription("completed", substring = true)
+            .assertCountEquals(0)
     }
 
     @Test
@@ -126,10 +130,10 @@ class ActiveSubagentBarTest {
         }
 
         composeRule.onNodeWithText("winning-desc").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Completed subagent: winning-desc")
+        composeRule.onNodeWithContentDescription("Subagent finished: winning-desc")
             .assertIsDisplayed()
         // It is NOT labeled as a running chip.
-        composeRule.onAllNodesWithContentDescription("Running subagent: winning-desc")
+        composeRule.onAllNodesWithContentDescription("Subagent running: winning-desc")
             .assertCountEquals(0)
     }
 
@@ -143,7 +147,7 @@ class ActiveSubagentBarTest {
             )
         }
 
-        composeRule.onNodeWithContentDescription("Failed subagent: losing-desc")
+        composeRule.onNodeWithContentDescription("Subagent failed: losing-desc")
             .assertIsDisplayed()
     }
 
@@ -201,5 +205,55 @@ class ActiveSubagentBarTest {
         composeRule.runOnIdle { subagents = persistentListOf() }
 
         composeRule.onAllNodesWithText("vanishing-desc").assertCountEquals(0)
+    }
+
+    @Test
+    fun backgroundTaskChipRendersWithTaskLabel() {
+        // letta-mobile-pvrrm: a background tool task surfaces in the SAME bar
+        // as a differentiated chip (task copy, not "subagent").
+        composeRule.setLettaTestContent {
+            ActiveSubagentBar(
+                subagents = persistentListOf(
+                    ActiveSubagent(
+                        id = "bg_1",
+                        description = "Building APK",
+                        subagentType = "tool",
+                        status = ActiveSubagent.Status.RUNNING,
+                        kind = ActiveSubagent.Kind.BACKGROUND_TASK,
+                    ),
+                ),
+            )
+        }
+
+        composeRule.onNodeWithText("Building APK").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Background task running: Building APK")
+            .assertIsDisplayed()
+        // It must NOT be labeled as a subagent.
+        composeRule.onAllNodesWithContentDescription("Subagent running:", substring = true)
+            .assertCountEquals(0)
+    }
+
+    @Test
+    fun manyBackgroundTasksAreNotCondensed() {
+        // letta-mobile-pvrrm: background tasks always render individually (only
+        // the running *subagent* set condenses).
+        composeRule.setLettaTestContent {
+            ActiveSubagentBar(
+                subagents = (1..4).map {
+                    ActiveSubagent(
+                        id = "bg_$it",
+                        description = "bg-desc-$it",
+                        subagentType = "tool",
+                        status = ActiveSubagent.Status.RUNNING,
+                        kind = ActiveSubagent.Kind.BACKGROUND_TASK,
+                    )
+                }.toImmutableList(),
+            )
+        }
+
+        composeRule.onNodeWithText("bg-desc-1").assertIsDisplayed()
+        composeRule.onNodeWithText("bg-desc-4").assertIsDisplayed()
+        composeRule.onAllNodesWithText("subagents running", substring = true)
+            .assertCountEquals(0)
     }
 }

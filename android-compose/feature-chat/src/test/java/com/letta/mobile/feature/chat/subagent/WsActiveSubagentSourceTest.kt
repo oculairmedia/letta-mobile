@@ -72,6 +72,41 @@ class WsActiveSubagentSourceTest {
     }
 
     @Test
+    fun `entry kind is inferred from correlation keys`() {
+        // letta-mobile-pvrrm: tool_call_id present -> a dispatched subagent.
+        assertEquals(
+            ActiveSubagent.Kind.SUBAGENT,
+            entry("toolu_1").toActiveSubagent().kind,
+        )
+        // Only a task_id (no tool_call_id) -> a background tool task.
+        assertEquals(
+            ActiveSubagent.Kind.BACKGROUND_TASK,
+            entry("", taskId = "task_2").toActiveSubagent().kind,
+        )
+    }
+
+    @Test
+    fun `startedAt seeds the lastUpdateAt baseline for the stuck heuristic`() {
+        // letta-mobile-dvobc: a parseable ISO timestamp becomes the baseline.
+        val withTs = SubagentEntry(
+            toolCallId = "toolu_1",
+            status = SubagentStatus.RUNNING,
+            startedAt = "2026-06-05T00:00:00Z",
+        ).toActiveSubagent()
+        assertEquals(
+            java.time.Instant.parse("2026-06-05T00:00:00Z").toEpochMilli(),
+            withTs.lastUpdateAt,
+        )
+        // A malformed timestamp must not crash — it degrades to null.
+        val bad = SubagentEntry(
+            toolCallId = "toolu_2",
+            status = SubagentStatus.RUNNING,
+            startedAt = "not-a-date",
+        ).toActiveSubagent()
+        assertNull(bad.lastUpdateAt)
+    }
+
+    @Test
     fun `subagentAgentId is carried through for view-conversation`() {
         // letta-mobile-vo9y1: present -> canViewConversation true.
         val mapped = entry("toolu_1", subagentAgentId = "agent-local-abc").toActiveSubagent()

@@ -136,8 +136,34 @@ class WsActiveSubagentSource(
             description = description,
             subagentType = subagentType,
             status = status.toActiveSubagentStatus(),
+            // letta-mobile-pvrrm: a registry entry that arrives WITHOUT a
+            // tool_call_id but WITH a task_id is a background tool task
+            // (run_in_background), not a dispatched subagent — render it with
+            // the background-task glyph/label. FOLLOW-UP: the shim should emit
+            // an explicit `kind` (and todo `progress`) per entry; until then we
+            // infer the kind from the correlation keys.
+            kind = if (toolCallId.isBlank() && !taskId.isNullOrBlank()) {
+                ActiveSubagent.Kind.BACKGROUND_TASK
+            } else {
+                ActiveSubagent.Kind.SUBAGENT
+            },
             subagentAgentId = subagentAgentId?.takeIf { it.isNotBlank() },
+            // letta-mobile-dvobc: baseline for the stuck heuristic. The
+            // registry snapshot does not yet carry a per-todo-change
+            // timestamp, so we seed it from `startedAt` when present. FOLLOW-UP
+            // (shim): emit last-todo-change so "stuck" reflects real stalls,
+            // not just long total runtime.
+            lastUpdateAt = startedAt?.let(::parseIsoMillis),
         )
+
+        /**
+         * Best-effort ISO-8601 -> epoch-ms parse. Returns null on any
+         * malformed value so a bad timestamp never crashes the bar (the chip
+         * simply reads as not-stuck).
+         */
+        internal fun parseIsoMillis(iso: String): Long? = runCatching {
+            java.time.Instant.parse(iso).toEpochMilli()
+        }.getOrNull()
 
         internal fun String.toActiveSubagentStatus(): ActiveSubagent.Status = when (this) {
             SubagentStatus.RUNNING -> ActiveSubagent.Status.RUNNING
