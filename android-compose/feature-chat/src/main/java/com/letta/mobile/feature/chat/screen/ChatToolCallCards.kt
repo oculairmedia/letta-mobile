@@ -76,6 +76,7 @@ import com.letta.mobile.feature.chat.render.ToolOutputRenderer
 import com.letta.mobile.feature.chat.render.toolCardBodyRenderEligibility
 import com.letta.mobile.feature.chat.subagent.LocalSubagentTodoSheetOpener
 import com.letta.mobile.feature.chat.subagent.SubagentTodoSheetTarget
+import com.letta.mobile.ui.components.MarkdownText
 
 private const val TOOL_CALL_ENTRANCE_ANIMATION_HISTORY_SIZE = 512
 
@@ -171,6 +172,24 @@ internal fun MessageToolCalls(
             }
         }
     }
+/**
+ * Agent-return card for a completed (or failed) subagent.
+ *
+ * letta-mobile-rnocg: this is the RETURN half of the subagent dispatch chrome.
+ * The server injects the subagent's result as a `<task-notification>` envelope
+ * (status / summary / result / usage / transcript / task & agent ids). Rendered
+ * as the default inbound message it became a giant green right-aligned USER
+ * bubble full of raw XML + the agent's markdown report. Here it renders as a
+ * dedicated, recede-by-default agent-return card:
+ *  - structured header: status badge, "Subagent completed/failed", usage chips,
+ *  - the summary as receding supporting text (always visible),
+ *  - the full markdown report rendered as a COLLAPSIBLE section, collapsed by
+ *    default — tap "Show full report" to expand.
+ *
+ * The header row remains tappable to open the dispatch's todo sheet / subagent
+ * conversation (correlated by toolCallId/taskId). The report toggle is a
+ * separate hit target so expanding the report does not also open the sheet.
+ */
 @Composable
 internal fun SubagentNotificationCard(
     notification: UiSubagentNotification,
@@ -179,9 +198,12 @@ internal fun SubagentNotificationCard(
     modifier: Modifier = Modifier,
 ) {
     val opener = LocalSubagentTodoSheetOpener.current
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     val effectiveToolCallId = toolCallId ?: notification.toolCallId
-    val openTodosModifier = if (!effectiveToolCallId.isNullOrBlank()) {
+    val headerOpenTodosModifier = if (!effectiveToolCallId.isNullOrBlank()) {
         Modifier.clickable {
+            HapticEffects.segmentTick(haptic, view)
             opener(
                 SubagentTodoSheetTarget(
                     toolCallId = effectiveToolCallId,
@@ -194,8 +216,15 @@ internal fun SubagentNotificationCard(
     }
     val isFailure = notification.status.equals("failed", ignoreCase = true) ||
         notification.status.equals("error", ignoreCase = true)
+    // Collapse the full report by default — the summary already conveys the
+    // outcome; the report is opt-in so a long markdown dump never floods the
+    // timeline (recede-by-default).
+    var reportExpanded by remember(notification.taskId, effectiveToolCallId, notification.result) {
+        mutableStateOf(false)
+    }
+    val report = notification.result?.takeIf { it.isNotBlank() }
     Card(
-        modifier = modifier.then(openTodosModifier),
+        modifier = modifier,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.70f),
         ),
@@ -208,7 +237,12 @@ internal fun SubagentNotificationCard(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(headerOpenTodosModifier),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Icon(
                     imageVector = if (isFailure) LettaIcons.Error else LettaIcons.CheckCircle,
                     contentDescription = null,
@@ -231,18 +265,41 @@ internal fun SubagentNotificationCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            notification.result?.let { result ->
-                Text(
-                    text = result,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 6,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 notification.usage?.let { SubagentMetaChip(text = it) }
                 notification.taskId?.let { SubagentMetaChip(text = it) }
+            }
+            if (report != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            HapticEffects.segmentTick(haptic, view)
+                            reportExpanded = !reportExpanded
+                        },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = if (reportExpanded) "Hide full report" else "Show full report",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Icon(
+                        imageVector = LettaIcons.ExpandMore,
+                        contentDescription = if (reportExpanded) "Hide full report" else "Show full report",
+                        modifier = Modifier
+                            .size(14.dp)
+                            .rotate(if (reportExpanded) 180f else 0f),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                AnimatedVisibility(visible = reportExpanded) {
+                    MarkdownText(
+                        text = report,
+                        textColor = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
             }
             notification.transcriptUri?.let { transcript ->
                 Text(

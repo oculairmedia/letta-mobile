@@ -470,27 +470,14 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
                 ))
             }
 
-            MessageType.USER -> result.add(msg.toUiMessage())
-            MessageType.ASSISTANT -> {
-                val uiMessage = msg.toUiMessage()
-                val notification = uiMessage.subagentNotification
-                val taskId = notification?.taskId
-                val correlatedToolCallId = when {
-                    notification == null -> null
-                    !notification.toolCallId.isNullOrBlank() -> notification.toolCallId
-                    !taskId.isNullOrBlank() -> subagentToolCallByTaskId[taskId]
-                    else -> null
-                }
-                result.add(
-                    if (notification != null && correlatedToolCallId != notification.toolCallId) {
-                        uiMessage.copy(
-                            subagentNotification = notification.copy(toolCallId = correlatedToolCallId),
-                        )
-                    } else {
-                        uiMessage
-                    }
-                )
-            }
+            // letta-mobile-rnocg: USER-role messages can carry an injected
+            // `<task-notification>` agent-return (background subagent finishing).
+            // `toUiMessage` already reclassifies those to role="assistant" with a
+            // populated subagentNotification; route them through the SAME
+            // task-id -> Agent tool-call correlation as the ASSISTANT path so the
+            // return card links back to its dispatch chip / todo sheet.
+            MessageType.USER, MessageType.ASSISTANT ->
+                result.add(msg.toUiMessage().correlateSubagentNotification(subagentToolCallByTaskId))
             MessageType.REASONING -> result.add(msg.toUiMessage())
             MessageType.APPROVAL_REQUEST -> result.add(msg.toUiMessage())
             MessageType.APPROVAL_RESPONSE -> {
@@ -529,6 +516,32 @@ fun List<AppMessage>.toUiMessages(): List<UiMessage> {
     return result
 }
 
+/**
+ * letta-mobile-rnocg: correlate a subagent-return notification back to the
+ * `Agent` tool call that dispatched it. The notification may carry its own
+ * `tool_call_id`; if not, we resolve it from the `task_id` -> Agent tool-call
+ * id index built upstream. With the tool-call id attached, the return card can
+ * open the dispatch's todo sheet / subagent conversation (same correlation seam
+ * as the dispatch chip, pbnxa #343). No-op when the message carries no
+ * notification.
+ */
+private fun UiMessage.correlateSubagentNotification(
+    subagentToolCallByTaskId: Map<String, String>,
+): UiMessage {
+    val notification = subagentNotification ?: return this
+    val taskId = notification.taskId
+    val correlatedToolCallId = when {
+        !notification.toolCallId.isNullOrBlank() -> notification.toolCallId
+        !taskId.isNullOrBlank() -> subagentToolCallByTaskId[taskId]
+        else -> null
+    }
+    return if (correlatedToolCallId != notification.toolCallId) {
+        copy(subagentNotification = notification.copy(toolCallId = correlatedToolCallId))
+    } else {
+        this
+    }
+}
+
 private fun extractSendMessageText(arguments: String, returnContent: String): String {
     return try {
         val msgStart = arguments.indexOf("\"message\"")
@@ -565,14 +578,34 @@ private fun extractSendMessageText(arguments: String, returnContent: String): St
 }
 
 fun AppMessage.toUiMessage(): UiMessage {
-    val role = when (messageType) {
-        MessageType.USER -> "user"
-        MessageType.ASSISTANT -> "assistant"
-        MessageType.REASONING -> "assistant"
-        MessageType.TOOL_CALL -> "tool"
-        MessageType.TOOL_RETURN -> "tool"
-        MessageType.APPROVAL_REQUEST -> "approval"
-        MessageType.APPROVAL_RESPONSE -> "approval"
+    // letta-mobile-rnocg: a completed background subagent surfaces its return
+    // by INJECTING a `<task-notification>` envelope into the conversation as a
+    // USER-role message (the server's async-tool-return convention). Rendered
+    // naively that paints a giant green right-aligned user bubble full of raw
+    // XML + the subagent's markdown report — reading as if the operator sent a
+    // wall of XML. Detect that envelope on EITHER a USER or ASSISTANT inbound
+    // message and reclassify it as an agent-return so it routes to the
+    // left-aligned, recede-by-default SubagentNotificationCard instead of the
+    // user bubble. Note: ASSISTANT was already parsed below; here we also catch
+    // the USER injection path (the actual on-device bug).
+    val subagentNotification = when (messageType) {
+        MessageType.ASSISTANT, MessageType.USER -> extractSubagentNotification(content)
+        else -> null
+    }
+    val role = when {
+        // A task-notification is an agent-return, never user input — flip the
+        // role so alignment, bubble shape, avatar, and renderer all treat it as
+        // an agent-side message.
+        subagentNotification != null -> "assistant"
+        else -> when (messageType) {
+            MessageType.USER -> "user"
+            MessageType.ASSISTANT -> "assistant"
+            MessageType.REASONING -> "assistant"
+            MessageType.TOOL_CALL -> "tool"
+            MessageType.TOOL_RETURN -> "tool"
+            MessageType.APPROVAL_REQUEST -> "approval"
+            MessageType.APPROVAL_RESPONSE -> "approval"
+        }
     }
     val toolCalls = when {
         messageType == MessageType.TOOL_CALL -> {
@@ -616,11 +649,6 @@ fun AppMessage.toUiMessage(): UiMessage {
             )
         }
         else -> null
-    }
-    val subagentNotification = if (messageType == MessageType.ASSISTANT) {
-        extractSubagentNotification(content)
-    } else {
-        null
     }
     val displayContent = when {
         messageType == MessageType.TOOL_CALL -> ""
