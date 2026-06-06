@@ -2,20 +2,20 @@ package com.letta.mobile.data.transport.api
 
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
-import com.letta.mobile.data.transport.ChannelTransport
+import com.letta.mobile.data.transport.ChannelTransportDefaults
+import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.JsonArray
 
 /**
- * Narrow public surface of [ChannelTransport] used by repositories and
- * bridge adapters. Tests can substitute hand-written fakes for this
- * interface instead of mocking the stateful concrete WebSocket transport
- * in a reused Gradle daemon JVM.
+ * Cross-platform transport surface used by repositories, chat bridges, and
+ * desktop/runtime adapters. Platform modules own the concrete socket/client
+ * implementation.
  */
 interface IChannelTransport {
-    val state: StateFlow<ChannelTransport.State>
+    val state: StateFlow<ChannelTransportState>
     val events: SharedFlow<ServerFrame>
 
     suspend fun connect(
@@ -40,24 +40,14 @@ interface IChannelTransport {
     fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult
 
     /**
-     * letta-mobile-2rkdj — Spec §11/§3.4: replay + live-tail a Run's
-     * frame log starting after [cursor]. Returns true if the
-     * `subscribe` frame was dispatched on the wire, false if the
-     * socket is not connected.
-     *
-     * Replayed frames arrive as [ServerFrame.SubscribeFrameMessage]
-     * envelopes on [events] in seq order; subscription terminates
-     * with [ServerFrame.SubscribeDone] once the run reaches a
-     * terminal status and the live-tail catches up.
-     *
-     * Pass `cursor = 0` for a full replay from the start of the run.
+     * Replay + live-tail a Run's frame log starting after [cursor].
      */
     fun subscribe(runId: String, cursor: Long = 0L): Boolean
 
     suspend fun sendCronList(
         agentId: String? = null,
         conversationId: String? = null,
-        timeoutMs: Long = ChannelTransport.DEFAULT_CRON_TIMEOUT_MS,
+        timeoutMs: Long = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS,
     ): ServerFrame.CronListResponse
 
     suspend fun sendCronAdd(
@@ -71,41 +61,31 @@ interface IChannelTransport {
         at: String? = null,
         timezone: String? = null,
         conversationId: String? = null,
-        timeoutMs: Long = ChannelTransport.DEFAULT_CRON_TIMEOUT_MS,
+        timeoutMs: Long = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS,
     ): ServerFrame.CronAddResponse
 
     suspend fun sendCronGet(
         taskId: String,
-        timeoutMs: Long = ChannelTransport.DEFAULT_CRON_TIMEOUT_MS,
+        timeoutMs: Long = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS,
     ): ServerFrame.CronGetResponse
 
     suspend fun sendCronDelete(
         taskId: String,
-        timeoutMs: Long = ChannelTransport.DEFAULT_CRON_TIMEOUT_MS,
+        timeoutMs: Long = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS,
     ): ServerFrame.CronDeleteResponse
 
     suspend fun sendCronDeleteAll(
         agentId: String,
-        timeoutMs: Long = ChannelTransport.DEFAULT_CRON_TIMEOUT_MS,
+        timeoutMs: Long = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS,
     ): ServerFrame.CronDeleteAllResponse
 
-    /**
-     * letta-mobile-73o2h.3 — §13.2: enumerate registered subagents.
-     * Active-only unless [all] is true. Mirrors [sendCronList]:
-     * resolves on the matching `subagent_list_response` frame via
-     * `request_id` correlation, throwing on timeout / send failure.
-     */
     suspend fun sendSubagentList(
         all: Boolean = false,
-        timeoutMs: Long = ChannelTransport.DEFAULT_CRON_TIMEOUT_MS,
+        timeoutMs: Long = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS,
     ): ServerFrame.SubagentListResponse
 
-    /**
-     * letta-mobile-73o2h.3 — §13.3: fetch one subagent's latest
-     * TodoWrite snapshot, keyed by the parent Agent [toolCallId].
-     */
     suspend fun sendSubagentTodos(
         toolCallId: String,
-        timeoutMs: Long = ChannelTransport.DEFAULT_CRON_TIMEOUT_MS,
+        timeoutMs: Long = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS,
     ): ServerFrame.SubagentTodosResponse
 }

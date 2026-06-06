@@ -9,6 +9,7 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.transport.ChannelTransport
+import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.testutil.FakeTimelineExternalTransportWriter
 import com.letta.mobile.testutil.TestData
@@ -311,7 +312,7 @@ class ChatConversationCoordinatorTest {
 
     private fun mockBridge(sendAccepted: Boolean): WsChatBridge = mockk(relaxed = true) {
         every { state } returns MutableStateFlow(
-            ChannelTransport.State.Connected(
+            ChannelTransportState.Connected(
                 serverId = "server-1",
                 sessionId = "sess-1",
                 deviceId = "android-letta-mobile",

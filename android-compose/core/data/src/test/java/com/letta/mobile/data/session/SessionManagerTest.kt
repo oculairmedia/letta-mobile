@@ -1070,12 +1070,12 @@ class SessionManagerTest {
         )
         advanceUntilIdle()
 
-        assertTrue(proxy.state.value is com.letta.mobile.data.transport.ChannelTransport.State.Idle)
+        assertTrue(proxy.state.value is com.letta.mobile.data.transport.ChannelTransportState.Idle)
 
         settingsRepository.activeConfigState.value = config("backend-b")
         advanceUntilIdle()
 
-        assertTrue(proxy.state.value is com.letta.mobile.data.transport.ChannelTransport.State.Idle)
+        assertTrue(proxy.state.value is com.letta.mobile.data.transport.ChannelTransportState.Idle)
     }
 
     private fun fakeLettaApiClient(): LettaApiClient = mockk(relaxed = true)
