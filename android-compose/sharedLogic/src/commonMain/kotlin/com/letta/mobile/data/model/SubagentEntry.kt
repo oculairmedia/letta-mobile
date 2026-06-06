@@ -17,10 +17,13 @@ import kotlinx.serialization.Serializable
  *    background dispatch's return body; they are absent for synchronous
  *    dispatches that haven't returned identity yet.
  *
- * Status vocabulary (§13.2): `running` | `completed` | `failed`. The shim
- * is the source of truth; mobile renders whatever string arrives —
- * [SubagentStatus] exposes the documented vocabulary as constants without
- * forcing a closed enum (forward-compat with future shim additions).
+ * Status vocabulary (§13.2): `running` | `completed` | `failed` |
+ * `cancelled`. `cancelled` (letta-mobile-drv4a) is the NON-CLEAN terminal
+ * outcome — a subagent that was killed / evicted / orphaned / TaskStop'd, or
+ * whose backing process died without a completion frame. The shim is the
+ * source of truth; mobile renders whatever string arrives — [SubagentStatus]
+ * exposes the documented vocabulary as constants without forcing a closed
+ * enum (forward-compat with future shim additions).
  *
  * Timestamps are ISO-8601 strings on the wire; mobile does not parse them
  * eagerly at this layer.
@@ -41,6 +44,16 @@ object SubagentStatus {
     const val RUNNING = "running"
     const val COMPLETED = "completed"
     const val FAILED = "failed"
+
+    /**
+     * letta-mobile-drv4a: non-clean terminal outcome — the subagent was
+     * killed / evicted (idle reaper) / orphaned / TaskStop'd, or its backing
+     * process/session/run died without writing a completion frame. The shim's
+     * reaper finalizes such entries `cancelled` so the chip stops being stuck
+     * `running` forever. Rendered as a terminal (failed-styled) chip that
+     * lingers then dismisses (29h9u).
+     */
+    const val CANCELLED = "cancelled"
 }
 
 /**

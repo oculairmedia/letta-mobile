@@ -49,4 +49,19 @@ object LettaSpacing {
     val avatarSize: Dp = xl  // 24.dp
     val iconSizeSmall: Dp = 14.dp
     val borderWidthThin: Dp = 1.dp
+
+    // letta-mobile-xrth2: homogeneous chip sizing for the active-subagent
+    // bar so subagent / self / background-task / terminal chips match the
+    // other tool chips. A single min-height + symmetric vertical padding
+    // removes the bottom-heavy asymmetry observed on device.
+    val chipMinHeight: Dp = 32.dp
+    val chipPaddingVertical: Dp = xs  // 6.dp — symmetric top/bottom
+    val chipPaddingHorizontal: Dp = md  // 12.dp
+
+    // letta-mobile-dvobc: the determinate progress ring drawn around a chip
+    // icon. The ring box is slightly larger than the inline icon so the arc
+    // sits cleanly OUTSIDE the glyph; the stroke is thin so it reads as
+    // chrome, not a control.
+    val chipRingSize: Dp = 20.dp
+    val chipRingStroke: Dp = 2.dp
 }

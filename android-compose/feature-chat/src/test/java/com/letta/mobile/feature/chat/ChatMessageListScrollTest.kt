@@ -18,8 +18,13 @@ import com.letta.mobile.feature.chat.screen.ChatAutoScrollAction
 import com.letta.mobile.feature.chat.screen.chatRenderItemSeesLiveScale
 import com.letta.mobile.feature.chat.screen.calculateLazyIndexForRenderItem
 import com.letta.mobile.feature.chat.screen.autoScrollAction
+import com.letta.mobile.feature.chat.screen.chatFadeShowBottom
+import com.letta.mobile.feature.chat.screen.chatFadeShowTop
+import com.letta.mobile.feature.chat.screen.chatFadeTargetColor
 import com.letta.mobile.feature.chat.screen.newestMessageAutoScrollSignature
 import com.letta.mobile.feature.chat.screen.shouldForceScrollOnUserSend
+import androidx.compose.ui.graphics.Color
+import com.letta.mobile.ui.theme.ChatBackground
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 
@@ -382,6 +387,56 @@ class ChatMessageListScrollTest {
                 isPinching = false,
                 scaleWindowIndexRange = 2..4,
                 itemIndex = 7,
+            ),
+        )
+    }
+
+    // letta-mobile-58qlr: fading-edge gating + target-color logic.
+
+    @Test
+    fun `top fade shows only when there is content scrolled off the top`() {
+        // reverseLayout: visual top == canScrollBackward.
+        assertTrue(chatFadeShowTop(canScrollBackward = true))
+        assertFalse(chatFadeShowTop(canScrollBackward = false))
+    }
+
+    @Test
+    fun `bottom fade shows only when there is content scrolled off the bottom`() {
+        // reverseLayout: visual bottom == canScrollForward.
+        assertTrue(chatFadeShowBottom(canScrollForward = true))
+        assertFalse(chatFadeShowBottom(canScrollForward = false))
+    }
+
+    @Test
+    fun `fade target uses solid chat background color so it blends exactly`() {
+        val solid = ChatBackground.SolidColor(Color(0xFF123456), "Custom")
+        assertEquals(
+            Color(0xFF123456),
+            chatFadeTargetColor(
+                chatBackground = solid,
+                fallbackContainerColor = Color(0xFF999999),
+            ),
+        )
+    }
+
+    @Test
+    fun `fade target falls back to container color for default and gradient backgrounds`() {
+        val fallback = Color(0xFF222222)
+        assertEquals(
+            fallback,
+            chatFadeTargetColor(
+                chatBackground = ChatBackground.Default,
+                fallbackContainerColor = fallback,
+            ),
+        )
+        assertEquals(
+            fallback,
+            chatFadeTargetColor(
+                chatBackground = ChatBackground.Gradient(
+                    colors = listOf(Color(0xFF000000), Color(0xFFFFFFFF)),
+                    name = "Mono",
+                ),
+                fallbackContainerColor = fallback,
             ),
         )
     }

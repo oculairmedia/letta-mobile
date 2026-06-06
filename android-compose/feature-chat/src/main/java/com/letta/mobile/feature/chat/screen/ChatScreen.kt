@@ -169,10 +169,12 @@ internal fun ChatScreen(
             .collectAsStateWithLifecycle(initialValue = persistentListOf<ActiveSubagent>())
         var lingerTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
         LaunchedEffect(subagentSnapshot) {
-            // Only tick while a terminal chip is lingering — when nothing is
-            // terminal there is no window to expire, so we idle (no wakeups on
-            // the hot streaming path).
-            while (subagentSnapshot.any { it.isTerminal }) {
+            // Tick while a terminal chip is lingering (to expire its window) OR
+            // while any chip is RUNNING (letta-mobile-dvobc: so the "stuck"
+            // ring heuristic re-evaluates elapsed-since-last-update without a
+            // new WS frame). When the bar is fully idle there is nothing to
+            // re-evaluate, so we idle — no wakeups on the hot streaming path.
+            while (subagentSnapshot.any { it.isTerminal || it.isActive }) {
                 lingerTick = System.currentTimeMillis()
                 kotlinx.coroutines.delay(1_000)
             }
@@ -391,6 +393,7 @@ internal fun ChatScreen(
                                 onFontScaleChange = { viewModel.setChatFontScale(it) },
                                 chatMode = chatMode,
                                 modifier = Modifier.fillMaxSize(),
+                                chatBackground = chatBackground,
                             )
                         }
                         else -> {
@@ -412,6 +415,7 @@ internal fun ChatScreen(
                                 onFontScaleChange = { viewModel.setChatFontScale(it) },
                                 chatMode = chatMode,
                                 modifier = Modifier.fillMaxSize(),
+                                chatBackground = chatBackground,
                             )
                         }
                     }
@@ -426,6 +430,11 @@ internal fun ChatScreen(
                 // streaming.
                 ActiveSubagentBar(
                     subagents = activeSubagents,
+                    // letta-mobile-dvobc: drive the "stuck" ring heuristic off
+                    // the same coarse 1s tick the linger window uses, so a
+                    // running chip's ring flips to yellow without a new WS
+                    // frame.
+                    now = lingerTick,
                     onChipClick = { subagent ->
                         tappedSubagentTarget = SubagentTodoSheetTarget(
                             toolCallId = subagent.id,
@@ -627,6 +636,7 @@ internal fun NoConversationChatContent(
     onFontScaleChange: (Float) -> Unit = {},
     chatMode: String = "interactive",
     modifier: Modifier = Modifier,
+    chatBackground: ChatBackground = ChatBackground.Default,
 ) {
     // letta-mobile-qkct: a fresh Client Mode send remains in
     // NoConversation until the gateway returns the newly-created
@@ -656,6 +666,7 @@ internal fun NoConversationChatContent(
             onFontScaleChange = onFontScaleChange,
             chatMode = chatMode,
             modifier = modifier,
+            chatBackground = chatBackground,
         )
     }
 }
@@ -677,6 +688,7 @@ private fun ChatContent(
     onFontScaleChange: (Float) -> Unit = {},
     chatMode: String = "interactive",
     modifier: Modifier = Modifier,
+    chatBackground: ChatBackground = ChatBackground.Default,
 ) {
     val renderItemsCache = remember { IncrementalChatRenderItemsCache() }
     val chatDisplayMode = chatMode.toChatDisplayMode()
@@ -713,6 +725,7 @@ private fun ChatContent(
                     onToggleRunCollapsed = onToggleRunCollapsed,
                     onToggleReasoningExpanded = onToggleReasoningExpanded,
                     modifier = Modifier.weight(1f),
+                    chatBackground = chatBackground,
                 )
             }
             A2uiSurfaceStack(

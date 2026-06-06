@@ -364,6 +364,100 @@ class MessageMapperTest : WordSpec({
             ui[1].subagentNotification!!.toolCallId shouldBe "toolu-agent-2"
         }
 
+        // letta-mobile-rnocg: the actual on-device bug. A completed background
+        // subagent surfaces its return by INJECTING a `<task-notification>`
+        // envelope as a USER-role message. Rendered naively that paints a giant
+        // green right-aligned USER bubble full of raw XML + markdown report.
+        // The mapper must reclassify it as an agent-return (role=assistant +
+        // structured subagentNotification, content suppressed) so it routes to
+        // the left-aligned, recede-by-default SubagentNotificationCard.
+        "render injected USER task-notification as an agent-return, NOT a user bubble" {
+            val messages = listOf(
+                TestData.appMessage(id = "u1", messageType = MessageType.USER, content = "Run the review in the background"),
+                TestData.appMessage(
+                    id = "task-note-injected",
+                    // The server injects the return as a USER-role message.
+                    messageType = MessageType.USER,
+                    content = """
+                        <task-notification>
+                          <status>completed</status>
+                          <summary>Background review finished with one finding.</summary>
+                          <result># Review report
+
+The implementation looks solid. One actionable issue: handle the null case.</result>
+                          <usage>tokens=4096 tools=7 duration=42s</usage>
+                          <task_id>task-789</task_id>
+                          <agent_id>agent-local-789</agent_id>
+                          Full transcript at: task://task-789
+                        </task-notification>
+                    """.trimIndent(),
+                ),
+            )
+
+            val ui = messages.toUiMessages()
+
+            ui shouldHaveSize 2
+            // The leading genuine user prompt stays a user bubble.
+            ui[0].role shouldBe "user"
+            ui[0].content shouldBe "Run the review in the background"
+            // The injected return is reclassified as an agent-return: NOT a user
+            // bubble, raw XML/markdown suppressed, structured notification parsed.
+            val returnMsg = ui[1]
+            returnMsg.role shouldBe "assistant"
+            returnMsg.content shouldBe ""
+            returnMsg.subagentNotification.shouldNotBeNull()
+            returnMsg.subagentNotification!!.status shouldBe "completed"
+            returnMsg.subagentNotification!!.summary shouldBe "Background review finished with one finding."
+            returnMsg.subagentNotification!!.result.shouldNotBeNull()
+            returnMsg.subagentNotification!!.result!!.shouldNotBeBlank()
+            returnMsg.subagentNotification!!.usage shouldBe "tokens=4096 tools=7 duration=42s"
+            returnMsg.subagentNotification!!.taskId shouldBe "task-789"
+            returnMsg.subagentNotification!!.subagentAgentId shouldBe "agent-local-789"
+            returnMsg.subagentNotification!!.transcriptUri shouldBe "task://task-789"
+        }
+
+        // letta-mobile-rnocg: the injected USER return must still correlate back
+        // to its dispatch (Agent tool call) by task id — same correlation seam as
+        // the ASSISTANT path — so the return card can open the subagent's todo
+        // sheet / conversation.
+        "correlate injected USER task-notification back to its Agent tool call" {
+            val messages = listOf(
+                TestData.appMessage(
+                    id = "agent-call",
+                    messageType = MessageType.TOOL_CALL,
+                    content = """{"subagent_type":"general","description":"Review implementation","run_in_background":true,"prompt":"Do the review"}""",
+                    toolName = "Agent",
+                    toolCallId = "toolu-agent-9",
+                ),
+                TestData.appMessage(
+                    id = "agent-return",
+                    messageType = MessageType.TOOL_RETURN,
+                    content = """{"task_id":"task-999","agent_id":"agent-local-999"}""",
+                    toolName = "Agent",
+                    toolCallId = "toolu-agent-9",
+                ),
+                TestData.appMessage(
+                    id = "task-note-injected",
+                    messageType = MessageType.USER,
+                    content = """
+                        <task-notification>
+                          <status>completed</status>
+                          <summary>Review finished.</summary>
+                          <task_id>task-999</task_id>
+                        </task-notification>
+                    """.trimIndent(),
+                ),
+            )
+
+            val ui = messages.toUiMessages()
+
+            // Tool call/return fold into one card; the injected return is the 2nd.
+            val returnMsg = ui.last()
+            returnMsg.role shouldBe "assistant"
+            returnMsg.subagentNotification.shouldNotBeNull()
+            returnMsg.subagentNotification!!.toolCallId shouldBe "toolu-agent-9"
+        }
+
         "promote send_message tool to assistant bubble" {
             val messages = listOf(
                 TestData.appMessage(id = "m1", messageType = MessageType.USER, content = "Hello"),

@@ -51,6 +51,7 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.DateSeparator
 import com.letta.mobile.ui.components.ScrollToBottomFab
+import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.LocalChatFontScale
 import com.letta.mobile.ui.theme.LocalChatIsPinching
@@ -300,6 +301,7 @@ internal fun ChatMessageList(
     onToggleRunCollapsed: (String) -> Unit,
     onToggleReasoningExpanded: (String) -> Unit,
     modifier: Modifier = Modifier,
+    chatBackground: ChatBackground = ChatBackground.Default,
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -483,7 +485,16 @@ internal fun ChatMessageList(
                         previousNewestMessageId = previousNewestId,
                     )
                 ) {
-                    listState.animateScrollToItem(0)
+                    // letta-mobile-58qlr.1: land the just-sent prompt CLEAR of
+                    // the bottom fading edge. With reverseLayout=true item 0 is
+                    // the newest item at the visual bottom; animateScrollToItem
+                    // would pin it flush to the bottom edge, where the
+                    // ChatFadingEdges overlay (bottom ~fade length) would dim
+                    // the user's own fresh prompt. A negative scrollOffset
+                    // shifts item 0 UP by the fade length so the whole bubble
+                    // sits above the fade zone and stays fully visible.
+                    val sendScrollOffset = with(density) { -ChatFadeEdgeLength.roundToPx() }
+                    listState.animateScrollToItem(0, sendScrollOffset)
                     return@collect
                 }
 
@@ -666,6 +677,26 @@ internal fun ChatMessageList(
                     suppressPinchLayoutAnimations
                 ),
         ) {
+            // letta-mobile-58qlr: soft gradient fade at the top/bottom scroll
+            // edges (replaces the harsh clip line). The fade target is the
+            // color the chat actually draws on — mirroring the ThinkingShader
+            // bgColor logic in ChatScreen — so content dissolves exactly into
+            // the background. Applied on a wrapping Box (separate node) so its
+            // offscreen DstIn layer doesn't clobber the LazyColumn's own
+            // rasterization graphicsLayer used during pinch.
+            val fadeTargetColor = chatFadeTargetColor(
+                chatBackground = chatBackground,
+                fallbackContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+            )
+            ChatFadingEdgesBox(
+                listState = listState,
+                targetColor = fadeTargetColor,
+                modifier = Modifier.fillMaxSize(),
+                // letta-mobile-58qlr.1: don't fade the bottom edge while pinned
+                // to the newest message — keeps a just-sent prompt / live
+                // streaming bubble fully visible instead of dimming it.
+                suppressBottom = isNearBottom,
+            ) {
             LazyColumn(
                 state = listState,
                 // Use the chat theme's compact gutter so assistant prose,
@@ -879,6 +910,7 @@ internal fun ChatMessageList(
                     }
                 }
             }
+            } // letta-mobile-58qlr: end ChatFadingEdgesBox
         } // letta-mobile-5e0f.r2: end CompositionLocalProvider(LocalChatIsPinching)
 
         ScrollToBottomFab(
