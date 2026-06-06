@@ -56,6 +56,11 @@ class WsActiveSubagentSourceTest {
         assertEquals(ActiveSubagent.Status.RUNNING, SubagentStatus.RUNNING.toActiveSubagentStatus())
         assertEquals(ActiveSubagent.Status.COMPLETED, SubagentStatus.COMPLETED.toActiveSubagentStatus())
         assertEquals(ActiveSubagent.Status.FAILED, SubagentStatus.FAILED.toActiveSubagentStatus())
+        // letta-mobile-drv4a: `cancelled` (killed / evicted / orphaned /
+        // TaskStop'd / process gone) is terminal → maps to FAILED so the chip
+        // lingers then dismisses instead of being stuck running.
+        assertEquals(ActiveSubagent.Status.FAILED, SubagentStatus.CANCELLED.toActiveSubagentStatus())
+        assertTrue(SubagentStatus.CANCELLED.toActiveSubagentStatus().isTerminal)
         // Forward-compat: unknown status keeps the chip running.
         assertEquals(ActiveSubagent.Status.RUNNING, "some_future_state".toActiveSubagentStatus())
     }
