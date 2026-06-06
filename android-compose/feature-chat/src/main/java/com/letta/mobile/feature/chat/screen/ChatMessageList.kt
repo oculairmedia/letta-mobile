@@ -485,7 +485,16 @@ internal fun ChatMessageList(
                         previousNewestMessageId = previousNewestId,
                     )
                 ) {
-                    listState.animateScrollToItem(0)
+                    // letta-mobile-58qlr.1: land the just-sent prompt CLEAR of
+                    // the bottom fading edge. With reverseLayout=true item 0 is
+                    // the newest item at the visual bottom; animateScrollToItem
+                    // would pin it flush to the bottom edge, where the
+                    // ChatFadingEdges overlay (bottom ~fade length) would dim
+                    // the user's own fresh prompt. A negative scrollOffset
+                    // shifts item 0 UP by the fade length so the whole bubble
+                    // sits above the fade zone and stays fully visible.
+                    val sendScrollOffset = with(density) { -ChatFadeEdgeLength.roundToPx() }
+                    listState.animateScrollToItem(0, sendScrollOffset)
                     return@collect
                 }
 
@@ -683,6 +692,10 @@ internal fun ChatMessageList(
                 listState = listState,
                 targetColor = fadeTargetColor,
                 modifier = Modifier.fillMaxSize(),
+                // letta-mobile-58qlr.1: don't fade the bottom edge while pinned
+                // to the newest message — keeps a just-sent prompt / live
+                // streaming bubble fully visible instead of dimming it.
+                suppressBottom = isNearBottom,
             ) {
             LazyColumn(
                 state = listState,

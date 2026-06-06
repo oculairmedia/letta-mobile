@@ -139,13 +139,20 @@ internal fun ChatFadingEdgesBox(
     targetColor: Color,
     modifier: Modifier = Modifier,
     fadeLength: Dp = ChatFadeEdgeLength,
+    // letta-mobile-58qlr.1: when true, the BOTTOM fade is suppressed regardless
+    // of scroll state. The caller sets this while pinned to the newest edge so
+    // a just-sent user prompt (or the live streaming bubble) at the bottom is
+    // never dimmed by the fade. The transient typing/streaming slot can make
+    // canScrollForward momentarily true even when the user is effectively at
+    // the bottom; this guard keeps their fresh prompt fully visible.
+    suppressBottom: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val showTop by remember(listState) {
         derivedStateOf { chatFadeShowTop(listState.canScrollBackward) }
     }
-    val showBottom by remember(listState) {
-        derivedStateOf { chatFadeShowBottom(listState.canScrollForward) }
+    val showBottom by remember(listState, suppressBottom) {
+        derivedStateOf { !suppressBottom && chatFadeShowBottom(listState.canScrollForward) }
     }
     // Touch density so the unit-conversion in the modifier is well-defined even
     // if this composable is ever previewed without a provided density.
