@@ -6,8 +6,10 @@ import com.letta.mobile.feature.chat.screen.DoubleTapImageScale
 import com.letta.mobile.feature.chat.screen.ImageTransformState
 import com.letta.mobile.feature.chat.screen.SwipeDismissThresholdPx
 import com.letta.mobile.feature.chat.screen.applyImageTransformGesture
+import com.letta.mobile.feature.chat.screen.chatImageViewerTopControlsY
 import com.letta.mobile.feature.chat.screen.clampImageOffset
 import com.letta.mobile.feature.chat.screen.doubleTapImageTransform
+import com.letta.mobile.feature.chat.screen.sanitizeImageTransform
 import com.letta.mobile.feature.chat.screen.shouldDismissImageViewer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -72,6 +74,53 @@ class ChatImageViewerTransformTest {
         assertEquals(DoubleTapImageScale, zoomed.scale, 0.001f)
         assertEquals(1f, reset.scale, 0.001f)
         assertEquals(Offset.Zero, reset.offset)
+    }
+
+    @Test
+    fun `non finite gesture values do not poison transform state after release`() {
+        val next = applyImageTransformGesture(
+            state = ImageTransformState(
+                scale = Float.NaN,
+                offset = Offset(Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY),
+            ),
+            zoom = Float.NaN,
+            pan = Offset(Float.POSITIVE_INFINITY, Float.NaN),
+            centroid = Offset(Float.NaN, Float.NEGATIVE_INFINITY),
+            containerSize = container,
+        )
+
+        assertEquals(1f, next.scale, 0.001f)
+        assertEquals(Offset.Zero, next.offset)
+        assertTrue(next.scale.isFinite())
+        assertTrue(next.offset.x.isFinite())
+        assertTrue(next.offset.y.isFinite())
+    }
+
+    @Test
+    fun `sanitize keeps released pinch transform finite and visible`() {
+        val released = sanitizeImageTransform(
+            state = ImageTransformState(
+                scale = 10f,
+                offset = Offset(Float.NaN, 10_000f),
+            ),
+            containerSize = container,
+        )
+
+        assertEquals(5f, released.scale, 0.001f)
+        assertEquals(0f, released.offset.x, 0.001f)
+        assertEquals(600f, released.offset.y, 0.001f)
+        assertTrue(released.scale.isFinite())
+        assertTrue(released.offset.x.isFinite())
+        assertTrue(released.offset.y.isFinite())
+    }
+
+    @Test
+    fun `top controls are placed below safe drawing inset`() {
+        val safeDrawingTop = 96f
+        val controlsY = chatImageViewerTopControlsY(safeDrawingTopPx = safeDrawingTop, density = 3f)
+
+        assertTrue(controlsY >= safeDrawingTop)
+        assertEquals(132f, controlsY, 0.001f)
     }
 
     @Test

@@ -23,10 +23,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Icon
@@ -81,6 +86,7 @@ internal const val MinImageScale = 1f
 internal const val DoubleTapImageScale = 2.5f
 internal const val MaxImageScale = 5f
 internal const val SwipeDismissThresholdPx = 160f
+internal val ChatImageViewerControlsPadding = 12.dp
 
 internal val ChatImageViewerScaleKey = SemanticsPropertyKey<Float>("ChatImageViewerScale")
 internal var SemanticsPropertyReceiver.chatImageViewerScale by ChatImageViewerScaleKey
@@ -101,14 +107,18 @@ internal fun applyImageTransformGesture(
     centroid: Offset,
     containerSize: Size,
 ): ImageTransformState {
-    val previousScale = state.scale
-    val nextScale = (previousScale * zoom).coerceIn(MinImageScale, MaxImageScale)
+    val safeState = sanitizeImageTransform(state, containerSize)
+    val safeZoom = zoom.takeIf { it.isFinite() && it > 0f } ?: 1f
+    val safePan = pan.takeIfFinite() ?: Offset.Zero
+    val containerCenter = containerSize.centerOrZero()
+    val safeCentroid = centroid.takeIfFinite() ?: containerCenter
+    val previousScale = safeState.scale
+    val nextScale = (previousScale * safeZoom).coerceIn(MinImageScale, MaxImageScale)
     if (nextScale <= MinImageScale) return ImageTransformState()
 
-    val containerCenter = Offset(containerSize.width / 2f, containerSize.height / 2f)
-    val centroidShift = centroid - containerCenter
+    val centroidShift = safeCentroid - containerCenter
     val scaleRatio = if (previousScale == 0f) 1f else nextScale / previousScale
-    val nextOffset = (state.offset + centroidShift) * scaleRatio - centroidShift + pan
+    val nextOffset = (safeState.offset + centroidShift) * scaleRatio - centroidShift + safePan
     return ImageTransformState(
         scale = nextScale,
         offset = clampImageOffset(nextOffset, nextScale, containerSize),
@@ -116,13 +126,44 @@ internal fun applyImageTransformGesture(
 }
 
 internal fun clampImageOffset(offset: Offset, scale: Float, containerSize: Size): Offset {
-    if (scale <= MinImageScale || containerSize.width <= 0f || containerSize.height <= 0f) return Offset.Zero
+    if (
+        scale <= MinImageScale ||
+        !scale.isFinite() ||
+        !containerSize.width.isFinite() ||
+        !containerSize.height.isFinite() ||
+        containerSize.width <= 0f ||
+        containerSize.height <= 0f
+    ) return Offset.Zero
+    val safeOffset = offset.withFiniteAxes()
     val maxX = ((containerSize.width * scale) - containerSize.width) / 2f
     val maxY = ((containerSize.height * scale) - containerSize.height) / 2f
+    if (!maxX.isFinite() || !maxY.isFinite()) return Offset.Zero
     return Offset(
-        x = offset.x.coerceIn(-maxX, maxX),
-        y = offset.y.coerceIn(-maxY, maxY),
+        x = safeOffset.x.coerceIn(-maxX, maxX),
+        y = safeOffset.y.coerceIn(-maxY, maxY),
     )
+}
+
+internal fun sanitizeImageTransform(state: ImageTransformState, containerSize: Size): ImageTransformState {
+    val safeScale = state.scale.takeIf { it.isFinite() }?.coerceIn(MinImageScale, MaxImageScale) ?: MinImageScale
+    if (safeScale <= MinImageScale) return ImageTransformState()
+    return ImageTransformState(
+        scale = safeScale,
+        offset = clampImageOffset(state.offset, safeScale, containerSize),
+    )
+}
+
+private fun Offset.takeIfFinite(): Offset? = takeIf { x.isFinite() && y.isFinite() }
+
+private fun Offset.withFiniteAxes(): Offset = Offset(
+    x = x.takeIf { it.isFinite() } ?: 0f,
+    y = y.takeIf { it.isFinite() } ?: 0f,
+)
+
+private fun Size.centerOrZero(): Offset = if (width.isFinite() && height.isFinite()) {
+    Offset(width / 2f, height / 2f)
+} else {
+    Offset.Zero
 }
 
 internal fun doubleTapImageTransform(
@@ -140,6 +181,10 @@ internal fun doubleTapImageTransform(
         containerSize = containerSize,
     )
 }
+
+internal fun chatImageViewerTopControlsY(safeDrawingTopPx: Float, density: Float): Float =
+    safeDrawingTopPx.coerceAtLeast(0f) +
+        (ChatImageViewerControlsPadding.value * density.coerceAtLeast(0f))
 
 internal fun shouldDismissImageViewer(
     scale: Float,
@@ -218,7 +263,10 @@ private fun ChatImageViewerContent(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                    .windowInsetsPadding(
+                        WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+                    )
+                    .padding(ChatImageViewerControlsPadding),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -325,12 +373,9 @@ private fun ZoomableAttachmentImage(
         modifier = modifier
             .onSizeChanged { size ->
                 containerSize = size
-                transform = transform.copy(
-                    offset = clampImageOffset(
-                        transform.offset,
-                        transform.scale,
-                        Size(size.width.toFloat(), size.height.toFloat()),
-                    ),
+                transform = sanitizeImageTransform(
+                    state = transform,
+                    containerSize = Size(size.width.toFloat(), size.height.toFloat()),
                 )
             }
             .semantics {
@@ -383,6 +428,10 @@ private fun ZoomableAttachmentImage(
                         zoomedAtGestureStart = zoomedAtGestureStart || transform.scale > 1.02f
                         pointersPressed = event.changes.any { it.pressed }
                     } while (pointersPressed)
+                    transform = sanitizeImageTransform(
+                        state = transform,
+                        containerSize = Size(containerSize.width.toFloat(), containerSize.height.toFloat()),
+                    )
                     if (!transformed && shouldDismissImageViewer(transform.scale, verticalDragDistance)) {
                         onDismiss()
                     }
