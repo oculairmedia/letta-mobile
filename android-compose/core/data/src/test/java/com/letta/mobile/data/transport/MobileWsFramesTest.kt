@@ -337,6 +337,49 @@ class MobileWsFramesTest : WordSpec({
             parsed.seq shouldBe 19L
         }
 
+        "letta-mobile-ipp8z tolerates SDK-Transport assistant frames missing mobile metadata" {
+            val payload = """
+                {"v":1,"type":"assistant_message","id":"cm-stream-1","content":"hello"}
+            """.trimIndent()
+            val parsed = json.decodeFromString(ServerFrameSerializer, payload)
+            parsed.shouldBeInstanceOf<ServerFrame.AssistantMessage>()
+            parsed.ts shouldBe ""
+            parsed.agentId shouldBe null
+            parsed.conversationId shouldBe null
+            parsed.turnId shouldBe null
+            parsed.runId shouldBe null
+            parsed.content shouldBe "hello"
+        }
+
+        "letta-mobile-ipp8z tolerates SDK-Transport stop and usage frames missing mobile metadata" {
+            val stop = json.decodeFromString(
+                ServerFrameSerializer,
+                """
+                {"v":1,"type":"stop_reason","stop_reason":"end_turn"}
+                """.trimIndent(),
+            )
+            stop.shouldBeInstanceOf<ServerFrame.StopReason>()
+            stop.id shouldBe ""
+            stop.ts shouldBe ""
+            stop.turnId shouldBe null
+            stop.runId shouldBe null
+            stop.stopReason shouldBe "end_turn"
+
+            val usage = json.decodeFromString(
+                ServerFrameSerializer,
+                """
+                {"v":1,"type":"usage_statistics","prompt_tokens":12,"total_tokens":18}
+                """.trimIndent(),
+            )
+            usage.shouldBeInstanceOf<ServerFrame.UsageStatistics>()
+            usage.id shouldBe ""
+            usage.ts shouldBe ""
+            usage.turnId shouldBe null
+            usage.runId shouldBe null
+            usage.promptTokens shouldBe 12L
+            usage.totalTokens shouldBe 18L
+        }
+
         "letta-mobile-2rkdj assistant and reasoning frames surface run seq metadata" {
             val assistant = json.decodeFromString(
                 ServerFrameSerializer,
