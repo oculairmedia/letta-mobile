@@ -60,6 +60,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
+import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
@@ -212,6 +213,12 @@ internal fun ChatScreen(
         // first-class subagent timeline cards both set the same target so
         // active bar + dispatch/result chrome open one coherent todo surface.
         var tappedSubagentTarget by remember { mutableStateOf<SubagentTodoSheetTarget?>(null) }
+        var imageViewerState by remember {
+            mutableStateOf<Pair<kotlinx.collections.immutable.ImmutableList<UiImageAttachment>, Int>?>(null)
+        }
+        val openImageViewer: (List<UiImageAttachment>, Int) -> Unit = { attachments, index ->
+            imageViewerState = attachments.toImmutableList() to index
+        }
 
         LaunchedEffect(composerState.error) {
             val message = composerState.error ?: return@LaunchedEffect
@@ -388,6 +395,7 @@ internal fun ChatScreen(
                                 onToggleReasoningExpanded = viewModel::toggleReasoningExpanded,
                                 onA2uiAction = viewModel::submitA2uiAction,
                                 onDismissA2uiSurface = viewModel::dismissA2uiSurface,
+                                onAttachmentImageTap = openImageViewer,
                                 activeFontScale = activeFontScale,
                                 onActiveFontScaleChange = { activeFontScale = it },
                                 onFontScaleChange = { viewModel.setChatFontScale(it) },
@@ -410,6 +418,7 @@ internal fun ChatScreen(
                                 onToggleReasoningExpanded = viewModel::toggleReasoningExpanded,
                                 onA2uiAction = viewModel::submitA2uiAction,
                                 onDismissA2uiSurface = viewModel::dismissA2uiSurface,
+                                onAttachmentImageTap = openImageViewer,
                                 activeFontScale = activeFontScale,
                                 onActiveFontScaleChange = { activeFontScale = it },
                                 onFontScaleChange = { viewModel.setChatFontScale(it) },
@@ -541,6 +550,15 @@ internal fun ChatScreen(
                     .padding(LettaSpacing.lg),
             )
 
+            imageViewerState?.let { (viewerAttachments, initialIndex) ->
+                ChatImageViewer(
+                    attachments = viewerAttachments,
+                    initialPage = initialIndex,
+                    onDismiss = { imageViewerState = null },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+
             if (chatMode == "debug" && state.a2uiDebugFrames.isNotEmpty()) {
                 A2uiDebugOverlay(
                     frames = state.a2uiDebugFrames,
@@ -631,6 +649,7 @@ internal fun NoConversationChatContent(
     onToggleReasoningExpanded: (String) -> Unit,
     onA2uiAction: (A2uiAction) -> Unit = {},
     onDismissA2uiSurface: (String) -> Unit = {},
+    onAttachmentImageTap: (List<UiImageAttachment>, Int) -> Unit = { _, _ -> },
     activeFontScale: Float = 1f,
     onActiveFontScaleChange: (Float) -> Unit = {},
     onFontScaleChange: (Float) -> Unit = {},
@@ -661,6 +680,7 @@ internal fun NoConversationChatContent(
             onToggleReasoningExpanded = onToggleReasoningExpanded,
             onA2uiAction = onA2uiAction,
             onDismissA2uiSurface = onDismissA2uiSurface,
+            onAttachmentImageTap = onAttachmentImageTap,
             activeFontScale = activeFontScale,
             onActiveFontScaleChange = onActiveFontScaleChange,
             onFontScaleChange = onFontScaleChange,
@@ -683,6 +703,7 @@ private fun ChatContent(
     onToggleReasoningExpanded: (String) -> Unit,
     onA2uiAction: (A2uiAction) -> Unit = {},
     onDismissA2uiSurface: (String) -> Unit = {},
+    onAttachmentImageTap: (List<UiImageAttachment>, Int) -> Unit = { _, _ -> },
     activeFontScale: Float = 1f,
     onActiveFontScaleChange: (Float) -> Unit = {},
     onFontScaleChange: (Float) -> Unit = {},
@@ -724,6 +745,7 @@ private fun ChatContent(
                     onSubmitApproval = onSubmitApproval,
                     onToggleRunCollapsed = onToggleRunCollapsed,
                     onToggleReasoningExpanded = onToggleReasoningExpanded,
+                    onAttachmentImageTap = onAttachmentImageTap,
                     modifier = Modifier.weight(1f),
                     chatBackground = chatBackground,
                 )
