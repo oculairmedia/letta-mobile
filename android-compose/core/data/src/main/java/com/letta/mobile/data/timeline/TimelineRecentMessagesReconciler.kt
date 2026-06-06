@@ -1,7 +1,5 @@
 package com.letta.mobile.data.timeline
 
-import com.letta.mobile.data.api.MessageApi
-import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CompletableDeferred
@@ -16,7 +14,7 @@ import kotlinx.coroutines.sync.withLock
  */
 internal class TimelineRecentMessagesReconciler(
     private val conversationId: String,
-    private val messageApi: MessageApi,
+    private val messageApi: TimelineTransport,
     private val eventQueue: Channel<TimelineGatewayEvent>,
     private val state: MutableStateFlow<Timeline>,
     private val streamSubscriberActive: StateFlow<Boolean>,
@@ -61,7 +59,7 @@ internal class TimelineRecentMessagesReconciler(
                 return
             }
             val serverMessages = messageApi.listConversationMessages(
-                conversationId = ConversationId(conversationId),
+                conversationId = conversationId,
                 limit = RECONCILE_LIMIT,
                 order = "desc",
             ).reversed()

@@ -1,11 +1,7 @@
 package com.letta.mobile.data.timeline
 
-import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.api.NoActiveRunException
-import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.stream.SseFrame
-import com.letta.mobile.data.stream.SseParser
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -26,7 +22,7 @@ import kotlin.random.Random
  */
 internal suspend fun runStreamSubscriber(
     conversationId: String,
-    messageApi: com.letta.mobile.data.api.MessageApi,
+    messageApi: TimelineTransport,
     activeStreamCount: TimelineAtomicCounter,
     events: MutableSharedFlow<TimelineSyncEvent>,
     seenRunIds: TimelineSeenRunTracker,
@@ -49,7 +45,7 @@ internal suspend fun runStreamSubscriber(
     var runHeartbeatCount = 0
     while (currentCoroutineContext().isActive) {
         try {
-            val channel = messageApi.streamConversation(ConversationId(conversationId))
+            val stream = messageApi.streamConversation(conversationId)
             val activeStreamCountOnOpen = activeStreamCount.incrementAndGet()
             var activeStreamCountAfterClose = activeStreamCountOnOpen
             var streamTimedOut = false
@@ -71,7 +67,7 @@ internal suspend fun runStreamSubscriber(
                 )
                 var lastLivenessAtMs = runOpenedAtMs
                 coroutineScope {
-                    val frames = SseParser.parseFrames(channel).produceIn(this)
+                    val frames = stream.produceIn(this)
                     try {
                         while (currentCoroutineContext().isActive) {
                         val result = withTimeoutOrNull(streamSilenceTimeoutMs) {
@@ -89,14 +85,14 @@ internal suspend fun runStreamSubscriber(
                                 "eventsReceived" to runEventsCount,
                                 "heartbeatsReceived" to runHeartbeatCount,
                             )
-                            channel.cancel(CancellationException("SSE silence timeout"))
+                            frames.cancel(CancellationException("SSE silence timeout"))
                             break
                         }
 
                         val frame = result.getOrNull() ?: break
                         lastLivenessAtMs = System.currentTimeMillis()
                         when (frame) {
-                            SseFrame.Heartbeat -> {
+                            TimelineStreamFrame.Heartbeat -> {
                                 runHeartbeatCount++
                                 val now = lastLivenessAtMs
                                 if (lastHeartbeatTelemetryAtMs == 0L ||
@@ -111,14 +107,14 @@ internal suspend fun runStreamSubscriber(
                                     )
                                 }
                             }
-                            is SseFrame.Message -> {
+                            is TimelineStreamFrame.Message -> {
                                 val message = frame.message
                                 // letta-mobile-mge5.6: raw-event counter for rate metrics.
                                 runEventsCount++
                                 Telemetry.event(
                                     "TimelineSync", "streamSubscriber.eventReceived",
                                     "conversationId" to conversationId,
-                                    "messageType" to (message.messageType ?: "?"),
+                                    "messageType" to message.messageType,
                                     "runId" to (message.runId ?: "<null>"),
                                 )
                                 // Detect a new run_id: this is a run we didn't start
@@ -143,8 +139,8 @@ internal suspend fun runStreamSubscriber(
                                 }
                                 ingestStreamEvent(message)
                             }
-                            is SseFrame.RawEvent -> Unit
-                            SseFrame.Done -> Unit
+                            is TimelineStreamFrame.RawEvent -> Unit
+                            TimelineStreamFrame.Done -> Unit
                         }
                     }
                     } finally {
@@ -196,19 +192,6 @@ internal suspend fun runStreamSubscriber(
             delay(backoffMs)
             // letta-mobile-qv6d: idle path uses the longer cap.
             backoffMs = (backoffMs * 2).coerceAtMost(STREAM_IDLE_BACKOFF_MAX_MS)
-        } catch (e: ApiException) {
-            // letta-mobile-t8q7: idle-pattern classification (No active runs /
-            // EXPIRED / is now expired) is now done in MessageApi.streamConversation,
-            // which routes those bodies via the stackless NoActiveRunException
-            // path above. Anything that reaches here is a real server error.
-            // letta-mobile-mge5.6: distinguish transient network / server errors
-            // from the idle path. Grafana alerts on sustained networkError rate,
-            // not on idle404.
-            Telemetry.error(
-                "TimelineSync", "streamSubscriber.networkError", e,
-                "conversationId" to conversationId,
-            )
-            delay(STREAM_BACKOFF_MAX_MS)
         } catch (t: Throwable) {
             Telemetry.error(
                 "TimelineSync", "streamSubscriber.networkError", t,
@@ -220,6 +203,7 @@ internal suspend fun runStreamSubscriber(
 }
 
 // Extension function to produce a ReceiveChannel from a Flow
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 private fun <T> kotlinx.coroutines.flow.Flow<T>.produceIn(scope: CoroutineScope): ReceiveChannel<T> =
     scope.produce {
         collect { send(it) }

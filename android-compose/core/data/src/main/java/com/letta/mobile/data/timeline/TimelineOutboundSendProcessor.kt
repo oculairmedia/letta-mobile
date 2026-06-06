@@ -1,14 +1,11 @@
 package com.letta.mobile.data.timeline
 
-import com.letta.mobile.data.api.MessageApi
-import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.MessageCreate
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.buildContentParts
 import com.letta.mobile.data.model.toJsonArray
-import com.letta.mobile.data.stream.SseParser
 import com.letta.mobile.util.Telemetry
 import java.time.Instant
 import kotlinx.coroutines.CompletableDeferred
@@ -26,7 +23,7 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 internal class TimelineOutboundSendProcessor(
     private val conversationId: String,
-    private val messageApi: MessageApi,
+    private val messageApi: TimelineTransport,
     private val eventQueue: Channel<TimelineGatewayEvent>,
     private val writeMutex: Mutex,
     private val state: MutableStateFlow<Timeline>,
@@ -121,7 +118,7 @@ internal class TimelineOutboundSendProcessor(
             includeReturnMessageTypes = TimelineSyncLoop.DEFAULT_INCLUDE_TYPES,
         )
         val postTimer = Telemetry.startTimer("TimelineSync", "send.post")
-        val channel = messageApi.sendConversationMessage(ConversationId(conversationId), request)
+        val stream = messageApi.sendConversationMessage(conversationId, request)
         postTimer.stop("otid" to otid)
 
         val streamTimer = Telemetry.startTimer("TimelineSync", "send.stream")
@@ -129,7 +126,7 @@ internal class TimelineOutboundSendProcessor(
         var firstEventLogged = false
         val firstEventTimer = Telemetry.startTimer("TimelineSync", "send.firstEvent")
 
-        SseParser.parse(channel).collect { message ->
+        stream.collect { message ->
             eventCount++
             if (!firstEventLogged) {
                 firstEventLogged = true
@@ -166,7 +163,7 @@ internal class TimelineOutboundSendProcessor(
         for (attempt in 0 until RECONCILE_RETRY_ATTEMPTS) {
             try {
                 return messageApi.listConversationMessages(
-                    conversationId = ConversationId(conversationId),
+                    conversationId = conversationId,
                     limit = if (afterCursor != null) 50 else RECONCILE_LIMIT,
                     after = afterCursor,
                     order = if (afterCursor != null) "asc" else "desc",
