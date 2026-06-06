@@ -36,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,13 +47,18 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.feature.chat.R
 import com.letta.mobile.ui.icons.LettaIcons
 import java.io.File
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
 private const val MinImageScale = 1f
@@ -76,7 +82,13 @@ internal fun ChatImageViewer(
         pageCount = { attachments.size },
     )
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var verticalDragDistance by remember { mutableFloatStateOf(0f) }
+    val shareImageDescription = stringResource(R.string.action_share_image)
+    val saveImageDescription = stringResource(R.string.action_save_image)
+    val closeImageViewerDescription = stringResource(R.string.action_close)
+    val fullscreenImageDescription = stringResource(R.string.screen_chat_fullscreen_image)
+    val imageUnavailableText = stringResource(R.string.screen_chat_image_unavailable)
 
     Surface(
         modifier = modifier
@@ -105,6 +117,8 @@ internal fun ChatImageViewer(
                 ZoomableAttachmentImage(
                     attachment = attachments[page],
                     page = page,
+                    contentDescription = fullscreenImageDescription,
+                    unavailableText = imageUnavailableText,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -128,17 +142,25 @@ internal fun ChatImageViewer(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     ViewerActionButton(
                         icon = LettaIcons.Share,
-                        contentDescription = "Share image",
-                        onClick = { shareAttachment(context, attachments[pagerState.currentPage]) },
+                        contentDescription = shareImageDescription,
+                        onClick = {
+                            scope.launch {
+                                shareAttachment(context, attachments[pagerState.currentPage])
+                            }
+                        },
                     )
                     ViewerActionButton(
                         icon = LettaIcons.Save,
-                        contentDescription = "Save image",
-                        onClick = { saveAttachment(context, attachments[pagerState.currentPage]) },
+                        contentDescription = saveImageDescription,
+                        onClick = {
+                            scope.launch {
+                                saveAttachment(context, attachments[pagerState.currentPage])
+                            }
+                        },
                     )
                     ViewerActionButton(
                         icon = LettaIcons.Close,
-                        contentDescription = "Close image viewer",
+                        contentDescription = closeImageViewerDescription,
                         onClick = onDismiss,
                     )
                 }
@@ -172,6 +194,8 @@ private fun ViewerActionButton(
 private fun ZoomableAttachmentImage(
     attachment: UiImageAttachment,
     page: Int,
+    contentDescription: String,
+    unavailableText: String,
     modifier: Modifier = Modifier,
 ) {
     var scale by remember(page) { mutableFloatStateOf(MinImageScale) }
@@ -218,7 +242,7 @@ private fun ZoomableAttachmentImage(
         if (imageBitmap != null) {
             Image(
                 bitmap = imageBitmap,
-                contentDescription = "Fullscreen chat image",
+                contentDescription = contentDescription,
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .fillMaxSize()
@@ -235,7 +259,7 @@ private fun ZoomableAttachmentImage(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = "Image unavailable",
+                    text = unavailableText,
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White,
                 )
@@ -249,53 +273,64 @@ private fun ZoomableAttachmentImage(
     }
 }
 
-private fun saveAttachment(context: Context, attachment: UiImageAttachment) {
-    val bytes = attachment.decodeBytesOrNull() ?: run {
-        context.toast("Image unavailable")
-        return
-    }
-    val filename = attachment.imageFilename()
-    val values = ContentValues().apply {
-        put(MediaStore.Images.Media.DISPLAY_NAME, filename)
-        put(MediaStore.Images.Media.MIME_TYPE, attachment.mediaType)
-        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Letta")
-        put(MediaStore.Images.Media.IS_PENDING, 1)
-    }
-    val resolver = context.contentResolver
-    val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: run {
-        context.toast("Couldn't save image")
-        return
-    }
-    runCatching {
-        resolver.openOutputStream(uri)?.use { output -> output.write(bytes) }
-            ?: error("Could not open image output stream")
-        ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }.also { completeValues ->
-            resolver.update(uri, completeValues, null, null)
+private suspend fun saveAttachment(context: Context, attachment: UiImageAttachment) {
+    val saved = withContext(Dispatchers.IO) { saveAttachmentToMediaStore(context, attachment) }
+    context.toast(
+        if (saved) {
+            context.getString(R.string.screen_chat_image_saved)
+        } else {
+            context.getString(R.string.screen_chat_image_save_error)
         }
-    }.onSuccess {
-        context.toast("Image saved")
-    }.onFailure {
-        resolver.delete(uri, null, null)
-        context.toast("Couldn't save image")
+    )
+}
+
+private suspend fun shareAttachment(context: Context, attachment: UiImageAttachment) {
+    val uri = withContext(Dispatchers.IO) { writeAttachmentForSharing(context, attachment) }
+    if (uri == null) {
+        context.toast(context.getString(R.string.screen_chat_image_share_error))
+        return
+    }
+    context.startActivity(
+        Intent.createChooser(
+            attachment.shareIntent(uri),
+            context.getString(R.string.screen_chat_image_share_chooser),
+        )
+    )
+}
+
+private fun saveAttachmentToMediaStore(context: Context, attachment: UiImageAttachment): Boolean {
+    val bytes = attachment.decodeBytesOrNull() ?: return false
+    val resolver = context.contentResolver
+    var uri: Uri? = null
+    return runCatching {
+        val filename = attachment.imageFilename()
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+            put(MediaStore.Images.Media.MIME_TYPE, attachment.mediaType)
+            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Letta")
+            put(MediaStore.Images.Media.IS_PENDING, 1)
+        }
+        uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+        val imageUri = uri ?: return false
+        resolver.openOutputStream(imageUri)?.use { output -> output.write(bytes) }
+            ?: return false
+        ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }.also { completeValues ->
+            resolver.update(imageUri, completeValues, null, null)
+        }
+        true
+    }.getOrElse {
+        uri?.let { imageUri -> runCatching { resolver.delete(imageUri, null, null) } }
+        false
     }
 }
 
-private fun shareAttachment(context: Context, attachment: UiImageAttachment) {
-    val bytes = attachment.decodeBytesOrNull() ?: run {
-        context.toast("Image unavailable")
-        return
-    }
+private fun writeAttachmentForSharing(context: Context, attachment: UiImageAttachment): Uri? = runCatching {
+    val bytes = attachment.decodeBytesOrNull() ?: return null
     val imageDir = File(context.cacheDir, "shared-chat-images").apply { mkdirs() }
     val imageFile = File(imageDir, attachment.imageFilename())
-    runCatching {
-        imageFile.writeBytes(bytes)
-        FileProvider.getUriForFile(context, "${context.packageName}.chat-image-share", imageFile)
-    }.onSuccess { uri ->
-        context.startActivity(Intent.createChooser(attachment.shareIntent(uri), "Share image"))
-    }.onFailure {
-        context.toast("Couldn't share image")
-    }
-}
+    imageFile.writeBytes(bytes)
+    FileProvider.getUriForFile(context, "${context.packageName}.chat-image-share", imageFile)
+}.getOrNull()
 
 private fun UiImageAttachment.shareIntent(uri: Uri): Intent = Intent(Intent.ACTION_SEND).apply {
     type = mediaType

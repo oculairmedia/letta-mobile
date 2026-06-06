@@ -64,7 +64,7 @@ class GeneratedImageToolCardTest {
         composeRule.onNodeWithText("1 / 1").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Share image").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Save image").assertIsDisplayed()
-        composeRule.onNodeWithContentDescription("Close image viewer").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Close").assertIsDisplayed()
     }
 
     @Test
