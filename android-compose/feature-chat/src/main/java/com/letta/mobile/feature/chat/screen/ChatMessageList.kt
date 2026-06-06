@@ -32,7 +32,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -830,7 +829,15 @@ internal fun ChatMessageList(
                                     RunBlock(
                                         messages = listOf(msg),
                                         collapsed = runId in state.collapsedRunIds,
-                                        onToggleCollapsed = { onToggleRunCollapsed(runId) },
+                                        onToggleCollapsed = {
+                                            // letta-mobile-<collapse-floor>: release
+                                            // streaming floors once per toggle so a
+                                            // collapsed streaming run re-seeds to its
+                                            // smaller height (no dead space). O(1) per
+                                            // rare user action; no per-frame cost.
+                                            itemGeometryState.clearStreamingFloors()
+                                            onToggleRunCollapsed(runId)
+                                        },
                                         modifier = Modifier.padding(top = chatDimens.ungroupedMessageSpacing),
                                         isStreaming = state.isStreaming,
                                         activeApprovalRequestId = state.activeApprovalRequestId,
@@ -881,7 +888,12 @@ internal fun ChatMessageList(
                                 RunBlock(
                                     messages = renderItem.messages.map { it.first },
                                     collapsed = renderItem.runId in state.collapsedRunIds,
-                                    onToggleCollapsed = { onToggleRunCollapsed(renderItem.runId) },
+                                    onToggleCollapsed = {
+                                        // letta-mobile-<collapse-floor>: see above —
+                                        // release streaming floors on collapse toggle.
+                                        itemGeometryState.clearStreamingFloors()
+                                        onToggleRunCollapsed(renderItem.runId)
+                                    },
                                     modifier = highlightModifier.padding(top = chatDimens.ungroupedMessageSpacing),
                                     isStreaming = state.isStreaming,
                                     activeApprovalRequestId = state.activeApprovalRequestId,
@@ -1016,20 +1028,14 @@ private fun MeasuredChatRenderItem(
     // run is an INTENTIONAL shrink, exactly like pinch — but it slips past the
     // 75nad guard because isStreaming is still true, so the monotone-up
     // streaming floor (grown to the run's EXPANDED height) keeps the collapsed
-    // item floored tall, leaving dead space under the ongoing response. The
-    // collapsed view lives in a NEW bucket (expansionHash includes
-    // collapsedRunIds), but the transitional remeasure can seed that bucket's
-    // floor from the still-large height before it settles. Detect the
-    // expansion-state transition for this item and, on the frame it flips,
-    // (a) suppress the floor and (b) drop the stale streaming floor for the new
-    // bucket so it re-seeds from the smaller collapsed measurement.
-    var lastExpansionHash by remember { mutableIntStateOf(signature.bucket.expansionHash) }
-    val expansionJustChanged = lastExpansionHash != signature.bucket.expansionHash
-    if (expansionJustChanged) {
-        lastExpansionHash = signature.bucket.expansionHash
-        geometryState.resetStreamingFloor(signature.bucket)
-    }
-    val applyFloor = isStreaming && !isPinching && !expansionJustChanged
+    // item floored tall, leaving dead space under the ongoing response.
+    //
+    // The reset is handled ONCE per collapse event at the toggle chokepoint
+    // (clearStreamingFloors, called from onToggleRunCollapsed) — NOT here per
+    // item per frame. This keeps the streaming hot path O(1): the floor lookup
+    // below is unchanged, and after a collapse the cleared floors simply
+    // re-seed from the next (smaller) measurement.
+    val applyFloor = isStreaming && !isPinching
     val heightFloorPx = if (applyFloor) geometryState.heightFloorFor(signature, isStreaming) else 0
     val minHeightModifier = if (heightFloorPx > 0) {
         Modifier.heightIn(min = with(density) { heightFloorPx.toDp() })

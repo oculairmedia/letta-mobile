@@ -59,14 +59,15 @@ internal class ChatMessageGeometryState(
     }
 
     /**
-     * letta-mobile-<collapse-floor>: drop the monotone-up streaming floor for a
-     * bucket so it re-seeds from the next measurement. Used when an item's
-     * expansion state flips (e.g. collapsing the current streaming run) — an
+     * letta-mobile-<collapse-floor>: drop ALL monotone-up streaming floors so
+     * they re-seed from the next measurement. Called ONCE per collapse/expand
+     * toggle (a rare, deliberate user action) at the toggle chokepoint — an
      * intentional shrink that must not stay floored at the previous, larger
-     * (expanded) height.
+     * (expanded) height. O(streamingFloors) on a rare event; zero per-frame
+     * cost (the streaming hot path never touches this).
      */
-    fun resetStreamingFloor(bucket: ChatMessageGeometryBucket) {
-        streamingFloors.remove(bucket)
+    fun clearStreamingFloors() {
+        streamingFloors.clear()
     }
 
     fun retainStreamingBuckets(activeBuckets: Set<ChatMessageGeometryBucket>) {
