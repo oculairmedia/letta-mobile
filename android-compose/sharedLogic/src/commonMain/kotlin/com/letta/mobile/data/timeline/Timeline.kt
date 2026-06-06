@@ -1,7 +1,14 @@
 package com.letta.mobile.data.timeline
 
+import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.util.Telemetry
+import kotlinx.collections.immutable.PersistentList
+import kotlinx.collections.immutable.PersistentMap
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.persistentMapOf
+import kotlinx.collections.immutable.toPersistentList
 
 fun String.stripEnvelopeReminders(): String {
     return this.replace(Regex("<system-reminder>[\\s\\S]*?</system-reminder>\\s*"), "")
@@ -22,6 +29,7 @@ fun String.stripEnvelopeReminders(): String {
  *
  * See `docs/architecture/message-sync-migration.md` for design rationale.
  */
+@Immutable
 sealed class TimelineEvent {
     /** Monotonic ordering key. Stable across swaps. */
     abstract val position: Double
@@ -37,7 +45,7 @@ sealed class TimelineEvent {
      * The same objects are serialized into the outbound MessageCreate.content
      * array for the server.
      */
-    abstract val attachments: List<MessageContentPart.Image>
+    abstract val attachments: PersistentList<MessageContentPart.Image>
 
     abstract val source: MessageSource
 
@@ -51,23 +59,23 @@ sealed class TimelineEvent {
         val role: Role = Role.USER,
         val sentAt: TimelineInstant,
         val deliveryState: DeliveryState,
-        override val attachments: List<MessageContentPart.Image> = emptyList(),
+        override val attachments: PersistentList<MessageContentPart.Image> = persistentListOf(),
         override val source: MessageSource = MessageSource.LETTA_SERVER,
         // letta-mobile-5s1n: assistant-streaming additive fields. All default
         // to USER-bubble-equivalent values so existing call sites compile
         // unchanged. Mirrors the corresponding fields on [Confirmed] so the
         // VM->UiMessage mapper can render Locals and Confirmeds uniformly.
         val messageType: TimelineMessageType = TimelineMessageType.USER,
-        val toolCalls: List<com.letta.mobile.data.model.ToolCall> = emptyList(),
+        val toolCalls: PersistentList<ToolCall> = persistentListOf(),
         val approvalRequestId: String? = null,
         val approvalDecided: Boolean = false,
         val toolReturnContent: String? = null,
         val toolReturnIsError: Boolean = false,
-        val toolReturnContentByCallId: Map<String, String> = emptyMap(),
-        val toolReturnIsErrorByCallId: Map<String, Boolean> = emptyMap(),
-        val toolStartedAtByCallId: Map<String, TimelineInstant> = emptyMap(),
-        val toolCompletedAtByCallId: Map<String, TimelineInstant> = emptyMap(),
-        val toolBatchIdByCallId: Map<String, String> = emptyMap(),
+        val toolReturnContentByCallId: PersistentMap<String, String> = persistentMapOf(),
+        val toolReturnIsErrorByCallId: PersistentMap<String, Boolean> = persistentMapOf(),
+        val toolStartedAtByCallId: PersistentMap<String, TimelineInstant> = persistentMapOf(),
+        val toolCompletedAtByCallId: PersistentMap<String, TimelineInstant> = persistentMapOf(),
+        val toolBatchIdByCallId: PersistentMap<String, String> = persistentMapOf(),
         val reasoningContent: String? = null,
     ) : TimelineEvent()
 
@@ -81,11 +89,11 @@ sealed class TimelineEvent {
         val date: TimelineInstant,
         val runId: String?,
         val stepId: String?,
-        override val attachments: List<MessageContentPart.Image> = emptyList(),
+        override val attachments: PersistentList<MessageContentPart.Image> = persistentListOf(),
         // Populated for TOOL_CALL events (ToolCallMessage + ApprovalRequestMessage).
         // letta-mobile-mge5.14: without these the UI dropped tool calls entirely
         // because the VM->UiMessage mapper couldn't reconstruct structured args.
-        val toolCalls: List<com.letta.mobile.data.model.ToolCall> = emptyList(),
+        val toolCalls: PersistentList<ToolCall> = persistentListOf(),
         // Populated for ApprovalRequestMessage so the UI can surface an
         // approve/reject affordance tied to the original request.
         val approvalRequestId: String? = null,
@@ -103,8 +111,8 @@ sealed class TimelineEvent {
         // collapsible output in a single card.
         val toolReturnContent: String? = null,
         val toolReturnIsError: Boolean = false,
-        val toolReturnContentByCallId: Map<String, String> = emptyMap(),
-        val toolReturnIsErrorByCallId: Map<String, Boolean> = emptyMap(),
+        val toolReturnContentByCallId: PersistentMap<String, String> = persistentMapOf(),
+        val toolReturnIsErrorByCallId: PersistentMap<String, Boolean> = persistentMapOf(),
         override val source: MessageSource = MessageSource.LETTA_SERVER,
         val seqId: Int? = null,
     ) : TimelineEvent()
@@ -147,9 +155,10 @@ enum class TimelineMessageType {
  *
  * All mutations return a new [Timeline] (immutable).
  */
+@Immutable
 data class Timeline(
     val conversationId: String,
-    val events: List<TimelineEvent> = emptyList(),
+    val events: PersistentList<TimelineEvent> = persistentListOf(),
     /** Highest seen server message id. Advances as stream/reconcile events arrive. */
     val liveCursor: String? = null,
     /** Cursor for backfill pagination (oldest known message id). */
@@ -273,7 +282,7 @@ data class Timeline(
         } else {
             event
         }
-        return copy(events = events + safeEvent, stablePrefixVersion = stablePrefixVersion + 1)
+        return copy(events = events.adding(safeEvent), stablePrefixVersion = stablePrefixVersion + 1)
     }
 
     /**
@@ -290,7 +299,7 @@ data class Timeline(
             position = local.position,
             otid = local.otid,
         )
-        val newEvents = events.toMutableList().also { it[idx] = stabilized }
+        val newEvents = events.replacingAt(idx, stabilized)
         return copy(events = newEvents, stablePrefixVersion = stablePrefixVersion + 1)
     }
 
@@ -305,8 +314,8 @@ data class Timeline(
     fun insertOrdered(event: TimelineEvent): Timeline {
         if (findByOtid(event.otid) != null) return this
         val insertIdx = events.indexOfFirst { it.position > event.position }
-        val newEvents = if (insertIdx == -1) events + event
-                       else events.toMutableList().also { it.add(insertIdx, event) }
+        val newEvents = if (insertIdx == -1) events.adding(event)
+                       else events.addingAt(insertIdx, event)
         return copy(events = newEvents, stablePrefixVersion = stablePrefixVersion + 1)
     }
 
@@ -333,7 +342,7 @@ data class Timeline(
                 position = tail.position,
                 otid = tail.otid
             )
-            return copy(events = events.toMutableList().also { it[tailIdx] = stabilized })
+            return copy(events = events.replacingAt(tailIdx, stabilized))
         }
 
         val idx = serverIdToIndex[confirmed.serverId] ?: return this
@@ -343,7 +352,7 @@ data class Timeline(
             position = existing.position,
             otid = existing.otid
         )
-        val replaced = events.toMutableList().also { it[idx] = stabilized }
+        val replaced = events.replacingAt(idx, stabilized)
         if (!events.hasDuplicateOtidOutside(index = idx, otid = stabilized.otid)) {
             return copy(events = replaced, stablePrefixVersion = stablePrefixVersion + 1)
         }
@@ -358,7 +367,7 @@ data class Timeline(
             "otid" to stabilized.otid,
             level = Telemetry.Level.WARN,
         )
-        return copy(events = deduped, stablePrefixVersion = stablePrefixVersion + 1)
+        return copy(events = deduped.toPersistentList(), stablePrefixVersion = stablePrefixVersion + 1)
     }
 
     private fun List<TimelineEvent>.hasDuplicateOtidOutside(index: Int, otid: String): Boolean {
@@ -377,7 +386,7 @@ data class Timeline(
     private inline fun updateLocal(otid: String, transform: (TimelineEvent.Local) -> TimelineEvent.Local): Timeline {
         val idx = otidToIndex[otid]?.takeIf { events[it] is TimelineEvent.Local } ?: return this
         val local = events[idx] as TimelineEvent.Local
-        return copy(events = events.toMutableList().also { it[idx] = transform(local) }, stablePrefixVersion = stablePrefixVersion + 1)
+        return copy(events = events.replacingAt(idx, transform(local)), stablePrefixVersion = stablePrefixVersion + 1)
     }
 }
 

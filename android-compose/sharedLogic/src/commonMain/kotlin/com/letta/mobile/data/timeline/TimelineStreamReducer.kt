@@ -4,17 +4,19 @@ import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.util.Telemetry
+import kotlinx.collections.immutable.PersistentList
+import kotlinx.collections.immutable.PersistentMap
 
 data class TimelineReducerInput(
     val prev: Timeline,
     val frame: LettaMessage,
-    val pendingToolReturnsByCallId: Map<String, ToolReturnMessage>,
+    val pendingToolReturnsByCallId: PersistentMap<String, ToolReturnMessage>,
 )
 
 data class TimelineReducerOutput(
     val next: Timeline,
-    val updatedPendingToolReturnsByCallId: Map<String, ToolReturnMessage>,
-    val emittedEvents: List<TimelineSyncEvent>,
+    val updatedPendingToolReturnsByCallId: PersistentMap<String, ToolReturnMessage>,
+    val emittedEvents: PersistentList<TimelineSyncEvent>,
     val notification: PendingIngestNotification?,
 )
 
@@ -28,8 +30,8 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
     fun output(notification: PendingIngestNotification? = null): TimelineReducerOutput =
         TimelineReducerOutput(
             next = timeline,
-            updatedPendingToolReturnsByCallId = pendingToolReturnsByCallId.toMap(linkedMapOf()),
-            emittedEvents = pendingEvents.toList(),
+            updatedPendingToolReturnsByCallId = pendingToolReturnsByCallId.toTimelinePersistentMap(),
+            emittedEvents = pendingEvents.toTimelinePersistentList(),
             notification = notification,
         )
 
@@ -77,9 +79,9 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
                     approvalDecided = true,
                     toolReturnContent = body.ifBlank { match.toolReturnContent ?: body },
                     toolReturnIsError = isError,
-                    toolReturnContentByCallId = contentByCallId,
-                    toolReturnIsErrorByCallId = match.toolReturnIsErrorByCallId + (tcid to isError),
-                    attachments = (match.attachments + message.attachments).distinct(),
+                    toolReturnContentByCallId = contentByCallId.toTimelinePersistentMap(),
+                    toolReturnIsErrorByCallId = (match.toolReturnIsErrorByCallId + (tcid to isError)).toTimelinePersistentMap(),
+                    attachments = (match.attachments + message.attachments).distinct().toTimelinePersistentList(),
                 )
                 timeline = timeline.replaceByServerId(updated)
                 pendingEvents += TimelineSyncEvent.StreamEventIngested(match.serverId, message.messageType)
@@ -158,10 +160,10 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
                 approvalDecided = existing.approvalDecided || confirmed.approvalDecided,
                 toolReturnContent = confirmed.toolReturnContent ?: existing.toolReturnContent,
                 toolReturnIsError = confirmed.toolReturnIsError || existing.toolReturnIsError,
-                toolReturnContentByCallId = existing.toolReturnContentByCallId + confirmed.toolReturnContentByCallId,
-                toolReturnIsErrorByCallId = existing.toolReturnIsErrorByCallId + confirmed.toolReturnIsErrorByCallId,
+                toolReturnContentByCallId = (existing.toolReturnContentByCallId + confirmed.toolReturnContentByCallId).toTimelinePersistentMap(),
+                toolReturnIsErrorByCallId = (existing.toolReturnIsErrorByCallId + confirmed.toolReturnIsErrorByCallId).toTimelinePersistentMap(),
                 approvalRequestId = confirmed.approvalRequestId ?: existing.approvalRequestId,
-                attachments = (existing.attachments + confirmed.attachments).distinct(),
+                attachments = (existing.attachments + confirmed.attachments).distinct().toTimelinePersistentList(),
                 source = existing.source,
                 seqId = latestSeqId(existing.seqId, confirmed.seqId),
             ),
@@ -329,8 +331,8 @@ private fun applyPendingToolReturns(
         approvalDecided = true,
         toolReturnContent = firstReturn.toolReturn.funcResponse ?: ev.toolReturnContent,
         toolReturnIsError = firstReturn.isErr == true || firstReturn.status == "error" || ev.toolReturnIsError,
-        toolReturnContentByCallId = returnContentByCallId,
-        toolReturnIsErrorByCallId = returnIsErrorByCallId,
-        attachments = (ev.attachments + matchingReturns.flatMap { (_, toolReturn) -> toolReturn.attachments }).distinct(),
+        toolReturnContentByCallId = returnContentByCallId.toTimelinePersistentMap(),
+        toolReturnIsErrorByCallId = returnIsErrorByCallId.toTimelinePersistentMap(),
+        attachments = (ev.attachments + matchingReturns.flatMap { (_, toolReturn) -> toolReturn.attachments }).distinct().toTimelinePersistentList(),
     )
 }

@@ -31,7 +31,7 @@ internal suspend fun ingestStreamEvent(
             TimelineReducerInput(
                 prev = state.value,
                 frame = message,
-                pendingToolReturnsByCallId = pendingToolReturnsByCallId.toMap(),
+                pendingToolReturnsByCallId = pendingToolReturnsByCallId.toTimelinePersistentMap(),
             )
         )
         message.seqId?.takeIf { it >= 0 }?.let { seq ->

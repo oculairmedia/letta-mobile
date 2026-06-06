@@ -84,8 +84,8 @@ fun LettaMessage.toTimelineEvent(position: Double): TimelineEvent.Confirmed? {
         date = date,
         runId = runId,
         stepId = stepId,
-        attachments = attachments,
-        toolCalls = toolCallsList,
+        attachments = attachments.toTimelinePersistentList(),
+        toolCalls = toolCallsList.toTimelinePersistentList(),
         approvalRequestId = approvalId,
         seqId = seqId,
     )

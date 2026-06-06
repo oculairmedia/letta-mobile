@@ -55,11 +55,11 @@ fun applyReturnsAndResponsesFromSnapshot(
                 ?: ev.toolReturnContent,
             toolReturnIsError = matchingReturn?.let { it.isErr == true || it.status == "error" }
                 ?: ev.toolReturnIsError,
-            toolReturnContentByCallId = returnContentByCallId,
-            toolReturnIsErrorByCallId = returnIsErrorByCallId,
+            toolReturnContentByCallId = returnContentByCallId.toTimelinePersistentMap(),
+            toolReturnIsErrorByCallId = returnIsErrorByCallId.toTimelinePersistentMap(),
         )
     }
     if (newEvents !== state.value.events) {
-        state.value = state.value.copy(events = newEvents)
+        state.value = state.value.copy(events = newEvents.toTimelinePersistentList())
     }
 }

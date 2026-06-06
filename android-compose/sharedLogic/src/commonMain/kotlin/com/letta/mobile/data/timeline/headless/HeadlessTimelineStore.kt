@@ -15,6 +15,8 @@ import com.letta.mobile.data.timeline.TimelineReducerInput
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.timeline.reduceStreamFrame
 import com.letta.mobile.data.timeline.timelineNow
+import com.letta.mobile.data.timeline.toTimelinePersistentList
+import com.letta.mobile.data.timeline.toTimelinePersistentMap
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -63,7 +65,7 @@ class HeadlessTimelineStore(
             TimelineReducerInput(
                 prev = timelineLocked(conversationId),
                 frame = message,
-                pendingToolReturnsByCallId = pending,
+                pendingToolReturnsByCallId = pending.toTimelinePersistentMap(),
             )
         )
         timelines[conversationId] = output.next
@@ -187,7 +189,7 @@ class HeadlessTimelineStore(
                 role = Role.USER,
                 sentAt = timelineNow(),
                 deliveryState = DeliveryState.SENDING,
-                attachments = attachments,
+                attachments = attachments.toTimelinePersistentList(),
                 source = MessageSource.LETTA_SERVER,
             )
         )
