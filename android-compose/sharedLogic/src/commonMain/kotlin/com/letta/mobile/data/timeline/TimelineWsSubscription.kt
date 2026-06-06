@@ -6,19 +6,18 @@ package com.letta.mobile.data.timeline
  * Ensures that if an external transport is active (e.g., admin-shim WS delivering messages),
  * the SSE stream subscriber suppresses dual ingestion.
  */
-internal class TimelineWsSubscription(
-    private val conversationId: String,
+class TimelineWsSubscription(
+    @Suppress("unused") private val conversationId: String,
 ) {
-    @Volatile
-    private var externalTransportActive = false
+    private val externalTransportActive = TimelineAtomicFlag()
 
-    fun isActive(): Boolean = externalTransportActive
+    fun isActive(): Boolean = externalTransportActive.get()
 
     fun markActive() {
-        externalTransportActive = true
+        externalTransportActive.set(true)
     }
 
     fun clear() {
-        externalTransportActive = false
+        externalTransportActive.set(false)
     }
 }

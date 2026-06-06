@@ -12,6 +12,16 @@ class TimelineAtomicCounter(initialValue: Int = 0) {
     fun decrementAndGet(): Int = value.decrementAndGet()
 }
 
+class TimelineAtomicFlag(initialValue: Boolean = false) {
+    private val value = atomic(initialValue)
+
+    fun get(): Boolean = value.value
+
+    fun set(newValue: Boolean) {
+        value.value = newValue
+    }
+}
+
 class TimelineSeenRunTracker {
     private val mutex = Mutex()
     private val seenRunIds = mutableSetOf<String>()

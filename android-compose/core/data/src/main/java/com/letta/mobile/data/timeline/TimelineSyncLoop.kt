@@ -26,7 +26,7 @@ import kotlinx.coroutines.sync.withLock
  * Single sync loop per conversation. Acts as a thin orchestrator (under 200 lines).
  */
 class TimelineSyncLoop(
-    private val messageApi: MessageApi,
+    private val messageApi: TimelineTransport,
     private val conversationId: String,
     scope: CoroutineScope,
     logTag: String = "TimelineSync",
@@ -36,6 +36,28 @@ class TimelineSyncLoop(
     private val conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
     private val streamSilenceTimeoutMs: Long = STREAM_SILENCE_TIMEOUT_MS,
 ) {
+    constructor(
+        messageApi: MessageApi,
+        conversationId: String,
+        scope: CoroutineScope,
+        logTag: String = "TimelineSync",
+        ingestedListener: IngestedMessageListener? = null,
+        ingestedListenerProvider: (() -> IngestedMessageListener?)? = null,
+        pendingLocalStore: PendingLocalStore = NoOpPendingLocalStore,
+        conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
+        streamSilenceTimeoutMs: Long = STREAM_SILENCE_TIMEOUT_MS,
+    ) : this(
+        messageApi = MessageApiTimelineTransport(messageApi),
+        conversationId = conversationId,
+        scope = scope,
+        logTag = logTag,
+        ingestedListener = ingestedListener,
+        ingestedListenerProvider = ingestedListenerProvider,
+        pendingLocalStore = pendingLocalStore,
+        conversationCursorStore = conversationCursorStore,
+        streamSilenceTimeoutMs = streamSilenceTimeoutMs,
+    )
+
     private val loopJob = SupervisorJob(scope.coroutineContext[Job])
     private val loopScope = CoroutineScope(scope.coroutineContext + loopJob)
 

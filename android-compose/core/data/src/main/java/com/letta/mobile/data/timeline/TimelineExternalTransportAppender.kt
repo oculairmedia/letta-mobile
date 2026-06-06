@@ -1,8 +1,5 @@
 package com.letta.mobile.data.timeline
 
-import com.letta.mobile.data.api.MessageApi
-import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.util.Telemetry
@@ -21,7 +18,7 @@ import java.time.Instant
  */
 internal class TimelineExternalTransportAppender(
     private val conversationId: String,
-    private val messageApi: MessageApi,
+    private val messageApi: TimelineTransport,
     private val eventQueue: Channel<TimelineGatewayEvent>,
     private val state: MutableStateFlow<Timeline>,
     private val events: MutableSharedFlow<TimelineSyncEvent>,
@@ -125,11 +122,11 @@ internal class TimelineExternalTransportAppender(
         var lastError: Throwable? = null
         for (attempt in 0 until RECONCILE_RETRY_ATTEMPTS) {
             try {
-                return messageApi.listMessages(
-                    agentId = AgentId(agentId),
+                return messageApi.listAgentMessages(
+                    agentId = agentId,
                     limit = RECONCILE_LIMIT,
                     order = "desc",
-                    conversationId = ConversationId(externalConversationId),
+                    conversationId = externalConversationId,
                 )
             } catch (t: Throwable) {
                 if (!isRetryableReconcileError(t) || attempt == RECONCILE_RETRY_ATTEMPTS - 1) {

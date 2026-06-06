@@ -1,7 +1,5 @@
 package com.letta.mobile.data.timeline
 
-import com.letta.mobile.data.api.MessageApi
-import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,7 +11,7 @@ import kotlinx.coroutines.sync.withLock
  */
 internal class TimelineHydrator(
     private val conversationId: String,
-    private val messageApi: MessageApi,
+    private val messageApi: TimelineTransport,
     private val pendingLocalStore: PendingLocalStore,
     private val conversationCursorStore: ConversationCursorStore,
     private val writeMutex: Mutex,
@@ -50,7 +48,7 @@ internal class TimelineHydrator(
             val rawFetchLimit = hydrateRawFetchLimit(limit)
             val response = normalizeHydratedMessageOrder(
                 messageApi.listConversationMessages(
-                    conversationId = ConversationId(conversationId),
+                    conversationId = conversationId,
                     limit = rawFetchLimit,
                     order = "desc",
                 ).reversed()
