@@ -58,8 +58,13 @@ subprojects {
                 .removeSuffix("Kotlin")
                 .replaceFirstChar { it.lowercase() }
             val kotlinOutputDir = layout.buildDirectory.dir("generated/ksp/$kspVariant/kotlin").get().asFile
+            val classOutputDir = layout.buildDirectory.dir("generated/ksp/$kspVariant/classes").get().asFile
+            doFirst {
+                classOutputDir.mkdirs()
+            }
             doLast {
                 kotlinOutputDir.mkdirs()
+                classOutputDir.mkdirs()
             }
         }
     }

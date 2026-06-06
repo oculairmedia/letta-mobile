@@ -12,18 +12,15 @@ import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.ToolCallPayload
 import com.letta.mobile.data.transport.WsFrameMapper
 import com.letta.mobile.util.Telemetry
-import io.kotest.matchers.collections.shouldHaveSize
-import io.kotest.matchers.shouldBe
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import org.junit.After
-import org.junit.Test
-import org.junit.jupiter.api.Tag
+import kotlin.test.AfterTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
-@Tag("unit")
 class TimelineStreamReducerTest {
-    @After
+    @AfterTest
     fun tearDown() {
         Telemetry.clear()
         Telemetry.chatHotPathDebugEnabled.set(false)
@@ -585,7 +582,7 @@ class TimelineStreamReducerTest {
                     content = "historical message $index",
                     serverId = "server-$index",
                     messageType = TimelineMessageType.ASSISTANT,
-                    date = java.time.Instant.EPOCH,
+                    date = parseTimelineInstant("1970-01-01T00:00:00Z"),
                     runId = "run-$index",
                     stepId = null,
                 )
@@ -638,4 +635,12 @@ class TimelineStreamReducerTest {
         )
         return Telemetry.snapshot().map { it.name }.toSet()
     }
+}
+
+private infix fun <T> T.shouldBe(expected: T) {
+    assertEquals(expected, this)
+}
+
+private infix fun Collection<*>.shouldHaveSize(expected: Int) {
+    assertEquals(expected, size)
 }
