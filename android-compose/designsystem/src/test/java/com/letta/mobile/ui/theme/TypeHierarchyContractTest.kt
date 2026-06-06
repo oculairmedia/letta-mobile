@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.jupiter.api.Tag
 import androidx.compose.material3.Typography
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 
 @Tag("unit")
 class TypeHierarchyContractTest {
@@ -14,8 +14,8 @@ class TypeHierarchyContractTest {
     @Test
     fun `list item hierarchy maps to semantic Material roles`() {
         assertEquals(typography.titleMedium, typography.listItemHeadline)
-        assertEquals(typography.bodySmall, typography.listItemSupporting)
-        assertEquals(typography.labelMedium, typography.listItemMetadata)
+        assertEquals(typography.bodySmall.copy(fontWeight = FontWeight.Medium), typography.listItemSupporting)
+        assertEquals(typography.labelMedium.copy(fontWeight = FontWeight.SemiBold), typography.listItemMetadata)
     }
 
     @Test
@@ -23,7 +23,8 @@ class TypeHierarchyContractTest {
         val style = typography.listItemMetadataMonospace
 
         assertEquals(typography.labelMedium.fontSize, style.fontSize)
-        assertEquals(FontFamily.Monospace, style.fontFamily)
+        assertEquals(FontWeight.SemiBold, style.fontWeight)
+        assertEquals(LettaCodeFont, style.fontFamily)
     }
 
     @Test

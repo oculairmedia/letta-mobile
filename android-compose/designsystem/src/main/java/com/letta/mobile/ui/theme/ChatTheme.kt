@@ -41,19 +41,19 @@ data class ChatTypography(
 )
 
 data class ChatShapes(
-    val bubbleRadius: Dp = LettaSpacing.bubbleRadius,
-    val codeBlockRadius: Dp = LettaSpacing.codeBlockRadius,
-    val bubble: Shape = RoundedCornerShape(LettaSpacing.bubbleRadius),
+    val bubbleRadius: Dp = LettaChatTokens.shapes.bubbleRadiusDp.dp,
+    val codeBlockRadius: Dp = LettaChatTokens.shapes.codeBlockRadiusDp.dp,
+    val bubble: Shape = RoundedCornerShape(LettaChatTokens.shapes.bubbleRadiusDp.dp),
 )
 
 data class ChatDimens(
-    val bubblePaddingHorizontal: Dp = LettaSpacing.bubblePaddingHorizontal,
-    val bubblePaddingVertical: Dp = LettaSpacing.bubblePaddingVertical,
-    val bubbleMaxWidthFraction: Float = 0.88f,
-    val messageSpacing: Dp = LettaSpacing.messageSpacing,
-    val groupedMessageSpacing: Dp = LettaSpacing.messageSpacing,
-    val ungroupedMessageSpacing: Dp = LettaSpacing.xs,
-    val contentPaddingHorizontal: Dp = LettaSpacing.screenHorizontal,
+    val bubblePaddingHorizontal: Dp = LettaChatTokens.dimens.bubblePaddingHorizontalDp.dp,
+    val bubblePaddingVertical: Dp = LettaChatTokens.dimens.bubblePaddingVerticalDp.dp,
+    val bubbleMaxWidthFraction: Float = LettaChatTokens.dimens.bubbleMaxWidthFraction,
+    val messageSpacing: Dp = LettaChatTokens.dimens.messageSpacingDp.dp,
+    val groupedMessageSpacing: Dp = LettaChatTokens.dimens.groupedMessageSpacingDp.dp,
+    val ungroupedMessageSpacing: Dp = LettaChatTokens.dimens.ungroupedMessageSpacingDp.dp,
+    val contentPaddingHorizontal: Dp = LettaChatTokens.dimens.contentPaddingHorizontalDp.dp,
 )
 
 val LocalChatColors = staticCompositionLocalOf<ChatColors> { error("No ChatColors provided") }
@@ -116,11 +116,13 @@ fun LettaChatTheme(
     val chatTypography = remember(materialTypography, colorScheme, fontScale) {
         ChatTypography(
             messageBody = materialTypography.bodyMedium.scaledBy(fontScale),
-            roleLabel = materialTypography.chatBubbleSender.copy(letterSpacing = 0.4.sp).scaledBy(fontScale),
+            roleLabel = materialTypography.chatBubbleSender
+                .copy(letterSpacing = LettaChatTokens.typography.roleLabelLetterSpacingSp.sp)
+                .scaledBy(fontScale),
             codeBlock = TextStyle(
                 fontFamily = LettaCodeFont,
-                fontSize = 12.sp,
-                lineHeight = 16.sp,
+                fontSize = LettaChatTokens.typography.codeBlockFontSizeSp.sp,
+                lineHeight = LettaChatTokens.typography.codeBlockLineHeightSp.sp,
             ).scaledBy(fontScale),
             toolLabel = materialTypography.labelMedium.scaledBy(fontScale),
             toolDetail = materialTypography.labelSmall.copy(

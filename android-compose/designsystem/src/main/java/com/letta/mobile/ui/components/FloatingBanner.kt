@@ -15,6 +15,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.theme.LettaElevationTokens
+import com.letta.mobile.ui.theme.LettaShapeTokens
 
 /**
  * Lightweight in-app banner for transient chat warnings. Unlike platform
@@ -36,9 +38,9 @@ fun FloatingBanner(
         Surface(
             color = MaterialTheme.colorScheme.errorContainer,
             contentColor = MaterialTheme.colorScheme.onErrorContainer,
-            shape = RoundedCornerShape(12.dp),
-            tonalElevation = 3.dp,
-            shadowElevation = 6.dp,
+            shape = RoundedCornerShape(LettaShapeTokens.listRadius.dp),
+            tonalElevation = LettaElevationTokens.floatingBannerTonal.dp,
+            shadowElevation = LettaElevationTokens.floatingBannerShadow.dp,
         ) {
             Text(
                 text = text,

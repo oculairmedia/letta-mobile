@@ -32,6 +32,8 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIconSizing
+import com.letta.mobile.ui.theme.LettaElevationTokens
+import com.letta.mobile.ui.theme.LettaShapeTokens
 
 
 /**
@@ -103,12 +105,16 @@ fun ActionSheetItem(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val corner by animateDpAsState(
-        targetValue = if (isPressed) 12.dp else 8.dp,
+        targetValue = if (isPressed) LettaShapeTokens.listRadius.dp else LettaShapeTokens.actionRadius.dp,
         animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
         label = "actionSheetItemCorner",
     )
     val elevation by animateDpAsState(
-        targetValue = if (isPressed) 4.dp else 2.dp,
+        targetValue = if (isPressed) {
+            LettaElevationTokens.actionSheetItemPressed.dp
+        } else {
+            LettaElevationTokens.actionSheetItemResting.dp
+        },
         animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
         label = "actionSheetItemElevation",
     )
