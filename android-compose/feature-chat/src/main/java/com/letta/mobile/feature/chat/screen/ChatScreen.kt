@@ -391,6 +391,7 @@ internal fun ChatScreen(
                                 onFontScaleChange = { viewModel.setChatFontScale(it) },
                                 chatMode = chatMode,
                                 modifier = Modifier.fillMaxSize(),
+                                chatBackground = chatBackground,
                             )
                         }
                         else -> {
@@ -412,6 +413,7 @@ internal fun ChatScreen(
                                 onFontScaleChange = { viewModel.setChatFontScale(it) },
                                 chatMode = chatMode,
                                 modifier = Modifier.fillMaxSize(),
+                                chatBackground = chatBackground,
                             )
                         }
                     }
@@ -627,6 +629,7 @@ internal fun NoConversationChatContent(
     onFontScaleChange: (Float) -> Unit = {},
     chatMode: String = "interactive",
     modifier: Modifier = Modifier,
+    chatBackground: ChatBackground = ChatBackground.Default,
 ) {
     // letta-mobile-qkct: a fresh Client Mode send remains in
     // NoConversation until the gateway returns the newly-created
@@ -656,6 +659,7 @@ internal fun NoConversationChatContent(
             onFontScaleChange = onFontScaleChange,
             chatMode = chatMode,
             modifier = modifier,
+            chatBackground = chatBackground,
         )
     }
 }
@@ -677,6 +681,7 @@ private fun ChatContent(
     onFontScaleChange: (Float) -> Unit = {},
     chatMode: String = "interactive",
     modifier: Modifier = Modifier,
+    chatBackground: ChatBackground = ChatBackground.Default,
 ) {
     val renderItemsCache = remember { IncrementalChatRenderItemsCache() }
     val chatDisplayMode = chatMode.toChatDisplayMode()
@@ -713,6 +718,7 @@ private fun ChatContent(
                     onToggleRunCollapsed = onToggleRunCollapsed,
                     onToggleReasoningExpanded = onToggleReasoningExpanded,
                     modifier = Modifier.weight(1f),
+                    chatBackground = chatBackground,
                 )
             }
             A2uiSurfaceStack(
