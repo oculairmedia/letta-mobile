@@ -352,6 +352,116 @@ class ChatTimelineObserverTest {
     }
 
     @Test
+    fun `unchanged streaming tick is deduped and does not re-project or rewrite uiState`() = runTest {
+        // letta-mobile-yflpp: a streaming tick that re-emits the SAME tail event
+        // (no real content change) must NOT run a new projection or rewrite
+        // uiState — that no-op churn was pegging the UI thread (~20 projections
+        // /sec over 85+ tool cards) and dropping tool-card taps mid-stream.
+        Telemetry.clear()
+        val harness = Harness(backgroundScope)
+        var timeline = Timeline("conv-1")
+        repeat(64) { index ->
+            timeline = timeline.append(confirmed("user-$index", "history-$index"))
+        }
+        timeline = timeline.append(confirmed("assistant-tail", "hello", TimelineMessageType.ASSISTANT))
+        val flow = harness.seedTimeline(timeline)
+
+        harness.observer.start("conv-1")
+        runCurrent()
+        val stateAfterFirst = harness.uiState.value
+        val messagesAfterFirst = harness.uiState.value.messages
+        Telemetry.clear()
+
+        // Re-emit a DISTINCT Timeline instance that renders identically — only a
+        // non-rendered field (liveCursor) changed. This is exactly the storm
+        // signature: the reducer's `copy(liveCursor = serverId)` after a STALE/
+        // EQUAL merge makes the Timeline `!=` (so the StateFlow emits) while the
+        // visible tail is unchanged. The dedupe must treat this as a no-op.
+        flow.value = timeline.copy(liveCursor = "live-cursor-bump")
+        runCurrent()
+
+        // uiState must be the SAME instance (no rewrite => no recomposition).
+        assertSame(stateAfterFirst, harness.uiState.value)
+        assertSame(messagesAfterFirst, harness.uiState.value.messages)
+        // No new full projection snapshot for the no-op tick.
+        val snapshots = Telemetry.snapshot().filter {
+            it.tag == "TimelineSync" && it.name == "uiProjection.snapshot"
+        }
+        assertTrue("expected no uiProjection.snapshot for a no-op tick", snapshots.isEmpty())
+        // A suppressed counter is surfaced instead so the dedupe is observable.
+        val suppressed = Telemetry.snapshot().filter {
+            it.tag == "TimelineSync" && it.name == "uiProjection.suppressed"
+        }
+        assertTrue("expected a uiProjection.suppressed event", suppressed.isNotEmpty())
+    }
+
+    @Test
+    fun `a real tail change after a deduped no-op still projects`() = runTest {
+        // Guard: dedupe must not stick. After a no-op tick, a genuine content
+        // change must still produce a fresh projection.
+        Telemetry.clear()
+        val harness = Harness(backgroundScope)
+        var timeline = Timeline("conv-1")
+        repeat(8) { index ->
+            timeline = timeline.append(confirmed("user-$index", "history-$index"))
+        }
+        timeline = timeline.append(confirmed("assistant-tail", "hel", TimelineMessageType.ASSISTANT))
+        val flow = harness.seedTimeline(timeline)
+
+        harness.observer.start("conv-1")
+        runCurrent()
+
+        // No-op tick (only a non-rendered field changed).
+        flow.value = timeline.copy(liveCursor = "bump-1")
+        runCurrent()
+        // Real change.
+        flow.value = timeline.replaceByServerId(
+            confirmed("assistant-tail", "hello", TimelineMessageType.ASSISTANT),
+        )
+        runCurrent()
+
+        assertEquals("hello", harness.uiState.value.messages.last().content)
+        assertEquals(ChatMessageListChange.ReplaceTail, harness.uiState.value.messageListChange)
+    }
+
+    @Test
+    fun `rapid burst of distinct ticks coalesces while a projection is in flight`() = runTest {
+        // letta-mobile-yflpp COALESCE: when many distinct timeline emissions
+        // arrive faster than they can be projected, conflate() must collapse
+        // them — only the LATEST is projected, never the whole backlog.
+        val harness = Harness(backgroundScope)
+        var timeline = Timeline("conv-1")
+        repeat(8) { index ->
+            timeline = timeline.append(confirmed("user-$index", "history-$index"))
+        }
+        timeline = timeline.append(confirmed("assistant-tail", "t0", TimelineMessageType.ASSISTANT))
+        val flow = harness.seedTimeline(timeline)
+
+        harness.observer.start("conv-1")
+        runCurrent()
+        Telemetry.clear()
+
+        // Push 20 distinct tail values without yielding to the collector.
+        repeat(20) { i ->
+            timeline = timeline.replaceByServerId(
+                confirmed("assistant-tail", "token-$i", TimelineMessageType.ASSISTANT),
+            )
+            flow.value = timeline
+        }
+        runCurrent()
+
+        // The latest value wins; the collector did not process all 20.
+        assertEquals("token-19", harness.uiState.value.messages.last().content)
+        val snapshots = Telemetry.snapshot().count {
+            it.tag == "TimelineSync" && it.name == "uiProjection.snapshot"
+        }
+        assertTrue(
+            "expected coalesced projections (<20) but ran $snapshots",
+            snapshots < 20,
+        )
+    }
+
+    @Test
     fun `long history streaming tail projection does not scan full history per frame`() = runTest {
         Telemetry.clear()
         val harness = Harness(backgroundScope)
@@ -421,6 +531,9 @@ class ChatTimelineObserverTest {
             syncA2uiHistorySnapshot = syncA2uiHistorySnapshot,
             projectionDispatcher = scope.coroutineContext[ContinuationInterceptor] as? CoroutineDispatcher
                 ?: Dispatchers.Default,
+            // Disable frame pacing so virtual-clock emissions stay synchronous
+            // under runCurrent(); coalescing is exercised separately.
+            projectionFrameIntervalMs = 0L,
         )
 
         init {
