@@ -10,7 +10,7 @@ package com.letta.mobile.data.timeline
  */
 interface IngestedMessageListener {
     /**
-     * Called on the TimelineSyncLoop's coroutine context (Dispatchers.IO)
+     * Called on the TimelineSyncLoop's coroutine context.
      * after the event has been appended to state and the write lock has been
      * released. Implementations may do slow lookup/network work; exceptions
      * are swallowed and logged.

@@ -18,7 +18,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withTimeoutOrNull
-import java.util.concurrent.atomic.AtomicInteger
 import kotlin.random.Random
 
 /**
@@ -28,9 +27,9 @@ import kotlin.random.Random
 internal suspend fun runStreamSubscriber(
     conversationId: String,
     messageApi: com.letta.mobile.data.api.MessageApi,
-    activeStreamCount: AtomicInteger,
+    activeStreamCount: TimelineAtomicCounter,
     events: MutableSharedFlow<TimelineSyncEvent>,
-    seenRunIds: MutableSet<String>,
+    seenRunIds: TimelineSeenRunTracker,
     streamSilenceTimeoutMs: Long,
     reconcileForExternalRun: suspend (String) -> Unit,
     ingestStreamEvent: suspend (LettaMessage) -> Unit,
@@ -132,7 +131,7 @@ internal suspend fun runStreamSubscriber(
                                 // the reconcile.  letta-mobile-mge5 for Matrix-originated
                                 // messages.
                                 val runId = message.runId
-                                if (runId != null && seenRunIds.add(runId)) {
+                                if (runId != null && seenRunIds.markSeen(runId)) {
                                     val capturedRunId = runId
                                     runCatching { reconcileForExternalRun(capturedRunId) }.onFailure { t ->
                                         Telemetry.error(

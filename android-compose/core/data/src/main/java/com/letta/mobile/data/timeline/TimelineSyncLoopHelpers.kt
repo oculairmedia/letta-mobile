@@ -11,7 +11,6 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import java.io.IOException
 
 private const val REQUEST_PREVIEW_MAX_CHARS = 2_048
 private const val DATA_URL_PREVIEW_CHARS = 32
@@ -92,9 +91,8 @@ internal fun previewDataUrl(url: String): String {
 }
 
 internal fun isRetryableReconcileError(t: Throwable): Boolean = when (t) {
-    is IOException -> true
     is ApiException -> t.code in 500..599
-    else -> false
+    else -> isTimelineNetworkFailure(t)
 }
 
 internal fun hydrateRawFetchLimit(visibleTarget: Int): Int =

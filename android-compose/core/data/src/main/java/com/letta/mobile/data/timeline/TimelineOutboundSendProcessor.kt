@@ -1,7 +1,5 @@
 package com.letta.mobile.data.timeline
 
-import android.util.Log
-import com.letta.mobile.core.BuildConfig
 import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
@@ -12,7 +10,6 @@ import com.letta.mobile.data.model.buildContentParts
 import com.letta.mobile.data.model.toJsonArray
 import com.letta.mobile.data.stream.SseParser
 import com.letta.mobile.util.Telemetry
-import java.io.IOException
 import java.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -22,7 +19,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
@@ -41,11 +37,6 @@ internal class TimelineOutboundSendProcessor(
     private val ingestStreamEvent: suspend (LettaMessage) -> Unit,
 ) {
     val sendQueue = Channel<PendingSend>(Channel.UNLIMITED)
-
-    private val previewJson = Json {
-        encodeDefaults = true
-        explicitNulls = false
-    }
 
     init {
         scope.launch { processSendQueue() }
@@ -129,9 +120,6 @@ internal class TimelineOutboundSendProcessor(
             includePings = true,
             includeReturnMessageTypes = TimelineSyncLoop.DEFAULT_INCLUDE_TYPES,
         )
-        if (BuildConfig.DEBUG) {
-            Log.d(logTag, "send.requestBody otid=$otid preview=${previewRequest(request, previewJson)}")
-        }
         val postTimer = Telemetry.startTimer("TimelineSync", "send.post")
         val channel = messageApi.sendConversationMessage(ConversationId(conversationId), request)
         postTimer.stop("otid" to otid)
