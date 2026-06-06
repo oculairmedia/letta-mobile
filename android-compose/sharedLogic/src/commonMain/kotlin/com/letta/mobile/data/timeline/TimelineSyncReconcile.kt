@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.ToolReturnMessage
@@ -70,6 +71,7 @@ suspend fun reconcileAfterSend(
     }
 }
 
+@Immutable
 data class ReconcileAfterSendResult(
     val confirmedLocal: Boolean,
     val appendedMissing: Int,

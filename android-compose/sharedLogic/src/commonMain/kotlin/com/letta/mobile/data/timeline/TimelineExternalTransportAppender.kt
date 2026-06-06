@@ -36,7 +36,7 @@ class TimelineExternalTransportAppender(
             TimelineGatewayEvent.ExternalTransportLocalAppend(
                 content = content,
                 otid = otid,
-                attachments = attachments,
+                attachments = attachments.toTimelinePersistentList(),
                 sentAt = sentAt,
                 ack = ack,
             )

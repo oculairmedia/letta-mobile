@@ -9,6 +9,7 @@ import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.util.Telemetry
 import java.time.Instant
 import org.junit.After
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -133,7 +134,7 @@ class TimelineHydrationReducerTest {
             conversationId = "conversation-1",
             serverMessagesChronological = listOf(UserMessage(id = "server-1", contentRaw = JsonPrimitive("confirmed"))),
             timelineBeforeFetch = Timeline("conversation-1"),
-            currentTimeline = Timeline("conversation-1", events = listOf(local)),
+            currentTimeline = Timeline("conversation-1", events = persistentListOf(local)),
             diskRecords = emptyList(),
         )
 
@@ -159,7 +160,7 @@ class TimelineHydrationReducerTest {
             content = "second",
             serverId = "current-2",
         )
-        val current = Timeline("conversation-1", events = listOf(first, second))
+        val current = Timeline("conversation-1", events = persistentListOf(first, second))
         Telemetry.clear()
 
         val result = TimelineHydrationReducer.reduce(
@@ -203,7 +204,7 @@ class TimelineHydrationReducerTest {
                 )
             ),
             timelineBeforeFetch = Timeline("conversation-1"),
-            currentTimeline = Timeline("conversation-1", events = listOf(currentAssistant)),
+            currentTimeline = Timeline("conversation-1", events = persistentListOf(currentAssistant)),
             diskRecords = emptyList(),
         )
 

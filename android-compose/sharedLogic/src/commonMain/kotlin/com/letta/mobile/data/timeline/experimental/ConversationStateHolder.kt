@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.persistentMapOf
 
 /**
  * letta-mobile-oc8j Phase 1 → Phase 3a.
@@ -75,8 +77,8 @@ class ConversationStateHolder(
 
     private fun seedOutputFor(timeline: Timeline) = TimelineReducerOutput(
         next = timeline,
-        updatedPendingToolReturnsByCallId = emptyMap(),
-        emittedEvents = emptyList(),
+        updatedPendingToolReturnsByCallId = persistentMapOf(),
+        emittedEvents = persistentListOf(),
         notification = null,
     )
 

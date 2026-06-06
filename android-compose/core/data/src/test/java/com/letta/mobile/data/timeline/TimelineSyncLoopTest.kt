@@ -17,6 +17,7 @@ import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.writeStringUtf8
 import io.mockk.mockk
 import kotlin.random.Random
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -1231,7 +1232,7 @@ class TimelineSyncLoopTest {
         )
         api.addStoredMessage(
             com.letta.mobile.data.model.ApprovalRequestMessage(
-                id = reqId, toolCalls = listOf(toolCall),
+                id = reqId, toolCalls = persistentListOf(toolCall),
             )
         )
         api.addStoredMessage(
@@ -1272,7 +1273,7 @@ class TimelineSyncLoopTest {
         api.addStoredMessage(
             com.letta.mobile.data.model.ApprovalRequestMessage(
                 id = "req-batch",
-                toolCalls = listOf(callA, callB),
+                toolCalls = persistentListOf(callA, callB),
             )
         )
         api.addStoredMessage(
@@ -1319,7 +1320,7 @@ class TimelineSyncLoopTest {
         // Seed the store with a user message so send has something to build from.
         api.nextStreamMessages = listOf(
             com.letta.mobile.data.model.ApprovalRequestMessage(
-                id = reqId, toolCalls = listOf(toolCall),
+                id = reqId, toolCalls = persistentListOf(toolCall),
             ),
             com.letta.mobile.data.model.ToolReturnMessage(
                 id = "ret-2",
@@ -2148,7 +2149,7 @@ class TimelineSyncLoopImageRestoreTest {
             otid = "otid-dup",
             conversationId = "conv-dedup",
             content = "here",
-            attachments = emptyList(),
+            attachments = persistentListOf(),
             sentAt = java.time.Instant.parse("2026-04-19T13:00:00Z"),
         )
         val scope = CoroutineScope(Dispatchers.Unconfined)

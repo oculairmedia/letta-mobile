@@ -52,6 +52,8 @@ kotlin {
                 api("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
                 api("org.jetbrains.kotlinx:atomicfu:0.32.1")
+                api("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.5.0-beta01")
+                api("org.jetbrains.compose.runtime:runtime:1.9.0")
             }
         }
 
