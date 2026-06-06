@@ -407,7 +407,8 @@ private fun ZoomableAttachmentImage(
                         val pressed = event.changes.filter { it.pressed }
                         val zoom = event.calculateZoom()
                         val pan = event.calculatePan()
-                        val isTransformGesture = pressed.size >= 2 || zoom != 1f || transform.scale > 1.02f
+                        val isTransformGesture = pressed.isNotEmpty() &&
+                            (pressed.size >= 2 || zoom != 1f || transform.scale > 1.02f)
                         if (isTransformGesture) {
                             transformed = true
                             val centroid = event.calculateCentroid(useCurrent = true)

@@ -301,7 +301,7 @@ internal fun ChatMessageList(
     onSubmitApproval: (String, List<String>, Boolean, String?) -> Unit,
     onToggleRunCollapsed: (String) -> Unit,
     onToggleReasoningExpanded: (String) -> Unit,
-    onAttachmentImageTap: (List<UiImageAttachment>, Int) -> Unit,
+    onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
     modifier: Modifier = Modifier,
     chatBackground: ChatBackground = ChatBackground.Default,
 ) {

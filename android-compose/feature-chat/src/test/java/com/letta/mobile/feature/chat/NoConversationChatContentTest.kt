@@ -70,6 +70,7 @@ class NoConversationChatContentTest {
                         onSubmitApproval = { _, _, _, _ -> },
                         onToggleRunCollapsed = {},
                         onToggleReasoningExpanded = {},
+                        onAttachmentImageTap = null,
                         modifier = Modifier,
                     )
                 }
@@ -107,6 +108,7 @@ class NoConversationChatContentTest {
                         onSubmitApproval = { _, _, _, _ -> },
                         onToggleRunCollapsed = {},
                         onToggleReasoningExpanded = {},
+                        onAttachmentImageTap = null,
                         modifier = Modifier,
                     )
                 }
@@ -155,6 +157,7 @@ class NoConversationChatContentTest {
                             dismissedSurfaceId = surfaceId
                             surfaces = persistentMapOf()
                         },
+                        onAttachmentImageTap = null,
                         modifier = Modifier,
                     )
                 }
