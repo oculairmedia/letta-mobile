@@ -1,6 +1,5 @@
 package com.letta.mobile.data.timeline
 
-import com.letta.mobile.data.api.NoActiveRunException
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
@@ -51,7 +50,7 @@ internal suspend fun runStreamSubscriber(
             var streamTimedOut = false
             var timedOutSilenceMs = 0L
             try {
-                runOpenedAtMs = System.currentTimeMillis()
+                runOpenedAtMs = timelineCurrentTimeMillis()
                 runEventsCount = 0
                 runHeartbeatCount = 0
                 var lastHeartbeatTelemetryAtMs = 0L
@@ -74,7 +73,7 @@ internal suspend fun runStreamSubscriber(
                             frames.receiveCatching()
                         }
                         if (result == null) {
-                            val now = System.currentTimeMillis()
+                            val now = timelineCurrentTimeMillis()
                             timedOutSilenceMs = now - lastLivenessAtMs
                             streamTimedOut = true
                             Telemetry.event(
@@ -90,7 +89,7 @@ internal suspend fun runStreamSubscriber(
                         }
 
                         val frame = result.getOrNull() ?: break
-                        lastLivenessAtMs = System.currentTimeMillis()
+                        lastLivenessAtMs = timelineCurrentTimeMillis()
                         when (frame) {
                             TimelineStreamFrame.Heartbeat -> {
                                 runHeartbeatCount++
@@ -172,7 +171,7 @@ internal suspend fun runStreamSubscriber(
             Telemetry.event(
                 "TimelineSync", "streamSubscriber.closed",
                 "conversationId" to conversationId,
-                "durationMs" to (System.currentTimeMillis() - runOpenedAtMs),
+                "durationMs" to (timelineCurrentTimeMillis() - runOpenedAtMs),
                 "eventsReceived" to runEventsCount,
                 "heartbeatsReceived" to runHeartbeatCount,
                 "activeStreamCount" to activeStreamCountAfterClose,
@@ -180,7 +179,7 @@ internal suspend fun runStreamSubscriber(
             backoffMs = STREAM_BACKOFF_START_MS
         } catch (e: CancellationException) {
             throw e
-        } catch (_: NoActiveRunException) {
+        } catch (_: TimelineNoActiveRunException) {
             // No active run: back off exponentially. This is the expected
             // idle path. Counted at INFO so Grafana can compute the
             // activity-density ratio (eventReceived / idle404).

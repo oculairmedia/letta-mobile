@@ -7,6 +7,8 @@ actual typealias TimelineInstant = Instant
 
 actual fun timelineNow(): TimelineInstant = Instant.now()
 
+actual fun timelineCurrentTimeMillis(): Long = Instant.now().toEpochMilli()
+
 actual fun parseTimelineInstant(value: String): TimelineInstant = Instant.parse(value)
 
 actual fun parseTimelineInstantOrNull(value: String): TimelineInstant? =

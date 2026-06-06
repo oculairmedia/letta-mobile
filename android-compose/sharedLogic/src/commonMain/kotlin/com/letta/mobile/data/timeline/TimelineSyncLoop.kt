@@ -1,11 +1,9 @@
 package com.letta.mobile.data.timeline
 
-import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolReturnMessage
-import java.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -36,28 +34,6 @@ class TimelineSyncLoop(
     private val conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
     private val streamSilenceTimeoutMs: Long = STREAM_SILENCE_TIMEOUT_MS,
 ) {
-    constructor(
-        messageApi: MessageApi,
-        conversationId: String,
-        scope: CoroutineScope,
-        logTag: String = "TimelineSync",
-        ingestedListener: IngestedMessageListener? = null,
-        ingestedListenerProvider: (() -> IngestedMessageListener?)? = null,
-        pendingLocalStore: PendingLocalStore = NoOpPendingLocalStore,
-        conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
-        streamSilenceTimeoutMs: Long = STREAM_SILENCE_TIMEOUT_MS,
-    ) : this(
-        messageApi = MessageApiTimelineTransport(messageApi),
-        conversationId = conversationId,
-        scope = scope,
-        logTag = logTag,
-        ingestedListener = ingestedListener,
-        ingestedListenerProvider = ingestedListenerProvider,
-        pendingLocalStore = pendingLocalStore,
-        conversationCursorStore = conversationCursorStore,
-        streamSilenceTimeoutMs = streamSilenceTimeoutMs,
-    )
-
     private val loopJob = SupervisorJob(scope.coroutineContext[Job])
     private val loopScope = CoroutineScope(scope.coroutineContext + loopJob)
 
@@ -65,7 +41,7 @@ class TimelineSyncLoop(
     val state: StateFlow<Timeline> = _state.asStateFlow()
 
     private val _streamSubscriberActive = MutableStateFlow(false)
-    internal val streamSubscriberActive: StateFlow<Boolean> = _streamSubscriberActive.asStateFlow()
+    val streamSubscriberActive: StateFlow<Boolean> = _streamSubscriberActive.asStateFlow()
 
     private val writeMutex = Mutex()
     internal val eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED)
@@ -162,7 +138,7 @@ class TimelineSyncLoop(
         loopScope.launch { runStreamSubscriber() }
     }
 
-    internal suspend fun emitHydrateFailed(message: String) {
+    suspend fun emitHydrateFailed(message: String) {
         _events.emit(TimelineSyncEvent.HydrateFailed(message))
     }
 
@@ -180,7 +156,7 @@ class TimelineSyncLoop(
         return outboundSendProcessor.send(content, attachments)
     }
 
-    internal suspend fun appendExternalTransportLocal(content: String, otid: String, attachments: List<MessageContentPart.Image> = emptyList()): String {
+    suspend fun appendExternalTransportLocal(content: String, otid: String, attachments: List<MessageContentPart.Image> = emptyList()): String {
         return externalTransportAppender.appendExternalTransportLocal(content, otid, attachments)
     }
 
@@ -257,25 +233,25 @@ class TimelineSyncLoop(
         return ack.await()
     }
 
-    internal suspend fun reconcileForExternalRun(runId: String) {
+    suspend fun reconcileForExternalRun(runId: String) {
         reconcileForExternalRun(runId) { name, attrs, allowWhileActive ->
             recentMessagesReconciler.reconcileRecentMessagesFromServer(name, attrs, allowWhileActive)
         }
     }
 
-    internal suspend fun reconcileRecentMessages(reason: String, forceRefresh: Boolean = false) {
+    suspend fun reconcileRecentMessages(reason: String, forceRefresh: Boolean = false) {
         recentMessagesReconciler.reconcileRecentMessages(reason, forceRefresh)
     }
 
-    internal suspend fun markExternalTransportLocalSent(otid: String) {
+    suspend fun markExternalTransportLocalSent(otid: String) {
         externalTransportAppender.markExternalTransportLocalSent(otid)
     }
 
-    internal suspend fun markExternalTransportLocalFailed(otid: String) {
+    suspend fun markExternalTransportLocalFailed(otid: String) {
         externalTransportAppender.markExternalTransportLocalFailed(otid)
     }
 
-    internal suspend fun reconcileExternalTransportSend(agentId: String, externalConversationId: String, otid: String) {
+    suspend fun reconcileExternalTransportSend(agentId: String, externalConversationId: String, otid: String) {
         externalTransportAppender.reconcileExternalTransportSend(agentId, externalConversationId, otid)
     }
 
@@ -299,7 +275,7 @@ class TimelineSyncLoop(
         Telemetry.event("TimelineSync", "streamSubscriber.activeChanged", "conversationId" to conversationId, "active" to active)
     }
 
-    internal suspend fun submitStreamEvent(message: LettaMessage) {
+    suspend fun submitStreamEvent(message: LettaMessage) {
         if (wsSubscription.isActive()) {
             Telemetry.event("TimelineSync", "streamSubscriber.skippedDualIngest", "conversationId" to conversationId, "messageType" to message.messageType, "messageId" to message.id)
             return
@@ -307,14 +283,14 @@ class TimelineSyncLoop(
         eventQueue.send(TimelineGatewayEvent.StreamMessage(message))
     }
 
-    internal suspend fun ingestStreamEvent(message: LettaMessage) {
+    suspend fun ingestStreamEvent(message: LettaMessage) {
         wsSubscription.markActive()
         val ack = CompletableDeferred<Unit>()
         eventQueue.send(TimelineGatewayEvent.StreamMessage(message, ack))
         ack.await()
     }
 
-    internal fun clearExternalTransportActive() {
+    fun clearExternalTransportActive() {
         wsSubscription.clear()
     }
 

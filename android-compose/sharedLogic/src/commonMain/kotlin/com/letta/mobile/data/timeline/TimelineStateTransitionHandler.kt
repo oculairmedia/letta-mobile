@@ -10,7 +10,7 @@ import kotlinx.coroutines.sync.withLock
 /**
  * Handles timeline local event additions, retry transitions, and delivery state transitions (sent/failed).
  */
-internal class TimelineStateTransitionHandler(
+class TimelineStateTransitionHandler(
     private val conversationId: String,
     private val state: MutableStateFlow<Timeline>,
     private val events: MutableSharedFlow<TimelineSyncEvent>,
