@@ -12,6 +12,9 @@ import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.ToolCallPayload
 import com.letta.mobile.data.transport.WsFrameMapper
 import com.letta.mobile.util.Telemetry
+import kotlinx.collections.immutable.PersistentMap
+import kotlinx.collections.immutable.persistentMapOf
+import kotlinx.collections.immutable.toPersistentList
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -586,7 +589,7 @@ class TimelineStreamReducerTest {
                     runId = "run-$index",
                     stepId = null,
                 )
-            },
+            }.toPersistentList(),
         )
 
         val output = reduce(
@@ -605,7 +608,7 @@ class TimelineStreamReducerTest {
     private fun reduce(
         prev: Timeline = timeline(),
         frame: com.letta.mobile.data.model.LettaMessage,
-        pendingToolReturnsByCallId: Map<String, ToolReturnMessage> = emptyMap(),
+        pendingToolReturnsByCallId: PersistentMap<String, ToolReturnMessage> = persistentMapOf(),
     ): TimelineReducerOutput = reduceStreamFrame(
         TimelineReducerInput(
             prev = prev,

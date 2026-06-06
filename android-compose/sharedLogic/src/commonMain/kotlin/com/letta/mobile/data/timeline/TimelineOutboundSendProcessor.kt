@@ -44,7 +44,7 @@ internal class TimelineOutboundSendProcessor(
     ): String {
         val otid = newOtid()
         val sentAt = timelineNow()
-        val pending = PendingSend(otid, content, attachments)
+        val pending = PendingSend(otid, content, attachments.toTimelinePersistentList())
         val appendAck = CompletableDeferred<Unit>()
         eventQueue.send(TimelineGatewayEvent.LocalSendAppend(pending, sentAt, appendAck))
         appendAck.await()

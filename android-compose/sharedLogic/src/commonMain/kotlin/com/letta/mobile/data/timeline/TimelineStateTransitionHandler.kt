@@ -49,7 +49,7 @@ class TimelineStateTransitionHandler(
                     if (it.otid == event.otid && it is TimelineEvent.Local) {
                         it.copy(deliveryState = DeliveryState.SENDING)
                     } else it
-                })
+                }.toTimelinePersistentList())
                 sendQueue.send(PendingSend(event.otid, existing.content, existing.attachments))
             }
         }

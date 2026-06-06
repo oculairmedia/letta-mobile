@@ -1,5 +1,6 @@
 package com.letta.mobile.data.model
 
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -494,6 +495,7 @@ data class PingMessage(
 ) : LettaMessage
 
 @Serializable
+@Immutable
 data class ToolCall(
     val id: String? = null,
     @SerialName("tool_call_id") val toolCallId: String? = null,

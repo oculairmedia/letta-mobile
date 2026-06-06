@@ -1,10 +1,12 @@
 package com.letta.mobile.data.timeline
 
+import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.util.Telemetry
 
+@Immutable
 data class HydratedTimelineResult(
     val timeline: Timeline,
     val visibleEventCount: Int,
@@ -53,7 +55,7 @@ object TimelineHydrationReducer {
                     role = Role.USER,
                     sentAt = rec.sentAt,
                     deliveryState = DeliveryState.SENT,
-                    attachments = rec.attachments,
+                    attachments = rec.attachments.toTimelinePersistentList(),
                 )
             }
         val maxServerPos = converted.lastOrNull()?.position ?: 0.0
@@ -73,7 +75,7 @@ object TimelineHydrationReducer {
         return HydratedTimelineResult(
             timeline = Timeline(
                 conversationId = conversationId,
-                events = deduped,
+                events = deduped.toTimelinePersistentList(),
                 liveCursor = converted.lastOrNull()?.serverId,
             ),
             visibleEventCount = converted.size,
@@ -152,9 +154,9 @@ object TimelineHydrationReducer {
             approvalDecided = byResponse || byReturn || approvalDecided,
             toolReturnContent = matchingReturn?.toolReturn?.funcResponse ?: toolReturnContent,
             toolReturnIsError = matchingReturn?.let { it.isErr == true || it.status == "error" } ?: toolReturnIsError,
-            toolReturnContentByCallId = returnContentByCallId,
-            toolReturnIsErrorByCallId = returnIsErrorByCallId,
-            attachments = (attachments + matchingReturns.flatMap { (_, toolReturn) -> toolReturn.attachments }).distinct(),
+            toolReturnContentByCallId = returnContentByCallId.toTimelinePersistentMap(),
+            toolReturnIsErrorByCallId = returnIsErrorByCallId.toTimelinePersistentMap(),
+            attachments = (attachments + matchingReturns.flatMap { (_, toolReturn) -> toolReturn.attachments }).distinct().toTimelinePersistentList(),
         )
     }
 }

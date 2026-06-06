@@ -1,7 +1,9 @@
 package com.letta.mobile.data.timeline
 
+import androidx.compose.runtime.Immutable
 import com.letta.mobile.util.Telemetry
 
+@Immutable
 data class PendingIngestNotification(
     val serverId: String,
     val messageType: String,

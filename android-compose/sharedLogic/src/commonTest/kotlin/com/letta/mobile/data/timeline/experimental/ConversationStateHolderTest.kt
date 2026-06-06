@@ -3,6 +3,7 @@ package com.letta.mobile.data.timeline.experimental
 import app.cash.turbine.test
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineEvent
@@ -13,6 +14,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlinx.collections.immutable.PersistentMap
+import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -117,7 +120,7 @@ class ConversationStateHolderTest {
             TimelineReducerInput(
                 prev = Timeline(conversationId = conversationId),
                 frame = seedFrame,
-                pendingToolReturnsByCallId = emptyMap(),
+                pendingToolReturnsByCallId = persistentMapOf(),
             )
         ).next
 
@@ -139,7 +142,7 @@ class ConversationStateHolderTest {
                 TimelineReducerInput(
                     prev = acc,
                     frame = frame,
-                    pendingToolReturnsByCallId = emptyMap(),
+                    pendingToolReturnsByCallId = persistentMapOf(),
                 )
             ).next
         }
@@ -191,12 +194,12 @@ class ConversationStateHolderTest {
 
     private data class Fold(
         val timeline: Timeline,
-        val pending: Map<String, com.letta.mobile.data.model.ToolReturnMessage>,
+        val pending: PersistentMap<String, ToolReturnMessage>,
     )
 
     private fun initialFold(conversationId: String) = Fold(
         timeline = Timeline(conversationId = conversationId),
-        pending = emptyMap(),
+        pending = persistentMapOf(),
     )
 }
 

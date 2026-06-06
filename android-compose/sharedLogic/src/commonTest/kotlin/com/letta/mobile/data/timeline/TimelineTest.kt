@@ -1,6 +1,7 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.util.Telemetry
+import kotlinx.collections.immutable.persistentListOf
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -149,7 +150,7 @@ class TimelineTest {
         Telemetry.clear()
         val t = Timeline(
             "c1",
-            events = listOf(
+            events = persistentListOf(
                 confirmed("tail", 1.0, serverId = "srv-old-duplicate"),
                 confirmed("older", 2.0, serverId = "srv-older"),
                 confirmed("tail", 3.0, serverId = "srv-tail", content = "hel"),
@@ -177,7 +178,7 @@ class TimelineTest {
         Telemetry.clear()
         val existing = confirmed("stable", 1.0, TimelineMessageType.ASSISTANT).copy(serverId = "srv-1")
         val duplicate = confirmed("stable", 2.0, TimelineMessageType.USER).copy(serverId = "srv-2")
-        val t = Timeline("c1", events = listOf(existing, duplicate))
+        val t = Timeline("c1", events = persistentListOf(existing, duplicate))
         Telemetry.clear()
 
         val updated = t.replaceByServerId(
@@ -316,7 +317,7 @@ class TimelineTest {
     @Test
     fun `init logs telemetry for position collision`() {
         Telemetry.clear()
-        val events = listOf(
+        val events = persistentListOf(
             local("a", 1.0, "first"),
             confirmed("b", 1.0),  // position collision
         )
@@ -337,7 +338,7 @@ class TimelineTest {
     @Test
     fun `init logs telemetry for duplicate otid`() {
         Telemetry.clear()
-        val events = listOf(
+        val events = persistentListOf(
             local("dup", 1.0, "first"),
             confirmed("dup", 2.0),  // otid duplicate
         )
