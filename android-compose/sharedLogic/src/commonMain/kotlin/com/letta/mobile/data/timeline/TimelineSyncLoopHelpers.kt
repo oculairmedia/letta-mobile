@@ -1,6 +1,5 @@
 package com.letta.mobile.data.timeline
 
-import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.model.MessageCreateRequest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -91,7 +90,7 @@ internal fun previewDataUrl(url: String): String {
 }
 
 internal fun isRetryableReconcileError(t: Throwable): Boolean = when (t) {
-    is ApiException -> t.code in 500..599
+    is TimelineTransportHttpException -> t.code in 500..599
     else -> isTimelineNetworkFailure(t)
 }
 

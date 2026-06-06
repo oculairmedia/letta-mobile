@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * approvalDecided=true and attaches toolReturnContent as appropriate.
  * Must be invoked inside writeMutex.
  */
-internal fun applyReturnsAndResponsesFromSnapshot(
+fun applyReturnsAndResponsesFromSnapshot(
     snapshot: List<LettaMessage>,
     state: MutableStateFlow<Timeline>,
 ) {

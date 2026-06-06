@@ -8,14 +8,13 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.time.Instant
 
 /**
  * Reconcile timeline state after sending a message. Swaps Local→Confirmed
  * for the outbound message, pulls in any server messages we don't yet have,
  * and advances liveCursor.
  */
-internal suspend fun reconcileAfterSend(
+suspend fun reconcileAfterSend(
     otid: String,
     conversationId: String,
     writeMutex: Mutex,
@@ -71,14 +70,14 @@ internal suspend fun reconcileAfterSend(
     }
 }
 
-internal data class ReconcileAfterSendResult(
+data class ReconcileAfterSendResult(
     val confirmedLocal: Boolean,
     val appendedMissing: Int,
     val confirmedServerId: String?,
     val shouldDeletePendingLocal: Boolean,
 )
 
-internal suspend fun applyReconcileAfterSendSnapshot(
+suspend fun applyReconcileAfterSendSnapshot(
     otid: String,
     conversationId: String,
     serverMessages: List<LettaMessage>,
@@ -130,7 +129,7 @@ internal suspend fun applyReconcileAfterSendSnapshot(
     )
 }
 
-internal fun Timeline.mergeServerMessages(
+fun Timeline.mergeServerMessages(
     serverMessages: List<LettaMessage>,
 ): Pair<Timeline, Int> {
     var timeline = this
@@ -147,12 +146,12 @@ internal fun Timeline.mergeServerMessages(
     return timeline to merged
 }
 
-internal fun Timeline.positionForServerMessageDate(message: LettaMessage): Double {
-    val messageDate = message.date?.let { runCatching { Instant.parse(it) }.getOrNull() }
+fun Timeline.positionForServerMessageDate(message: LettaMessage): Double {
+    val messageDate = message.date?.let { parseTimelineInstantOrNull(it) }
         ?: return nextLocalPosition()
     val nextIndex = events.indexOfFirst { event ->
         val eventDate = (event as? TimelineEvent.Confirmed)?.date ?: return@indexOfFirst false
-        eventDate > messageDate
+        compareTimelineInstants(eventDate, messageDate) > 0
     }
     if (nextIndex < 0) return nextLocalPosition()
 
@@ -167,7 +166,7 @@ internal fun Timeline.positionForServerMessageDate(message: LettaMessage): Doubl
 
 
 
-internal suspend fun reconcileForExternalRun(
+suspend fun reconcileForExternalRun(
     runId: String,
     reconcileRecentMessagesFromServer: suspend (String, Array<Pair<String, Any?>>, Boolean) -> Unit,
 ) {

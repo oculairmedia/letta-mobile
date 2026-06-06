@@ -14,7 +14,7 @@ import com.letta.mobile.data.timeline.TimelineMessageType
 import com.letta.mobile.data.timeline.TimelineReducerInput
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.timeline.reduceStreamFrame
-import java.time.Instant
+import com.letta.mobile.data.timeline.timelineNow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -185,7 +185,7 @@ class HeadlessTimelineStore(
                 otid = otid,
                 content = content,
                 role = Role.USER,
-                sentAt = Instant.now(),
+                sentAt = timelineNow(),
                 deliveryState = DeliveryState.SENDING,
                 attachments = attachments,
                 source = MessageSource.LETTA_SERVER,

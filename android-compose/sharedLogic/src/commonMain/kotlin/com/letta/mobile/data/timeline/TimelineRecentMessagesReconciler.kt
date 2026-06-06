@@ -12,7 +12,7 @@ import kotlinx.coroutines.sync.withLock
 /**
  * Lifts recent-messages synchronization: periodic reconciles + snapshot applications.
  */
-internal class TimelineRecentMessagesReconciler(
+class TimelineRecentMessagesReconciler(
     private val conversationId: String,
     private val messageApi: TimelineTransport,
     private val eventQueue: Channel<TimelineGatewayEvent>,

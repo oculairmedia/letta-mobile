@@ -118,7 +118,7 @@ open class TimelineRepository @Inject constructor(
                 "conversationId" to conversationId,
             )
             val created = TimelineSyncLoop(
-                messageApi = messageApi,
+                messageApi = MessageApiTimelineTransport(messageApi),
                 conversationId = conversationId,
                 scope = scope,
                 ingestedListenerProvider = { ingestedListener },

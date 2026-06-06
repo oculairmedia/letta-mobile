@@ -19,7 +19,7 @@ class TimelineSyncStreamSubscriberPolicyTest {
     }
 
     private fun timelineSource(fileName: String): String = repositoryRoot()
-        .resolve("core/data/src/main/java/com/letta/mobile/data/timeline")
+        .resolve("sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/timeline")
         .resolve(fileName)
         .readText()
 

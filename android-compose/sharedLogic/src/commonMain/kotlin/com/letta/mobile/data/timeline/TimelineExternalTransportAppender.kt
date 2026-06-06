@@ -10,13 +10,12 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.time.Instant
 
 /**
  * Handles appending local events from external transport (admin-shim WS),
  * marking them as sent/failed, and doing agent-specific reconciliation.
  */
-internal class TimelineExternalTransportAppender(
+class TimelineExternalTransportAppender(
     private val conversationId: String,
     private val messageApi: TimelineTransport,
     private val eventQueue: Channel<TimelineGatewayEvent>,
@@ -31,7 +30,7 @@ internal class TimelineExternalTransportAppender(
         otid: String,
         attachments: List<MessageContentPart.Image> = emptyList(),
     ): String {
-        val sentAt = Instant.now()
+        val sentAt = timelineNow()
         val ack = CompletableDeferred<String>()
         eventQueue.send(
             TimelineGatewayEvent.ExternalTransportLocalAppend(

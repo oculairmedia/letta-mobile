@@ -4,6 +4,8 @@ expect class TimelineInstant
 
 expect fun timelineNow(): TimelineInstant
 
+expect fun timelineCurrentTimeMillis(): Long
+
 expect fun parseTimelineInstant(value: String): TimelineInstant
 
 expect fun parseTimelineInstantOrNull(value: String): TimelineInstant?

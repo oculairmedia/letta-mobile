@@ -8,6 +8,8 @@ actual typealias TimelineInstant = Instant
 
 actual fun timelineNow(): TimelineInstant = Clock.System.now()
 
+actual fun timelineCurrentTimeMillis(): Long = Clock.System.now().toEpochMilliseconds()
+
 actual fun parseTimelineInstant(value: String): TimelineInstant = Instant.parse(value)
 
 actual fun parseTimelineInstantOrNull(value: String): TimelineInstant? =

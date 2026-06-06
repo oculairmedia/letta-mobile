@@ -27,6 +27,15 @@ interface TimelineTransport {
     ): List<LettaMessage>
 }
 
+class TimelineTransportHttpException(
+    val code: Int,
+    message: String,
+    cause: Throwable? = null,
+) : Exception(message, cause)
+
+class TimelineNoActiveRunException(val conversationId: String) :
+    Exception("No active runs for conversation $conversationId")
+
 sealed interface TimelineStreamFrame {
     data object Heartbeat : TimelineStreamFrame
     data object Done : TimelineStreamFrame

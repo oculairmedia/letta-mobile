@@ -7,7 +7,6 @@ import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.buildContentParts
 import com.letta.mobile.data.model.toJsonArray
 import com.letta.mobile.util.Telemetry
-import java.time.Instant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
@@ -44,7 +43,7 @@ internal class TimelineOutboundSendProcessor(
         attachments: List<MessageContentPart.Image> = emptyList(),
     ): String {
         val otid = newOtid()
-        val sentAt = Instant.now()
+        val sentAt = timelineNow()
         val pending = PendingSend(otid, content, attachments)
         val appendAck = CompletableDeferred<Unit>()
         eventQueue.send(TimelineGatewayEvent.LocalSendAppend(pending, sentAt, appendAck))
