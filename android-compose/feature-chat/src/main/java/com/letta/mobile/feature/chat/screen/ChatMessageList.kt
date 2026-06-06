@@ -51,6 +51,7 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.DateSeparator
 import com.letta.mobile.ui.components.ScrollToBottomFab
+import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.LocalChatFontScale
 import com.letta.mobile.ui.theme.LocalChatIsPinching
@@ -300,6 +301,7 @@ internal fun ChatMessageList(
     onToggleRunCollapsed: (String) -> Unit,
     onToggleReasoningExpanded: (String) -> Unit,
     modifier: Modifier = Modifier,
+    chatBackground: ChatBackground = ChatBackground.Default,
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -666,6 +668,22 @@ internal fun ChatMessageList(
                     suppressPinchLayoutAnimations
                 ),
         ) {
+            // letta-mobile-58qlr: soft gradient fade at the top/bottom scroll
+            // edges (replaces the harsh clip line). The fade target is the
+            // color the chat actually draws on — mirroring the ThinkingShader
+            // bgColor logic in ChatScreen — so content dissolves exactly into
+            // the background. Applied on a wrapping Box (separate node) so its
+            // offscreen DstIn layer doesn't clobber the LazyColumn's own
+            // rasterization graphicsLayer used during pinch.
+            val fadeTargetColor = chatFadeTargetColor(
+                chatBackground = chatBackground,
+                fallbackContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+            )
+            ChatFadingEdgesBox(
+                listState = listState,
+                targetColor = fadeTargetColor,
+                modifier = Modifier.fillMaxSize(),
+            ) {
             LazyColumn(
                 state = listState,
                 // Use the chat theme's compact gutter so assistant prose,
@@ -879,6 +897,7 @@ internal fun ChatMessageList(
                     }
                 }
             }
+            } // letta-mobile-58qlr: end ChatFadingEdgesBox
         } // letta-mobile-5e0f.r2: end CompositionLocalProvider(LocalChatIsPinching)
 
         ScrollToBottomFab(
