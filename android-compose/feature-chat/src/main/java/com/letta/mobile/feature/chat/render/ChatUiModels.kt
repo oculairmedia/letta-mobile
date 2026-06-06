@@ -191,6 +191,15 @@ internal enum class ChatMessageListChange {
     Full,
     AppendTail,
     ReplaceTail,
+
+    /**
+     * letta-mobile-yflpp: a deduped no-op tick — the projected message list is
+     * byte-identical to the previous one. The observer suppresses the uiState
+     * write entirely for this case, so this value should never reach the UI in
+     * practice; it exists so [ChatTimelineObserver] can flag the no-op
+     * projection it returns from its fast path.
+     */
+    None,
 }
 
 @androidx.compose.runtime.Immutable

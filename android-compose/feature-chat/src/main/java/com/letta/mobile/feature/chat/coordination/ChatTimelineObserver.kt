@@ -19,6 +19,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
@@ -51,12 +52,18 @@ internal class ChatTimelineObserver(
     private val syncA2uiHistorySnapshot: (conversationId: String, messages: List<A2uiMessage>) -> Map<String, A2uiSurfaceState> =
         { _, _ -> emptyMap() },
     private val projectionDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    // letta-mobile-yflpp: minimum gap between projection writes (COALESCE). Set
+    // to 0 in unit tests so virtual-clock emissions stay synchronous.
+    private val projectionFrameIntervalMs: Long = PROJECTION_FRAME_INTERVAL_MS,
 ) {
     private var observerJob: Job? = null
     private var hydrateSignalJob: Job? = null
     private var projectionCache: MutableMap<TimelineProjectionKey, CachedTimelineProjectionEvent> = mutableMapOf()
     private var lastProjectionSnapshot: CachedTimelineProjectionSnapshot? = null
     private var projectionTelemetryTick: Int = 0
+    // letta-mobile-yflpp: running count of consecutive deduped no-op ticks,
+    // used to throttle the uiProjection.suppressed telemetry sample.
+    private var suppressedProjectionTick: Int = 0
 
     /**
      * Older messages fetched via pagination need to survive the next timeline
@@ -77,6 +84,7 @@ internal class ChatTimelineObserver(
         projectionCache = mutableMapOf()
         lastProjectionSnapshot = null
         projectionTelemetryTick = 0
+        suppressedProjectionTick = 0
     }
 
     fun start(conversationId: String) {
@@ -90,6 +98,7 @@ internal class ChatTimelineObserver(
         projectionCache = mutableMapOf()
         lastProjectionSnapshot = null
         projectionTelemetryTick = 0
+        suppressedProjectionTick = 0
         observerConversationId = conversationId
         observerJob = scope.launch {
             val flow = try {
@@ -135,6 +144,16 @@ internal class ChatTimelineObserver(
             }
 
             try {
+                // letta-mobile-yflpp COALESCE: during streaming the
+                // authoritative Timeline StateFlow can produce ~20 updates/sec
+                // (one per token delta + shadow-holder parity churn). `flow` is
+                // a StateFlow, which is already conflated — a collector that
+                // suspends (e.g. on the projection dispatcher or the frame-pace
+                // delay below) only ever sees the LATEST value when it resumes,
+                // never a backlog. Together with that pacing delay the
+                // projection runs at most ~once per frame instead of once per
+                // delta, so Compose hit-testing / gesture handling get a clean
+                // pass and tool-card taps land mid-stream.
                 flow.collect { timeline ->
                     val prefix = olderPrefixFor(conversationId)
                     val previousState = uiState.value
@@ -144,6 +163,16 @@ internal class ChatTimelineObserver(
                             prefix = prefix,
                             previousState = previousState,
                         )
+                    }
+
+                    // letta-mobile-yflpp DEDUPE: a no-op streaming tick (the
+                    // tail event was re-emitted unchanged) projects to a UI
+                    // byte-identical to the screen. Skip the uiState write so we
+                    // don't allocate a new ChatUiState and force a recomposition
+                    // storm over every tool card. Telemetry was already emitted
+                    // as uiProjection.suppressed by projectTimelineSnapshot.
+                    if (projection.noChange) {
+                        return@collect
                     }
                     val ui = projection.ui
                     val a2uiSurfaces = syncA2uiHistorySnapshot(conversationId, projection.a2uiMessages)
@@ -190,6 +219,19 @@ internal class ChatTimelineObserver(
                             hasMoreOlderMessages = newHasMoreOlder,
                         ),
                     )
+
+                    // letta-mobile-yflpp COALESCE: pace real updates to at most
+                    // ~one per frame. conflate() already drops backlog while we
+                    // were projecting; this delay guarantees a minimum gap
+                    // between writes so a burst of genuine token deltas can't
+                    // peg the UI thread with >60 recompositions/sec. The latest
+                    // value is always re-read after the delay, so no update is
+                    // lost — they just collapse to frame cadence. A zero
+                    // interval (tests) disables pacing so virtual-clock tests
+                    // that drive emissions with runCurrent() stay synchronous.
+                    if (projectionFrameIntervalMs > 0L) {
+                        delay(projectionFrameIntervalMs)
+                    }
                 }
             } finally {
                 hydrateSignalJob?.cancel()
@@ -278,8 +320,14 @@ internal class ChatTimelineObserver(
         val tailIsAssistant = timeline.events.lastOrNull().let {
             it is TimelineEvent.Confirmed && it.messageType == TimelineMessageType.ASSISTANT
         }
-        val anyLettaServerLocalPending = nextRecords.any(CachedTimelineProjectionEvent::isLettaServerLocalPending)
-        val anyConfirmed = nextRecords.any(CachedTimelineProjectionEvent::isConfirmedVisible)
+        var pendingCount = 0
+        var confirmedCount = 0
+        nextRecords.forEach {
+            if (it.isLettaServerLocalPending) pendingCount++
+            if (it.isConfirmedVisible) confirmedCount++
+        }
+        val anyLettaServerLocalPending = pendingCount > 0
+        val anyConfirmed = confirmedCount > 0
         val liveToolCardCount = nextRecords.sumOf { it.toolCardCount }
         val prefixToolCardCount = prefix.sumOf { it.toolCardCount() }
         val result = TimelineProjection(
@@ -306,6 +354,10 @@ internal class ChatTimelineObserver(
             anyConfirmed = anyConfirmed,
             toolCardCount = liveToolCardCount,
             prefixToolCardCount = prefixToolCardCount,
+            uiSnapshot = ui,
+            tailIsAssistant = tailIsAssistant,
+            pendingCount = pendingCount,
+            confirmedCount = confirmedCount,
         )
         emitProjectionTelemetry(
             timeline = timeline,
@@ -336,6 +388,44 @@ internal class ChatTimelineObserver(
         val tailCached = projectionCache[tailKey]?.takeIf { it.event == tailEvent }
         val tailRecord = tailCached ?: tailEvent.projectForCacheRecord(tailKey)
 
+        // letta-mobile-yflpp DEDUPE: during streaming the authoritative Timeline
+        // StateFlow can re-emit ~20x/sec for the SAME visible content. The
+        // reducer (TimelineStreamReducer.replaceByServerId + copy(liveCursor=…))
+        // produces a NEW Timeline instance even when a delta merged to identical
+        // text — e.g. STALE / EQUAL / SUFFIX_DUPLICATE merge branches, or a
+        // frame that only advanced a non-rendered field like seqId/liveCursor.
+        // That makes the Timeline `!=` (so StateFlow emits) while the *rendered*
+        // tail is byte-identical to what's already on screen. Re-projecting it
+        // would allocate a fresh ChatUiState and force a full Compose
+        // recomposition over every tool card, pegging the UI thread so pointer
+        // hit-testing / gesture handling can't get a clean pass — the
+        // intermittent dead-tap-mid-stream bug.
+        //
+        // We compare the *projected* tail (uiMessage + a2ui + tool-card count +
+        // visible flags), NOT the raw event, so a tick that only changed a
+        // non-rendered field is correctly recognised as a no-op. On a match we
+        // return a no-change projection and the collector skips the uiState
+        // write entirely.
+        if (replaceTail) {
+            val previousTailRecord = previous.records.lastOrNull()
+            if (previousTailRecord != null && tailRecord.rendersSameAs(previousTailRecord)) {
+                return TimelineProjection(
+                    ui = previous.uiSnapshot ?: combineOlderPrefix(prefix, previous.liveMessages).toImmutableList(),
+                    tailIsAssistant = previous.tailIsAssistant,
+                    anyLettaServerLocalPending = previous.anyLettaServerLocalPending,
+                    anyConfirmed = previous.anyConfirmed,
+                    a2uiMessages = previous.a2uiMessages,
+                    toolCardCount = previous.prefixToolCardCount + previous.toolCardCount,
+                    eventsReused = previous.records.size,
+                    eventsProjected = 0,
+                    prefixEventsChecked = 0,
+                    fastPath = true,
+                    messageListChange = ChatMessageListChange.None,
+                    noChange = true,
+                )
+            }
+        }
+
         val records = if (appendTail) {
             previous.records + tailRecord
         } else {
@@ -355,18 +445,37 @@ internal class ChatTimelineObserver(
         val a2uiMessages = if (appendTail) {
             previous.a2uiMessages + tailRecord.a2uiMessages
         } else {
-            previous.records.dropLast(1).flatMap { it.a2uiMessages } + tailRecord.a2uiMessages
+            // letta-mobile-yflpp: avoid the O(history) flatMap rebuild on every
+            // streaming delta. The previous snapshot already holds the combined
+            // a2ui list; strip the previous tail's contribution (a suffix of
+            // known length) and append the new tail's, keeping this O(delta).
+            val previousTailA2uiCount = previous.records.last().a2uiMessages.size
+            val prefixA2ui = if (previousTailA2uiCount == 0) {
+                previous.a2uiMessages
+            } else {
+                previous.a2uiMessages.subList(0, previous.a2uiMessages.size - previousTailA2uiCount)
+            }
+            prefixA2ui + tailRecord.a2uiMessages
         }
-        val anyLettaServerLocalPending = if (appendTail) {
-            previous.anyLettaServerLocalPending || tailRecord.isLettaServerLocalPending
-        } else {
-            records.any(CachedTimelineProjectionEvent::isLettaServerLocalPending)
+        // letta-mobile-yflpp: track pending/confirmed as counts on the snapshot
+        // so a replaceTail can recompute the aggregate booleans in O(delta)
+        // (subtract the old tail, add the new tail) instead of re-scanning the
+        // whole history per streaming delta.
+        val previousTailRecord = previous.records.last()
+        val pendingCount = when {
+            appendTail -> previous.pendingCount + (if (tailRecord.isLettaServerLocalPending) 1 else 0)
+            else -> previous.pendingCount -
+                (if (previousTailRecord.isLettaServerLocalPending) 1 else 0) +
+                (if (tailRecord.isLettaServerLocalPending) 1 else 0)
         }
-        val anyConfirmed = if (appendTail) {
-            previous.anyConfirmed || tailRecord.isConfirmedVisible
-        } else {
-            records.any(CachedTimelineProjectionEvent::isConfirmedVisible)
+        val confirmedCount = when {
+            appendTail -> previous.confirmedCount + (if (tailRecord.isConfirmedVisible) 1 else 0)
+            else -> previous.confirmedCount -
+                (if (previousTailRecord.isConfirmedVisible) 1 else 0) +
+                (if (tailRecord.isConfirmedVisible) 1 else 0)
         }
+        val anyLettaServerLocalPending = pendingCount > 0
+        val anyConfirmed = confirmedCount > 0
         val toolCardCount = if (appendTail) {
             previous.toolCardCount + tailRecord.toolCardCount
         } else {
@@ -388,6 +497,10 @@ internal class ChatTimelineObserver(
             anyConfirmed = anyConfirmed,
             toolCardCount = toolCardCount,
             prefixToolCardCount = previous.prefixToolCardCount,
+            uiSnapshot = ui,
+            tailIsAssistant = tailIsAssistant,
+            pendingCount = pendingCount,
+            confirmedCount = confirmedCount,
         )
         val messageListChange = if (appendTail) {
             ChatMessageListChange.AppendTail
@@ -416,6 +529,29 @@ internal class ChatTimelineObserver(
         previousState: ChatUiState,
         startedAtMs: Long,
     ) {
+        // letta-mobile-yflpp DEDUPE telemetry: a no-op tick never reaches the
+        // UI, so don't emit a full uiProjection.snapshot (which is what made
+        // the storm look like ~20 real projections/sec in logcat). Emit a
+        // throttled uiProjection.suppressed counter instead so the dedupe is
+        // observable on-device (`adb logcat -s Telemetry/TimelineSync`) without
+        // re-creating the spam it suppresses.
+        if (projection.noChange) {
+            suppressedProjectionTick++
+            if (suppressedProjectionTick % SUPPRESSED_TELEMETRY_SAMPLE == 1) {
+                Telemetry.event(
+                    "TimelineSync",
+                    "uiProjection.suppressed",
+                    "conversationId" to timeline.conversationId,
+                    "eventsTotal" to timeline.events.size,
+                    "suppressedRunCount" to suppressedProjectionTick,
+                    "toolCardCount" to projection.toolCardCount,
+                    "isStreaming" to previousState.isStreaming,
+                )
+            }
+            return
+        }
+        suppressedProjectionTick = 0
+
         projectionTelemetryTick++
         if (projection.fastPath && timeline.events.size > 128 && projectionTelemetryTick % 16 != 1) return
 
@@ -498,6 +634,13 @@ internal class ChatTimelineObserver(
         val prefixEventsChecked: Int,
         val fastPath: Boolean,
         val messageListChange: ChatMessageListChange,
+        /**
+         * letta-mobile-yflpp: true when this projection is byte-identical to
+         * the previously applied one (a no-op streaming tick). The collector
+         * skips the uiState write and emits suppressed telemetry instead of a
+         * full uiProjection.snapshot.
+         */
+        val noChange: Boolean = false,
     )
 
     private data class CachedTimelineProjectionSnapshot(
@@ -511,6 +654,16 @@ internal class ChatTimelineObserver(
         val anyConfirmed: Boolean,
         val toolCardCount: Int,
         val prefixToolCardCount: Int,
+        // letta-mobile-yflpp: cache the already-combined immutable UI list and
+        // tail flag so a deduped no-op tick can return the previous projection
+        // without re-running combineOlderPrefix/toImmutableList (O(history)).
+        val uiSnapshot: ImmutableList<UiMessage>? = null,
+        val tailIsAssistant: Boolean = false,
+        // letta-mobile-yflpp: counts of pending/confirmed records so the fast
+        // path can keep aggregate booleans O(delta) instead of re-scanning all
+        // records per streaming tick.
+        val pendingCount: Int = 0,
+        val confirmedCount: Int = 0,
     )
 
     private data class TimelineProjectionKey(
@@ -527,5 +680,34 @@ internal class ChatTimelineObserver(
         val toolCardCount: Int,
         val isLettaServerLocalPending: Boolean,
         val isConfirmedVisible: Boolean,
-    )
+    ) {
+        /**
+         * letta-mobile-yflpp: true when this record renders identically to
+         * [other] — same projected UiMessage, same extracted a2ui messages, and
+         * same projection-relevant flags. Deliberately ignores the raw
+         * [TimelineEvent] (and thus non-rendered fields like seqId/liveCursor)
+         * so a streaming tick that changed nothing visible is treated as a
+         * no-op. UiMessage and A2uiMessage are data classes, so == is a deep
+         * content compare.
+         */
+        fun rendersSameAs(other: CachedTimelineProjectionEvent): Boolean =
+            key == other.key &&
+                uiMessage == other.uiMessage &&
+                toolCardCount == other.toolCardCount &&
+                isLettaServerLocalPending == other.isLettaServerLocalPending &&
+                isConfirmedVisible == other.isConfirmedVisible &&
+                a2uiMessages == other.a2uiMessages
+    }
+
+    private companion object {
+        // letta-mobile-yflpp COALESCE: minimum gap between projection writes.
+        // ~one frame at 60Hz; a tight server delta stream collapses to frame
+        // cadence instead of ~20 recompositions/sec, keeping the UI thread free
+        // for Compose pointer hit-testing so tool-card taps land mid-stream.
+        const val PROJECTION_FRAME_INTERVAL_MS = 16L
+
+        // Sample rate for the deduped no-op telemetry counter so a long
+        // suppressed run doesn't itself become spam.
+        const val SUPPRESSED_TELEMETRY_SAMPLE = 32
+    }
 }
