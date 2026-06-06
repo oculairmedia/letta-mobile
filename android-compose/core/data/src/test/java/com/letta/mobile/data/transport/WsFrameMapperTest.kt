@@ -9,6 +9,7 @@ import io.kotest.core.spec.style.WordSpec
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -20,6 +21,11 @@ import org.junit.jupiter.api.Tag
  */
 @Tag("unit")
 class WsFrameMapperTest : WordSpec({
+
+    val json = Json {
+        ignoreUnknownKeys = true
+        explicitNulls = false
+    }
 
     "WsFrameMapper" should {
         "preserve the cm-stream- prefix on assistant_message ids" {
@@ -38,6 +44,23 @@ class WsFrameMapperTest : WordSpec({
             mapped.otid shouldBe "cm-android-abc"
             mapped.runId shouldBe "R"
             mapped.date shouldBe "t"
+        }
+
+        "letta-mobile-ipp8z maps assistant frames that omitted SDK-Transport metadata" {
+            val frame = json.decodeFromString(
+                ServerFrameSerializer,
+                """
+                {"v":1,"type":"assistant_message","id":"cm-stream-1","content":"hello"}
+                """.trimIndent(),
+            ).shouldBeInstanceOf<ServerFrame.AssistantMessage>()
+
+            val mapped = WsFrameMapper.toLettaMessage(frame)
+
+            mapped.shouldBeInstanceOf<AssistantMessage>()
+            mapped.id shouldBe "cm-stream-1"
+            mapped.content shouldBe "hello"
+            mapped.date shouldBe ""
+            mapped.runId shouldBe null
         }
 
         "preserve toolcall- prefix on tool_call ids" {
