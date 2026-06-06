@@ -134,6 +134,40 @@ class SessionManagerTest {
     }
 
     @Test
+    fun `session graph satisfies shared repository graph contract`() = runTest {
+        val graph = SessionGraphFactory(
+            FakeAgentApi(),
+            FakeAgentDao(),
+            FakeConversationApi(),
+            FakeConversationDao(),
+            FakeArchiveApi(),
+            FakeFolderApi(),
+            FakeGroupApi(),
+            FakeIdentityApi(),
+            fakeLettaApiClient(),
+            FakeMcpServerApi(),
+            FakeModelApi(),
+            FakePassageApi(),
+            FakeProjectApi(),
+            FakeProjectWorkApi(),
+            FakeRunApi(),
+            FakeJobApi(),
+            FakeProviderApi(),
+            FakeScheduleApi(),
+            FakeStepApi(),
+            FakeToolApi(),
+        ).create()
+
+        val sharedGraph: SessionRepositoryGraph = graph
+
+        assertEquals(graph.backendDescriptor, sharedGraph.backendDescriptor)
+        assertEquals(graph.agentRepository, sharedGraph.agentRepository)
+        assertEquals(graph.channelTransport, sharedGraph.channelTransport)
+        assertEquals(graph.folderRepository, sharedGraph.folderRepository)
+        assertEquals(graph.groupRepository, sharedGraph.groupRepository)
+    }
+
+    @Test
     fun `session graph can select local runtime backend behind internal option`() = runTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = localConfig("backend-a"))
         val graph = SessionGraphFactory(
