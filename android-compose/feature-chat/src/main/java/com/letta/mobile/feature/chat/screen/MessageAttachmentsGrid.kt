@@ -16,8 +16,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.feature.chat.R
 
 /**
  * Renders attached images for a chat bubble. Up to 4 images per row in a wrap-
@@ -113,8 +117,16 @@ private fun AttachmentImage(
         }.getOrNull()
     }
 
+    val openImageDescription = stringResource(R.string.action_open_image)
+    val interactiveModifier = if (onClick != null) {
+        modifier
+            .semantics { contentDescription = openImageDescription }
+            .clickable(onClick = onClick)
+    } else {
+        modifier
+    }
     Surface(
-        modifier = if (onClick != null) modifier.clickable(onClick = onClick) else modifier,
+        modifier = interactiveModifier,
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(8.dp),
     ) {
