@@ -26,9 +26,9 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.letta.mobile.feature.chat.a2ui.A2uiHistoryExtractor
-import com.letta.mobile.feature.chat.render.ChatMessageListChange
+import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.feature.chat.render.ChatUiState
-import com.letta.mobile.feature.chat.render.timelineEventToUiMessage
+import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 
 /**
@@ -132,7 +132,7 @@ internal class ChatTimelineObserver(
                             uiState.value = collapseCompletedRunsIfStreamingFinished(
                                 prevState,
                                 prevState.copy(
-                                    error = "Couldn't sync agent reply — pull to refresh",
+                                    error = "Couldn't sync agent reply â€” pull to refresh",
                                     isStreaming = false,
                                     isAgentTyping = false,
                                 ),
@@ -147,7 +147,7 @@ internal class ChatTimelineObserver(
                 // letta-mobile-yflpp COALESCE: during streaming the
                 // authoritative Timeline StateFlow can produce ~20 updates/sec
                 // (one per token delta + shadow-holder parity churn). `flow` is
-                // a StateFlow, which is already conflated — a collector that
+                // a StateFlow, which is already conflated â€” a collector that
                 // suspends (e.g. on the projection dispatcher or the frame-pace
                 // delay below) only ever sees the LATEST value when it resumes,
                 // never a backlog. Together with that pacing delay the
@@ -226,7 +226,7 @@ internal class ChatTimelineObserver(
                     // between writes so a burst of genuine token deltas can't
                     // peg the UI thread with >60 recompositions/sec. The latest
                     // value is always re-read after the delay, so no update is
-                    // lost — they just collapse to frame cadence. A zero
+                    // lost â€” they just collapse to frame cadence. A zero
                     // interval (tests) disables pacing so virtual-clock tests
                     // that drive emissions with runCurrent() stay synchronous.
                     if (projectionFrameIntervalMs > 0L) {
@@ -390,15 +390,15 @@ internal class ChatTimelineObserver(
 
         // letta-mobile-yflpp DEDUPE: during streaming the authoritative Timeline
         // StateFlow can re-emit ~20x/sec for the SAME visible content. The
-        // reducer (TimelineStreamReducer.replaceByServerId + copy(liveCursor=…))
+        // reducer (TimelineStreamReducer.replaceByServerId + copy(liveCursor=â€¦))
         // produces a NEW Timeline instance even when a delta merged to identical
-        // text — e.g. STALE / EQUAL / SUFFIX_DUPLICATE merge branches, or a
+        // text â€” e.g. STALE / EQUAL / SUFFIX_DUPLICATE merge branches, or a
         // frame that only advanced a non-rendered field like seqId/liveCursor.
         // That makes the Timeline `!=` (so StateFlow emits) while the *rendered*
         // tail is byte-identical to what's already on screen. Re-projecting it
         // would allocate a fresh ChatUiState and force a full Compose
         // recomposition over every tool card, pegging the UI thread so pointer
-        // hit-testing / gesture handling can't get a clean pass — the
+        // hit-testing / gesture handling can't get a clean pass â€” the
         // intermittent dead-tap-mid-stream bug.
         //
         // We compare the *projected* tail (uiMessage + a2ui + tool-card count +
@@ -683,7 +683,7 @@ internal class ChatTimelineObserver(
     ) {
         /**
          * letta-mobile-yflpp: true when this record renders identically to
-         * [other] — same projected UiMessage, same extracted a2ui messages, and
+         * [other] â€” same projected UiMessage, same extracted a2ui messages, and
          * same projection-relevant flags. Deliberately ignores the raw
          * [TimelineEvent] (and thus non-rendered fields like seqId/liveCursor)
          * so a streaming tick that changed nothing visible is treated as a

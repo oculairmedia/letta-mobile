@@ -85,7 +85,7 @@ import com.letta.mobile.feature.chat.coordination.LocalRuntimeChatSendCoordinato
 import com.letta.mobile.feature.chat.coordination.ProjectChatCoordinator
 import com.letta.mobile.feature.chat.coordination.TimelineSendCoordinator
 import com.letta.mobile.feature.chat.coordination.WsChatSendCoordinator
-import com.letta.mobile.feature.chat.render.ChatMessageListChange
+import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.feature.chat.render.ChatTransport
 import com.letta.mobile.feature.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.render.ConversationState

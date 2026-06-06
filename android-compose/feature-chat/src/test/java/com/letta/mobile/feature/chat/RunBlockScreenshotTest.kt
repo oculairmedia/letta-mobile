@@ -31,8 +31,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import com.letta.mobile.feature.chat.coordination.ChatRenderItem
-import com.letta.mobile.feature.chat.coordination.groupMessagesForRender
+import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.chat.projection.groupMessagesForRender
 import com.letta.mobile.feature.chat.screen.RunBlock
 import com.letta.mobile.feature.chat.screen.ChatMessageItem
 

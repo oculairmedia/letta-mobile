@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 import com.letta.mobile.feature.chat.render.ChatUiState
-import com.letta.mobile.feature.chat.render.ChatMessageListChange
+import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.feature.chat.render.ConversationState
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 
@@ -39,9 +39,9 @@ internal class ChatConversationCoordinator(
     private val explicitConversationId: () -> String?,
     // letta-mobile-9cb37: the conversation id the *route* explicitly asked for,
     // snapshotted once at construction (see ChatRouteArgs.pinnedExplicitConversationId).
-    // Unlike explicitConversationId() — a live read of the shared CONVERSATION_ID_KEY
+    // Unlike explicitConversationId() â€” a live read of the shared CONVERSATION_ID_KEY
     // that setRouteConversationId mutates and that Compose can restore stale across an
-    // agent switch — this is the authoritative "open exactly THIS conversation" signal.
+    // agent switch â€” this is the authoritative "open exactly THIS conversation" signal.
     // Null for fresh/blank routes so resume-recent / picker fallbacks are untouched.
     private val pinnedExplicitConversationId: String? = null,
     private val setRouteConversationId: (String?) -> Unit,
@@ -147,7 +147,7 @@ internal class ChatConversationCoordinator(
             ?: explicitConversationId()
             ?: currentClientModeConversationId()?.also { cached ->
                 // letta-mobile-go8el follow-up: PR #177 wired setRouteConversationId on the
-                // resolveMostRecent fallback below but missed this branch — the legacy
+                // resolveMostRecent fallback below but missed this branch â€” the legacy
                 // clientModeConversationId SavedStateHandle key still persists across sessions
                 // (will be deleted after a soak per the bead). When the user reopens a chat
                 // and resolve takes THIS branch (cached value present), we must mirror the
@@ -205,7 +205,7 @@ internal class ChatConversationCoordinator(
     private suspend fun resolveTimelineConversation(isFirstResolve: Boolean) {
         // letta-mobile-9cb37: when the route explicitly asked for a conversation
         // (e.g. the subagent "view conversation" shortcut targeting `default`),
-        // that request must win on the first resolve — even across an agent
+        // that request must win on the first resolve â€” even across an agent
         // switch, where the live explicitConversationId() may have been restored
         // stale to the target agent's prior active/last conversation. Pin it into
         // the route key so downstream loads/sends agree, and skip the
@@ -315,7 +315,7 @@ internal class ChatConversationCoordinator(
             // letta-mobile-ork1: kick off a server pull so the cached
             // TimelineSyncLoop catches up on any messages that landed
             // outside this process (other devices, agent runs between
-            // sessions). Fire-and-forget — the observer above will pick
+            // sessions). Fire-and-forget â€” the observer above will pick
             // up the updated state when the reconcile lands. We don't
             // await it here because the user can still send / scroll
             // against the cached view while the fetch is in flight.

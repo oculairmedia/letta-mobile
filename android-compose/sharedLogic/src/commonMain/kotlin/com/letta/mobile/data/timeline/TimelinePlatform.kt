@@ -12,4 +12,6 @@ expect fun parseTimelineInstantOrNull(value: String): TimelineInstant?
 
 expect fun compareTimelineInstants(left: TimelineInstant, right: TimelineInstant): Int
 
+expect fun timelineInstantDurationMillis(start: TimelineInstant, end: TimelineInstant): Long
+
 expect fun newTimelineClientId(): String

@@ -9,7 +9,7 @@ import com.letta.mobile.data.model.UiSubagentDispatch
 import com.letta.mobile.data.model.UiToolCall
 import java.util.LinkedHashMap
 import kotlin.math.roundToInt
-import com.letta.mobile.feature.chat.coordination.ChatRenderItem
+import com.letta.mobile.data.chat.projection.ChatRenderItem
 
 private const val GeometryFullHashMaxChars = 96
 private const val GeometrySampleWindowChars = 24
@@ -68,7 +68,7 @@ internal class ChatMessageGeometryState(
     /**
      * letta-mobile-<collapse-floor>: drop ALL monotone-up streaming floors so
      * they re-seed from the next measurement. Called ONCE per collapse/expand
-     * toggle (a rare, deliberate user action) at the toggle chokepoint — an
+     * toggle (a rare, deliberate user action) at the toggle chokepoint â€” an
      * intentional shrink that must not stay floored at the previous, larger
      * (expanded) height. O(streamingFloors) on a rare event; zero per-frame
      * cost (the streaming hot path never touches this).

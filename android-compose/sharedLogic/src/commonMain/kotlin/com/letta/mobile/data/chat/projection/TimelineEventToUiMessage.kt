@@ -1,4 +1,4 @@
-package com.letta.mobile.feature.chat.render
+package com.letta.mobile.data.chat.projection
 
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalResponse
@@ -12,8 +12,7 @@ import com.letta.mobile.data.timeline.Role
 import com.letta.mobile.data.timeline.TimelineEvent
 import com.letta.mobile.data.timeline.TimelineMessageType
 import com.letta.mobile.data.timeline.stripEnvelopeReminders
-import java.time.Duration
-import com.letta.mobile.feature.chat.screen.AdminChatViewModel
+import com.letta.mobile.data.timeline.timelineInstantDurationMillis
 
 /**
  * lettabot-y4j (defensive client-side scrub):
@@ -50,7 +49,7 @@ private val SYSTEM_REMINDER_ORPHAN_TAG = Regex(
     RegexOption.IGNORE_CASE,
 )
 
-internal fun scrubUserEnvelope(content: String): String {
+fun scrubUserEnvelope(content: String): String {
     if (content.isEmpty()) return content
     if (!content.contains("<system-reminder", ignoreCase = true) &&
         !content.contains("</system-reminder", ignoreCase = true)) return content
@@ -75,8 +74,8 @@ internal fun scrubUserEnvelope(content: String): String {
 
 /**
  * Pure mapping from a [TimelineEvent] to the [UiMessage] the chat screen
- * renders. Extracted as a top-level function so it can be unit-tested without
- * instantiating [AdminChatViewModel].
+ * renders. Kept as a top-level function so it can be unit-tested without
+ * instantiating a platform view model.
  *
  * Contract (letta-mobile-mge5.23):
  * - Standalone TOOL_RETURN events → null (should be merged into TOOL_CALL).
@@ -98,7 +97,7 @@ internal fun scrubUserEnvelope(content: String): String {
  *   tooling) should observe the timeline directly without going through this
  *   projection.
  */
-internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
+fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
     return when (ev) {
         is TimelineEvent.Local -> {
             // letta-mobile-5s1n: Locals can now represent in-flight assistant
@@ -146,7 +145,7 @@ internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                             ev.toolStartedAtByCallId[callId]
                                 ?.let { startedAt ->
                                     val completedAt = ev.toolCompletedAtByCallId[callId] ?: ev.sentAt
-                                    Duration.between(startedAt, completedAt).toMillis().coerceAtLeast(0L)
+                                    timelineInstantDurationMillis(startedAt, completedAt).coerceAtLeast(0L)
                                 }
                         } else null
                         UiToolCall(

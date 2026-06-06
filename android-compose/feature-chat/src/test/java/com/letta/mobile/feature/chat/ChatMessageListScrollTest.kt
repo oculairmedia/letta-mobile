@@ -8,7 +8,7 @@ import kotlinx.collections.immutable.persistentSetOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
-import com.letta.mobile.feature.chat.coordination.ChatRenderItem
+import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.feature.chat.render.ChatMessageGeometryBucket
 import com.letta.mobile.feature.chat.render.ChatMessageGeometryState
 import com.letta.mobile.feature.chat.render.ChatRenderItemGeometrySignature
