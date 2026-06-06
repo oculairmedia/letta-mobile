@@ -12,7 +12,6 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.longClick
 import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.Modifier
@@ -175,7 +174,11 @@ class ToolOutputRendererTest {
         }
 
         composeRule.onNodeWithText("ERROR raw output", substring = true)
-            .performTouchInput { longClick() }
+            .performTouchInput {
+                down(center)
+                advanceEventTime(1_200)
+                up()
+            }
 
         composeRule.runOnIdle {
             assertEquals(raw, clipboardManager?.getText()?.text)

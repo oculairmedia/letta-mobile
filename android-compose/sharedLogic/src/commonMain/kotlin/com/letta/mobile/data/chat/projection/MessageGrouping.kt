@@ -1,4 +1,4 @@
-package com.letta.mobile.feature.chat.coordination
+package com.letta.mobile.data.chat.projection
 
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.UiMessage
@@ -29,7 +29,7 @@ import com.letta.mobile.ui.common.GroupPosition
  * is a raw List (migrating that to ImmutableList is tracked separately).
  */
 @Immutable
-internal sealed interface ChatRenderItem {
+sealed interface ChatRenderItem {
     /** Stable LazyColumn `key` — must be unique across the whole list. */
     val key: String
 
@@ -162,7 +162,7 @@ internal sealed interface ChatRenderItem {
  *
  * letta-mobile-m772.2
  */
-internal fun groupMessagesForRender(
+fun groupMessagesForRender(
     reversed: List<Pair<UiMessage, GroupPosition>>,
 ): List<ChatRenderItem> {
     if (reversed.isEmpty()) return emptyList()
@@ -264,7 +264,7 @@ internal fun groupMessagesForRender(
  * so a duplicate degrades into a distinct-but-stable slot instead of a hard
  * crash. In a correct snapshot no item is rewritten, so this is a no-op.
  */
-internal fun deduplicateRenderKeys(items: List<ChatRenderItem>): List<ChatRenderItem> {
+fun deduplicateRenderKeys(items: List<ChatRenderItem>): List<ChatRenderItem> {
     if (items.size < 2) return items
     val seen = HashSet<String>(items.size)
     var rewroteAny = false
@@ -360,5 +360,5 @@ private fun runBlockKey(
  * Normalising here guarantees a single, stable `run-<id>` prefix regardless
  * of whether the server id already had one (letta-mobile-lkj4r).
  */
-internal fun runKey(runId: String): String =
+fun runKey(runId: String): String =
     if (runId.startsWith("run-")) runId else "run-$runId"

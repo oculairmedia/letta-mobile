@@ -22,6 +22,7 @@ import io.mockk.every
 import io.mockk.mockk
 import java.time.Instant
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toPersistentList
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -40,7 +41,7 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import com.letta.mobile.feature.chat.coordination.ChatTimelineObserver
-import com.letta.mobile.feature.chat.render.ChatMessageListChange
+import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.feature.chat.render.ChatUiState
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -92,7 +93,10 @@ class ChatTimelineObserverTest {
         )
         assertEquals(listOf("older-1", "live-1"), merged.map { it.id })
 
-        liveFlow.value = Timeline("conv-1", events = listOf(confirmed("live-1", "new"), confirmed("live-2", "newer")))
+        liveFlow.value = Timeline(
+            "conv-1",
+            events = persistentListOf(confirmed("live-1", "new"), confirmed("live-2", "newer")),
+        )
         runCurrent()
 
         assertEquals(listOf("older-1", "live-1", "live-2"), harness.uiState.value.messages.map { it.id })
@@ -133,7 +137,7 @@ class ChatTimelineObserverTest {
 
         flow.value = Timeline(
             "conv-1",
-            events = listOf(
+            events = persistentListOf(
                 confirmed("user-1", "approved"),
                 confirmed("assistant-2", "working", TimelineMessageType.REASONING),
             ),
@@ -248,7 +252,7 @@ class ChatTimelineObserverTest {
 
         flow.value = Timeline(
             "conv-1",
-            events = listOf(
+            events = persistentListOf(
                 first,
                 confirmed("assistant-2", "next", TimelineMessageType.ASSISTANT),
             ),
@@ -337,7 +341,7 @@ class ChatTimelineObserverTest {
 
         flow.value = Timeline(
             "conv-1",
-            events = listOf(confirmed("assistant-1", "edited", TimelineMessageType.ASSISTANT)),
+            events = persistentListOf(confirmed("assistant-1", "edited", TimelineMessageType.ASSISTANT)),
         )
         runCurrent()
 
@@ -355,7 +359,7 @@ class ChatTimelineObserverTest {
     fun `unchanged streaming tick is deduped and does not re-project or rewrite uiState`() = runTest {
         // letta-mobile-yflpp: a streaming tick that re-emits the SAME tail event
         // (no real content change) must NOT run a new projection or rewrite
-        // uiState — that no-op churn was pegging the UI thread (~20 projections
+        // uiState â€” that no-op churn was pegging the UI thread (~20 projections
         // /sec over 85+ tool cards) and dropping tool-card taps mid-stream.
         Telemetry.clear()
         val harness = Harness(backgroundScope)
@@ -372,7 +376,7 @@ class ChatTimelineObserverTest {
         val messagesAfterFirst = harness.uiState.value.messages
         Telemetry.clear()
 
-        // Re-emit a DISTINCT Timeline instance that renders identically — only a
+        // Re-emit a DISTINCT Timeline instance that renders identically â€” only a
         // non-rendered field (liveCursor) changed. This is exactly the storm
         // signature: the reducer's `copy(liveCursor = serverId)` after a STALE/
         // EQUAL merge makes the Timeline `!=` (so the StateFlow emits) while the
@@ -428,7 +432,7 @@ class ChatTimelineObserverTest {
     fun `rapid burst of distinct ticks coalesces while a projection is in flight`() = runTest {
         // letta-mobile-yflpp COALESCE: when many distinct timeline emissions
         // arrive faster than they can be projected, conflate() must collapse
-        // them — only the LATEST is projected, never the whole backlog.
+        // them â€” only the LATEST is projected, never the whole backlog.
         val harness = Harness(backgroundScope)
         var timeline = Timeline("conv-1")
         repeat(8) { index ->
@@ -546,7 +550,7 @@ class ChatTimelineObserverTest {
         fun seedTimeline(
             conversationId: String,
             events: List<TimelineEvent> = emptyList(),
-        ): MutableStateFlow<Timeline> = seedTimeline(Timeline(conversationId = conversationId, events = events))
+        ): MutableStateFlow<Timeline> = seedTimeline(Timeline(conversationId = conversationId, events = events.toPersistentList()))
 
         fun seedTimeline(timeline: Timeline): MutableStateFlow<Timeline> {
             val flow = MutableStateFlow(timeline)

@@ -37,9 +37,9 @@ import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.feature.chat.render.StepDotIcon
+import com.letta.mobile.data.chat.projection.StepDotIcon
 import com.letta.mobile.feature.chat.render.runStepDotColor
-import com.letta.mobile.feature.chat.render.runStepDotIcon
+import com.letta.mobile.data.chat.projection.runStepDotIcon
 
 /**
  * Width of the timeline gutter on the left of a run block. Sized to fit a
@@ -124,11 +124,11 @@ internal fun RunBlock(
     if (messages.isEmpty()) return
 
     // letta-mobile-7kpxn (polish audit): honour the reduced-motion contract on
-    // the run expand/collapse the same way the tool-card lifecycle does — when
+    // the run expand/collapse the same way the tool-card lifecycle does â€” when
     // the OS animation scale is 0, swap instantly instead of playing the ramp.
     val reducedMotion = rememberReducedMotionEnabled()
 
-    // Defensive: the grouping layer already guarantees ≥2 messages for a
+    // Defensive: the grouping layer already guarantees â‰¥2 messages for a
     // RunBlock, but if we ever get a single-message run (e.g. via a future
     // caller), short-circuit to a plain row so we don't paint a degenerate
     // 1-dot gutter. letta-mobile-m772.10.
@@ -154,7 +154,7 @@ internal fun RunBlock(
         )
 
         Box(modifier = Modifier.fillMaxWidth()) {
-            // Timeline gutter — drawn behind the rows so the vertical rule
+            // Timeline gutter â€” drawn behind the rows so the vertical rule
             // passes through every dot. Sized via the same Column so its
             // height tracks the rendered messages exactly.
             Column(
@@ -171,7 +171,7 @@ internal fun RunBlock(
                 // into the AnimatedVisibility block, triggering a fresh
                 // expandVertically animation and the visible bubble
                 // movement Emmanuel reported. Treating "the visible set"
-                // uniformly removes that swap entirely — when collapsed we
+                // uniformly removes that swap entirely â€” when collapsed we
                 // simply render only `messages.last()`; when expanded we
                 // render the whole run.
                 //
@@ -344,7 +344,7 @@ private fun UiMessage.withoutStandaloneContentForToolGroup(): UiMessage =
  * message is reasoning or the list only contains one entry.
  */
 private fun selectCollapsedPreview(messages: List<UiMessage>): UiMessage {
-    // Walk backwards from newest — the first non-reasoning hit is the
+    // Walk backwards from newest â€” the first non-reasoning hit is the
     // most relevant preview of what the run actually *did*.
     for (i in messages.lastIndex downTo 0) {
         if (!messages[i].isReasoning) return messages[i]
@@ -362,9 +362,9 @@ private fun RunHeader(
     onToggleCollapsed: () -> Unit,
 ) {
     val label = if (collapsed) {
-        "Run · $messageCount steps · tap to expand"
+        "Run Â· $messageCount steps Â· tap to expand"
     } else {
-        "Run · $messageCount steps · tap to collapse"
+        "Run Â· $messageCount steps Â· tap to collapse"
     }
     Row(
         modifier = Modifier

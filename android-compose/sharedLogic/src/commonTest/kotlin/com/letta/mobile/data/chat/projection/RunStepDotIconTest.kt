@@ -1,16 +1,14 @@
-package com.letta.mobile.feature.chat
+package com.letta.mobile.data.chat.projection
 
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
-import org.junit.Assert.assertEquals
-import org.junit.Test
-import com.letta.mobile.feature.chat.render.StepDotIcon
-import com.letta.mobile.feature.chat.render.runStepDotIcon
+import kotlin.test.assertEquals
+import kotlin.test.Test
 
 /**
- * Pure-JVM tests for [runStepDotIcon] — the classification used by
+ * Pure-JVM tests for [runStepDotIcon] â€” the classification used by
  * `RunBlock`'s timeline gutter to pick a per-step indicator. Color resolution
  * lives in `runStepDotColor` and is verified separately via screenshot tests.
  *
@@ -20,7 +18,7 @@ class RunStepDotIconTest {
 
     @Test
     fun `reasoning message classifies as Reasoning`() {
-        val msg = baseAssistant().copy(isReasoning = true, content = "thinking…")
+        val msg = baseAssistant().copy(isReasoning = true, content = "thinkingâ€¦")
         assertEquals(StepDotIcon.Reasoning, msg.runStepDotIcon())
     }
 

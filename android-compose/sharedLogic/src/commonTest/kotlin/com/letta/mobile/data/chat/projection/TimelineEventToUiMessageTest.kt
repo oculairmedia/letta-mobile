@@ -1,4 +1,4 @@
-package com.letta.mobile.feature.chat
+package com.letta.mobile.data.chat.projection
 
 import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.MessageContentPart
@@ -7,18 +7,17 @@ import com.letta.mobile.data.timeline.MessageSource
 import com.letta.mobile.data.timeline.Role
 import com.letta.mobile.data.timeline.TimelineEvent
 import com.letta.mobile.data.timeline.TimelineMessageType
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
-import org.junit.Test
-import java.time.Instant
-import org.junit.jupiter.api.Tag
-import com.letta.mobile.feature.chat.render.timelineEventToUiMessage
+import com.letta.mobile.data.timeline.parseTimelineInstant
+import kotlinx.collections.immutable.toPersistentList
+import kotlinx.collections.immutable.toPersistentMap
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import kotlin.test.Test
 
 /**
- * Programmatic test harness for the TimelineEvent → UiMessage contract that
+ * Programmatic test harness for the TimelineEvent â†’ UiMessage contract that
  * drives the chat UI. Covers every failure mode Emmanuel surfaced during the
  * mge5 series: tool-call bubble showing but missing command text, missing
  * output, approve/reject visible when already approved, reasoning dropped,
@@ -26,7 +25,6 @@ import com.letta.mobile.feature.chat.render.timelineEventToUiMessage
  *
  * letta-mobile-mge5.23. Prefer adding a case here over iterating on a phone.
  */
-@Tag("integration")
 class TimelineEventToUiMessageTest {
 
     private fun confirmed(
@@ -50,15 +48,15 @@ class TimelineEventToUiMessageTest {
         messageType = messageType,
         runId = null,
         stepId = null,
-        date = Instant.parse("2026-04-19T06:00:00Z"),
-        toolCalls = toolCalls,
+        date = parseTimelineInstant("2026-04-19T06:00:00Z"),
+        toolCalls = toolCalls.toPersistentList(),
         approvalRequestId = approvalRequestId,
         approvalDecided = approvalDecided,
         toolReturnContent = toolReturnContent,
         toolReturnIsError = toolReturnIsError,
-        toolReturnContentByCallId = toolReturnContentByCallId,
-        toolReturnIsErrorByCallId = toolReturnIsErrorByCallId,
-        attachments = attachments,
+        toolReturnContentByCallId = toolReturnContentByCallId.toPersistentMap(),
+        toolReturnIsErrorByCallId = toolReturnIsErrorByCallId.toPersistentMap(),
+        attachments = attachments.toPersistentList(),
         source = source,
     )
 
@@ -75,11 +73,11 @@ class TimelineEventToUiMessageTest {
             otid = "cm-tool-call-late",
             content = "",
             role = Role.ASSISTANT,
-            sentAt = Instant.parse("2026-05-10T12:00:00Z"),
+            sentAt = parseTimelineInstant("2026-05-10T12:00:00Z"),
             deliveryState = DeliveryState.SENT,
             messageType = TimelineMessageType.TOOL_CALL,
             toolReturnContent = "early result",
-            toolReturnContentByCallId = mapOf("call-late" to "early result"),
+            toolReturnContentByCallId = mapOf("call-late" to "early result").toPersistentMap(),
         )
 
         assertNull(timelineEventToUiMessage(ev))
@@ -169,7 +167,7 @@ class TimelineEventToUiMessageTest {
     @Test
     fun `decided approval hides approve_reject UI and surfaces decision via tool-call chip`() {
         // letta-mobile-23h5 (regression fix 2026-04-19): once decided we
-        // MUST NOT synthesize a standalone UiApprovalResponse — it would
+        // MUST NOT synthesize a standalone UiApprovalResponse â€” it would
         // short-circuit ChatMessageBubble into ApprovalResponseCard and the
         // rich tool card (with command + output) would never render. The
         // approved state is conveyed via the per-tool-call chip instead.
@@ -181,8 +179,8 @@ class TimelineEventToUiMessageTest {
             approvalDecided = true,
         )
         val ui = timelineEventToUiMessage(ev)!!
-        assertNull("approvalRequest must be gone once decided", ui.approvalRequest)
-        assertNull("must NOT synthesize approvalResponse on the tool-call event", ui.approvalResponse)
+        assertNull(ui.approvalRequest, "approvalRequest must be gone once decided")
+        assertNull(ui.approvalResponse, "must NOT synthesize approvalResponse on the tool-call event")
         val call = ui.toolCalls!![0]
         assertEquals("Bash", call.name)
         assertEquals(
@@ -204,9 +202,9 @@ class TimelineEventToUiMessageTest {
         )
         val ui = timelineEventToUiMessage(ev)!!
         assertNull(ui.approvalRequest)
-        // letta-mobile-23h5: see sibling test — decision lives on the tool
+        // letta-mobile-23h5: see sibling test â€” decision lives on the tool
         // call's chip, never on a sibling approvalResponse card.
-        assertNull("must NOT synthesize approvalResponse on the tool-call event", ui.approvalResponse)
+        assertNull(ui.approvalResponse, "must NOT synthesize approvalResponse on the tool-call event")
         val call = ui.toolCalls!![0]
         assertEquals("Bash", call.name)
         assertEquals("{\"command\":\"echo ok\"}", call.arguments)
@@ -226,7 +224,7 @@ class TimelineEventToUiMessageTest {
         )
         val ui = timelineEventToUiMessage(ev)!!
         assertEquals("assistant", ui.role)
-        assertTrue("isReasoning must be true", ui.isReasoning)
+        assertTrue(ui.isReasoning, "isReasoning must be true")
         assertEquals("I should check the logs first.", ui.content)
     }
 
@@ -248,8 +246,8 @@ class TimelineEventToUiMessageTest {
         )!!
 
         assertTrue(
-            "Server reasoning must not be dropped by UI/render dedupe when the assistant response reuses its id",
             reasoning.id != assistant.id,
+            "Server reasoning must not be dropped by UI/render dedupe when the assistant response reuses its id",
         )
         assertEquals("shared-server-id:REASONING", reasoning.id)
         assertEquals("shared-server-id", assistant.id)
@@ -265,8 +263,8 @@ class TimelineEventToUiMessageTest {
             messageType = TimelineMessageType.REASONING,
             runId = "run-live",
             stepId = "step-live",
-            date = Instant.parse("2026-04-19T06:00:00Z"),
-            toolCalls = emptyList(),
+            date = parseTimelineInstant("2026-04-19T06:00:00Z"),
+            toolCalls = emptyList<ToolCall>().toPersistentList(),
             approvalRequestId = null,
             approvalDecided = false,
             toolReturnContent = null,
@@ -289,35 +287,35 @@ class TimelineEventToUiMessageTest {
      * `POST /v1/conversations`), the server seeds the message log with a
      * single `system_message` carrying the agent's base instructions. Pre-fix,
      * that arrived through the timeline as a Confirmed/SYSTEM event and the
-     * mapper rendered it with role="system" — populating the UI with
+     * mapper rendered it with role="system" â€” populating the UI with
      * "miscellaneous message history" before the user had even sent anything
      * (Emmanuel report 2026-04-28). The chat surface is for user-facing
      * conversation; agent-state system messages must not leak into it.
      */
     @Test
-    fun `SYSTEM Confirmed events are dropped (e75s)`() {
+    fun `SYSTEM Confirmed events are dropped for e75s`() {
         val ev = confirmed(
             TimelineMessageType.SYSTEM,
             content = "You are a helpful assistant. Base instructions...",
             serverId = "system-seed-1",
         )
         assertNull(
-            "system_message events must not project into the chat UI",
             timelineEventToUiMessage(ev),
+            "system_message events must not project into the chat UI",
         )
     }
 
     @Test
-    fun `SYSTEM Local events are dropped (e75s, defense-in-depth)`() {
+    fun `SYSTEM Local events are dropped for e75s defense in depth`() {
         // We don't currently synthesize SYSTEM Locals on the client, but if
         // any future code path does (e.g. an offline-state bubble), the chat
-        // projection still drops them — the bug class is "agent-state system
+        // projection still drops them â€” the bug class is "agent-state system
         // text shown as a chat bubble", regardless of source.
         val ev = TimelineEvent.Local(
             position = 1.0,
             otid = "local-system-1",
             content = "Base instructions...",
-            sentAt = Instant.parse("2026-04-19T06:00:00Z"),
+            sentAt = parseTimelineInstant("2026-04-19T06:00:00Z"),
             deliveryState = com.letta.mobile.data.timeline.DeliveryState.SENT,
             messageType = TimelineMessageType.SYSTEM,
         )
@@ -331,7 +329,7 @@ class TimelineEventToUiMessageTest {
             otid = "cm-android-failed",
             content = "did this land?",
             role = Role.USER,
-            sentAt = Instant.parse("2026-05-27T12:00:00Z"),
+            sentAt = parseTimelineInstant("2026-05-27T12:00:00Z"),
             deliveryState = DeliveryState.FAILED,
             messageType = TimelineMessageType.USER,
         )
@@ -346,21 +344,21 @@ class TimelineEventToUiMessageTest {
 
     @Test
     fun `client mode local tool call uses per-call completed timestamp for execution time`() {
-        val startedAt = Instant.parse("2026-05-10T12:00:00Z")
-        val completedAt = startedAt.plusMillis(250)
+        val startedAt = parseTimelineInstant("2026-05-10T12:00:00Z")
+        val completedAt = parseTimelineInstant("2026-05-10T12:00:00.250Z")
         val ev = TimelineEvent.Local(
             position = 1.0,
             otid = "cm-tool-batch-1",
             content = "",
             role = com.letta.mobile.data.timeline.Role.ASSISTANT,
-            sentAt = completedAt.plusMillis(500),
+            sentAt = parseTimelineInstant("2026-05-10T12:00:00.750Z"),
             deliveryState = com.letta.mobile.data.timeline.DeliveryState.SENT,
             messageType = TimelineMessageType.TOOL_CALL,
-            toolCalls = listOf(ToolCall(toolCallId = "call-a", name = "Bash", arguments = "{}")),
-            toolReturnContentByCallId = mapOf("call-a" to "ok"),
-            toolStartedAtByCallId = mapOf("call-a" to startedAt),
-            toolCompletedAtByCallId = mapOf("call-a" to completedAt),
-            toolBatchIdByCallId = mapOf("call-a" to "batch-1"),
+            toolCalls = listOf(ToolCall(toolCallId = "call-a", name = "Bash", arguments = "{}")).toPersistentList(),
+            toolReturnContentByCallId = mapOf("call-a" to "ok").toPersistentMap(),
+            toolStartedAtByCallId = mapOf("call-a" to startedAt).toPersistentMap(),
+            toolCompletedAtByCallId = mapOf("call-a" to completedAt).toPersistentMap(),
+            toolBatchIdByCallId = mapOf("call-a" to "batch-1").toPersistentMap(),
         )
 
         val call = timelineEventToUiMessage(ev)!!.toolCalls!!.single()
@@ -464,7 +462,7 @@ class TimelineEventToUiMessageTest {
      * back-to-back system-reminder envelopes in a single user turn
      * (device info + agent info + permission mode). The first envelope
      * is preceded by the lettabot wrapper's own `<system-reminder>` open
-     * — so the persisted form has a stray closing tag separating
+     * â€” so the persisted form has a stray closing tag separating
      * lettabot's envelope end from Letta Code's envelope start, and a
      * naive non-greedy single-block regex leaves orphan tags visible.
      */

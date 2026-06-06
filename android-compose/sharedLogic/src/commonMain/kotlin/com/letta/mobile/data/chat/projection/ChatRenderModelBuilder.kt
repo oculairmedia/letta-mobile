@@ -1,11 +1,11 @@
-package com.letta.mobile.feature.chat.coordination
+package com.letta.mobile.data.chat.projection
 
 import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.feature.chat.render.ChatMessageListChange
+import com.letta.mobile.data.timeline.TimelineInstant
+import com.letta.mobile.data.timeline.parseTimelineInstantOrNull
+import com.letta.mobile.data.timeline.timelineInstantDurationMillis
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.common.groupMessages
-import java.time.Duration
-import java.time.Instant
 
 /**
  * Display-level message filtering mode for chat rendering.
@@ -13,15 +13,13 @@ import java.time.Instant
  * Debug currently uses the same message set as Interactive; it only changes
  * the per-message renderer in ChatScreen.
  */
-internal enum class ChatDisplayMode {
+enum class ChatDisplayMode {
     Simple,
     Interactive,
     Debug,
 }
 
-private const val ChatRenderModelDebugLogging = false
-
-internal fun String.toChatDisplayMode(): ChatDisplayMode = when (this) {
+fun String.toChatDisplayMode(): ChatDisplayMode = when (this) {
     "simple" -> ChatDisplayMode.Simple
     "debug" -> ChatDisplayMode.Debug
     else -> ChatDisplayMode.Interactive
@@ -33,13 +31,13 @@ internal fun String.toChatDisplayMode(): ChatDisplayMode = when (this) {
  * [visibleMessages] and [groupedMessages] are in chronological chat order.
  * [renderItems] is newest-first, matching LazyColumn(reverseLayout = true).
  */
-internal data class ChatRenderModel(
+data class ChatRenderModel(
     val visibleMessages: List<UiMessage>,
     val groupedMessages: List<Pair<UiMessage, GroupPosition>>,
     val renderItems: List<ChatRenderItem>,
 )
 
-internal fun buildChatRenderModel(
+fun buildChatRenderModel(
     messages: List<UiMessage>,
     mode: ChatDisplayMode,
 ): ChatRenderModel {
@@ -62,29 +60,6 @@ internal fun buildChatRenderModel(
 
     val renderItems = groupMessagesForRender(reversed)
 
-    if (ChatRenderModelDebugLogging) {
-        val inputCount = messages.size
-        val renderItemCount = renderItems.size
-        val seenKeys = HashSet<String>(renderItems.size)
-        val dupKeys = renderItems.filterNot { seenKeys.add(it.key) }.map { it.key }
-        if (dupKeys.isNotEmpty()) {
-            android.util.Log.w(
-                "ChatRenderModel-DEBUG",
-                "DUP_RENDER_KEYS: ${dupKeys.size} duplicates: ${dupKeys.take(5)} renderItems=$renderItemCount",
-            )
-        }
-
-        val dedupDropPercent = if (inputCount > 0) {
-            ((inputCount - renderItemCount).toFloat() / inputCount * 100).toInt()
-        } else 0
-        if (dedupDropPercent > 20) {
-            android.util.Log.w(
-                "ChatRenderModel-DEBUG",
-                "RENDER_MODEL_DEDUP_DROP: input=$inputCount renderItems=$renderItemCount drop=$dedupDropPercent%",
-            )
-        }
-    }
-
     return ChatRenderModel(
         visibleMessages = visibleMessages,
         groupedMessages = groupedMessages,
@@ -92,7 +67,7 @@ internal fun buildChatRenderModel(
     )
 }
 
-internal class IncrementalChatRenderItemsCache {
+class IncrementalChatRenderItemsCache {
     var fullBuildCount: Int = 0
         private set
     var incrementalBuildCount: Int = 0
@@ -202,7 +177,7 @@ internal class IncrementalChatRenderItemsCache {
 
 private fun attachLatencyMetadata(messages: List<UiMessage>): List<UiMessage> {
     val result = messages.toMutableList()
-    var promptAt: Instant? = null
+    var promptAt: TimelineInstant? = null
     val assistantIndices = mutableListOf<Int>()
 
     fun flushTurn() {
@@ -219,7 +194,7 @@ private fun attachLatencyMetadata(messages: List<UiMessage>): List<UiMessage> {
         val target = targetIndex?.let(result::get)
         val responseAt = target?.timestamp?.parseInstantOrNull()
         val latency = responseAt?.let { end ->
-            Duration.between(turnPromptAt, end).toMillis()
+            timelineInstantDurationMillis(turnPromptAt, end)
                 .takeIf { it in 0L..30 * 60 * 1000L }
         }
         if (targetIndex != null && latency != null) {
@@ -242,7 +217,7 @@ private fun attachLatencyMetadata(messages: List<UiMessage>): List<UiMessage> {
     return result
 }
 
-private fun String.parseInstantOrNull(): Instant? = runCatching { Instant.parse(this) }.getOrNull()
+private fun String.parseInstantOrNull(): TimelineInstant? = parseTimelineInstantOrNull(this)
 
 private fun UiMessage.isTurnLatencyTarget(): Boolean =
     role == "assistant" &&
@@ -255,7 +230,7 @@ private fun UiMessage.isTurnLatencyTarget(): Boolean =
         approvalResponse == null &&
         attachments.isEmpty()
 
-internal fun dedupeReasoningAssistantEchoes(messages: List<UiMessage>): List<UiMessage> {
+fun dedupeReasoningAssistantEchoes(messages: List<UiMessage>): List<UiMessage> {
     val result = ArrayList<UiMessage>(messages.size)
     var lastReasoningContent: String? = null
     for (msg in messages) {
@@ -284,7 +259,7 @@ private fun UiMessage.isPlainAssistantTextEchoOf(lastReasoningContent: String?):
         attachments.isEmpty()
 }
 
-internal fun filterMessagesForMode(
+fun filterMessagesForMode(
     messages: List<UiMessage>,
     mode: ChatDisplayMode,
 ): List<UiMessage> = when (mode) {
@@ -303,7 +278,7 @@ internal fun filterMessagesForMode(
     ChatDisplayMode.Debug -> messages
 }
 
-internal fun dedupeGroupedMessagesForLazyKeys(
+fun dedupeGroupedMessagesForLazyKeys(
     groupedMessages: List<Pair<UiMessage, GroupPosition>>,
 ): List<Pair<UiMessage, GroupPosition>> {
     // Defensive: LazyColumn crashes on duplicate item keys. mergeOlderMessages
@@ -311,14 +286,6 @@ internal fun dedupeGroupedMessagesForLazyKeys(
     // edge case could still leak duplicates — so guard in the pure pipeline too.
     val seen = HashSet<String>(groupedMessages.size)
     val idDeduped = groupedMessages.filter { (msg, _) -> seen.add(msg.id) }
-    val idDropped = groupedMessages.size - idDeduped.size
-    if (ChatRenderModelDebugLogging && idDropped > 0) {
-        android.util.Log.w(
-            "ChatRenderModel-DEBUG",
-            "KEY_DEDUP_DROPPED: $idDropped duplicate message IDs detected in grouped messages",
-        )
-    }
-
     // Secondary content-based dedupe — guard against the
     // optimistic-Local-survives-Confirmed race documented in
     // ClientModeSendCoordinator.reconcileClientModeConversation (letta-mobile-a7ij).
@@ -335,13 +302,6 @@ internal fun dedupeGroupedMessagesForLazyKeys(
     // ids with identical content (legitimate quick-fire repeats) are
     // preserved.
     val contentDeduped = dedupeOptimisticContentTwins(idDeduped)
-    val totalDropped = groupedMessages.size - contentDeduped.size
-    if (ChatRenderModelDebugLogging && totalDropped > idDropped) {
-        android.util.Log.w(
-            "ChatRenderModel-DEBUG",
-            "CONTENT_DEDUP_DROPPED: ${totalDropped - idDropped} optimistic content-twins collapsed",
-        )
-    }
     return contentDeduped
 }
 
@@ -365,7 +325,7 @@ private fun String.isOptimisticUiMessageId(): Boolean =
  * available so downstream consumers (notifications, latency metadata)
  * latch onto the confirmed identity.
  */
-internal fun dedupeOptimisticContentTwins(
+fun dedupeOptimisticContentTwins(
     grouped: List<Pair<UiMessage, GroupPosition>>,
 ): List<Pair<UiMessage, GroupPosition>> {
     if (grouped.size < 2) return grouped

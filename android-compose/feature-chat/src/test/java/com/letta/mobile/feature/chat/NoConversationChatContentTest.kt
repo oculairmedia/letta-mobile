@@ -7,7 +7,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -164,7 +163,11 @@ class NoConversationChatContentTest {
             }
         }
 
-        composeRule.onNodeWithText("Review tool call").performTouchInput { longClick() }
+        composeRule.onNodeWithText("Review tool call").performTouchInput {
+            down(center)
+            advanceEventTime(1_200)
+            up()
+        }
         composeRule.onNodeWithText("Dismiss").assertIsDisplayed().performClick()
 
         composeRule.runOnIdle {

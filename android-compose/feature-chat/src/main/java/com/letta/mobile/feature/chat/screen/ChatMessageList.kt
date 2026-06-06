@@ -65,7 +65,7 @@ import kotlin.math.abs
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
-import com.letta.mobile.feature.chat.coordination.ChatRenderItem
+import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.feature.chat.render.ChatMessageGeometryState
 import com.letta.mobile.feature.chat.render.ChatRenderItemGeometrySignature
 import com.letta.mobile.feature.chat.render.ChatUiState
@@ -314,7 +314,7 @@ internal fun ChatMessageList(
     // perf/frame-budget-audit: `renderItems` gets a fresh identity on every
     // streamed token, so a `remember(renderItems) { associateBy { it.key } }`
     // here rebuilt an O(conversation) map PER TOKEN purely to serve the
-    // pinch-begin handler below (its only consumer) — the same rmzmo/gsvgt
+    // pinch-begin handler below (its only consumer) â€” the same rmzmo/gsvgt
     // O(history)-per-token smell. Keep the latest renderItems available via
     // rememberUpdatedState and build the lookup lazily, once, when a pinch
     // actually begins (a rare gesture).
@@ -351,7 +351,7 @@ internal fun ChatMessageList(
 
     // letta-mobile-8u662: viewport-bounded scale window for live pinch
     // reflow. During a pinch we only need to drive real text re-layout for
-    // items the user can see — items composed off-screen by the LazyColumn
+    // items the user can see â€” items composed off-screen by the LazyColumn
     // for prefetch keep their cached committed-scale geometry until the
     // gesture commits or they enter the window via scroll.
     //
@@ -370,7 +370,7 @@ internal fun ChatMessageList(
     //
     // Date separators, loading indicators, and other cheap items are
     // outside renderItems and just see liveFontScale via the existing
-    // CompositionLocalProvider — they're one-line labels, free to reflow.
+    // CompositionLocalProvider â€” they're one-line labels, free to reflow.
     val scaleWindowIndexRange: IntRange = if (pinchFontScaleController.isPinching) {
         val visible = listState.layoutInfo.visibleItemsInfo
         if (visible.isEmpty()) {
@@ -407,8 +407,8 @@ internal fun ChatMessageList(
     val autoScrollSignature by rememberUpdatedState(newestMessageAutoScrollSignature(state.messages))
     val isStreamingForAutoScroll by rememberUpdatedState(state.isStreaming)
     // letta-mobile-gsvgt (F1): keep this per-tick summary O(1). The previous
-    // implementation keyed the remember on state.messages AND renderItems —
-    // both of which get a fresh identity on every streamed token — and its
+    // implementation keyed the remember on state.messages AND renderItems â€”
+    // both of which get a fresh identity on every streamed token â€” and its
     // body called renderItems.pinchVisibleContentSummary(), an O(total
     // conversation) walk over every render item and every message inside
     // every RunBlock. That ran PER TOKEN during streaming purely to keep a
@@ -483,7 +483,7 @@ internal fun ChatMessageList(
                 // letta-mobile-4bgm3: when the user SENDS a message, the
                 // optimistic user bubble becomes the newest item. Force the
                 // viewport to that bubble regardless of current scroll
-                // position — distinct from the streaming auto-scroll throttle,
+                // position â€” distinct from the streaming auto-scroll throttle,
                 // which only snaps when already pinned near the bottom. Without
                 // this, sending from a scrolled-up position in a long
                 // conversation leaves the new prompt off the top edge.
@@ -678,7 +678,7 @@ internal fun ChatMessageList(
         // every pointer frame during a pinch. The previous implementation
         // applied a `graphicsLayer { scaleX = visualFontScale ... }` to
         // the LazyColumn which bitmap-scaled the rendered output without
-        // re-laying out. That looked OK but felt static — text didn't
+        // re-laying out. That looked OK but felt static â€” text didn't
         // reflow until the gesture committed. Now reflow is continuous.
         // ChatTypography is already memoized on fontScale in LettaChatTheme,
         // so feeding distinct values per frame allocates one ChatTypography
@@ -695,8 +695,8 @@ internal fun ChatMessageList(
         ) {
             // letta-mobile-58qlr: soft gradient fade at the top/bottom scroll
             // edges (replaces the harsh clip line). The fade target is the
-            // color the chat actually draws on — mirroring the ThinkingShader
-            // bgColor logic in ChatScreen — so content dissolves exactly into
+            // color the chat actually draws on â€” mirroring the ThinkingShader
+            // bgColor logic in ChatScreen â€” so content dissolves exactly into
             // the background. Applied on a wrapping Box (separate node) so its
             // offscreen DstIn layer doesn't clobber the LazyColumn's own
             // rasterization graphicsLayer used during pinch.
@@ -709,7 +709,7 @@ internal fun ChatMessageList(
                 targetColor = fadeTargetColor,
                 modifier = Modifier.fillMaxSize(),
                 // letta-mobile-58qlr.1: don't fade the bottom edge while pinned
-                // to the newest message — keeps a just-sent prompt / live
+                // to the newest message â€” keeps a just-sent prompt / live
                 // streaming bubble fully visible instead of dimming it.
                 suppressBottom = isNearBottom,
             ) {
@@ -771,7 +771,7 @@ internal fun ChatMessageList(
                         // override BACK to activeFontScale for off-window items.
                         // The renderItems index is approximate (date separators
                         // are injected into the LazyColumn between them, so
-                        // visible indices don't map 1:1) — the margin already
+                        // visible indices don't map 1:1) â€” the margin already
                         // absorbs this drift.
                         val itemSeesLiveScale = chatRenderItemSeesLiveScale(
                             isPinching = pinchFontScaleController.isPinching,
@@ -794,7 +794,7 @@ internal fun ChatMessageList(
                                 // letta-mobile-m772.4 follow-up: reasoning bubbles that
                                 // land as Single (because their run had only one message,
                                 // or because the message predates runId tracking) still
-                                // need the collapse affordance — otherwise the body is
+                                // need the collapse affordance â€” otherwise the body is
                                 // always shown with no toggle. Thread the same callbacks
                                 // RunBlock uses so behaviour is consistent across modes
                                 // and group sizes.
@@ -806,7 +806,7 @@ internal fun ChatMessageList(
                                 // with the same LazyColumn key". Routing both states
                                 // through the same composable (RunBlock) keeps the
                                 // slot's composable subtree identical across the
-                                // transition — Compose just sees the messages list
+                                // transition â€” Compose just sees the messages list
                                 // grow from 1 to N inside the existing RunBlock. The
                                 // RunBlock's messages.size == 1 short-circuit renders
                                 // exactly what RenderChatMessage would render, so
@@ -881,7 +881,7 @@ internal fun ChatMessageList(
                                     messages = renderItem.messages.map { it.first },
                                     collapsed = renderItem.runId in state.collapsedRunIds,
                                     onToggleCollapsed = {
-                                        // letta-mobile-<collapse-floor>: see above —
+                                        // letta-mobile-<collapse-floor>: see above â€”
                                         // release streaming floors on collapse toggle.
                                         itemGeometryState.clearStreamingFloors()
                                         onToggleRunCollapsed(renderItem.runId)
@@ -988,7 +988,7 @@ private fun MeasuredChatRenderItem(
     // height-floor from the geometry cache. The floor exists to keep streaming
     // items stable across re-measures (so a bubble that just landed at H px
     // can't suddenly report H-30 mid-stream and jitter), but during pinch the
-    // user explicitly asked everything to be smaller — applying the floor at
+    // user explicitly asked everything to be smaller â€” applying the floor at
     // the previous-scale value leaves a phantom gap at the bottom of the
     // LazyColumn because items can't shrink below the cached floor.
     //
@@ -1006,13 +1006,13 @@ private fun MeasuredChatRenderItem(
     // a min size on items that aren't actively growing).
     //
     // letta-mobile-<collapse-floor>: collapsing the CURRENT (still-streaming)
-    // run is an INTENTIONAL shrink, exactly like pinch — but it slips past the
+    // run is an INTENTIONAL shrink, exactly like pinch â€” but it slips past the
     // 75nad guard because isStreaming is still true, so the monotone-up
     // streaming floor (grown to the run's EXPANDED height) keeps the collapsed
     // item floored tall, leaving dead space under the ongoing response.
     //
     // The reset is handled ONCE per collapse event at the toggle chokepoint
-    // (clearStreamingFloors, called from onToggleRunCollapsed) — NOT here per
+    // (clearStreamingFloors, called from onToggleRunCollapsed) â€” NOT here per
     // item per frame. This keeps the streaming hot path O(1): the floor lookup
     // below is unchanged, and after a collapse the cleared floors simply
     // re-seed from the next (smaller) measurement.
@@ -1030,7 +1030,7 @@ private fun MeasuredChatRenderItem(
             .then(minHeightModifier)
             .onSizeChanged { size ->
                 // letta-mobile-8vivd: don't record measurements taken during a
-                // pinch into the cache — those heights are the live (mid-
+                // pinch into the cache â€” those heights are the live (mid-
                 // gesture) values which would corrupt the committed-scale
                 // cache entries. Once the gesture ends and content re-measures
                 // at the committed scale, the next onSizeChanged seeds the
@@ -1086,7 +1086,7 @@ internal fun autoScrollAction(
 // letta-mobile-4bgm3: a brand-new user message becoming the newest item means
 // the user just sent something (optimistic insertion). In that case we force a
 // scroll to the newest edge (item 0 with reverseLayout) so the just-sent bubble
-// is always brought into view — independent of the streaming snap throttle in
+// is always brought into view â€” independent of the streaming snap throttle in
 // [autoScrollAction] and independent of whether the viewport was near the bottom.
 //
 // We require the message id to differ from the previously-handled newest id so

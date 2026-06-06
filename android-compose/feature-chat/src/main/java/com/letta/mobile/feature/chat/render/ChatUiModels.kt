@@ -1,7 +1,8 @@
-package com.letta.mobile.feature.chat.render
+﻿package com.letta.mobile.feature.chat.render
 
 import androidx.compose.material3.SnackbarDuration
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
+import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.ProjectBugReport
 import com.letta.mobile.data.model.UiMessage
@@ -68,7 +69,7 @@ internal data class ProjectBriefSection(
 internal data class ProjectBriefUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
-    // ImmutableMap so Compose treats this whole state as stable — raw
+    // ImmutableMap so Compose treats this whole state as stable â€” raw
     // kotlin.collections.Map is an unstable interface type to the
     // compiler (it could be a MutableMap at runtime). See o7ob.2.6.
     val sections: kotlinx.collections.immutable.ImmutableMap<ProjectBriefSectionKey, ProjectBriefSection> =
@@ -185,21 +186,6 @@ internal sealed interface ConversationState {
 
     @androidx.compose.runtime.Immutable
     data class Error(val message: String) : ConversationState
-}
-
-internal enum class ChatMessageListChange {
-    Full,
-    AppendTail,
-    ReplaceTail,
-
-    /**
-     * letta-mobile-yflpp: a deduped no-op tick — the projected message list is
-     * byte-identical to the previous one. The observer suppresses the uiState
-     * write entirely for this case, so this value should never reach the UI in
-     * practice; it exists so [ChatTimelineObserver] can flag the no-op
-     * projection it returns from its fast path.
-     */
-    None,
 }
 
 @androidx.compose.runtime.Immutable

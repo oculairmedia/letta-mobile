@@ -28,7 +28,7 @@ class TimelineSendCoordinatorTest {
     @Test
     fun `fresh timeline send creates conversation and starts observer`() = runTest {
         val harness = Harness(scope = this, isFreshRoute = true)
-        coEvery { harness.conversationRepository.createConversation("agent-1", "hello") } returns
+        coEvery { harness.conversationRepository.createConversation(AgentId("agent-1"), "hello") } returns
             TestData.conversation(id = "new-conv", agentId = "agent-1")
 
         harness.coordinator.send("hello")
@@ -49,7 +49,9 @@ class TimelineSendCoordinatorTest {
         harness.coordinator.send("second")
         advanceUntilIdle()
 
-        coVerify(exactly = 1) { harness.conversationRepository.updateConversation("conv-1", "agent-1", "first") }
+        coVerify(exactly = 1) {
+            harness.conversationRepository.updateConversation(ConversationId("conv-1"), AgentId("agent-1"), "first")
+        }
         coVerify(exactly = 1) { harness.timelineRepository.sendMessage("conv-1", "first") }
         coVerify(exactly = 1) { harness.timelineRepository.sendMessage("conv-1", "second") }
     }
@@ -69,7 +71,7 @@ class TimelineSendCoordinatorTest {
     @Test
     fun `stale existing conversation creates replacement and retries send`() = runTest {
         val harness = Harness(scope = this, activeConversationId = "stale-conv")
-        coEvery { harness.conversationRepository.createConversation("agent-1", "hello") } returns
+        coEvery { harness.conversationRepository.createConversation(AgentId("agent-1"), "hello") } returns
             TestData.conversation(id = "replacement-conv", agentId = "agent-1")
         coEvery { harness.timelineRepository.sendMessage("stale-conv", "hello") } throws
             ApiException(404, "Conversation not found with id='stale-conv'")

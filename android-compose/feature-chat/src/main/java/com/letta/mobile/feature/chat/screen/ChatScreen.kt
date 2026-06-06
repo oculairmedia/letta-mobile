@@ -73,8 +73,8 @@ import com.letta.mobile.ui.components.ThinkingShader
 import com.letta.mobile.ui.components.ThinkingTextToken
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.feature.chat.coordination.ChatComposerEffect
-import com.letta.mobile.feature.chat.coordination.IncrementalChatRenderItemsCache
-import com.letta.mobile.feature.chat.coordination.toChatDisplayMode
+import com.letta.mobile.data.chat.projection.IncrementalChatRenderItemsCache
+import com.letta.mobile.data.chat.projection.toChatDisplayMode
 import com.letta.mobile.feature.chat.render.A2uiDebugFrameUi
 import com.letta.mobile.feature.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.render.ConversationState
@@ -104,7 +104,7 @@ import kotlin.math.max
  * Feature flag: when false, the tool-affordance chip strip above the
  * composer is suppressed. The component (`ToolAffordanceRow`), the
  * smart-template builder (`buildToolCallTemplate`), and the
- * `AdminChatViewModel.activeAgent` flow all stay wired — only the
+ * `AdminChatViewModel.activeAgent` flow all stay wired â€” only the
  * call-site stops feeding tools through, so flipping to true re-enables
  * the row without any other change.
  */
@@ -125,7 +125,7 @@ internal fun ChatScreen(
     // bar. In production this is left null so the screen binds the real
     // WS-backed source from the view model (the per-socket subagent registry
     // shipped in letta-mobile-73o2h.1). Previews/tests pass an explicit
-    // FakeActiveSubagentSource. The bar itself is unchanged — only the feed
+    // FakeActiveSubagentSource. The bar itself is unchanged â€” only the feed
     // is swapped at this single seam.
     activeSubagentSource: ActiveSubagentSource? = null,
     // letta-mobile-lgm98: optional self-todo source seam (previews/tests pass a
@@ -143,7 +143,7 @@ internal fun ChatScreen(
     var activeFontScale by remember { mutableFloatStateOf(fontScale) }
     LaunchedEffect(fontScale) { activeFontScale = fontScale }
 
-    // Timeline sync loop handles live updates — no on-resume refresh needed.
+    // Timeline sync loop handles live updates â€” no on-resume refresh needed.
 
     val backgroundModifier = when (chatBackground) {
         is ChatBackground.Default -> Modifier
@@ -165,7 +165,7 @@ internal fun ChatScreen(
         // completed/failed chip stays visible for its dwell, then auto-drops.
         // A coarse 1s tick re-evaluates the window so an expired terminal
         // dismisses on its own without any new WS frame. Snapshots still
-        // reduce by replacement (no per-frame rebuild — preserves rmzmo).
+        // reduce by replacement (no per-frame rebuild â€” preserves rmzmo).
         val subagentSnapshot by resolvedSubagentSource.activeSubagents
             .collectAsStateWithLifecycle(initialValue = persistentListOf<ActiveSubagent>())
         var lingerTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -174,7 +174,7 @@ internal fun ChatScreen(
             // while any chip is RUNNING (letta-mobile-dvobc: so the "stuck"
             // ring heuristic re-evaluates elapsed-since-last-update without a
             // new WS frame). When the bar is fully idle there is nothing to
-            // re-evaluate, so we idle — no wakeups on the hot streaming path.
+            // re-evaluate, so we idle â€” no wakeups on the hot streaming path.
             while (subagentSnapshot.any { it.isTerminal || it.isActive }) {
                 lingerTick = System.currentTimeMillis()
                 kotlinx.coroutines.delay(1_000)
@@ -294,9 +294,9 @@ internal fun ChatScreen(
         ) {
             // letta-mobile-vcky.b3: thinking glow declared BEFORE the
             // Column so it paints first (behind everything). Aligned to
-            // BottomCenter — strip bottom hugs the bottom of the chat
+            // BottomCenter â€” strip bottom hugs the bottom of the chat
             // region (top of nav bar / IME). The shader peak (uv.y=0.92
-            // of a 216dp strip → ~17dp above the strip bottom) lands
+            // of a 216dp strip â†’ ~17dp above the strip bottom) lands
             // inside the composer's painted area; the composer (opaque
             // Surface) covers the peak. What's visible above the composer
             // is the long diffuse upper tail. Half-opacity vs. the
@@ -498,7 +498,7 @@ internal fun ChatScreen(
                     )
                 }
 
-                // letta-mobile-ndtc.3: gradient "thinking" text token —
+                // letta-mobile-ndtc.3: gradient "thinking" text token â€”
                 // ephemeral subtitle that appears between the message list /
                 // A2UI surfaces and the composer while awaiting the agent's
                 // first frame. Driven by `isAgentTyping`; switches to the
@@ -866,6 +866,6 @@ private fun ErrorContent(
 // NoConversation showing only "Start a conversation / Send a message to
 // create a new conversation.") was removed when the empty-state for the
 // in-chat "New Conversation" path was unified with the chat-list FAB
-// path — both now render StarterPrompts. The strings
+// path â€” both now render StarterPrompts. The strings
 // screen_chat_empty_title and screen_chat_empty_subtitle remain in
 // res/values/strings.xml in case a future surface needs them.

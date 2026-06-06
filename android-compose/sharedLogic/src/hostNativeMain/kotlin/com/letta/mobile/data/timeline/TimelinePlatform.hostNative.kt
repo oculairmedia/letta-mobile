@@ -18,6 +18,9 @@ actual fun parseTimelineInstantOrNull(value: String): TimelineInstant? =
 actual fun compareTimelineInstants(left: TimelineInstant, right: TimelineInstant): Int =
     left.compareTo(right)
 
+actual fun timelineInstantDurationMillis(start: TimelineInstant, end: TimelineInstant): Long =
+    (end - start).inWholeMilliseconds
+
 actual fun newTimelineClientId(): String {
     val random = Random.Default
     return listOf(4, 2, 2, 2, 6)

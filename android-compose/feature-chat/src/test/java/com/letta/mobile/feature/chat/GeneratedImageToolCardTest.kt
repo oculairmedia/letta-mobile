@@ -23,7 +23,7 @@ import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
-import com.letta.mobile.feature.chat.coordination.ChatRenderItem
+import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.feature.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.render.ConversationState
 import com.letta.mobile.feature.chat.screen.ChatImageViewer

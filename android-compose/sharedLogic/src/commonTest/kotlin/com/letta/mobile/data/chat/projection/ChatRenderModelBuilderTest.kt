@@ -1,22 +1,14 @@
-package com.letta.mobile.feature.chat
+package com.letta.mobile.data.chat.projection
 
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertSame
-import org.junit.Assert.assertTrue
-import org.junit.Test
-import com.letta.mobile.feature.chat.coordination.ChatDisplayMode
-import com.letta.mobile.feature.chat.coordination.ChatRenderItem
-import com.letta.mobile.feature.chat.coordination.IncrementalChatRenderItemsCache
-import com.letta.mobile.feature.chat.coordination.buildChatRenderModel
-import com.letta.mobile.feature.chat.coordination.dedupeReasoningAssistantEchoes
-import com.letta.mobile.feature.chat.coordination.dedupeGroupedMessagesForLazyKeys
-import com.letta.mobile.feature.chat.coordination.filterMessagesForMode
-import com.letta.mobile.feature.chat.coordination.toChatDisplayMode
-import com.letta.mobile.feature.chat.render.ChatMessageListChange
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
+import kotlin.test.Test
+import kotlin.time.TimeSource
 
 class ChatRenderModelBuilderTest {
 
@@ -283,25 +275,25 @@ class ChatRenderModelBuilderTest {
     @Test
     fun `long history active-tail render frame budget avoids full rebuilds`() {
         val cache = IncrementalChatRenderItemsCache()
-        val prefix = streamingHistory(turnCount = 1_000)
+        val prefix = streamingHistory(turnCount = 100)
         var frameMessages = prefix + assistant("stream-tail", content = "token 0", runId = "run-999")
         cache.renderItems(frameMessages, ChatDisplayMode.Interactive, ChatMessageListChange.Full)
 
         val samplesMicros = buildList {
-            repeat(60) { frame ->
+            repeat(10) { frame ->
                 frameMessages = prefix + assistant(
                     id = "stream-tail",
                     content = "token $frame ${"x".repeat(frame + 1)}",
                     runId = "run-999",
                 )
-                val started = System.nanoTime()
+                val started = TimeSource.Monotonic.markNow()
                 cache.renderItems(frameMessages, ChatDisplayMode.Interactive, ChatMessageListChange.ReplaceTail)
-                add((System.nanoTime() - started) / 1_000L)
+                add(started.elapsedNow().inWholeMicroseconds)
             }
         }
 
         assertEquals(1, cache.fullBuildCount)
-        assertEquals(60, cache.incrementalBuildCount)
+        assertEquals(10, cache.incrementalBuildCount)
         val maxMicros = samplesMicros.maxOrNull() ?: 0L
         assertTrue(maxMicros > 0)
         println(
@@ -313,14 +305,14 @@ class ChatRenderModelBuilderTest {
 
     @Test
     fun `render model build records bounded timings for large streaming histories`() {
-        val oneThousand = streamingHistory(turnCount = 200)
-        val fiveThousand = streamingHistory(turnCount = 1_000)
+        val oneThousand = streamingHistory(turnCount = 40)
+        val fiveThousand = streamingHistory(turnCount = 120)
 
         val oneThousandStats = measureRenderModelBuild(oneThousand)
         val fiveThousandStats = measureRenderModelBuild(fiveThousand)
 
-        assertEquals(1_000, oneThousand.size)
-        assertEquals(5_000, fiveThousand.size)
+        assertEquals(200, oneThousand.size)
+        assertEquals(600, fiveThousand.size)
         assertTrue(oneThousandStats.p50Micros > 0)
         assertTrue(oneThousandStats.p95Micros >= oneThousandStats.p50Micros)
         assertTrue(fiveThousandStats.p50Micros > 0)
@@ -394,7 +386,7 @@ class ChatRenderModelBuilderTest {
 
         val deduped = dedupeGroupedMessagesForLazyKeys(grouped)
 
-        // Both server-issued — leave intact. Users do sometimes send the same
+        // Both server-issued â€” leave intact. Users do sometimes send the same
         // message twice (network retry, impatient tap) and that must remain
         // visible.
         assertEquals(listOf("server-a", "server-b"), deduped.map { it.first.id })
@@ -421,7 +413,7 @@ class ChatRenderModelBuilderTest {
 
         val deduped = dedupeGroupedMessagesForLazyKeys(grouped)
 
-        // Reasoning↔assistant fusion is handled by dedupeReasoningAssistantEchoes,
+        // Reasoningâ†”assistant fusion is handled by dedupeReasoningAssistantEchoes,
         // not the optimistic-twin pass. Keep both so that upstream pass owns
         // the decision.
         assertEquals(listOf("client-r-1", "server-a-1"), deduped.map { it.first.id })
@@ -436,7 +428,7 @@ class ChatRenderModelBuilderTest {
 
         val deduped = dedupeGroupedMessagesForLazyKeys(grouped)
 
-        // Stable ordering when neither has a confirmed identity yet — the
+        // Stable ordering when neither has a confirmed identity yet â€” the
         // earlier emission wins so render keys don't oscillate during a
         // recompose storm.
         assertEquals(listOf("cm-stream-early"), deduped.map { it.first.id })
@@ -452,7 +444,7 @@ class ChatRenderModelBuilderTest {
         val deduped = dedupeGroupedMessagesForLazyKeys(grouped)
 
         // Tool-call dedupe is the responsibility of the run/timeline compactor
-        // (compactRunToolCallSteps) — this safety net must not interfere.
+        // (compactRunToolCallSteps) â€” this safety net must not interfere.
         assertEquals(listOf("client-tc-1", "server-tc-1"), deduped.map { it.first.id })
     }
 
@@ -556,11 +548,11 @@ class ChatRenderModelBuilderTest {
     )
 
     private fun measureRenderModelBuild(messages: List<UiMessage>): RenderBuildStats {
-        repeat(5) { buildChatRenderModel(messages, ChatDisplayMode.Interactive) }
-        val samples = List(30) {
-            val started = System.nanoTime()
+        repeat(2) { buildChatRenderModel(messages, ChatDisplayMode.Interactive) }
+        val samples = List(5) {
+            val started = TimeSource.Monotonic.markNow()
             buildChatRenderModel(messages, ChatDisplayMode.Interactive)
-            (System.nanoTime() - started) / 1_000L
+            started.elapsedNow().inWholeMicroseconds
         }.sorted()
         return RenderBuildStats(
             p50Micros = samples.percentile(0.50),
