@@ -1,4 +1,15 @@
+import java.net.URI
+import java.security.MessageDigest
 import java.util.Properties
+import java.util.zip.ZipInputStream
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.OutputFile
+import org.gradle.api.tasks.TaskAction
 
 plugins {
     id("com.android.application")
@@ -125,8 +136,13 @@ val computedVersionCode = computeVersionCode(computedVersionName)
 
 logger.lifecycle("[versioning] versionName=$computedVersionName versionCode=$computedVersionCode")
 
-val embeddedLettaCodeVersion = "0.26.2"
-val embeddedLettaCodeIntegrity = "sha512-J8dqAXCrQMlZNh81vTMj5q6E6iH0ZrNc8mSrWyv4h92Dq+qD4XqjC6H1f9HyX84zLIL3LcMqZk7itlDoEnHNiQ=="
+val embeddedLettaCodeVersion = "0.26.1"
+val embeddedLettaCodeIntegrity = "sha512-vI+UU6ZNyTLtKFqhvr5+AyGXj1/sF5oggjgwB6Q0y0t/Y6FaytIlzKhus/P9/LtziXZdbZmqItMGEbYSXk2/CQ=="
+val embeddedLettaCodeLibnodeVersion = "v18.20.4"
+val embeddedLettaCodeLibnodeSha256 = "bd7321eaa1a7602fbe0bb87302df2d79d87835cf4363fbdd17c350dbb485c2af"
+val embeddedLettaCodeLibnodeArchiveName = "nodejs-mobile-$embeddedLettaCodeLibnodeVersion-android.zip"
+val embeddedLettaCodeLibnodeUrl =
+    "https://github.com/nodejs-mobile/nodejs-mobile/releases/download/$embeddedLettaCodeLibnodeVersion/$embeddedLettaCodeLibnodeArchiveName"
 val embeddedLettaCodeNativeEnabled = providers.gradleProperty("embedLettaCodeNative")
     .map { it.equals("true", ignoreCase = true) }
     .orElse(false)
@@ -134,12 +150,90 @@ val embeddedLettaCodeAssetsEnabled = providers.gradleProperty("embedLettaCodeAss
     .map { it.equals("true", ignoreCase = true) }
     .orElse(embeddedLettaCodeNativeEnabled)
 val embeddedLettaCodeAssetsDir = layout.buildDirectory.dir("generated/embedded-lettacode-assets")
+val embeddedLettaCodeLibnodeDir = layout.buildDirectory.dir("generated/embedded-lettacode-libnode")
+val embeddedLettaCodeLibnodeArchive = layout.buildDirectory.file("embedded-lettacode/libnode/$embeddedLettaCodeLibnodeArchiveName")
 
 fun npmCommand(): String =
     if (System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) "npm.cmd" else "npm"
 
+abstract class PrepareEmbeddedLettaCodeLibnodeTask : DefaultTask() {
+    @get:Input
+    abstract val archiveUrl: Property<String>
+
+    @get:Input
+    abstract val expectedSha256: Property<String>
+
+    @get:OutputFile
+    abstract val archiveFile: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    @TaskAction
+    fun prepare() {
+        val archive = archiveFile.get().asFile
+        archive.parentFile.mkdirs()
+        val expected = expectedSha256.get()
+        if (!archive.isFile || archive.sha256() != expected) {
+            logger.lifecycle("[embedded-lettacode] downloading ${archive.name}")
+            URI(archiveUrl.get()).toURL().openStream().use { input ->
+                archive.outputStream().use { output -> input.copyTo(output) }
+            }
+        }
+        val actualSha256 = archive.sha256()
+        check(actualSha256 == expected) {
+            "Unexpected SHA-256 for ${archive.name}: $actualSha256"
+        }
+
+        val outputDir = outputDirectory.get().asFile.canonicalFile
+        outputDir.deleteRecursively()
+        outputDir.mkdirs()
+        ZipInputStream(archive.inputStream()).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                val target = outputDir.resolve(entry.name).canonicalFile
+                check(target.path == outputDir.path || target.path.startsWith(outputDir.path + File.separator)) {
+                    "Archive entry escapes output directory: ${entry.name}"
+                }
+                if (entry.isDirectory) {
+                    target.mkdirs()
+                } else {
+                    target.parentFile?.mkdirs()
+                    target.outputStream().use { output -> zip.copyTo(output) }
+                }
+                zip.closeEntry()
+            }
+        }
+    }
+
+    private fun File.sha256(): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        inputStream().use { input ->
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        return digest.digest().joinToString("") { byte -> "%02x".format(byte) }
+    }
+}
+
+val prepareEmbeddedLettaCodeLibnode = tasks.register<PrepareEmbeddedLettaCodeLibnodeTask>(
+    "prepareEmbeddedLettaCodeLibnode",
+) {
+    onlyIf { embeddedLettaCodeNativeEnabled.get() }
+    notCompatibleWithConfigurationCache("Downloads and extracts the Node.js Mobile native archive.")
+    archiveUrl.set(embeddedLettaCodeLibnodeUrl)
+    expectedSha256.set(embeddedLettaCodeLibnodeSha256)
+    archiveFile.set(embeddedLettaCodeLibnodeArchive)
+    outputDirectory.set(embeddedLettaCodeLibnodeDir)
+}
+
 val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAssets") {
     onlyIf { embeddedLettaCodeAssetsEnabled.get() }
+    notCompatibleWithConfigurationCache("Runs npm install and copies embedded LettaCode assets.")
     outputs.dir(embeddedLettaCodeAssetsDir)
     doLast {
         val npmWorkDir = layout.buildDirectory.dir("embedded-lettacode/npm").get().asFile
@@ -212,9 +306,14 @@ android {
         buildConfigField("String", "EMBEDDED_LETTACODE_INTEGRITY", "\"$embeddedLettaCodeIntegrity\"")
 
         if (embeddedLettaCodeNativeEnabled.get()) {
+            ndk {
+                abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
+            }
             externalNativeBuild {
                 cmake {
-                    arguments += "-DLETTACODE_LIBNODE_DIR=${projectDir.resolve("libnode").absolutePath.replace("\\", "/")}"
+                    arguments += "-DLETTACODE_LIBNODE_DIR=${
+                        embeddedLettaCodeLibnodeDir.get().asFile.absolutePath.replace("\\", "/")
+                    }"
                 }
             }
         }
@@ -350,7 +449,7 @@ android {
         }
         if (embeddedLettaCodeNativeEnabled.get()) {
             getByName("main") {
-                jniLibs.directories.add("libnode/bin")
+                jniLibs.directories.add(embeddedLettaCodeLibnodeDir.get().asFile.resolve("bin").absolutePath)
             }
         }
         // The `benchmark` buildType (macrobenchmark target) uses the same
@@ -374,6 +473,18 @@ if (embeddedLettaCodeAssetsEnabled.get()) {
     tasks.configureEach {
         if (name.startsWith("merge") && name.endsWith("Assets")) {
             dependsOn(prepareEmbeddedLettaCodeAssets)
+        }
+    }
+}
+
+if (embeddedLettaCodeNativeEnabled.get()) {
+    tasks.configureEach {
+        if (
+            name.contains("CMake") ||
+            (name.startsWith("merge") && name.endsWith("NativeLibs")) ||
+            (name.startsWith("merge") && name.endsWith("JniLibFolders"))
+        ) {
+            dependsOn(prepareEmbeddedLettaCodeLibnode)
         }
     }
 }
@@ -468,6 +579,9 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+
+    // On-device LLM inference for imported .litertlm model files.
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.13.1")
 
     // Drag-to-reorder for Compose
     implementation("sh.calvin.reorderable:reorderable:3.1.0")

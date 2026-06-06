@@ -7,7 +7,7 @@ set_target_properties(
     libnode
     PROPERTIES
     IMPORTED_LOCATION "${LETTACODE_LIBNODE_DIR}/bin/${ANDROID_ABI}/libnode.so"
-    INTERFACE_INCLUDE_DIRECTORIES "${LETTACODE_LIBNODE_DIR}/include"
+    INTERFACE_INCLUDE_DIRECTORIES "${LETTACODE_LIBNODE_DIR}/include/node"
 )
 
 add_library(lettacode_node_bridge SHARED lettacode_node_bridge.cpp)

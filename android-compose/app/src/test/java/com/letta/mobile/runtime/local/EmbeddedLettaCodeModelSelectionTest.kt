@@ -3,6 +3,9 @@ package com.letta.mobile.runtime.local
 import com.letta.mobile.data.model.LettaConfig
 import java.io.File
 import java.nio.file.Files
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -145,6 +148,58 @@ class EmbeddedLettaCodeModelSelectionTest {
             )
 
             assertFalse(request.environment.containsKey("LETTA_ANDROID_ON_DEVICE_MODEL_PATH"))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `start request writes local provider config when on-device base url is available`() {
+        val root = Files.createTempDirectory("letta-code-start-request").toFile()
+        try {
+            val project = PreparedLettaCodeProject(
+                projectDir = File(root, "project"),
+                entrypoint = File(root, "project/letta.js"),
+                workingDirectory = File(root, "workdir"),
+                storageDirectory = File(root, "local-backend"),
+                homeDirectory = File(root, "home"),
+            )
+            val selection = EmbeddedLettaCodeModelSelection(
+                modelHandle = "local/gemma-3n",
+                modelPath = "/data/model/gemma.litertlm",
+                runtime = "litert-lm",
+                accelerator = "gpu",
+                maxTokens = 4096,
+            )
+
+            val request = project.toLettaCodeNodeStartRequest(
+                session = EmbeddedLettaCodeSessionKey(
+                    agentId = "agent-1",
+                    conversationId = "conv-1",
+                    modelKey = selection.startKey,
+                ),
+                modelSelection = selection,
+                onDeviceProviderBaseUrl = "http://127.0.0.1:43123/v1",
+            )
+
+            assertEquals("gemma-3n", selection.openAiModelId)
+            assertEquals("lmstudio/gemma-3n", selection.lettaCodeModelHandle)
+            assertEquals("lmstudio/gemma-3n", request.arguments[5])
+            assertEquals("http://127.0.0.1:43123/v1", request.environment["LMSTUDIO_BASE_URL"])
+
+            val authFile = File(project.storageDirectory, "providers/auth.json")
+            val rootJson = Json.parseToJsonElement(authFile.readText()).jsonObject
+            val provider = rootJson
+                .getValue("providers").jsonObject
+                .getValue("lc-lmstudio").jsonObject
+            assertEquals("local-provider-lc-lmstudio", provider.getValue("id").jsonPrimitive.content)
+            assertEquals("lc-lmstudio", provider.getValue("name").jsonPrimitive.content)
+            assertEquals("lmstudio", provider.getValue("provider_type").jsonPrimitive.content)
+            assertEquals("http://127.0.0.1:43123/v1", provider.getValue("base_url").jsonPrimitive.content)
+            assertEquals(
+                "not-needed",
+                provider.getValue("auth").jsonObject.getValue("key").jsonPrimitive.content,
+            )
         } finally {
             root.deleteRecursively()
         }
