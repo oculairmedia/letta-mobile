@@ -13,11 +13,9 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.mapNotNull
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
- * letta-mobile-wecy: chat-flavored projection of [ChannelTransport].
+ * letta-mobile-wecy: chat-flavored projection of [IChannelTransport].
  *
  * Wraps the wire-level transport into the higher-level events the
  * chat ViewModels actually want to switch on:
@@ -36,26 +34,25 @@ import javax.inject.Singleton
  *
  * The bridge owns NO timeline state — it just translates. Connection
  * lifecycle, single-flight, and run_id capture stay in
- * [ChannelTransport]; this class delegates connect/send/cancel/bye/
+ * the platform transport; this class delegates connect/send/cancel/bye/
  * disconnect through.
  *
  * Wiring beads: w4t2 (send-path swap), a6ag (post-turn_done refetch),
  * 0vvm (backend gating).
  */
-@Singleton
-class WsChatBridge @Inject constructor(
+class WsChatBridge(
     private val transport: IChannelTransport,
 ) {
     /** Re-export the connection state without forcing callers to know about ChannelTransport. */
-    val state: StateFlow<ChannelTransport.State> = transport.state
+    val state: StateFlow<ChannelTransportState> = transport.state
 
     val connection: Flow<WsConnectionState> = transport.state.map { it.toConnectionState() }
 
-    fun isConnected(): Boolean = transport.state.value is ChannelTransport.State.Connected
+    fun isConnected(): Boolean = transport.state.value is ChannelTransportState.Connected
 
     suspend fun awaitConnected(): WsConnectionState.Connected = transport.state
-        .filter { it is ChannelTransport.State.Connected }
-        .map { state -> (state as ChannelTransport.State.Connected).toConnectionState() }
+        .filter { it is ChannelTransportState.Connected }
+        .map { state -> (state as ChannelTransportState.Connected).toConnectionState() }
         .first()
 
     /** High-level event stream tailored for chat consumers. */
@@ -65,9 +62,9 @@ class WsChatBridge @Inject constructor(
         // ViewModel can show a banner / re-enable retry without
         // having to re-implement a state-collector.
         transport.state
-            .filter { it is ChannelTransport.State.Disconnected }
+            .filter { it is ChannelTransportState.Disconnected }
             .map { state ->
-                val d = state as ChannelTransport.State.Disconnected
+                val d = state as ChannelTransportState.Disconnected
                 WsTimelineEvent.Disconnected(d.code, d.reason, d.isAuthFailure)
             },
     )
@@ -86,7 +83,7 @@ class WsChatBridge @Inject constructor(
 
     /**
      * Returns false if the connection isn't live or a turn is already
-     * in flight (mirrors [ChannelTransport.send]). The caller surfaces
+     * in flight (mirrors [IChannelTransport.send]). The caller surfaces
      * the failure as appropriate (snackbar, queued retry, etc.).
      *
      * lcp-dlj: when [attachments] is non-empty, builds a Letta
@@ -138,18 +135,18 @@ sealed interface WsConnectionState {
     ) : WsConnectionState
 }
 
-private fun ChannelTransport.State.toConnectionState(): WsConnectionState = when (this) {
-    is ChannelTransport.State.Idle -> WsConnectionState.Idle
-    is ChannelTransport.State.Connecting -> WsConnectionState.Connecting
-    is ChannelTransport.State.Connected -> toConnectionState()
-    is ChannelTransport.State.Disconnected -> WsConnectionState.Disconnected(
+private fun ChannelTransportState.toConnectionState(): WsConnectionState = when (this) {
+    is ChannelTransportState.Idle -> WsConnectionState.Idle
+    is ChannelTransportState.Connecting -> WsConnectionState.Connecting
+    is ChannelTransportState.Connected -> toConnectionState()
+    is ChannelTransportState.Disconnected -> WsConnectionState.Disconnected(
         code = code,
         reason = reason,
         isAuthFailure = isAuthFailure,
     )
 }
 
-private fun ChannelTransport.State.Connected.toConnectionState(): WsConnectionState.Connected =
+private fun ChannelTransportState.Connected.toConnectionState(): WsConnectionState.Connected =
     WsConnectionState.Connected(
         a2uiEnabled = a2uiEnabled,
         catalog = a2uiCatalog,

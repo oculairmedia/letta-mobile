@@ -25,6 +25,7 @@ import com.letta.mobile.data.timeline.headless.HeadlessTimelineStore
 import com.letta.mobile.data.timeline.headless.HydrationReplayOrder
 import com.letta.mobile.data.timeline.headless.TimelineAssertionOptions
 import com.letta.mobile.data.transport.ChannelTransport
+import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.RunCursorStore
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.WsChatBridge
@@ -123,9 +124,9 @@ internal class ConnectCommand : AdminShimCommand(
         try {
             bridge.connect(baseUrl, token, deviceId, clientVersion)
             withTimeout(timeoutMs) {
-                bridge.state.filter { it is ChannelTransport.State.Connected }.first()
+                bridge.state.filter { it is ChannelTransportState.Connected }.first()
             }
-            val connected = bridge.state.value as ChannelTransport.State.Connected
+            val connected = bridge.state.value as ChannelTransportState.Connected
             println(
                 "[connect] serverId=${connected.serverId} sessionId=${connected.sessionId} " +
                     "deviceId=${connected.deviceId ?: "<none>"} a2ui=${connected.a2uiEnabled} " +
@@ -494,7 +495,7 @@ internal class DisconnectCommand : AdminShimCommand(
         val bridge = WsChatBridge(transport)
         bridge.connect(baseUrl, token, deviceId, clientVersion)
         withTimeout(5_000) {
-            bridge.state.filter { it is ChannelTransport.State.Connected }.first()
+            bridge.state.filter { it is ChannelTransportState.Connected }.first()
         }
         println("[disconnect] connected; sending bye")
         bridge.bye()
@@ -525,12 +526,12 @@ internal class ReconnectCommand : AdminShimCommand(
         }
         try {
             bridge.connect(baseUrl, token, deviceId, clientVersion)
-            withTimeout(5_000) { bridge.state.filter { it is ChannelTransport.State.Connected }.first() }
+            withTimeout(5_000) { bridge.state.filter { it is ChannelTransportState.Connected }.first() }
             println("[reconnect] first connection up")
             bridge.disconnect()
             println("[reconnect] disconnected")
             bridge.connect(baseUrl, token, deviceId, clientVersion)
-            withTimeout(5_000) { bridge.state.filter { it is ChannelTransport.State.Connected }.first() }
+            withTimeout(5_000) { bridge.state.filter { it is ChannelTransportState.Connected }.first() }
             println("[reconnect] second connection up")
             delay(holdMs)
         } finally {
@@ -563,6 +564,9 @@ private fun ServerFrame.typeName(): String = when (this) {
     is ServerFrame.CronDeleteResponse -> "cron_delete_response success=$success"
     is ServerFrame.CronDeleteAllResponse -> "cron_delete_all_response success=$success"
     is ServerFrame.CronsUpdated -> "crons_updated reason=$reason"
+    is ServerFrame.SubagentListResponse -> "subagent_list_response success=$success"
+    is ServerFrame.SubagentTodosResponse -> "subagent_todos_response success=$success"
+    is ServerFrame.SubagentsUpdated -> "subagents_updated reason=$reason"
     is ServerFrame.Unknown -> "unknown:$type"
 }
 

@@ -38,12 +38,6 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
-sealed interface A2uiActionDispatchResult {
-    data class Sent(val frameId: String) : A2uiActionDispatchResult
-    data class Queued(val frameId: String) : A2uiActionDispatchResult
-    data object Failed : A2uiActionDispatchResult
-}
-
 /**
  * client for the admin-shim's `/shim/v1/mobile` WebSocket.
  * Delegates responsibilities to:
@@ -77,28 +71,6 @@ class ChannelTransport internal constructor(
         NoOpConversationCursorStore,
     )
 
-    sealed interface State {
-        data object Idle : State
-        data object Connecting : State
-        data class Connected(
-            val serverId: String,
-            val sessionId: String,
-            val deviceId: String?,
-            val a2uiEnabled: Boolean = false,
-            val a2uiVersion: String? = null,
-            val a2uiCatalog: String? = null,
-            val canonicalLiveTransport: String? = null,
-            val a2uiSupportedCatalogs: List<String> = emptyList(),
-            val a2uiSupportedWidgets: List<String> = emptyList(),
-        ) : State
-
-        data class Disconnected(
-            val code: Int,
-            val reason: String,
-            val isAuthFailure: Boolean = false,
-        ) : State
-    }
-
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
@@ -106,8 +78,8 @@ class ChannelTransport internal constructor(
         coerceInputValues = true
     }
 
-    private val _state = MutableStateFlow<State>(State.Idle)
-    override val state: StateFlow<State> = _state.asStateFlow()
+    private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
+    override val state: StateFlow<ChannelTransportState> = _state.asStateFlow()
 
     private val _events = MutableSharedFlow<ServerFrame>(
         replay = 0,
@@ -129,7 +101,7 @@ class ChannelTransport internal constructor(
             clearPendingA2uiActions(reason = "session ended")
             connection.disconnect(reason = "session ended")
             cronCorrelator.cancelPendingRequests("session ended")
-            _state.value = State.Disconnected(NORMAL_CLOSE, "session ended")
+            _state.value = ChannelTransportState.Disconnected(NORMAL_CLOSE, "session ended")
         }
     }
 
@@ -143,7 +115,7 @@ class ChannelTransport internal constructor(
         clientVersion: String,
     ): Unit = socketMutex.withLock {
         teardownLocked(reason = "reconnect")
-        _state.value = State.Connecting
+        _state.value = ChannelTransportState.Connecting
         conversationStateManager.clearAllTurnState()
         cursorCoordinator.ensureLoaded()
         val helloResume = cursorCoordinator.loadHelloResumeCursors()
@@ -187,7 +159,7 @@ class ChannelTransport internal constructor(
                     Log.i(TAG, "Ignoring close from superseded WS socket")
                     return
                 }
-                _state.value = State.Disconnected(code, reason)
+                _state.value = ChannelTransportState.Disconnected(code, reason)
                 conversationStateManager.clearAllTurnState()
                 cronCorrelator.cancelPendingRequests("WS closed: code=$code reason=$reason")
                 if (!wasClientInitiatedClose && code == KEEPALIVE_PONG_TIMEOUT_CLOSE_CODE) {
@@ -208,7 +180,7 @@ class ChannelTransport internal constructor(
                     return
                 }
                 val isAuth = httpCode == 401 || httpCode == 403
-                _state.value = State.Disconnected(
+                _state.value = ChannelTransportState.Disconnected(
                     code = httpCode ?: -1,
                     reason = t.message ?: t::class.java.simpleName,
                     isAuthFailure = isAuth,
@@ -244,7 +216,7 @@ class ChannelTransport internal constructor(
             )
             return false
         }
-        if (state.value !is State.Connected) return false
+        if (state.value !is ChannelTransportState.Connected) return false
         val conversationKey = if (startNewConversation) {
             NEW_CONVERSATION_STATE_KEY
         } else {
@@ -297,7 +269,7 @@ class ChannelTransport internal constructor(
     override fun subscribe(runId: String, cursor: Long): Boolean {
         if (runId.isEmpty()) return false
         if (cursor < 0L) return false
-        if (state.value !is State.Connected) return false
+        if (state.value !is ChannelTransportState.Connected) return false
         return connection.sendFrame(
             SubscribeFrame(
                 id = UUID.randomUUID().toString(),
@@ -431,7 +403,7 @@ class ChannelTransport internal constructor(
         frame: ClientFrame,
         timeoutMs: Long,
     ): ServerFrame {
-        if (state.value !is State.Connected) {
+        if (state.value !is ChannelTransportState.Connected) {
             throw IllegalStateException("Cron send failed: state=${state.value::class.simpleName}")
         }
         return cronCorrelator.awaitCronResponse(
@@ -448,8 +420,8 @@ class ChannelTransport internal constructor(
 
     private fun teardownLocked(reason: String) {
         connection.teardown(reason)
-        if (_state.value !is State.Disconnected) {
-            _state.value = State.Disconnected(NORMAL_CLOSE, reason)
+        if (_state.value !is ChannelTransportState.Disconnected) {
+            _state.value = ChannelTransportState.Disconnected(NORMAL_CLOSE, reason)
         }
         conversationStateManager.clearAllTurnState()
         cronCorrelator.cancelPendingRequests("WS teardown: $reason")
@@ -472,7 +444,7 @@ class ChannelTransport internal constructor(
 
         when (frame) {
             is ServerFrame.Welcome -> {
-                _state.value = State.Connected(
+                _state.value = ChannelTransportState.Connected(
                     serverId = frame.serverId,
                     sessionId = frame.sessionId,
                     deviceId = frame.deviceId,
@@ -486,7 +458,7 @@ class ChannelTransport internal constructor(
             }
 
             is ServerFrame.A2uiCapabilities -> {
-                (_state.value as? State.Connected)?.let { current ->
+                (_state.value as? ChannelTransportState.Connected)?.let { current ->
                     _state.value = current.copy(
                         a2uiSupportedCatalogs = frame.supportedCatalogs,
                         a2uiSupportedWidgets = frame.supportedWidgets,
@@ -617,12 +589,12 @@ class ChannelTransport internal constructor(
                     "surfaceId=${action.surfaceId} event=${action.name} frameId=${frame.id}",
             )
             return enqueueA2uiAction(conversationKey, frame).also { result ->
-                if (stateNow !is State.Connected || socket == null) {
+                if (stateNow !is ChannelTransportState.Connected || socket == null) {
                     requestReconnectIfQueued(result, "missing run_id and no live socket")
                 }
             }
         }
-        if (stateNow is State.Connected && socket != null) {
+        if (stateNow is ChannelTransportState.Connected && socket != null) {
             val ok = connection.sendFrame(frame)
             if (ok) {
                 Log.i(
@@ -691,7 +663,7 @@ class ChannelTransport internal constructor(
     private fun requestReconnect(reason: String) {
         connection.requestReconnect(
             reason = reason,
-            isConnecting = { state.value is State.Connecting },
+            isConnecting = { state.value is ChannelTransportState.Connecting },
             connectFn = ::connect
         )
     }
@@ -708,7 +680,7 @@ class ChannelTransport internal constructor(
                 return
             }
             val socket = connection.getSocket()
-            if (state.value !is State.Connected || socket == null || !connection.sendFrame(frame)) {
+            if (state.value !is ChannelTransportState.Connected || socket == null || !connection.sendFrame(frame)) {
                 requeueA2uiActionFirst(conversationId, frame)
                 return
             }
@@ -761,7 +733,7 @@ class ChannelTransport internal constructor(
             "subscribe_done",
         )
 
-        const val DEFAULT_CRON_TIMEOUT_MS: Long = 5_000L
+        const val DEFAULT_CRON_TIMEOUT_MS: Long = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS
 
         internal fun nowIso(): String = Instant.now().toString()
 

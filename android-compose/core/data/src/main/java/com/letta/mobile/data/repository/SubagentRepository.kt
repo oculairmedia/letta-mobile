@@ -5,8 +5,9 @@ import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.transport.ChannelTransport
-import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
+import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -139,7 +140,7 @@ open class SubagentRepository(
     private suspend fun observeReconnects() {
         var wasConnected: Boolean? = null
         transport.state.collect { connectionState ->
-            val nowConnected = connectionState is ChannelTransport.State.Connected
+            val nowConnected = connectionState is ChannelTransportState.Connected
             if (wasConnected == false && nowConnected && initialized.get()) {
                 runCatching { refresh() }
                     .onFailure { e -> Log.w(TAG, "reconnect refresh failed: ${e.message}") }

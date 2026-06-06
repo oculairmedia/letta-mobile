@@ -2,7 +2,7 @@ package com.letta.mobile.testutil
 
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
-import com.letta.mobile.data.transport.ChannelTransport
+import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.coroutines.delay
@@ -17,13 +17,13 @@ import kotlinx.serialization.json.JsonArray
  * observers.
  */
 class FakeChannelTransport(
-    initialState: ChannelTransport.State = ChannelTransport.State.Connected(
+    initialState: ChannelTransportState = ChannelTransportState.Connected(
         serverId = "srv",
         sessionId = "sess",
         deviceId = "dev",
     ),
 ) : IChannelTransport {
-    override val state: MutableStateFlow<ChannelTransport.State> = MutableStateFlow(initialState)
+    override val state: MutableStateFlow<ChannelTransportState> = MutableStateFlow(initialState)
     override val events: MutableSharedFlow<ServerFrame> = MutableSharedFlow(
         replay = 0,
         extraBufferCapacity = 16,
@@ -113,7 +113,7 @@ class FakeChannelTransport(
     override fun bye(): Boolean = byeResult
 
     override suspend fun disconnect() {
-        state.value = ChannelTransport.State.Disconnected(1000, "fake disconnect")
+        state.value = ChannelTransportState.Disconnected(1000, "fake disconnect")
     }
 
     override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult = a2uiActionResult

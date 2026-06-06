@@ -14,6 +14,7 @@ import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.timeline.ConversationCursorStore
 import com.letta.mobile.data.timeline.NoOpConversationCursorStore
 import com.letta.mobile.data.transport.ChannelTransport
+import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.RunCursorStore
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsTimelineEvent
@@ -487,7 +488,7 @@ class A2uiToolApprovalRoundTripTest {
 
         server.closeActiveSocket()
         withRealTimeout {
-            bridge.state.first { it is ChannelTransport.State.Disconnected }
+            bridge.state.first { it is ChannelTransportState.Disconnected }
         }
 
         composeRule.onNodeWithText("Once").performClick()
@@ -628,7 +629,7 @@ private suspend fun connect(
     server: A2uiShimServer,
 ) = coroutineScope {
     val connected = async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
-        bridge.state.first { it is ChannelTransport.State.Connected }
+        bridge.state.first { it is ChannelTransportState.Connected }
     }
     transport.connect(
         baseShimUrl = server.baseUrl(),

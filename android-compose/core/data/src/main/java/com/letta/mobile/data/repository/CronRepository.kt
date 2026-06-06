@@ -4,8 +4,9 @@ import android.util.Log
 import com.letta.mobile.data.model.CronTask
 import com.letta.mobile.data.repository.api.ICronRepository
 import com.letta.mobile.data.transport.ChannelTransport
-import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
+import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -184,7 +185,7 @@ open class CronRepository(
     private suspend fun observeReconnects() {
         var wasConnected: Boolean? = null
         transport.state.collect { state ->
-            val nowConnected = state is ChannelTransport.State.Connected
+            val nowConnected = state is ChannelTransportState.Connected
             if (wasConnected == false && nowConnected) {
                 initialized.toList().forEach { agentId ->
                     runCatching { refresh(agentId) }

@@ -3,6 +3,7 @@ package com.letta.mobile.cli.runtime
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.headless.HeadlessTimelineStore
 import com.letta.mobile.data.transport.ChannelTransport
+import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.RunCursorStore
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsTimelineEvent
@@ -55,9 +56,9 @@ internal class CliWsSession(
             clientVersion = clientVersion,
         )
         withTimeout(timeoutMs) {
-            bridge.state.filter { it is ChannelTransport.State.Connected }.first()
+            bridge.state.filter { it is ChannelTransportState.Connected }.first()
         }
-        val state = bridge.state.value as ChannelTransport.State.Connected
+        val state = bridge.state.value as ChannelTransportState.Connected
         println(
             "[ws] connected serverId=${state.serverId} sessionId=${state.sessionId} " +
                 "a2ui=${state.a2uiEnabled} canonical=${state.canonicalLiveTransport ?: "<unspecified>"}"
