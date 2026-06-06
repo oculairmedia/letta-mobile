@@ -47,6 +47,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontFamily
+import com.letta.mobile.data.model.UiImageAttachment
+import kotlinx.collections.immutable.toImmutableList
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.DateSeparator
@@ -309,11 +311,26 @@ internal fun ChatMessageList(
     val chatShapes = MaterialTheme.chatShapes
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
-    val renderItemsByKey = remember(renderItems) { renderItems.associateBy { it.key } }
+    // perf/frame-budget-audit: `renderItems` gets a fresh identity on every
+    // streamed token, so a `remember(renderItems) { associateBy { it.key } }`
+    // here rebuilt an O(conversation) map PER TOKEN purely to serve the
+    // pinch-begin handler below (its only consumer) — the same rmzmo/gsvgt
+    // O(history)-per-token smell. Keep the latest renderItems available via
+    // rememberUpdatedState and build the lookup lazily, once, when a pinch
+    // actually begins (a rare gesture).
+    val currentRenderItems by rememberUpdatedState(renderItems)
     val itemGeometryState = remember { ChatMessageGeometryState() }
     var highlightedMessageId by remember { mutableStateOf<String?>(null) }
     var hasScrolledToTarget by remember { mutableStateOf(false) }
     var showFontIndicator by remember { mutableStateOf(false) }
+    // letta-mobile-1k3ge restore: fullscreen image viewer state. Hoisted here
+    // so any message's tapped attachment opens the viewer overlay below.
+    var imageViewerState by remember {
+        mutableStateOf<Pair<kotlinx.collections.immutable.ImmutableList<UiImageAttachment>, Int>?>(null)
+    }
+    val onAttachmentImageTap: (List<UiImageAttachment>, Int) -> Unit = { attachments, index ->
+        imageViewerState = attachments.toImmutableList() to index
+    }
     var pinchTick by remember { mutableStateOf(0L) }
     var pinchAnimationSuppressionTick by remember { mutableStateOf(0L) }
     var suppressPinchLayoutAnimations by remember { mutableStateOf(false) }
@@ -563,6 +580,13 @@ internal fun ChatMessageList(
                                 suppressPinchLayoutAnimations = true
                                 pinchAnimationSuppressionTick = 0L
                                 pinchFontScaleController.begin(activeFontScale)
+                                // perf/frame-budget-audit: build the key->item
+                                // lookup lazily here (pinch-begin only) over the
+                                // current render items, instead of eagerly per
+                                // token in composition. Only the visible item
+                                // keys are looked up, so a single associateBy at
+                                // gesture start is cheap and history-bounded.
+                                val renderItemsByKey = currentRenderItems.associateBy { it.key }
                                 val visibleRenderItems = listState.layoutInfo.visibleItemsInfo.mapNotNull { itemInfo ->
                                     renderItemsByKey[itemInfo.key]
                                 }
@@ -805,7 +829,15 @@ internal fun ChatMessageList(
                                     RunBlock(
                                         messages = listOf(msg),
                                         collapsed = runId in state.collapsedRunIds,
-                                        onToggleCollapsed = { onToggleRunCollapsed(runId) },
+                                        onToggleCollapsed = {
+                                            // letta-mobile-<collapse-floor>: release
+                                            // streaming floors once per toggle so a
+                                            // collapsed streaming run re-seeds to its
+                                            // smaller height (no dead space). O(1) per
+                                            // rare user action; no per-frame cost.
+                                            itemGeometryState.clearStreamingFloors()
+                                            onToggleRunCollapsed(runId)
+                                        },
                                         modifier = Modifier.padding(top = chatDimens.ungroupedMessageSpacing),
                                         isStreaming = state.isStreaming,
                                         activeApprovalRequestId = state.activeApprovalRequestId,
@@ -822,6 +854,7 @@ internal fun ChatMessageList(
                                             onSubmitApproval = onSubmitApproval,
                                             reasoningCollapsed = message.id !in state.expandedReasoningMessageIds,
                                             onToggleReasoning = { onToggleReasoningExpanded(message.id) },
+                                            onAttachmentImageTap = onAttachmentImageTap,
                                             modifier = rowModifier,
                                         )
                                     }
@@ -837,6 +870,7 @@ internal fun ChatMessageList(
                                         onSubmitApproval = onSubmitApproval,
                                         reasoningCollapsed = msg.id !in state.expandedReasoningMessageIds,
                                         onToggleReasoning = { onToggleReasoningExpanded(msg.id) },
+                                        onAttachmentImageTap = onAttachmentImageTap,
                                     )
                                 }
                             }
@@ -854,7 +888,12 @@ internal fun ChatMessageList(
                                 RunBlock(
                                     messages = renderItem.messages.map { it.first },
                                     collapsed = renderItem.runId in state.collapsedRunIds,
-                                    onToggleCollapsed = { onToggleRunCollapsed(renderItem.runId) },
+                                    onToggleCollapsed = {
+                                        // letta-mobile-<collapse-floor>: see above —
+                                        // release streaming floors on collapse toggle.
+                                        itemGeometryState.clearStreamingFloors()
+                                        onToggleRunCollapsed(renderItem.runId)
+                                    },
                                     modifier = highlightModifier.padding(top = chatDimens.ungroupedMessageSpacing),
                                     isStreaming = state.isStreaming,
                                     activeApprovalRequestId = state.activeApprovalRequestId,
@@ -871,6 +910,7 @@ internal fun ChatMessageList(
                                         onSubmitApproval = onSubmitApproval,
                                         reasoningCollapsed = message.id !in state.expandedReasoningMessageIds,
                                         onToggleReasoning = { onToggleReasoningExpanded(message.id) },
+                                        onAttachmentImageTap = onAttachmentImageTap,
                                         modifier = rowModifier,
                                     )
                                 }
@@ -920,6 +960,17 @@ internal fun ChatMessageList(
                 .align(Alignment.BottomEnd)
                 .padding(LettaSpacing.innerPadding),
         )
+
+        // letta-mobile-1k3ge restore: fullscreen image viewer overlay. Opens
+        // when an attachment is tapped (state set via onAttachmentImageTap),
+        // supports pinch-zoom / swipe-to-dismiss; dismiss clears the state.
+        imageViewerState?.let { (viewerAttachments, initialIndex) ->
+            ChatImageViewer(
+                attachments = viewerAttachments,
+                initialPage = initialIndex,
+                onDismiss = { imageViewerState = null },
+            )
+        }
 
         if (showFontIndicator) {
             // letta-mobile-6261e: indicator now tracks the live effective
@@ -972,6 +1023,18 @@ private fun MeasuredChatRenderItem(
     // items rely on Compose's natural measurement (the cache is still seeded
     // via onSizeChanged for streaming-stability lookups; we just don't force
     // a min size on items that aren't actively growing).
+    //
+    // letta-mobile-<collapse-floor>: collapsing the CURRENT (still-streaming)
+    // run is an INTENTIONAL shrink, exactly like pinch — but it slips past the
+    // 75nad guard because isStreaming is still true, so the monotone-up
+    // streaming floor (grown to the run's EXPANDED height) keeps the collapsed
+    // item floored tall, leaving dead space under the ongoing response.
+    //
+    // The reset is handled ONCE per collapse event at the toggle chokepoint
+    // (clearStreamingFloors, called from onToggleRunCollapsed) — NOT here per
+    // item per frame. This keeps the streaming hot path O(1): the floor lookup
+    // below is unchanged, and after a collapse the cleared floors simply
+    // re-seed from the next (smaller) measurement.
     val applyFloor = isStreaming && !isPinching
     val heightFloorPx = if (applyFloor) geometryState.heightFloorFor(signature, isStreaming) else 0
     val minHeightModifier = if (heightFloorPx > 0) {
@@ -1101,6 +1164,7 @@ private fun RenderChatMessage(
     onSubmitApproval: (String, List<String>, Boolean, String?) -> Unit,
     reasoningCollapsed: Boolean = false,
     onToggleReasoning: (() -> Unit)? = null,
+    onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     // reverseLayout = true: top = space below (toward newer),
@@ -1138,6 +1202,7 @@ private fun RenderChatMessage(
                 onSubmitApproval(requestId, toolCallIds, approve, reason)
             },
             approvalInFlight = state.activeApprovalRequestId == message.approvalRequest?.requestId,
+            onAttachmentImageTap = onAttachmentImageTap,
             modifier = modifier.then(highlightModifier).padding(top = spacingBelow, bottom = spacingAbove),
         )
     }

@@ -445,15 +445,27 @@ internal fun findShellCommandEnd(text: String, start: Int, lineEnd: Int): Int {
     return index
 }
 
-internal fun keywordRegex(languageHint: String?): Regex {
-    val keywords = when (languageHint) {
-        "kotlin" -> kotlinKeywords
-        "python" -> pythonKeywords
-        "javascript" -> javascriptKeywords
-        "bash", "sh", "shell" -> shellKeywords
-        else -> commonCodeKeywords
-    }
-    return Regex("""\b(${keywords.joinToString("|") { Regex.escape(it) }})\b""")
+// perf/frame-budget-audit: the keyword alternation regex was recompiled on
+// every keywordRegex(...) call (each builds a big `\b(a|b|c|...)\b` pattern via
+// joinToString + Regex.escape). The keyword sets are static, so compile each of
+// the five language variants exactly once and reuse them. This sits on the
+// tool-output code-highlight path; highlight results are cached downstream but
+// the compile itself was pure waste on every cache miss.
+private fun compileKeywordRegex(keywords: Set<String>): Regex =
+    Regex("""\b(${keywords.joinToString("|") { Regex.escape(it) }})\b""")
+
+private val kotlinKeywordRegex by lazy { compileKeywordRegex(kotlinKeywords) }
+private val pythonKeywordRegex by lazy { compileKeywordRegex(pythonKeywords) }
+private val javascriptKeywordRegex by lazy { compileKeywordRegex(javascriptKeywords) }
+private val shellKeywordRegex by lazy { compileKeywordRegex(shellKeywords) }
+private val commonKeywordRegex by lazy { compileKeywordRegex(commonCodeKeywords) }
+
+internal fun keywordRegex(languageHint: String?): Regex = when (languageHint) {
+    "kotlin" -> kotlinKeywordRegex
+    "python" -> pythonKeywordRegex
+    "javascript" -> javascriptKeywordRegex
+    "bash", "sh", "shell" -> shellKeywordRegex
+    else -> commonKeywordRegex
 }
 
 private val jsonLiterals = listOf("true", "false", "null")

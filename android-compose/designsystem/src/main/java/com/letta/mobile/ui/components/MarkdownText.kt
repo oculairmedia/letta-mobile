@@ -78,8 +78,22 @@ fun MarkdownText(
     // MathBlock segments. Display-math is block-level (stacked column);
     // inline-math is interleaved with prose (wrapping row). Cheap fast-path
     // when neither marker is present.
-    val hasDisplay = renderText.contains("$$")
-    val hasInline = !hasDisplay && renderText.contains('$') && containsLikelyInlineMath(renderText)
+    //
+    // perf/frame-budget-audit: the inline-math precheck compiles a Regex on
+    // every recompose (containsLikelyInlineMath -> Regex(...)). During
+    // streaming MarkdownText is re-invoked for the active block at paint
+    // cadence, so this ran ~17Hz per message. Gate the whole math classify
+    // behind remember(renderText) so the regex match (and its compile, now
+    // a precompiled module-level Regex) only runs when the text changes.
+    val mathMarkers = remember(renderText) {
+        val display = renderText.contains("$$")
+        MathMarkers(
+            hasDisplay = display,
+            hasInline = !display && renderText.contains('$') && containsLikelyInlineMath(renderText),
+        )
+    }
+    val hasDisplay = mathMarkers.hasDisplay
+    val hasInline = mathMarkers.hasInline
     if (hasDisplay || hasInline) {
         val blockSegments = remember(renderText) { splitDisplayMathSegments(renderText) }
         val hasBlockSplit = blockSegments.any { it is MathSegment.Math } && blockSegments.size > 1
@@ -192,10 +206,9 @@ internal sealed class MathSegment {
  * text segments (between adjacent math blocks) are dropped.
  */
 internal fun splitDisplayMathSegments(text: String): List<MathSegment> {
-    val regex = Regex("\\$\\$([\\s\\S]+?)\\$\\$")
     val out = mutableListOf<MathSegment>()
     var last = 0
-    for (match in regex.findAll(text)) {
+    for (match in displayMathRegex.findAll(text)) {
         if (match.range.first > last) {
             val before = text.substring(last, match.range.first)
             if (before.isNotBlank()) out.add(MathSegment.Text(before))
@@ -231,10 +244,9 @@ internal fun splitDisplayMathSegments(text: String): List<MathSegment> {
  * splitter's contract. `$$` escapes are left for the display-math pass.
  */
 internal fun splitInlineMathSegments(text: String): List<MathSegment> {
-    val regex = Regex(INLINE_MATH_PATTERN)
     val out = mutableListOf<MathSegment>()
     var last = 0
-    for (match in regex.findAll(text)) {
+    for (match in inlineMathRegex.findAll(text)) {
         val body = match.groupValues[1]
         if (body.isBlank()) continue
         // groupValues[1] is the math body, but match.range covers the full
@@ -256,6 +268,10 @@ internal fun splitInlineMathSegments(text: String): List<MathSegment> {
     return out
 }
 
+/** @Immutable carrier for the cached math-marker classification (see [MarkdownText]). */
+@androidx.compose.runtime.Immutable
+private data class MathMarkers(val hasDisplay: Boolean, val hasInline: Boolean)
+
 /**
  * Cheap precheck used by [MarkdownText] to decide whether to invoke the
  * inline-math splitter at all. Mirrors [INLINE_MATH_PATTERN] but is an
@@ -264,7 +280,7 @@ internal fun splitInlineMathSegments(text: String): List<MathSegment> {
  */
 internal fun containsLikelyInlineMath(text: String): Boolean {
     if (!text.contains('$')) return false
-    return Regex(INLINE_MATH_PATTERN).containsMatchIn(text)
+    return inlineMathRegex.containsMatchIn(text)
 }
 
 // (?<=^|[^\w$]) — opening must follow a non-word, non-$ boundary
@@ -276,6 +292,13 @@ internal fun containsLikelyInlineMath(text: String): Boolean {
 // (?!\w)       — closing not followed by a word char (rules out `$x$abc`-style runs bleeding into identifiers)
 private const val INLINE_MATH_PATTERN =
     "(?<=^|[^\\w$])\\$(?![\\s\\d])([^$\\n]+?)(?<!\\s)\\$(?!\\w)"
+
+// perf/frame-budget-audit: precompile the math regexes once at class-load
+// instead of `Regex(...)` per call. These were rebuilt on every invocation
+// of containsLikelyInlineMath / splitInlineMathSegments / splitDisplayMathSegments,
+// which sit on the streaming markdown render path.
+private val inlineMathRegex = Regex(INLINE_MATH_PATTERN)
+private val displayMathRegex = Regex("\\$\\$([\\s\\S]+?)\\$\\$")
 
 /**
  * Auto-linkify bare URLs in the text by wrapping them in markdown link syntax.
@@ -383,9 +406,13 @@ private fun String.longestBacktickRun(): Int {
  * Strip trailing punctuation commonly not part of URLs.
  * Common cases: "Check https://example.com." or "See (https://example.com)."
  */
+private val urlTrailingPunctuation = setOf('.', ',', ')', ']', ';', ':', '!', '?')
+
 private fun stripTrailingPunctuation(url: String): String {
     var cleaned = url
-    while (cleaned.isNotEmpty() && cleaned.last() in setOf('.', ',', ')', ']', ';', ':', '!', '?')) {
+    // perf/frame-budget-audit: reuse a hoisted set instead of allocating one
+    // per loop iteration.
+    while (cleaned.isNotEmpty() && cleaned.last() in urlTrailingPunctuation) {
         cleaned = cleaned.dropLast(1)
     }
     return cleaned
@@ -476,6 +503,9 @@ private fun MarkdownTextRaw(
         )
     }
 
+    // Note (perf/frame-budget-audit): markdownExtendedSpans is itself a
+    // @Composable factory, so it can't be hoisted behind a plain remember {}.
+    // The allocation is delegated to the markdown library; left as-is.
     val extendedSpans = markdownExtendedSpans {
         ExtendedSpans(
             RoundedCornerSpanPainter(

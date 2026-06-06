@@ -153,6 +153,10 @@ internal class IncrementalChatRenderItemsCache {
                 messages.size == previous.size &&
                     (messages.size == 1 || messages[messages.size - 2].id == previous[messages.size - 2].id)
             ChatMessageListChange.Full -> false
+            // letta-mobile-yflpp: a deduped no-op tick is suppressed upstream
+            // by ChatTimelineObserver and never reaches this builder; treat it
+            // conservatively as not reusable if it ever does.
+            ChatMessageListChange.None -> false
         }
     }
 

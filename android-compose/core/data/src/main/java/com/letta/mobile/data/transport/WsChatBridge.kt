@@ -252,11 +252,11 @@ private fun ServerFrame.toTimelineEvent(): WsTimelineEvent? = when (this) {
         dropCount = dropCount,
     )
     is ServerFrame.StopReason -> WsTimelineEvent.StopReason(
-        turnId = turnId, runId = runId, stopReason = stopReason,
+        turnId = turnId.orEmpty(), runId = runId.orEmpty(), stopReason = stopReason,
     )
     is ServerFrame.UsageStatistics -> WsTimelineEvent.UsageStatistics(
-        turnId = turnId,
-        runId = runId,
+        turnId = turnId.orEmpty(),
+        runId = runId.orEmpty(),
         promptTokens = promptTokens,
         completionTokens = completionTokens,
         totalTokens = totalTokens,

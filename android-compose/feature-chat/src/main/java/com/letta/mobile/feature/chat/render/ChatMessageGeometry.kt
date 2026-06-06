@@ -2,10 +2,17 @@ package com.letta.mobile.feature.chat.render
 
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
+import com.letta.mobile.data.model.UiGeneratedComponent
+import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.UiSubagentDispatch
+import com.letta.mobile.data.model.UiToolCall
 import java.util.LinkedHashMap
 import kotlin.math.roundToInt
 import com.letta.mobile.feature.chat.coordination.ChatRenderItem
+
+private const val GeometryFullHashMaxChars = 96
+private const val GeometrySampleWindowChars = 24
 
 internal data class ChatMessageGeometryBucket(
     val renderKey: String,
@@ -56,6 +63,18 @@ internal class ChatMessageGeometryState(
             return
         }
         exactHeights[signature] = safeHeight
+    }
+
+    /**
+     * letta-mobile-<collapse-floor>: drop ALL monotone-up streaming floors so
+     * they re-seed from the next measurement. Called ONCE per collapse/expand
+     * toggle (a rare, deliberate user action) at the toggle chokepoint — an
+     * intentional shrink that must not stay floored at the previous, larger
+     * (expanded) height. O(streamingFloors) on a rare event; zero per-frame
+     * cost (the streaming hot path never touches this).
+     */
+    fun clearStreamingFloors() {
+        streamingFloors.clear()
     }
 
     fun retainStreamingBuckets(activeBuckets: Set<ChatMessageGeometryBucket>) {
@@ -113,7 +132,7 @@ private fun ChatRenderItem.geometryContentFingerprint(state: ChatUiState): ChatR
         include(message.id.hashCode())
         include(message.role.hashCode())
         include(message.content.length)
-        include(message.content.hashCode())
+        include(message.content.geometryTextHash())
         include(message.timestamp.hashCode())
         include(message.runId.hashCode())
         include(message.stepId.hashCode())
@@ -121,14 +140,12 @@ private fun ChatRenderItem.geometryContentFingerprint(state: ChatUiState): ChatR
         include(message.isReasoning.hashCode())
         include(message.isError.hashCode())
         include(message.latencyMs.hashCode())
-        include(message.toolCalls.hashCode())
-        include(message.generatedUi.hashCode())
+        include(message.toolCalls.geometryToolCallsHash())
+        include(message.generatedUi.geometryGeneratedUiHash())
         include(message.approvalRequest.hashCode())
         include(message.approvalResponse.hashCode())
         include(message.attachments.size)
-        include(message.attachments.fold(1) { acc, attachment ->
-            31 * acc + attachment.mediaType.hashCode() + attachment.base64.length
-        })
+        include(message.attachments.geometryAttachmentsHash())
         include((message.id !in state.expandedReasoningMessageIds).hashCode())
         include((state.activeApprovalRequestId == message.approvalRequest?.requestId).hashCode())
     }
@@ -177,6 +194,87 @@ private fun ChatRenderItem.geometryExpansionHash(state: ChatUiState): Int {
                 include((message.id !in state.expandedReasoningMessageIds).hashCode())
             }
         }
+    }
+    return hash
+}
+
+private fun String.geometryTextHash(): Int {
+    if (length <= GeometryFullHashMaxChars) return hashCode()
+    var hash = length
+
+    fun include(value: Int) {
+        hash = 31 * hash + value
+    }
+
+    fun includeRange(start: Int, endExclusive: Int) {
+        for (index in start until endExclusive.coerceAtMost(length)) {
+            include(this[index].code)
+        }
+    }
+
+    includeRange(0, GeometrySampleWindowChars)
+    val middleStart = (length / 2 - GeometrySampleWindowChars / 2)
+        .coerceIn(0, length)
+    includeRange(middleStart, middleStart + GeometrySampleWindowChars)
+    includeRange((length - GeometrySampleWindowChars).coerceAtLeast(0), length)
+    include(this[length / 4].code)
+    include(this[length / 2].code)
+    include(this[(length * 3) / 4].code)
+    return hash
+}
+
+private fun String?.geometryNullableTextHash(): Int = this?.geometryTextHash() ?: 0
+
+private fun List<UiToolCall>?.geometryToolCallsHash(): Int {
+    if (isNullOrEmpty()) return 0
+    var hash = size
+    fun include(value: Int) {
+        hash = 31 * hash + value
+    }
+    for (toolCall in this) {
+        include(toolCall.name.hashCode())
+        include(toolCall.arguments.geometryTextHash())
+        include(toolCall.result.geometryNullableTextHash())
+        include(toolCall.status.hashCode())
+        include(toolCall.generatedImageAttachments.geometryAttachmentsHash())
+        include(toolCall.executionTimeMs.hashCode())
+        include(toolCall.toolCallId.hashCode())
+        include(toolCall.approvalDecision.hashCode())
+        include(toolCall.subagentDispatch.geometrySubagentDispatchHash())
+    }
+    return hash
+}
+
+private fun UiSubagentDispatch?.geometrySubagentDispatchHash(): Int {
+    if (this == null) return 0
+    var hash = toolCallId.hashCode()
+    fun include(value: Int) {
+        hash = 31 * hash + value
+    }
+    include(description.geometryTextHash())
+    include(subagentType.hashCode())
+    include(runInBackground.hashCode())
+    include(prompt.geometryTextHash())
+    include(taskId.hashCode())
+    include(subagentAgentId.hashCode())
+    return hash
+}
+
+private fun UiGeneratedComponent?.geometryGeneratedUiHash(): Int {
+    if (this == null) return 0
+    var hash = name.hashCode()
+    hash = 31 * hash + propsJson.geometryTextHash()
+    hash = 31 * hash + fallbackText.geometryNullableTextHash()
+    return hash
+}
+
+private fun List<UiImageAttachment>.geometryAttachmentsHash(): Int {
+    if (isEmpty()) return 0
+    var hash = size
+    for (attachment in this) {
+        hash = 31 * hash + attachment.mediaType.hashCode()
+        hash = 31 * hash + attachment.base64.length
+        hash = 31 * hash + attachment.base64.geometryTextHash()
     }
     return hash
 }

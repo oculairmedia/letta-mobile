@@ -61,6 +61,7 @@ data class UiToolCall(
     val arguments: String,
     val result: String?,
     val status: String? = null,
+    val generatedImageAttachments: List<UiImageAttachment> = emptyList(),
     /**
      * Best-effort wall-clock execution duration for the tool call, measured
      * from the tool-call message timestamp to the matching tool-return

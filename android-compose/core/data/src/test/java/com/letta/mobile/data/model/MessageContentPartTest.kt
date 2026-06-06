@@ -267,6 +267,46 @@ class MessageContentPartTest {
     }
 
     @Test
+    fun `generate image tool return payload reuses image attachment extraction`() {
+        val metadata = """
+            {
+              "path": "/tmp/generated-image.png",
+              "mime_type": "image/png",
+              "model": "gpt-image-2-medium",
+              "size": "1024x1024",
+              "quality": "medium",
+              "prompt": "a small brass robot"
+            }
+        """.trimIndent()
+        val content = buildJsonArray {
+            add(buildJsonObject {
+                put("type", JsonPrimitive("text"))
+                put("text", JsonPrimitive(metadata))
+            })
+            add(buildJsonObject {
+                put("type", JsonPrimitive("image"))
+                put("source", buildJsonObject {
+                    put("type", JsonPrimitive("base64"))
+                    put("media_type", JsonPrimitive("image/png"))
+                    put("data", JsonPrimitive("GENERATED_IMAGE+/=="))
+                })
+            })
+        }
+
+        val message = ToolReturnMessage(
+            id = "tool-return-generate-image",
+            toolCallId = "call-generate-image",
+            status = "success",
+            toolReturnRaw = content,
+        )
+
+        assertTrue(message.toolReturn.funcResponse.orEmpty().contains("gpt-image-2-medium"))
+        assertEquals(1, message.attachments.size)
+        assertEquals("image/png", message.attachments.first().mediaType)
+        assertEquals("GENERATED_IMAGE+/==", message.attachments.first().base64)
+    }
+
+    @Test
     fun `tool return single image object payload does not deserialize as tool return envelope`() {
         val content = buildJsonObject {
             put("type", JsonPrimitive("image"))
