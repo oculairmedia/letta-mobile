@@ -46,13 +46,25 @@ internal fun rememberSmoothedStreamingText(
     // composition / before the smoother has begun revealing.
     val initialDisplayed = remember { seedText }
     var displayedText by remember { mutableStateOf(initialDisplayed) }
+    // letta-mobile-1kz40 (head-clip / order race): seed() runs exactly once, in
+    // a remember{} block that executes during composition BEFORE the inline
+    // updateTarget() below. seed() records the provisional prefix as the cursor
+    // but it is NOT trusted as a verified prefix of the real target — the very
+    // next updateTarget() re-verifies the cursor against the actual rawText via
+    // the longest-common-prefix clamp inside the smoother. So even if seedText
+    // is stale or not a prefix of rawText (the head-clip cause), the cursor is
+    // clamped back to a true prefix and the head is never dropped. Folding the
+    // verification into updateTarget makes the seed/update ordering unable to
+    // clip the head.
+    val nowMs = { System.nanoTime() / 1_000_000L }
     remember {
-        smoother.seed(seedText, isStreaming, System.nanoTime() / 1_000_000L)
+        smoother.seed(seedText, isStreaming, nowMs())
         true
     }
 
-    // Push every rawText / isStreaming change into the smoother.
-    val nowMs = { System.nanoTime() / 1_000_000L }
+    // Push every rawText / isStreaming change into the smoother. This always
+    // runs after the one-time seed above (same composition pass), so the
+    // first target the smoother sees re-clamps any provisional seed cursor.
     smoother.updateTarget(rawText, isStreaming, nowMs())
 
     // Paint loop: runs while the smoother hasn't fully caught up.
