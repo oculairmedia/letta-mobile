@@ -13,55 +13,49 @@ import androidx.compose.ui.unit.dp
  */
 object LettaSpacing {
     // Core scale
-    val none: Dp = 0.dp
-    val xxxs: Dp = 2.dp
-    val xxs: Dp = 4.dp
-    val xs: Dp = 6.dp
-    val sm: Dp = 8.dp
-    val md: Dp = 12.dp
-    val lg: Dp = 16.dp
-    val xl: Dp = 24.dp
-    val xxl: Dp = 32.dp
-    val xxxl: Dp = 64.dp
+    val none: Dp = LettaSpacingTokens.none.dp
+    val xxxs: Dp = LettaSpacingTokens.xxxs.dp
+    val xxs: Dp = LettaSpacingTokens.xxs.dp
+    val xs: Dp = LettaSpacingTokens.xs.dp
+    val sm: Dp = LettaSpacingTokens.sm.dp
+    val md: Dp = LettaSpacingTokens.md.dp
+    val lg: Dp = LettaSpacingTokens.lg.dp
+    val xl: Dp = LettaSpacingTokens.xl.dp
+    val xxl: Dp = LettaSpacingTokens.xxl.dp
+    val xxxl: Dp = LettaSpacingTokens.xxxl.dp
 
     // Semantic tokens (legacy, preserved for compat)
-    val screenHorizontal: Dp = md  // 12.dp
-    val cardGap: Dp = sm  // 8.dp
-    val sectionGap: Dp = lg  // 16.dp
-    val cardGroupItemGap: Dp = xxxs  // 2.dp
-    val innerPadding: Dp = lg  // 16.dp
-    val innerPaddingSmall: Dp = md  // 12.dp
-    val iconGap: Dp = md  // 12.dp
-    val chipGap: Dp = sm  // 8.dp
+    val screenHorizontal: Dp = LettaSpacingTokens.screenHorizontal.dp
+    val cardGap: Dp = LettaSpacingTokens.cardGap.dp
+    val sectionGap: Dp = LettaSpacingTokens.sectionGap.dp
+    val cardGroupItemGap: Dp = LettaSpacingTokens.cardGroupItemGap.dp
+    val innerPadding: Dp = LettaSpacingTokens.innerPadding.dp
+    val innerPaddingSmall: Dp = LettaSpacingTokens.innerPaddingSmall.dp
+    val iconGap: Dp = LettaSpacingTokens.iconGap.dp
+    val chipGap: Dp = LettaSpacingTokens.chipGap.dp
 
     // Chat-specific semantic tokens (awbf.1 extraction)
-    val bubblePaddingHorizontal: Dp = 10.dp  // asymmetric token (10 vs 12)
-    val bubblePaddingVertical: Dp = 7.dp  // asymmetric token (7 vs 8)
-    val messageSpacing: Dp = xxxs  // 2.dp - tight spacing for grouped messages
-    val composerAttachIconSize: Dp = 18.dp
-    val composerAttachButtonSize: Dp = 36.dp
+    val bubblePaddingHorizontal: Dp = LettaSpacingTokens.bubblePaddingHorizontal.dp
+    val bubblePaddingVertical: Dp = LettaSpacingTokens.bubblePaddingVertical.dp
+    val messageSpacing: Dp = LettaSpacingTokens.messageSpacing.dp
+    val composerAttachIconSize: Dp = LettaSpacingTokens.composerAttachIconSize.dp
+    val composerAttachButtonSize: Dp = LettaSpacingTokens.composerAttachButtonSize.dp
 
     // Corner radii (chat bubble and code blocks)
-    val bubbleRadius: Dp = md  // 12.dp
-    val codeBlockRadius: Dp = sm  // 8.dp
+    val bubbleRadius: Dp = LettaSpacingTokens.bubbleRadius.dp
+    val codeBlockRadius: Dp = LettaSpacingTokens.codeBlockRadius.dp
 
     // Avatar and icon sizing
-    val avatarSize: Dp = xl  // 24.dp
-    val iconSizeSmall: Dp = 14.dp
-    val borderWidthThin: Dp = 1.dp
+    val avatarSize: Dp = LettaSpacingTokens.avatarSize.dp
+    val iconSizeSmall: Dp = LettaSpacingTokens.iconSizeSmall.dp
+    val borderWidthThin: Dp = LettaSpacingTokens.borderWidthThin.dp
 
-    // letta-mobile-xrth2: homogeneous chip sizing for the active-subagent
-    // bar so subagent / self / background-task / terminal chips match the
-    // other tool chips. A single min-height + symmetric vertical padding
-    // removes the bottom-heavy asymmetry observed on device.
-    val chipMinHeight: Dp = 32.dp
-    val chipPaddingVertical: Dp = xs  // 6.dp — symmetric top/bottom
-    val chipPaddingHorizontal: Dp = md  // 12.dp
+    // Homogeneous chip sizing for active-subagent and tool chips.
+    val chipMinHeight: Dp = LettaSpacingTokens.chipMinHeight.dp
+    val chipPaddingVertical: Dp = LettaSpacingTokens.chipPaddingVertical.dp
+    val chipPaddingHorizontal: Dp = LettaSpacingTokens.chipPaddingHorizontal.dp
 
-    // letta-mobile-dvobc: the determinate progress ring drawn around a chip
-    // icon. The ring box is slightly larger than the inline icon so the arc
-    // sits cleanly OUTSIDE the glyph; the stroke is thin so it reads as
-    // chrome, not a control.
-    val chipRingSize: Dp = 20.dp
-    val chipRingStroke: Dp = 2.dp
+    // Determinate progress ring drawn around chip icons.
+    val chipRingSize: Dp = LettaSpacingTokens.chipRingSize.dp
+    val chipRingStroke: Dp = LettaSpacingTokens.chipRingStroke.dp
 }

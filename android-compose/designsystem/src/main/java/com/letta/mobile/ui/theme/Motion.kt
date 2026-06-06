@@ -30,13 +30,13 @@ import androidx.compose.ui.unit.IntSize
  * easing used for readable local state changes.
  */
 object LettaMotion {
-    const val StreamingSizeMillis = 60
-    const val ContentSizeMillis = 220
-    const val EnterMillis = 190
-    const val ExitMillis = 130
-    const val FastFadeInMillis = 120
-    const val FastFadeOutMillis = 90
-    const val ChipMillis = 150
+    const val StreamingSizeMillis = LettaMotionTokens.StreamingSizeMillis
+    const val ContentSizeMillis = LettaMotionTokens.ContentSizeMillis
+    const val EnterMillis = LettaMotionTokens.EnterMillis
+    const val ExitMillis = LettaMotionTokens.ExitMillis
+    const val FastFadeInMillis = LettaMotionTokens.FastFadeInMillis
+    const val FastFadeOutMillis = LettaMotionTokens.FastFadeOutMillis
+    const val ChipMillis = LettaMotionTokens.ChipMillis
 
     val streamingSizeSpec: FiniteAnimationSpec<IntSize> =
         tween(durationMillis = StreamingSizeMillis, easing = LinearEasing)
