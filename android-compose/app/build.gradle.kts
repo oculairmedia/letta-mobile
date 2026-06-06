@@ -637,6 +637,7 @@ dependencies {
     testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.1.0")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("androidx.test:core-ktx:1.7.0")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
