@@ -32,6 +32,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -1010,7 +1011,25 @@ private fun MeasuredChatRenderItem(
     // items rely on Compose's natural measurement (the cache is still seeded
     // via onSizeChanged for streaming-stability lookups; we just don't force
     // a min size on items that aren't actively growing).
-    val applyFloor = isStreaming && !isPinching
+    //
+    // letta-mobile-<collapse-floor>: collapsing the CURRENT (still-streaming)
+    // run is an INTENTIONAL shrink, exactly like pinch — but it slips past the
+    // 75nad guard because isStreaming is still true, so the monotone-up
+    // streaming floor (grown to the run's EXPANDED height) keeps the collapsed
+    // item floored tall, leaving dead space under the ongoing response. The
+    // collapsed view lives in a NEW bucket (expansionHash includes
+    // collapsedRunIds), but the transitional remeasure can seed that bucket's
+    // floor from the still-large height before it settles. Detect the
+    // expansion-state transition for this item and, on the frame it flips,
+    // (a) suppress the floor and (b) drop the stale streaming floor for the new
+    // bucket so it re-seeds from the smaller collapsed measurement.
+    var lastExpansionHash by remember { mutableIntStateOf(signature.bucket.expansionHash) }
+    val expansionJustChanged = lastExpansionHash != signature.bucket.expansionHash
+    if (expansionJustChanged) {
+        lastExpansionHash = signature.bucket.expansionHash
+        geometryState.resetStreamingFloor(signature.bucket)
+    }
+    val applyFloor = isStreaming && !isPinching && !expansionJustChanged
     val heightFloorPx = if (applyFloor) geometryState.heightFloorFor(signature, isStreaming) else 0
     val minHeightModifier = if (heightFloorPx > 0) {
         Modifier.heightIn(min = with(density) { heightFloorPx.toDp() })
