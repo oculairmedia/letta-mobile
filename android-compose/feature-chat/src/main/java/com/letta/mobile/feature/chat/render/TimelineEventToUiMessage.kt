@@ -154,6 +154,13 @@ internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                             arguments = tc.arguments ?: "",
                             result = result,
                             status = if (result == null) null else if (isError) "error" else "success",
+                            generatedImageAttachments = if (tc.name == "generate_image") {
+                                ev.attachments.map {
+                                    UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
+                                }
+                            } else {
+                                emptyList()
+                            },
                             executionTimeMs = executionTimeMs,
                             toolCallId = callId,
                             approvalDecision = chip,
@@ -203,8 +210,12 @@ internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                 toolCalls = uiToolCalls,
                 approvalRequest = uiApproval,
                 approvalResponse = null,
-                attachments = ev.attachments.map {
-                    UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
+                attachments = if (uiToolCalls.orEmpty().any { it.name == "generate_image" }) {
+                    emptyList()
+                } else {
+                    ev.attachments.map {
+                        UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
+                    }
                 },
             )
         }
@@ -248,6 +259,13 @@ internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                             arguments = tc.arguments ?: "",
                             result = result,
                             status = if (result == null) null else if (isError) "error" else "success",
+                            generatedImageAttachments = if (tc.name == "generate_image") {
+                                ev.attachments.map {
+                                    UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
+                                }
+                            } else {
+                                emptyList()
+                            },
                             toolCallId = callId,
                             approvalDecision = chip,
                         )
@@ -316,8 +334,12 @@ internal fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                 toolCalls = uiToolCalls,
                 approvalRequest = uiApproval,
                 approvalResponse = uiApprovalResponse,
-                attachments = ev.attachments.map {
-                    UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
+                attachments = if (uiToolCalls.orEmpty().any { it.name == "generate_image" }) {
+                    emptyList()
+                } else {
+                    ev.attachments.map {
+                        UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
+                    }
                 },
             )
         }

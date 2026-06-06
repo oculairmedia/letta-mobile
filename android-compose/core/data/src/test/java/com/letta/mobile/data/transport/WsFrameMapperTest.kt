@@ -127,6 +127,49 @@ class WsFrameMapperTest : WordSpec({
             mapped.attachments.single().base64 shouldBe "LIVE_TOOL_IMAGE+/=="
         }
 
+        "preserve generate_image tool return metadata and inline image from live frames" {
+            val imagePayload = buildJsonArray {
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("text"))
+                    put("text", JsonPrimitive("""
+                        {
+                          "path": "/tmp/generated-image.png",
+                          "mime_type": "image/png",
+                          "model": "gpt-image-2-medium",
+                          "size": "1024x1024",
+                          "quality": "medium",
+                          "prompt": "a small brass robot"
+                        }
+                    """.trimIndent()))
+                })
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("image"))
+                    put("source", buildJsonObject {
+                        put("type", JsonPrimitive("base64"))
+                        put("media_type", JsonPrimitive("image/png"))
+                        put("data", JsonPrimitive("LIVE_GENERATED_IMAGE+/=="))
+                    })
+                })
+            }
+            val frame = ServerFrame.ToolReturnMessage(
+                id = "toolreturn-tc-generate-image",
+                ts = "t",
+                agentId = "a", conversationId = "c",
+                turnId = "T", runId = "R",
+                toolCallId = "tc-generate-image",
+                status = "success",
+                toolReturn = imagePayload,
+            )
+
+            val mapped = WsFrameMapper.toLettaMessage(frame)
+
+            mapped.shouldBeInstanceOf<ToolReturnMessage>()
+            mapped.toolReturn.funcResponse.orEmpty().contains("gpt-image-2-medium") shouldBe true
+            mapped.attachments.size shouldBe 1
+            mapped.attachments.single().mediaType shouldBe "image/png"
+            mapped.attachments.single().base64 shouldBe "LIVE_GENERATED_IMAGE+/=="
+        }
+
         "map reasoning_message and propagate signature when set" {
             val frame = ServerFrame.ReasoningMessage(
                 id = "letta-reason-1",

@@ -146,6 +146,52 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `generate image tool return attaches inline image to matching tool call`() {
+        val seeded = reduce(
+            frame = ToolCallMessage(
+                id = "tool-generate-image",
+                toolCall = ToolCall(toolCallId = "call-generate-image", name = "generate_image", arguments = "{}"),
+            )
+        ).next
+        val toolReturn = ToolReturnMessage(
+            id = "return-generate-image",
+            toolCallId = "call-generate-image",
+            status = "success",
+            toolReturnRaw = buildJsonArray {
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("text"))
+                    put("text", JsonPrimitive("""
+                        {
+                          "path": "/tmp/generated-image.png",
+                          "mime_type": "image/png",
+                          "model": "gpt-image-2-medium",
+                          "size": "1024x1024",
+                          "quality": "medium",
+                          "prompt": "a small brass robot"
+                        }
+                    """.trimIndent()))
+                })
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("image"))
+                    put("source", buildJsonObject {
+                        put("type", JsonPrimitive("base64"))
+                        put("media_type", JsonPrimitive("image/png"))
+                        put("data", JsonPrimitive("STREAM_GENERATED_IMAGE+/=="))
+                    })
+                })
+            },
+        )
+
+        val output = reduce(prev = seeded, frame = toolReturn)
+
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.toolReturnContentByCallId["call-generate-image"].orEmpty().contains("gpt-image-2-medium") shouldBe true
+        event.attachments shouldBe listOf(
+            MessageContentPart.Image(base64 = "STREAM_GENERATED_IMAGE+/==", mediaType = "image/png")
+        )
+    }
+
+    @Test
     fun `tool return without matching call is buffered without rendering`() {
         val toolReturn = ToolReturnMessage(
             id = "return-first",

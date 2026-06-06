@@ -12,16 +12,20 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -39,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -68,6 +73,7 @@ import com.letta.mobile.ui.theme.scaledBy
 import com.letta.mobile.ui.theme.sectionTitle
 import com.letta.mobile.util.Telemetry
 import java.util.LinkedHashMap
+import kotlinx.collections.immutable.toImmutableList
 import com.letta.mobile.feature.chat.render.ToolDisplayInfo
 import com.letta.mobile.feature.chat.render.ToolDisplayRegistry
 import com.letta.mobile.feature.chat.render.LocalToolCardBodyParentVisible
@@ -77,6 +83,7 @@ import com.letta.mobile.feature.chat.render.toolCardBodyRenderEligibility
 import com.letta.mobile.feature.chat.subagent.LocalSubagentTodoSheetOpener
 import com.letta.mobile.feature.chat.subagent.SubagentTodoSheetTarget
 import com.letta.mobile.ui.components.MarkdownText
+import com.letta.mobile.ui.components.shimmerColor
 
 private const val TOOL_CALL_ENTRANCE_ANIMATION_HISTORY_SIZE = 512
 
@@ -475,6 +482,10 @@ internal fun ToolCallCard(
     approvalStateOverride: ToolApprovalState? = null,
     keepExpanded: Boolean = false,
 ) {
+    if (toolCall.name == "generate_image") {
+        GeneratedImageToolCard(toolCall = toolCall)
+        return
+    }
     val subagentDispatch = toolCall.subagentDispatch
     if (subagentDispatch != null) {
         SubagentDispatchCard(
@@ -708,6 +719,167 @@ internal fun ToolCallCard(
             }
         }
     }
+}
+
+@Composable
+private fun GeneratedImageToolCard(
+    toolCall: UiToolCall,
+    modifier: Modifier = Modifier,
+) {
+    val reducedMotion = rememberReducedMotionEnabled()
+    val hasImage = toolCall.generatedImageAttachments.isNotEmpty()
+    val isError = ToolReturnStatus.isError(toolCall.status)
+    val prompt = remember(toolCall.arguments) { summarizeGenerateImagePrompt(toolCall.arguments) }
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.42f),
+        ),
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.38f),
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = when {
+                        isError -> LettaIcons.Error
+                        hasImage -> LettaIcons.CheckCircle
+                        else -> LettaIcons.Refresh
+                    },
+                    contentDescription = when {
+                        isError -> "Image generation failed"
+                        hasImage -> "Generated image ready"
+                        else -> "Generating image"
+                    },
+                    modifier = Modifier.size(LettaIconSizing.Inline),
+                    tint = when {
+                        isError -> MaterialTheme.colorScheme.error
+                        hasImage -> MaterialTheme.colorScheme.tertiary
+                        else -> MaterialTheme.colorScheme.onTertiaryContainer
+                    },
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (hasImage) "Generated image" else "Generating image",
+                        style = MaterialTheme.typography.chatBubbleSender,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    )
+                    prompt?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.listItemSupporting,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.78f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                toolCall.executionTimeMs?.let { ms ->
+                    ToolMetaChip(text = formatToolExecutionTime(ms))
+                }
+            }
+
+            AnimatedContent(
+                targetState = hasImage,
+                modifier = Modifier.fillMaxWidth(),
+                transitionSpec = {
+                    if (reducedMotion) {
+                        (ChatMotion.instantEnter() togetherWith ChatMotion.instantExit())
+                            .using(SizeTransform(clip = true) { _, _ -> ChatMotion.instantSizeSpec })
+                    } else {
+                        (ChatMotion.expandEnter() togetherWith ChatMotion.expandExit())
+                            .using(SizeTransform(clip = true) { _, _ -> ChatMotion.contentSizeSpec })
+                    }
+                },
+                contentAlignment = Alignment.TopStart,
+                label = "GeneratedImageToolStage",
+            ) { ready ->
+                if (ready) {
+                    MessageAttachmentsGrid(
+                        attachments = toolCall.generatedImageAttachments.toImmutableList(),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
+                    GeneratedImageShimmer(modifier = Modifier.fillMaxWidth())
+                }
+            }
+
+            val errorText = toolCall.result?.takeIf { it.isNotBlank() }
+            if (isError && errorText != null) {
+                Text(
+                    text = errorText,
+                    style = MaterialTheme.typography.listItemSupporting,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun GeneratedImageShimmer(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .height(220.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f)),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(18.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(shimmerColor()),
+        )
+    }
+}
+
+private fun summarizeGenerateImagePrompt(arguments: String): String? {
+    if (arguments.isBlank()) return null
+    val prompt = extractJsonStringValue(arguments, "prompt")?.takeIf { it.isNotBlank() }
+        ?: return arguments.take(96).let { if (arguments.length > 96) "$it…" else it }
+    return prompt.take(120).let { if (prompt.length > 120) "$it…" else it }
+}
+
+private fun extractJsonStringValue(json: String, field: String): String? {
+    val key = "\"$field\""
+    val keyIndex = json.indexOf(key)
+    if (keyIndex < 0) return null
+    val colonIndex = json.indexOf(':', keyIndex + key.length)
+    if (colonIndex < 0) return null
+    val quoteStart = json.indexOf('"', colonIndex + 1)
+    if (quoteStart < 0) return null
+    val out = StringBuilder()
+    var index = quoteStart + 1
+    while (index < json.length) {
+        when (val char = json[index]) {
+            '\\' -> {
+                val next = json.getOrNull(index + 1) ?: break
+                out.append(
+                    when (next) {
+                        'n', 't', 'r' -> ' '
+                        else -> next
+                    }
+                )
+                index += 2
+            }
+            '"' -> break
+            else -> {
+                out.append(char)
+                index += 1
+            }
+        }
+    }
+    return out.toString()
 }
 
 @Composable
