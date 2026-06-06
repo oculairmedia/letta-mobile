@@ -1,6 +1,6 @@
 # KMP Extraction Current State
 
-Last updated: 2026-05-25 on branch `codex/kmp-shared-components`.
+Last updated: 2026-06-06 on branch `codex/windows-chat-ui-decision`.
 
 ## Goal
 
@@ -34,10 +34,16 @@ Koog dependencies or Koog-specific concepts to UI, repositories, or settings.
 | Runtime reducer | `RuntimeEventProjector` and common tests cover replay, delivery status, tool return folding, approvals, MemFS commits, and AgentFile import/export projection. |
 | Shared model/protocol tests | `sharedLogic/commonTest` covers domain ID serialization, backend labels, agent update wire keys, message content-part wire shape, transport protocol contracts, attachment limits, tool-output parsing, and runtime projector/store behavior. |
 | Shared repository contracts | Common-safe repository interfaces for agents, archives, blocks, conversations, conversation-inspector messages, cron schedules, identities, jobs, MCP servers, models, passages, projects, providers, runs, schedules, settings, steps, tools, and Vibesync events live in `sharedLogic/commonMain`. Paging, upload/Ktor, and UI-message contracts remain Android-owned. |
+| Shared session graph contracts | `SessionRepositoryGraph`, `SessionRepositoryGraphFactory`, and `SessionRepositoryGraphProvider` live in `sharedLogic/commonMain`; platform modules still own concrete repository implementations and DI wiring. |
+| Shared timeline engine | Timeline models, platform seams, transport contracts, sync reducers, stream/reconcile helpers, local-pending seams, and headless replay utilities live in `sharedLogic/commonMain`. Android still owns Room/DataStore persistence adapters, notification publication, and UI observers. |
+| Shared chat projection models | `ChatRenderModelBuilder`, `ChatRenderItem`, `ChatMessageListChange`, message grouping, and run/tool visual classifications live in `sharedLogic/commonMain` so Android and desktop renderers can consume the same ordered chat model. |
+| Shared A2UI contracts | A2UI protocol DTOs, action contracts, surface/data model contracts, and binding formatters live in `sharedLogic/commonMain`; platform modules still own concrete Compose renderers and platform actions. |
+| Shared design tokens | Spacing, sizing, motion, shape, elevation, chat dimensions, typography scalars, palette presets, and chat background tokens live in `sharedLogic/commonMain`; Android adapts them into Material/Compose values and desktop can do the same. |
 | In-memory shared implementations | `InMemoryRuntimeEventOutbox`, `InMemoryMemFsStore`, and `LocalLettaBackend` are portable and covered by common tests. |
 | Android persistence adapters | Android `:core` binds Room-backed `RuntimeEventOutbox` and `MemFsStore` implementations. |
 | Local backend selection | `LettaConfig.Mode.LOCAL` is selectable in Android settings, health checks skip HTTP probing for it, and `SessionGraphFactory` can create a `LocalLettaBackend` for local configs. |
 | Chat send boundary | Local-mode chat sends route through `LocalRuntimeChatSendCoordinator`, which projects `LocalLettaBackend` events into the existing timeline writer. |
+| Windows desktop shell | `:desktop` is a runnable Compose Desktop JVM app with Windows package tasks. It currently boots as a preview shell over shared contracts while repository/session and chat UI wiring are completed. |
 | Beads federation | `.beads/config.yaml` has `federation.remote` for the shared Dolt remote. |
 
 ## Deliberately Stubbed
@@ -46,7 +52,7 @@ Koog dependencies or Koog-specific concepts to UI, repositories, or settings.
 |---|---|
 | Koog | Do not implement now. `TurnEngine` remains the seam; Android currently provides a placeholder failed event so local mode fails visibly. |
 | Local runtime feature completion | Do not prioritize model execution, tools, approvals, or attachment handling until KMP extraction is further along. |
-| Shared UI | Do not create `sharedUI` yet. The current app is Android UI first; native future platforms can consume `sharedLogic` without Compose. |
+| Shared UI | Do not create `sharedUI` for the first Windows chat release. Windows should build a platform-specific Compose Desktop chat surface over `sharedLogic`; see [Windows Chat UI Decision](windows-chat-ui-decision.md). |
 
 ## Not Complete
 
@@ -54,10 +60,9 @@ Koog dependencies or Koog-specific concepts to UI, repositories, or settings.
 |---|---|
 | Official KMP project shape | The repo is not yet split into `shared` or `sharedLogic` plus one app module per platform. Android still owns most application code. |
 | Native targets | `:sharedLogic` now declares a host-native smoke target (`hostNative`) so common code can be compiled by Kotlin/Native on the developer/CI host. iOS framework targets are not declared yet. |
-| Letta DTO extraction | Remaining model files in Android `:core` are Android/UI/JVM helpers: Room converters, UI message models, and app-message timeline projection model. Transport lifecycle code still lives in Android `:core`. |
-| Timeline extraction | The timeline model and reducers still live in Android `:core`; moving them needs a common replacement for JVM-only time/UUID usage. |
-| Repository contracts | Repository contracts are partially extracted. Remaining Android-owned contracts depend on Paging, Ktor upload/channel types, or UI timeline models. |
-| App modules | No `iosApp`, `desktopApp`, or `webApp` module exists. This is expected until shared logic has enough value for another platform and iOS/framework CI strategy is agreed. |
+| Letta DTO extraction | Remaining model files in Android `:core` are Android/UI/JVM helpers such as Room converters and legacy UI message adapters. |
+| Repository implementations | Repository contracts are shared, but Android still owns the primary Ktor/Room/DataStore/Hilt implementations. Desktop needs JVM implementations or adapters before it can drive the real chat surface. |
+| App modules | `:desktop` exists as a Windows JVM Compose preview. No `iosApp` or `webApp` module exists yet; iOS/framework CI strategy is still undecided. |
 
 ## Android-Owned Boundary After First Pass
 
@@ -68,13 +73,12 @@ straight file move.
 | Area | Why it remains Android-owned |
 |---|---|
 | `DomainIdConverters.kt` | Room type converters for shared identity value classes. |
-| `UiMessage.kt` | Compose-stable UI projection model, not a wire/domain contract. |
-| `AppMessage.kt` and most `data/timeline/*` | Use JVM `Instant`/`UUID` and represent Android timeline projection semantics. Needs a common clock/ID/time model first. `TimelineExternalTransportWriter` is already shared as a narrow write contract. |
-| `IAllConversationsRepository` / `IMessageRepository` | Expose Android Paging and `AppMessage`; split common one-shot APIs only after timeline/common paging design is settled. |
+| `UiMessage.kt` | Legacy Android UI adapter model. Shared render models now live under `sharedLogic/data/chat/projection`, but Android-specific Compose stability adapters may stay platform-side. |
+| `IAllConversationsRepository` / `IMessageRepository` | Expose Android Paging and legacy Android UI message models; keep them platform-side until desktop needs a common paging/streaming list contract. |
 | `IFolderRepository` / `IGroupRepository` | Expose Ktor `ContentType` / `ByteReadChannel`; extract a common non-streaming/non-upload subset separately if another platform needs it. |
 | `SseParser.kt` / `Utf8LineReader.kt` | Ktor channel parser plus Android logging. `SseFrame` is shared; parser adapters should be platform-specific or rebuilt around a common byte/line abstraction. |
-| `ChannelTransport.kt`, `IChannelTransport`, `WsChatBridge.kt`, `DataStoreRunCursorStore` | Android socket lifecycle, Hilt/DataStore adapters, reconnect/cursor persistence, and logging. Shared frame/cursor contracts are already extracted. |
-| `A2uiDataModel.kt`, `A2uiSurfaceManager.kt`, `A2uiActions.kt` | Compose-backed data model observation and renderer action-context resolution. A2UI protocol/action DTOs are shared. |
+| `ChannelTransport.kt`, `WsChatBridge.kt`, `DataStoreRunCursorStore` | Android socket lifecycle, Hilt/DataStore adapters, reconnect/cursor persistence, and logging. Shared transport/frame/cursor contracts are extracted. |
+| Compose A2UI renderers | Android `designsystem` still owns concrete widget rendering, haptics, URL opening, and Android action handling. Shared A2UI protocol/action/data model contracts are extracted. |
 
 ## Extraction Pivot
 
@@ -84,9 +88,9 @@ features:
 | Order | Extraction | Rationale |
 |---|---|---|
 | 1 | Finish current pure-contract cleanup | Keep extracting small platform-neutral contracts only when they compile on JVM, Android, and host Native. Avoid touching local runtime execution. |
-| 2 | Timeline/common message projection design | Required before a non-Android UI can render the same conversations. Needs careful time/ID portability. |
-| 3 | Common non-upload repository subsets | Split folder/group/message APIs away from Paging and Ktor upload/channel types only where another platform can consume them. |
-| 4 | Shared reducers and projection fixtures | Lets Android and future platforms prove identical timeline/runtime behavior. |
+| 2 | Desktop repository/session implementations | Windows can boot now, but it needs JVM adapters for the shared repository/session contracts before it can drive real chat. |
+| 3 | Windows chat UI over shared projections | Build platform-specific desktop panes over `ChatRenderModelBuilder`, A2UI contracts, and shared design tokens. |
+| 4 | Shared projection fixtures | Lets Android and desktop prove identical timeline/runtime/render-model behavior without sharing the whole UI tree. |
 | 5 | iOS/native target declaration and validation | Add iOS framework targets once common APIs are clean enough and dependency strategy is agreed. |
 
 ## Guardrails
