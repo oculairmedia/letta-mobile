@@ -143,6 +143,12 @@ class WsActiveSubagentSource(
             SubagentStatus.RUNNING -> ActiveSubagent.Status.RUNNING
             SubagentStatus.COMPLETED -> ActiveSubagent.Status.COMPLETED
             SubagentStatus.FAILED -> ActiveSubagent.Status.FAILED
+            // letta-mobile-drv4a: `cancelled` (killed / evicted / orphaned /
+            // TaskStop'd / process gone) is a TERMINAL outcome — map it to
+            // FAILED so the chip renders a failed-styled outcome and lingers
+            // then dismisses (29h9u), instead of being treated as still-running
+            // by the forward-compat fallback below and getting stuck forever.
+            SubagentStatus.CANCELLED -> ActiveSubagent.Status.FAILED
             // Forward-compat: an unrecognized status keeps the chip visible
             // (treated as still-running) rather than being filtered out.
             else -> ActiveSubagent.Status.RUNNING
