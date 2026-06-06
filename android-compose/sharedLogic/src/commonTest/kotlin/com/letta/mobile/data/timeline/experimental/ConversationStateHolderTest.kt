@@ -8,15 +8,14 @@ import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineEvent
 import com.letta.mobile.data.timeline.TimelineReducerInput
 import com.letta.mobile.data.timeline.reduceStreamFrame
-import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
-import org.junit.jupiter.api.Tag
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 /**
  * letta-mobile-oc8j Phase 1 parity tests.
@@ -31,7 +30,6 @@ import org.junit.Test
  * penalty, `TimelineSyncLoop` will migrate to consume the holder.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-@Tag("integration")
 class ConversationStateHolderTest {
 
     private val conversationId = "conv-test"
@@ -200,4 +198,8 @@ class ConversationStateHolderTest {
         timeline = Timeline(conversationId = conversationId),
         pending = emptyMap(),
     )
+}
+
+private infix fun <T> T.shouldBe(expected: T) {
+    assertEquals(expected, this)
 }

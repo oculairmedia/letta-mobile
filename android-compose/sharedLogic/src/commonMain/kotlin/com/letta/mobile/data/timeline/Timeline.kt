@@ -2,12 +2,10 @@ package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.util.Telemetry
-import java.time.Instant
-import java.util.UUID
 
 fun String.stripEnvelopeReminders(): String {
-    return this.replace(Regex("<system-reminder>.*?</system-reminder>\\s*", RegexOption.DOT_MATCHES_ALL), "")
-               .replace(Regex("<skill-reminder>.*?</skill-reminder>\\s*", RegexOption.DOT_MATCHES_ALL), "")
+    return this.replace(Regex("<system-reminder>[\\s\\S]*?</system-reminder>\\s*"), "")
+               .replace(Regex("<skill-reminder>[\\s\\S]*?</skill-reminder>\\s*"), "")
                .trim()
 }
 
@@ -51,7 +49,7 @@ sealed class TimelineEvent {
         override val otid: String,
         override val content: String,
         val role: Role = Role.USER,
-        val sentAt: Instant,
+        val sentAt: TimelineInstant,
         val deliveryState: DeliveryState,
         override val attachments: List<MessageContentPart.Image> = emptyList(),
         override val source: MessageSource = MessageSource.LETTA_SERVER,
@@ -67,8 +65,8 @@ sealed class TimelineEvent {
         val toolReturnIsError: Boolean = false,
         val toolReturnContentByCallId: Map<String, String> = emptyMap(),
         val toolReturnIsErrorByCallId: Map<String, Boolean> = emptyMap(),
-        val toolStartedAtByCallId: Map<String, Instant> = emptyMap(),
-        val toolCompletedAtByCallId: Map<String, Instant> = emptyMap(),
+        val toolStartedAtByCallId: Map<String, TimelineInstant> = emptyMap(),
+        val toolCompletedAtByCallId: Map<String, TimelineInstant> = emptyMap(),
         val toolBatchIdByCallId: Map<String, String> = emptyMap(),
         val reasoningContent: String? = null,
     ) : TimelineEvent()
@@ -80,7 +78,7 @@ sealed class TimelineEvent {
         override val content: String,
         val serverId: String,
         val messageType: TimelineMessageType,
-        val date: Instant,
+        val date: TimelineInstant,
         val runId: String?,
         val stepId: String?,
         override val attachments: List<MessageContentPart.Image> = emptyList(),
@@ -392,7 +390,7 @@ private fun List<TimelineEvent>.stablePrefixFingerprint(): Long {
 }
 
 /** Generate a new client-side otid for outgoing messages. */
-fun newOtid(): String = "client-${UUID.randomUUID()}"
+fun newOtid(): String = "client-${newTimelineClientId()}"
 
 /** Current wall-clock instant — abstracted for test injection. */
-internal fun now(): Instant = Instant.now()
+internal fun now(): TimelineInstant = timelineNow()

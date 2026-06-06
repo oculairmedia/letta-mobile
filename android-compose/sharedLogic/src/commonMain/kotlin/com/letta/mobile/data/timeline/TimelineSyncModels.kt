@@ -15,7 +15,6 @@ import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.model.UnknownMessage
 import com.letta.mobile.data.model.UsageStatistics
 import com.letta.mobile.data.model.UserMessage
-import java.time.Instant
 
 /** Observable events emitted by the sync loop for UI/log subscribers. */
 sealed class TimelineSyncEvent {
@@ -66,7 +65,7 @@ fun LettaMessage.toTimelineEvent(position: Double): TimelineEvent.Confirmed? {
         is com.letta.mobile.data.model.ErrorMessage -> emptyList()
     }
     val effectiveOtid = otid ?: "server-$id-${type.name.lowercase()}"
-    val date = runCatching { date?.let(Instant::parse) ?: Instant.now() }.getOrElse { Instant.now() }
+    val date = date?.let(::parseTimelineInstantOrNull) ?: timelineNow()
     val toolCallsList = when (this) {
         is ToolCallMessage -> effectiveToolCalls
         is ApprovalRequestMessage -> effectiveToolCalls
@@ -119,10 +118,10 @@ fun normalizeHydratedMessageOrder(messages: List<LettaMessage>): List<LettaMessa
         val seqCompare = compareNullableInts(l.seqId, r.seqId)
         if (seqCompare != 0) return@sortedWith seqCompare
 
-        val leftDate = l.date?.let { runCatching { Instant.parse(it) }.getOrNull() }
-        val rightDate = r.date?.let { runCatching { Instant.parse(it) }.getOrNull() }
+        val leftDate = l.date?.let(::parseTimelineInstantOrNull)
+        val rightDate = r.date?.let(::parseTimelineInstantOrNull)
         if (leftDate != null && rightDate != null) {
-            val dateCompare = leftDate.compareTo(rightDate)
+            val dateCompare = compareTimelineInstants(leftDate, rightDate)
             if (dateCompare != 0) return@sortedWith dateCompare
         }
 

@@ -1,7 +1,6 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.model.MessageContentPart
-import java.time.Instant
 
 /**
  * Disk-backed store of optimistic user messages that the server may never
@@ -29,7 +28,7 @@ data class PendingLocalRecord(
     val conversationId: String,
     val content: String,
     val attachments: List<MessageContentPart.Image>,
-    val sentAt: Instant,
+    val sentAt: TimelineInstant,
 )
 
 /** No-op store used in tests / situations where persistence is undesired. */
