@@ -74,7 +74,6 @@ private fun resolveContextValue(
     }
     is JsonArray -> JsonArray(value.map { resolveContextValue(it, surface) })
     is JsonPrimitive -> resolveComponentValueReference(value, surface) ?: value
-    else -> value
 }
 
 // letta-mobile-lwmo: the shim's A2UI agent prompt emits Button.action.context
