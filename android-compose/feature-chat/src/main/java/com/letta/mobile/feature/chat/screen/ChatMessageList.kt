@@ -48,7 +48,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontFamily
 import com.letta.mobile.data.model.UiImageAttachment
-import kotlinx.collections.immutable.toImmutableList
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.DateSeparator
@@ -302,6 +301,7 @@ internal fun ChatMessageList(
     onSubmitApproval: (String, List<String>, Boolean, String?) -> Unit,
     onToggleRunCollapsed: (String) -> Unit,
     onToggleReasoningExpanded: (String) -> Unit,
+    onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
     modifier: Modifier = Modifier,
     chatBackground: ChatBackground = ChatBackground.Default,
 ) {
@@ -323,14 +323,6 @@ internal fun ChatMessageList(
     var highlightedMessageId by remember { mutableStateOf<String?>(null) }
     var hasScrolledToTarget by remember { mutableStateOf(false) }
     var showFontIndicator by remember { mutableStateOf(false) }
-    // letta-mobile-1k3ge restore: fullscreen image viewer state. Hoisted here
-    // so any message's tapped attachment opens the viewer overlay below.
-    var imageViewerState by remember {
-        mutableStateOf<Pair<kotlinx.collections.immutable.ImmutableList<UiImageAttachment>, Int>?>(null)
-    }
-    val onAttachmentImageTap: (List<UiImageAttachment>, Int) -> Unit = { attachments, index ->
-        imageViewerState = attachments.toImmutableList() to index
-    }
     var pinchTick by remember { mutableStateOf(0L) }
     var pinchAnimationSuppressionTick by remember { mutableStateOf(0L) }
     var suppressPinchLayoutAnimations by remember { mutableStateOf(false) }
@@ -960,17 +952,6 @@ internal fun ChatMessageList(
                 .align(Alignment.BottomEnd)
                 .padding(LettaSpacing.innerPadding),
         )
-
-        // letta-mobile-1k3ge restore: fullscreen image viewer overlay. Opens
-        // when an attachment is tapped (state set via onAttachmentImageTap),
-        // supports pinch-zoom / swipe-to-dismiss; dismiss clears the state.
-        imageViewerState?.let { (viewerAttachments, initialIndex) ->
-            ChatImageViewer(
-                attachments = viewerAttachments,
-                initialPage = initialIndex,
-                onDismiss = { imageViewerState = null },
-            )
-        }
 
         if (showFontIndicator) {
             // letta-mobile-6261e: indicator now tracks the live effective
