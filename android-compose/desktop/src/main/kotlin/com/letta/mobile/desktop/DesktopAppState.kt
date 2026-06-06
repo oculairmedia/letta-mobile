@@ -1,0 +1,73 @@
+package com.letta.mobile.desktop
+
+import com.letta.mobile.data.model.LettaConfig
+
+data class DesktopBootstrapState(
+    val config: LettaConfig,
+    val featureReadiness: List<DesktopFeatureReadiness>,
+)
+
+data class DesktopFeatureReadiness(
+    val title: String,
+    val description: String,
+    val state: DesktopFeatureState,
+)
+
+enum class DesktopFeatureState {
+    Ready,
+    InProgress,
+    AndroidOnly,
+}
+
+enum class DesktopDestination(
+    val label: String,
+    val summary: String,
+) {
+    Overview(
+        label = "Overview",
+        summary = "Windows desktop launch status and backend configuration.",
+    ),
+    Agents(
+        label = "Agents",
+        summary = "Shared agent models are available; repository and persistence wiring still need desktop implementations.",
+    ),
+    Conversations(
+        label = "Conversations",
+        summary = "Conversation UI will move here after Android-only navigation and Hilt dependencies are separated.",
+    ),
+    Settings(
+        label = "Settings",
+        summary = "Desktop settings will use JVM storage instead of Android DataStore and encrypted preferences.",
+    ),
+}
+
+fun defaultDesktopBootstrapState() = DesktopBootstrapState(
+    config = LettaConfig(
+        id = "desktop-local",
+        mode = LettaConfig.Mode.SELF_HOSTED,
+        serverUrl = "http://localhost:8283",
+        accessToken = null,
+    ),
+    featureReadiness = listOf(
+        DesktopFeatureReadiness(
+            title = "Windows desktop runtime",
+            description = "Compose Desktop boots from Gradle with EXE and MSI package tasks configured.",
+            state = DesktopFeatureState.Ready,
+        ),
+        DesktopFeatureReadiness(
+            title = "Shared Letta models",
+            description = "The app consumes :sharedLogic so data contracts match Android.",
+            state = DesktopFeatureState.Ready,
+        ),
+        DesktopFeatureReadiness(
+            title = "Desktop repository layer",
+            description = "JVM storage, credentials, and HTTP client bindings are the next portability step.",
+            state = DesktopFeatureState.InProgress,
+        ),
+        DesktopFeatureReadiness(
+            title = "Android app shell",
+            description = "Current navigation, Hilt wiring, notifications, and DataStore remain Android-only.",
+            state = DesktopFeatureState.AndroidOnly,
+        ),
+    ),
+)
