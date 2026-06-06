@@ -52,6 +52,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.data.model.ToolReturnStatus
 import com.letta.mobile.data.model.UiApprovalRequest
@@ -99,6 +100,7 @@ internal fun MessageToolCalls(
     messageId: String? = null,
     animateEntrance: Boolean = false,
     approvalRequest: UiApprovalRequest? = null,
+    onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
 ) {
     val pendingApprovalToolCallIds = remember(approvalRequest) {
         approvalRequest?.toolCalls
@@ -151,6 +153,7 @@ internal fun MessageToolCalls(
                     modifier = Modifier,
                     animateRows = animateEntrance,
                     rowAnimationKeyPrefix = "message|${messageId.orEmpty()}",
+                    onAttachmentImageTap = onAttachmentImageTap,
                 )
             }
         } else {
@@ -171,6 +174,7 @@ internal fun MessageToolCalls(
                             ToolCallCard(
                                 toolCall = toolCall,
                                 approvalStateOverride = approvalState,
+                                onAttachmentImageTap = onAttachmentImageTap,
                             )
                         }
                     }
@@ -481,9 +485,13 @@ internal fun ToolCallCard(
     toolCall: UiToolCall,
     approvalStateOverride: ToolApprovalState? = null,
     keepExpanded: Boolean = false,
+    onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
 ) {
     if (toolCall.name == "generate_image") {
-        GeneratedImageToolCard(toolCall = toolCall)
+        GeneratedImageToolCard(
+            toolCall = toolCall,
+            onAttachmentImageTap = onAttachmentImageTap,
+        )
         return
     }
     val subagentDispatch = toolCall.subagentDispatch
@@ -725,6 +733,7 @@ internal fun ToolCallCard(
 private fun GeneratedImageToolCard(
     toolCall: UiToolCall,
     modifier: Modifier = Modifier,
+    onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
 ) {
     val reducedMotion = rememberReducedMotionEnabled()
     val hasImage = toolCall.generatedImageAttachments.isNotEmpty()
@@ -804,9 +813,15 @@ private fun GeneratedImageToolCard(
                 label = "GeneratedImageToolStage",
             ) { ready ->
                 if (ready) {
+                    val generatedAttachments = remember(toolCall.generatedImageAttachments) {
+                        toolCall.generatedImageAttachments.toImmutableList()
+                    }
                     MessageAttachmentsGrid(
-                        attachments = toolCall.generatedImageAttachments.toImmutableList(),
+                        attachments = generatedAttachments,
                         modifier = Modifier.fillMaxWidth(),
+                        onImageClick = onAttachmentImageTap?.let { cb ->
+                            { index -> cb(generatedAttachments, index) }
+                        },
                     )
                 } else {
                     GeneratedImageShimmer(modifier = Modifier.fillMaxWidth())
@@ -1183,6 +1198,7 @@ internal fun CompactToolCallGroupCard(
     onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)? = null,
     animateRows: Boolean = false,
     rowAnimationKeyPrefix: String = "",
+    onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
 ) {
     val reducedMotion = rememberReducedMotionEnabled()
     Card(
@@ -1227,6 +1243,7 @@ internal fun CompactToolCallGroupCard(
                         CompactToolCallRow(
                             toolCall = toolCall,
                             approvalState = toolCall.approvalState(pendingApprovalToolCallIds),
+                            onAttachmentImageTap = onAttachmentImageTap,
                         )
                     }
                 }
@@ -1246,6 +1263,7 @@ internal fun CompactToolCallGroupCard(
 internal fun CompactToolCallRow(
     toolCall: UiToolCall,
     approvalState: ToolApprovalState?,
+    onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
 ) {
     val fontScale = LocalChatFontScale.current
     val haptic = LocalHapticFeedback.current
@@ -1412,21 +1430,28 @@ internal fun CompactToolCallRow(
                         .fillMaxWidth()
                         .padding(top = 2.dp, bottom = 4.dp),
                 ) {
-                    ToolCallExpandedSummary(
-                        toolCall = toolCall,
-                        argumentSummary = argumentSummary,
-                        resultPreview = resultPreview,
-                        isError = isError,
-                        fontScale = fontScale,
-                    )
-                    ToolCallExpandedBody(
-                        toolCall = toolCall,
-                        display = display,
-                        executionTimeText = executionTimeText,
-                        displayResult = displayResult,
-                        isError = isError,
-                        fontScale = fontScale,
-                    )
+                    if (toolCall.name == "generate_image") {
+                        GeneratedImageToolCard(
+                            toolCall = toolCall,
+                            onAttachmentImageTap = onAttachmentImageTap,
+                        )
+                    } else {
+                        ToolCallExpandedSummary(
+                            toolCall = toolCall,
+                            argumentSummary = argumentSummary,
+                            resultPreview = resultPreview,
+                            isError = isError,
+                            fontScale = fontScale,
+                        )
+                        ToolCallExpandedBody(
+                            toolCall = toolCall,
+                            display = display,
+                            executionTimeText = executionTimeText,
+                            displayResult = displayResult,
+                            isError = isError,
+                            fontScale = fontScale,
+                        )
+                    }
                 }
             }
         }

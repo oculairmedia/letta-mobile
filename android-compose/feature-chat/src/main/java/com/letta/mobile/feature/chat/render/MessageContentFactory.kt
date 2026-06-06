@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.components.MarkdownText
 import com.letta.mobile.ui.components.StreamingMarkdownText
@@ -36,6 +37,7 @@ internal interface MessageContentRenderer {
         textColor: Color,
         modifier: Modifier,
         onGeneratedUiMessage: ((String) -> Unit)? = null,
+        onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
         isStreaming: Boolean = false,
     )
 }
@@ -608,6 +610,7 @@ internal object TextMessageRenderer : MessageContentRenderer {
         textColor: Color,
         modifier: Modifier,
         onGeneratedUiMessage: ((String) -> Unit)?,
+        onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
         isStreaming: Boolean,
     ) {
         if (message.role == "user") {
@@ -639,6 +642,7 @@ internal object SubagentNotificationRenderer : MessageContentRenderer {
         textColor: Color,
         modifier: Modifier,
         onGeneratedUiMessage: ((String) -> Unit)?,
+        onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
         isStreaming: Boolean,
     ) {
         SubagentNotificationCard(
@@ -658,6 +662,7 @@ internal object ToolCallRenderer : MessageContentRenderer {
         textColor: Color,
         modifier: Modifier,
         onGeneratedUiMessage: ((String) -> Unit)?,
+        onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
         isStreaming: Boolean,
     ) {
         Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -685,6 +690,7 @@ internal object ToolCallRenderer : MessageContentRenderer {
                     messageId = message.id,
                     animateEntrance = shouldAnimateToolCallEntrance(isStreaming),
                     approvalRequest = message.approvalRequest,
+                    onAttachmentImageTap = onAttachmentImageTap,
                 )
             }
         }

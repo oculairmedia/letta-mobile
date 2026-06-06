@@ -1,8 +1,15 @@
 package com.letta.mobile.feature.chat.screen
 
+import android.content.ContentValues
+import android.content.Context
+import android.content.Intent
 import android.graphics.BitmapFactory
+import android.net.Uri
+import android.provider.MediaStore
 import android.util.Base64
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.core.content.FileProvider
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -38,11 +45,13 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.ui.icons.LettaIcons
+import java.io.File
 import kotlinx.collections.immutable.ImmutableList
 import kotlin.math.abs
 
@@ -66,6 +75,7 @@ internal fun ChatImageViewer(
         initialPage = initialPage.coerceIn(0, attachments.lastIndex),
         pageCount = { attachments.size },
     )
+    val context = LocalContext.current
     var verticalDragDistance by remember { mutableFloatStateOf(0f) }
 
     Surface(
@@ -115,21 +125,46 @@ internal fun ChatImageViewer(
                         .background(Color.Black.copy(alpha = 0.45f), MaterialTheme.shapes.small)
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                 )
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(Color.Black.copy(alpha = 0.45f), MaterialTheme.shapes.small)
-                        .semantics { contentDescription = "Close image viewer" },
-                ) {
-                    Icon(
-                        imageVector = LettaIcons.Close,
-                        contentDescription = null,
-                        tint = Color.White,
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ViewerActionButton(
+                        icon = LettaIcons.Share,
+                        contentDescription = "Share image",
+                        onClick = { shareAttachment(context, attachments[pagerState.currentPage]) },
+                    )
+                    ViewerActionButton(
+                        icon = LettaIcons.Save,
+                        contentDescription = "Save image",
+                        onClick = { saveAttachment(context, attachments[pagerState.currentPage]) },
+                    )
+                    ViewerActionButton(
+                        icon = LettaIcons.Close,
+                        contentDescription = "Close image viewer",
+                        onClick = onDismiss,
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ViewerActionButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .size(48.dp)
+            .background(Color.Black.copy(alpha = 0.45f), MaterialTheme.shapes.small)
+            .semantics { this.contentDescription = contentDescription },
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = Color.White,
+        )
     }
 }
 
@@ -212,4 +247,77 @@ private fun ZoomableAttachmentImage(
             }
         }
     }
+}
+
+private fun saveAttachment(context: Context, attachment: UiImageAttachment) {
+    val bytes = attachment.decodeBytesOrNull() ?: run {
+        context.toast("Image unavailable")
+        return
+    }
+    val filename = attachment.imageFilename()
+    val values = ContentValues().apply {
+        put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+        put(MediaStore.Images.Media.MIME_TYPE, attachment.mediaType)
+        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Letta")
+        put(MediaStore.Images.Media.IS_PENDING, 1)
+    }
+    val resolver = context.contentResolver
+    val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: run {
+        context.toast("Couldn't save image")
+        return
+    }
+    runCatching {
+        resolver.openOutputStream(uri)?.use { output -> output.write(bytes) }
+            ?: error("Could not open image output stream")
+        ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }.also { completeValues ->
+            resolver.update(uri, completeValues, null, null)
+        }
+    }.onSuccess {
+        context.toast("Image saved")
+    }.onFailure {
+        resolver.delete(uri, null, null)
+        context.toast("Couldn't save image")
+    }
+}
+
+private fun shareAttachment(context: Context, attachment: UiImageAttachment) {
+    val bytes = attachment.decodeBytesOrNull() ?: run {
+        context.toast("Image unavailable")
+        return
+    }
+    val imageDir = File(context.cacheDir, "shared-chat-images").apply { mkdirs() }
+    val imageFile = File(imageDir, attachment.imageFilename())
+    runCatching {
+        imageFile.writeBytes(bytes)
+        FileProvider.getUriForFile(context, "${context.packageName}.chat-image-share", imageFile)
+    }.onSuccess { uri ->
+        context.startActivity(Intent.createChooser(attachment.shareIntent(uri), "Share image"))
+    }.onFailure {
+        context.toast("Couldn't share image")
+    }
+}
+
+private fun UiImageAttachment.shareIntent(uri: Uri): Intent = Intent(Intent.ACTION_SEND).apply {
+    type = mediaType
+    putExtra(Intent.EXTRA_STREAM, uri)
+    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+}
+
+private fun UiImageAttachment.decodeBytesOrNull(): ByteArray? = runCatching {
+    Base64.decode(base64, Base64.DEFAULT)
+}.getOrNull()
+
+private fun UiImageAttachment.imageFilename(): String =
+    "letta-image-${System.currentTimeMillis()}.${mediaType.fileExtension()}"
+
+private fun String.fileExtension(): String = when (substringAfter('/').substringBefore(';').lowercase()) {
+    "jpeg" -> "jpg"
+    "png" -> "png"
+    "webp" -> "webp"
+    "gif" -> "gif"
+    else -> "png"
+}
+
+private fun Context.toast(message: String) {
+    Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
 }

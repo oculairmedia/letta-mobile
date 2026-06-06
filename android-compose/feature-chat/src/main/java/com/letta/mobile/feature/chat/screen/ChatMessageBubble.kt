@@ -276,6 +276,7 @@ internal fun MessageBubbleSurface(
                     textColor = textColor,
                     modifier = Modifier,
                     onGeneratedUiMessage = onGeneratedUiMessage,
+                    onAttachmentImageTap = onAttachmentImageTap,
                     isStreaming = isLastAssistant,
                 )
             }

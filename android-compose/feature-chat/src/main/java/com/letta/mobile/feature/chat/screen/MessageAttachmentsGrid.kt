@@ -16,6 +16,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiImageAttachment
 
@@ -113,8 +115,15 @@ private fun AttachmentImage(
         }.getOrNull()
     }
 
+    val interactiveModifier = if (onClick != null) {
+        modifier
+            .semantics { contentDescription = "Open image" }
+            .clickable(onClick = onClick)
+    } else {
+        modifier
+    }
     Surface(
-        modifier = if (onClick != null) modifier.clickable(onClick = onClick) else modifier,
+        modifier = interactiveModifier,
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(8.dp),
     ) {
