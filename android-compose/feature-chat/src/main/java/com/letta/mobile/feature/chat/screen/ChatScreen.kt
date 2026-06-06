@@ -751,7 +751,11 @@ private fun A2uiSurfaceStack(
     modifier: Modifier = Modifier,
 ) {
     if (surfaces.isEmpty()) return
-    val orderedSurfaces = surfaces.values.sortedBy(A2uiSurfaceState::surfaceId)
+    // perf/frame-budget-audit: key the sort on the (immutable) surfaces map so
+    // it doesn't re-sort on every recompose of the stack.
+    val orderedSurfaces = remember(surfaces) {
+        surfaces.values.sortedBy(A2uiSurfaceState::surfaceId)
+    }
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(LettaSpacing.sm),

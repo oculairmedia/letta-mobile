@@ -255,8 +255,16 @@ private fun clampToWordBoundary(raw: String): String {
     return raw.substring(0, boundary + 1)
 }
 
+// perf/frame-budget-audit: hoist the boundary set to a module-level constant.
+// isStreamingBoundary() is called per-character of the streaming tail (via
+// indexOfLast in clampToWordBoundary) on every streamingDisplayText pass, so a
+// `setOf(...)` literal inside the function allocated a fresh Set per char —
+// pure GC churn on the streaming hot path.
+private val STREAMING_BOUNDARY_CHARS =
+    setOf('.', ',', ';', ':', '!', '?', ')', ']', '}', '—', '-', '/', '\\')
+
 private fun Char.isStreamingBoundary(): Boolean =
-    isWhitespace() || this in setOf('.', ',', ';', ':', '!', '?', ')', ']', '}', '—', '-', '/', '\\')
+    isWhitespace() || this in STREAMING_BOUNDARY_CHARS
 
 /**
  * Whether a streaming cursor glyph is appropriate for the supplied raw
