@@ -40,7 +40,12 @@ interface SelfTodoSource {
  * The description is a compact progress label ("N/M done") so the chip reads
  * as the agent's own running plan at a glance.
  */
-internal fun List<SubagentTodo>.toSelfEntry(): ActiveSubagent? {
+internal fun List<SubagentTodo>.toSelfEntry(
+    // letta-mobile-dvobc: injected so the self chip's stuck heuristic is
+    // testable. Wall-clock epoch-ms stamped as the last-update time whenever
+    // the plan changes (each new snapshot is a fresh observation).
+    now: Long = System.currentTimeMillis(),
+): ActiveSubagent? {
     if (isEmpty()) return null
     val completed = count { it.status.trim().lowercase() == "completed" }
     val total = size
@@ -51,6 +56,9 @@ internal fun List<SubagentTodo>.toSelfEntry(): ActiveSubagent? {
         subagentType = "self",
         status = ActiveSubagent.Status.RUNNING,
         isSelf = true,
+        // letta-mobile-dvobc: real determinate ring fill from the plan.
+        progress = SubagentTodoProgress(completed = completed, total = total),
+        lastUpdateAt = now,
     )
 }
 
