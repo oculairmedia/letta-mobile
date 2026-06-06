@@ -15,14 +15,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.put
-import java.text.NumberFormat
-import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
-import java.util.Currency
-import java.util.Locale
 
 @Stable
 data class A2uiSurfaceState(
@@ -237,29 +229,29 @@ private object A2uiFunctionEvaluator {
 
     private fun formatNumber(args: JsonObject, dataModel: JsonElement): String {
         val value = argumentNumber(args, "value", dataModel) ?: return ""
-        val formatter = NumberFormat.getNumberInstance(Locale.US)
-        argumentNumber(args, "minimumFractionDigits", dataModel)?.toInt()?.let {
-            formatter.minimumFractionDigits = it
-        }
-        argumentNumber(args, "maximumFractionDigits", dataModel)?.toInt()?.let {
-            formatter.maximumFractionDigits = it
-        }
-        argumentNumber(args, "fractionDigits", dataModel)?.toInt()?.let {
-            formatter.minimumFractionDigits = it
-            formatter.maximumFractionDigits = it
-        }
-        return formatter.format(value)
+        val fractionDigits = argumentNumber(args, "fractionDigits", dataModel)?.toInt()
+        val minimumFractionDigits = fractionDigits
+            ?: argumentNumber(args, "minimumFractionDigits", dataModel)?.toInt()
+            ?: 0
+        val maximumFractionDigits = fractionDigits
+            ?: argumentNumber(args, "maximumFractionDigits", dataModel)?.toInt()
+            ?: 3
+        return A2uiBindingFormatters.formatNumber(
+            value = value,
+            minimumFractionDigits = minimumFractionDigits,
+            maximumFractionDigits = maximumFractionDigits,
+        )
     }
 
     private fun formatCurrency(args: JsonObject, dataModel: JsonElement): String {
         val value = argumentNumber(args, "value", dataModel) ?: return ""
-        val formatter = NumberFormat.getCurrencyInstance(Locale.US)
         val currencyCode = argumentText(args, "currency", dataModel)
             ?: argumentText(args, "currencyCode", dataModel)
-        currencyCode?.let { code ->
-            runCatching { Currency.getInstance(code) }.getOrNull()?.let { formatter.currency = it }
-        }
-        return formatter.format(value)
+            ?: "USD"
+        return A2uiBindingFormatters.formatCurrency(
+            value = value,
+            currencyCode = currencyCode,
+        )
     }
 
     private fun formatDate(args: JsonObject, dataModel: JsonElement): String {
@@ -267,9 +259,7 @@ private object A2uiFunctionEvaluator {
         val pattern = argumentText(args, "pattern", dataModel)
             ?: argumentText(args, "format", dataModel)
             ?: "yyyy-MM-dd"
-        val formatter = runCatching { DateTimeFormatter.ofPattern(pattern) }.getOrElse { DateTimeFormatter.ISO_LOCAL_DATE }
-        val temporal = parseDateTime(value) ?: return value
-        return formatter.format(temporal)
+        return A2uiBindingFormatters.formatDate(value = value, pattern = pattern)
     }
 
     private fun pluralize(args: JsonObject, dataModel: JsonElement): String {
@@ -330,11 +320,6 @@ private object A2uiFunctionEvaluator {
 
     private fun String.matchesRegex(pattern: String): Boolean =
         runCatching { Regex(pattern).matches(this) }.getOrDefault(false)
-
-    private fun parseDateTime(value: String): java.time.temporal.TemporalAccessor? =
-        runCatching { Instant.parse(value).atZone(ZoneOffset.UTC) }.getOrNull()
-            ?: runCatching { LocalDateTime.parse(value, DateTimeFormatter.ISO_DATE_TIME) }.getOrNull()
-            ?: runCatching { LocalDate.parse(value, DateTimeFormatter.ISO_LOCAL_DATE) }.getOrNull()
 
     private fun parseExpressionArgs(raw: String): JsonObject = buildJsonObject {
         raw.split(',')

@@ -23,10 +23,8 @@ class A2uiDataModel(
 
     fun observe(path: String): State<JsonElement?> {
         val normalizedPath = A2uiJsonPointer.normalize(path)
-        return synchronized(observedPaths) {
-            observedPaths.getOrPut(normalizedPath) {
-                mutableStateOf(A2uiJsonPointer.resolve(root, normalizedPath))
-            }
+        return observedPaths.getOrPut(normalizedPath) {
+            mutableStateOf(A2uiJsonPointer.resolve(root, normalizedPath))
         }
     }
 
@@ -42,12 +40,10 @@ class A2uiDataModel(
     }
 
     private fun refreshObservedPaths() {
-        synchronized(observedPaths) {
-            observedPaths.forEach { (path, state) ->
-                val nextValue = A2uiJsonPointer.resolve(root, path)
-                if (state.value != nextValue) {
-                    state.value = nextValue
-                }
+        observedPaths.forEach { (path, state) ->
+            val nextValue = A2uiJsonPointer.resolve(root, path)
+            if (state.value != nextValue) {
+                state.value = nextValue
             }
         }
     }
