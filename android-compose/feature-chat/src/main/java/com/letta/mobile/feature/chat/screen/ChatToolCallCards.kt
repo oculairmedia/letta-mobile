@@ -485,7 +485,14 @@ internal fun ToolCallCard(
         )
         return
     }
-    val subagentNotification = toolCall.result?.let(::parseTaskNotificationForToolCard)
+    // perf/frame-budget-audit: parseTaskNotificationForToolCard runs a chain of
+    // regex extractions over the raw tool result. It was previously invoked on
+    // every recompose of ToolCallCard (which recomposes per streamed token while
+    // a tool card is the live message). Key it on the result so the parse only
+    // runs when the result text actually changes.
+    val subagentNotification = remember(toolCall.result) {
+        toolCall.result?.let(::parseTaskNotificationForToolCard)
+    }
     if (subagentNotification != null) {
         SubagentNotificationCard(
             notification = subagentNotification,
@@ -620,15 +627,25 @@ internal fun ToolCallCard(
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 } else {
-                    val infiniteTransition = rememberInfiniteTransition(label = "toolSpin")
-                    val angle by infiniteTransition.animateFloat(
-                        initialValue = 0f,
-                        targetValue = 360f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(1200, easing = LinearEasing),
-                        ),
-                        label = "toolSpinAngle",
-                    )
+                    // perf/frame-budget-audit + reduced-motion contract: only
+                    // run the infinite spin animation when reduced-motion is
+                    // OFF. Under reduced motion show a static icon (no
+                    // per-frame compositor invalidation), matching the
+                    // disclosure/entrance animations which already honour it.
+                    val angle = if (reducedMotion) {
+                        0f
+                    } else {
+                        val infiniteTransition = rememberInfiniteTransition(label = "toolSpin")
+                        val animated by infiniteTransition.animateFloat(
+                            initialValue = 0f,
+                            targetValue = 360f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(1200, easing = LinearEasing),
+                            ),
+                            label = "toolSpinAngle",
+                        )
+                        animated
+                    }
                     Icon(
                         imageVector = LettaIcons.Refresh,
                         contentDescription = "Running",
@@ -1159,15 +1176,23 @@ internal fun CompactToolCallRow(
                     tint = MaterialTheme.colorScheme.primary,
                 )
                 else -> {
-                    val t = rememberInfiniteTransition(label = "compactSpin")
-                    val a by t.animateFloat(
-                        initialValue = 0f,
-                        targetValue = 360f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(1200, easing = LinearEasing),
-                        ),
-                        label = "compactSpinAngle",
-                    )
+                    // perf/frame-budget-audit + reduced-motion contract: skip
+                    // the infinite spin under reduced motion (static icon, no
+                    // per-frame compositor work).
+                    val a = if (reducedMotion) {
+                        0f
+                    } else {
+                        val t = rememberInfiniteTransition(label = "compactSpin")
+                        val animated by t.animateFloat(
+                            initialValue = 0f,
+                            targetValue = 360f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(1200, easing = LinearEasing),
+                            ),
+                            label = "compactSpinAngle",
+                        )
+                        animated
+                    }
                     Icon(
                         imageVector = LettaIcons.Refresh,
                         contentDescription = "Running",

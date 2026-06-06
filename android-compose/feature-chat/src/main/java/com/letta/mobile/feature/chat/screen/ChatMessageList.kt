@@ -311,7 +311,14 @@ internal fun ChatMessageList(
     val chatShapes = MaterialTheme.chatShapes
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
-    val renderItemsByKey = remember(renderItems) { renderItems.associateBy { it.key } }
+    // perf/frame-budget-audit: `renderItems` gets a fresh identity on every
+    // streamed token, so a `remember(renderItems) { associateBy { it.key } }`
+    // here rebuilt an O(conversation) map PER TOKEN purely to serve the
+    // pinch-begin handler below (its only consumer) — the same rmzmo/gsvgt
+    // O(history)-per-token smell. Keep the latest renderItems available via
+    // rememberUpdatedState and build the lookup lazily, once, when a pinch
+    // actually begins (a rare gesture).
+    val currentRenderItems by rememberUpdatedState(renderItems)
     val itemGeometryState = remember { ChatMessageGeometryState() }
     var highlightedMessageId by remember { mutableStateOf<String?>(null) }
     var hasScrolledToTarget by remember { mutableStateOf(false) }
@@ -573,6 +580,13 @@ internal fun ChatMessageList(
                                 suppressPinchLayoutAnimations = true
                                 pinchAnimationSuppressionTick = 0L
                                 pinchFontScaleController.begin(activeFontScale)
+                                // perf/frame-budget-audit: build the key->item
+                                // lookup lazily here (pinch-begin only) over the
+                                // current render items, instead of eagerly per
+                                // token in composition. Only the visible item
+                                // keys are looked up, so a single associateBy at
+                                // gesture start is cheap and history-bounded.
+                                val renderItemsByKey = currentRenderItems.associateBy { it.key }
                                 val visibleRenderItems = listState.layoutInfo.visibleItemsInfo.mapNotNull { itemInfo ->
                                     renderItemsByKey[itemInfo.key]
                                 }
