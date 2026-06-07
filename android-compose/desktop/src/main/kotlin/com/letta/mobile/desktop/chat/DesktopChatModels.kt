@@ -22,6 +22,19 @@ data class DesktopConversationSummary(
 )
 
 @Immutable
+enum class DesktopChatConnectionState {
+    Demo,
+    Loading,
+    ConfigNeeded,
+    Offline,
+    NoConversations,
+    Live,
+    Sending,
+    StreamDisconnected,
+    SendFailed,
+}
+
+@Immutable
 data class DesktopChatSurfaceState(
     val conversations: List<DesktopConversationSummary>,
     val selectedConversationId: String?,
@@ -30,6 +43,7 @@ data class DesktopChatSurfaceState(
     val isSending: Boolean,
     val isLoading: Boolean = false,
     val isRemoteBacked: Boolean = false,
+    val connectionState: DesktopChatConnectionState = DesktopChatConnectionState.Demo,
     val statusMessage: String? = null,
     val errorMessage: String? = null,
     val backendLabel: String,
@@ -43,6 +57,27 @@ data class DesktopChatSurfaceState(
 
     val renderItems: List<ChatRenderItem>
         get() = buildDesktopChatRenderItems(selectedMessages)
+
+    val canSend: Boolean
+        get() = selectedConversationId != null &&
+            isRemoteBacked &&
+            !isSending &&
+            !isLoading &&
+            connectionState in setOf(
+                DesktopChatConnectionState.Live,
+                DesktopChatConnectionState.SendFailed,
+                DesktopChatConnectionState.StreamDisconnected,
+            )
+
+    val shouldShowStatePanel: Boolean
+        get() = selectedConversationId == null ||
+            (connectionState == DesktopChatConnectionState.StreamDisconnected && selectedMessages.isEmpty()) ||
+            connectionState in setOf(
+                DesktopChatConnectionState.Loading,
+                DesktopChatConnectionState.ConfigNeeded,
+                DesktopChatConnectionState.Offline,
+                DesktopChatConnectionState.NoConversations,
+            )
 }
 
 fun defaultDesktopChatSurfaceState(
@@ -81,12 +116,31 @@ fun defaultDesktopChatSurfaceState(
         isSending = false,
         isLoading = false,
         isRemoteBacked = false,
-        statusMessage = "Local preview",
+        connectionState = DesktopChatConnectionState.Demo,
+        statusMessage = "Demo preview",
         errorMessage = null,
         backendLabel = "${bootstrapState.config.serverUrl} - graph ${bootstrapState.sessionGraphId}",
         sessionGraphId = bootstrapState.sessionGraphId,
     )
 }
+
+fun initialLiveDesktopChatSurfaceState(
+    bootstrapState: DesktopBootstrapState,
+): DesktopChatSurfaceState =
+    DesktopChatSurfaceState(
+        conversations = emptyList(),
+        selectedConversationId = null,
+        messagesByConversationId = emptyMap(),
+        composerText = "",
+        isSending = false,
+        isLoading = true,
+        isRemoteBacked = true,
+        connectionState = DesktopChatConnectionState.Loading,
+        statusMessage = "Connecting to ${bootstrapState.config.serverUrl}",
+        errorMessage = null,
+        backendLabel = "${bootstrapState.config.serverUrl} - graph ${bootstrapState.sessionGraphId}",
+        sessionGraphId = bootstrapState.sessionGraphId,
+    )
 
 fun DesktopChatSurfaceState.selectConversation(
     conversationId: String,

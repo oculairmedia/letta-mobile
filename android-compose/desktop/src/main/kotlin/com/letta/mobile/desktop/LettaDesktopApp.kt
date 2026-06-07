@@ -130,6 +130,7 @@ fun LettaDesktopApp() {
                     onChatConversationSelected = chatController::selectConversation,
                     onChatComposerTextChanged = chatController::updateComposerText,
                     onChatSend = chatController::send,
+                    onChatRetryConnection = chatController::retryConnection,
                     onConfigSaved = { nextConfig ->
                         configStore.save(nextConfig)
                         activeConfig = configStore.load()
@@ -237,6 +238,7 @@ private fun DestinationContent(
     onChatConversationSelected: (String) -> Unit,
     onChatComposerTextChanged: (String) -> Unit,
     onChatSend: () -> Unit,
+    onChatRetryConnection: () -> Unit,
     onConfigSaved: (LettaConfig) -> Unit,
     onTokenCleared: () -> Unit,
     modifier: Modifier = Modifier,
@@ -247,6 +249,7 @@ private fun DestinationContent(
             onConversationSelected = onChatConversationSelected,
             onComposerTextChanged = onChatComposerTextChanged,
             onSend = onChatSend,
+            onRetryConnection = onChatRetryConnection,
             modifier = modifier,
         )
         return

@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.Timeline
@@ -27,6 +28,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -40,6 +42,7 @@ class DesktopChatControllerTest {
 
         val state = controller.state.value
         assertTrue(state.isRemoteBacked)
+        assertEquals(DesktopChatConnectionState.Live, state.connectionState)
         assertFalse(state.isLoading)
         assertEquals("conv-1", state.selectedConversationId)
         assertEquals("Remote planning", state.conversations.first().title)
@@ -62,6 +65,7 @@ class DesktopChatControllerTest {
         val state = controller.state.value
         assertEquals("", state.composerText)
         assertFalse(state.isSending)
+        assertEquals(DesktopChatConnectionState.Live, state.connectionState)
         val sentMessage = gateway.sentRequests.single().messages?.single() as JsonObject
         assertEquals("user", sentMessage["role"]?.jsonPrimitive?.content)
         assertEquals("Ship live desktop chat", sentMessage["content"]?.jsonPrimitive?.content)
@@ -71,7 +75,7 @@ class DesktopChatControllerTest {
     }
 
     @Test
-    fun unavailableBackendKeepsLocalPreviewAndSurfacesError() = runTest {
+    fun unavailableBackendShowsOfflineStateWithoutLocalPreview() = runTest {
         val controller = testController(
             object : FakeDesktopChatGateway() {
                 override suspend fun listConversations(limit: Int): List<Conversation> {
@@ -86,8 +90,108 @@ class DesktopChatControllerTest {
         val state = controller.state.value
         assertFalse(state.isRemoteBacked)
         assertFalse(state.isLoading)
+        assertEquals(DesktopChatConnectionState.Offline, state.connectionState)
         assertNotNull(state.errorMessage)
-        assertEquals("desktop-readiness", state.selectedConversationId)
+        assertNull(state.selectedConversationId)
+        assertTrue(state.conversations.isEmpty())
+
+        controller.close()
+    }
+
+    @Test
+    fun blankServerUrlShowsConfigNeededWithoutConstructingGateway() = runTest {
+        var gatewayConstructed = false
+        val controller = DesktopChatController(
+            bootstrapState = defaultDesktopBootstrapState(
+                config = LettaConfig(
+                    id = "blank",
+                    mode = LettaConfig.Mode.LOCAL,
+                    serverUrl = "",
+                ),
+            ),
+            scope = this,
+            gatewayFactory = {
+                gatewayConstructed = true
+                FakeDesktopChatGateway()
+            },
+        )
+
+        controller.start()
+        runCurrent()
+
+        val state = controller.state.value
+        assertEquals(DesktopChatConnectionState.ConfigNeeded, state.connectionState)
+        assertFalse(state.isRemoteBacked)
+        assertFalse(gatewayConstructed)
+        assertTrue(state.conversations.isEmpty())
+
+        controller.close()
+    }
+
+    @Test
+    fun emptyConversationListShowsNoConversationsState() = runTest {
+        val controller = testController(FakeDesktopChatGateway(conversationIds = emptyList()))
+
+        controller.start()
+        runCurrent()
+
+        val state = controller.state.value
+        assertTrue(state.isRemoteBacked)
+        assertFalse(state.isLoading)
+        assertEquals(DesktopChatConnectionState.NoConversations, state.connectionState)
+        assertNull(state.selectedConversationId)
+        assertTrue(state.conversations.isEmpty())
+
+        controller.close()
+    }
+
+    @Test
+    fun retryConnectionReloadsAfterOfflineFailure() = runTest {
+        val gateways = ArrayDeque<DesktopChatGateway>()
+        gateways += object : FakeDesktopChatGateway() {
+            override suspend fun listConversations(limit: Int): List<Conversation> {
+                error("first backend offline")
+            }
+        }
+        gateways += FakeDesktopChatGateway()
+        val controller = testController(gatewayFactory = { gateways.removeFirst() })
+
+        controller.start()
+        runCurrent()
+        assertEquals(DesktopChatConnectionState.Offline, controller.state.value.connectionState)
+
+        controller.retryConnection()
+        runCurrent()
+
+        val state = controller.state.value
+        assertEquals(DesktopChatConnectionState.Live, state.connectionState)
+        assertEquals("conv-1", state.selectedConversationId)
+        assertTrue(state.isRemoteBacked)
+
+        controller.close()
+    }
+
+    @Test
+    fun sendFailureSurfacesSendFailedStateAndKeepsRemoteConversation() = runTest {
+        val loop = FakeDesktopTimelineLoop("conv-1", sendFailure = IllegalStateException("stream send failed"))
+            .also { it.completeHydrate() }
+        val controller = testController(
+            gateway = FakeDesktopChatGateway(),
+            loopFactory = { _, _, _ -> loop },
+        )
+
+        controller.start()
+        runCurrent()
+        controller.updateComposerText("try remote send")
+        controller.send()
+        runCurrent()
+
+        val state = controller.state.value
+        assertEquals(DesktopChatConnectionState.SendFailed, state.connectionState)
+        assertFalse(state.isSending)
+        assertNotNull(state.errorMessage)
+        assertEquals("conv-1", state.selectedConversationId)
+        assertTrue(state.isRemoteBacked)
 
         controller.close()
     }
@@ -104,6 +208,7 @@ class DesktopChatControllerTest {
         controller.start()
         runCurrent()
         val loadingState = controller.state.value
+        assertEquals(DesktopChatConnectionState.Loading, loadingState.connectionState)
 
         controller.close()
         controller.close()
@@ -131,6 +236,7 @@ class DesktopChatControllerTest {
 
         assertEquals(1, loop.closeCount)
         assertTrue(controller.state.value.isLoading)
+        assertEquals(DesktopChatConnectionState.Loading, controller.state.value.connectionState)
     }
 
     @Test
@@ -151,6 +257,7 @@ class DesktopChatControllerTest {
         runCurrent()
 
         assertEquals("conv-2", controller.state.value.selectedConversationId)
+        assertEquals(DesktopChatConnectionState.Live, controller.state.value.connectionState)
         assertEquals(1, loops.first().closeCount)
         assertEquals(0, loops.last().closeCount)
 
@@ -196,6 +303,7 @@ class DesktopChatControllerTest {
 
         assertEquals("conv-2", controller.state.value.selectedConversationId)
         assertTrue(controller.state.value.isLoading)
+        assertEquals(DesktopChatConnectionState.Loading, controller.state.value.connectionState)
         assertEquals(1, loops.first().closeCount)
 
         controller.close()
@@ -221,6 +329,13 @@ class DesktopChatControllerTest {
             bootstrapState = defaultDesktopBootstrapState(),
             scope = this,
             gatewayFactory = { gateway },
+        )
+
+    private fun TestScope.testController(gatewayFactory: () -> DesktopChatGateway): DesktopChatController =
+        DesktopChatController(
+            bootstrapState = defaultDesktopBootstrapState(),
+            scope = this,
+            gatewayFactory = gatewayFactory,
         )
 }
 
@@ -301,6 +416,7 @@ private class CloseTrackingGateway(
 
 private class FakeDesktopTimelineLoop(
     conversationId: String,
+    private val sendFailure: Throwable? = null,
 ) : DesktopTimelineLoop {
     override val state = MutableStateFlow(Timeline(conversationId))
     val hydrateStarted = CompletableDeferred<Unit>()
@@ -319,6 +435,7 @@ private class FakeDesktopTimelineLoop(
         content: String,
         attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>,
     ): String {
+        sendFailure?.let { throw it }
         sentMessages += content
         return "client-test"
     }

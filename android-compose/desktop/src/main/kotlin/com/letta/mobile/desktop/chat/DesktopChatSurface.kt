@@ -30,6 +30,7 @@ import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Psychology
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.Button
@@ -63,6 +64,7 @@ fun DesktopChatSurface(
     onConversationSelected: (String) -> Unit,
     onComposerTextChanged: (String) -> Unit,
     onSend: () -> Unit,
+    onRetryConnection: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -73,6 +75,7 @@ fun DesktopChatSurface(
         ConversationPane(
             state = state,
             onConversationSelected = onConversationSelected,
+            onRetryConnection = onRetryConnection,
         )
         Box(
             modifier = Modifier
@@ -84,6 +87,7 @@ fun DesktopChatSurface(
             state = state,
             onComposerTextChanged = onComposerTextChanged,
             onSend = onSend,
+            onRetryConnection = onRetryConnection,
             modifier = Modifier.weight(1f),
         )
     }
@@ -93,6 +97,7 @@ fun DesktopChatSurface(
 private fun ConversationPane(
     state: DesktopChatSurfaceState,
     onConversationSelected: (String) -> Unit,
+    onRetryConnection: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -143,6 +148,14 @@ private fun ConversationPane(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            if (state.conversations.isEmpty()) {
+                item {
+                    ConversationPaneStateCard(
+                        state = state,
+                        onRetryConnection = onRetryConnection,
+                    )
+                }
+            }
             items(
                 items = state.conversations,
                 key = { it.id },
@@ -152,6 +165,60 @@ private fun ConversationPane(
                     selected = conversation.id == state.selectedConversationId,
                     onClick = { onConversationSelected(conversation.id) },
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConversationPaneStateCard(
+    state: DesktopChatSurfaceState,
+    onRetryConnection: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = state.connectionState.statusIcon(),
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = state.connectionState.statusColor(),
+                )
+                Text(
+                    text = state.connectionState.panelTitle(),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Text(
+                text = state.errorMessage ?: state.connectionState.panelBody(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (state.connectionState.canRetry()) {
+                Button(
+                    onClick = onRetryConnection,
+                    enabled = !state.isLoading,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Retry")
+                }
             }
         }
     }
@@ -249,6 +316,7 @@ private fun ChatDetailPane(
     state: DesktopChatSurfaceState,
     onComposerTextChanged: (String) -> Unit,
     onSend: () -> Unit,
+    onRetryConnection: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -263,10 +331,18 @@ private fun ChatDetailPane(
                 .height(1.dp)
                 .background(MaterialTheme.colorScheme.outlineVariant),
         )
-        MessageList(
-            renderItems = state.renderItems,
-            modifier = Modifier.weight(1f),
-        )
+        if (state.shouldShowStatePanel) {
+            ChatStatePanel(
+                state = state,
+                onRetryConnection = onRetryConnection,
+                modifier = Modifier.weight(1f),
+            )
+        } else {
+            MessageList(
+                renderItems = state.renderItems,
+                modifier = Modifier.weight(1f),
+            )
+        }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -275,10 +351,68 @@ private fun ChatDetailPane(
         )
         ComposerBar(
             text = state.composerText,
-            enabled = state.selectedConversationId != null && !state.isSending && !state.isLoading,
+            enabled = state.canSend,
             onTextChanged = onComposerTextChanged,
             onSend = onSend,
         )
+    }
+}
+
+@Composable
+private fun ChatStatePanel(
+    state: DesktopChatSurfaceState,
+    onRetryConnection: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 28.dp, vertical = 22.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier.widthIn(max = 520.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Surface(
+                modifier = Modifier.size(52.dp),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = state.connectionState.statusIcon(),
+                        contentDescription = null,
+                    )
+                }
+            }
+            Text(
+                text = state.connectionState.panelTitle(),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = state.errorMessage ?: state.connectionState.panelBody(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (state.connectionState.canRetry()) {
+                Button(
+                    onClick = onRetryConnection,
+                    enabled = !state.isLoading,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Retry connection")
+                }
+            }
+        }
     }
 }
 
@@ -692,6 +826,67 @@ private fun StatusDot(color: Color) {
             .size(9.dp)
             .background(color, CircleShape),
     )
+}
+
+@Composable
+private fun DesktopChatConnectionState.statusColor(): Color = when (this) {
+    DesktopChatConnectionState.Live,
+    DesktopChatConnectionState.Sending -> MaterialTheme.colorScheme.primary
+    DesktopChatConnectionState.Demo,
+    DesktopChatConnectionState.NoConversations -> MaterialTheme.colorScheme.tertiary
+    DesktopChatConnectionState.Loading -> MaterialTheme.colorScheme.secondary
+    DesktopChatConnectionState.ConfigNeeded,
+    DesktopChatConnectionState.Offline,
+    DesktopChatConnectionState.StreamDisconnected,
+    DesktopChatConnectionState.SendFailed -> MaterialTheme.colorScheme.error
+}
+
+private fun DesktopChatConnectionState.statusIcon(): ImageVector = when (this) {
+    DesktopChatConnectionState.Live,
+    DesktopChatConnectionState.Sending -> Icons.Outlined.CheckCircle
+    DesktopChatConnectionState.Demo,
+    DesktopChatConnectionState.NoConversations -> Icons.Outlined.SmartToy
+    DesktopChatConnectionState.Loading -> Icons.Outlined.HourglassEmpty
+    DesktopChatConnectionState.ConfigNeeded,
+    DesktopChatConnectionState.Offline,
+    DesktopChatConnectionState.StreamDisconnected,
+    DesktopChatConnectionState.SendFailed -> Icons.Outlined.ErrorOutline
+}
+
+private fun DesktopChatConnectionState.panelTitle(): String = when (this) {
+    DesktopChatConnectionState.Demo -> "Demo preview"
+    DesktopChatConnectionState.Loading -> "Connecting"
+    DesktopChatConnectionState.ConfigNeeded -> "Backend configuration required"
+    DesktopChatConnectionState.Offline -> "Backend offline"
+    DesktopChatConnectionState.NoConversations -> "No conversations"
+    DesktopChatConnectionState.Live -> "Live"
+    DesktopChatConnectionState.Sending -> "Sending"
+    DesktopChatConnectionState.StreamDisconnected -> "Stream disconnected"
+    DesktopChatConnectionState.SendFailed -> "Send failed"
+}
+
+private fun DesktopChatConnectionState.panelBody(): String = when (this) {
+    DesktopChatConnectionState.Demo -> "Sample data is shown only in the explicit demo preview."
+    DesktopChatConnectionState.Loading -> "Loading conversations from the configured Letta backend."
+    DesktopChatConnectionState.ConfigNeeded -> "Set a server URL and token in Settings before connecting."
+    DesktopChatConnectionState.Offline -> "The configured backend could not be reached."
+    DesktopChatConnectionState.NoConversations -> "This backend returned no conversations for the active account."
+    DesktopChatConnectionState.Live -> "Connected to the configured backend."
+    DesktopChatConnectionState.Sending -> "Sending your message to the active conversation."
+    DesktopChatConnectionState.StreamDisconnected -> "The conversation stream disconnected. Existing messages remain visible."
+    DesktopChatConnectionState.SendFailed -> "The last send failed. You can edit and try again."
+}
+
+private fun DesktopChatConnectionState.canRetry(): Boolean = when (this) {
+    DesktopChatConnectionState.ConfigNeeded,
+    DesktopChatConnectionState.Offline,
+    DesktopChatConnectionState.StreamDisconnected -> true
+    DesktopChatConnectionState.Demo,
+    DesktopChatConnectionState.Loading,
+    DesktopChatConnectionState.NoConversations,
+    DesktopChatConnectionState.Live,
+    DesktopChatConnectionState.Sending,
+    DesktopChatConnectionState.SendFailed -> false
 }
 
 private fun UiMessage.senderLabel(): String = when {

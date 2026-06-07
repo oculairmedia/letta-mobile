@@ -12,6 +12,8 @@ class DesktopChatModelsTest {
     fun defaultStateBuildsRowsFromSharedChatProjection() {
         val state = defaultDesktopChatSurfaceState(defaultDesktopBootstrapState())
 
+        assertEquals(DesktopChatConnectionState.Demo, state.connectionState)
+        assertEquals("Demo preview", state.statusMessage)
         assertTrue(state.renderItems.any { it is ChatRenderItem.RunBlock })
         assertEquals(state.conversations.first().id, state.selectedConversationId)
         assertTrue(state.renderItems.all { it.key.isNotBlank() })
@@ -49,5 +51,17 @@ class DesktopChatModelsTest {
             "Ship the Windows preview",
             updated.conversations.first { it.id == updated.selectedConversationId }.lastMessagePreview,
         )
+    }
+
+    @Test
+    fun initialLiveStateStartsEmptyAndLoading() {
+        val state = initialLiveDesktopChatSurfaceState(defaultDesktopBootstrapState())
+
+        assertEquals(DesktopChatConnectionState.Loading, state.connectionState)
+        assertTrue(state.conversations.isEmpty())
+        assertEquals(null, state.selectedConversationId)
+        assertTrue(state.isLoading)
+        assertTrue(state.isRemoteBacked)
+        assertTrue(state.shouldShowStatePanel)
     }
 }

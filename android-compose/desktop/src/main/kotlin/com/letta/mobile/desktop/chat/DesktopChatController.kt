@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class DesktopChatController(
-    bootstrapState: DesktopBootstrapState,
+    private val bootstrapState: DesktopBootstrapState,
     private val scope: CoroutineScope,
     private val gatewayFactory: () -> DesktopChatGateway = {
         DesktopLettaHttpChatGateway(bootstrapState.config)
@@ -34,12 +34,8 @@ class DesktopChatController(
         )
     },
 ) {
-    private val sampleState = defaultDesktopChatSurfaceState(bootstrapState)
-    private val _state = MutableStateFlow(
-        sampleState.copy(
-            statusMessage = "Connecting to ${bootstrapState.config.serverUrl}",
-        ),
-    )
+    private val initialState = initialLiveDesktopChatSurfaceState(bootstrapState)
+    private val _state = MutableStateFlow(initialState)
     val state: StateFlow<DesktopChatSurfaceState> = _state.asStateFlow()
 
     private var gateway: DesktopChatGateway? = null
@@ -56,6 +52,22 @@ class DesktopChatController(
         if (started || closed) return
         started = true
         loadJob = scope.launch { connectAndLoad() }
+    }
+
+    fun retryConnection() {
+        if (closed) return
+        loadJob?.cancel()
+        selectJob?.cancel()
+        sendJob?.cancel()
+        timelineJob?.cancel()
+        activeLoop?.close()
+        activeLoop = null
+        (gateway as? AutoCloseable)?.close()
+        gateway = null
+        started = false
+        selectionGeneration++
+        _state.value = initialState
+        start()
     }
 
     fun close() {
@@ -98,7 +110,13 @@ class DesktopChatController(
 
         val loop = activeLoop
         if (loop == null || !_state.value.isRemoteBacked) {
-            _state.update { it.sendLocalMessage() }
+            _state.update {
+                if (it.connectionState == DesktopChatConnectionState.Demo) {
+                    it.sendLocalMessage()
+                } else {
+                    it
+                }
+            }
             return
         }
 
@@ -106,6 +124,7 @@ class DesktopChatController(
             it.copy(
                 composerText = "",
                 isSending = true,
+                connectionState = DesktopChatConnectionState.Sending,
                 statusMessage = "Sending",
                 errorMessage = null,
             )
@@ -118,6 +137,7 @@ class DesktopChatController(
                 _state.update {
                     it.copy(
                         isSending = false,
+                        connectionState = DesktopChatConnectionState.Live,
                         statusMessage = "Live",
                         errorMessage = null,
                     )
@@ -129,6 +149,7 @@ class DesktopChatController(
                 _state.update {
                     it.copy(
                         isSending = false,
+                        connectionState = DesktopChatConnectionState.SendFailed,
                         statusMessage = "Send failed",
                         errorMessage = t.message ?: t::class.simpleName ?: "Send failed",
                     )
@@ -139,9 +160,22 @@ class DesktopChatController(
 
     private suspend fun connectAndLoad() {
         if (closed) return
+        if (bootstrapState.config.serverUrl.isBlank()) {
+            _state.value = initialState.copy(
+                isLoading = false,
+                isSending = false,
+                isRemoteBacked = false,
+                connectionState = DesktopChatConnectionState.ConfigNeeded,
+                statusMessage = "Backend configuration required",
+                errorMessage = "Set a server URL in Settings.",
+            )
+            return
+        }
+
         _state.update {
             it.copy(
                 isLoading = true,
+                connectionState = DesktopChatConnectionState.Loading,
                 statusMessage = "Loading conversations",
                 errorMessage = null,
             )
@@ -155,7 +189,7 @@ class DesktopChatController(
             val selectedId = summaries.firstOrNull()?.id
 
             if (closed) return
-            _state.value = sampleState.copy(
+            _state.value = initialState.copy(
                 conversations = summaries,
                 selectedConversationId = selectedId,
                 messagesByConversationId = emptyMap(),
@@ -163,6 +197,11 @@ class DesktopChatController(
                 isLoading = false,
                 isSending = false,
                 isRemoteBacked = true,
+                connectionState = if (summaries.isEmpty()) {
+                    DesktopChatConnectionState.NoConversations
+                } else {
+                    DesktopChatConnectionState.Live
+                },
                 statusMessage = if (summaries.isEmpty()) "No conversations" else "Live",
                 errorMessage = null,
             )
@@ -172,14 +211,16 @@ class DesktopChatController(
             throw cancelled
         } catch (t: Throwable) {
             if (closed) return
+            val message = t.message ?: t::class.simpleName ?: "Backend unavailable"
             _state.update {
-                sampleState.copy(
+                initialState.copy(
                     composerText = it.composerText,
                     isLoading = false,
                     isSending = false,
                     isRemoteBacked = false,
-                    statusMessage = "Using local preview",
-                    errorMessage = t.message ?: t::class.simpleName ?: "Backend unavailable",
+                    connectionState = DesktopChatConnectionState.Offline,
+                    statusMessage = "Backend offline",
+                    errorMessage = message,
                 )
             }
         }
@@ -205,6 +246,7 @@ class DesktopChatController(
                 },
                 composerText = "",
                 isLoading = true,
+                connectionState = DesktopChatConnectionState.Loading,
                 statusMessage = "Loading messages",
                 errorMessage = null,
             )
@@ -226,6 +268,7 @@ class DesktopChatController(
             _state.update {
                 it.copy(
                     isLoading = false,
+                    connectionState = DesktopChatConnectionState.Live,
                     statusMessage = "Live",
                     errorMessage = null,
                 )
@@ -237,7 +280,8 @@ class DesktopChatController(
             _state.update {
                 it.copy(
                     isLoading = false,
-                    statusMessage = "Message load failed",
+                    connectionState = DesktopChatConnectionState.StreamDisconnected,
+                    statusMessage = "Stream disconnected",
                     errorMessage = t.message ?: t::class.simpleName ?: "Message load failed",
                 )
             }
