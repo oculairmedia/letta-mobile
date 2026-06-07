@@ -20,7 +20,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
@@ -31,6 +33,7 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.HourglassEmpty
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Refresh
@@ -46,7 +49,14 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -67,6 +77,8 @@ import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import java.util.Base64
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import org.jetbrains.skia.Image as SkiaImage
 
 @Composable
@@ -356,6 +368,7 @@ private fun ChatDetailPane(
             )
         } else {
             MessageList(
+                conversationId = state.selectedConversationId,
                 renderItems = state.renderItems,
                 modifier = Modifier.weight(1f),
             )
@@ -485,25 +498,109 @@ private fun ChatHeader(state: DesktopChatSurfaceState) {
 
 @Composable
 private fun MessageList(
+    conversationId: String?,
     renderItems: List<ChatRenderItem>,
     modifier: Modifier = Modifier,
 ) {
-    LazyColumn(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 28.dp, vertical = 22.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        items(
-            items = renderItems,
-            key = { it.key },
-        ) { item ->
-            when (item) {
-                is ChatRenderItem.Single -> DesktopMessageBubble(item.message)
-                is ChatRenderItem.RunBlock -> DesktopRunBlock(item)
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    var followLatest by remember(conversationId) { mutableStateOf(true) }
+    val isNearLatest by remember {
+        derivedStateOf { listState.isNearLatestMessage() }
+    }
+    val latestItemKey = renderItems.lastOrNull()?.key
+
+    LaunchedEffect(conversationId) {
+        followLatest = true
+        if (renderItems.isNotEmpty()) {
+            listState.scrollToItem(latestMessageScrollIndex(renderItems.size))
+        }
+    }
+
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress to listState.isNearLatestMessage() }
+            .distinctUntilChanged()
+            .collect { (isScrollInProgress, nearLatest) ->
+                if (!isScrollInProgress) {
+                    followLatest = nearLatest
+                }
+            }
+    }
+
+    LaunchedEffect(latestItemKey, renderItems.size) {
+        if (followLatest && renderItems.isNotEmpty()) {
+            listState.scrollToItem(latestMessageScrollIndex(renderItems.size))
+        }
+    }
+
+    Box(modifier = modifier.fillMaxWidth()) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 28.dp, vertical = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            items(
+                items = renderItems,
+                key = { it.key },
+            ) { item ->
+                when (item) {
+                    is ChatRenderItem.Single -> DesktopMessageBubble(item.message)
+                    is ChatRenderItem.RunBlock -> DesktopRunBlock(item)
+                }
+            }
+        }
+
+        if (renderItems.isNotEmpty() && !isNearLatest) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 18.dp)
+                    .size(44.dp)
+                    .clickable {
+                        followLatest = true
+                        scope.launch {
+                            listState.animateScrollToItem(latestMessageScrollIndex(renderItems.size))
+                        }
+                    },
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.KeyboardArrowDown,
+                        contentDescription = "Scroll to latest message",
+                    )
+                }
             }
         }
     }
+}
+
+internal fun LazyListState.isNearLatestMessage(
+    thresholdItems: Int = 1,
+): Boolean {
+    val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return true
+    return isNearLatestMessage(
+        totalItems = layoutInfo.totalItemsCount,
+        lastVisibleIndex = lastVisibleIndex,
+        thresholdItems = thresholdItems,
+    )
+}
+
+internal fun latestMessageScrollIndex(itemCount: Int): Int =
+    (itemCount - 1).coerceAtLeast(0)
+
+internal fun isNearLatestMessage(
+    totalItems: Int,
+    lastVisibleIndex: Int,
+    thresholdItems: Int = 1,
+): Boolean {
+    if (totalItems <= 0) return true
+    return lastVisibleIndex >= totalItems - 1 - thresholdItems
 }
 
 @Composable
