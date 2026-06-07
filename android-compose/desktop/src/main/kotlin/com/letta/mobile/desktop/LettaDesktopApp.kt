@@ -20,15 +20,19 @@ import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SmartToy
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -45,16 +49,32 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurface
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
+import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
+import com.letta.mobile.desktop.data.DesktopLettaConfigStore
+import com.letta.mobile.desktop.data.createDefaultDesktopDataBindings
+import com.letta.mobile.desktop.data.desktopConfigIdFor
 
 @Composable
 fun LettaDesktopApp() {
     var selectedDestination by rememberSaveable { mutableStateOf(DesktopDestination.Overview) }
-    val bootstrapState = remember { defaultDesktopBootstrapState() }
+    val secureSettingsStore = remember { DesktopFileSecureSettingsStore() }
+    val configStore = remember(secureSettingsStore) { DesktopLettaConfigStore(secureSettingsStore) }
+    var activeConfig by remember { mutableStateOf(configStore.load()) }
+    val dataBindings = remember(configStore) {
+        createDefaultDesktopDataBindings(
+            secureSettingsStore = secureSettingsStore,
+            configProvider = { activeConfig },
+        )
+    }
+    var bootstrapState by remember(dataBindings) {
+        mutableStateOf(defaultDesktopBootstrapState(dataBindings, activeConfig))
+    }
     val chatScope = rememberCoroutineScope()
     val chatController = remember(bootstrapState, chatScope) {
         DesktopChatController(
@@ -110,6 +130,19 @@ fun LettaDesktopApp() {
                     onChatConversationSelected = chatController::selectConversation,
                     onChatComposerTextChanged = chatController::updateComposerText,
                     onChatSend = chatController::send,
+                    onConfigSaved = { nextConfig ->
+                        configStore.save(nextConfig)
+                        activeConfig = configStore.load()
+                        dataBindings.sessionGraphProvider.rebuild()
+                        bootstrapState = defaultDesktopBootstrapState(dataBindings, activeConfig)
+                    },
+                    onTokenCleared = {
+                        val nextConfig = activeConfig.copy(accessToken = null)
+                        configStore.save(nextConfig)
+                        activeConfig = configStore.load()
+                        dataBindings.sessionGraphProvider.rebuild()
+                        bootstrapState = defaultDesktopBootstrapState(dataBindings, activeConfig)
+                    },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -204,6 +237,8 @@ private fun DestinationContent(
     onChatConversationSelected: (String) -> Unit,
     onChatComposerTextChanged: (String) -> Unit,
     onChatSend: () -> Unit,
+    onConfigSaved: (LettaConfig) -> Unit,
+    onTokenCleared: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (destination == DesktopDestination.Conversations) {
@@ -258,10 +293,10 @@ private fun DestinationContent(
             }
             DesktopDestination.Settings -> {
                 item {
-                    PortabilityCard(
-                        title = "Desktop settings",
-                        body = "Settings need a JVM implementation for storage, secrets, and backend selection. The default bootstrap targets a local Letta endpoint so the shell is useful during development.",
-                        state = DesktopFeatureState.InProgress,
+                    BackendSettingsCard(
+                        config = state.config,
+                        onConfigSaved = onConfigSaved,
+                        onTokenCleared = onTokenCleared,
                     )
                 }
             }
@@ -323,6 +358,101 @@ private fun BackendCard(config: LettaConfig) {
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     borderColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.24f),
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BackendSettingsCard(
+    config: LettaConfig,
+    onConfigSaved: (LettaConfig) -> Unit,
+    onTokenCleared: () -> Unit,
+) {
+    var serverUrl by remember(config.id) { mutableStateOf(config.serverUrl) }
+    var tokenInput by remember(config.id) { mutableStateOf("") }
+    var mode by remember(config.id) { mutableStateOf(config.mode) }
+
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f),
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                text = "Backend",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            OutlinedTextField(
+                value = serverUrl,
+                onValueChange = { serverUrl = it },
+                label = { Text("Server URL") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Mode",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LettaConfig.Mode.entries.forEach { option ->
+                        FilterChip(
+                            selected = mode == option,
+                            onClick = { mode = option },
+                            label = { Text(option.label) },
+                        )
+                    }
+                }
+            }
+            OutlinedTextField(
+                value = tokenInput,
+                onValueChange = { tokenInput = it },
+                label = { Text("Access token") },
+                placeholder = {
+                    Text(if (config.accessToken == null) "Optional" else "Saved token hidden")
+                },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Button(
+                    onClick = {
+                        val normalizedUrl = serverUrl.trim()
+                        onConfigSaved(
+                            LettaConfig(
+                                id = desktopConfigIdFor(normalizedUrl),
+                                mode = mode,
+                                serverUrl = normalizedUrl,
+                                accessToken = tokenInput.trim().takeIf { it.isNotBlank() }
+                                    ?: config.accessToken,
+                            ),
+                        )
+                        tokenInput = ""
+                    },
+                ) {
+                    Text("Save")
+                }
+                if (config.accessToken != null) {
+                    TextButton(
+                        onClick = {
+                            tokenInput = ""
+                            onTokenCleared()
+                        },
+                    ) {
+                        Text("Clear token")
+                    }
+                }
             }
         }
     }

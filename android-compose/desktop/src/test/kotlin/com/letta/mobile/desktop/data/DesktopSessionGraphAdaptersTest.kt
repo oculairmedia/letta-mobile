@@ -4,6 +4,7 @@ import com.letta.mobile.data.health.ServerHealthState
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.runtime.BackendKind
+import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -65,7 +66,9 @@ class DesktopSessionGraphAdaptersTest {
 
     @Test
     fun dataBindingsExposeDesktopStorageHealthAndSessionGraph() = runTest {
-        val bindings = createDefaultDesktopDataBindings()
+        val bindings = createDefaultDesktopDataBindings(
+            secureSettingsStore = DesktopInMemorySecureSettingsStore(),
+        )
 
         bindings.secureSettingsStore.putString("accessToken", "token-1")
         assertEquals("token-1", bindings.secureSettingsStore.getString("accessToken"))
@@ -78,5 +81,66 @@ class DesktopSessionGraphAdaptersTest {
 
         assertEquals(ServerHealthState.PROBING, health.states.value["desktop-local"])
         assertEquals(1L, bindings.sessionGraphProvider.current.id)
+    }
+
+    @Test
+    fun configStorePersistsBackendAndHidesBlankTokenUpdates() {
+        val settingsStore = DesktopInMemorySecureSettingsStore()
+        val configStore = DesktopLettaConfigStore(settingsStore)
+
+        configStore.save(
+            LettaConfig(
+                id = "desktop-test",
+                mode = LettaConfig.Mode.CLOUD,
+                serverUrl = "https://api.letta.com",
+                accessToken = "secret-token",
+            ),
+        )
+
+        val loaded = configStore.load()
+        assertEquals("desktop-test", loaded.id)
+        assertEquals(LettaConfig.Mode.CLOUD, loaded.mode)
+        assertEquals("https://api.letta.com", loaded.serverUrl)
+        assertEquals("secret-token", loaded.accessToken)
+        assertEquals(listOf("https://api.letta.com"), configStore.recentBackends())
+
+        configStore.save(loaded.copy(accessToken = ""))
+
+        assertNull(configStore.load().accessToken)
+    }
+
+    @Test
+    fun fileSettingsStorePersistsAcrossInstances() {
+        val file = Files.createTempFile("letta-desktop-settings", ".properties")
+        try {
+            val first = DesktopFileSecureSettingsStore(file)
+            first.putString("serverUrl", "http://localhost:8283")
+
+            val second = DesktopFileSecureSettingsStore(file)
+
+            assertEquals("http://localhost:8283", second.getString("serverUrl"))
+        } finally {
+            Files.deleteIfExists(file)
+        }
+    }
+
+    @Test
+    fun graphProviderRebuildUsesLatestConfigProviderValue() {
+        var config = LettaConfig(
+            id = "one",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "http://one.example",
+        )
+        val provider = DesktopSessionGraphProvider(
+            DesktopSessionGraphFactory(configProvider = { config }),
+        )
+
+        val first = provider.current
+        config = config.copy(id = "two", serverUrl = "http://two.example")
+        val second = provider.rebuild()
+
+        assertTrue(first.isClosed)
+        assertEquals("desktop-remote-letta:two", second.backendDescriptor.backendId.value)
+        assertEquals("http://two.example", second.backendDescriptor.label)
     }
 }

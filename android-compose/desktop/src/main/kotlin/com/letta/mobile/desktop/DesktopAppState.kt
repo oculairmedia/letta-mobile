@@ -3,6 +3,7 @@ package com.letta.mobile.desktop
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.desktop.data.DesktopDataBindings
 import com.letta.mobile.desktop.data.createDefaultDesktopDataBindings
+import com.letta.mobile.desktop.data.defaultDesktopLettaConfig
 
 data class DesktopBootstrapState(
     val config: LettaConfig,
@@ -46,13 +47,9 @@ enum class DesktopDestination(
 
 fun defaultDesktopBootstrapState(
     dataBindings: DesktopDataBindings = createDefaultDesktopDataBindings(),
+    config: LettaConfig = defaultDesktopLettaConfig(),
 ) = DesktopBootstrapState(
-    config = LettaConfig(
-        id = "desktop-local",
-        mode = LettaConfig.Mode.SELF_HOSTED,
-        serverUrl = "http://localhost:8283",
-        accessToken = null,
-    ),
+    config = config,
     sessionGraphId = dataBindings.sessionGraphProvider.current.id,
     featureReadiness = listOf(
         DesktopFeatureReadiness(
