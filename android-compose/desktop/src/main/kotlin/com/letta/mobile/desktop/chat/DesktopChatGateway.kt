@@ -4,11 +4,11 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
+import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.stream.SseFrame
 import com.letta.mobile.data.stream.SseParser
 import com.letta.mobile.data.timeline.TimelineNoActiveRunException
 import com.letta.mobile.data.timeline.TimelineStreamFrame
-import com.letta.mobile.data.timeline.TimelineTransport
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -39,15 +39,12 @@ import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 
-interface DesktopChatGateway : TimelineTransport {
-    suspend fun listConversations(limit: Int = 40): List<Conversation>
-    suspend fun getConversation(conversationId: String): Conversation
-}
+typealias DesktopChatGateway = ChatGateway
 
 class DesktopLettaHttpChatGateway(
     private val config: LettaConfig,
     private val httpClient: HttpClient = createDesktopLettaHttpClient(),
-) : DesktopChatGateway, AutoCloseable {
+) : ChatGateway, AutoCloseable {
     private val baseUrl = config.serverUrl.trimEnd('/')
 
     override suspend fun listConversations(limit: Int): List<Conversation> {

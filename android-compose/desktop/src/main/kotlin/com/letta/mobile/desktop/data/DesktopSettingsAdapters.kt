@@ -1,5 +1,8 @@
 package com.letta.mobile.desktop.data
 
+import com.letta.mobile.data.chat.runtime.BackendConfigPolicy
+import com.letta.mobile.data.chat.runtime.BackendConfigStore
+import com.letta.mobile.data.chat.runtime.SecureTokenStore
 import com.letta.mobile.data.health.IServerHealthRepository
 import com.letta.mobile.data.health.ServerHealthState
 import com.letta.mobile.data.model.LettaConfig
@@ -9,8 +12,12 @@ import java.io.OutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Properties
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 
 private const val DEFAULT_DESKTOP_LETTA_URL = "http://localhost:8283"
@@ -99,8 +106,57 @@ class DesktopFileSecureSettingsStore(
 
 class DesktopLettaConfigStore(
     private val settingsStore: SecureSettingsStore,
-) {
+) : BackendConfigStore, SecureTokenStore {
+    private val activeConfigState = MutableStateFlow(readConfig())
+    override val activeConfig: StateFlow<LettaConfig?> = activeConfigState.asStateFlow()
+
     fun load(): LettaConfig {
+        val config = readConfig()
+        activeConfigState.value = config
+        return config
+    }
+
+    override suspend fun loadActiveConfig(): LettaConfig = load()
+
+    fun save(config: LettaConfig) {
+        val normalized = config.normalized()
+        settingsStore.putString(KEY_ID, normalized.id)
+        settingsStore.putString(KEY_MODE, normalized.mode.name)
+        settingsStore.putString(KEY_SERVER_URL, normalized.serverUrl)
+        normalized.accessToken
+            ?.takeIf { it.isNotBlank() }
+            ?.let { settingsStore.putString(KEY_ACCESS_TOKEN, it) }
+            ?: settingsStore.remove(KEY_ACCESS_TOKEN)
+        rememberBackend(normalized.serverUrl)
+        activeConfigState.value = normalized
+    }
+
+    override suspend fun saveActiveConfig(config: LettaConfig) {
+        save(config)
+    }
+
+    fun recentBackends(): List<String> =
+        settingsStore.getString(KEY_RECENT_BACKENDS)
+            ?.split(RECENT_SEPARATOR)
+            ?.map { it.trim() }
+            ?.filter { it.isNotBlank() }
+            ?: emptyList()
+
+    override suspend fun recentBackendUrls(): List<String> = recentBackends()
+
+    override fun observeHasToken(): Flow<Boolean> =
+        activeConfig
+            .map { it?.accessToken?.isNotBlank() == true }
+            .distinctUntilChanged()
+
+    override suspend fun loadToken(): String? =
+        load().accessToken?.trim()?.takeIf { it.isNotBlank() }
+
+    override suspend fun saveToken(token: String?) {
+        save(load().copy(accessToken = token))
+    }
+
+    private fun readConfig(): LettaConfig {
         val fallback = defaultDesktopLettaConfig()
         return LettaConfig(
             id = settingsStore.getString(KEY_ID, fallback.id).orEmpty().ifBlank { fallback.id },
@@ -114,25 +170,6 @@ class DesktopLettaConfigStore(
         )
     }
 
-    fun save(config: LettaConfig) {
-        val normalized = config.normalized()
-        settingsStore.putString(KEY_ID, normalized.id)
-        settingsStore.putString(KEY_MODE, normalized.mode.name)
-        settingsStore.putString(KEY_SERVER_URL, normalized.serverUrl)
-        normalized.accessToken
-            ?.takeIf { it.isNotBlank() }
-            ?.let { settingsStore.putString(KEY_ACCESS_TOKEN, it) }
-            ?: settingsStore.remove(KEY_ACCESS_TOKEN)
-        rememberBackend(normalized.serverUrl)
-    }
-
-    fun recentBackends(): List<String> =
-        settingsStore.getString(KEY_RECENT_BACKENDS)
-            ?.split(RECENT_SEPARATOR)
-            ?.map { it.trim() }
-            ?.filter { it.isNotBlank() }
-            ?: emptyList()
-
     private fun rememberBackend(serverUrl: String) {
         val next = (listOf(serverUrl) + recentBackends())
             .distinct()
@@ -140,14 +177,12 @@ class DesktopLettaConfigStore(
         settingsStore.putString(KEY_RECENT_BACKENDS, next.joinToString(RECENT_SEPARATOR))
     }
 
-    private fun LettaConfig.normalized(): LettaConfig {
-        val url = serverUrl.trim().ifBlank { DEFAULT_DESKTOP_LETTA_URL }
-        return copy(
-            id = id.trim().ifBlank { desktopConfigIdFor(url) },
-            serverUrl = url,
-            accessToken = accessToken?.trim()?.takeIf { it.isNotBlank() },
+    private fun LettaConfig.normalized(): LettaConfig =
+        BackendConfigPolicy.normalize(
+            config = this,
+            fallback = defaultDesktopLettaConfig(),
+            generatedIdPrefix = "desktop",
         )
-    }
 
     private companion object {
         private const val KEY_ID = "letta.config.id"
@@ -168,7 +203,7 @@ fun defaultDesktopLettaConfig(): LettaConfig =
     )
 
 fun desktopConfigIdFor(serverUrl: String): String =
-    "desktop-${serverUrl.trim().lowercase().hashCode().toUInt().toString(16)}"
+    BackendConfigPolicy.stableConfigId("desktop", serverUrl)
 
 class DesktopServerHealthRepository(
     initialStates: Map<String, ServerHealthState> = emptyMap(),
@@ -194,6 +229,7 @@ data class DesktopDataBindings(
     val healthRepository: IServerHealthRepository,
     val sessionGraphFactory: DesktopSessionGraphFactory,
     val sessionGraphProvider: DesktopSessionGraphProvider,
+    val chatSessionGraphFactory: DesktopChatSessionGraphFactory,
 )
 
 fun createDefaultDesktopDataBindings(
@@ -206,5 +242,9 @@ fun createDefaultDesktopDataBindings(
         healthRepository = DesktopServerHealthRepository(),
         sessionGraphFactory = graphFactory,
         sessionGraphProvider = DesktopSessionGraphProvider(graphFactory),
+        chatSessionGraphFactory = defaultDesktopChatSessionGraphFactory(
+            configProvider = configProvider,
+            repositoryGraphFactory = graphFactory,
+        ),
     )
 }
