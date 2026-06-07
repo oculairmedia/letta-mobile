@@ -2,7 +2,6 @@ package com.letta.mobile.channel
 
 import androidx.work.ListenableWorker
 import com.letta.mobile.data.channel.CurrentConversationTracker
-import com.letta.mobile.data.api.ConversationApi
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
@@ -11,10 +10,9 @@ import com.letta.mobile.data.repository.ConversationInspectorMessage
 import com.letta.mobile.testutil.FakeAgentRepository
 import com.letta.mobile.testutil.FakeChannelNotificationPublisher
 import com.letta.mobile.testutil.FakeChannelSyncStateStore
+import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.FakeConversationInspectorMessageRepository
 import com.letta.mobile.testutil.FakeSettingsRepository
-import io.mockk.coEvery
-import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -114,7 +112,7 @@ class ChannelHeartbeatSyncTest {
     }
 
     private fun createFixture(): Fixture {
-        val conversationApi = mockk<ConversationApi>()
+        val conversationApi = FakeConversationApi()
         val messageRepository = FakeConversationInspectorMessageRepository()
         val agentRepository = FakeAgentRepository()
         val stateStore = FakeChannelSyncStateStore()
@@ -128,7 +126,7 @@ class ChannelHeartbeatSyncTest {
             ),
         )
 
-        val conversations = mutableListOf(
+        conversationApi.conversations += listOf(
             Conversation(
                 id = ConversationId("conv-1"),
                 agentId = AgentId("agent-1"),
@@ -141,9 +139,6 @@ class ChannelHeartbeatSyncTest {
                 ConversationInspectorMessage(id = "assistant-1", messageType = "assistant_message", date = null, runId = null, stepId = null, otid = null, summary = "Earlier")
             )
         )
-        coEvery {
-            conversationApi.listConversations(limit = 100, order = "desc", orderBy = "last_message_at")
-        } answers { conversations.toList() }
         messageRepository.messagesByConversation += messagesByConversation
 
         val coordinator = NotificationDeliveryCoordinator(
@@ -161,7 +156,7 @@ class ChannelHeartbeatSyncTest {
             notificationDeliveryCoordinator = coordinator,
         )
 
-        return Fixture(sync, stateStore, publisher, conversations, messageRepository.messagesByConversation)
+        return Fixture(sync, stateStore, publisher, conversationApi.conversations, messageRepository.messagesByConversation)
     }
 
     private data class Fixture(

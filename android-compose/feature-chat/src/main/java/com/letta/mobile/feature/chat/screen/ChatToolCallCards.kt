@@ -12,16 +12,20 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -39,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -47,6 +52,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.data.model.ToolReturnStatus
 import com.letta.mobile.data.model.UiApprovalRequest
@@ -68,6 +74,7 @@ import com.letta.mobile.ui.theme.scaledBy
 import com.letta.mobile.ui.theme.sectionTitle
 import com.letta.mobile.util.Telemetry
 import java.util.LinkedHashMap
+import kotlinx.collections.immutable.toImmutableList
 import com.letta.mobile.feature.chat.render.ToolDisplayInfo
 import com.letta.mobile.feature.chat.render.ToolDisplayRegistry
 import com.letta.mobile.feature.chat.render.LocalToolCardBodyParentVisible
@@ -77,6 +84,7 @@ import com.letta.mobile.feature.chat.render.toolCardBodyRenderEligibility
 import com.letta.mobile.feature.chat.subagent.LocalSubagentTodoSheetOpener
 import com.letta.mobile.feature.chat.subagent.SubagentTodoSheetTarget
 import com.letta.mobile.ui.components.MarkdownText
+import com.letta.mobile.ui.components.shimmerColor
 
 private const val TOOL_CALL_ENTRANCE_ANIMATION_HISTORY_SIZE = 512
 
@@ -92,6 +100,7 @@ internal fun MessageToolCalls(
     messageId: String? = null,
     animateEntrance: Boolean = false,
     approvalRequest: UiApprovalRequest? = null,
+    onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
 ) {
     val pendingApprovalToolCallIds = remember(approvalRequest) {
         approvalRequest?.toolCalls
@@ -144,6 +153,7 @@ internal fun MessageToolCalls(
                     modifier = Modifier,
                     animateRows = animateEntrance,
                     rowAnimationKeyPrefix = "message|${messageId.orEmpty()}",
+                    onAttachmentImageTap = onAttachmentImageTap,
                 )
             }
         } else {
@@ -164,6 +174,7 @@ internal fun MessageToolCalls(
                             ToolCallCard(
                                 toolCall = toolCall,
                                 approvalStateOverride = approvalState,
+                                onAttachmentImageTap = onAttachmentImageTap,
                             )
                         }
                     }
@@ -474,7 +485,15 @@ internal fun ToolCallCard(
     toolCall: UiToolCall,
     approvalStateOverride: ToolApprovalState? = null,
     keepExpanded: Boolean = false,
+    onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
 ) {
+    if (toolCall.name == "generate_image") {
+        GeneratedImageToolCard(
+            toolCall = toolCall,
+            onAttachmentImageTap = onAttachmentImageTap,
+        )
+        return
+    }
     val subagentDispatch = toolCall.subagentDispatch
     if (subagentDispatch != null) {
         SubagentDispatchCard(
@@ -485,7 +504,14 @@ internal fun ToolCallCard(
         )
         return
     }
-    val subagentNotification = toolCall.result?.let(::parseTaskNotificationForToolCard)
+    // perf/frame-budget-audit: parseTaskNotificationForToolCard runs a chain of
+    // regex extractions over the raw tool result. It was previously invoked on
+    // every recompose of ToolCallCard (which recomposes per streamed token while
+    // a tool card is the live message). Key it on the result so the parse only
+    // runs when the result text actually changes.
+    val subagentNotification = remember(toolCall.result) {
+        toolCall.result?.let(::parseTaskNotificationForToolCard)
+    }
     if (subagentNotification != null) {
         SubagentNotificationCard(
             notification = subagentNotification,
@@ -620,15 +646,25 @@ internal fun ToolCallCard(
                         tint = MaterialTheme.colorScheme.primary,
                     )
                 } else {
-                    val infiniteTransition = rememberInfiniteTransition(label = "toolSpin")
-                    val angle by infiniteTransition.animateFloat(
-                        initialValue = 0f,
-                        targetValue = 360f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(1200, easing = LinearEasing),
-                        ),
-                        label = "toolSpinAngle",
-                    )
+                    // perf/frame-budget-audit + reduced-motion contract: only
+                    // run the infinite spin animation when reduced-motion is
+                    // OFF. Under reduced motion show a static icon (no
+                    // per-frame compositor invalidation), matching the
+                    // disclosure/entrance animations which already honour it.
+                    val angle = if (reducedMotion) {
+                        0f
+                    } else {
+                        val infiniteTransition = rememberInfiniteTransition(label = "toolSpin")
+                        val animated by infiniteTransition.animateFloat(
+                            initialValue = 0f,
+                            targetValue = 360f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(1200, easing = LinearEasing),
+                            ),
+                            label = "toolSpinAngle",
+                        )
+                        animated
+                    }
                     Icon(
                         imageVector = LettaIcons.Refresh,
                         contentDescription = "Running",
@@ -691,6 +727,174 @@ internal fun ToolCallCard(
             }
         }
     }
+}
+
+@Composable
+private fun GeneratedImageToolCard(
+    toolCall: UiToolCall,
+    modifier: Modifier = Modifier,
+    onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
+) {
+    val reducedMotion = rememberReducedMotionEnabled()
+    val hasImage = toolCall.generatedImageAttachments.isNotEmpty()
+    val isError = ToolReturnStatus.isError(toolCall.status)
+    val prompt = remember(toolCall.arguments) { summarizeGenerateImagePrompt(toolCall.arguments) }
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.42f),
+        ),
+        border = BorderStroke(
+            width = 1.dp,
+            color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.38f),
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = when {
+                        isError -> LettaIcons.Error
+                        hasImage -> LettaIcons.CheckCircle
+                        else -> LettaIcons.Refresh
+                    },
+                    contentDescription = when {
+                        isError -> "Image generation failed"
+                        hasImage -> "Generated image ready"
+                        else -> "Generating image"
+                    },
+                    modifier = Modifier.size(LettaIconSizing.Inline),
+                    tint = when {
+                        isError -> MaterialTheme.colorScheme.error
+                        hasImage -> MaterialTheme.colorScheme.tertiary
+                        else -> MaterialTheme.colorScheme.onTertiaryContainer
+                    },
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (hasImage) "Generated image" else "Generating image",
+                        style = MaterialTheme.typography.chatBubbleSender,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    )
+                    prompt?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.listItemSupporting,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.78f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                toolCall.executionTimeMs?.let { ms ->
+                    ToolMetaChip(text = formatToolExecutionTime(ms))
+                }
+            }
+
+            AnimatedContent(
+                targetState = hasImage,
+                modifier = Modifier.fillMaxWidth(),
+                transitionSpec = {
+                    if (reducedMotion) {
+                        (ChatMotion.instantEnter() togetherWith ChatMotion.instantExit())
+                            .using(SizeTransform(clip = true) { _, _ -> ChatMotion.instantSizeSpec })
+                    } else {
+                        (ChatMotion.expandEnter() togetherWith ChatMotion.expandExit())
+                            .using(SizeTransform(clip = true) { _, _ -> ChatMotion.contentSizeSpec })
+                    }
+                },
+                contentAlignment = Alignment.TopStart,
+                label = "GeneratedImageToolStage",
+            ) { ready ->
+                if (ready) {
+                    val generatedAttachments = remember(toolCall.generatedImageAttachments) {
+                        toolCall.generatedImageAttachments.toImmutableList()
+                    }
+                    MessageAttachmentsGrid(
+                        attachments = generatedAttachments,
+                        modifier = Modifier.fillMaxWidth(),
+                        onImageClick = onAttachmentImageTap?.let { cb ->
+                            { index -> cb(generatedAttachments, index) }
+                        },
+                    )
+                } else {
+                    GeneratedImageShimmer(modifier = Modifier.fillMaxWidth())
+                }
+            }
+
+            val errorText = toolCall.result?.takeIf { it.isNotBlank() }
+            if (isError && errorText != null) {
+                Text(
+                    text = errorText,
+                    style = MaterialTheme.typography.listItemSupporting,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun GeneratedImageShimmer(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .height(220.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f)),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(18.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(shimmerColor()),
+        )
+    }
+}
+
+private fun summarizeGenerateImagePrompt(arguments: String): String? {
+    if (arguments.isBlank()) return null
+    val prompt = extractJsonStringValue(arguments, "prompt")?.takeIf { it.isNotBlank() }
+        ?: return arguments.take(96).let { if (arguments.length > 96) "$it…" else it }
+    return prompt.take(120).let { if (prompt.length > 120) "$it…" else it }
+}
+
+private fun extractJsonStringValue(json: String, field: String): String? {
+    val key = "\"$field\""
+    val keyIndex = json.indexOf(key)
+    if (keyIndex < 0) return null
+    val colonIndex = json.indexOf(':', keyIndex + key.length)
+    if (colonIndex < 0) return null
+    val quoteStart = json.indexOf('"', colonIndex + 1)
+    if (quoteStart < 0) return null
+    val out = StringBuilder()
+    var index = quoteStart + 1
+    while (index < json.length) {
+        when (val char = json[index]) {
+            '\\' -> {
+                val next = json.getOrNull(index + 1) ?: break
+                out.append(
+                    when (next) {
+                        'n', 't', 'r' -> ' '
+                        else -> next
+                    }
+                )
+                index += 2
+            }
+            '"' -> break
+            else -> {
+                out.append(char)
+                index += 1
+            }
+        }
+    }
+    return out.toString()
 }
 
 @Composable
@@ -994,6 +1198,7 @@ internal fun CompactToolCallGroupCard(
     onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)? = null,
     animateRows: Boolean = false,
     rowAnimationKeyPrefix: String = "",
+    onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
 ) {
     val reducedMotion = rememberReducedMotionEnabled()
     Card(
@@ -1038,6 +1243,7 @@ internal fun CompactToolCallGroupCard(
                         CompactToolCallRow(
                             toolCall = toolCall,
                             approvalState = toolCall.approvalState(pendingApprovalToolCallIds),
+                            onAttachmentImageTap = onAttachmentImageTap,
                         )
                     }
                 }
@@ -1057,6 +1263,7 @@ internal fun CompactToolCallGroupCard(
 internal fun CompactToolCallRow(
     toolCall: UiToolCall,
     approvalState: ToolApprovalState?,
+    onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
 ) {
     val fontScale = LocalChatFontScale.current
     val haptic = LocalHapticFeedback.current
@@ -1159,15 +1366,23 @@ internal fun CompactToolCallRow(
                     tint = MaterialTheme.colorScheme.primary,
                 )
                 else -> {
-                    val t = rememberInfiniteTransition(label = "compactSpin")
-                    val a by t.animateFloat(
-                        initialValue = 0f,
-                        targetValue = 360f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(1200, easing = LinearEasing),
-                        ),
-                        label = "compactSpinAngle",
-                    )
+                    // perf/frame-budget-audit + reduced-motion contract: skip
+                    // the infinite spin under reduced motion (static icon, no
+                    // per-frame compositor work).
+                    val a = if (reducedMotion) {
+                        0f
+                    } else {
+                        val t = rememberInfiniteTransition(label = "compactSpin")
+                        val animated by t.animateFloat(
+                            initialValue = 0f,
+                            targetValue = 360f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(1200, easing = LinearEasing),
+                            ),
+                            label = "compactSpinAngle",
+                        )
+                        animated
+                    }
                     Icon(
                         imageVector = LettaIcons.Refresh,
                         contentDescription = "Running",
@@ -1215,21 +1430,28 @@ internal fun CompactToolCallRow(
                         .fillMaxWidth()
                         .padding(top = 2.dp, bottom = 4.dp),
                 ) {
-                    ToolCallExpandedSummary(
-                        toolCall = toolCall,
-                        argumentSummary = argumentSummary,
-                        resultPreview = resultPreview,
-                        isError = isError,
-                        fontScale = fontScale,
-                    )
-                    ToolCallExpandedBody(
-                        toolCall = toolCall,
-                        display = display,
-                        executionTimeText = executionTimeText,
-                        displayResult = displayResult,
-                        isError = isError,
-                        fontScale = fontScale,
-                    )
+                    if (toolCall.name == "generate_image") {
+                        GeneratedImageToolCard(
+                            toolCall = toolCall,
+                            onAttachmentImageTap = onAttachmentImageTap,
+                        )
+                    } else {
+                        ToolCallExpandedSummary(
+                            toolCall = toolCall,
+                            argumentSummary = argumentSummary,
+                            resultPreview = resultPreview,
+                            isError = isError,
+                            fontScale = fontScale,
+                        )
+                        ToolCallExpandedBody(
+                            toolCall = toolCall,
+                            display = display,
+                            executionTimeText = executionTimeText,
+                            displayResult = displayResult,
+                            isError = isError,
+                            fontScale = fontScale,
+                        )
+                    }
                 }
             }
         }

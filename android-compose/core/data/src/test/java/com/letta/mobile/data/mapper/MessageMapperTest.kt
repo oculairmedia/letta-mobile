@@ -222,6 +222,50 @@ class MessageMapperTest : WordSpec({
             uiMessages.first().attachments.first().base64 shouldBe "TOOL_HYDRATED+/=="
             uiMessages.first().attachments.first().mediaType shouldBe "image/png"
         }
+
+        "generated image return is owned by specialized tool call ui" {
+            val contentRaw = kotlinx.serialization.json.buildJsonArray {
+                add(kotlinx.serialization.json.buildJsonObject {
+                    put("type", kotlinx.serialization.json.JsonPrimitive("text"))
+                    put("text", kotlinx.serialization.json.JsonPrimitive("{\"path\":\"generated.png\"}"))
+                })
+                add(kotlinx.serialization.json.buildJsonObject {
+                    put("type", kotlinx.serialization.json.JsonPrimitive("image"))
+                    put("source", kotlinx.serialization.json.buildJsonObject {
+                        put("type", kotlinx.serialization.json.JsonPrimitive("base64"))
+                        put("media_type", kotlinx.serialization.json.JsonPrimitive("image/png"))
+                        put("data", kotlinx.serialization.json.JsonPrimitive("GENERATED_CARD_IMAGE+/=="))
+                    })
+                })
+            }
+            val messages = listOf<com.letta.mobile.data.model.LettaMessage>(
+                com.letta.mobile.data.model.ToolCallMessage(
+                    id = "tool-call-generate-image",
+                    toolCall = ToolCall(
+                        toolCallId = "call-generate-image",
+                        name = "generate_image",
+                        arguments = "{\"prompt\":\"a brass automaton\"}",
+                    ),
+                ),
+                com.letta.mobile.data.model.ToolReturnMessage(
+                    id = "tool-return-generate-image",
+                    toolCallId = "call-generate-image",
+                    status = "success",
+                    toolReturnRaw = contentRaw,
+                ),
+            )
+
+            val uiMessages = messages.toAppMessages().toUiMessages()
+
+            uiMessages shouldHaveSize 1
+            val ui = uiMessages.first()
+            ui.attachments shouldHaveSize 0
+            val toolCall = ui.toolCalls.shouldNotBeNull().single()
+            toolCall.name shouldBe "generate_image"
+            toolCall.generatedImageAttachments shouldHaveSize 1
+            toolCall.generatedImageAttachments.first().base64 shouldBe "GENERATED_CARD_IMAGE+/=="
+            toolCall.generatedImageAttachments.first().mediaType shouldBe "image/png"
+        }
     }
 
     "List<AppMessage>.toUiMessages" should {

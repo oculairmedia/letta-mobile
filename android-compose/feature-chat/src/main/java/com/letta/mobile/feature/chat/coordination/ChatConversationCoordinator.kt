@@ -15,9 +15,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 import com.letta.mobile.feature.chat.render.ChatUiState
-import com.letta.mobile.feature.chat.render.ChatMessageListChange
+import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.feature.chat.render.ConversationState
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
+import com.letta.mobile.data.chat.runtime.ChatSessionReducer
+import com.letta.mobile.data.chat.runtime.ChatConversationSummary
+import com.letta.mobile.data.chat.runtime.ChatSessionState
 
 private sealed interface ClientModeBootstrapState {
     data object Idle : ClientModeBootstrapState
@@ -50,6 +53,7 @@ internal class ChatConversationCoordinator(
     private val agentRepository: IAgentRepository,
     private val currentConversationTracker: CurrentConversationTracker,
     private val uiState: MutableStateFlow<ChatUiState>,
+    private val updateSessionState: ((ChatSessionState) -> ChatSessionState) -> Unit,
     private val pendingClientModeBootstrapMessages: () -> kotlinx.collections.immutable.ImmutableList<UiMessage>,
     private val setPendingClientModeBootstrapUserMessage: (UiMessage) -> Unit,
     private val clearPendingClientModeBootstrapUserMessage: () -> Unit,
@@ -97,11 +101,7 @@ internal class ChatConversationCoordinator(
             setRouteConversationId(null)
         }
         scope.launch {
-            uiState.value = uiState.value.copy(
-                conversationState = ConversationState.Loading,
-                isLoadingMessages = true,
-                error = null,
-            )
+            updateSessionState { ChatSessionReducer.beginConversationLoad(it) }
 
             try {
                 if (useClientModeForResolve) {
@@ -112,18 +112,14 @@ internal class ChatConversationCoordinator(
                 resolveTimelineConversation(isFirstResolve)
             } catch (e: Exception) {
                 android.util.Log.w("AdminChatViewModel", "Failed to resolve conversation", e)
+                updateSessionState { ChatSessionReducer.conversationLoadFailed(it, e.message ?: "Failed to load conversation") }
                 uiState.value = uiState.value.copy(
-                    conversationState = ConversationState.Error(
-                        message = e.message ?: "Failed to load conversation",
-                    ),
                     messages = persistentListOf(),
                     messageListChange = ChatMessageListChange.Full,
-                    isLoadingMessages = false,
                     isLoadingOlderMessages = false,
                     hasMoreOlderMessages = false,
                     isStreaming = false,
                     isAgentTyping = false,
-                    error = null,
                 )
             }
         }
@@ -173,28 +169,35 @@ internal class ChatConversationCoordinator(
             ?: runCatching { agentRepository.getAgent(typedAgentId).first() }.getOrNull()
         if (clientConversationId != null) {
             startTimelineObserver(clientConversationId)
+            val summary = ChatConversationSummary(
+                id = clientConversationId,
+                title = agent?.name ?: uiState.value.agentName,
+                agentName = agent?.name ?: uiState.value.agentName,
+                updatedAtLabel = "",
+                lastMessagePreview = "",
+            )
+            updateSessionState { current ->
+                val next = ChatSessionReducer.conversationsLoaded(current, listOf(summary))
+                ChatSessionReducer.hydrateCompleted(next, next.selectionGeneration)
+            }
             uiState.value = uiState.value.copy(
                 agentName = agent?.name ?: uiState.value.agentName,
-                conversationState = ConversationState.Ready(clientConversationId),
                 isLoadingOlderMessages = false,
                 hasMoreOlderMessages = false,
                 isStreaming = false,
                 isAgentTyping = false,
-                error = null,
             )
         } else {
             stopTimelineObserver()
+            updateSessionState { ChatSessionReducer.conversationsLoaded(it, emptyList()) }
             uiState.value = uiState.value.copy(
                 agentName = agent?.name ?: uiState.value.agentName,
-                conversationState = ConversationState.NoConversation,
                 messages = pendingClientModeBootstrapMessages(),
                 messageListChange = ChatMessageListChange.Full,
-                isLoadingMessages = false,
                 isLoadingOlderMessages = false,
                 hasMoreOlderMessages = false,
                 isStreaming = false,
                 isAgentTyping = false,
-                error = null,
             )
         }
         consumeInitialMessageIfPresent(stageFreshClientModeDuplicate = true)?.let { message ->
@@ -233,20 +236,26 @@ internal class ChatConversationCoordinator(
             }
 
         if (conversationId == null) {
+            updateSessionState { ChatSessionReducer.conversationsLoaded(it, emptyList()) }
             uiState.value = uiState.value.copy(
-                conversationState = ConversationState.NoConversation,
                 messages = persistentListOf(),
                 messageListChange = ChatMessageListChange.Full,
-                isLoadingMessages = false,
                 isLoadingOlderMessages = false,
                 hasMoreOlderMessages = false,
-                error = null,
             )
         } else {
-            uiState.value = uiState.value.copy(
-                conversationState = ConversationState.Ready(conversationId),
-                error = null,
+            val cachedAgent = agentRepository.getCachedAgent(AgentId(agentId))
+            val summary = ChatConversationSummary(
+                id = conversationId,
+                title = cachedAgent?.name ?: uiState.value.agentName,
+                agentName = cachedAgent?.name ?: uiState.value.agentName,
+                updatedAtLabel = "",
+                lastMessagePreview = "",
             )
+            updateSessionState { current ->
+                val next = ChatSessionReducer.conversationsLoaded(current, listOf(summary))
+                ChatSessionReducer.beginSelectedConversationHydrate(next, next.selectionGeneration)
+            }
             loadMessagesInternal()
         }
 
@@ -266,14 +275,12 @@ internal class ChatConversationCoordinator(
         val currentConversationId = activeConversationId ?: explicitConversationId()
         if (requestedConversationId == null) {
             if (requestedConversationId == currentConversationId) {
+                updateSessionState { ChatSessionReducer.conversationsLoaded(it, emptyList()) }
                 uiState.value = uiState.value.copy(
-                    conversationState = ConversationState.NoConversation,
                     messages = persistentListOf(),
                     messageListChange = ChatMessageListChange.Full,
-                    isLoadingMessages = false,
                     isLoadingOlderMessages = false,
                     hasMoreOlderMessages = false,
-                    error = null,
                 )
             }
             loadTimer.stop("result" to "noConversation")
@@ -283,17 +290,36 @@ internal class ChatConversationCoordinator(
         val cachedMessages = emptyList<AppMessage>()
         if (cachedAgent != null || cachedMessages.isNotEmpty()) {
             if (requestedConversationId == currentConversationId) {
+                val summary = ChatConversationSummary(
+                    id = requestedConversationId,
+                    title = cachedAgent?.name ?: uiState.value.agentName,
+                    agentName = cachedAgent?.name ?: uiState.value.agentName,
+                    updatedAtLabel = "",
+                    lastMessagePreview = "",
+                )
+                updateSessionState { current ->
+                    val next = ChatSessionReducer.conversationsLoaded(current, listOf(summary))
+                    ChatSessionReducer.beginSelectedConversationHydrate(next, next.selectionGeneration)
+                }
                 uiState.value = uiState.value.copy(
                     agentName = cachedAgent?.name ?: uiState.value.agentName,
                     messages = if (cachedMessages.isNotEmpty()) cachedMessages.toUiMessages().toImmutableList() else uiState.value.messages,
                     messageListChange = ChatMessageListChange.Full,
-                    isLoadingMessages = cachedMessages.isEmpty(),
-                    error = null,
                 )
             }
         } else {
             if (requestedConversationId == currentConversationId) {
-                uiState.value = uiState.value.copy(isLoadingMessages = true)
+                updateSessionState { current ->
+                    val summary = ChatConversationSummary(
+                        id = requestedConversationId,
+                        title = uiState.value.agentName,
+                        agentName = uiState.value.agentName,
+                        updatedAtLabel = "",
+                        lastMessagePreview = "",
+                    )
+                    val next = ChatSessionReducer.conversationsLoaded(current, listOf(summary))
+                    ChatSessionReducer.beginSelectedConversationHydrate(next, next.selectionGeneration)
+                }
             }
         }
         try {
@@ -302,12 +328,19 @@ internal class ChatConversationCoordinator(
                 loadTimer.stop("result" to "staleConversation")
                 return
             }
+            val summary = ChatConversationSummary(
+                id = requestedConversationId,
+                title = agent.name,
+                agentName = agent.name,
+                updatedAtLabel = "",
+                lastMessagePreview = "",
+            )
+            updateSessionState { current ->
+                val next = ChatSessionReducer.conversationsLoaded(current, listOf(summary))
+                ChatSessionReducer.hydrateCompleted(next, next.selectionGeneration)
+            }
             uiState.value = uiState.value.copy(
                 agentName = agent.name,
-                conversationState = ConversationState.Ready(requestedConversationId),
-            )
-            uiState.value = uiState.value.copy(
-                isLoadingMessages = true,
                 isLoadingOlderMessages = false,
                 hasMoreOlderMessages = false,
             )
@@ -338,11 +371,15 @@ internal class ChatConversationCoordinator(
             if (requestedConversationId != (activeConversationId ?: explicitConversationId())) {
                 return
             }
+            updateSessionState { current ->
+                ChatSessionReducer.streamDisconnected(
+                    state = current,
+                    generation = current.selectionGeneration,
+                    errorMessage = e.message ?: "Failed to load messages",
+                )
+            }
             uiState.value = uiState.value.copy(
-                conversationState = ConversationState.Ready(requestedConversationId),
-                isLoadingMessages = false,
                 isLoadingOlderMessages = false,
-                error = e.message ?: "Failed to load messages",
             )
         }
     }
@@ -382,17 +419,15 @@ internal class ChatConversationCoordinator(
                         )
                     )
                 }
+                updateSessionState { ChatSessionReducer.conversationsLoaded(it, emptyList()) }
                 uiState.value = uiState.value.copy(
-                    conversationState = ConversationState.NoConversation,
                     messages = pendingClientModeBootstrapMessages(),
                     messageListChange = ChatMessageListChange.Full,
-                    isLoadingMessages = false,
                     isStreaming = true,
                     isAgentTyping = true,
                 )
             } else {
                 uiState.value = uiState.value.copy(
-                    isLoadingMessages = false,
                     isStreaming = true,
                     isAgentTyping = true,
                 )
@@ -420,16 +455,14 @@ internal class ChatConversationCoordinator(
         clearPendingClientModeBootstrapUserMessage()
         currentConversationTracker.setCurrent(null)
         stopTimelineObserver()
+        updateSessionState { ChatSessionReducer.conversationsLoaded(it, emptyList()) }
         uiState.value = uiState.value.copy(
-            conversationState = ConversationState.NoConversation,
             messages = persistentListOf(),
             messageListChange = ChatMessageListChange.Full,
-            isLoadingMessages = false,
             isLoadingOlderMessages = false,
             hasMoreOlderMessages = false,
             isStreaming = false,
             isAgentTyping = false,
-            error = null,
         )
     }
 }

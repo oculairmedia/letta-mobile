@@ -11,6 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.theme.LettaElevationTokens
+import com.letta.mobile.ui.theme.LettaShapeTokens
 
 /**
  * Shared card treatment for list, menu, and admin rows.
@@ -19,9 +21,9 @@ import androidx.compose.ui.unit.dp
  * not as decorative cards. Keep richer motion and emphasis inside the row.
  */
 object LettaCardDefaults {
-    val listShape: Shape = RoundedCornerShape(12.dp)
-    val prominentListShape: Shape = RoundedCornerShape(16.dp)
-    val actionShape: Shape = RoundedCornerShape(8.dp)
+    val listShape: Shape = RoundedCornerShape(LettaShapeTokens.listRadius.dp)
+    val prominentListShape: Shape = RoundedCornerShape(LettaShapeTokens.prominentListRadius.dp)
+    val actionShape: Shape = RoundedCornerShape(LettaShapeTokens.actionRadius.dp)
 
     val listContainerColor: Color
         @Composable get() = MaterialTheme.colorScheme.surfaceContainerLow
@@ -40,10 +42,10 @@ object LettaCardDefaults {
 
     @Composable
     fun listCardElevation(): CardElevation = CardDefaults.cardElevation(
-        defaultElevation = 0.dp,
-        pressedElevation = 1.dp,
-        focusedElevation = 1.dp,
-        hoveredElevation = 1.dp,
+        defaultElevation = LettaElevationTokens.none.dp,
+        pressedElevation = LettaElevationTokens.low.dp,
+        focusedElevation = LettaElevationTokens.low.dp,
+        hoveredElevation = LettaElevationTokens.low.dp,
     )
 }
 

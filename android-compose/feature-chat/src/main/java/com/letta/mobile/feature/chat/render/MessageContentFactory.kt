@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.components.MarkdownText
 import com.letta.mobile.ui.components.StreamingMarkdownText
@@ -36,6 +37,7 @@ internal interface MessageContentRenderer {
         textColor: Color,
         modifier: Modifier,
         onGeneratedUiMessage: ((String) -> Unit)? = null,
+        onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
         isStreaming: Boolean = false,
     )
 }
@@ -141,28 +143,74 @@ private fun AssistantResponseText(
 }
 
 private fun String.containsMarkdownTable(): Boolean {
-    val lines = lineSequence().filter { it.isNotBlank() }.toList()
-    if (lines.size < 2) return false
+    var previousStart = -1
+    var previousEnd = -1
+    var lineStart = 0
 
-    for (i in 0 until lines.lastIndex) {
-        if (lines[i].contains('|') && lines[i + 1].looksLikeMarkdownTableSeparator()) {
-            return true
+    while (lineStart <= length) {
+        val newlineIndex = indexOf('\n', startIndex = lineStart)
+        val rawEnd = if (newlineIndex >= 0) newlineIndex else length
+        val contentStart = firstNonWhitespaceIndex(lineStart, rawEnd)
+        if (contentStart < rawEnd) {
+            val contentEnd = lastNonWhitespaceExclusive(contentStart, rawEnd)
+            if (previousStart >= 0 &&
+                lineContainsPipe(previousStart, previousEnd) &&
+                looksLikeMarkdownTableSeparator(contentStart, contentEnd)
+            ) {
+                return true
+            }
+            previousStart = contentStart
+            previousEnd = contentEnd
         }
+        if (newlineIndex < 0) break
+        lineStart = newlineIndex + 1
     }
     return false
 }
 
-private fun String.looksLikeMarkdownTableSeparator(): Boolean {
-    val cells = trim()
-        .trim('|')
-        .split('|')
-        .map { it.trim() }
-        .filter { it.isNotEmpty() }
-    if (cells.isEmpty()) return false
-    return cells.all { cell ->
-        val withoutAlignment = cell.trim(':')
-        withoutAlignment.isNotEmpty() && withoutAlignment.all { it == '-' }
+private fun String.firstNonWhitespaceIndex(start: Int, endExclusive: Int): Int {
+    var index = start
+    while (index < endExclusive && this[index].isWhitespace()) {
+        index += 1
     }
+    return index
+}
+
+private fun String.lastNonWhitespaceExclusive(start: Int, endExclusive: Int): Int {
+    var index = endExclusive
+    while (index > start && this[index - 1].isWhitespace()) {
+        index -= 1
+    }
+    return index
+}
+
+private fun String.lineContainsPipe(start: Int, endExclusive: Int): Boolean {
+    for (index in start until endExclusive) {
+        if (this[index] == '|') return true
+    }
+    return false
+}
+
+private fun String.looksLikeMarkdownTableSeparator(start: Int, endExclusive: Int): Boolean {
+    var cellHasDash = false
+    var foundCell = false
+    var index = start
+
+    while (index < endExclusive) {
+        when (this[index]) {
+            '|', ' ', '\t' -> {
+                if (this[index] == '|' && cellHasDash) {
+                    foundCell = true
+                    cellHasDash = false
+                }
+            }
+            ':' -> Unit
+            '-' -> cellHasDash = true
+            else -> return false
+        }
+        index += 1
+    }
+    return foundCell || cellHasDash
 }
 
 /**
@@ -255,8 +303,16 @@ private fun clampToWordBoundary(raw: String): String {
     return raw.substring(0, boundary + 1)
 }
 
+// perf/frame-budget-audit: hoist the boundary set to a module-level constant.
+// isStreamingBoundary() is called per-character of the streaming tail (via
+// indexOfLast in clampToWordBoundary) on every streamingDisplayText pass, so a
+// `setOf(...)` literal inside the function allocated a fresh Set per char —
+// pure GC churn on the streaming hot path.
+private val STREAMING_BOUNDARY_CHARS =
+    setOf('.', ',', ';', ':', '!', '?', ')', ']', '}', '—', '-', '/', '\\')
+
 private fun Char.isStreamingBoundary(): Boolean =
-    isWhitespace() || this in setOf('.', ',', ';', ':', '!', '?', ')', ']', '}', '—', '-', '/', '\\')
+    isWhitespace() || this in STREAMING_BOUNDARY_CHARS
 
 /**
  * Whether a streaming cursor glyph is appropriate for the supplied raw
@@ -554,6 +610,7 @@ internal object TextMessageRenderer : MessageContentRenderer {
         textColor: Color,
         modifier: Modifier,
         onGeneratedUiMessage: ((String) -> Unit)?,
+        onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
         isStreaming: Boolean,
     ) {
         if (message.role == "user") {
@@ -585,6 +642,7 @@ internal object SubagentNotificationRenderer : MessageContentRenderer {
         textColor: Color,
         modifier: Modifier,
         onGeneratedUiMessage: ((String) -> Unit)?,
+        onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
         isStreaming: Boolean,
     ) {
         SubagentNotificationCard(
@@ -604,6 +662,7 @@ internal object ToolCallRenderer : MessageContentRenderer {
         textColor: Color,
         modifier: Modifier,
         onGeneratedUiMessage: ((String) -> Unit)?,
+        onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
         isStreaming: Boolean,
     ) {
         Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -631,6 +690,7 @@ internal object ToolCallRenderer : MessageContentRenderer {
                     messageId = message.id,
                     animateEntrance = shouldAnimateToolCallEntrance(isStreaming),
                     approvalRequest = message.approvalRequest,
+                    onAttachmentImageTap = onAttachmentImageTap,
                 )
             }
         }

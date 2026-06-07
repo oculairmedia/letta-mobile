@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import io.mockk.mockk
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -53,7 +54,7 @@ class TimelineHandlersIsolationTest {
                     date = Instant.now(),
                     runId = "run-1",
                     stepId = "step-1",
-                    toolCalls = listOf(
+                    toolCalls = persistentListOf(
                         com.letta.mobile.data.model.ToolCall(
                             id = "call-id-1",
                             name = "test_tool",
@@ -95,7 +96,7 @@ class TimelineHandlersIsolationTest {
                     date = Instant.now(),
                     runId = "run-1",
                     stepId = "step-1",
-                    toolCalls = listOf(
+                    toolCalls = persistentListOf(
                         com.letta.mobile.data.model.ToolCall(
                             name = "synthetic_tool",
                             arguments = ""
@@ -182,7 +183,7 @@ class TimelineHandlersIsolationTest {
             TimelineGatewayEvent.ExternalTransportLocalAppend(
                 content = "external msg",
                 otid = "ext-otid-1",
-                attachments = emptyList(),
+                attachments = persistentListOf(),
                 sentAt = Instant.now(),
                 ack = ack
             )

@@ -8,7 +8,7 @@ import kotlinx.collections.immutable.persistentSetOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
-import com.letta.mobile.feature.chat.coordination.ChatRenderItem
+import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.feature.chat.render.ChatMessageGeometryBucket
 import com.letta.mobile.feature.chat.render.ChatMessageGeometryState
 import com.letta.mobile.feature.chat.render.ChatRenderItemGeometrySignature
@@ -343,6 +343,18 @@ class ChatMessageListScrollTest {
         )
 
         assertNotEquals(collapsed, expanded)
+    }
+
+    @Test
+    fun `render item geometry signature samples long content changes without full text hash`() {
+        val baseContent = "a".repeat(200)
+        val changedContent = baseContent.replaceRange(100, 101, "b")
+
+        val base = single("assistant", content = baseContent).chatGeometrySignature()
+        val changed = single("assistant", content = changedContent).chatGeometrySignature()
+
+        assertEquals(base.contentLength, changed.contentLength)
+        assertNotEquals(base.contentHash, changed.contentHash)
     }
 
     @Test

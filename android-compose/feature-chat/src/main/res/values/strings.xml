@@ -8,8 +8,11 @@
   <string name="action_copy">Copy</string>
   <string name="action_delete">Delete</string>
   <string name="action_edit">Edit</string>
+  <string name="action_open_image">Open image</string>
+  <string name="action_save_image">Save image</string>
   <string name="action_refresh">Refresh</string>
   <string name="action_remove_attachment">Remove attachment</string>
+  <string name="action_share_image">Share image</string>
   <string name="action_preview_attachment">Preview attachment</string>
   <string name="action_reset_messages">Reset Messages</string>
   <string name="action_retry">Retry</string>
@@ -49,6 +52,12 @@
   <string name="screen_chat_context_window_percent">%1$d%%</string>
   <string name="screen_chat_context_window_title">Context utilization</string>
   <string name="screen_chat_context_window_unavailable">Context usage is not available yet.</string>
+  <string name="screen_chat_fullscreen_image">Fullscreen chat image</string>
+  <string name="screen_chat_image_save_error">Couldn\'t save image</string>
+  <string name="screen_chat_image_saved">Image saved</string>
+  <string name="screen_chat_image_share_error">Couldn\'t share image</string>
+  <string name="screen_chat_image_share_chooser">Share image</string>
+  <string name="screen_chat_image_unavailable">Image unavailable</string>
   <string name="screen_chat_input_hint">Type a message…</string>
   <string name="screen_chat_pending_content_description">Message sending</string>
   <string name="screen_chat_title">Agent Chat</string>

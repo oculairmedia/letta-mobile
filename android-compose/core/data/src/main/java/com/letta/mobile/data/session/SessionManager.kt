@@ -23,7 +23,7 @@ class SessionManager internal constructor(
     private val settingsRepository: ISettingsRepository,
     private val sessionGraphFactory: SessionGraphFactory,
     private val managerScope: CoroutineScope,
-) {
+) : SessionRepositoryGraphProvider<SessionGraph> {
     @Inject
     constructor(
         settingsRepository: ISettingsRepository,
@@ -35,9 +35,9 @@ class SessionManager internal constructor(
     )
 
     private val _currentGraph = MutableStateFlow(sessionGraphFactory.create())
-    val currentGraph: StateFlow<SessionGraph> = _currentGraph.asStateFlow()
+    override val currentGraph: StateFlow<SessionGraph> = _currentGraph.asStateFlow()
     private val _sessionError = MutableStateFlow<Throwable?>(null)
-    val sessionError: StateFlow<Throwable?> = _sessionError.asStateFlow()
+    override val sessionError: StateFlow<Throwable?> = _sessionError.asStateFlow()
 
     init {
         managerScope.launch {
@@ -53,12 +53,12 @@ class SessionManager internal constructor(
 
     private val rebuildLock = ReentrantLock()
 
-    fun rebuild(): SessionGraph = rebuildLock.withLock {
+    override fun rebuild(): SessionGraph = rebuildLock.withLock {
         val previous = _currentGraph.value
         try {
             val next = sessionGraphFactory.create()
             _currentGraph.value = next
-            previous.scope.cancel()
+            previous.close()
             _sessionError.value = null
             next
         } catch (t: Throwable) {
@@ -67,10 +67,10 @@ class SessionManager internal constructor(
         }
     }
 
-    val current: SessionGraph
+    override val current: SessionGraph
         get() = _currentGraph.value
 
-    suspend fun <T> withCurrentSession(block: suspend (SessionGraph) -> T): T {
+    override suspend fun <T> withCurrentSession(block: suspend (SessionGraph) -> T): T {
         val graph = current
         val result = block(graph)
         if (current !== graph) {

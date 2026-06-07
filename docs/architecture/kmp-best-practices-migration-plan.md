@@ -260,6 +260,7 @@ Included modules:
 :designsystem
 :feature-chat
 :feature-editagent
+:desktop
 :cli
 :macrobenchmark
 :baselineprofile
@@ -269,16 +270,16 @@ Current characteristics:
 
 - `:app` is a full Android application module.
 - `:sharedLogic` is the first KMP library module and owns portable domain
-  identity value classes.
+  identity value classes, transport/runtime contracts, timeline logic,
+  repository/session contracts, chat projection models, A2UI contracts, and
+  cross-platform design tokens.
+- `:desktop` is a JVM Compose Desktop preview module for Windows.
 - `:core`, `:designsystem`, `:feature-chat`, and `:feature-editagent` are
   Android library modules.
 - Android packaging, signing, flavors, Sentry, baseline profile consumption,
   manifest placeholders, and version derivation live in `:app`.
-- Shared runtime concepts are currently still in Android modules:
+- Some shared runtime concepts are still implemented in Android modules:
   - `SessionManager` and `SessionGraph`
-  - timeline models and reducers
-  - `TimelineExternalTransportWriter`
-  - API models and repository interfaces
   - DataStore, Room, Android security, Hilt, OkHttp/Ktor wiring
 - Compose UI and Android platform UI dependencies are spread across `:app`,
   `:designsystem`, and `:feature-chat`.
@@ -305,8 +306,8 @@ android-compose/
   sharedTesting/             optional test fixtures and fake backends
 
   core/                      temporary Android-era module during migration
-  designsystem/              Android-only until sharedUI decision is made
-  feature-chat/              Android-only until sharedUI decision is made
+  designsystem/              Android-owned for the first Windows release
+  feature-chat/              Android-owned for the first Windows release
 ```
 
 The exact folder names can change, but the responsibilities should not:
@@ -428,8 +429,9 @@ Create ADRs before moving files:
 1. KMP module structure ADR
 2. SessionGraph as backend runtime boundary ADR
 3. RuntimeEvent as durable timeline gateway ADR
-4. shared UI decision record: Android-only UI now, `sharedUI` later unless iOS
-   commits to Compose Multiplatform
+4. shared UI decision record: Windows uses a platform-specific Compose Desktop
+   chat surface over `sharedLogic`; `sharedUI` remains deferred. See
+   [Windows Chat UI Decision](windows-chat-ui-decision.md).
 
 Output:
 

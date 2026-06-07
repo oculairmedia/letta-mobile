@@ -1,0 +1,338 @@
+package com.letta.mobile.data.timeline
+
+import com.letta.mobile.data.model.ApprovalResponseMessage
+import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.ToolReturnMessage
+import com.letta.mobile.util.Telemetry
+import kotlinx.collections.immutable.PersistentList
+import kotlinx.collections.immutable.PersistentMap
+
+data class TimelineReducerInput(
+    val prev: Timeline,
+    val frame: LettaMessage,
+    val pendingToolReturnsByCallId: PersistentMap<String, ToolReturnMessage>,
+)
+
+data class TimelineReducerOutput(
+    val next: Timeline,
+    val updatedPendingToolReturnsByCallId: PersistentMap<String, ToolReturnMessage>,
+    val emittedEvents: PersistentList<TimelineSyncEvent>,
+    val notification: PendingIngestNotification?,
+)
+
+fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
+    var timeline = input.prev
+    val pendingToolReturnsByCallId = LinkedHashMap(input.pendingToolReturnsByCallId)
+    val pendingEvents = mutableListOf<TimelineSyncEvent>()
+    val conversationId = input.prev.conversationId
+    val message = input.frame
+
+    fun output(notification: PendingIngestNotification? = null): TimelineReducerOutput =
+        TimelineReducerOutput(
+            next = timeline,
+            updatedPendingToolReturnsByCallId = pendingToolReturnsByCallId.toTimelinePersistentMap(),
+            emittedEvents = pendingEvents.toTimelinePersistentList(),
+            notification = notification,
+        )
+
+    // Chat stream reducer diagnostics are opt-in because this reducer is called
+    // once per streamed frame. Keep the transformation pure-ish and bounded by
+    // default; enable Telemetry.chatHotPathDebugEnabled while investigating.
+    if (message is ApprovalResponseMessage) {
+        val reqId = message.approvalRequestId ?: return output()
+        val match = timeline.events.firstOrNull {
+            it is TimelineEvent.Confirmed && it.approvalRequestId == reqId
+        } as? TimelineEvent.Confirmed ?: return output()
+        if (match.approvalDecided) {
+            hotPathTelemetry(
+                "streamSubscriber.eventDeduped",
+                "reason" to "approvalAlreadyDecided",
+                "approvalRequestId" to reqId,
+                "conversationId" to conversationId,
+            )
+            return output()
+        }
+        val updated = match.copy(approvalDecided = true)
+        timeline = timeline.replaceByServerId(updated)
+        pendingEvents += TimelineSyncEvent.StreamEventIngested(match.serverId, message.messageType)
+        return output()
+    }
+
+    if (message is ToolReturnMessage) {
+        val tcid = message.toolCallId
+        hotPathTelemetry(
+            "toolReturn.observed",
+            "toolCallId" to (tcid ?: "<null>"),
+            "hasBody" to (message.toolReturn.funcResponse?.isNotEmpty() == true),
+            "timelineSize" to timeline.events.size,
+        )
+        if (!tcid.isNullOrBlank()) {
+            val match = timeline.events.firstOrNull { ev ->
+                ev is TimelineEvent.Confirmed &&
+                    ev.toolCalls.any { it.effectiveId.takeIf { id -> id.isNotBlank() } == tcid }
+            } as? TimelineEvent.Confirmed
+            if (match != null) {
+                val body = message.toolReturn.funcResponse ?: ""
+                val isError = message.isErr == true || message.status == "error"
+                val contentByCallId = match.toolReturnContentByCallId + (tcid to body)
+                val updated = match.copy(
+                    approvalDecided = true,
+                    toolReturnContent = body.ifBlank { match.toolReturnContent ?: body },
+                    toolReturnIsError = isError,
+                    toolReturnContentByCallId = contentByCallId.toTimelinePersistentMap(),
+                    toolReturnIsErrorByCallId = (match.toolReturnIsErrorByCallId + (tcid to isError)).toTimelinePersistentMap(),
+                    attachments = (match.attachments + message.attachments).distinct().toTimelinePersistentList(),
+                )
+                timeline = timeline.replaceByServerId(updated)
+                pendingEvents += TimelineSyncEvent.StreamEventIngested(match.serverId, message.messageType)
+                hotPathTelemetry(
+                    "toolReturn.attached",
+                    "serverId" to match.serverId,
+                    "bodyLen" to body.length,
+                )
+                val mt = message.messageType
+                if (mt == "tool_return_message" && body.isNotBlank()) {
+                    return output(
+                        PendingIngestNotification(
+                            serverId = match.serverId,
+                            messageType = mt,
+                            contentPreview = body.take(140),
+                        )
+                    )
+                }
+            } else {
+                pendingToolReturnsByCallId[tcid] = message
+                hotPathTelemetry(
+                    "toolReturn.noMatch",
+                    "toolCallId" to tcid,
+                    "timelineSize" to timeline.events.size,
+                )
+            }
+        }
+        return output()
+    }
+
+    val confirmed = message.toTimelineEvent(position = timeline.nextLocalPosition())
+    if (confirmed == null) {
+        hotPathTelemetry(
+            "streamSubscriber.toTimelineEventNull",
+            "messageType" to message.messageType,
+            "messageId" to message.id,
+            "conversationId" to conversationId,
+        )
+        return output()
+    }
+
+    val existing = timeline.findByServerId(confirmed.serverId, confirmed.messageType)
+    if (existing != null) {
+        if (existing.hasAlreadyIngestedStreamFrame(confirmed)) {
+            hotPathTelemetry(
+                "streamSubscriber.duplicateSeqSkipped",
+                "serverId" to confirmed.serverId,
+                "messageType" to message.messageType,
+                "existingSeqId" to existing.seqId,
+                "incomingSeqId" to confirmed.seqId,
+                "conversationId" to conversationId,
+            )
+            return output()
+        }
+        val oldText = existing.content
+        val newText = confirmed.content
+        val canUseSnapshotMerge = existing.seqId != null && confirmed.seqId != null
+        val textMerge = mergeStreamText(
+            existing = oldText,
+            incoming = newText,
+            canUseSnapshotMerge = canUseSnapshotMerge,
+        )
+        val mergedText = textMerge.text
+        val oldCalls = existing.toolCalls
+        val newCalls = confirmed.toolCalls
+        val oldScore = oldCalls.count { !it.arguments.isNullOrBlank() }
+        val newScore = newCalls.count { !it.arguments.isNullOrBlank() }
+        val mergedCalls = if (newCalls.isEmpty() && oldCalls.isNotEmpty()) oldCalls
+            else if (oldCalls.isEmpty()) newCalls
+            else if (newScore >= oldScore) newCalls
+            else oldCalls
+        val merged = applyPendingToolReturns(
+            confirmed.copy(
+                content = mergedText,
+                toolCalls = mergedCalls,
+                approvalDecided = existing.approvalDecided || confirmed.approvalDecided,
+                toolReturnContent = confirmed.toolReturnContent ?: existing.toolReturnContent,
+                toolReturnIsError = confirmed.toolReturnIsError || existing.toolReturnIsError,
+                toolReturnContentByCallId = (existing.toolReturnContentByCallId + confirmed.toolReturnContentByCallId).toTimelinePersistentMap(),
+                toolReturnIsErrorByCallId = (existing.toolReturnIsErrorByCallId + confirmed.toolReturnIsErrorByCallId).toTimelinePersistentMap(),
+                approvalRequestId = confirmed.approvalRequestId ?: existing.approvalRequestId,
+                attachments = (existing.attachments + confirmed.attachments).distinct().toTimelinePersistentList(),
+                source = existing.source,
+                seqId = latestSeqId(existing.seqId, confirmed.seqId),
+            ),
+            pendingToolReturnsByCallId,
+        )
+        timeline = timeline.replaceByServerId(merged)
+        timeline = timeline.copy(liveCursor = confirmed.serverId)
+        pendingEvents += TimelineSyncEvent.StreamEventIngested(confirmed.serverId, message.messageType)
+        hotPathTelemetry(
+            "streamSubscriber.merged",
+            "serverId" to confirmed.serverId,
+            "messageType" to message.messageType,
+            "existingType" to existing.messageType.name,
+            "oldLen" to oldText.length,
+            "newLen" to newText.length,
+            "mergedLen" to mergedText.length,
+            "mergeBranch" to textMerge.branch.name,
+            "mergeGarbleRisk" to textMerge.garbleRisk,
+            "oldToolCalls" to oldCalls.size,
+            "newToolCalls" to newCalls.size,
+            "mergedToolCalls" to mergedCalls.size,
+            "conversationId" to conversationId,
+        )
+        textMerge.defensiveTelemetryName()?.let { eventName ->
+            hotPathTelemetry(
+                eventName,
+                "serverId" to confirmed.serverId,
+                "messageType" to message.messageType,
+                "oldLen" to oldText.length,
+                "newLen" to newText.length,
+                "mergedLen" to mergedText.length,
+                "conversationId" to conversationId,
+            )
+        }
+        return output()
+    }
+
+    if (timeline.findByOtid(confirmed.otid) != null) {
+        hotPathTelemetry(
+            "streamSubscriber.eventDeduped",
+            "reason" to "otidSeen",
+            "otid" to confirmed.otid,
+            "conversationId" to conversationId,
+        )
+        return output()
+    }
+    if (timeline.containsIdentityFor(confirmed)) {
+        hotPathTelemetry(
+            "streamSubscriber.eventDeduped",
+            "reason" to "semanticIdentitySeen",
+            "serverId" to confirmed.serverId,
+            "messageType" to message.messageType,
+            "conversationId" to conversationId,
+        )
+        return output()
+    }
+
+    val prefixOrphanTarget = timeline.findSameRunAssistantPrefixOrBlankTarget(confirmed)
+    if (prefixOrphanTarget != null) {
+        hotPathTelemetry(
+            "streamSubscriber.assistantPrefixOrphanSkipped",
+            "incomingServerId" to confirmed.serverId,
+            "existingServerId" to prefixOrphanTarget.serverId,
+            "runId" to (confirmed.runId ?: "<null>"),
+            "incomingLen" to confirmed.content.length,
+            "existingLen" to prefixOrphanTarget.content.length,
+            "conversationId" to conversationId,
+        )
+        return output()
+    }
+
+    timeline = timeline.append(applyPendingToolReturns(confirmed, pendingToolReturnsByCallId))
+    timeline = timeline.copy(liveCursor = confirmed.serverId)
+    pendingEvents += TimelineSyncEvent.StreamEventIngested(confirmed.serverId, message.messageType)
+    hotPathTelemetry(
+        "streamSubscriber.ingested",
+        "serverId" to confirmed.serverId,
+        "messageType" to message.messageType,
+        "conversationId" to conversationId,
+    )
+    val mt = message.messageType
+    return output(
+        if (mt == "assistant_message" || mt == "tool_return_message") {
+            PendingIngestNotification(
+                serverId = confirmed.serverId,
+                messageType = mt,
+                contentPreview = confirmed.content.take(140).ifBlank { null },
+            )
+        } else {
+            null
+        }
+    )
+}
+
+private fun StreamTextMergeResult.defensiveTelemetryName(): String? = when (branch) {
+    StreamTextMergeBranch.CUMULATIVE -> "streamSubscriber.cumulativeSnapshotReplaced"
+    StreamTextMergeBranch.STALE -> "streamSubscriber.staleFrameDropped"
+    StreamTextMergeBranch.SUFFIX_DUPLICATE -> "streamSubscriber.endsWithDropped"
+    StreamTextMergeBranch.EMPTY_INCOMING,
+    StreamTextMergeBranch.EQUAL,
+    StreamTextMergeBranch.APPEND -> null
+}
+
+private fun hotPathTelemetry(
+    name: String,
+    vararg attrs: Pair<String, Any?>,
+) {
+    if (!Telemetry.isChatHotPathDebugEnabled()) return
+    Telemetry.event(
+        "TimelineSync",
+        name,
+        *attrs,
+        level = Telemetry.Level.DEBUG,
+    )
+}
+
+private fun Timeline.findSameRunAssistantPrefixOrBlankTarget(
+    incoming: TimelineEvent.Confirmed,
+): TimelineEvent.Confirmed? {
+    if (incoming.messageType != TimelineMessageType.ASSISTANT) return null
+    val incomingRunId = incoming.runId?.takeIf { it.isNotBlank() } ?: return null
+    val incomingText = incoming.content.trim()
+    return events
+        .asSequence()
+        .filterIsInstance<TimelineEvent.Confirmed>()
+        .firstOrNull { existing ->
+            if (existing.messageType != TimelineMessageType.ASSISTANT) return@firstOrNull false
+            if (existing.serverId == incoming.serverId) return@firstOrNull false
+            if (existing.runId != incomingRunId) return@firstOrNull false
+
+            val existingText = existing.content.trim()
+            existingText.isNotBlank() &&
+                (incomingText.isBlank() ||
+                    (existingText.length > incomingText.length && existingText.startsWith(incomingText)))
+        }
+}
+
+/**
+ * Attach any tool_return frames that arrived before their tool_call frame.
+ */
+private fun applyPendingToolReturns(
+    ev: TimelineEvent.Confirmed,
+    pendingToolReturnsByCallId: LinkedHashMap<String, ToolReturnMessage>,
+): TimelineEvent.Confirmed {
+    if (ev.messageType != TimelineMessageType.TOOL_CALL || ev.toolCalls.isEmpty()) return ev
+    val matchingReturns = ev.toolCalls.mapNotNull { toolCall ->
+        val callId = toolCall.effectiveId.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+        val toolReturn = pendingToolReturnsByCallId.remove(callId) ?: return@mapNotNull null
+        callId to toolReturn
+    }
+    if (matchingReturns.isEmpty()) return ev
+    val firstReturn = matchingReturns.first().second
+    val returnContentByCallId = ev.toolReturnContentByCallId + matchingReturns.mapNotNull { (callId, toolReturn) ->
+        toolReturn.toolReturn.funcResponse?.let { callId to it }
+    }.toMap()
+    val returnIsErrorByCallId = ev.toolReturnIsErrorByCallId + matchingReturns.associate { (callId, toolReturn) ->
+        callId to (toolReturn.isErr == true || toolReturn.status == "error")
+    }
+    Telemetry.event(
+        "TimelineSync", "toolReturn.attachedPending",
+        "serverId" to ev.serverId,
+        "count" to matchingReturns.size,
+    )
+    return ev.copy(
+        approvalDecided = true,
+        toolReturnContent = firstReturn.toolReturn.funcResponse ?: ev.toolReturnContent,
+        toolReturnIsError = firstReturn.isErr == true || firstReturn.status == "error" || ev.toolReturnIsError,
+        toolReturnContentByCallId = returnContentByCallId.toTimelinePersistentMap(),
+        toolReturnIsErrorByCallId = returnIsErrorByCallId.toTimelinePersistentMap(),
+        attachments = (ev.attachments + matchingReturns.flatMap { (_, toolReturn) -> toolReturn.attachments }).distinct().toTimelinePersistentList(),
+    )
+}

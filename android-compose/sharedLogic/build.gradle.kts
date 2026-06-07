@@ -51,12 +51,18 @@ kotlin {
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
                 api("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+                api("org.jetbrains.kotlinx:atomicfu:0.32.1")
+                api("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.5.0-beta01")
+                api("org.jetbrains.compose.runtime:runtime:1.9.0")
+                api("io.ktor:ktor-http:3.5.0")
+                api("io.ktor:ktor-io:3.5.0")
             }
         }
 
         commonTest {
             dependencies {
                 implementation(kotlin("test"))
+                implementation("app.cash.turbine:turbine:1.2.1")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
             }

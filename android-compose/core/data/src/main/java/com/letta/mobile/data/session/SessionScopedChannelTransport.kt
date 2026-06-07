@@ -3,6 +3,7 @@ package com.letta.mobile.data.session
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransport
+import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.IChannelTransport
 import javax.inject.Inject
@@ -37,7 +38,7 @@ class SessionScopedChannelTransport internal constructor(
     )
 
     private val _state = MutableStateFlow(sessionManager.current.channelTransport.state.value)
-    override val state: StateFlow<ChannelTransport.State> = _state
+    override val state: StateFlow<ChannelTransportState> = _state
 
     override val events: SharedFlow<ServerFrame> = sessionManager.currentGraph
         .flatMapLatest { it.channelTransport.events }

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.model
 
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -34,6 +35,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * Text-only messages continue to go through the legacy string path to minimize
  * server-side compatibility surface.
  */
+@Immutable
 sealed class MessageContentPart {
     data class Text(val text: String) : MessageContentPart()
 

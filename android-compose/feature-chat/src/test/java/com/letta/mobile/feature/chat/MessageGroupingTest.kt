@@ -8,15 +8,15 @@ import com.letta.mobile.ui.common.GroupPosition
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import com.letta.mobile.feature.chat.coordination.ChatRenderItem
-import com.letta.mobile.feature.chat.coordination.deduplicateRenderKeys
-import com.letta.mobile.feature.chat.coordination.groupMessagesForRender
-import com.letta.mobile.feature.chat.coordination.runKey
+import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.chat.projection.deduplicateRenderKeys
+import com.letta.mobile.data.chat.projection.groupMessagesForRender
+import com.letta.mobile.data.chat.projection.runKey
 import com.letta.mobile.feature.chat.screen.RunTimelineStep
 import com.letta.mobile.feature.chat.screen.compactRunToolCallSteps
 
 /**
- * Pure-JVM tests for [groupMessagesForRender] — verifies that contiguous
+ * Pure-JVM tests for [groupMessagesForRender] â€” verifies that contiguous
  * assistant messages sharing a `runId` collapse into [ChatRenderItem.RunBlock]
  * entries while everything else stays as [ChatRenderItem.Single].
  *
@@ -51,7 +51,7 @@ class MessageGroupingTest {
 
     @Test
     fun `single-message run renders as Single not RunBlock`() {
-        // A run with only one message has no grouping benefit — emit Single
+        // A run with only one message has no grouping benefit â€” emit Single
         // so we don't paint a degenerate gutter.
         val items = groupMessagesForRender(
             listOf(assistant("a1", runId = "r1") to GroupPosition.None),
@@ -62,7 +62,7 @@ class MessageGroupingTest {
 
     @Test
     fun `two assistant messages sharing runId collapse into RunBlock`() {
-        // Reversed input (newest first): a2, a1 — both runId=r1.
+        // Reversed input (newest first): a2, a1 â€” both runId=r1.
         val items = groupMessagesForRender(
             listOf(
                 assistant("a2", runId = "r1") to GroupPosition.First,
@@ -72,7 +72,7 @@ class MessageGroupingTest {
         assertEquals(1, items.size)
         val block = items.single() as ChatRenderItem.RunBlock
         assertEquals("r1", block.runId)
-        // Internal storage is chat order (oldest → newest).
+        // Internal storage is chat order (oldest â†’ newest).
         assertEquals(listOf("a1", "a2"), block.messages.map { it.first.id })
     }
 
@@ -93,7 +93,7 @@ class MessageGroupingTest {
 
     @Test
     fun `mixed conversation interleaves Singles and RunBlocks correctly`() {
-        // Reversed (newest → oldest):
+        // Reversed (newest â†’ oldest):
         //   user "u3"
         //   assistant "a2b" runId=r2
         //   assistant "a2a" runId=r2
@@ -123,8 +123,8 @@ class MessageGroupingTest {
 
     @Test
     fun `non-contiguous runIds do not merge across other messages`() {
-        // a3(r1), user(u2), a1(r1) — should produce three Singles, NOT one
-        // RunBlock — the user message between them breaks contiguity.
+        // a3(r1), user(u2), a1(r1) â€” should produce three Singles, NOT one
+        // RunBlock â€” the user message between them breaks contiguity.
         val items = groupMessagesForRender(
             listOf(
                 assistant("a3", runId = "r1") to GroupPosition.None,
@@ -156,20 +156,20 @@ class MessageGroupingTest {
                 assistant("a1", runId = "") to GroupPosition.None,
             ),
         )
-        // Blank runIds shouldn't collapse — emit two Singles.
+        // Blank runIds shouldn't collapse â€” emit two Singles.
         assertEquals(2, items.size)
         items.forEach { assertTrue(it is ChatRenderItem.Single) }
     }
 
-    // ──────────────────────────────────────────────────────────────────────
-    // letta-mobile-w9l3 — stable LazyColumn key across the Single→RunBlock
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // letta-mobile-w9l3 â€” stable LazyColumn key across the Singleâ†’RunBlock
     // transition that happens mid-stream when a sibling message in the same
     // run arrives. The grouper preemptively adopts `run-$runId` for an
     // assistant Single whose runId is unique in the snapshot, so when a
     // sibling lands and the item promotes to a RunBlock, the LazyColumn
     // slot identity is preserved and Compose reuses the composable instead
-    // of unmount→remount (which used to flash visibly).
-    // ──────────────────────────────────────────────────────────────────────
+    // of unmountâ†’remount (which used to flash visibly).
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @Test
     fun `Single with unique runId adopts run key for stable transition`() {
@@ -201,7 +201,7 @@ class MessageGroupingTest {
                 assistant("a1", runId = "r1") to GroupPosition.Last,
             ),
         )
-        // The key MUST be identical across both snapshots — that's the
+        // The key MUST be identical across both snapshots â€” that's the
         // whole point of the w9l3 fix. If these diverge, LazyColumn will
         // unmount the old slot and remount a new one, causing the flash.
         assertEquals(before.single().key, after.single().key)
@@ -211,7 +211,7 @@ class MessageGroupingTest {
 
     @Test
     fun `Single without runId still keys by message id`() {
-        // User messages and untagged assistants have no runId — they MUST
+        // User messages and untagged assistants have no runId â€” they MUST
         // fall back to the message-id key, never a run key.
         val items = groupMessagesForRender(
             listOf(
@@ -225,7 +225,7 @@ class MessageGroupingTest {
 
     @Test
     fun `non-contiguous duplicate runIds keep msg key to avoid LazyColumn collision`() {
-        // a3(r1), user(u2), a1(r1) — same runId appears twice as Singles
+        // a3(r1), user(u2), a1(r1) â€” same runId appears twice as Singles
         // separated by a non-matching message. Adopting `run-r1` on both
         // would produce two LazyColumn items with the same key, which
         // crashes Compose. The grouper MUST detect this and keep
@@ -248,8 +248,8 @@ class MessageGroupingTest {
 
     @Test
     fun `contiguous assistants from different runIds do not merge into one RunBlock`() {
-        // Three contiguous assistant messages — two sharing runId "r2" and
-        // one in runId "r1" — must not merge across the run boundary.
+        // Three contiguous assistant messages â€” two sharing runId "r2" and
+        // one in runId "r1" â€” must not merge across the run boundary.
         val items = groupMessagesForRender(
             listOf(
                 assistant("a3b", runId = "r2") to GroupPosition.First,
@@ -340,7 +340,7 @@ class MessageGroupingTest {
 
     @Test
     fun `run block drops plain assistant echoes already present as older chat messages`() {
-        val duplicateText = "Good — predictable nights are the best kind."
+        val duplicateText = "Good â€” predictable nights are the best kind."
         val items = groupMessagesForRender(
             listOf(
                 assistant("run-tool", runId = "current", content = "about to inspect") to GroupPosition.First,
@@ -385,13 +385,13 @@ class MessageGroupingTest {
         assertEquals(listOf("run-final", "run-repeat"), currentRun.messages.map { it.first.id })
     }
 
-    // ──────────────────────────────────────────────────────────────────────
-    // letta-mobile-lkj4r — server run ids that already carry a `run-` prefix
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // letta-mobile-lkj4r â€” server run ids that already carry a `run-` prefix
     // must NOT be double-prefixed into `run-run-<id>` keys. A doubled key both
     // (a) looks wrong and (b) collides with a sibling that derived the
     // single-prefixed `run-<id>` form, crashing the LazyColumn with
     // "Key 'run-run-<id>' was already used."
-    // ──────────────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     @Test
     fun `RunBlock with already-prefixed runId is not double-prefixed`() {
@@ -402,7 +402,7 @@ class MessageGroupingTest {
             ),
         )
         val block = items.single() as ChatRenderItem.RunBlock
-        // Key must be the run id verbatim — NOT `run-run-80aa0047`.
+        // Key must be the run id verbatim â€” NOT `run-run-80aa0047`.
         assertEquals("run-80aa0047", block.key)
         assertTrue("key must not be double-run-prefixed", !block.key.startsWith("run-run-"))
     }
@@ -435,7 +435,7 @@ class MessageGroupingTest {
                 // unique single whose run id already carries the prefix
                 assistant("a-solo", runId = "run-deadbeef") to GroupPosition.None,
                 user("u2") to GroupPosition.None,
-                // a run id WITHOUT the server prefix — must gain exactly one
+                // a run id WITHOUT the server prefix â€” must gain exactly one
                 assistant("b2", runId = "plainrun") to GroupPosition.First,
                 assistant("b1", runId = "plainrun") to GroupPosition.Last,
                 user("u1") to GroupPosition.None,
@@ -444,7 +444,7 @@ class MessageGroupingTest {
 
         val keys = items.map { it.key }
 
-        // (1) All keys are unique — the actual LazyColumn crash condition.
+        // (1) All keys are unique â€” the actual LazyColumn crash condition.
         assertEquals("render keys must be unique: $keys", keys.size, keys.toSet().size)
 
         // (2) No key is double-`run-`-prefixed.
@@ -464,7 +464,7 @@ class MessageGroupingTest {
     @Test
     fun `single-prefixed Single transitions to single-prefixed RunBlock with stable key`() {
         // The exact streaming scenario from the crash: an assistant frame in a
-        // run whose server id already starts with `run-` lands first (unique →
+        // run whose server id already starts with `run-` lands first (unique â†’
         // Single), then a sibling arrives and promotes it to a RunBlock. The
         // key MUST stay identical AND must never be `run-run-<id>`, or the
         // LazyColumn unmounts the slot (flash) or crashes on the doubled key.
@@ -627,8 +627,8 @@ class MessageGroupingTest {
         val deduped = deduplicateRenderKeys(listOf(first, second))
         val keys = deduped.map { it.key }
         assertEquals("all render keys must be globally unique", keys.size, keys.toSet().size)
-        // First occurrence keeps the canonical (single-prefixed) key — no
-        // #337 regression — and the collision is disambiguated by item id.
+        // First occurrence keeps the canonical (single-prefixed) key â€” no
+        // #337 regression â€” and the collision is disambiguated by item id.
         assertEquals(runKey(sharedRunId), keys[0])
         assertTrue(keys[1].startsWith(runKey(sharedRunId)))
         assertTrue(keys[1] != keys[0])

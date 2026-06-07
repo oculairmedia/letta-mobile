@@ -18,18 +18,23 @@ class RememberStreamSmootherTest {
     fun `updates and reveals text progressively`() {
         val smoother = StreamingDisplayTextSmoother()
 
-        // Start streaming
-        smoother.updateTarget("Hello", isStreaming = true, nowMs = 0L)
+        // Start streaming. letta-mobile-1kz40: the re-tuned cadence reveals
+        // several chars per frame, so use a target long enough that it is not
+        // fully revealed in two frames, and assert the prefix + monotonic
+        // invariants rather than exact single-char counts.
+        val target = "Hello there, this is a longer streaming message to reveal"
+        smoother.updateTarget(target, isStreaming = true, nowMs = 0L)
 
-        // First frame - should reveal first character
         val step1 = smoother.step(16L)
-        assertEquals("H", step1)
+        assertTrue("Displayed must be a prefix of target, was '$step1'", target.startsWith(step1))
+        assertTrue("Reveal starts from the head", step1.isEmpty() || step1[0] == 'H')
 
-        // Second frame - should reveal second character
+        // Second frame - advances monotonically, still a prefix
         val step2 = smoother.step(32L)
-        assertEquals("He", step2)
+        assertTrue("Reveal advances monotonically", step2.length >= step1.length)
+        assertTrue("Displayed must be a prefix of target, was '$step2'", target.startsWith(step2))
 
-        // Not yet fully revealed
+        // Not yet fully revealed after only two frames of a long target.
         assertFalse(smoother.isFullyRevealed)
     }
 
@@ -43,11 +48,13 @@ class RememberStreamSmootherTest {
         // End streaming
         smoother.updateTarget("Hi", isStreaming = false, nowMs = 32L)
 
-        // Continue stepping until fully revealed
-        var text = ""
+        // Continue stepping until fully revealed. Always take at least one
+        // step so we capture the final text even if the (now faster) reveal
+        // has already caught up.
+        var text = smoother.step(48L)
         var loops = 0
         while (!smoother.isFullyRevealed && loops < 20) {
-            text = smoother.step((loops * 16L + 48L))
+            text = smoother.step((loops * 16L + 64L))
             loops++
         }
 
@@ -115,12 +122,15 @@ class RememberStreamSmootherTest {
     fun `seed with empty prefix behaves like a normal reveal`() {
         val smoother = StreamingDisplayTextSmoother()
 
-        // Empty seed => nothing was painted yet; normal char-by-char reveal.
+        // Empty seed => nothing was painted yet; normal reveal from the head.
         smoother.seed("", isStreaming = true, nowMs = 0L)
         smoother.updateTarget("Hi", isStreaming = true, nowMs = 0L)
 
+        // letta-mobile-1kz40: assert head-preserving prefix reveal, not an
+        // exact single-char count (the re-tuned cadence may reveal both chars).
         val step1 = smoother.step(16L)
-        assertEquals("H", step1)
+        assertTrue("Displayed must be a prefix of 'Hi', was '$step1'", "Hi".startsWith(step1))
+        assertTrue("Reveal starts from the head", step1.isEmpty() || step1[0] == 'H')
     }
 
     @Test

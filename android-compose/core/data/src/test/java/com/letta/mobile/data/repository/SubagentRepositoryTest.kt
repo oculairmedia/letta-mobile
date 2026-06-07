@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.data.transport.ChannelTransport
+import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.testutil.FakeChannelTransport
 import kotlinx.coroutines.CoroutineStart
@@ -168,7 +169,7 @@ class SubagentRepositoryTest {
         assertEquals(1, transport.subagentListCalls.size)
 
         // Simulate a WS drop + reconnect.
-        transport.state.value = ChannelTransport.State.Disconnected(1000, "idle timeout")
+        transport.state.value = ChannelTransportState.Disconnected(1000, "idle timeout")
         delay(10)
         transport.state.value = connectedState()
 
@@ -215,7 +216,7 @@ class SubagentRepositoryTest {
 
     // ─── Helpers ──────────────────────────────────────────────────────
 
-    private fun connectedState() = ChannelTransport.State.Connected(
+    private fun connectedState() = ChannelTransportState.Connected(
         serverId = "srv",
         sessionId = "sess",
         deviceId = "dev",

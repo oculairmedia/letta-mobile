@@ -5,6 +5,7 @@ plugins {
     id("com.android.kotlin.multiplatform.library") version "9.2.0" apply false
     id("org.jetbrains.kotlin.jvm") version "2.3.20" apply false
     id("org.jetbrains.kotlin.multiplatform") version "2.3.20" apply false
+    id("org.jetbrains.compose") version "1.11.1" apply false
     id("app.cash.paparazzi") version "2.0.0-alpha05" apply false
     id("io.github.takahirom.roborazzi") version "1.63.0" apply false
     id("org.jetbrains.kotlin.plugin.compose") version "2.3.20" apply false
@@ -44,6 +45,38 @@ subprojects {
         if (name.startsWith("process") && name.endsWith("MainManifest")) {
             outputs.cacheIf("AGP main manifest processing cache packing is disabled; see letta-mobile-pywa") {
                 false
+            }
+        }
+    }
+}
+
+subprojects {
+    plugins.withId("com.google.devtools.ksp") {
+        afterEvaluate {
+            tasks.matching { task -> task.name.startsWith("ksp") && task.name.endsWith("Kotlin") }.forEach { kspTask ->
+                val kspVariant = kspTask.name
+                    .removePrefix("ksp")
+                    .removeSuffix("Kotlin")
+                    .replaceFirstChar { it.lowercase() }
+                val kotlinOutputDir = layout.buildDirectory.dir("generated/ksp/$kspVariant/kotlin").get().asFile
+                val classOutputDir = layout.buildDirectory.dir("generated/ksp/$kspVariant/classes").get().asFile
+                val prepareOutputDirs = tasks.register("prepare${kspTask.name.replaceFirstChar { it.uppercase() }}OutputDirs") {
+                    outputs.dir(kotlinOutputDir)
+                    outputs.dir(classOutputDir)
+                    doLast {
+                        kotlinOutputDir.mkdirs()
+                        classOutputDir.mkdirs()
+                    }
+                }
+                kspTask.dependsOn(prepareOutputDirs)
+                kspTask.doFirst {
+                    kotlinOutputDir.mkdirs()
+                    classOutputDir.mkdirs()
+                }
+                kspTask.doLast {
+                    kotlinOutputDir.mkdirs()
+                    classOutputDir.mkdirs()
+                }
             }
         }
     }

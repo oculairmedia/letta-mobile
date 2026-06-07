@@ -9,6 +9,7 @@ import io.kotest.core.spec.style.WordSpec
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -20,6 +21,11 @@ import org.junit.jupiter.api.Tag
  */
 @Tag("unit")
 class WsFrameMapperTest : WordSpec({
+
+    val json = Json {
+        ignoreUnknownKeys = true
+        explicitNulls = false
+    }
 
     "WsFrameMapper" should {
         "preserve the cm-stream- prefix on assistant_message ids" {
@@ -38,6 +44,23 @@ class WsFrameMapperTest : WordSpec({
             mapped.otid shouldBe "cm-android-abc"
             mapped.runId shouldBe "R"
             mapped.date shouldBe "t"
+        }
+
+        "letta-mobile-ipp8z maps assistant frames that omitted SDK-Transport metadata" {
+            val frame = json.decodeFromString(
+                ServerFrameSerializer,
+                """
+                {"v":1,"type":"assistant_message","id":"cm-stream-1","content":"hello"}
+                """.trimIndent(),
+            ).shouldBeInstanceOf<ServerFrame.AssistantMessage>()
+
+            val mapped = WsFrameMapper.toLettaMessage(frame)
+
+            mapped.shouldBeInstanceOf<AssistantMessage>()
+            mapped.id shouldBe "cm-stream-1"
+            mapped.content shouldBe "hello"
+            mapped.date shouldBe ""
+            mapped.runId shouldBe null
         }
 
         "preserve toolcall- prefix on tool_call ids" {
@@ -125,6 +148,49 @@ class WsFrameMapperTest : WordSpec({
             mapped.attachments.size shouldBe 1
             mapped.attachments.single().mediaType shouldBe "image/png"
             mapped.attachments.single().base64 shouldBe "LIVE_TOOL_IMAGE+/=="
+        }
+
+        "preserve generate_image tool return metadata and inline image from live frames" {
+            val imagePayload = buildJsonArray {
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("text"))
+                    put("text", JsonPrimitive("""
+                        {
+                          "path": "/tmp/generated-image.png",
+                          "mime_type": "image/png",
+                          "model": "gpt-image-2-medium",
+                          "size": "1024x1024",
+                          "quality": "medium",
+                          "prompt": "a small brass robot"
+                        }
+                    """.trimIndent()))
+                })
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("image"))
+                    put("source", buildJsonObject {
+                        put("type", JsonPrimitive("base64"))
+                        put("media_type", JsonPrimitive("image/png"))
+                        put("data", JsonPrimitive("LIVE_GENERATED_IMAGE+/=="))
+                    })
+                })
+            }
+            val frame = ServerFrame.ToolReturnMessage(
+                id = "toolreturn-tc-generate-image",
+                ts = "t",
+                agentId = "a", conversationId = "c",
+                turnId = "T", runId = "R",
+                toolCallId = "tc-generate-image",
+                status = "success",
+                toolReturn = imagePayload,
+            )
+
+            val mapped = WsFrameMapper.toLettaMessage(frame)
+
+            mapped.shouldBeInstanceOf<ToolReturnMessage>()
+            mapped.toolReturn.funcResponse.orEmpty().contains("gpt-image-2-medium") shouldBe true
+            mapped.attachments.size shouldBe 1
+            mapped.attachments.single().mediaType shouldBe "image/png"
+            mapped.attachments.single().base64 shouldBe "LIVE_GENERATED_IMAGE+/=="
         }
 
         "map reasoning_message and propagate signature when set" {

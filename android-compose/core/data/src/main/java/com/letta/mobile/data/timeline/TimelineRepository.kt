@@ -9,7 +9,6 @@ import java.util.LinkedHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.drop
@@ -48,7 +47,7 @@ open class TimelineRepository @Inject constructor(
     }
 
     // Dedicated supervisor scope — child jobs fail in isolation.
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + timelineIoDispatcher)
 
     init {
         sessionManager?.currentGraph
@@ -93,7 +92,7 @@ open class TimelineRepository @Inject constructor(
         // still only runs once per conv (first caller wins). The TimelineSync
         // writeMutex inside hydrate() prevents concurrent state mutation.
         runCatching {
-            withContext(Dispatchers.IO) {
+            withContext(timelineIoDispatcher) {
                 loop.hydrate()
             }
         }.onFailure { t ->
@@ -119,7 +118,7 @@ open class TimelineRepository @Inject constructor(
                 "conversationId" to conversationId,
             )
             val created = TimelineSyncLoop(
-                messageApi = messageApi,
+                messageApi = MessageApiTimelineTransport(messageApi),
                 conversationId = conversationId,
                 scope = scope,
                 ingestedListenerProvider = { ingestedListener },
@@ -266,7 +265,7 @@ open class TimelineRepository @Inject constructor(
         conversationCursorStore.clearCursor(conversationId)
         val loop = getOrCreateLoopWithoutHydrate(conversationId)
         runCatching {
-            withContext(Dispatchers.IO) {
+            withContext(timelineIoDispatcher) {
                 loop.hydrate(
                     limit = CURSOR_REPAIR_HYDRATE_LIMIT,
                     recordConversationCursor = true,

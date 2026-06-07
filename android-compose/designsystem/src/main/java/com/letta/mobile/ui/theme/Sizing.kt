@@ -4,7 +4,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 object LettaSizing {
-    val compactWidthBreakpoint: Dp = 600.dp
-    val readableDialogMaxWidth: Dp = 1000.dp
-    val diagramPreviewMinHeight: Dp = 120.dp
+    val compactWidthBreakpoint: Dp = LettaSizingTokens.compactWidthBreakpoint.dp
+    val readableDialogMaxWidth: Dp = LettaSizingTokens.readableDialogMaxWidth.dp
+    val diagramPreviewMinHeight: Dp = LettaSizingTokens.diagramPreviewMinHeight.dp
 }

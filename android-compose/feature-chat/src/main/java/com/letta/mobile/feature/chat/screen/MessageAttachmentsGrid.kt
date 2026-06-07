@@ -2,6 +2,7 @@ package com.letta.mobile.feature.chat.screen
 
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,8 +16,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiImageAttachment
+import com.letta.mobile.feature.chat.R
 
 /**
  * Renders attached images for a chat bubble. Up to 4 images per row in a wrap-
@@ -28,41 +33,69 @@ import com.letta.mobile.data.model.UiImageAttachment
 internal fun MessageAttachmentsGrid(
     attachments: kotlinx.collections.immutable.ImmutableList<UiImageAttachment>,
     modifier: Modifier = Modifier,
+    // letta-mobile-1k3ge restore: tap an attachment to open the fullscreen
+    // viewer. The Int is the tapped attachment's index in [attachments] so the
+    // viewer can open the pager on that image. Null = not tappable.
+    onImageClick: ((Int) -> Unit)? = null,
 ) {
     if (attachments.isEmpty()) return
 
     when (attachments.size) {
-        1 -> SingleImage(attachment = attachments.first(), modifier = modifier)
+        1 -> SingleImage(
+            attachment = attachments.first(),
+            modifier = modifier,
+            onClick = onImageClick?.let { cb -> { cb(0) } },
+        )
         2 -> Row(
             modifier = modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            attachments.forEach { ImageCell(attachment = it, modifier = Modifier.weight(1f)) }
+            attachments.forEachIndexed { index, attachment ->
+                ImageCell(
+                    attachment = attachment,
+                    modifier = Modifier.weight(1f),
+                    onClick = onImageClick?.let { cb -> { cb(index) } },
+                )
+            }
         }
         else -> Row(
             modifier = modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            attachments.take(3).forEach {
-                ImageCell(attachment = it, modifier = Modifier.weight(1f))
+            attachments.take(3).forEachIndexed { index, attachment ->
+                ImageCell(
+                    attachment = attachment,
+                    modifier = Modifier.weight(1f),
+                    onClick = onImageClick?.let { cb -> { cb(index) } },
+                )
             }
         }
     }
 }
 
 @Composable
-private fun SingleImage(attachment: UiImageAttachment, modifier: Modifier = Modifier) {
+private fun SingleImage(
+    attachment: UiImageAttachment,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+) {
     AttachmentImage(
         attachment = attachment,
         modifier = modifier.fillMaxWidth().height(220.dp),
+        onClick = onClick,
     )
 }
 
 @Composable
-private fun ImageCell(attachment: UiImageAttachment, modifier: Modifier = Modifier) {
+private fun ImageCell(
+    attachment: UiImageAttachment,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+) {
     AttachmentImage(
         attachment = attachment,
         modifier = modifier.height(120.dp),
+        onClick = onClick,
     )
 }
 
@@ -70,6 +103,7 @@ private fun ImageCell(attachment: UiImageAttachment, modifier: Modifier = Modifi
 private fun AttachmentImage(
     attachment: UiImageAttachment,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
 ) {
     // letta-mobile-v4f9: Coil 3.4's BitmapFetcher silently returns null
     // for `data(ByteArray)`, so AsyncImage paints an empty square. The
@@ -83,8 +117,16 @@ private fun AttachmentImage(
         }.getOrNull()
     }
 
+    val openImageDescription = stringResource(R.string.action_open_image)
+    val interactiveModifier = if (onClick != null) {
+        modifier
+            .semantics { contentDescription = openImageDescription }
+            .clickable(onClick = onClick)
+    } else {
+        modifier
+    }
     Surface(
-        modifier = modifier,
+        modifier = interactiveModifier,
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(8.dp),
     ) {
